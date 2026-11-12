@@ -557,5 +557,19 @@ describe('bp-hr-data', () => {
     it('estimateCardioRisk: нет записей → null', () => {
       expect(estimateCardioRisk([])).toBeNull();
     });
+
+    it('estimateCardioRisk: возрастной порог по полу — 55 ♂ / 65 ♀', () => {
+      const entries = [
+        mk(localIso(0), 'morning', 120, 78),
+        mk(localIso(1), 'morning', 118, 76),
+      ];
+      const male60 = estimateCardioRisk(entries, { age: 60, sex: 'male' });
+      const female60 = estimateCardioRisk(entries, { age: 60, sex: 'female' });
+      const female70 = estimateCardioRisk(entries, { age: 70, sex: 'female' });
+
+      expect(male60!.factors.some((f) => f.label.startsWith('Возраст') && f.active)).toBe(true);
+      expect(female60!.factors.some((f) => f.label.startsWith('Возраст'))).toBe(false);
+      expect(female70!.factors.some((f) => f.label.startsWith('Возраст') && f.active)).toBe(true);
+    });
   });
 });

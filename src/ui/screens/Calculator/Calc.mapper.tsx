@@ -39,7 +39,7 @@ import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCover
 import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
-import { hctGradationLabel } from './Calc.labs-derived';
+import { hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 
@@ -245,7 +245,12 @@ const NEURO_RECOMMENDED_HIGH: Set<string> = new Set(['citicoline','lions_mane','
 const NEURO_RECOMMENDED_MEDIUM: Set<string> = new Set(['ashwagandha','theanine','gaba','melatonin','acetyl_l_carnitine','bacopa','rhodiola']);
 
 // ── Доменные карты симптомов (нейротоксичность / ОДА) ─────────────────────────
-interface DomainSym { code: string; label: string; }
+interface DomainSym {
+  code: string;
+  label: string;
+  /** ♀-подпись порога (если порог/норма отличаются по полу). */
+  femaleLabel?: string;
+}
 interface DomainCfg {
   id: string; label: string; icon: string; color: string;
   symptoms: DomainSym[]; substances: Set<string>;
@@ -397,9 +402,9 @@ const HEMATO_DOMAINS: DomainCfg[] = [
     substances: new Set(['aspirin','garlic','ginkgo','pycnogenol','dipyridamole','omega3']) },
   { id: 'rheology', label: 'Реология / вязкость', icon: '💧', color: '#06b6d4',
     symptoms: [
-      { code: 'hct_up', label: 'Гематокрит >48%' },
-      { code: 'hct_high', label: 'Гематокрит >52%' },
-      { code: 'hgb_up', label: 'Гемоглобин >175 г/л' },
+      { code: 'hct_up', label: 'Гематокрит >48%', femaleLabel: 'Гематокрит >44% (♀)' },
+      { code: 'hct_high', label: 'Гематокрит >52%', femaleLabel: 'Гематокрит >48% (♀)' },
+      { code: 'hgb_up', label: 'Гемоглобин >175 г/л', femaleLabel: 'Гемоглобин >150 г/л (♀)' },
     ],
     substances: new Set(['pentoxifylline','citrulline','omega3','nac','sulodexide']) },
   { id: 'hyperviscosity', label: 'Симптомы гипервязкости', icon: '⚠️', color: '#ef4444',
@@ -462,9 +467,13 @@ function buildHematoSymptomsFromState(state: any): Set<string> {
   const plt = labs['PLT'];
   const fib = labs['FIBRINOGEN'];
   const dd = labs['D_DIMER'];
-  if (hct != null && hct > 48) s.add('hct_up');
-  if (hct != null && hct > 52) s.add('hct_high');
-  if (hgb != null && hgb > 175) s.add('hgb_up');
+  const sex = state?.profile?.sex === 'female' ? 'female' : 'male';
+  const hctCuts = hctSymptomCuts(sex);
+  const hgbCut = hgbSymptomCut(sex);
+  // ♀ ниже: HCT 44/48 и Hb 150 (женские нормы), ♂ — прежние 48/52 и 175.
+  if (hct != null && hct > hctCuts.correction) s.add('hct_up');
+  if (hct != null && hct > hctCuts.therapy) s.add('hct_high');
+  if (hgb != null && hgb > hgbCut) s.add('hgb_up');
   if (plt != null && plt > 400) s.add('plt_up');
   if (fib != null && fib > 4) s.add('fibrinogen_up');
   if (dd != null && dd > 0.5) s.add('ddimer_up');
@@ -474,7 +483,7 @@ function buildHematoSymptomsFromState(state: any): Set<string> {
 }
 
 // Доменная карта симптомов: чипы по клиническим доменам + профиль риска
-function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]; checked: Set<string>; onToggle: (code: string) => void }) {
+function DomainSymptomMap({ domains, checked, onToggle, sex }: { domains: DomainCfg[]; checked: Set<string>; onToggle: (code: string) => void; sex?: 'male' | 'female' }) {
   const scores = domains.map(d => ({ d, score: Math.min(10, d.symptoms.filter(sym => checked.has(sym.code)).length * 3) }));
   const active = scores.filter(x => x.score >= 6).sort((a, b) => b.score - a.score);
   return (
@@ -495,7 +504,7 @@ function DomainSymptomMap({ domains, checked, onToggle }: { domains: DomainCfg[]
                     background: on ? d.color + '22' : 'rgba(255,255,255,0.03)',
                     border: on ? `1px solid ${d.color}66` : '1px solid rgba(255,255,255,0.06)',
                     color: on ? d.color : 'rgba(255,255,255,0.5)' }}>
-                  {on ? '✓ ' : ''}{sym.label}
+                  {on ? '✓ ' : ''}{sex === 'female' && sym.femaleLabel ? sym.femaleLabel : sym.label}
                   </button>
                 );
               })}
@@ -1067,9 +1076,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           dDimer: notifLabs['D_DIMER'] ?? notifLabs['D_ДИМЕР'],
         },
         fullPanel: state.labs?.fullPanel ?? null,
+        // Пол нужен для честных порогов: HCT 48/52, АЛТ 2.5×ULN 31, E2-диапазон цикла.
+        sex: state.profile?.sex === 'female' ? 'female' : 'male',
         pharma: {
           phase: rec?.phase || 'course',
-          hasAI: rec?.subs?.some((s: any) => s.substanceId === 'anastrozole' || s.substanceId === 'anastro'),
+          hasAI: rec?.subs?.some((s: any) =>
+            s.substanceId === 'anastrozole' || s.substanceId === 'anastro' ||
+            s.substanceId === 'letrozole' || s.substanceId === 'exemestane'),
           hasOral17: rec?.pedFlags?.hasOral17 || false,
         },
         goals: { cycleWeeks: state.goals?.cycleWeeks || 12 },
@@ -2402,7 +2415,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
 
                   {/* Симптомы гипервязкости */}
-                  <DomainSymptomMap domains={HEMATO_DOMAINS} checked={hematoSymptoms} onToggle={toggleHematoSymptom} />
+                  <DomainSymptomMap domains={HEMATO_DOMAINS} checked={hematoSymptoms} onToggle={toggleHematoSymptom} sex={state.profile?.sex === 'female' ? 'female' : 'male'} />
 
                   {/* Quick protocols */}
                   <div style={{ fontSize:9, fontWeight:700, color:'#ffffff', marginBottom:4 }}>⚡ Протоколы</div>

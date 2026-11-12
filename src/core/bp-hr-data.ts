@@ -460,7 +460,8 @@ export interface CardioRiskProfile {
 
 /**
  * Лёгкий ОЦЕНОЧНЫЙ профиль сердечно-сосудистого риска на основе дневника АД.
- * Учитывает среднее АД (7д), вариабельность, BP Load, ЧСС покоя и возраст.
+ * Учитывает среднее АД (7д), вариабельность, BP Load, ЧСС покоя и возраст
+ * (порог 55 лет ♂ / 65 лет ♀).
  * Это НЕ диагноз и НЕ медицинский скрининг — инструмент самоконтроля.
  */
 export function estimateCardioRisk(
@@ -477,7 +478,11 @@ export function estimateCardioRisk(
   const variability = calcVariability(entries);
   const load = calcBPLoad(entries);
   const age = profile?.age ?? 0;
+  const sex = profile?.sex;
   const smoking = profile?.smoking;
+  // Возрастной порог различается по полу: ССЗ у женщин манифестируют в среднем
+  // на ~10 лет позже, поэтому 55 — мужской порог, 65 — женский (ACC/AHA).
+  const ageThreshold = sex === 'female' ? 65 : 55;
 
   const factors: CardioRiskFactor[] = [];
   let points = 0;
@@ -490,7 +495,7 @@ export function estimateCardioRisk(
   add(`Вариабельность (SD систолы ${variability.sysSD.toFixed(1)})`, variability.sysSD > 15 || variability.diaSD > 10, 'высокая вариабельность связана с риском событий', 1);
   add(`BP Load ${load}%`, load > 50, 'больше половины измерений выше цели', 1);
   if (avgHr > 90) add(`ЧСС в покое ${avgHr}`, true, 'тахикардия покоя', 1);
-  if (age >= 55) add(`Возраст ${age} лет`, true, 'возрастной фактор риска', 1);
+  if (age >= ageThreshold) add(`Возраст ${age} лет`, true, sex === 'female' ? 'возрастной фактор риска (♀ порог 65 лет)' : 'возрастной фактор риска', 1);
   if (smoking) add('Курение', true, 'активное курение', 1);
 
   const level: CardioRiskProfile['level'] = points >= 4 ? 'high' : points >= 2 ? 'moderate' : 'low';

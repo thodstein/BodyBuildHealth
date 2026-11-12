@@ -3,7 +3,7 @@
  * Мужской путь без sex — байт-в-байт; женские пороги HCT (48/52/56) паритетны движку.
  */
 import { describe, it, expect } from 'vitest';
-import { deriveStateFromLabs, hctGradationLabel } from '../Calc.labs-derived';
+import { deriveStateFromLabs, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from '../Calc.labs-derived';
 
 const fp = (hct: string) => ({ date: '2026-09-01', panelHematology: { HCT: hct } }) as never;
 
@@ -22,6 +22,19 @@ describe('hctGradationLabel', () => {
     // 50 у женщины уже терапия (муж — ещё нет)
     expect(hctGradationLabel(50, 'male')).toContain('коррекция');
     expect(hctGradationLabel(50, 'female')).toContain('терапия');
+  });
+});
+
+describe('hctSymptomCuts / hgbSymptomCut (доменная карта гематологии)', () => {
+  it('♂ — прежние пороги: HCT 48/52, Hb 175', () => {
+    expect(hctSymptomCuts('male')).toEqual({ correction: 48, therapy: 52 });
+    expect(hctSymptomCuts()).toEqual({ correction: 48, therapy: 52 });
+    expect(hgbSymptomCut('male')).toBe(175);
+  });
+
+  it('♀ — от женских норм: HCT 44/48 (ULN 48), Hb 150', () => {
+    expect(hctSymptomCuts('female')).toEqual({ correction: 44, therapy: 48 });
+    expect(hgbSymptomCut('female')).toBe(150);
   });
 });
 

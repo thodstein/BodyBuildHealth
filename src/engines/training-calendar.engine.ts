@@ -3,8 +3,10 @@
  *
  * Training Calendar: monthly/daily planned vs actual workout tracking
  * Water Tracker: daily goals, hourly logging, trends, reminders
- * Export Engine: JSON/CSV exports, PDF report generation (HTML-based)
- * Lab Analysis Engine: automatic interpretation of lab results
+ * Export Engine: JSON/CSV exports
+ *
+ * Интерпретация анализов живёт в одном месте — `lab-analysis.engine.ts`
+ * (дубль таблиц порогов отсюда удалён, чтобы не расходились нормы и советы).
  *
  * @module training-calendar-engine
  */
@@ -13,7 +15,6 @@
 // сегодня, ключи ячеек календаря, окна недели/месяца). UTC-версия в вечернее
 // время UTC+3…+12 сдвигала всё на «вчера».
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
-import { ruCount, RU_DAYS } from './ru-plural';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -114,37 +115,6 @@ export interface WaterStats {
   bestDay: { date: string; amount: number };
   streak: number; // days meeting goal
   trend: number;  // % change vs last week
-}
-
-export interface LabInterpretation {
-  marker: string;
-  value: number;
-  unit: string;
-  referenceRange: string;
-  status: 'low' | 'normal' | 'high' | 'critical_low' | 'critical_high';
-  severity: number; // 0-100
-  interpretation: string;
-  recommendations: string[];
-  relatedConditions: string[];
-  drugAssociations: string[];
-}
-
-export interface LabPanel {
-  name: string;
-  date: string;
-  interpretations: LabInterpretation[];
-  overallStatus: 'optimal' | 'good' | 'warning' | 'critical';
-  overallScore: number; // 0-100
-}
-
-export interface ExportReport {
-  title: string;
-  generatedAt: string;
-  sections: {
-    heading: string;
-    content: string;
-    type: 'text' | 'table' | 'chart' | 'summary';
-  }[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -669,213 +639,8 @@ export function quickAddWater(amountMl: number): number {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. Lab Analysis Engine
+// 4. Export Engine (JSON/CSV)
 // ═══════════════════════════════════════════════════════════════════════════
-
-const LAB_REFERENCE_DB: Record<string, { name: string; unit: string; low: number; high: number; criticalLow: number; criticalHigh: number }> = {
-  ALT: { name: 'АЛТ', unit: 'U/L', low: 7, high: 40, criticalLow: 3, criticalHigh: 120 },
-  AST: { name: 'АСТ', unit: 'U/L', low: 7, high: 40, criticalLow: 3, criticalHigh: 120 },
-  GGT: { name: 'ГГТ', unit: 'U/L', low: 10, high: 60, criticalLow: 5, criticalHigh: 150 },
-  ALP: { name: 'ЩФ', unit: 'U/L', low: 40, high: 130, criticalLow: 20, criticalHigh: 300 },
-  Bilirubin_Total: { name: 'Билирубин общий', unit: 'мкмоль/л', low: 3, high: 21, criticalLow: 1, criticalHigh: 50 },
-  Bilirubin_Direct: { name: 'Билирубин прямой', unit: 'мкмоль/л', low: 0, high: 5, criticalLow: 0, criticalHigh: 15 },
-  Creatinine: { name: 'Креатинин', unit: 'мкмоль/л', low: 62, high: 106, criticalLow: 30, criticalHigh: 200 },
-  Urea: { name: 'Мочевина', unit: 'ммоль/л', low: 2.5, high: 8.3, criticalLow: 1.5, criticalHigh: 15 },
-  Uric_Acid: { name: 'Мочевая кислота', unit: 'мкмоль/л', low: 200, high: 420, criticalLow: 120, criticalHigh: 600 },
-  Glucose: { name: 'Глюкоза', unit: 'ммоль/л', low: 3.9, high: 6.1, criticalLow: 2.8, criticalHigh: 11 },
-  HbA1c: { name: 'HbA1c', unit: '%', low: 4.0, high: 5.7, criticalLow: 3.5, criticalHigh: 8.0 },
-  Cholesterol_Total: { name: 'Холестерин общий', unit: 'ммоль/л', low: 3.0, high: 5.2, criticalLow: 2.0, criticalHigh: 8.0 },
-  HDL: { name: 'ЛПВП', unit: 'ммоль/л', low: 1.0, high: 1.6, criticalLow: 0.6, criticalHigh: 3.0 },
-  LDL: { name: 'ЛПНП', unit: 'ммоль/л', low: 1.5, high: 3.0, criticalLow: 0.8, criticalHigh: 5.0 },
-  Triglycerides: { name: 'Триглицериды', unit: 'ммоль/л', low: 0.5, high: 1.7, criticalLow: 0.3, criticalHigh: 5.0 },
-  TSH: { name: 'ТТГ', unit: 'мМЕ/л', low: 0.4, high: 4.0, criticalLow: 0.1, criticalHigh: 10 },
-  T4_free: { name: 'Т4 своб.', unit: 'пмоль/л', low: 10, high: 22, criticalLow: 5, criticalHigh: 35 },
-  T3_free: { name: 'Т3 своб.', unit: 'пмоль/л', low: 3.5, high: 6.5, criticalLow: 2, criticalHigh: 10 },
-  Testosterone_Total: { name: 'Тестостерон', unit: 'нмоль/л', low: 8.9, high: 29, criticalLow: 3, criticalHigh: 52 },
-  Estradiol: { name: 'Эстрадиол', unit: 'пмоль/л', low: 40, high: 160, criticalLow: 15, criticalHigh: 300 },
-  Prolactin: { name: 'Пролактин', unit: 'мМЕ/л', low: 86, high: 324, criticalLow: 50, criticalHigh: 500 },
-  LH: { name: 'ЛГ', unit: 'МЕ/л', low: 1.7, high: 8.6, criticalLow: 0.5, criticalHigh: 15 },
-  FSH: { name: 'ФСГ', unit: 'МЕ/л', low: 1.5, high: 12.4, criticalLow: 0.3, criticalHigh: 20 },
-  SHBG: { name: 'ГСПГ', unit: 'нмоль/л', low: 18, high: 54, criticalLow: 5, criticalHigh: 100 },
-  PSA: { name: 'ПСА', unit: 'нг/мл', low: 0, high: 4.0, criticalLow: 0, criticalHigh: 10 },
-  Hematocrit: { name: 'Гематокрит', unit: '%', low: 39, high: 51, criticalLow: 30, criticalHigh: 56 },
-  Hemoglobin: { name: 'Гемоглобин', unit: 'г/л', low: 130, high: 170, criticalLow: 100, criticalHigh: 200 },
-  Ferritin: { name: 'Ферритин', unit: 'нг/мл', low: 30, high: 400, criticalLow: 10, criticalHigh: 800 },
-  hsCRP: { name: 'hs-CRP', unit: 'мг/л', low: 0, high: 3, criticalLow: 0, criticalHigh: 10 },
-  Cystatin_C: { name: 'Цистатин С', unit: 'мг/л', low: 0.5, high: 1.2, criticalLow: 0.3, criticalHigh: 2.5 },
-  eGFR: { name: 'СКФ', unit: 'мл/мин', low: 90, high: 120, criticalLow: 60, criticalHigh: 150 },
-};
-
-const INTERPRETATION_DB: Record<string, { high: string; low: string; drugs: string[]; conditions: string[] }> = {
-  ALT: {
-    high: 'Повышение АЛТ указывает на повреждение гепатоцитов (цитолиз). При ААС — 17α-алкилированные стероиды, гепатотоксичные препараты.',
-    low: 'Низкий АЛТ — редкость, может указывать на дефицит B6.',
-    drugs: ['Метандростенолон', 'Станозолол', 'Оксиметолон', 'Халотестин'],
-    conditions: ['Гепатит', 'Жировой гепатоз', 'Холестаз'],
-  },
-  AST: {
-    high: 'Повышение АСТ вместе с АЛТ — гепатоцитолиз. Изолированное повышение — мышечное повреждение.',
-    low: 'Редко. Может быть при дефиците B6.',
-    drugs: ['Метандростенолон', 'Станозолол', 'Оксиметолон'],
-    conditions: ['Гепатит', 'Рабдомиолиз', 'Инфаркт миокарда'],
-  },
-  Creatinine: {
-    high: 'Повышение креатинина — снижение СКФ. При ААС — FSGS, гиперфильтрация, обезвоживание. Креатин-добавки ложно завышают.',
-    low: 'Низкий — низкая мышечная масса или гиперфильтрация.',
-    drugs: ['Тренболон', 'Все ААС (через FSGS)'],
-    conditions: ['FSGS', 'ХПН', 'Обезвоживание'],
-  },
-  Hematocrit: {
-    high: 'HCT >51% — эритроцитоз от ААС. Риск тромбоза. >54% — флеботомия показана.',
-    low: 'Анемия или гемодилюция (задержка жидкости от ГР/эстрогенов).',
-    drugs: ['Болденон', 'Тестостерон', 'Оксиметолон'],
-    conditions: ['Эритроцитоз', 'Тромбоз', 'Гипервязкость'],
-  },
-  HDL: {
-    high: 'Высокий ЛПВП — кардиопротективный. Отлично.',
-    low: 'Снижение ЛПВП — стандартный эффект ААС через печёночную липазу. Риск атеросклероза.',
-    drugs: ['Все 17α-алкилированные', 'Мастерон', 'Тренболон'],
-    conditions: ['Атеросклероз', 'Дислипидемия'],
-  },
-  LDL: {
-    high: 'Повышение ЛПНП — атерогенный сдвиг. Стандартно для оральных ААС.',
-    low: 'Нормально. Очень низкий — редкость.',
-    drugs: ['Все 17α-алкилированные', 'Мастерон', 'Провирон'],
-    conditions: ['Атеросклероз', 'ИБС'],
-  },
-  Testosterone_Total: {
-    high: 'Суперфизиологические уровни — экзогенный тестостерон. Ожидаемо на курсе.',
-    low: 'Подавление оси HPTA. Гипогонадизм. Требуется ПКТ.',
-    drugs: ['Все ААС (подавление)', 'Тестостерон (повышение)'],
-    conditions: ['Гипогонадизм', 'Азооспермия'],
-  },
-  Estradiol: {
-    high: 'Избыточная ароматизация тестостерона. Риск гинекомастии, задержки воды, гипертензии.',
-    low: 'Обвал E2 — non-aromatizable ААС + передоз ИА. Суставы, либидо, нейропротекция.',
-    drugs: ['Тестостерон', 'Болденон', 'Метандростенолон'],
-    conditions: ['Гинекомастия', 'Задержка жидкости'],
-  },
-  Prolactin: {
-    high: 'Гиперпролактинемия — 19-nor ААС (тренболон, нандролон). Галакторея, либидо ↓.',
-    low: 'Обычно не клинически значимо.',
-    drugs: ['Тренболон', 'Нандролон', 'Пептиды GHRP'],
-    conditions: ['Гинекомастия', 'Галакторея', 'ЭД'],
-  },
-  TSH: {
-    high: 'Гипотиреоз. ГР подавляет TSH. Проверить T4 своб.',
-    low: 'Гипертиреоз. Редко на ААС.',
-    drugs: ['Гормон Роста', 'Тренболон'],
-    conditions: ['Гипотиреоз'],
-  },
-};
-
-export function interpretLabValue(
-  code: string, value: number,
-): LabInterpretation | null {
-  const ref = LAB_REFERENCE_DB[code];
-  if (!ref) return null;
-
-  let status: LabInterpretation['status'] = 'normal';
-  let severity = 0;
-  let interpretation = '';
-  const recs: string[] = [];
-
-  if (value > ref.criticalHigh) {
-    status = 'critical_high';
-    severity = 90;
-  } else if (value > ref.high) {
-    status = 'high';
-    severity = Math.round(((value - ref.high) / (ref.criticalHigh - ref.high)) * 50 + 20);
-  } else if (value < ref.criticalLow) {
-    status = 'critical_low';
-    severity = 90;
-  } else if (value < ref.low) {
-    status = 'low';
-    severity = Math.round(((ref.low - value) / (ref.low - ref.criticalLow)) * 50 + 20);
-  }
-
-  const interp = INTERPRETATION_DB[code];
-  if (interp) {
-    interpretation = status === 'high' || status === 'critical_high' ? interp.high : interp.low || '';
-    if (status === 'critical_high' || status === 'high') {
-      recs.push('Повторите анализ через 2 недели');
-      if (code === 'Hematocrit' && value > 52) recs.push('Флеботомия / сдача крови');
-      if (code === 'ALT' || code === 'AST') recs.push('Добавьте TUDCA 500-1000 мг + NAC 1200 мг');
-      if (code === 'LDL' || code === 'HDL') recs.push('Омега-3 4-6 г/день + Цитрусовый бергамот');
-      if (code === 'Estradiol' && value > 200) recs.push('Рассмотрите ИА (анастрозол 0.25-0.5 мг 2×/нед)');
-    }
-  }
-
-  return {
-    marker: code,
-    value,
-    unit: ref.unit,
-    referenceRange: `${ref.low}-${ref.high}`,
-    status,
-    severity: Math.min(100, severity),
-    interpretation: interpretation || (status === 'high' ? 'Выше нормы' : status === 'low' ? 'Ниже нормы' : 'В норме'),
-    recommendations: recs,
-    relatedConditions: interp?.conditions || [],
-    drugAssociations: interp?.drugs || [],
-  };
-}
-
-export function analyzeLabPanel(values: { code: string; value: number }[], panelName: string, date: string): LabPanel {
-  const interpretations = values
-    .map(v => interpretLabValue(v.code, v.value))
-    .filter((v): v is LabInterpretation => v !== null);
-
-  const criticalCount = interpretations.filter(i => i.status === 'critical_high' || i.status === 'critical_low').length;
-  const abnormalCount = interpretations.filter(i => i.status !== 'normal').length;
-
-  let overallStatus: LabPanel['overallStatus'] = 'optimal';
-  if (criticalCount > 2) overallStatus = 'critical';
-  else if (criticalCount > 0) overallStatus = 'warning';
-  else if (abnormalCount > 3) overallStatus = 'warning';
-  else if (abnormalCount > 0) overallStatus = 'good';
-
-  const overallScore = Math.round(100 - criticalCount * 15 - (abnormalCount - criticalCount) * 5);
-
-  return { name: panelName, date, interpretations, overallStatus, overallScore };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 4. Export Engine
-// ═══════════════════════════════════════════════════════════════════════════
-
-export function generateHealthReport(
-  profile: { name: string; age: number; weight: number },
-  labPanels: LabPanel[],
-  stats: { totalSessions: number; bestLifts: Record<string, any>; streak: number },
-): ExportReport {
-  const sections: ExportReport['sections'] = [];
-
-  sections.push({
-    heading: 'Профиль пациента',
-    content: `Имя: ${profile.name}\nВозраст: ${profile.age}\nВес: ${profile.weight} кг`,
-    type: 'text',
-  });
-
-  sections.push({
-    heading: 'Тренировочная статистика',
-    content: `Всего тренировок: ${stats.totalSessions}\nСерия: ${ruCount(stats.streak, RU_DAYS)}\n` +
-      Object.entries(stats.bestLifts || {}).map(([k, v]: [string, any]) => `${k}: ${v.weight}кг ×${v.reps}`).join('\n'),
-    type: 'summary',
-  });
-
-  for (const panel of labPanels) {
-    const rows = panel.interpretations.map(i =>
-      `| ${i.marker} | ${i.value} ${i.unit} | ${i.referenceRange} | ${i.status} | ${i.interpretation} |`
-    );
-    sections.push({
-      heading: `Лаб-панель: ${panel.name} (${panel.date}) — Статус: ${panel.overallStatus}`,
-      content: `| Маркер | Значение | Референс | Статус | Интерпретация |\n${rows.join('\n')}`,
-      type: 'table',
-    });
-  }
-
-  return { title: 'Health Engine — Отчёт о здоровье', generatedAt: new Date().toISOString(), sections };
-}
 
 export function exportToJSON(data: any): string {
   return JSON.stringify(data, null, 2);

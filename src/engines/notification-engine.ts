@@ -4,6 +4,7 @@
 //  ════════════════════════════════════════════════════════════════════════════
 
 import { computeOverdueSystems, type SystemOverdue, type LabSliceLike } from './labs-overdue';
+import { getLabNorm } from './lab-norms.engine';
 
 export type NotificationPriority = 'info' | 'warning' | 'critical';
 export type NotificationChannel = 'telegram' | 'browser' | 'toast';
@@ -21,6 +22,9 @@ export interface NotificationRule {
 }
 
 export interface NotificationState {
+  /** Пол для порогов. По умолчанию — мужской путь (обратная совместимость:
+   *  старые вызовы без поля получают прежние пороги). */
+  sex?: 'male' | 'female' | string;
   labs: {
     lastLabDate?: string;
     alt?: number; ast?: number; ggt?: number;
@@ -50,6 +54,15 @@ export interface NotificationState {
   };
 }
 
+const isFemale = (s: NotificationState): boolean => s.sex === 'female';
+
+// У женского контура свои пороги: HCT 48/52 (эритроцитоз у женщин), АЛТ 2.5×ULN 31,
+// E2 — физиологический диапазон цикла (до ~200, овуляторный пик до ~400 пг/мл),
+// поэтому мужские E2-правила для женщин дают ложные срабатывания 2–3 раза в неделю.
+// Числа берём из единого резолвера норм (lab-norms.engine), а не литералами.
+const FEMALE_HCT_THERAPY = getLabNorm('HCT', 'female')?.uln ?? 48;
+const FEMALE_HCT_URGENT = FEMALE_HCT_THERAPY + 4;
+const FEMALE_ALT_2_5_ULN = Math.round((getLabNorm('ALT', 'female')?.uln ?? 31) * 2.5);
 const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'labs_overdue',
@@ -78,7 +91,7 @@ const NOTIFICATION_RULES: NotificationRule[] = [
       const weeksSince = s.labs.lastLabDate
         ? (Date.now() - new Date(s.labs.lastLabDate).getTime()) / (7 * 24 * 3600 * 1000)
         : 5;
-      return weeksSince >= 4 && s.pharma.phase === 'course' && !!(s.pharma.hasAI || (s.labs.e2 && s.labs.e2 > 80));
+      return !isFemale(s) && weeksSince >= 4 && s.pharma.phase === 'course' && !!(s.pharma.hasAI || (s.labs.e2 && s.labs.e2 > 80));
     },
     message: '🔬 Контроль эстрадиола (E2): прошло 4+ нед. При AI-терапии — критично (риск E2-crash <20 или гинекомастия >80).',
     priority: 'critical',
@@ -86,10 +99,46 @@ const NOTIFICATION_RULES: NotificationRule[] = [
     cooldownHours: 24,
   },
   {
+    // ♀ На ИА контроль нужен не из-за гинекомастии, а чтобы не обнулить E2:
+    // низкий E2 бьёт по либидо, костям и циклу. Без ИА мониторинг не форсируем —
+    // физиологический E2 в цикле и так меняется в разы.
+    id: 'e2_monitor_female',
+    trigger: 'protocol_milestone',
+    condition: (s) => {
+      const weeksSince = s.labs.lastLabDate
+        ? (Date.now() - new Date(s.labs.lastLabDate).getTime()) / (7 * 24 * 3600 * 1000)
+        : 5;
+      return isFemale(s) && weeksSince >= 4 && s.pharma.phase === 'course' && !!s.pharma.hasAI;
+    },
+    message: '🔬 Контроль E2 на ИА (♀): цель 20–40 пг/мл, не обнулять — либидо, кости, цикл. Сдать E2 + прогестерон.',
+    priority: 'critical',
+    channels: ['browser', 'toast', 'telegram'],
+    cooldownHours: 24,
+  },
+  {
     id: 'hct_high',
     trigger: 'risk_threshold',
-    condition: (s) => (s.labs.hct || 0) >= 52,
+    condition: (s) => !isFemale(s) && (s.labs.hct || 0) >= 52,
     message: '🩸 Гематокрит ≥52% — повышенный риск тромбоза. Рекомендована флеботомия 300-450 мл + контроль HCT через 3 дня.',
+    priority: 'critical',
+    channels: ['browser', 'toast', 'telegram'],
+    cooldownHours: 24,
+  },
+  {
+    // ♀ Норма 36–48 %: ULN — уже «терапия», ULN+4 — «ургент» (градация приложения).
+    id: 'hct_high_female',
+    trigger: 'risk_threshold',
+    condition: (s) => isFemale(s) && (s.labs.hct || 0) >= FEMALE_HCT_THERAPY && (s.labs.hct || 0) < FEMALE_HCT_URGENT,
+    message: `🩸 Гематокрит ≥${FEMALE_HCT_THERAPY} % (♀ норма 36–48) — эритроцитоз. Гидратация, контроль HCT через 3 дня; при ≥${FEMALE_HCT_URGENT} % — флеботомия.`,
+    priority: 'warning',
+    channels: ['browser', 'toast'],
+    cooldownHours: 48,
+  },
+  {
+    id: 'hct_critical_female',
+    trigger: 'risk_threshold',
+    condition: (s) => isFemale(s) && (s.labs.hct || 0) >= FEMALE_HCT_URGENT,
+    message: `⛔ Гематокрит ≥${FEMALE_HCT_URGENT} % (♀ ургент) — высокий риск тромбоза. Флеботомия 300-450 мл + контроль HCT через 3 дня.`,
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,
@@ -97,8 +146,19 @@ const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'e2_crash',
     trigger: 'risk_threshold',
-    condition: (s) => (s.labs.e2 || 30) < 15,
+    condition: (s) => !isFemale(s) && (s.labs.e2 || 30) < 15,
     message: '⚠ Эстрадиол <15 пг/мл — КРИТИЧЕСКИ НИЗКИЙ. Риск: боль в суставах, потеря либидо, ухудшение липидов. Снизить/отменить АИ.',
+    priority: 'critical',
+    channels: ['browser', 'toast', 'telegram'],
+    cooldownHours: 24,
+  },
+  {
+    // ♀ Без ИА низкий E2 — норма ранней фолликулярной фазы, поэтому алерт
+    // только на фоне приёма ИА (там это реальный краш от передозировки).
+    id: 'e2_crash_female',
+    trigger: 'risk_threshold',
+    condition: (s) => isFemale(s) && !!s.pharma.hasAI && (s.labs.e2 || 30) < 20,
+    message: '⚠ E2 <20 пг/мл на ИА (♀) — E2-краш. Риск: суставы, либидо, кости, сбой цикла. Снизить/отменить АИ.',
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,
@@ -106,8 +166,18 @@ const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'e2_high',
     trigger: 'risk_threshold',
-    condition: (s) => (s.labs.e2 || 20) > 80,
+    condition: (s) => !isFemale(s) && (s.labs.e2 || 20) > 80,
     message: '⚠ Эстрадиол >80 пг/мл — ВЫСОКИЙ. Риск гинекомастии, отёков. Рассмотреть увеличение дозы АИ.',
+    priority: 'warning',
+    channels: ['browser', 'toast'],
+    cooldownHours: 48,
+  },
+  {
+    // ♀ Порог выше овуляторного пика: 80–400 пг/мл — физиология цикла, а не риск.
+    id: 'e2_high_female',
+    trigger: 'risk_threshold',
+    condition: (s) => isFemale(s) && (s.labs.e2 || 20) > 400,
+    message: '⚠ E2 >400 пг/мл (♀) — выше типичного овуляторного пика. Если это не овуляция — обсудить с врачом; E2 не обнулять.',
     priority: 'warning',
     channels: ['browser', 'toast'],
     cooldownHours: 48,
@@ -115,8 +185,18 @@ const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'alt_critical',
     trigger: 'risk_threshold',
-    condition: (s) => (s.labs.alt || 0) > 100,
+    condition: (s) => !isFemale(s) && (s.labs.alt || 0) > 100,
     message: '⛔ АЛТ >100 Ед/л (2.5×ULN) — гепатотоксичность. Немедленно сдать повторно. При >200 — стоп ААС, TUDCA×2.',
+    priority: 'critical',
+    channels: ['browser', 'toast', 'telegram'],
+    cooldownHours: 24,
+  },
+  {
+    // ♀ ULN 31 → 2.5×ULN = 78: порог >100 для женщин — это уже ~3.2×ULN.
+    id: 'alt_critical_female',
+    trigger: 'risk_threshold',
+    condition: (s) => isFemale(s) && (s.labs.alt || 0) > FEMALE_ALT_2_5_ULN,
+    message: `⛔ АЛТ >${FEMALE_ALT_2_5_ULN} Ед/л (2.5× женской ULN 31) — гепатотоксичность. Повторить анализ; при росте — стоп ААС, TUDCA.`,
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,

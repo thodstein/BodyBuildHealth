@@ -1,4 +1,5 @@
 import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
+import { getLabNorm } from '../../../engines/lab-norms.engine';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -159,6 +160,21 @@ export function labPointsToSlice(input: any): LabSlice | null {
 export function hctGradationLabel(hct: number, sex?: 'male' | 'female'): string {
   if (sex === 'female') return hct >= 52 ? '🔴 ургент' : hct >= 48 ? '🟠 терапия' : hct >= 44 ? '🟡 коррекция' : '🟢 норма';
   return hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма';
+}
+
+/**
+ * Пороги HCT для доменной карты симптомов (калькулятор): ♂ 48/52, ♀ 44/48.
+ * Считаются от ULN единого резолвера (`lab-norms.engine`): коррекция = ULN−4,
+ * терапия = ULN. Тот же шаг, что в градации выше (♀ 44/48/52, ♂ 48/52/57).
+ */
+export function hctSymptomCuts(sex?: 'male' | 'female'): { correction: number; therapy: number } {
+  const uln = getLabNorm('HCT', sex === 'female' ? 'female' : 'male')?.uln ?? 52;
+  return { correction: uln - 4, therapy: uln };
+}
+
+/** Порог «Гемоглобин выше нормы» для доменной карты: ♂ 175 (как было), ♀ ULN 150. */
+export function hgbSymptomCut(sex?: 'male' | 'female'): number {
+  return sex === 'female' ? (getLabNorm('HGB', 'female')?.uln ?? 150) : 175;
 }
 
 export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
