@@ -2730,6 +2730,9 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         riskStatus: planResult?.riskStatus,
         unmodeledDrugs: planResult?.unmodeledDrugs,
         derivedSupport: planResult?.derivedSupport,
+        // UL по фактическим дозам: без этого «Мои планы» показывали чистый план,
+        // дозы которого были срезаны пределом при расчёте.
+        ulWarnings: planResult?.ulWarnings,
       };
       const existing = JSON.parse(localStorage.getItem('he_my_plans') || '[]');
       existing.push(data);

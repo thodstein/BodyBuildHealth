@@ -187,6 +187,35 @@ describe('fav plan source', () => {
     expect(container.textContent).not.toContain('Механизмы:');
   });
 
+  it('сохранённый план с превышением UL не выглядит «чистым»', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{
+        id: 13, name: 'С UL', level: 'mid', date: new Date().toISOString(), subs: ['nac', 'vitamin_d3'],
+        riskBefore: 40, riskAfter: 25, supportScore: 75,
+        ulWarnings: [
+          { substanceId: 'nac', currentDoseMg: 3234, ulMg: 2400, percentUL: 135, risk: 'Превышение UL', recommendation: '…', appliedDoseMg: 2400 },
+          { substanceId: 'vitamin_d3', currentDoseMg: 149, ulMg: 100, percentUL: 149, risk: 'Превышение UL', recommendation: '…', appliedDoseMg: 100 },
+        ],
+      }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).toContain('UL по фактическим дозам: 2');
+  });
+
+  it('старый план без ulWarnings — строки UL нет', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{ id: 14, name: 'Без UL', level: 'mid', date: new Date().toISOString(), subs: ['nac'], riskBefore: 40, riskAfter: 25, supportScore: 75 }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).not.toContain('UL по фактическим дозам');
+  });
+
   it('старый план без supportScore/недели — без «NaN» и «undefined»', () => {
     localStorage.setItem(
       'he_my_plans',
