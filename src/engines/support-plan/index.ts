@@ -25,6 +25,7 @@
  */
 
 import { calculateSupportTZ, hydrateState } from './engine';
+import { mechanismCoverageOf } from '../risk-engine-tz-spec';
 import type { CalculatorState, CalculatorResult, PlanResult } from './types';
 import { clamp } from './types';
 import { buildSubstances, buildSchedule, computeWeekScale } from './substances';
@@ -107,7 +108,14 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
   const mechanisms = buildMechanisms(tzRes);
 
   // ── 5. Coverage percent (clamped ≤100, BUG 14) ──
+  // ВНИМАНИЕ: величина = 100 − остаточный риск, а не доля закрытых механизмов.
+  // Подписывать её «покрытием» нельзя — рядом считаем настоящее покрытие.
   const coveragePercent = clamp(100 - tzRes.overallRiskAfter);
+
+  // ── 5a. Реальное покрытие механизмов ──
+  // Знаменатель — механизмы, которые ДАЮТ риск в этом курсе (raw > 0), иначе
+  // «покрытие» размывалось бы механизмами, к которым курс не относится.
+  const mechanismCoverage = mechanismCoverageOf(tzRes.tzSpecResult);
 
   // ── 6. Synergy comment ──
   const synergyComment = buildSynergyComment(tzRes.selectedSubstances);
@@ -161,6 +169,7 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     systems,
     mechanisms,
     coveragePercent,
+    mechanismCoverage,
     synergyComment,
     monitoring,
     specialInstructions,

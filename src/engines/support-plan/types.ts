@@ -320,6 +320,12 @@ export interface CalculatorResult {
    * UI обязан подписать это, а не выдавать за доказательную базу.
    */
   derivedSupport?: string[];
+  /**
+   * Реальное покрытие механизмов: доля механизмов риска (raw > 0), закрытых
+   * поддержкой (k_used > 0). НЕ путать с `overallRiskAfter` /
+   * `100 − overallRiskAfter` (см. `coveragePercent` в PlanResult).
+   */
+  mechanismCoverage?: { covered: number; total: number; percent: number };
 }
 
 export interface TimelineWeekData {
@@ -399,7 +405,17 @@ export interface PlanResult {
   schedule: Array<{ timeBlock: string; substances: Array<{ id: string; name: string; dose: string; instructions: string }> }>;
   systems: Record<string, { raw: number; net: number; mechanisms: string[] }>;
   mechanisms: PlanMechanism[];
+  /**
+   * `100 − остаточный риск`. Историческое имя: это НЕ покрытие механизмов.
+   * Не подписывать как «покрытие» (см. `mechanismCoverage`).
+   */
   coveragePercent: number;
+  /**
+   * Реальное покрытие: доля механизмов, которые дают риск в этом курсе
+   * (`raw > 0`), закрытых поддержкой (`k_used > 0`). Именно эту величину
+   * можно называть «покрытием механизмов».
+   */
+  mechanismCoverage?: { covered: number; total: number; percent: number };
   synergyComment: string;
   monitoring: string[];
   specialInstructions: string[];

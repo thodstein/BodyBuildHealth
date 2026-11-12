@@ -143,6 +143,7 @@ describe('fav plan source', () => {
         id: 'p1', name: 'План Средний', level: 'mid', week: 4,
         subs: ['sub_a', 'sub_b'], dosages: {}, date: new Date().toISOString(),
         riskBefore: 420, riskAfter: 300, supportScore: 70,
+        mechanismCoverage: { covered: 3, total: 6, percent: 50 },
         riskStatus: 'partial', unmodeledDrugs: ['unknown_drug_xyz'],
         derivedSupport: ['ginger'],
       }]),
@@ -156,7 +157,23 @@ describe('fav plan source', () => {
     expect(container.textContent).toContain('unknown_drug_xyz');
     expect(container.textContent).toContain('Оценочное покрытие (q=C)');
     expect(container.textContent).toContain('ginger');
-    expect(container.textContent).toContain('70/100');
+    // 100 − остаточный риск подписан как «Снижение риска», а не «Покрытие»:
+    // это разные величины, и старая подпись выдавала риск-скор за покрытие.
+    expect(container.textContent).toContain('Снижение риска: 70/100');
+    // Настоящее покрытие механизмов — отдельно, с числителем/знаменателем.
+    expect(container.textContent).toContain('Механизмы: 50% (3 из 6)');
+  });
+
+  it('старый план без mechanismCoverage не рисует пустую строку механизмов', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{ id: 11, name: 'Без мех.', level: 'mid', date: new Date().toISOString(), subs: ['sub_a'], riskBefore: 40, riskAfter: 25, supportScore: 75 }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).not.toContain('Механизмы:');
+    expect(container.textContent).toContain('Снижение риска: 75/100');
   });
 
   it('старый план без supportScore/недели — без «NaN» и «undefined»', () => {

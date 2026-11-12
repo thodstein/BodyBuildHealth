@@ -87,3 +87,26 @@ describe('TzRiskCard: непокрытое разделено на «пробе�
     expect(container.textContent).toContain('Сопутствующие препараты');
   });
 });
+
+describe('TzRiskCard: покрытие механизмов отдельно от «100 − риск»', () => {
+  const mech = (id: string, raw: number, k_used: number) => ({
+    id, name: id, weight: 1, m_i: 1, E_i: 1, raw, afterSupport: raw, k_used,
+    q_label: '', rawPercent: raw, afterPercent: raw,
+  });
+
+  it('считает только механизмы с риском и подписывает числитель/знаменатель', () => {
+    const tz = makeTz({
+      organs: [
+        { id: 'cardio', label: 'Сердце', maxRaw: 100, rawScore: 10, rawPercent: 10, afterScore: 5, afterPercent: 5, k_protect: 50,
+          mechanisms: [mech('cv1', 5, 40), mech('cv2', 3, 0), mech('cv3', 0, 0)] } as any,
+      ],
+    });
+    const { container } = render(<TzRiskCard tz={tz} before={40} after={30} />);
+    expect(container.textContent).toContain('Механизмы: 1/2 закрыто');
+  });
+
+  it('нет механизмов риска (например, no_data) — строки нет', () => {
+    const { container } = render(<TzRiskCard tz={makeTz({ riskStatus: 'no_data' })} before={0} after={0} />);
+    expect(container.textContent).not.toContain('Механизмы:');
+  });
+});

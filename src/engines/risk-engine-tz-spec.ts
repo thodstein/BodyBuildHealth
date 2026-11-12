@@ -242,6 +242,20 @@ const MECH_LAB_MARKERS:Record<string,string[]>={
   hem1:['HCT','HGB','RBC','WBC'],hem2:['GLU','HOMA'],hem3:['GLU'],hem4:['K'],hem5:['K','NA','MG','CA'],
 };
 
+// ── Покрытие механизмов (честная метрика) ──
+// Доля механизмов, которые ДАЮТ риск в этом расчёте (raw > 0) и закрыты
+// поддержкой (k_used > 0). Не то же самое, что «100 − остаточный риск»:
+// эту величину можно называть «покрытием», первый — нет.
+export function mechanismCoverageOf(tz: TzSpecResult | null | undefined): { covered: number; total: number; percent: number } {
+  const riskMechs = (tz?.organs || []).flatMap(o => (o.mechanisms || []).filter(m => m.raw > 0));
+  const covered = riskMechs.filter(m => m.k_used > 0).length;
+  return {
+    covered,
+    total: riskMechs.length,
+    percent: riskMechs.length > 0 ? Math.round((covered / riskMechs.length) * 100) : 0,
+  };
+}
+
 // ── Якорные floors из клинических руководств ──
 // Доказанная лабораторная патология задаёт нижнюю границу риска системы
 // НЕЗАВИСИМО от таргетов препарата (eGFR 25 опасен и без ренального таргета).

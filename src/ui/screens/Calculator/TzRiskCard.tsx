@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { TzSpecResult, TzSpecOrganResult, TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
-import { getCategoryLabel } from '../../../engines/risk-engine-tz-spec';
+import { getCategoryLabel, mechanismCoverageOf } from '../../../engines/risk-engine-tz-spec';
 import { isSupportSubstanceId } from '../../../data/support-db/mech-map';
 import { GLASS } from './Calc.types';
 
@@ -41,6 +41,9 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
   const [expandedOrgan, setExpandedOrgan] = useState<string | null>(null);
   const noData = tz?.riskStatus === 'no_data';
   const organs = noData ? [] : (Array.isArray(tz?.organs) ? tz.organs : []);
+  // Честное покрытие: доля механизмов, дающих риск и закрытых поддержкой.
+  // Не выводим при no_data — там механизмов риска нет вовсе.
+  const mc = noData ? null : mechanismCoverageOf(tz);
 
   return (
     <div className="calc-tzrisk" style={{ ...GLASS, padding: '10px 12px', marginTop: 6, marginBottom: 6 }}>
@@ -170,6 +173,11 @@ export const TzRiskCard: React.FC<Props> = ({ tz, before, after, peakWeek }) => 
         <span>D_cov: {tz.d_cov.toFixed(1)}</span>
         <span>U: &times;{tz.u_i.toFixed(2)}</span>
         <span>Поддержка: {tz.supportCount} веществ</span>
+        {mc && mc.total > 0 && (
+          <span title="Доля механизмов, дающих риск в этом расчёте, которые закрыты поддержкой (k > 0). Это не «100 − остаточный риск». Считается по текущей неделе расчёта (как и список механизмов ниже).">
+            Механизмы: {mc.covered}/{mc.total} закрыто
+          </span>
+        )}
       </div>
       )}
 

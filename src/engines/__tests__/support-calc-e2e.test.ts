@@ -5,7 +5,7 @@ import type { CalculatorState } from '../support-plan/types';
 import { buildMapperCtx } from '../support-plan/mapper-ctx';
 import { resolvePlan, isDoctorControlled } from '../tz-mapper-engine';
 import { buildTzInput, buildTzInputCore } from '../support-plan/engine-helpers';
-import { calculateTzSpecRisk } from '../risk-engine-tz-spec';
+import { calculateTzSpecRisk, mechanismCoverageOf } from '../risk-engine-tz-spec';
 import { canonId } from '../support-plan/shared-constants';
 import { detectActivePedClasses } from '../../data/ped-class-matrix';
 import { getAdministrationRules } from '../../data/administration-rules-db';
@@ -120,6 +120,53 @@ describe('PlanResult: честность риска прокинута в пла
     if (Array.isArray(plan.derivedSupport)) {
       expect(plan.derivedSupport.every(id => typeof id === 'string' && id.length > 0)).toBe(true);
     }
+  });
+});
+
+describe('Покрытие механизмов — отдельная величина от «100 − остаточный риск»', () => {
+  it('mechanismCoverageOf: считает только механизмы с риском (raw>0)', () => {
+    const tz: any = {
+      organs: [{
+        mechanisms: [
+          { id: 'cv1', raw: 5, k_used: 40 },
+          { id: 'cv2', raw: 3, k_used: 0 },
+          { id: 'cv3', raw: 0, k_used: 0 }, // риска нет — в знаменатель не входит
+        ],
+      }],
+    };
+    expect(mechanismCoverageOf(tz)).toEqual({ covered: 1, total: 2, percent: 50 });
+  });
+
+  it('mechanismCoverageOf: пустой/отсутствующий результат — 0%, а не NaN/100%', () => {
+    expect(mechanismCoverageOf(null)).toEqual({ covered: 0, total: 0, percent: 0 });
+    expect(mechanismCoverageOf({ organs: [] } as any)).toEqual({ covered: 0, total: 0, percent: 0 });
+  });
+
+  it('план и калькулятор отдают реальное покрытие механизмов', () => {
+    const s = stateWith(['test_enan', 'tren_enan']);
+    const plan = runSupportUnified(s);
+    const mc = plan.mechanismCoverage;
+    expect(mc).toBeTruthy();
+    expect(mc!.total).toBeGreaterThan(0);
+    expect(mc!.covered).toBeGreaterThanOrEqual(0);
+    expect(mc!.covered).toBeLessThanOrEqual(mc!.total);
+    expect(mc!.percent).toBeGreaterThanOrEqual(0);
+    expect(mc!.percent).toBeLessThanOrEqual(100);
+    // Калькулятор и план считают одно и то же по одному и тому же TZ-результату.
+    const calc = calculateSupportTZ(s);
+    expect(calc.mechanismCoverage).toEqual(mechanismCoverageOf(calc.tzSpecResult));
+    expect(calc.mechanismCoverage).toEqual(mc);
+  });
+
+  it('курс с поддержкой реально закрывает хотя бы один механизм риска', () => {
+    const plan = runSupportUnified(stateWith(['test_enan', 'tren_enan']));
+    expect(plan.mechanismCoverage!.covered).toBeGreaterThan(0);
+  });
+
+  it('препарат без модели → покрытие механизмов не рисуется как 100%', () => {
+    const plan = runSupportUnified(stateWith(['unknown_drug_xyz']));
+    expect(plan.mechanismCoverage!.total).toBe(0);
+    expect(plan.mechanismCoverage!.percent).toBe(0);
   });
 });
 

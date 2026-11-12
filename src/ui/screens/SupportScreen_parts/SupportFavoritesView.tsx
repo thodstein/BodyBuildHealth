@@ -523,8 +523,15 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                           </div>
                         </div>
                         <div style={{ fontSize:8, color:'var(--text-dim)' }}>
-                          {p.subs?.length || 0} препаратов · Риск: {Math.round(Number(p.riskBefore) || 0)}% → {Math.round(Number(p.riskAfter) || 0)}% · Покрытие: {Number.isFinite(p.supportScore) ? Math.round(p.supportScore) : Math.round(100 - (Number(p.riskAfter) || 0))}/100
+                          {p.subs?.length || 0} препаратов · Риск: {Math.round(Number(p.riskBefore) || 0)}% → {Math.round(Number(p.riskAfter) || 0)}% · Снижение риска: {Number.isFinite(p.supportScore) ? Math.round(p.supportScore) : Math.round(100 - (Number(p.riskAfter) || 0))}/100
                         </div>
+                        {/* Покрытие механизмов — отдельная величина (доля механизмов риска,
+                            закрытых поддержкой). В старых планах поля нет — молчим. */}
+                        {p.mechanismCoverage && Number.isFinite(p.mechanismCoverage.percent) && (
+                          <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>
+                            Механизмы: {p.mechanismCoverage.percent}% ({p.mechanismCoverage.covered} из {p.mechanismCoverage.total})
+                          </div>
+                        )}
                         {/* Честность сохранённого расчёта: старые планы поля не имеют — молчим. */}
                         {p.riskStatus && p.riskStatus !== 'ok' && (
                           <div style={{ fontSize:8, color:'#f59e0b', marginTop:2 }}>
@@ -599,7 +606,10 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     </div>
                     {r.calcResult && (
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>
-                        Риск: {Math.round(r.calcResult.riskBeforeSupport)}% → {Math.round(r.calcResult.riskAfterSupport)}% · Покрытие: {Math.round(r.calcResult.supportScore)}/100
+                        Риск: {Math.round(r.calcResult.riskBeforeSupport)}% → {Math.round(r.calcResult.riskAfterSupport)}% · Снижение риска: {Math.round(r.calcResult.supportScore)}/100
+                        {r.calcResult.mechanismCoverage && Number.isFinite(r.calcResult.mechanismCoverage.percent)
+                          ? ` · Механизмы: ${r.calcResult.mechanismCoverage.percent}% (${r.calcResult.mechanismCoverage.covered} из ${r.calcResult.mechanismCoverage.total})`
+                          : ''}
                         {/* Старые записи (без riskStatus) писались до появления честного
                             статуса: подписываем, чтобы проценты не читались как полный расчёт. */}
                         {r.calcResult.riskStatus === 'partial' || r.calcResult.riskStatus === 'no_data'

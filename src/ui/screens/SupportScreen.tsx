@@ -765,7 +765,10 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     const calcResultData: Record<string, any> = {
       riskBeforeSupport: tzResult.overallRiskBefore,
       riskAfterSupport: tzResult.overallRiskAfter,
+      // supportScore — историческое имя: 100 − остаточный риск. Настоящее
+      // покрытие механизмов — отдельным полем (см. `mechanismCoverage`).
       supportScore: Math.round(100 - tzResult.overallRiskAfter),
+      mechanismCoverage: tzResult.mechanismCoverage,
       systemSupport: Object.fromEntries(
         Object.entries(systemBreakdown).map(([k, v]) => [k, 100 - v.net])
       ),
@@ -2679,9 +2682,14 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
     }
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
 Уровень: ${supportLevel} | Неделя: ${courseWeekState}
-Риск: ${planResult.overallRiskBefore}% -> ${planResult.overallRiskAfter}%
-Покрытие: ${planResult.coveragePercent}%
-${riskNotes.length > 0 ? riskNotes.join('\n') + '\n' : ''}
+Риск: ${planResult.overallRiskBefore}% -> ${planResult.overallRiskAfter}%${
+  typeof planResult.overallRiskBefore === 'number' && typeof planResult.overallRiskAfter === 'number'
+    ? ` (снижение ${Math.round(planResult.overallRiskBefore - planResult.overallRiskAfter)} п.п.)`
+    : ''
+}
+${planResult.mechanismCoverage
+  ? `Покрытие механизмов: ${planResult.mechanismCoverage.percent}% (${planResult.mechanismCoverage.covered} из ${planResult.mechanismCoverage.total} механизмов риска)\n`
+  : ''}${riskNotes.length > 0 ? riskNotes.join('\n') + '\n' : ''}
 ПРЕПАРАТЫ (${subs.length}):
 ${subs.join('\n')}
 
@@ -2704,7 +2712,10 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         date: new Date().toISOString(),
         riskBefore: planResult?.overallRiskBefore || 0,
         riskAfter: planResult?.overallRiskAfter || 0,
+        // supportScore — историческое имя: это 100 − остаточный риск («снижение»),
+        // а не доля закрытых механизмов. Настоящее покрытие — `mechanismCoverage`.
         supportScore: planResult?.coveragePercent ?? Math.round(100 - (planResult?.overallRiskAfter || 0)),
+        mechanismCoverage: planResult?.mechanismCoverage,
         riskStatus: planResult?.riskStatus,
         unmodeledDrugs: planResult?.unmodeledDrugs,
         derivedSupport: planResult?.derivedSupport,

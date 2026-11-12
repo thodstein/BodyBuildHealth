@@ -13,7 +13,7 @@ import {
   PHASE_BLOCKLIST,
 } from './engine-helpers';
 import { evaluateRecommendations } from '../recommendation-engine';
-import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type TzSpecResult } from '../risk-engine-tz-spec';
+import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, mechanismCoverageOf, type TzSpecInput, type TzSpecResult } from '../risk-engine-tz-spec';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { getSupportMechIndex } from '../../data/support-db/mech-map';
@@ -796,6 +796,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       unmodeledDrugs: unmodeledDrugs.length > 0 ? unmodeledDrugs : undefined,
       unmappedSupport: unmappedSupport.length > 0 ? unmappedSupport : undefined,
       derivedSupport: tzResultFinal?.derivedSupport?.length ? tzResultFinal.derivedSupport : undefined,
+      mechanismCoverage: tzResultFinal ? mechanismCoverageOf(tzResultFinal) : undefined,
     };
     result.risk.systems = tzResultFinal
       ? toSystemRisksFromTz(tzResultFinal, finalScores, synergyIds.length)
