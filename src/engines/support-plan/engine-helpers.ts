@@ -70,9 +70,18 @@ export function checkDepletionCascade(
 
 /** Проверка превышения верхнего допустимого уровня (UL).
  *  Возвращает массив предупреждений. */
-interface ULWarning {
+export interface ULWarning {
   substanceId: string; currentDoseMg: number; ulMg: number;
   percentUL: number; risk: string; recommendation: string;
+  /**
+   * Доза, реально попавшая в план ПОСЛЕ UL-капа (`doses[subId]`).
+   *
+   * `currentDoseMg` — расчётная доза ДО капа: именно она показывает, что
+   * нормализация по весу вышла за предел. Без этого поля UI не мог отличить
+   * «плановые 100 мкг при расчёте 110» от «плановые 110» и либо занижал, либо
+   * пугал. Поле необязательное: старые сохранённые расчёты его не имеют.
+   */
+  appliedDoseMg?: number;
 }
 export function checkUpperLimits(
   substances: string[],
@@ -88,7 +97,12 @@ export function checkUpperLimits(
     const doseMg = raw !== undefined && raw > 0 ? raw : (doses[subId] || 0);
     if (doseMg > ul) {
       const pct = Math.round(doseMg / ul * 100);
-      const unit = doseUnitLabel(subId);
+      const applied = doses[subId];
+      // До капа и после капа — в одной строке. Раньше при >150 % рекомендовалось
+      // «≤1.5×UL», хотя план капал дозу до UL — совет противоречил собственному плану.
+      const appliedTxt = applied !== undefined && applied > 0 && applied < doseMg
+        ? ` В плане ограничено до ${formatDose(subId, applied)}.`
+        : '';
       warnings.push({
         substanceId: subId,
         currentDoseMg: doseMg,
@@ -96,8 +110,9 @@ export function checkUpperLimits(
         percentUL: pct,
         risk: pct > 200 ? 'Высокий риск токсичности' : pct > 150 ? 'Значительное превышение UL' : pct > 100 ? 'Превышение UL' : 'В пределах нормы',
         recommendation: pct > 150
-          ? `Снизить дозу до ≤${formatDose(subId, Math.round(ul * 1.5))} под контролем врача (сейчас ${formatDose(subId, Math.round(doseMg))}, UL ${formatDose(subId, ul)}).`
-          : `Рассмотреть снижение дозы до ≤${formatDose(subId, ul)} (сейчас ${formatDose(subId, Math.round(doseMg))}).`,
+          ? `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): значительное превышение, снизить до ≤${formatDose(subId, ul)} под контролем врача.${appliedTxt}`
+          : `Расчётная доза ${formatDose(subId, Math.round(doseMg))} — ${pct}% от UL (${formatDose(subId, ul)}): рассмотреть снижение до ≤${formatDose(subId, ul)}.${appliedTxt}`,
+        ...(applied !== undefined && applied > 0 ? { appliedDoseMg: applied } : {}),
       });
     }
   }

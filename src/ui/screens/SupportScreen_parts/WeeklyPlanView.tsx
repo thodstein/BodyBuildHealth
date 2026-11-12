@@ -1,6 +1,8 @@
 import React from 'react';
 import type { PlanResult } from '../../../engines/support-plan';
 import { computeWeekScale } from '../../../engines/support-plan/substances';
+import { SUB_NAMES } from '../../../engines/support-plan/engine-helpers';
+import { formatDose } from '../../../data/dose-units';
 
 const ACCENT = '#00e68a';
 
@@ -153,6 +155,32 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
           );
         })}
       </div>
+
+      {/* UL по ФАКТИЧЕСКИМ дозам плана (а не по типовой дозе каталога) */}
+      {planResult.ulWarnings && planResult.ulWarnings.length > 0 && (
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
+          <div style={{ fontSize: 7, color: '#f59e0b', fontWeight: 700, marginBottom: 3 }}>
+            ⚠ Пределы доз (UL) по фактическим дозам плана ({planResult.ulWarnings.length})
+          </div>
+          {planResult.ulWarnings.map((w, i) => {
+            const name = planResult.substances.find(s => s.id === w.substanceId)?.name
+              || SUB_NAMES[w.substanceId] || w.substanceId;
+            const applied = w.appliedDoseMg && w.appliedDoseMg > 0 ? w.appliedDoseMg : null;
+            return (
+              <div key={`${w.substanceId}-${i}`} style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45 }}>
+                <span style={{ color: '#fbbf24', fontWeight: 700 }}>{name}</span>: расчёт {formatDose(w.substanceId, w.currentDoseMg)}
+                {applied !== null && applied < w.currentDoseMg
+                  ? <> → ограничено до <span style={{ color: '#fbbf24', fontWeight: 700 }}>{formatDose(w.substanceId, applied)}</span></>
+                  : null}
+                {' '}· UL {formatDose(w.substanceId, w.ulMg)} ({w.percentUL}% от UL){w.risk ? ` — ${w.risk}` : ''}
+              </div>
+            );
+          })}
+          <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
+            Дозы нормализованы по весу; после превышения UL доза капается до предела.
+          </div>
+        </div>
+      )}
 
       {/* Per-mechanism coverage summary */}
       {(() => {

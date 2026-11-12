@@ -3783,7 +3783,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               </div>
             );
           })}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование.</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование. Проверка идёт по ТИПОВОЙ дозе каталога; UL по фактическим дозам плана — в недельном плане поддержки.</div>
           <SafetyCumulativeLoad planResult={planResult} />
             </div>
           )}

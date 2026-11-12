@@ -184,6 +184,10 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     conflicts,
     riskBreakdown,
     depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
+    // UL по фактическим дозам плана: движок их считает (с учётом веса и UL-капа),
+    // но экран поддержки не выводил — «Контроль дозировок» показывал типовые
+    // дозы каталога, а не назначенные.
+    ulWarnings: tzRes.ulWarnings && tzRes.ulWarnings.length > 0 ? tzRes.ulWarnings : undefined,
     cumulativeLoad: cumulativeLoad.length > 0 ? cumulativeLoad : undefined,
     pillBurden,
     phaseAssignedDrugs: tzRes.phaseAssignedDrugs,

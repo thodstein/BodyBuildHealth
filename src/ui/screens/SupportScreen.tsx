@@ -48,7 +48,7 @@ import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engine
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
 import { runSupportUnified, runSupportForLevel, canonId } from '../../engines/support-plan';
-import { defaultDoseUnit, formatDefaultDose, formatDoseFromMg } from '../../data/dose-units';import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
+import { defaultDoseUnit, formatDefaultDose, formatDoseFromMg, formatDose } from '../../data/dose-units';import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
 import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
 import { calculateMixScore, type TrainingMixScore, type MixSubstance, type MixProfile, MIX_MECHANISMS, MIX_SYNERGY, MIX_TEMPLATES, type MixTemplate, buildBestRecipe, type MixRecipe, type MixRecipeItem, groupRecipeItemsByTiming } from '../../engines/training-mix-scoring.engine';
@@ -2680,6 +2680,14 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
     }
     if (planResult.derivedSupport && planResult.derivedSupport.length > 0) {
       riskNotes.push(`ℹ Оценочное покрытие (q=C, механизмы выведены из каталога): ${planResult.derivedSupport.join(', ')}`);
+    }
+    if (planResult.ulWarnings && planResult.ulWarnings.length > 0) {
+      riskNotes.push(`⚠ UL по фактическим дозам плана: ${planResult.ulWarnings.map(w => {
+        const applied = w.appliedDoseMg && w.appliedDoseMg > 0 && w.appliedDoseMg < w.currentDoseMg
+          ? ` → ${formatDose(w.substanceId, w.appliedDoseMg)}`
+          : '';
+        return `${w.substanceId} ${formatDose(w.substanceId, w.currentDoseMg)}${applied} (UL ${formatDose(w.substanceId, w.ulMg)}, ${w.percentUL}%)`;
+      }).join('; ')}`);
     }
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
 Уровень: ${supportLevel} | Неделя: ${courseWeekState}

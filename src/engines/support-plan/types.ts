@@ -287,7 +287,7 @@ export interface CalculatorResult {
   timestamp: string;
   /** Нутрициологические предупреждения */
   depletionWarnings?: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }>;
-  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string }>;
+  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string; /** доза после UL-капа */ appliedDoseMg?: number }>;
   dailyLoad?: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }>;
   /**
    * Фазовые назначения — вещества, автоматически добавленные движком
@@ -447,6 +447,12 @@ export interface PlanResult {
   derivedSupport?: string[];
   /** Нутрициологические данные */
   depletionWarnings?: Array<{ depleter: string; depleterName: string; depleted: string; depletedName: string; mechanism: string; severity: string; recommendation: string }>;
+  /**
+   * Превышения UL по ФАКТИЧЕСКИМ дозам плана (не по типовой дозе каталога).
+   * `currentDoseMg` — расчётная доза до капа, `appliedDoseMg` — что попало в план
+   * после UL-капа. Раньше движок их считал, но экран плана не показывал.
+   */
+  ulWarnings?: Array<{ substanceId: string; currentDoseMg: number; ulMg: number; percentUL: number; risk: string; recommendation: string; appliedDoseMg?: number }>;
   cumulativeLoad?: Array<{ nutrientId: string; nutrientName: string; totalMg: number; ulMg?: number; percentUL?: number; isOverUL: boolean; contributors: string[] }>;
   pillBurden?: { totalSubstances: number; estimatedPillsPerDay: number; morningPills: number; afternoonPills: number; eveningPills: number; feasibility: string; message: string };
   /** Mandatory-назначения (hCG, AI, caber, TUDCA, NAC и т.д.) */
