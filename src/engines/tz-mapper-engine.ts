@@ -1659,10 +1659,10 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   }
   // ── 5. базовые витамины (D3+K2, Mg, B6, B12, Folate, VitC) ─
   const BASE_VITS: Array<{ id: string; category: TzCategory; reason: string }> = [
-    { id: 'vitamin_d3', category: 'vitamin', reason: 'D3 5000 МЕ — иммунитет, костный метаболизм' },
+    { id: 'vitamin_d3', category: 'vitamin', reason: 'D3 2000 МЕ — иммунитет, костный метаболизм' },
     { id: 'vitamin_k2', category: 'vitamin', reason: 'K2 MK-7 100 мкг — обязателен с D3' },
     { id: 'b_complex', category: 'vitamin', reason: 'B-Complex (B6 P5P 25 мг + B12 метил 1000 мкг + 5-MTHF 400 мкг) — метилирование, гомоцистеин' },
-    { id: 'magnesium', category: 'mineral', reason: 'Mg 400 мг — кофактор D3, сон, вазодилатация' },
+    { id: 'magnesium', category: 'mineral', reason: 'Mg 200 мг элементарного — кофактор D3, сон, вазодилатация' },
     { id: 'vitamin_c', category: 'vitamin', reason: 'VitC 500 мг — антиоксидант, регенерация витамина E' },
     { id: 'vitamin_e', category: 'antioxidant', reason: 'VitE 200 МЕ — липофильный антиоксидант (с Astaxanthin + VitC), защита мембран' },
   ];

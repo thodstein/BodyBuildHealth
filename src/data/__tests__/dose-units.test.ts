@@ -96,7 +96,7 @@ describe('formatDoseFromMg (каталожные dosage.mg)', () => {
 describe('formatDefaultDose / defaultDoseUnit', () => {
   it('значения DEFAULT_DOSAGES подписываются их натуральной единицей', () => {
     expect(defaultDoseUnit('vitamin_d3')).toBe('МЕ');
-    expect(formatDefaultDose('vitamin_d3', 5000)).toBe('5000 МЕ');
+    expect(formatDefaultDose('vitamin_d3', 2000)).toBe('2000 МЕ');
     expect(formatDefaultDose('selenium', 200)).toBe('200 мкг');
     expect(formatDefaultDose('nac', 600)).toBe('600 мг');
     expect(formatDefaultDose('probiotics', 20)).toBe('20 млрд КОЕ');

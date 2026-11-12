@@ -140,7 +140,7 @@ const TIER_RULES: TierRule[] = [
   { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']] }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']] }, tier3: { alerts: ['Ферритин = {value} ng/mL — избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо.'] } },
 
   // ─── ВИТАМИНЫ/МИНЕРАЛЫ ───
-  { marker: 'VITAMIN_D', tier1: { titrate: [['vitamin_d3', 2.0, 'D3 ↑10000 МЕ (было 5000)'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '15 мин/день']] }, tier2: { titrate: [['vitamin_d3', 4.0, 'D3 ↑20000 МЕ'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '20 мин/день']] }, tier3: { alerts: ['D3 = {value} ng/mL — тяжёлый дефицит. Врач. Высокие дозы под контролем.'] } },
+  { marker: 'VITAMIN_D', tier1: { titrate: [['vitamin_d3', 2.0, 'D3 ↑10000 МЕ (база 2000)'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '15 мин/день']] }, tier2: { titrate: [['vitamin_d3', 4.0, 'D3 ↑20000 МЕ'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '20 мин/день']] }, tier3: { alerts: ['D3 = {value} ng/mL — тяжёлый дефицит. Врач. Высокие дозы под контролем.'] } },
 
   { marker: 'B12', tier1: { titrate: [['vitamin_b12', 2.0, 'B12 ↑2000 мкг (метилкобаламин)']], nutrition: [['Животные продукты', 'Мясо/рыба/яйца']] }, tier2: { titrate: [['vitamin_b12', 5.0, 'B12 ↑5000 мкг']], nutrition: [['Врач', 'Невролог если нейропатия']] }, tier3: { alerts: ['B12 = {value} pg/mL — нейропатия. Врач. Инъекции B12.'] } },
 
@@ -192,7 +192,7 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'IRON', tier1: { nutrition: [['Красное мясо', 'Heme-iron'], ['Витамин C', '500 мг с едой']] }, tier2: { add: [['iron_bisglycinate', 'Железо бисглицинат 30 мг'], ['vitamin_c', 'Витамин C 500 мг']] }, tier3: { alerts: ['Железо = {value} — тяжёлый дефицит. Гематолог.'] } },
 
-  { marker: 'CALCIUM', tier1: { nutrition: [['Молочные', '500 мг Ca с едой'], ['Витамин D', 'Проверить D3']] }, tier2: { add: [['vitamin_d3', 'D3 5000 МЕ'], ['vitamin_k2', 'K2 200 мкг']] }, tier3: { alerts: ['Кальций = {value} — нарушение кальциевого обмена. Врач.'] } },
+  { marker: 'CALCIUM', tier1: { nutrition: [['Молочные', '500 мг Ca с едой'], ['Витамин D', 'Проверить D3']] }, tier2: { add: [['vitamin_d3', 'D3 2000 МЕ'], ['vitamin_k2', 'K2 200 мкг']] }, tier3: { alerts: ['Кальций = {value} — нарушение кальциевого обмена. Врач.'] } },
 
   { marker: 'PHOSPHORUS', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { nutrition: [['Врач', 'Нефролог/эндокринолог']] }, tier3: { alerts: ['Фосфор = {value} ммоль/л — нарушение. Врач.'] } },
 

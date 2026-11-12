@@ -193,7 +193,7 @@ const SUPPLEMENT_TIMING_DB: SupplementTiming[] = [
   {
     name: 'Витамин D3 + K2', morning: true, preWorkout: false, intraWorkout: false,
     postWorkout: false, evening: false, beforeBed: false, withFood: true, emptyStomach: false,
-    dosage: '5000 МЕ D3 + 100 мкг K2', notes: 'С первым приёмом пищи, содержащим жиры.',
+    dosage: '2000 МЕ D3 + 100 мкг K2', notes: 'С первым приёмом пищи, содержащим жиры.',
   },
   {
     name: 'Магний (бисглицинат)', morning: false, preWorkout: false, intraWorkout: false,

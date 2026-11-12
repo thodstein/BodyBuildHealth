@@ -5,7 +5,7 @@
  * UI/шерингом через `formatDefaultDose` (мкг/МЕ). Но фолбэк на дозу каталога
  * клал туда МИЛЛИГРАММЫ — биотин «5 мг» подписывался как «5 мкг» (1000× ниже),
  * а сравнение с фактическим приёмом (`support-genetics-diet`) считало
- * 100 мкг принятыми при 5000 мкг в плане.
+ * 100 мкг принятыми при 2000 мкг в плане.
  */
 import { describe, it, expect } from 'vitest';
 import { buildSubstances } from '../substances';
@@ -45,10 +45,10 @@ describe('buildSubstances: доза в натуральной единице (н
     expect(s.doseDisplay).toBe('3 г');
   });
 
-  it('DEFAULT_DOSAGES приоритетнее каталога (D3 5000 МЕ)', () => {
+  it('DEFAULT_DOSAGES приоритетнее каталога (D3 2000 МЕ)', () => {
     const [s] = buildSubstances(['vitamin_d3'], tzStub);
-    expect(s.doseMg).toBe(5000);
-    expect(s.doseDisplay).toBe('5000 МЕ');
+    expect(s.doseMg).toBe(2000);
+    expect(s.doseDisplay).toBe('2000 МЕ');
   });
 
   it('schedule подписывает те же единицы, что и карточка', () => {

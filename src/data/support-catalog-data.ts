@@ -168,8 +168,8 @@ vitamin_d3: {
     id: 'vitamin_d3', name: 'Vitamin D3', nameRu: 'Витамин D3',
     tier: 'core', category: ['vitamin', 'bone', 'hormonal', 'immunomodulator'],
     forms: [
-      { id: 'vitamin_d3', name: 'Vitamin D3 5000 IU', nameRu: 'Витамин D3 5000 МЕ', dose: '5000 МЕ с едой', best: true },
-      { id: 'VIT_D3_LIP', name: 'Vitamin D3 Liposomal', nameRu: 'Липосомальный D3 5000 МЕ', dose: '5000 МЕ', best: false, notes: 'Лучшая биодоступность' },
+      { id: 'vitamin_d3', name: 'Vitamin D3 2000 IU', nameRu: 'Витамин D3 2000 МЕ', dose: '2000 МЕ с едой', best: true },
+      { id: 'VIT_D3_LIP', name: 'Vitamin D3 Liposomal 5000 IU', nameRu: 'Липосомальный D3 5000 МЕ', dose: '5000 МЕ', best: false, notes: 'Коррекция дефицита — по назначению врача' },
     ],
     organs: ['BONES', 'IMMUNE_SYSTEM', 'MUSCLES', 'REPRODUCTIVE', 'ENDOCRINE'],
     systems: ['endocrine', 'hepatic', 'hematologic'],
@@ -198,7 +198,7 @@ vitamin_d3: {
     ],
     contraindications: ['Гиперкальциемия', 'Саркоидоз', 'Гиперпаратиреоз'],
     sideEffects: ['Гиперкальциемия при передозировке', 'Тошнота при высоких дозах'],
-    dosage: { mg: 0.125, timing: 'с жирной едой', form: 'D3 5000 МЕ' },
+    dosage: { mg: 0.05, timing: 'с жирной едой', form: 'D3 2000 МЕ' },
     bestForCourse: true,
     specialInstructions: ['Принимать с жирной пищей', 'Контролировать 25(OH)D каждые 8 нед'],
     analog: ['vitamin_k2', 'magnesium'],
@@ -206,7 +206,7 @@ vitamin_d3: {
     organMechanism: 'Костный метаболизм, кальциевый гомеостаз, минерализация матрикса, иммунный ответ',
     mechanismOfAction: 'Активация VDR-рецепторов, регуляция транскрипции генов кальций-связывающих белков (остеокальцин, TRPV6), модуляция кателицидина',
     clinicalEffect: 'Нормализация кальция, усиление врождённого иммунитета, поддержка синтеза тестостерона, профилактика остеопороза',
-    bestForm: 'Витамин D3 5000 МЕ с едой (липосомальная форма для лучшей биодоступности)',
+    bestForm: 'Витамин D3 2000 МЕ с едой (липосомальная форма для лучшей биодоступности)',
   },
 zinc: {
     id: 'zinc', name: 'Zinc', nameRu: 'Цинк',

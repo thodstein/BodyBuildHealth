@@ -3,7 +3,7 @@
  *
  * Две разные шкалы живут рядом и легко перепутать:
  *  - `DEFAULT_DOSAGES[id].mg` — НАТУРАЛЬНАЯ единица вещества
- *    (selenium 200 = 200 мкг, vitamin_d3 5000 = 5000 МЕ);
+ *    (selenium 200 = 200 мкг, vitamin_d3 2000 = 2000 МЕ);
  *  - `SUPPORT_CATALOG_DATA[id].dosage.mg` — МИЛЛИГРАММЫ.
  *
  * Если кто-то добавит в `DEFAULT_DOSAGES` значение в миллиграммах для
@@ -54,10 +54,10 @@ describe('DEFAULT_DOSAGES ↔ SUPPORT_CATALOG_DATA: шкала единиц', ()
     expect(broken, broken.join('; ')).toEqual([]);
   });
 
-  it('витамин D: 5000 МЕ по умолчанию = 0.125 мг в каталоге', () => {
-    expect((DEFAULT_DOSAGES as any).vitamin_d3.mg).toBe(5000);
+  it('витамин D: 2000 МЕ по умолчанию = 0.05 мг в каталоге', () => {
+    expect((DEFAULT_DOSAGES as any).vitamin_d3.mg).toBe(2000);
     expect(defaultDoseUnit('vitamin_d3')).toBe('МЕ');
-    expect(catalogEntry('vitamin_d3').dosage.mg).toBeCloseTo(0.125, 3);
+    expect(catalogEntry('vitamin_d3').dosage.mg).toBeCloseTo(0.05, 3);
   });
 
   it('селен: 200 мкг по умолчанию = 0.2 мг в каталоге', () => {

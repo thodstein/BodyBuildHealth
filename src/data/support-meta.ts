@@ -2966,7 +2966,9 @@ export const SUBSTANCE_ANALOGS: Record<string, { id: string; name: string; reaso
   omega3: [{ id: 'omega3', name: 'Омега-3', reason: 'Оригинал', form: 'EPA+DHA 60%', mg: 2000, timing: 'с едой, 2x/д' }, { id: 'egcg', name: 'EGCG', reason: 'Антиоксидант + липиды', form: 'капсулы', mg: 400, timing: 'натощак' }],
   tudca: [{ id: 'tudca', name: 'TUDCA', reason: 'Оригинал', form: 'капсулы', mg: 500, timing: 'перед едой, 2x/д' }, { id: 'milk_thistle', name: 'Силимарин', reason: 'Гепатопротекция (слабее)', form: 'капсулы', mg: 600, timing: 'с едой, 2x/д' }, { id: 'phosphatidylcholine', name: 'Фосфатидилхолин', reason: 'Мембраны гепатоцитов', form: 'капсулы', mg: 1200, timing: 'с едой' }],
   magnesium: [{ id: 'magnesium', name: 'Магний бисглицинат', reason: 'Оригинал', form: 'бисглицинат', mg: 400, timing: 'на ночь' }, { id: 'taurine', name: 'Таурин', reason: 'Расслабление + антиоксидант', form: 'порошок', mg: 2000, timing: 'натощак' }],
-  vitamin_d3: [{ id: 'vitamin_d3', name: 'Витамин D3', reason: 'Оригинал', form: 'капсулы', mg: 5000, timing: 'с едой (МЕ)' }, { id: 'vitamin_k2', name: 'Витамин K2', reason: 'Направление Ca в кости', form: 'МК-7', mg: 200, timing: 'с едой (мкг)' }],
+  // 2000 МЕ — единая базовая доза поддержки (см. DEFAULT_DOSAGES ниже): 50 мкг = 50 % UL 4000 МЕ.
+  // 5000 МЕ остаётся в протоколах коррекции дефицита (не базовая доза плана).
+  vitamin_d3: [{ id: 'vitamin_d3', name: 'Витамин D3', reason: 'Оригинал', form: 'капсулы', mg: 2000, timing: 'с едой (МЕ)' }, { id: 'vitamin_k2', name: 'Витамин K2', reason: 'Направление Ca в кости', form: 'МК-7', mg: 200, timing: 'с едой (мкг)' }],
   coq10: [
     { id: 'coq10', name: 'CoQ10 убихинол', reason: 'Оригинал (активная форма)', form: 'убихинол', mg: 200, timing: 'с едой (жирной)', therapeuticClass: 'cardioprotector', clinicalEquivalence: 'high', criticalNote: '⚠ Убихинол в 4.25x биодоступнее убихинона. 200 мг убихинола = 47 мг убихинола теоретически. После 40 лет — преимущественно убихинол.' },
     { id: 'pqq', name: 'PQQ', reason: 'Митохондриальный биогенез', form: 'BioPQQ® 20 мг', mg: 20, timing: 'с едой', therapeuticClass: 'mitochondrial', clinicalEquivalence: 'moderate' },
@@ -3119,7 +3121,7 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   curcumin: { mg: 1000, timing: 'с пиперином, с едой' },
   egcg: { mg: 400, timing: 'натощак' },
   glucosamine: { mg: 1500, timing: 'с едой' },
-  magnesium: { mg: 400, timing: 'на ночь (бисглицинат)' },
+  magnesium: { mg: 200, timing: 'на ночь (бисглицинат)' },
   nac: { mg: 1200, timing: 'натощак' },
   nebivolol: { mg: 5, timing: 'утро (ЧСС контроль!)' },
   omega3: { mg: 4000, timing: 'с едой, 2x/д (EPA+DHA 60%)' },
@@ -3128,7 +3130,11 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   tudca: { mg: 1000, timing: 'перед едой, 2x/д' },
   // Канон реестра 10-25 мг (SUPPORT_DOSING); EFSA UL добавки 12 мг — движок капит UL-гейтом
   vitamin_b6: { mg: 25, timing: 'с едой' },
-  vitamin_d3: { mg: 5000, timing: 'с едой (МЕ)' },
+  // ЕДИНАЯ базовая доза D3 = 2000 МЕ (50 мкг). Раньше здесь стояло 5000 МЕ, а
+  // титрация движка давала 50 мкг (=2000 МЕ) — план показывал одно, UL-блок считал
+  // другое. 5000 МЕ выше UL 4000 МЕ (NUTRIENT_UL 100 мкг) и годится только для
+  // коррекции дефицита по назначению врача — это текст протоколов, не базовая доза.
+  vitamin_d3: { mg: 2000, timing: 'с едой (МЕ)' },
   zinc: { mg: 30, timing: 'на ночь (пиколинат)' },
   piperine: { mg: 10, timing: 'с куркумином' }, chondroitin: { mg: 1200, timing: 'с едой' },
   msm: { mg: 2000, timing: 'с едой' }, copper: { mg: 2, timing: 'отдельно от цинка (мг)' },

@@ -258,7 +258,7 @@ const LONGEVITY_PROTOCOLS: LongevityProtocol[] = [
     name: 'Hormonal Optimization (Natural)', category: 'hormonal',
     interventions: [
       { name: 'Цинк + Магний', dosage: 'Zn 50мг + Mg 400мг', frequency: 'Перед сном', evidence: 'ZMA — классика для тестостерона.' },
-      { name: 'Витамин D3', dosage: '5000 МЕ', frequency: 'Утро', evidence: 'Корреляция D3 и тестостерона.' },
+      { name: 'Витамин D3', dosage: '2000 МЕ', frequency: 'Утро', evidence: 'Корреляция D3 и тестостерона.' },
       { name: 'Ашваганда KSM-66', dosage: '600 мг', frequency: 'Вечер', evidence: 'Снижает кортизол на 27%. ↑ тестостерон на 15%.' },
       { name: 'Сон 7.5-9ч', dosage: '—', frequency: 'Ежедневно', evidence: '1 нед <5ч сна снижает тестостерон на 10-15%.' },
       { name: 'Boron', dosage: '10 мг', frequency: 'Утро', evidence: '↑ свободный тестостерон на 25% в исследованиях.' },

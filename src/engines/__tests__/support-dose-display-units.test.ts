@@ -30,7 +30,7 @@ describe('buildSubstances: единицы доз', () => {
     const d = display(['nac', 'magnesium']);
     // nac 1200 мг из DEFAULT_DOSAGES → показываем в граммах.
     expect(d.nac).toBe('1.2 г');
-    expect(d.magnesium).toBe('400 мг');
+    expect(d.magnesium).toBe('200 мг');
     expect(d.nac).not.toContain('мкг');
     expect(d.magnesium).not.toContain('мкг');
   });

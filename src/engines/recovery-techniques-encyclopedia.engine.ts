@@ -562,7 +562,7 @@ const PERI_WORKOUT_PROTOCOLS: PeriWorkoutProtocol[] = [
     hydration: '500 мл воды',
     supplements: [
       { name: 'Омега-3', dosage: '3-6 г', timing: 'С едой', rationale: 'Противовоспалительное.' },
-      { name: 'Витамин D3 + K2', dosage: '5000 МЕ + 100 мкг', timing: 'С едой', rationale: 'С жирами для абсорбции.' },
+      { name: 'Витамин D3 + K2', dosage: '2000 МЕ + 100 мкг', timing: 'С едой', rationale: 'С жирами для абсорбции.' },
     ],
     totalKcal: '600-900 ккал',
   },

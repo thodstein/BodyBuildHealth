@@ -266,7 +266,7 @@ const SUPPLEMENT_STACKS: SupplementStack[] = [
   {
     name: 'Базовое здоровье (всем)', goal: 'Общее здоровье', level: 'beginner', monthlyCost: '~1,500 ₽',
     supplements: [
-      { name: 'Витамин D3 + K2', dosage: '5000 МЕ + 100 мкг', timing: 'Утро с жирной пищей', priority: 'essential', notes: '80% людей в дефиците. Иммунитет, кости, гормоны.' },
+      { name: 'Витамин D3 + K2', dosage: '2000 МЕ + 100 мкг', timing: 'Утро с жирной пищей', priority: 'essential', notes: '80% людей в дефиците. Иммунитет, кости, гормоны.' },
       { name: 'Омега-3', dosage: '2-3 г EPA+DHA', timing: 'С едой', priority: 'essential', notes: 'Сердце, мозг, воспаление.' },
       { name: 'Магний бисглицинат', dosage: '400 мг', timing: 'Перед сном', priority: 'essential', notes: 'Сон, расслабление, 300+ ферментов.' },
       { name: 'Цинк пиколинат', dosage: '25 мг', timing: 'С едой', priority: 'recommended', notes: 'Иммунитет, тестостерон, кожа.' },

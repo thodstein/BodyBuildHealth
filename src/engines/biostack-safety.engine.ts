@@ -2,24 +2,48 @@ import { SUPPORT_CATALOG_DATA } from '../data/support-database';
 import type { LabCompositeResult } from './lab-analysis.engine';
 import { INTERACTIONS_DB, resolveInteractionId } from '../data/support-interactions-db';
 import { hasBlockingInteraction, getDDIForPair, getDDIForDrug } from '../data/drug-drug-interactions';
+import { NUTRIENT_LIMITS_V2, resolveNutrient, type NutrientLimit } from './support-limits';
+import { resolveElementalFactor, elementalMgOf } from '../data/elemental-dose';
 
-/* ─── Daily Upper Limits (UL) in mg ─── */
-export const SUPPLEMENT_UPPER_LIMITS: Record<string, number> = {
-  zinc: 40, zinc_picolinate: 40, zinc_carnosine: 40,
-  selenium: 0.4, vitamin_b6: 100, vitamin_a: 3, vitamin_d3: 0.1,
-  vitamin_e: 1000, vitamin_c: 2000, calcium: 2500,
-  magnesium: 350, magnesium_citrate: 350, magnesium_glycinate: 350, magnesium_l_threonate: 350,
-  iron: 45, copper: 10, manganese: 11, boron: 20,
-  chromium: 1, iodine: 1.1, potassium: 4700,
-  coq10: 1200, alpha_lipoic: 1800, nac: 3000,
-  curcumin: 8000, berberine: 1500, ashwagandha: 6000,
-  l_carnitine: 4000, creatine: 20000, taurine: 6000,
-  theanine: 400, glycine: 30000, glutamine: 40000,
-};
+// Обратная совместимость: раньше пересчёт жил здесь, потребители импортируют его отсюда.
+export { resolveElementalFactor, elementalMgOf } from '../data/elemental-dose';
 
-/* ─── Daily OPTIMAL doses (mg) — above opt*1.5 flag for titrate/cycling ───
-   Used by checkStackToxicity to warn not just at UL but when a stack pushes
-   a substance well above its evidence-based optimal dose. */
+/* ─── ЕДИНЫЙ реестр пределов ───
+   До этого здесь жила ЧЕТВЁРТАЯ копия таблицы UL (`SUPPLEMENT_UPPER_LIMITS`)
+   со своими числами (B6 = 100 мг IOM вместо EFSA 12 мг, селен = 400 вместо 255)
+   и одной единицей («мг») — расходилась с `NUTRIENT_UL` движка и с реестром.
+   Источник теперь один — `NUTRIENT_LIMITS_V2`; `SUPPLEMENT_UPPER_LIMITS`
+   остаётся производным видом (мг) для внешних потребителей и тестов.
+   ВАЖНО: UL ≠ safe level ≠ клинический ориентир. «Красным» может быть только
+   превышение настоящего UL; `SafeLevel`/`ClinicalGuidance` — жёлтая титрация. */
+
+/** Предел реестра в мг ЭЛЕМЕНТАРНОГО вещества (мкг/МЕ приводим к мг). */
+function limitToMg(lim: NutrientLimit): number | undefined {
+  if (!(lim.value > 0)) return undefined;                    // NotEstablished (value = 0)
+  if (lim.unit === 'mg') return lim.value;
+  if (lim.unit === 'mcg') return lim.value / 1000;
+  if (lim.unit === 'iu') return lim.value * 0.025 / 1000;    // 1 МЕ витамина D = 0.025 мкг
+  return undefined;
+}
+
+/** Производный вид реестра в мг элементарного вещества — обратная совместимость. */
+export const SUPPLEMENT_UPPER_LIMITS: Record<string, number> = (() => {
+  const out: Record<string, number> = {};
+  for (const [key, lim] of Object.entries(NUTRIENT_LIMITS_V2)) {
+    if (lim.kind === 'NotEstablished') continue;
+    const mg = limitToMg(lim);
+    if (mg !== undefined) out[key] = mg;
+  }
+  // Исторический ключ проекта: реестр зовёт нутриент `vitamin_d`.
+  if (out.vitamin_d !== undefined) out.vitamin_d3 = out.vitamin_d;
+  return out;
+})();
+
+/* ─── Daily OPTIMAL doses (mg элементарного вещества) ───
+   Это НЕ регуляторный предел, а клинический оптимум: выше opt×1.5 движок
+   предлагает титрацию/циклирование (`severity: 'titrate'`). Для ботаники и
+   аминокислот без установленного UL это единственный честный контур — им
+   НЕЛЬЗЯ выдавать выдуманный «UL». */
 export const SUPPLEMENT_OPTIMAL_LIMITS: Record<string, number> = {
   zinc: 30, selenium: 0.2, vitamin_b6: 25, vitamin_c: 1000,
   calcium: 1200, iron: 18, copper: 3, manganese: 5, boron: 10,
@@ -79,14 +103,23 @@ export const ABSORPTION_ENHANCERS: Array<{ target: string; enhancer: string; eff
 export interface ToxWarning {
   substanceId: string;
   name: string;
+  /** Суммарная доза в мг ЭЛЕМЕНТАРНОГО вещества. */
   totalDose: number;
+  /** Предел/оптимум в мг элементарного вещества. */
   ul: number;
   percentUL: number;
   severity: 'safe' | 'warning' | 'danger' | 'titrate';
   message: string;
+  /** Доза в правильной единице («255 мкг», «4000 МЕ») — UI не должен склеивать «мг». */
+  doseText?: string;
+  /** Предел в той же единице, что и `doseText`. */
+  limitText?: string;
+  /** true — доза пересчитана из массы соли в элементарное вещество. */
+  elemental?: boolean;
 }
 
-// Canonical nutrient → UL key (resolves compound forms to base nutrient)
+/* Легаси-карта форм → базовый нутриент. Основной резолв теперь `resolveNutrient`
+   (реестр, границы слов), здесь остаются только исторические псевдонимы каталога. */
 export const UL_CANONICAL: Record<string, string> = {
   'zinc_picolinate': 'zinc', 'zinc_carnosine': 'zinc', 'zinc_gluconate': 'zinc',
   'magnesium_citrate': 'magnesium', 'magnesium_glycinate': 'magnesium', 'magnesium_l_threonate': 'magnesium', 'magnesium_oxide': 'magnesium',
@@ -99,161 +132,177 @@ export const UL_CANONICAL: Record<string, string> = {
   'chromium_picolate': 'chromium', 'iodine_kelp': 'iodine', 'potassium_citrate': 'potassium',
 };
 
-/* ─── Dose-unit normalization ───
-   SUPPLEMENT_UPPER_LIMITS are in mg of ELEMENTAL nutrient.
-   Some catalog entries store dosage.mg in IU (МЕ), mcg (мкг) or whole SALT mass
-   (e.g. "Магний 400 мг" = 400 мг цитрата/глицината ≈ 56–64 мг элементарного Mg).
-   factor converts stored dosage.mg → true elemental mg before UL check.
-   (Prevents false "danger" alerts: D3 5000 МЕ, or Mg 400 мг соли vs UL 350 мг.) */
-export const DOSE_TO_ELEMENTAL_MG: Record<string, number> = {
-  vitamin_d3: 0.000025,          // 1 МЕ = 0.025 мкг → 5000 МЕ = 0.125 мг
-  selenium: 0.001,               // мкг → мг (200 мкг = 0.2 мг)
-  selenium_methylselenocysteine: 0.001,
-  selenium_yeast: 0.001,
-  vitamin_k2: 0.001,             // мкг → мг
-  vitamin_b12: 0.001,            // мкг → мг
-  folate: 0.001,                 // мкг → мг
-  magnesium_l_threonate: 0.072,  // ~7.2% элементарного Mg (144 мг из 2000 мг соли)
-};
+/* ─── Пересчёт «как на этикетке» → элементарное вещество ───
+   Единственная реализация — `src/data/elemental-dose.ts` (её же читает карточка
+   вещества в калькуляторе). Каталог хранит МИЛЛИГРАММЫ для всех веществ:
+   селен 0.2 мг = 200 мкг, D3 0.05 мг = 2000 МЕ, B12 1 мг = 1000 мкг — поэтому
+   для микронутриентов коэффициент не нужен (раньше здесь стояли 0.001/0.000025,
+   и доза занижалась в 1000×/40000×, а превышения селена/D3 молча не находились).
+   Коэффициент нужен только минералам, где на этикетке МАССА СОЛИ
+   («Магний цитрат 400 мг» ≈ 64 мг элементарного Mg).
+   Решение продукта (ноябрь 2026): UL считаем в пересчёте на ЭЛЕМЕНТАРНОЕ
+   вещество (фактическое количество в таблетке), а не массу соли. */
 
-/* Elemental fraction of the salt by compound form (Cyrillic keywords from catalog `form`).
-   Used when a mineral is stored as salt mass (not the special IU/mcg cases above). */
-const MINERAL_FORM_FRACTION: Record<string, Record<string, number>> = {
-  magnesium: {
-    'оксид': 0.603, 'треонат': 0.072, 'цитрат': 0.16, 'глицинат': 0.139,
-    'бисглицинат': 0.139, 'лизинат': 0.106, 'малат': 0.155, 'таурат': 0.087,
-    'хлорид': 0.12, 'лактат': 0.12,
-  },
-  zinc: {
-    'пиколинат': 0.20, 'глюконат': 0.143, 'карнозин': 0.22, 'цитрат': 0.345,
-    'оксид': 0.80, 'сульфат': 0.23, 'бисглицинат': 0.16, 'хелат': 0.16,
-  },
-  iron: {
-    'бисглицинат': 0.16, 'сульфат': 0.20, 'фумарат': 0.329, 'глюконат': 0.12, 'цитрат': 0.18,
-  },
-  calcium: {
-    'карбонат': 0.40, 'цитрат': 0.21, 'глюконат': 0.089, 'лактат': 0.13, 'малат': 0.13,
-  },
-  copper: {
-    'бисглицинат': 0.154, 'глюконат': 0.143, 'цитрат': 0.38, 'сульфат': 0.254,
-  },
-  manganese: {
-    'глицинат': 0.136, 'глюконат': 0.228, 'сульфат': 0.368, 'цитрат': 0.30,
-  },
-  boron: {
-    'цитрат': 0.16, 'глицинат': 0.16,
-  },
-  potassium: {
-    'цитрат': 0.28, 'хлорид': 0.52, 'глюконат': 0.14, 'оратат': 0.30,
-  },
-};
-
-/* Conservative default elemental fraction if the exact form keyword is not recognized. */
-const MINERAL_DEFAULT_FRACTION: Record<string, number> = {
-  magnesium: 0.15, zinc: 0.20, iron: 0.16, calcium: 0.30,
-  copper: 0.15, manganese: 0.15, boron: 0.16, potassium: 0.30,
-};
-
-/**
- * Resolve the conversion factor (stored salt mass → elemental mg) for a catalog id.
- * Returns `undefined` when the nutrient is stored directly as elemental (factor 1).
- */
-export function resolveElementalFactor(id: string, cat: any): number | undefined {
-  const lc = id.toLowerCase();
-  // 1) Explicit IU/mcg/special-salt override
-  if (DOSE_TO_ELEMENTAL_MG[lc] !== undefined) return DOSE_TO_ELEMENTAL_MG[lc];
-  // 2) Mineral salt → derive from compound form
-  const keyHint = lc.includes('magnesium') ? 'magnesium'
-    : lc.includes('zinc') ? 'zinc'
-    : lc.includes('iron') ? 'iron'
-    : lc.includes('calcium') ? 'calcium'
-    : lc.includes('copper') ? 'copper'
-    : lc.includes('manganese') ? 'manganese'
-    : lc.includes('boron') ? 'boron'
-    : lc.includes('potassium') ? 'potassium'
-    : '';
-  if (!keyHint) return undefined; // non-mineral: stored as-is (factor 1)
-  const form = ((cat?.dosage?.form || '') + ' ' + (cat?.nameRu || '')).toLowerCase();
-  const table = MINERAL_FORM_FRACTION[keyHint];
-  for (const kw of Object.keys(table)) {
-    if (form.includes(kw)) return table[kw];
-  }
-  return MINERAL_DEFAULT_FRACTION[keyHint];
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
 }
 
+/** Число в единице предела реестра (мг / мкг / МЕ) — без «склейки» в мг. */
+function formatLimitAmount(mg: number, unit: NutrientLimit['unit']): string {
+  if (unit === 'mg') return `${round2(mg)} мг`;
+  if (unit === 'mcg') return `${round2(mg * 1000)} мкг`;
+  return `${Math.round(mg * 40000)} МЕ`; // iu — в реестре только витамин D
+}
+
+/**
+ * Ключ агрегации: канонический нутриент реестра (`resolveNutrient`).
+ * Для ботаники/аминокислот без регуляторного предела — их id, если у них есть
+ * клинический оптимум (иначе `null`: лучше молчание, чем выдуманный «UL»).
+ */
+function aggregationKey(id: string, cat: any): string | null {
+  const canon = resolveNutrient(id) ?? resolveNutrient(cat?.nameRu) ?? resolveNutrient(cat?.name);
+  if (canon) return canon;
+  const lc = id.toLowerCase();
+  if (UL_CANONICAL[lc]) return UL_CANONICAL[lc];
+  if (SUPPLEMENT_OPTIMAL_LIMITS[lc] !== undefined) return lc;
+  return null;
+}
+
+/**
+ * Токсикологический контроль стека: сумма по нутриентам в мг ЭЛЕМЕНТАРНОГО
+ * вещества против единого реестра пределов (`NUTRIENT_LIMITS_V2`).
+ *
+ * Семантика типов сохранена: `danger`/`warning` — только превышение настоящего
+ * UL; `safe` — 80–100 % UL; `titrate` — выше клинического оптимума/ориентира,
+ * что НЕ является «превышением нормы».
+ */
 export function checkStackToxicity(stackIds: string[]): ToxWarning[] {
   const warnings: ToxWarning[] = [];
-  const doseSum: Record<string, { total: number; ids: string[]; names: string[] }> = {};
+  const agg: Record<string, {
+    totalMg: number;
+    ids: string[];
+    names: string[];
+    displayId: string;
+    elemental: boolean;
+  }> = {};
 
   for (const id of stackIds) {
     const cat = SUPPORT_CATALOG_DATA[id];
-    if (!cat?.dosage?.mg) continue;
-    const lc = id.toLowerCase();
-    // Normalize IU/mcg/salt-mass → elemental mg before UL comparison
-    const convFactor = resolveElementalFactor(id, cat);
-    const doseMg = convFactor !== undefined ? cat.dosage.mg * convFactor : cat.dosage.mg;
+    if (!cat?.dosage?.mg || !(cat.dosage.mg > 0)) continue;
+    const key = aggregationKey(id, cat);
+    if (!key) continue;
+    const factor = resolveElementalFactor(id, cat);
+    const doseMg = elementalMgOf(id, cat);
+    if (!(doseMg > 0)) continue;
     const name = cat.nameRu || cat.name || id;
-
-    let mappedKey = UL_CANONICAL[lc] || '';
-    if (!mappedKey) {
-      for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
-        if (lc.includes(ulKey) || ulKey.includes(lc)) { mappedKey = ulKey; break; }
-      }
-    }
-    if (!mappedKey) {
-      const names = cat.nameRu?.toLowerCase() || '';
-      for (const ulKey of Object.keys(SUPPLEMENT_UPPER_LIMITS)) {
-        if (names.includes(ulKey)) { mappedKey = ulKey; break; }
-      }
-    }
-    if (!mappedKey) continue;
-
-    if (!doseSum[mappedKey]) doseSum[mappedKey] = { total: 0, ids: [], names: [] };
-    doseSum[mappedKey].total += doseMg;
-    doseSum[mappedKey].ids.push(id);
-    doseSum[mappedKey].names.push(name);
+    const acc = agg[key] ?? (agg[key] = {
+      totalMg: 0, ids: [], names: [], displayId: id, elemental: false,
+    });
+    acc.totalMg += doseMg;
+    acc.ids.push(id);
+    if (!acc.names.includes(name)) acc.names.push(name);
+    if (factor !== undefined) acc.elemental = true;
   }
 
-  for (const [key, data] of Object.entries(doseSum)) {
-    const ul = SUPPLEMENT_UPPER_LIMITS[key];
-    const opt = SUPPLEMENT_OPTIMAL_LIMITS[key];
-    if (!ul && !opt) continue;
+  for (const [key, data] of Object.entries(agg)) {
+    const lim = NUTRIENT_LIMITS_V2[key];
+    const limitMg = lim ? limitToMg(lim) : undefined;
+    const optMg = SUPPLEMENT_OPTIMAL_LIMITS[key];
+    const elementalNote = data.elemental ? ' (в пересчёте на элементарное вещество)' : '';
+    const totalText = lim && lim.unit
+      ? formatLimitAmount(data.totalMg, lim.unit)
+      : `${round2(data.totalMg)} мг`;
+    // Несколько источников одного нутриента — показываем все («Цинк + Пиколинат цинка»).
+    const nameText = data.names.join(' + ');
 
-    let pushed = false;
-
-    if (ul) {
-      const pct = (data.total / ul) * 100;
+    // 1) Настоящий UL — единственный тип, где превышение = токсический риск.
+    if (lim && lim.kind === 'UL' && limitMg !== undefined && limitMg > 0) {
+      const pct = Math.round((data.totalMg / limitMg) * 100);
       if (pct >= 80) {
         const severity = pct > 150 ? 'danger' : pct > 100 ? 'warning' : 'safe';
+        const ulText = formatLimitAmount(limitMg, lim.unit);
+        // Альтернативное значение другого регулятора — показываем только в мягком
+        // предупреждении, чтобы не выдавать его за применённый предел.
+        const altText = lim.altValue != null && lim.altJurisdiction
+          ? (lim.unit === 'iu'
+            ? `${round2(lim.altValue)} мкг`
+            : formatLimitAmount(lim.altValue, lim.unit))
+          : '';
+        const alt = altText ? ` (${lim.altJurisdiction} ${lim.altYear}: ${altText})` : '';
         warnings.push({
-          substanceId: key,
-          name: data.names.join(' + '),
-          totalDose: Math.round(data.total),
-          ul,
-          percentUL: Math.round(pct),
+          substanceId: data.displayId,
+          name: nameText,
+          totalDose: round2(data.totalMg),
+          ul: round2(limitMg),
+          percentUL: pct,
           severity,
+          doseText: totalText,
+          limitText: ulText,
+          elemental: data.elemental,
           message: severity === 'danger'
-            ? `⛔ СУММАРНАЯ ДОЗА ${Math.round(data.total)} мг превышает UL ${ul} мг в ${Math.round(pct / 100)}x! Опасно.`
+            ? `⛔ Суммарно ${totalText}${elementalNote} — это ${pct}% от UL ${ulText} (${lim.jurisdiction} ${lim.year}). Опасно: ${lim.criticalEffect}.`
             : severity === 'warning'
-            ? `⚠ Суммарная доза ${Math.round(data.total)} мг близка к UL ${ul} мг (${Math.round(pct)}%). Риск токсичности.`
-            : `⚡ Суммарно ${Math.round(data.total)} мг из UL ${ul} мг (${Math.round(pct)}%) — OK, но следите.`,
+            ? `⚠ Суммарно ${totalText}${elementalNote} — ${pct}% от UL ${ulText} (${lim.jurisdiction} ${lim.year}). Риск токсичности: ${lim.criticalEffect}.`
+            : `⚡ Суммарно ${totalText}${elementalNote} — ${pct}% от UL ${ulText}${alt}. OK, но следите.`,
         });
-        pushed = true;
       }
+      continue;
     }
 
-    // Point D: also warn when a stack pushes a substance well above its
-    // evidence-based OPTIMAL dose (not just UL) → suggest titration/cycling.
-    if (!pushed && opt && data.total > opt * 1.5) {
-      const pctOpt = Math.round((data.total / opt) * 100);
+    // 2) SafeLevel — выше него НЕ наблюдалось adverse effects, но это не UL.
+    if (lim && lim.kind === 'SafeLevel' && limitMg !== undefined && limitMg > 0) {
+      const pct = Math.round((data.totalMg / limitMg) * 100);
+      if (pct >= 100) {
+        warnings.push({
+          substanceId: data.displayId,
+          name: nameText,
+          totalDose: round2(data.totalMg),
+          ul: round2(limitMg),
+          percentUL: pct,
+          severity: 'warning',
+          doseText: totalText,
+          limitText: formatLimitAmount(limitMg, lim.unit),
+          elemental: data.elemental,
+          message: `⚠ Суммарно ${totalText}${elementalNote} — выше ${lim.jurisdiction} ${lim.year} safe level ${formatLimitAmount(limitMg, lim.unit)}. Это НЕ порог токсичности: UL для вещества не установлен, риск оценивается по анализам.`,
+        });
+      }
+      continue;
+    }
+
+    // 3) Клинический ориентир — не регуляторный предел.
+    if (lim && lim.kind === 'ClinicalGuidance' && limitMg !== undefined && limitMg > 0) {
+      const pct = Math.round((data.totalMg / limitMg) * 100);
+      if (pct >= 100) {
+        warnings.push({
+          substanceId: data.displayId,
+          name: nameText,
+          totalDose: round2(data.totalMg),
+          ul: round2(limitMg),
+          percentUL: pct,
+          severity: 'titrate',
+          doseText: totalText,
+          limitText: formatLimitAmount(limitMg, lim.unit),
+          elemental: data.elemental,
+          message: `↕ Суммарно ${totalText}${elementalNote} — выше клинического ориентира ${formatLimitAmount(limitMg, lim.unit)} (${pct}%). Это не регуляторный UL; рассмотрите снижение/циклирование.`,
+        });
+      }
+      continue;
+    }
+
+    // 4) Нет предела, но есть клинический оптимум → титрация, не «UL».
+    if (optMg !== undefined && optMg > 0 && data.totalMg > optMg * 1.5) {
+      const pctOpt = Math.round((data.totalMg / optMg) * 100);
       warnings.push({
-        substanceId: key,
-        name: data.names.join(' + '),
-        totalDose: Math.round(data.total),
-        ul: opt,
+        substanceId: data.displayId,
+        name: nameText,
+        totalDose: round2(data.totalMg),
+        ul: round2(optMg),
         percentUL: pctOpt,
         severity: 'titrate',
-        message: `↕ Суммарная доза ${Math.round(data.total)} мг выше оптимальной (~${opt} мг, ${pctOpt}%). Рассмотрите снижение/циклирование.`,
+        doseText: totalText,
+        limitText: `${round2(optMg)} мг`,
+        elemental: data.elemental,
+        message: `↕ Суммарно ${totalText}${elementalNote} выше оптимальной (~${round2(optMg)} мг, ${pctOpt}%). Рассмотрите снижение/циклирование.`,
       });
     }
   }

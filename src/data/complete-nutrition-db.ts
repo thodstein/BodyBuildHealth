@@ -312,9 +312,9 @@ export const COMPLETE_FOOD_DB: FoodNutrient[] = [
     typicalPortion: 4, glycemicIndex: 'none', athleteRating: 5, notes: 'EPA+DHA. 3-6г/день на курсе.',
   },
   {
-    name: 'vitamin_d3', nameRu: 'Витамин D3 5000 МЕ', category: 'supplement',
-    per100g: { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, sugar: 0, saturatedFat: 0, sodiumMg: 0, potassiumMg: 0, calciumMg: 0, ironMg: 0, magnesiumMg: 0, zincMg: 0, vitDMcg: 125, vitB12Mcg: 0, vitCMg: 0, omega3g: 0 },
-    typicalPortion: 1, glycemicIndex: 'none', athleteRating: 5, notes: '5000 МЕ/день. С K2 и жирной пищей.',
+    name: 'vitamin_d3', nameRu: 'Витамин D3 2000 МЕ', category: 'supplement',
+    per100g: { kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, sugar: 0, saturatedFat: 0, sodiumMg: 0, potassiumMg: 0, calciumMg: 0, ironMg: 0, magnesiumMg: 0, zincMg: 0, vitDMcg: 5000, vitB12Mcg: 0, vitCMg: 0, omega3g: 0 },
+    typicalPortion: 1, glycemicIndex: 'none', athleteRating: 5, notes: '2000 МЕ/день (50 мкг). С K2 и жирной пищей.',
   },
   {
     name: 'magnesium_bisglycinate', nameRu: 'Магний бисглицинат', category: 'supplement',

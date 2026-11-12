@@ -5,7 +5,7 @@
  * МИЛЛИГРАММЫ), а потребители подписывали её `formatDefaultDose` /
  * сравнивали с фактическим приёмом, которые работают в натуральной единице
  * (мкг/МЕ). Итог: селен «0.2 мкг» вместо 200 мкг, витамин D «0.13 МЕ»
- * вместо 5000 МЕ, а биотин считался перекрытым приёмом 5 мкг.
+ * вместо 2000 МЕ, а биотин считался перекрытым приёмом 5 мкг.
  */
 import { describe, it, expect } from 'vitest';
 import { subDosage } from '../Calc.mapper';
@@ -18,10 +18,10 @@ describe('subDosage: натуральная единица, а не мг кат�
     expect(formatDefaultDose('selenium', d!.mg)).toBe('200 мкг');
   });
 
-  it('витамин D3: 0.125 мг каталога → 5000 (МЕ)', () => {
+  it('витамин D3: 0.05 мг каталога → 2000 (МЕ)', () => {
     const d = subDosage('vitamin_d3');
-    expect(d?.mg).toBe(5000);
-    expect(formatDefaultDose('vitamin_d3', d!.mg)).toBe('5000 МЕ');
+    expect(d?.mg).toBe(2000);
+    expect(formatDefaultDose('vitamin_d3', d!.mg)).toBe('2000 МЕ');
   });
 
   it('биотин: 5 мг каталога → 5000 мкг', () => {

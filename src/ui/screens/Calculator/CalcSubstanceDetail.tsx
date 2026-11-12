@@ -7,6 +7,7 @@ import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
 import { DEFAULT_DOSAGES } from '../../../data/support-meta';
 import { formatDefaultDose } from '../../../data/dose-units';
+import { resolveElementalFactor, elementalMgOf } from '../../../data/elemental-dose';
 import { getSubstanceForm } from '../../../data/substance-forms';
 import { getTitrationProtocol } from '../../../data/titration-protocols';
 import { isCuratedSupport, isSupportSubstanceId } from '../../../data/support-db/mech-map';
@@ -52,6 +53,12 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   const derivedMech = mechsCovered.length > 0 && !isCuratedSupport(id);
 
   const doseMg = dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null;
+  // Минералы каталога хранят МАССУ СОЛИ («магний цитрат 400 мг»), а UL-проверка и
+  // текст рекомендации — элементарное вещество. Показываем пересчёт рядом с дозой,
+  // иначе «400 мг» читаются как 400 мг элементарного магния (в 6 раз больше).
+  const saltFactor = catalogEntry ? resolveElementalFactor(id, catalogEntry) : undefined;
+  const elementalDose = catalogEntry && dose ? elementalMgOf(id, catalogEntry, dose.mg) : 0;
+  const showElemental = saltFactor !== undefined && elementalDose > 0;
 
   return (
     <div className="calc-substdetail" style={{ ...GLASS, padding: 0, marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)', overflow: 'hidden' }}>
@@ -65,6 +72,14 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
         {doseMg !== null && (
           <span style={{ fontSize: 10, fontWeight: 700, color: isTitrated ? '#f59e0b' : '#00e68a', whiteSpace: 'nowrap' }}>
             {formatDefaultDose(id, doseMg)}
+          </span>
+        )}
+        {showElemental && (
+          <span
+            title="Масса соли с этикетки приведена к фактическому количеству минерала — именно эта величина сравнивается с UL"
+            style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}
+          >
+            ≈ {Math.round(elementalDose * 10) / 10} мг элементарного
           </span>
         )}
         {dose && (

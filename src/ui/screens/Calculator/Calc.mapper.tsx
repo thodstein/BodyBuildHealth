@@ -95,7 +95,7 @@ const JOINT_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'collagen_uc2', nameRu: 'Коллаген UC-II (неденатурир.)', dose: '40 мг', desc: 'Оральная толерантность, ↓ атаку на коллаген сустава' },
   { id: 'msm', nameRu: 'MSM (Метилсульфонилметан)', dose: '2000 мг', desc: 'Донатор серы, ↓ NF-κB, ↓ боль на 25-40%' },
   { id: 'vitamin_c', nameRu: 'Витамин C', dose: '1000 мг', desc: 'Кофактор пролил/лизил-гидроксилаз → тройная спираль' },
-  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '5000 МЕ', desc: 'VDR-активация, Ca²⁺ гомеостаз, минерализация' },
+  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '2000 МЕ', desc: 'VDR-активация, Ca²⁺ гомеостаз, минерализация' },
   { id: 'vitamin_k2', nameRu: 'Витамин K2', dose: '100 мкг', desc: 'Активация остеокальцина → Ca²⁺ в кости' },
   { id: 'omega3', nameRu: 'Омега-3 (очищенный ЭПК)', dose: '2-3 г', desc: 'Резолвины/протектины, ↓ воспаления в синовии (адъювант, слабее куркумина/босвеллии при ОА)' },
   { id: 'manganese', nameRu: 'Марганец', dose: '5-10 мг', desc: 'Кофактор гликозилтрансфераз → синтез ГАГ' },
@@ -213,7 +213,7 @@ const NEURO_CATALOG: { id: string; nameRu: string; dose: string; desc: string }[
   { id: 'x5htp', nameRu: '5-HTP', dose: '100 мг', desc: 'Прямой субстрат серотонина, ↓ тревожность, ↑ сон' },
   { id: 'curcumin', nameRu: 'Куркумин + пиперин', dose: '500 мг', desc: '↓ NF-κB, ↓ нейровоспаление, ↑ BDNF' },
   { id: 'omega3', nameRu: 'Омега-3 (DHA для мозга)', dose: '3 г', desc: 'DHA — структурный липид нейрональных мембран' },
-  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '5000 МЕ', desc: '↑ BDNF, ↓ нейровоспаление, VDR в гиппокампе' },
+  { id: 'vitamin_d3', nameRu: 'Витамин D3', dose: '2000 МЕ', desc: '↑ BDNF, ↓ нейровоспаление, VDR в гиппокампе' },
   { id: 'vitamin_b6', nameRu: 'B6 (P5P)', dose: '50 мг', desc: 'Кофактор синтеза ГАМК, серотонина, дофамина' },
   { id: 'vitamin_b12', nameRu: 'B12 (метилкобаламин)', dose: '1000 мкг', desc: 'Синтез миелина, кофактор метионин-синтазы' },
   { id: 'alpha_lipoic', nameRu: 'α-Липоевая кислота', dose: '600 мг', desc: 'Кофактор митохондрий, ↓ окислит. стресс, нейропатия' },
@@ -3779,11 +3779,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   <span style={{ fontSize:9, fontWeight:700, color:'#ffffff' }}>{subNameRu(w.substanceId)}</span>
                 </div>
                 <div style={{ fontSize:8, color:col, lineHeight:1.4 }}>{w.message}</div>
-                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.totalDose} / {w.ul} мг)</div>}
+                {w.percentUL > 0 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.4 }}>→ {w.percentUL}% от {isTitr ? 'оптимума' : 'UL'} ({w.doseText || `${w.totalDose} мг`} / {w.limitText || `${w.ul} мг`})</div>}
               </div>
             );
           })}
-          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел (элементарное вещество). Титрация — доза выше клинического оптимума, рекомендуется циклирование. Проверка идёт по ТИПОВОЙ дозе каталога; UL по фактическим дозам плана — в недельном плане поддержки.</div>
+          <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginTop:3 }}>UL — верхний допустимый предел из единого реестра (EFSA/IOM) в пересчёте на ЭЛЕМЕНТАРНОЕ вещество: масса соли на этикетке («магний цитрат 400 мг») приводится к фактическому количеству минерала. Титрация — доза выше клинического оптимума или ориентира (не регуляторный UL), рекомендуется циклирование. Проверка идёт по ТИПОВОЙ дозе каталога; UL по фактическим дозам плана — в недельном плане поддержки.</div>
           <SafetyCumulativeLoad planResult={planResult} />
             </div>
           )}
