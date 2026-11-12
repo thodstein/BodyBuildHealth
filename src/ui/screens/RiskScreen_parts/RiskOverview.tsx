@@ -210,8 +210,8 @@ export const RiskOverview: React.FC<{
       )}
 
       {/* Support Coverage — How support reduces risk per system */}
-      <Section id="support_coverage" icon="shield" title="Покрытие поддержкой">
-        <div style={{ fontSize:12, color:'#fff', marginBottom:8, lineHeight:1.5 }}>Насколько препараты поддержки снижают риски по системам</div>
+      <Section id="support_coverage" icon="shield" title="Снижение риска поддержкой">
+        <div style={{ fontSize:12, color:'#fff', marginBottom:8, lineHeight:1.5 }}>Доля снижённого риска по системам — не доля закрытых механизмов (она в карточке механизм-модели)</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
           {(() => {
             const supportData = riskResult?.coverageMap || {};

@@ -176,6 +176,17 @@ describe('fav plan source', () => {
     expect(container.textContent).toContain('Снижение риска: 75/100');
   });
 
+  it('план без механизмов риска (0 из 0) не показывает «Механизмы: 0%»', () => {
+    localStorage.setItem(
+      'he_my_plans',
+      JSON.stringify([{ id: 12, name: 'Нет данных', level: 'mid', date: new Date().toISOString(), subs: [], riskBefore: 0, riskAfter: 0, supportScore: 100, mechanismCoverage: { covered: 0, total: 0, percent: 0 } }]),
+    );
+    const { container } = render(
+      <SupportFavoritesView s={planMocks({ planSubTab: 'myplans' })} />,
+    );
+    expect(container.textContent).not.toContain('Механизмы:');
+  });
+
   it('старый план без supportScore/недели — без «NaN» и «undefined»', () => {
     localStorage.setItem(
       'he_my_plans',

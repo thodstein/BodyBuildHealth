@@ -397,6 +397,13 @@ export interface PlanSubstance {
 export interface PlanMechanism {
   mechKey: string; mechLabel: string; systemLabel: string;
   substances: string[]; riskBefore: number; riskAfter: number;
+  /**
+   * Механизм закрыт поддержкой (k > 0, как в `mechanismCoverageOf`).
+   * Не покрытые механизмы попадают в `uncoveredMechanisms` и подписываются в UI.
+   */
+  covered?: boolean;
+  /** Лучший уровень доказательности среди веществ, покрывающих механизм (A/B/C). */
+  confidence?: string;
 }
 
 export interface PlanResult {

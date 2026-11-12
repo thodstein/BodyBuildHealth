@@ -527,7 +527,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                         </div>
                         {/* Покрытие механизмов — отдельная величина (доля механизмов риска,
                             закрытых поддержкой). В старых планах поля нет — молчим. */}
-                        {p.mechanismCoverage && Number.isFinite(p.mechanismCoverage.percent) && (
+                        {p.mechanismCoverage && p.mechanismCoverage.total > 0 && Number.isFinite(p.mechanismCoverage.percent) && (
                           <div style={{ fontSize:8, color:'var(--text-dim)', marginTop:2 }}>
                             Механизмы: {p.mechanismCoverage.percent}% ({p.mechanismCoverage.covered} из {p.mechanismCoverage.total})
                           </div>
@@ -607,7 +607,7 @@ export const SupportFavoritesView: React.FC<{ s: Record<string, any> }> = ({ s }
                     {r.calcResult && (
                       <div style={{ fontSize:8, color:'var(--text-dim)' }}>
                         Риск: {Math.round(r.calcResult.riskBeforeSupport)}% → {Math.round(r.calcResult.riskAfterSupport)}% · Снижение риска: {Math.round(r.calcResult.supportScore)}/100
-                        {r.calcResult.mechanismCoverage && Number.isFinite(r.calcResult.mechanismCoverage.percent)
+                        {r.calcResult.mechanismCoverage && r.calcResult.mechanismCoverage.total > 0 && Number.isFinite(r.calcResult.mechanismCoverage.percent)
                           ? ` · Механизмы: ${r.calcResult.mechanismCoverage.percent}% (${r.calcResult.mechanismCoverage.covered} из ${r.calcResult.mechanismCoverage.total})`
                           : ''}
                         {/* Старые записи (без riskStatus) писались до появления честного

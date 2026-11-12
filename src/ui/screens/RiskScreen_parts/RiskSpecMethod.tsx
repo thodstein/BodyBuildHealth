@@ -1,7 +1,7 @@
 // Механизм-ориентированная модель риска — UI (качественное оформление)
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
 import React, { useState, useEffect, useMemo } from 'react';
-import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, mechanismCoverageOf, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
 import { useDataLink } from '../../../core/data-link';
 import { getRiskColor } from '../../../core/utils/risk-colors';
@@ -395,6 +395,18 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                 U: ×{result.u_i.toFixed(2)}{result.u_i > 1.001 ? ` (+${Math.round((result.u_i - 1) * 100)}% неопределённости)` : ' (без надбавки)'}
               </span>
               <span style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>Поддержка: {result.supportCount} веществ</span>
+              {(() => {
+                // Честное покрытие: доля механизмов риска, закрытых поддержкой.
+                // Kp выше — снижение ОБЩЕГО риска, это разные величины.
+                const mc = mechanismCoverageOf(result);
+                if (mc.total === 0) return null;
+                return (
+                  <span title="Механизмы, дающие риск в этом курсе, которые закрыты поддержкой (k > 0). Не то же самое, что Kp."
+                    style={{ padding:'4px 10px', borderRadius:999, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    Механизмы: {mc.covered}/{mc.total} закрыто
+                  </span>
+                );
+              })()}
             </div>
 
             {result.overallVerification !== undefined && (

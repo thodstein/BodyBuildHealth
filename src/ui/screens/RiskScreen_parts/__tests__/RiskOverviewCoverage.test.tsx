@@ -58,7 +58,9 @@ describe('RiskOverview support coverage', () => {
       />,
     );
     expect(queryByText(/Сердце/)).not.toBeNull();
-    fireEvent.click(getByText('Покрытие поддержкой'));
+    // Заголовок — «Снижение риска поддержкой»: число здесь = доля снижения
+    // риска по системе, а не доля закрытых механизмов (аудит 2026-11).
+    fireEvent.click(getByText('Снижение риска поддержкой'));
     expect(queryByText(/Сердце/)).toBeNull();
   });
 });

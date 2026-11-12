@@ -12,7 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const FIELDS = ['riskStatus', 'unmodeledDrugs', 'derivedSupport', 'unmappedSupport'];
+const FIELDS = ['riskStatus', 'unmodeledDrugs', 'derivedSupport', 'unmappedSupport', 'mechanismCoverage'];
 
 function writerBlock(file: string, marker: RegExp): string {
   const src = readFileSync(resolve(process.cwd(), file), 'utf8');

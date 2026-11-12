@@ -155,24 +155,55 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
       </div>
 
       {/* Per-mechanism coverage summary */}
-      {planResult.mechanisms && planResult.mechanisms.length > 0 && (
-        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-          <div style={{ fontSize: 7, color: '#60a5fa', fontWeight: 700, marginBottom: 3 }}>
-            🎯 Механизмы с покрытием ({planResult.mechanisms.length})
+      {(() => {
+        const mechs = planResult.mechanisms || [];
+        if (mechs.length === 0) return null;
+        const covered = mechs.filter(m => m.covered !== false);
+        const uncovered = (planResult.uncoveredMechanisms || []).slice().sort((a, b) => b.risk - a.risk);
+        const percent = mechs.length > 0 ? Math.round((covered.length / mechs.length) * 100) : 0;
+        const shown = uncovered.slice(0, 8);
+        return (
+          <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+            <div style={{ fontSize: 7, color: '#60a5fa', fontWeight: 700, marginBottom: 3 }}>
+              🎯 Закрыто {covered.length} из {mechs.length} механизмов риска ({percent}%)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {covered.map((m, i) => (
+                <span key={`${m.mechKey}-${i}`} title={`${m.systemLabel}${m.confidence ? ` · док. ${m.confidence}` : ''}`} style={{
+                  padding: '1px 4px', borderRadius: 3,
+                  background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)',
+                  fontSize: 6, color: '#60a5fa',
+                }}>
+                  {m.mechLabel}
+                </span>
+              ))}
+            </div>
+            {uncovered.length > 0 && (
+              <>
+                <div style={{ fontSize: 7, color: '#fbbf24', fontWeight: 700, margin: '6px 0 3px' }}>
+                  ⚠ Не закрыто ({uncovered.length}): поддержка не даёт k этим механизмам
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                  {shown.map((m, i) => (
+                    <span key={`${m.mechKey}-un-${i}`} title={m.systemLabel} style={{
+                      padding: '1px 4px', borderRadius: 3,
+                      background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
+                      fontSize: 6, color: '#fbbf24',
+                    }}>
+                      {m.mechLabel} · {m.risk}
+                    </span>
+                  ))}
+                  {uncovered.length > shown.length && (
+                    <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.4)', alignSelf: 'center' }}>
+                      +{uncovered.length - shown.length} ещё
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {planResult.mechanisms.map((m, i) => (
-              <span key={i} style={{
-                padding: '1px 4px', borderRadius: 3,
-                background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)',
-                fontSize: 6, color: '#60a5fa',
-              }}>
-                {m.mechKey}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

@@ -2,7 +2,7 @@
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
 import { ruCount, RU_ELEMENTS, RU_STACKS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
-import { calculateTzSpecRisk, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, mechanismCoverageOf, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../engines/tz-snapshot';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
@@ -983,6 +983,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         unmodeledDrugs: tzFinalRisk.unmodeledDrugs,
         unmappedSupport: tzFinalRisk.unmappedSupport,
         derivedSupport: tzFinalRisk.derivedSupport,
+        // Покрытие механизмов — тем же контрактом, что SupportScreen:
+        // «Риски» не должны пересчитывать покрытие как 100 − риск.
+        mechanismCoverage: mechanismCoverageOf(tzFinalRisk),
         timestamp: Date.now(),
       }));
     } catch { /* storage недоступен */ }

@@ -876,6 +876,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
         // «Риски»/отчёты не могут назвать поддержку, не участвующую в покрытии.
         unmappedSupport: tzResult.unmappedSupport,
         derivedSupport: tzResult.derivedSupport,
+        mechanismCoverage: tzResult.mechanismCoverage,
         timestamp: Date.now(),
       }));
       // Write unified risk bridge (C18: RiskScreen ↔ support engine sync)
@@ -2687,8 +2688,10 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
     ? ` (снижение ${Math.round(planResult.overallRiskBefore - planResult.overallRiskAfter)} п.п.)`
     : ''
 }
-${planResult.mechanismCoverage
+${planResult.mechanismCoverage && planResult.mechanismCoverage.total > 0
   ? `Покрытие механизмов: ${planResult.mechanismCoverage.percent}% (${planResult.mechanismCoverage.covered} из ${planResult.mechanismCoverage.total} механизмов риска)\n`
+  : ''}${planResult.uncoveredMechanisms && planResult.uncoveredMechanisms.length > 0
+  ? `⚠ Не закрыто механизмов риска: ${planResult.uncoveredMechanisms.length} — ${planResult.uncoveredMechanisms.slice(0, 5).map(m => `${m.mechLabel} (${m.risk})`).join('; ')}${planResult.uncoveredMechanisms.length > 5 ? ' …' : ''}\n`
   : ''}${riskNotes.length > 0 ? riskNotes.join('\n') + '\n' : ''}
 ПРЕПАРАТЫ (${subs.length}):
 ${subs.join('\n')}
