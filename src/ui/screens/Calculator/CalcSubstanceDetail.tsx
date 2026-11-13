@@ -19,13 +19,15 @@ interface Props {
   rec: SupportRecommendation;
   subNameRu: (id: string) => string;
   subDosage: (id: string) => { mg: number; timing: string } | null;
+  /** Доза плана (вес + UL) — та же, что в карточке; если не передана, берётся типовая. */
+  planDose?: (id: string) => number;
   subTier: (id: string) => string;
   titrationFactors?: Map<string, number>;
   canonIdLocal: (id: string) => string;
 }
 
 export const CalcSubstanceDetail: React.FC<Props> = ({
-  sub, subNameRu, subDosage, subTier, titrationFactors, canonIdLocal,
+  sub, subNameRu, subDosage, planDose, subTier, titrationFactors, canonIdLocal,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -52,12 +54,14 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   // маркера читалась как «доказательность C из ТЗ-таблицы».
   const derivedMech = mechsCovered.length > 0 && !isCuratedSupport(id);
 
-  const doseMg = dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null;
+  const doseMg = planDose
+    ? (planDose(id) || null)
+    : (dose ? (titrFactor && titrFactor > 1 ? Math.round(dose.mg * titrFactor) : dose.mg) : null);
   // Минералы каталога хранят МАССУ СОЛИ («магний цитрат 400 мг»), а UL-проверка и
   // текст рекомендации — элементарное вещество. Показываем пересчёт рядом с дозой,
   // иначе «400 мг» читаются как 400 мг элементарного магния (в 6 раз больше).
   const saltFactor = catalogEntry ? resolveElementalFactor(id, catalogEntry) : undefined;
-  const elementalDose = catalogEntry && dose ? elementalMgOf(id, catalogEntry, dose.mg) : 0;
+  const elementalDose = catalogEntry && doseMg !== null ? elementalMgOf(id, catalogEntry, doseMg) : 0;
   const showElemental = saltFactor !== undefined && elementalDose > 0;
 
   return (

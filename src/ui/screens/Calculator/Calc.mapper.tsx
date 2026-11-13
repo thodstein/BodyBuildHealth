@@ -30,7 +30,7 @@ import { formatDefaultDose, naturalFromMg } from '../../../data/dose-units';
 import { canonId } from '../../../engines/support-plan/shared-constants';
 import { supportNameRu } from '../../../data/support-names';
 import { isCuratedSupport } from '../../../data/support-db/mech-map';
-import { NON_PILL_SUPPORT_IDS } from '../../../engines/support-plan/substances';
+import { NON_PILL_SUPPORT_IDS, resolvePlanDose } from '../../../engines/support-plan/substances';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { CONTRAINDICATIONS, getContraindications, checkContraindications } from '../../../data/substance-contraindications';
@@ -578,6 +578,19 @@ function planItemKind(id: string): 'База' | 'Минерал' | 'БАД' | '�
   if (['telmisartan','tadalafil','nebivolol','anastrozole','hcg','aspirin','cabergoline','metformin'].includes(id)) return 'Препарат';
   return 'БАД';
 }
+/**
+ * Заголовки групп для текстовых экспортов — из ТЕХ ЖЕ значений, что возвращает
+ * `planItemKind`. Раньше здесь были плюральные литералы («Минералы», «БАДы»,
+ * «Препараты»), которые никогда не совпадали с единственным числом: в отчёт
+ * врачу попадала только «База курса», а весь план поддержки терялся.
+ */
+const PLAN_KIND_HEADINGS: Record<ReturnType<typeof planItemKind>, string> = {
+  'База': 'БАЗА КУРСА (не препараты):',
+  'Минерал': 'МИНЕРАЛЬНАЯ ПОДДЕРЖКА:',
+  'Препарат': 'ПРЕПАРАТЫ:',
+  'БАД': 'БАДЫ И ДОБАВКИ:',
+};
+const PLAN_KIND_ORDER: Array<ReturnType<typeof planItemKind>> = ['База', 'Минерал', 'Препарат', 'БАД'];
 function subNameRu(id: string): string {
   // Единый резолвер (src/data/support-names.ts) + локальная карта имён как
   // приоритетный fallback. Раньше это была третья копия одной и той же логики.
@@ -592,6 +605,17 @@ export function subDosage(id: string): { mg: number; timing: string } | null {
   // показывался как «0.2 мкг», а витамин D — как «0.13 МЕ».
   if (e?.dosage) return { mg: naturalFromMg(id, e.dosage.mg), timing: e.dosage.timing };
   return DEFAULT_DOSAGES[canonId(id)] || DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
+}
+/**
+ * Доза, которую реально рекомендует план (карточка/расписание/титрация) —
+ * тот же резолвер `resolvePlanDose`, а не `DEFAULT_DOSAGES × фактор титрации`.
+ * Экспорты «Копировать»/«Врачу» и чипы раньше считали вторую дозу:
+ * при 140 кг карточка показывала магний 350 мг, а текст — 200 мг.
+ * Лаб-титрация (`titrationFactors`) — ориентир, она остаётся в обосновании.
+ */
+function planDoseOf(id: string, weight?: number): number {
+  if (!subDosage(id)) return 0; // нет дозы в справочнике — не печатаем фолбэк 500 мг
+  return resolvePlanDose(id, weight);
 }
 function subTier(id: string): string {
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
@@ -2899,9 +2923,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.4)', marginBottom:3, textTransform:'uppercase', letterSpacing:'0.3px' }}>Список ({finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).length}) · база курса — в карточке «Образ жизни»</div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
                   {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).map((s, i) => {
-                    const doseInfo = subDosage(s.substanceId);
                     const titrF = finalRec.titrationFactors?.get(canonIdLocal(s.substanceId));
-                    const mg = doseInfo ? (titrF && titrF > 1 ? Math.round(doseInfo.mg * titrF) : doseInfo.mg) : null;
+                    // Доза — плана (как в карточке ниже), не DEFAULT×титрация.
+                    const mg = planDoseOf(s.substanceId, state.profile?.weight) || null;
                     const isTitr = !!titrF && titrF > 1;
                     return (
                       <span
@@ -2922,7 +2946,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                          {planItemKind(s.substanceId) === 'База' ? '🧭 ' : planItemKind(s.substanceId) === 'Минерал' ? '⚡ ' : ''}{subNameRu(s.substanceId)}{mg ? ` ${formatDefaultDose(s.substanceId, mg)}` : ''}
                         {mixPlanIds.has(canonIdLocal(s.substanceId)) && <span style={{ marginLeft: 3, fontSize: 6, color: '#c4b5fd', fontWeight: 800 }}>🏋️</span>}
                         {isDoctorControlled(s.substanceId) && <span style={{ marginLeft: 3, fontSize: 6, color: '#fca5a5', fontWeight: 800 }}>👨‍⚕️</span>}
-                        {isTitr && ` ↑${((titrF! - 1) * 100).toFixed(0)}%`}
+                        {isTitr && <span title="Лаб-титрация: ориентир по анализам; в дозу плана не заложена (см. обоснование)"> ↑{((titrF! - 1) * 100).toFixed(0)}%</span>}
                       </span>
                     );
                   })}
@@ -2961,6 +2985,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     rec={finalRecWithResidual ?? finalRec}
                     subNameRu={subNameRu}
                     subDosage={subDosage}
+                    planDose={(id: string) => planDoseOf(id, state.profile?.weight)}
                     subTier={subTier}
                     titrationFactors={finalRec.titrationFactors}
                     canonIdLocal={canonIdLocal}
@@ -4095,7 +4120,7 @@ function canonIdLocal(id: string): string {
   return map[id?.toLowerCase()] || map[id] || (id?.toLowerCase() || id);
 }
 
-function buildPlanText(rec: SupportRecommendation): string {
+export function buildPlanText(rec: SupportRecommendation, weight?: number): string {
   const lines: string[] = [];
   lines.push(`⎯⎯ ПЛАН ПОДДЕРЖКИ (ТЗ-28) ⎯⎯`);
   lines.push(`Уровень: ${rec.level}`);
@@ -4103,24 +4128,17 @@ function buildPlanText(rec: SupportRecommendation): string {
   lines.push(`Веществ: ${rec.subs.length}`);
   lines.push('');
   lines.push('НАЗНАЧЕНИЯ (по категориям):');
-  const kindLabels: Array<['База' | 'Минералы' | 'БАДы' | 'Препараты', string]> = [
-    ['База', 'БАЗА КУРСА (не препараты):'],
-    ['Минералы', 'МИНЕРАЛЬНАЯ ПОДДЕРЖКА:'],
-    ['Препараты', 'ПРЕПАРАТЫ:'],
-    ['БАДы', 'БАДЫ И ДОБАВКИ:'],
-  ];
-  for (const [kind, label] of kindLabels) {
+  for (const kind of PLAN_KIND_ORDER) {
     const items = rec.subs.filter(s => planItemKind(s.substanceId) === kind);
     if (items.length === 0) continue;
     lines.push('');
-    lines.push(label);
+    lines.push(PLAN_KIND_HEADINGS[kind]);
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      // Доза с правильной единицей (мкг/МЕ/Ед/ФЕ) и с учётом титрации:
-      // раньше ВСЁ печаталось как «мг» (селен 200 мкг → «200 мг»).
-      const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
-      const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
+      // Доза с правильной единицей (мкг/МЕ/Ед/ФЕ) — из резолвера плана:
+      // раньше ВСЁ печаталось как «мг», а вес/UL не учитывались вовсе.
+      const scaled = planDoseOf(s.substanceId, weight);
       const doseStr = scaled > 0
         ? ` · ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
@@ -4203,7 +4221,7 @@ function buildPlanText(rec: SupportRecommendation): string {
   return lines.join('\n');
 }
 
-function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): string {
+export function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): string {
   const lines: string[] = [];
   lines.push('ОТЧЁТ ДЛЯ ВРАЧА — МЕХАНИЗМ-ОРИЕНТИРОВАННАЯ МОДЕЛЬ ТЗ-28');
   lines.push('Sources: tz-mapper-engine, tz-bridge-* (5 файлов). Все механизмы из 28 ТЗ.');
@@ -4215,22 +4233,16 @@ function buildDoctorReport(rec: SupportRecommendation, state: CalculatorState): 
   lines.push(`Фаза определения: ${rec.phase} → ${rec.phaseLabel}`);
   lines.push('');
   lines.push('НАЗНАЧЕНИЯ (по категориям, с учётом фазы и guardrails):');
-  const doctorKinds: Array<['База' | 'Минералы' | 'Препараты' | 'БАДы', string]> = [
-    ['База', 'БАЗА КУРСА (не препараты):'],
-    ['Минералы', 'МИНЕРАЛЬНАЯ ПОДДЕРЖКА:'],
-    ['Препараты', 'ПРЕПАРАТЫ:'],
-    ['БАДы', 'БАДЫ И ДОБАВКИ:'],
-  ];
-  for (const [kind, label] of doctorKinds) {
+  for (const kind of PLAN_KIND_ORDER) {
     const items = rec.subs.filter(s => planItemKind(s.substanceId) === kind);
     if (items.length === 0) continue;
     lines.push('');
-    lines.push(label);
+    lines.push(PLAN_KIND_HEADINGS[kind]);
     for (const s of items) {
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
-      const tF = (rec as any).titrationFactors?.get?.(canonIdLocal(s.substanceId));
-      const scaled = dose && dose.mg > 0 && tF && tF > 1 ? Math.round(dose.mg * tF) : dose?.mg ?? 0;
+      // Та же доза, что в карточке плана (вес + потолки UL), а не DEFAULT×титрация.
+      const scaled = planDoseOf(s.substanceId, state.profile?.weight);
       const doseStr = scaled > 0
         ? `, ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
@@ -4407,13 +4419,13 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state, planResult }) => 
   }, [rec]);
 
   const copyPlan = useCallback(async () => {
-    const text = buildPlanText(rec);
+    const text = buildPlanText(rec, state.profile?.weight);
     try { await navigator.clipboard.writeText(text); } catch {
       const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
       try { document.execCommand('copy'); } catch {} document.body.removeChild(ta);
     }
     setCopiedFlash(true); setTimeout(() => setCopiedFlash(false), 1800);
-  }, [rec]);
+  }, [rec, state.profile?.weight]);
 
   const copyDoctor = useCallback(async () => {
     const text = buildDoctorReport(rec, state);
