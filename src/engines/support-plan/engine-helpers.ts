@@ -26,6 +26,7 @@ import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
+import { resolvePlanDose } from './substances';
 
 //  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
 // ═══════════════════════════════════════════════════════════════
@@ -772,22 +773,34 @@ export function applyTitration(
   if (p.hasCaber && substances.includes('cabergoline')) {
     d.cabergoline = cw <= 2 ? 0.125 : 0.25;
   }
-  // NAC / TUDCA titration: build up to avoid GI upset
-  if (substances.includes('nac')) d.nac = cw <= 2 ? normalizeDoseByWeight(1200, bw) : normalizeDoseByWeight(1800, bw);
-  if (substances.includes('tudca')) d.tudca = cw <= 2 ? normalizeDoseByWeight(500, bw) : normalizeDoseByWeight(1000, bw);
-  // Body-weight normalized minerals/vitamins
-  if (substances.includes('magnesium')) d.magnesium = normalizeDoseByWeight(200, bw);
-  if (substances.includes('zinc')) d.zinc = normalizeDoseByWeight(15, bw);
-  // 50 мкг = 2000 МЕ (1 мкг = 40 МЕ). UL = 100 мкг = 4000 МЕ (IOM 2011).
-  // Ранее передавалось 2000 (как мкг), что после ×40 в doseStr давало 80 000 МЕ — в 20× выше UL.
-  if (substances.includes('vitamin_d3')) d.vitamin_d3 = normalizeDoseByWeight(50, bw, 70);
-  if (substances.includes('omega3')) d.omega3 = normalizeDoseByWeight(2000, bw);
-  if (substances.includes('alpha_lipoic')) d.alpha_lipoic = normalizeDoseByWeight(300, bw);
-  if (substances.includes('coq10')) d.coq10 = normalizeDoseByWeight(100, bw);
-  if (substances.includes('glycine')) d.glycine = normalizeDoseByWeight(2000, bw);
-  if (substances.includes('potassium')) d.potassium = normalizeDoseByWeight(200, bw);
-  if (substances.includes('vitamin_c')) d.vitamin_c = normalizeDoseByWeight(500, bw);
-  if (substances.includes('selenium')) d.selenium = normalizeDoseByWeight(50, bw, 70);
+  // ── Дозы нутриентов: ОДНА модель с карточкой плана ──
+  // Здесь жила вторая модель (`normalizeDoseByWeight(200, bw)` с ^0.75), а карточка
+  // считала вес-дозу линейно (магний 2.5 мг/кг, цинк 0.5 мг/кг). При 140 кг это
+  // давало 350 мг в карточке и 293 мг в приёме — два числа для одной дозы.
+  // Теперь обе стороны берут `resolvePlanDose` (WEIGHT_BASED_DOSING + потолки UL),
+  // а `applyTitration` только переводит натуральную единицу в единицу реестра
+  // (витамин D: МЕ → мкг) и накладывает UL-кап ниже.
+  const PLAN_DOSED_NUTRIENTS = [
+    'magnesium', 'zinc', 'vitamin_d3', 'selenium', 'vitamin_c', 'omega3',
+    'alpha_lipoic', 'coq10', 'glycine', 'potassium',
+  ];
+  for (const id of PLAN_DOSED_NUTRIENTS) {
+    if (!substances.includes(id)) continue;
+    const natural = resolvePlanDose(id, bw);
+    if (!(natural > 0)) continue;
+    const c = canonId(id);
+    d[id] = c === 'vitamin_d3' || c === 'vitamin_d' ? vitaminDMcgFromIu(natural) : natural;
+  }
+  // NAC / TUDCA: наращивание от дозы ПЛАНА, а не отдельные абсолютные числа
+  // (иначе расписание уезжало выше карточки: план 1200, приём 1800).
+  if (substances.includes('nac')) {
+    const target = resolvePlanDose('nac', bw);
+    d.nac = cw <= 2 ? Math.round(target * 2 / 3) : target;
+  }
+  if (substances.includes('tudca')) {
+    const target = resolvePlanDose('tudca', bw);
+    d.tudca = cw <= 2 ? Math.round(target / 2) : target;
+  }
   // UL-cap: гарантия, что нормализация по весу не превысит верхний допустимый уровень (NUTRIENT_UL).
   // Единицы доз в `d` совпадают с единицами NUTRIENT_UL (мг для макро, мкг для микродоз).
   // ВАЖНО: сырые (до капа) значения сохраняем, иначе `checkUpperLimits` их уже

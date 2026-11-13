@@ -95,14 +95,14 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
             background: computeWeekScale(currentWeek) < 1.0 ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.1)',
           }}>
             {computeWeekScale(currentWeek) < 1.0
-              ? `Адаптация: дозы ×${computeWeekScale(currentWeek).toFixed(1)}`
+              ? 'Адаптация: ввод в курс'
               : 'Полные дозы'}
           </span>
         </div>
         {computeWeekScale(currentWeek) < 1.0 && (
           <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', lineHeight: 1.3 }}>
-            Постепенное наращивание доз для адаптации ЖКТ и минимизации побочных эффектов.
-            Полные дозы с недели {Math.max(7, Math.ceil(currentWeek / 7) * 7)}.
+            Ввод в курс: дозы наращиваются по неделям (титрация). Расписание ниже показывает
+            ЦЕЛЕВЫЕ дозы плана — их же видно в карточках веществ.
           </div>
         )}
       </div>

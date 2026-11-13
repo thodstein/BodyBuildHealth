@@ -29,6 +29,18 @@ const WEIGHT_BASED_DOSING: Record<string, { mgPerKg: number; minMg: number; maxM
   zinc:         { mgPerKg: 0.5, minMg: 15,   maxMg: 40   },
 };
 
+/**
+ * Вес-дозы для МИКРОГРАММОВЫХ нутриентов (D3, Se) — таблица в мкг, а не в мг:
+ * 0.0007 мг/кг читать невозможно, а `naturalFromMg` молча пересчитывал бы не то.
+ * Потолки = UL реестра (`NUTRIENT_UL`), поэтому вес не может вывести за предел.
+ */
+const WEIGHT_BASED_DOSING_MCG: Record<string, { mcgPerKg: number; minMcg: number; maxMcg: number }> = {
+  // 50 мкг = 2000 МЕ при 70 кг (как базовая DEFAULT_DOSAGES), рост до UL 100 мкг = 4000 МЕ.
+  vitamin_d3: { mcgPerKg: 50 / 70, minMcg: 50, maxMcg: 100 },
+  // 50 мкг при 70 кг; UL селена 255 мкг.
+  selenium:   { mcgPerKg: 50 / 70, minMcg: 50, maxMcg: 255 },
+};
+
 // ═══════════════════════════════════════════════════════════════
 //  SUBSTANCE_REASONS — однострочное обоснование для каждого вещества
 // ═══════════════════════════════════════════════════════════════
@@ -107,6 +119,7 @@ export const NON_PILL_SUPPORT_IDS = new Set(Object.keys(FOUNDATION_ITEMS));
 function planDoseParts(id: string, weight?: number): {
   doseMg: number;
   wbdMg?: number;
+  wbdMcg?: number;
   def?: { mg: number; timing: string };
   catalogDose?: number;
 } {
@@ -121,19 +134,26 @@ function planDoseParts(id: string, weight?: number): {
   const wbdMg = wbd && weight && weight > 0
     ? Math.round(Math.max(wbd.minMg, Math.min(wbd.maxMg, weight * wbd.mgPerKg)))
     : undefined;
+  // Микрограммовые нутриенты (D3, Se) — отдельная таблица в мкг.
+  const wbdMcgRule = WEIGHT_BASED_DOSING_MCG[cid];
+  const wbdMcg = wbdMcgRule && weight && weight > 0
+    ? Math.round(Math.max(wbdMcgRule.minMcg, Math.min(wbdMcgRule.maxMcg, weight * wbdMcgRule.mcgPerKg)))
+    : undefined;
   // ВНУТРЕННЯЯ доза плана — всегда НАТУРАЛЬНАЯ единица вещества (мкг для
   // селена/биотина, МЕ для D3), как в `DEFAULT_DOSAGES`: `dosages[id].mg`
   // и `PlanSubstance.doseMg` читатели подписывают через `formatDefaultDose`.
   // Раньше мг-фолбэк каталога (biotin 5 мг) попадал сюда без пересчёта и
   // отображался как «5 мкг» — 1000× ниже реальной дозы.
-  const doseMg = wbdMg !== undefined
-    ? naturalFromMg(cid, wbdMg)
-    : def
-      ? def.mg
-      : catalogDose !== undefined
-        ? naturalFromMg(cid, catalogDose)
-        : (FOUNDATION_ITEMS[cid] ? 0 : 500);
-  return { doseMg, wbdMg, def, catalogDose };
+  const doseMg = wbdMcg !== undefined
+    ? naturalFromMg(cid, wbdMcg / 1000)
+    : wbdMg !== undefined
+      ? naturalFromMg(cid, wbdMg)
+      : def
+        ? def.mg
+        : catalogDose !== undefined
+          ? naturalFromMg(cid, catalogDose)
+          : (FOUNDATION_ITEMS[cid] ? 0 : 500);
+  return { doseMg, wbdMg, wbdMcg, def, catalogDose };
 }
 
 /**
@@ -167,18 +187,20 @@ export function buildSubstances(
     seen.add(id);
     seenCanon.add(cid);
     const e = catalogEntry(id);
-    const { doseMg, wbdMg, def, catalogDose } = planDoseParts(id, weight);
+    const { doseMg, wbdMg, wbdMcg, def, catalogDose } = planDoseParts(id, weight);
     const foundation = FOUNDATION_ITEMS[cid];
     // Доза для отображения. Раньше и натуральная единица `DEFAULT_DOSAGES`
     // (селен 200 мкг, D3 5000 МЕ), и мг-шкала каталога подписывались «мг» —
     // получалось «200 мг» селена (1000×) и «5000 мг» витамина D.
-    const doseDisplay = foundation?.dose || (def && wbdMg === undefined
+    const doseDisplay = foundation?.dose || (def && wbdMg === undefined && wbdMcg === undefined
       ? formatDefaultDose(cid, def.mg)
-      : wbdMg !== undefined
-        ? formatDoseFromMg(cid, wbdMg)
-        : catalogDose !== undefined
-          ? formatDoseFromMg(cid, catalogDose)
-          : 'по инструкции');
+      : wbdMcg !== undefined
+        ? formatDefaultDose(cid, doseMg)
+        : wbdMg !== undefined
+          ? formatDoseFromMg(cid, wbdMg)
+          : catalogDose !== undefined
+            ? formatDoseFromMg(cid, catalogDose)
+            : 'по инструкции');
     const entry = {
       id,
       name: foundation?.name || e?.nameRu || e?.name || id,
@@ -263,6 +285,32 @@ export function buildSchedule(
     const block = timeOf(id);
     blocks[block].push({
       id, name, dose,
+      instructions: block === 'morning' ? 'С завтраком' : block === 'afternoon' ? 'С обедом' : 'За 1-2 ч до сна',
+    });
+  }
+  return (['morning', 'afternoon', 'evening'] as const).map(b => ({ timeBlock: b, substances: blocks[b] }));
+}
+
+/**
+ * Расписание приёма из ГОТОВОГО плана (`PlanSubstance[]`).
+ *
+ * Карточка плана и «Расписание приёма» (`WeeklyPlanView`) обязаны показывать одну
+ * и ту же дозу. Раньше `PlanResult.schedule` собирался повторным резолвом
+ * `DEFAULT_DOSAGES` (без веса): при 140 кг карточка показывала магний 350 мг
+ * (2.5 мг/кг), а расписание — 200 мг из справочника.
+ */
+export function buildScheduleFromPlan(
+  subs: PlanSubstance[],
+): Array<{ timeBlock: string; substances: Array<{ id: string; name: string; dose: string; instructions: string }> }> {
+  const blocks: Record<'morning' | 'afternoon' | 'evening', Array<{ id: string; name: string; dose: string; instructions: string }>> = {
+    morning: [], afternoon: [], evening: [],
+  };
+  for (const s of subs) {
+    const block = timeOf(canonId(s.id));
+    blocks[block].push({
+      id: s.id,
+      name: s.name,
+      dose: s.doseDisplay || 'по инструкции',
       instructions: block === 'morning' ? 'С завтраком' : block === 'afternoon' ? 'С обедом' : 'За 1-2 ч до сна',
     });
   }

@@ -8,7 +8,7 @@
  *
  *  Структура папки support-plan/:
  *   - types.ts      — константы, утилиты (SYSTEM_LABELS_RU, clamp, catalogEntry)
- *   - substances.ts — buildSubstances, buildSchedule, computeWeekScale
+ *   - substances.ts — buildSubstances, buildSchedule, buildScheduleFromPlan, computeWeekScale
  *   - systems.ts    — buildSystems, buildMechanisms, buildCoverageGaps,
  *                     buildUncoveredMechanisms, buildRiskDynamics, buildRiskBreakdown
  *   - display.ts    — buildSynergyComment, buildMonitoring, buildSpecialInstructions,
@@ -28,7 +28,7 @@ import { calculateSupportTZ, hydrateState } from './engine';
 import { mechanismCoverageOf } from '../risk-engine-tz-spec';
 import type { CalculatorState, CalculatorResult, PlanResult } from './types';
 import { clamp } from './types';
-import { buildSubstances, buildSchedule, computeWeekScale } from './substances';
+import { buildSubstances, buildScheduleFromPlan, computeWeekScale } from './substances';
 import {
   buildSystems, buildMechanisms, buildCoverageGaps,
   buildUncoveredMechanisms, buildRiskDynamics, buildRiskBreakdown,
@@ -151,7 +151,9 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
   const riskBreakdown = buildRiskBreakdown(state, tzRes);
 
   // ── 17. Schedule ──
-  const schedule = buildSchedule(tzRes.selectedSubstances);
+  // Строим из готовых `substances`, а не из `DEFAULT_DOSAGES`: иначе расписание
+  // расходится с карточкой при вес-зависимых дозах (магний 350 vs 200 мг).
+  const schedule = buildScheduleFromPlan(substances);
 
   // ── 18. Depletion warnings ──
   const depletionWarnings = buildDepletionWarnings(tzRes);
