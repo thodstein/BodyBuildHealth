@@ -2130,6 +2130,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       }
       return best;
     };
+    // §8.100 (B15): жировая плотность рецепта на cut-днях. Жир в этих ячейках сидит ВНУТРИ
+    // ядер рецептов (сыр/сметана/семечки), а ядра резать нельзя (§3E). При этом приём собран
+    // из рецепта ЦЕЛИКОМ: `coreIdsOf` возвращает все пункты, редактируемых сайдов нет, и
+    // закрыватель дня возвращает пустой список правок — день замирает
+    // (70 кг cut/4/трен P1.8: 43/40 Ж = 7.8%, 1813/126/43/230).
+    // Единственный легальный рычаг — ОТБОР: при близкой дистанции выигрывает рецепт, у которого
+    // доля калорий из жира не выше доли приёма. Замер (36 ячеек): 70 cut/4/трен 7.8% → 2.7%,
+    // ячеек за каноном 4 → 3, ни одна ячейка не ухудшилась.
+    // Белковый аналог этого отбора ПРОВЕРЕН И ОТКЛОНЁН: на 120 кг cut/5/трен отбор по белковой
+    // плотности давал 3401/317/68/380 (12.7%) — ядра уходят в «обезжиренные» углеводные блюда.
+    const _fatTight = (targets?.f || 0) > 0 && (args.athleteWeightKg ?? 0) > 0
+      && (targets.f / Math.max(1, args.athleteWeightKg ?? 80)) <= 0.7;
+    const _dayFatShare = targetKcal > 0 ? ((tgt.f || 0) * 9) / targetKcal : 0.2;
+    const fatLeanPenalty = (scaled: { kcal: number; f: number } | null): number => {
+      if (!_fatTight || !scaled || !(scaled.kcal > 0)) return 0;
+      const share = (scaled.f * 9) / scaled.kcal;
+      return Math.max(-0.06, Math.min(0.12, (share - _dayFatShare) * 0.25));
+    };
     const rankCands = (candidatePool: Recipe[]): Recipe[] => candidatePool
       .map(r => {
         const t = decomposedFacts(r).totals;
@@ -2143,7 +2161,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         // в цель приёма» (carb-fill), 10% — штраф за перебор белка ядра. Мясной рецепт
         // «точно по ккал» оставлял день +19% Б / −7% У: ядро резать нельзя, поэтому
         // углеводно-плотные блюда должны выигрывать у белковых при близкой дистанции.
-        if (!scaled || !_rankWeights) return { r, d: dBase };
+        if (!scaled || !_rankWeights) return { r, d: dBase + fatLeanPenalty(scaled) };
         return { r, d: carbRoomScore(scaled, { p: tgt.p || 30, c: tgt.c || 40 }, dBase, tgt.f || 0) };
       })
       .sort((a, b) => a.d - b.d)
