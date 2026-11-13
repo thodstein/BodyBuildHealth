@@ -41,3 +41,59 @@ describe('buildExportDataFromRec — labSchedule из движка', () => {
     expect(pct.protocol.clinicalNotes.join(' ')).not.toContain('Дельта-правила');
   });
 });
+
+describe('buildExportDataFromRec — доза и МНН из плана, а не из прозы', () => {
+  const recSub = (reason: string): any => ({
+    subs: [{ substanceId: 'selenium', reason, category: 'mineral' }],
+    phase: 'course',
+    monitoringSchedule: [],
+    protocolWarnings: [],
+  });
+
+  it('доза берётся из карточки плана (resolvePlanDose), числа из reason игнорируются', () => {
+    const data = buildExportDataFromRec(
+      recSub('Антиоксидант: 5000 МЕ — глутатионпероксидаза'),
+      patient,
+      course,
+      [{ id: 'selenium', name: 'Селен', doseDisplay: '200 мкг', timing: 'с едой' }],
+    );
+    const s = data.protocol.substances[0];
+    expect(s.mnn).toBe('Селен');
+    expect(s.dose).toBe('200 мкг');
+    expect(s.frequency).toBe('с едой');
+    expect(s.mechanism).toContain('глутатионпероксидаза'); // обоснование — в «Механизм», не в «Дозу»
+  });
+
+  it('без плана доза не выдумывается: «—», название из каталога', () => {
+    const data = buildExportDataFromRec(recSub('Селен 5000 МЕ'), patient, course);
+    const s = data.protocol.substances[0];
+    expect(s.dose).toBe('—');
+    expect(s.frequency).toBe('—');
+    expect(s.mnn).toBe('Селен');
+  });
+});
+
+describe('buildExportDataFromRec — пороги по полу', () => {
+  const byMarker = (data: any, marker: string) => data.labSchedule.find((l: any) => l.marker === marker);
+
+  it('♀ fallback: HCT 48/52, АЛТ 31/78, креатинин 97, без ПСА', () => {
+    const fem = buildExportDataFromRec(recWith([]), { ...patient, sex: 'female' }, course);
+    expect(byMarker(fem, 'Гематокрит').target).toBe('<48%');
+    expect(byMarker(fem, 'Гематокрит').criticalThreshold).toContain('>52%');
+    expect(byMarker(fem, 'АЛТ').target).toBe('<31 Ед/л');
+    expect(byMarker(fem, 'АЛТ').criticalThreshold).toContain('>78');
+    expect(byMarker(fem, 'Креатинин').target).toBe('<97 мкмоль/л');
+    expect(byMarker(fem, 'ПСА')).toBeUndefined();
+    expect(fem.protocol.stopCriteria.join(' ')).toContain('>52%');
+    expect(fem.protocol.clinicalNotes.join(' ')).toContain('♀');
+  });
+
+  it('♂ (и legacy sex=m) — мужской путь байт-в-байт: HCT 54, АЛТ 200, ПСА есть', () => {
+    const male = buildExportDataFromRec(recWith([]), patient, course);
+    expect(byMarker(male, 'Гематокрит').criticalThreshold).toBe('>54% (флеботомия)');
+    expect(byMarker(male, 'АЛТ').criticalThreshold).toBe('>200 (стоп курс)');
+    expect(byMarker(male, 'ПСА')).toBeDefined();
+    expect(male.protocol.stopCriteria.join(' ')).toContain('>54%');
+    expect(male.protocol.clinicalNotes.join(' ')).not.toContain('♀');
+  });
+});

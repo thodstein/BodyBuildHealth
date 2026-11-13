@@ -76,6 +76,17 @@ export function getLabNorm(code: string, sex?: 'male' | 'female'): LabNorm | nul
   return { lln: entry.lln, uln: entry.uln, unit: entry.prefUnit || '', female: false };
 }
 
+/**
+ * ♀ Производные пороги, которых нет в таблицах норм. Единая точка для всех
+ * поверхностей (уведомления, PDF для врача), чтобы ULN+4 и 2.5×ULN не
+ * расползались литералами по файлам.
+ *  - HCT: ULN — «терапия», ULN+4 — «ургент» (градация приложения);
+ *  - АЛТ: 2.5× ULN — порог гепатотоксичности.
+ */
+export const FEMALE_HCT_THERAPY = getLabNorm('HCT', 'female')?.uln ?? 48;
+export const FEMALE_HCT_URGENT = FEMALE_HCT_THERAPY + 4;
+export const FEMALE_ALT_2_5_ULN = Math.round((getLabNorm('ALT', 'female')?.uln ?? 31) * 2.5);
+
 /** Л9: общая легенда женских порогов (показывается только при sex=female). */
 export const FEMALE_LABS_NOTE =
   '♀ Пороги по полу: HCT 36–48%, Hb 120–150 г/л, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ≤31, креатинин ≤97, ферритин ≤200. ' +

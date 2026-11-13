@@ -4058,7 +4058,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       )}
 
       {/* CalcActions (сохранить/копировать/врачу) */}
-      {finalRecWithResidual && <CalcActions rec={finalRecWithResidual} level={level} state={state} />}
+      {finalRecWithResidual && <CalcActions rec={finalRecWithResidual} level={level} state={state} planResult={planResult} />}
 
       
       {/* ⛔ Согласие на блок-конфликт при добавлении */}
@@ -4378,9 +4378,11 @@ interface CalcActionsProps {
   rec: SupportRecommendation;
   level: SupportLevel;
   state: CalculatorState;
+  /** План (дозы уже посчитаны движком) — для PDF/печати. */
+  planResult?: import('../../../engines/support-plan').PlanResult;
 }
 
-const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
+const CalcActions: React.FC<CalcActionsProps> = ({ rec, state, planResult }) => {
   const [savedFlash, setSavedFlash] = useState(false);
   const [copiedFlash, setCopiedFlash] = useState(false);
   const [doctorFlash, setDoctorFlash] = useState(false);
@@ -4439,11 +4441,12 @@ const CalcActions: React.FC<CalcActionsProps> = ({ rec, state }) => {
         peds: rec?.pedFlags?.pedIds || [],
         weeks: state.goals?.cycleWeeks || 12,
         phase: rec?.phase || 'course',
-      }
+      },
+      planResult?.substances,
     );
     printProtocol(data);
     setPdfFlash(true); setTimeout(() => setPdfFlash(false), 1800);
-  }, [rec, state]);
+  }, [rec, state, planResult]);
 
   const btn = (label: string, onClick: () => void, flash: boolean, col: string, icon: string) => (
     <button data-sup-io="calc-action" onClick={onClick} style={{

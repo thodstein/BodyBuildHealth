@@ -4,7 +4,7 @@
 //  ════════════════════════════════════════════════════════════════════════════
 
 import { computeOverdueSystems, type SystemOverdue, type LabSliceLike } from './labs-overdue';
-import { getLabNorm } from './lab-norms.engine';
+import { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN } from './lab-norms.engine';
 
 export type NotificationPriority = 'info' | 'warning' | 'critical';
 export type NotificationChannel = 'telegram' | 'browser' | 'toast';
@@ -60,9 +60,6 @@ const isFemale = (s: NotificationState): boolean => s.sex === 'female';
 // E2 — физиологический диапазон цикла (до ~200, овуляторный пик до ~400 пг/мл),
 // поэтому мужские E2-правила для женщин дают ложные срабатывания 2–3 раза в неделю.
 // Числа берём из единого резолвера норм (lab-norms.engine), а не литералами.
-const FEMALE_HCT_THERAPY = getLabNorm('HCT', 'female')?.uln ?? 48;
-const FEMALE_HCT_URGENT = FEMALE_HCT_THERAPY + 4;
-const FEMALE_ALT_2_5_ULN = Math.round((getLabNorm('ALT', 'female')?.uln ?? 31) * 2.5);
 const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'labs_overdue',

@@ -5,6 +5,21 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
+import {
+  getLabNorm, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
+} from '../../engines/lab-norms.engine';
+
+/**
+ * Назначение из карточки плана. Доза уже посчитана движком (`resolvePlanDose`),
+ * поэтому PDF не пытается угадать её из текста обоснования.
+ */
+export interface ExportPlanDose {
+  id: string;
+  name?: string;
+  doseDisplay?: string;
+  timing?: string;
+}
 
 export interface ExportSubstance {
   id: string;
@@ -131,7 +146,7 @@ function buildPrintDocument(data: ProtocolExportData): string {
   <h2>📦 ПРЕПАРАТЫ ПОДДЕРЖКИ (${protocol.substances.length})</h2>
   <div class="section-note">Дозировки титруются по лабораторным показателям. Не превышать указанные дозы без контроля врача.</div>
   <table>
-    <thead><tr><th>МНН</th><th>Доза</th><th>Частота</th><th>Длительность</th><th>Механизм</th><th>Предупреждения</th></tr></thead>
+    <thead><tr><th>МНН</th><th>Доза</th><th>Приём</th><th>Длительность</th><th>Механизм</th><th>Предупреждения</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
 
@@ -181,35 +196,61 @@ export function printProtocol(data: ProtocolExportData): void {
 export function buildExportDataFromRec(
   rec: any,
   patient: { name: string; age: number; weight: number; height: number; sex: string },
-  course: { drugs: string[]; peds: string[]; weeks: number; phase: string }
+  course: { drugs: string[]; peds: string[]; weeks: number; phase: string },
+  planDoses?: ExportPlanDose[]
 ): ProtocolExportData {
-  const substances: ExportSubstance[] = (rec.subs || []).map((s: any) => ({
-    id: s.substanceId,
-    mnn: s.reason?.split(' — ')[0] || s.substanceId,
-    dose: s.reason?.match(/([\d.]+[\s]*(?:мг|г|МЕ|мкг|табл|капс)[^\s]*)/)?.[0] || '',
-    frequency: s.reason?.match(/([\d]+[x×р]\/[дн])/)?.[0] || '',
-    duration: rec.phase === 'pct' ? '8-12 нед' : `${course.weeks} нед`,
-    mechanism: s.reason?.split(' — ')[1] || '',
-    category: s.category || 'other',
-    warnings: [],
-    monitoring: [],
-  }));
+  const isFemale = patient.sex === 'female';
+
+  // МНН и доза — из плана. Раньше и то и другое выдёргивалось регэкспом из
+  // `reason` (текста-обоснования): в колонку «МНН» попадало обоснование, а в
+  // «Дозу» — первое число с единицей из прозы (или пусто).
+  const byId = new Map((planDoses || []).map(s => [s.id, s]));
+  const substances: ExportSubstance[] = (rec.subs || []).map((s: any) => {
+    const plan = byId.get(s.substanceId);
+    const catalog = SUPPORT_CATALOG_DATA[s.substanceId];
+    return {
+      id: s.substanceId,
+      mnn: plan?.name || catalog?.nameRu || s.substanceId,
+      dose: plan?.doseDisplay || '—',
+      frequency: plan?.timing || '—',
+      duration: rec.phase === 'pct' ? '8-12 нед' : `${course.weeks} нед`,
+      mechanism: s.reason || '',
+      category: s.category || 'other',
+      warnings: [],
+      monitoring: [],
+    };
+  });
+
+  // Пороги — из единого резолвера норм (UCUM_MAP / женский слой), не литералами.
+  const sex = isFemale ? 'female' : 'male';
+  const hctUln = Math.round(getLabNorm('HCT', sex)?.uln ?? (isFemale ? 48 : 52));
+  const altUln = Math.round(getLabNorm('ALT', sex)?.uln ?? (isFemale ? 31 : 40));
+  const astUln = Math.round(getLabNorm('AST', sex)?.uln ?? (isFemale ? 31 : 40));
+  const ggtUln = Math.round(getLabNorm('GGT', sex)?.uln ?? (isFemale ? 31 : 55));
+  const creaUln = Math.round(getLabNorm('CREATININE', sex)?.uln ?? (isFemale ? 97 : 110));
+  // Стоп-пороги: у женщин — проектная градация (HCT ULN+4, АЛТ 2.5×ULN),
+  // у мужчин — 54 % и 200 Ед/л (те же числа, что в стоп-таблицах протоколов).
+  const hctStop = isFemale ? FEMALE_HCT_URGENT : 54;
+  const altStop = isFemale ? `${FEMALE_ALT_2_5_ULN}` : '200';
 
   const FALLBACK_LAB_SCHEDULE: ExportLabSchedule[] = [
-    { marker: 'АЛТ', frequency: 'Каждые 4 нед', target: '<40 Ед/л', criticalThreshold: '>200 (стоп курс)' },
-    { marker: 'АСТ', frequency: 'Каждые 4 нед', target: '<40 Ед/л', criticalThreshold: '>200 (стоп курс)' },
-    { marker: 'ГГТ', frequency: 'Каждые 4 нед', target: '<55 Ед/л' },
+    { marker: 'АЛТ', frequency: 'Каждые 4 нед', target: `<${altUln} Ед/л`, criticalThreshold: `>${altStop} (стоп курс)` },
+    { marker: 'АСТ', frequency: 'Каждые 4 нед', target: `<${astUln} Ед/л`, criticalThreshold: `>${altStop} (стоп курс)` },
+    { marker: 'ГГТ', frequency: 'Каждые 4 нед', target: `<${ggtUln} Ед/л` },
     { marker: 'Билирубин', frequency: 'Каждые 4 нед', target: '<21 мкмоль/л' },
     { marker: 'ЛПНП', frequency: 'Каждые 6 нед', target: '<3.0 ммоль/л' },
     { marker: 'ЛПВП', frequency: 'Каждые 6 нед', target: '>1.0 ммоль/л' },
     { marker: 'ТГ', frequency: 'Каждые 6 нед', target: '<1.7 ммоль/л' },
-    { marker: 'Гематокрит', frequency: 'Каждые 4 нед', target: '<50%', criticalThreshold: '>54% (флеботомия)' },
-    { marker: 'Эстрадиол (E2)', frequency: 'Каждые 4 нед', target: '20-40 пг/мл', criticalThreshold: '<15 или >80' },
+    { marker: 'Гематокрит', frequency: 'Каждые 4 нед', target: `<${hctUln}%`, criticalThreshold: `>${hctStop}% (флеботомия)` },
+    isFemale
+      // Без фазовой модели цикла не подставляем мужскую цель 20-40 пг/мл.
+      ? { marker: 'Эстрадиол (E2)', frequency: 'Каждые 4 нед', target: 'по фазе цикла (20–200 без ИА)', criticalThreshold: '<20 на ИА или >400 вне овуляции' }
+      : { marker: 'Эстрадиол (E2)', frequency: 'Каждые 4 нед', target: '20-40 пг/мл', criticalThreshold: '<15 или >80' },
     { marker: 'Пролактин', frequency: 'Каждые 6 нед', target: '<15 нг/мл' },
-    { marker: 'Креатинин', frequency: 'Каждые 4 нед', target: '<106 мкмоль/л' },
+    { marker: 'Креатинин', frequency: 'Каждые 4 нед', target: `<${creaUln} мкмоль/л` },
     { marker: 'eGFR', frequency: 'Каждые 4 нед', target: '>90 мл/мин' },
     { marker: 'Глюкоза', frequency: 'Каждые 6 нед', target: '3.9-5.5 ммоль/л' },
-    { marker: 'ПСА', frequency: 'Каждые 12 нед (40+ лет)', target: '<4.0 нг/мл' },
+    ...(isFemale ? [] : [{ marker: 'ПСА', frequency: 'Каждые 12 нед (40+ лет)', target: '<4.0 нг/мл' }]),
   ];
 
   // Персональный график из движка (фаза + классы + поддержка); fallback — статика выше.
@@ -227,10 +268,12 @@ export function buildExportDataFromRec(
     : FALLBACK_LAB_SCHEDULE;
 
   const stopCriteria = [
-    'АЛТ/АСТ >200 Ед/л — немедленная отмена ААС, повторить анализ через 7 дней',
-    'Гематокрит >54% — флеботомия 300-450 мл, контроль HCT через 3 дня',
+    `АЛТ/АСТ >${altStop} Ед/л — немедленная отмена ААС, повторить анализ через 7 дней`,
+    `Гематокрит >${hctStop}% — флеботомия 300-450 мл, контроль HCT через 3 дня`,
     'АД >160/100 мм рт.ст. — коррекция дозы телмисартана/небиволола',
-    'E2 <15 пг/мл — снизить/отменить анастрозол, контроль через 1 нед',
+    isFemale
+      ? 'E2 <20 пг/мл на ИА — снизить/отменить анастрозол, контроль через 1 нед'
+      : 'E2 <15 пг/мл — снизить/отменить анастрозол, контроль через 1 нед',
     'D-димер >500 нг/мл — консультация гематолога, исключить тромбоз',
     'Пролактин >50 нг/мл — увеличить каберголин, МРТ гипофиза',
     'Креатинин >200 мкмоль/л или eGFR <30 — стоп ААС, нефролог',
@@ -255,6 +298,7 @@ export function buildExportDataFromRec(
   const clinicalNotes = [
     'Все дозировки указаны для стартового протокола. Корректировать по лабораторным показателям каждые 4 нед.',
     'Препараты с пометкой 💊 — рецептурные. Требуют назначения врача.',
+    isFemale ? FEMALE_LABS_NOTE : '',
     rec.monitoringPlan ? `График мониторинга: ${rec.monitoringPlan.split('\n')[0]}` : '',
     rec.protocolWarnings?.length ? `Предупреждения: ${rec.protocolWarnings.join('; ')}` : '',
     ['course', 'bridge', 'trt'].includes(rec.phase) ? 'Дельта-правила (нужен baseline K0): HCT Δ+5 п.п. → флеботомия; АЛТ >2× своего baseline; HDL −40%; E2 −30% от steady-state → AI избыточен.' : '',
