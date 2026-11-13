@@ -46,3 +46,26 @@ describe('протокол «Гематология»: женские порог
     expect(hemato).not.toContain('не мужские 51/54');
   });
 });
+
+describe('стеатоз и предкурсовой чеклист: те же нормы', () => {
+  const steatosis = read('supportProtocolSteatosis.tsx');
+  const shared = read('supportProtocolsShared.tsx');
+
+  it('стеатоз: АЛТ/АСТ с женским порогом, ГГТ и ЩФ по нормам приложения', () => {
+    expect(steatosis).toContain('♂ <40 / ♀ <31 Ед/л');
+    expect(steatosis).toContain(`ЩФ <${ucum.ALP.uln}`);
+    expect(steatosis).not.toContain('ГГТ <60');
+    expect(steatosis).not.toContain('ЩФ <150');
+  });
+
+  it('предкурсовой чеклист: билирубин и ЩФ по нормам приложения', () => {
+    expect(shared).toContain(`билирубин', target:`);
+    expect(shared).toContain(`билирубин', target:'АЛТ/АСТ <40 (♀ <31) · ГГТ <55 (♀ <31) · ЩФ <${ucum.ALP.uln} · бил <${ucum.BIL.uln} мкмоль/л'`);
+    expect(shared).not.toContain('бил <21 мкмоль/л');
+  });
+
+  it('предкурсовой чеклист: пролактин = ULN экрана «Анализы», не 28 нг/мл', () => {
+    expect(shared).toContain(`PRL <320 мМЕ/л (<${ucum.PRL.uln} нг/мл)`);
+    expect(shared).not.toContain('<28 нг/мл');
+  });
+});
