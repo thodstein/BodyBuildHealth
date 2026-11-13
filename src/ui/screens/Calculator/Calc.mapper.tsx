@@ -40,6 +40,7 @@ import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
+import { getLabNorm } from '../../../engines/lab-norms.engine';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 
@@ -125,25 +126,41 @@ type GenericEnhancementConfig = {
   presets: { id: string; label: string; level: 1 | 2 | 3; ids: string[] }[];
 };
 type SpecializedDomain = { id: string; label: string; icon: string; markers: string[]; ids: string[]; trigger?: (labs: Record<string, number>, state: CalculatorState) => boolean };
-const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
+
+/**
+ * §6.2 (проход 28): пороги триггеров — из единого резолвера норм (`lab-norms`),
+ * а не мужские литералы. У женщины АЛТ 35 (ULN 31) не включала «Цитолиз»,
+ * HCT 45 (ULN 48, коррекция 44) не включала «Эндотелий/тромбоз», креатинин 100
+ * (ULN 97) не включал «Фильтрацию» — на экране «Анализы» те же значения уже
+ * помечены как отклонение.
+ */
+const normUln = (code: string, state?: { profile?: { sex?: 'male' | 'female' } }, fallback = 0): number =>
+  getLabNorm(code, state?.profile?.sex)?.uln ?? fallback;
+/** Ранний порог гемореологии = «коррекция» доменной карты (♂ 48, ♀ 44). */
+const hctCorrection = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
+  hctSymptomCuts(state?.profile?.sex).correction;
+export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   cardio: [
     { id:'bp', label:'АД/объём', icon:'🩺', markers:['BP_SYSTOLIC','BP_DIASTOLIC'], ids:['hydration','cardio_aerobic','electrolyte_balance','telmisartan'], trigger:(l)=> (l.BP_SYSTOLIC ?? 0)>130 || (l.BP_DIASTOLIC ?? 0)>85 },
     { id:'lipids', label:'Липиды', icon:'🫀', markers:['LDL','HDL','TRIGLYCERIDES','APO_B','APOB'], ids:['omega3','bergamot','coq10'], trigger:(l)=> (l.LDL ?? 0)>3 || (l.TRIGLYCERIDES ?? 0)>1.7 || (l.HDL ?? 9)<1 },
     { id:'rhythm', label:'Ритм/ЧСС', icon:'💓', markers:['HR','K','MG'], ids:['magnesium','taurine','nebivolol'], trigger:(l)=> (l.HR ?? 0)>80 || (l.K ?? 9)<3.5 },
-    { id:'endothelium', label:'Эндотелий/тромбоз', icon:'🩸', markers:['HCT','D_DIMER','FIBRINOGEN'], ids:['hydration','cardio_aerobic','nattokinase','serrapeptase','bromelain'], trigger:(l)=> (l.HCT ?? 0)>48 || (l.D_DIMER ?? 0)>.5 || (l.FIBRINOGEN ?? 0)>4 },
+    { id:'endothelium', label:'Эндотелий/тромбоз', icon:'🩸', markers:['HCT','D_DIMER','FIBRINOGEN'], ids:['hydration','cardio_aerobic','nattokinase','serrapeptase','bromelain'], trigger:(l, state)=> (l.HCT ?? 0)>hctCorrection(state) || (l.D_DIMER ?? 0)>.5 || (l.FIBRINOGEN ?? 0)>4 },
   ],
   hepatic: [
-    { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l)=>(l.ALT??0)>40||(l.AST??0)>40 },
-    { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l)=>(l.GGT??0)>55||(l.ALP??0)>120||(l.BILIRUBIN??0)>21 },
+    { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l, state)=>(l.ALT??0)>normUln('ALT',state,40)||(l.AST??0)>normUln('AST',state,40) },
+    { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l, state)=>(l.GGT??0)>normUln('GGT',state,55)||(l.ALP??0)>normUln('ALP',state,130)||(l.BILIRUBIN??0)>normUln('BIL',state,21) },
     { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
   ],
   renal: [
-    { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','eGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l)=>(l.CREATININE??0)>105||(l.eGFR??200)<90||(l.CYSTATIN_C??0)>1 },
+    { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','eGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.eGFR??200)<90||(l.CYSTATIN_C??0)>1 },
     { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>.15 },
     { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<3.5||(l.K??4)>5||(l.MG??1)<.75 },
   ],
   endocrine: [
-    { id:'e2', label:'Ароматизация/E2', icon:'⚖️', markers:['E2','SHBG'], ids:['anastrozole','zinc','vitamin_d3'], trigger:(l)=>(l.E2??0)>40 },
+    // Проход 28: 40 пг/мл — мужской порог ароматизации. У женщины E2 40–200 —
+    // нормальная фолликулярная/лютеиновая фаза, поэтому домен для неё не включаем
+    // (женские гормоны ведёт слой «Женщины», а не мужской AI-триггер).
+    { id:'e2', label:'Ароматизация/E2', icon:'⚖️', markers:['E2','SHBG'], ids:['anastrozole','zinc','vitamin_d3'], trigger:(l, state)=> state.profile.sex !== 'female' && (l.E2??0)>40 },
     { id:'prl', label:'Пролактин', icon:'🧪', markers:['PRL'], ids:['agmatine','vitex','p5p','cabergoline'], trigger:(l)=>(l.PRL??0)>25 },
     { id:'hpta', label:'HPTA', icon:'🧬', markers:['LH','FSH','TT','FT'], ids:['hcg','enclomiphene','tamoxifen','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
     { id:'stress', label:'Кортизол', icon:'🧠', markers:['CORTISOL'], ids:['magnesium_l_threonate','phosphatidylserine','ashwagandha','theanine'], trigger:(l)=>(l.CORTISOL??0)>535 },
