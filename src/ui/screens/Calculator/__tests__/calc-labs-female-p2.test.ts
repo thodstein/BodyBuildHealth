@@ -54,3 +54,26 @@ describe('deriveStateFromLabs: женские пороги HCT', () => {
     expect(deriveStateFromLabs(fp('54'), 'female').derivedFields).toContain('cardio.hctElevation');
   });
 });
+
+describe('deriveStateFromLabs: печень/почки — те же ULN, что на экране «Анализы»', () => {
+  const bio = (panelBiochem: Record<string, string>) => ({ date: '2026-09-01', panelBiochem }) as never;
+
+  it('АЛТ 35: у мужчины норма, у женщины — mild (ULN 40 / 31)', () => {
+    expect(deriveStateFromLabs(bio({ ALT: '35' }), 'male').hepatobiliary.altAstElevation).toBe('none');
+    expect(deriveStateFromLabs(bio({ ALT: '35' }), 'female').hepatobiliary.altAstElevation).toBe('mild');
+  });
+
+  it('ГГТ 40: у мужчины норма, у женщины — mild (ULN 55 / 31)', () => {
+    expect(deriveStateFromLabs(bio({ GGT: '40' }), 'male').hepatobiliary.ggtElevation).toBe('none');
+    expect(deriveStateFromLabs(bio({ GGT: '40' }), 'female').hepatobiliary.ggtElevation).toBe('mild');
+  });
+
+  it('креатинин 100: у мужчины норма, у женщины — mild (ULN 110 / 97)', () => {
+    expect(deriveStateFromLabs(bio({ Creatinine: '100' }), 'male').urinary.creatinineElevation).toBe('none');
+    expect(deriveStateFromLabs(bio({ Creatinine: '100' }), 'female').urinary.creatinineElevation).toBe('mild');
+  });
+
+  it('билирубин 19: выше ULN (17.1) — mild, а не «норма» по литералу 21', () => {
+    expect(deriveStateFromLabs(bio({ Bilirubin: '19' }), 'male').hepatobiliary.bilirubinElevation).toBe('mild');
+  });
+});

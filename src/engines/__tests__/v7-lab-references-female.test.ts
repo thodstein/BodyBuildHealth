@@ -12,6 +12,7 @@ import {
   type MatrixInput,
 } from '../risk-engine-v7-matrix';
 import { calculateTZRisk, type TZRiskInput } from '../risk-engine-tz';
+import { UCUM_MAP } from '../../core/constants';
 
 describe('getLabReference', () => {
   it('без sex / sex=male — базовая таблица (та же ссылка)', () => {
@@ -43,6 +44,21 @@ describe('getLabReference', () => {
     expect(LAB_REFERENCES.ALT.uln).toBe(40);
     expect(LAB_REFERENCES.Hct.uln).toBe(0.52);
     expect(LAB_REFERENCES_FEMALE.ALT.uln).toBe(31);
+  });
+
+  it('P2: ULN печени/почек — из UCUM_MAP (экран «Анализы» и риск-модель не спорят)', () => {
+    // Было: АСТ 35 vs 40, ГГТ 50 vs 55, креатинин 106 vs 110, ЩФ 120 vs 130,
+    // билирубин 20 vs 17.1. Пользователь видел «норму» и «отклонение» одновременно.
+    expect(LAB_REFERENCES.AST.uln).toBe(UCUM_MAP.AST.uln);
+    expect(LAB_REFERENCES.GGT.uln).toBe(UCUM_MAP.GGT.uln);
+    expect(LAB_REFERENCES.ALP.uln).toBe(UCUM_MAP.ALP.uln);
+    expect(LAB_REFERENCES.Bilirubin.uln).toBe(UCUM_MAP.BIL.uln);
+    expect(LAB_REFERENCES.Creatinine.uln).toBe(UCUM_MAP.CREATININE.uln);
+    // Hct в V7 — доля, в UCUM — проценты.
+    expect(LAB_REFERENCES.Hct.uln).toBe(UCUM_MAP.HCT.uln / 100);
+    // Женские ветки остаются женскими.
+    expect(getLabReference('AST', 'female')!.uln).toBe(31);
+    expect(getLabReference('Creatinine', 'female')!.uln).toBe(97);
   });
 });
 

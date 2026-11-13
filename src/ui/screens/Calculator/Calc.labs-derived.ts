@@ -208,27 +208,35 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   const ggt = getV('panelBiochem', 'GGT');
   const bilirubin = getV('panelBiochem', 'Bilirubin');
 
+  // §6.2 (P2, проход 24): границы — от ULN единого резолвера (`lab-norms`), пол
+  // учитывается. Раньше здесь жили мужские литералы (40/80/120, 55/100/200,
+  // 21/40/60, 110/130/150): у женщины АЛТ 35 одновременно была «нормой» и
+  // «отклонением» на разных экранах.
+  const altUln = getLabNorm('ALT', sex)?.uln ?? 40;
+  const ggtUln = getLabNorm('GGT', sex)?.uln ?? 55;
+  const biliUln = getLabNorm('BIL', sex)?.uln ?? 21;
+
   if (alt !== null || ast !== null) {
     const maxTransam = Math.max(alt ?? 0, ast ?? 0);
-    if (maxTransam < 40) hep.altAstElevation = 'none';
-    else if (maxTransam < 80) hep.altAstElevation = 'mild';
-    else if (maxTransam < 120) hep.altAstElevation = 'moderate';
+    if (maxTransam < altUln) hep.altAstElevation = 'none';
+    else if (maxTransam < altUln * 2) hep.altAstElevation = 'mild';
+    else if (maxTransam < altUln * 3) hep.altAstElevation = 'moderate';
     else hep.altAstElevation = 'severe';
     derived.push('hepatobiliary.altAstElevation');
   }
 
   if (ggt !== null) {
-    if (ggt < 55) hep.ggtElevation = 'none';
-    else if (ggt < 100) hep.ggtElevation = 'mild';
-    else if (ggt < 200) hep.ggtElevation = 'moderate';
+    if (ggt < ggtUln) hep.ggtElevation = 'none';
+    else if (ggt < ggtUln * 2) hep.ggtElevation = 'mild';
+    else if (ggt < ggtUln * 4) hep.ggtElevation = 'moderate';
     else hep.ggtElevation = 'severe';
     derived.push('hepatobiliary.ggtElevation');
   }
 
   if (bilirubin !== null) {
-    if (bilirubin < 21) hep.bilirubinElevation = 'none';
-    else if (bilirubin < 40) hep.bilirubinElevation = 'mild';
-    else if (bilirubin < 60) hep.bilirubinElevation = 'moderate';
+    if (bilirubin < biliUln) hep.bilirubinElevation = 'none';
+    else if (bilirubin < biliUln * 2) hep.bilirubinElevation = 'mild';
+    else if (bilirubin < biliUln * 3.5) hep.bilirubinElevation = 'moderate';
     else hep.bilirubinElevation = 'severe';
     derived.push('hepatobiliary.bilirubinElevation');
   }
@@ -270,9 +278,11 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   }
 
   if (hct !== null) {
-    // §6.2: женские пороги ниже (48/52/56 против мужских 52/56/60) — паритет с движком.
-    const fem = sex === 'female';
-    const t1 = fem ? 48 : 52, t2 = fem ? 52 : 56, t3 = fem ? 56 : 60;
+    // §6.2 (P2, проход 24): один источник — `hctSymptomCuts` (ULN из lab-norms:
+    // ♂ 52, ♀ 48). Градация: норма < ULN, mild < ULN+4, moderate < ULN+8 —
+    // мужской путь байт-в-байт (52/56/60), женский 48/52/56.
+    const therapy = hctSymptomCuts(sex).therapy;
+    const t1 = therapy, t2 = therapy + 4, t3 = therapy + 8;
     if (hct < t1) card.hctElevation = 'none';
     else if (hct < t2) card.hctElevation = 'mild';
     else if (hct < t3) card.hctElevation = 'moderate';
@@ -296,9 +306,11 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   const protein = getS('panelUrinalysis', 'Protein');
 
   if (creatinine !== null) {
-    if (creatinine < 110) urin.creatinineElevation = 'none';
-    else if (creatinine < 130) urin.creatinineElevation = 'mild';
-    else if (creatinine < 150) urin.creatinineElevation = 'moderate';
+    // §6.2 (P2): ULN по полу (♂ 110, ♀ 97), шаг +20/+40 как был.
+    const crUln = getLabNorm('CREATININE', sex)?.uln ?? 110;
+    if (creatinine < crUln) urin.creatinineElevation = 'none';
+    else if (creatinine < crUln + 20) urin.creatinineElevation = 'mild';
+    else if (creatinine < crUln + 40) urin.creatinineElevation = 'moderate';
     else urin.creatinineElevation = 'severe';
     derived.push('urinary.creatinineElevation');
   }

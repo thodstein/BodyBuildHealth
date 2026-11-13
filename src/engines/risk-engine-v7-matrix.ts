@@ -8,6 +8,7 @@ import { zScore, hillEffect, hillTox, nutritionMultipliers, trainingMultipliers,
 import type { LabPoint, CourseEntry } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { resolveFemaleAasProfile, type FemaleAasProfile } from './female-aas-risk';
+import { UCUM_MAP } from '../core/constants';
 
 // --- 7x7 Risk Systems & Mechanisms ---
 
@@ -747,6 +748,31 @@ export const LAB_REFERENCES: Record<string, LabReference> = {
   Haptoglobin: { mean: 1.0, sd: 0.4, uln: 2.0, sensitive: false, alpha: 0.2 },
   RBC: { mean: 5.0, sd: 0.4, uln: 5.8, sensitive: false, alpha: 0.2 },
 };
+
+/**
+ * §6.2 (P2, проход 24): ULN печёночной/почечной панели — из ЕДИНСТВЕННОГО
+ * источника норм (`UCUM_MAP`, его же показывает «Анализы»/`lab-norms`), а не
+ * своя копия. Было: АСТ 35 против 40, ГГТ 50 против 55, креатинин 106 против
+ * 110, ЩФ 120 против 130, билирубин 20 против 17.1 — риск-модель считала
+ * «отклонение» там, где экран анализов показывал норму (и наоборот).
+ *
+ * `mean/sd/alpha` остаются параметрами модели (z-термы): UCUM задаёт только
+ * верхнюю границу. Hct в V7 хранится долей (0.52 = 52 %) — переводим.
+ */
+const UCUM_ULN_SOURCE: Record<string, string> = {
+  ALT: 'ALT',
+  AST: 'AST',
+  GGT: 'GGT',
+  ALP: 'ALP',
+  Bilirubin: 'BIL',
+  Creatinine: 'CREATININE',
+  Hct: 'HCT',
+};
+for (const [key, code] of Object.entries(UCUM_ULN_SOURCE)) {
+  const src = (UCUM_MAP as Record<string, { uln?: number } | undefined>)[code];
+  if (!src || typeof src.uln !== 'number') continue;
+  LAB_REFERENCES[key].uln = key === 'Hct' ? src.uln / 100 : src.uln;
+}
 
 /**
  * §6.2 (P2) — женские нормы V7-референсов (только маркеры с однозначным направлением
