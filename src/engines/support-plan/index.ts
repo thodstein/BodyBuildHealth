@@ -8,7 +8,7 @@
  *
  *  Структура папки support-plan/:
  *   - types.ts      — константы, утилиты (SYSTEM_LABELS_RU, clamp, catalogEntry)
- *   - substances.ts — buildSubstances, buildSchedule, buildScheduleFromPlan, computeWeekScale
+ *   - substances.ts — buildSubstances, buildScheduleFromPlan, computeWeekScale
  *   - systems.ts    — buildSystems, buildMechanisms, buildCoverageGaps,
  *                     buildUncoveredMechanisms, buildRiskDynamics, buildRiskBreakdown
  *   - display.ts    — buildSynergyComment, buildMonitoring, buildSpecialInstructions,

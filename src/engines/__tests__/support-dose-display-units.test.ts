@@ -1,14 +1,14 @@
 /**
  * support-dose-display-units.test.ts — guard единиц в отображаемых дозах плана.
  *
- * Аудит 2026-11 (продолжение): `buildSubstances` и `buildSchedule` подписывали
+ * Аудит 2026-11 (продолжение): `buildSubstances` и расписание приёма подписывали
  * ВСЕ дозы как «мг» — 200 мкг селена выглядели как «200 мг» (1000×),
  * 5000 МЕ витамина D — как «5000 мг», а при отсутствии данных рисовалось
  * выдуманное «500 мг». Эти тесты фиксируют натуральные единицы и честное
  * «по инструкции».
  */
 import { describe, it, expect } from 'vitest';
-import { buildSubstances, buildSchedule } from '../support-plan/substances';
+import { buildSubstances, buildScheduleFromPlan } from '../support-plan/substances';
 import type { CalculatorResult } from '../support-plan/types';
 
 const fakeResult = {} as CalculatorResult;
@@ -46,9 +46,9 @@ describe('buildSubstances: единицы доз', () => {
   });
 });
 
-describe('buildSchedule: единицы доз', () => {
+describe('buildScheduleFromPlan: единицы доз', () => {
   it('селен — мкг в расписании приёма', () => {
-    const blocks = buildSchedule(['selenium']);
+    const blocks = buildScheduleFromPlan(buildSubstances(['selenium'], fakeResult));
     const item = blocks.flatMap((b) => b.substances).find((s) => s.id === 'selenium');
     expect(item).toBeTruthy();
     expect(item!.dose).toContain('мкг');

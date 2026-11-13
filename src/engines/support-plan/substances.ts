@@ -252,52 +252,16 @@ function timeOf(id: string): 'morning' | 'afternoon' | 'evening' {
 }
 
 /**
- * Распределение веществ по времени приёма (утро/день/вечер).
- * Для каждого вещества: id, name, dose, instructions.
- */
-export function buildSchedule(
-  ids: string[]
-): Array<{ timeBlock: string; substances: Array<{ id: string; name: string; dose: string; instructions: string }> }> {
-  const blocks: Record<'morning' | 'afternoon' | 'evening', Array<{ id: string; name: string; dose: string; instructions: string }>> = {
-    morning: [], afternoon: [], evening: [],
-  };
-  const seen = new Set<string>();
-  const seenCanon = new Set<string>();
-  for (const id of ids) {
-    const cid = canonId(id);
-    if (seen.has(id) || seenCanon.has(cid)) continue;
-    seen.add(id);
-    seenCanon.add(cid);
-    const e = catalogEntry(id);
-    // Канонизация дозы (см. buildSubstances): алиас → канонический id.
-    const def = DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id];
-    const foundation = FOUNDATION_ITEMS[cid];
-    if (foundation) {
-      blocks.morning.push({ id, name: foundation.name, dose: foundation.dose, instructions: foundation.timing });
-      continue;
-    }
-    const name = e?.nameRu || e?.name || id;
-    // Та же логика единиц, что в buildSubstances: DEFAULT_DOSAGES — натуральная
-    // единица, dosage.mg каталога — миллиграммы.
-    const dose = def
-      ? formatDefaultDose(cid, def.mg)
-      : (e?.dosage?.mg ? formatDoseFromMg(cid, e.dosage.mg) : 'по инструкции');
-    const block = timeOf(id);
-    blocks[block].push({
-      id, name, dose,
-      instructions: block === 'morning' ? 'С завтраком' : block === 'afternoon' ? 'С обедом' : 'За 1-2 ч до сна',
-    });
-  }
-  return (['morning', 'afternoon', 'evening'] as const).map(b => ({ timeBlock: b, substances: blocks[b] }));
-}
-
-/**
  * Расписание приёма из ГОТОВОГО плана (`PlanSubstance[]`).
  *
  * Карточка плана и «Расписание приёма» (`WeeklyPlanView`) обязаны показывать одну
  * и ту же дозу. Раньше `PlanResult.schedule` собирался повторным резолвом
  * `DEFAULT_DOSAGES` (без веса): при 140 кг карточка показывала магний 350 мг
  * (2.5 мг/кг), а расписание — 200 мг из справочника.
+ *
+ * Старый `buildSchedule(ids)` (вторая модель доз `DEFAULT_DOSAGES` без веса)
+ * удалён в двадцатом проходе: его использовали только юнит-тесты, а прод-путь
+ * (`index.ts`) с прохода 17 строит расписание из карточки плана.
  */
 export function buildScheduleFromPlan(
   subs: PlanSubstance[],

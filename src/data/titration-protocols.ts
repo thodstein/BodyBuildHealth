@@ -223,12 +223,15 @@ export const TITRATION_PROTOCOLS: Record<string, TitrationProtocol> = {
   vitamin_d3: {
     substanceId: 'vitamin_d3',
     name: 'Витамин D3',
-    startDose: '5000 МЕ/день',
-    maxDose: '20000 МЕ/день (под контролем)',
+    // Базовая доза — как в плане (2000 МЕ; вес-рост до UL 4000 МЕ). 5000+ МЕ
+    // здесь только коррекция подтверждённого дефицита, а не «стартовая доза»:
+    // иначе раскрытая карточка спорила с карточкой плана (2000 МЕ).
+    startDose: '2000 МЕ/день',
+    maxDose: '20000 МЕ/день (только коррекция дефицита под контролем врача)',
     steps: [
-      { dose: '5000 МЕ/день + K2 100 мкг', duration: '12 недель', trigger: 'Базовая доза', labs: '25-OH-D3', labTarget: '40-60 ng/mL' },
-      { dose: '10000 МЕ/день + K2 200 мкг', duration: '8 недель', trigger: '25-OH-D3 < 30 ng/mL', labs: '25-OH-D3', labTarget: '40-60' },
-      { dose: '20000 МЕ/день + K2 200 мкг', duration: '4-8 недель', trigger: '25-OH-D3 < 15 ng/mL', labs: '25-OH-D3, Ca²⁺', labTarget: '40-60, Ca < 2.6' },
+      { dose: '2000 МЕ/день + K2 100 мкг', duration: 'постоянно', trigger: 'Базовая доза плана (вес-рост до 4000 МЕ)', labs: '25-OH-D3', labTarget: '40-60 ng/mL' },
+      { dose: '10000 МЕ/день + K2 200 мкг', duration: '8 недель', trigger: '25-OH-D3 < 30 ng/mL — коррекция дефицита', labs: '25-OH-D3', labTarget: '40-60' },
+      { dose: '20000 МЕ/день + K2 200 мкг', duration: '4-8 недель', trigger: '25-OH-D3 < 15 ng/mL — тяжёлый дефицит, под контролем врача', labs: '25-OH-D3, Ca²⁺', labTarget: '40-60, Ca < 2.6' },
     ],
     stopConditions: [
       '25-OH-D3 > 100 ng/mL → STOP (токсичность)',

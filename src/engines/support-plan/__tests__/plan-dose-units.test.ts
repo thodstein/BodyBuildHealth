@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildSubstances } from '../substances';
-import { buildSchedule } from '../substances';
+import { buildScheduleFromPlan } from '../substances';
 import type { CalculatorResult } from '../types';
 
 const tzStub = {} as CalculatorResult;
@@ -52,7 +52,7 @@ describe('buildSubstances: доза в натуральной единице (н
   });
 
   it('schedule подписывает те же единицы, что и карточка', () => {
-    const schedule = buildSchedule(['biotin', 'iodine']);
+    const schedule = buildScheduleFromPlan(buildSubstances(['biotin', 'iodine'], tzStub));
     const all = schedule.flatMap(b => b.substances);
     expect(all.find(x => x.id === 'biotin')?.dose).toBe('5000 мкг');
     expect(all.find(x => x.id === 'iodine')?.dose).toBe('150 мкг');
