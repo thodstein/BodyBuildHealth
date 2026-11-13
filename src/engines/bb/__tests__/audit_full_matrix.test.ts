@@ -1,6 +1,7 @@
 import { buildBBPlan } from '../bb-builder.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
 import { derivePattern } from '../../movement-pattern';
+import { BB_MRV_TOLERANCE } from '../bb-validator.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -37,6 +38,14 @@ describe('AUDIT FULL MATRIX', () => {
                 seen.set(key, count+1);
               }
             }
+          }
+          // Инвариант, который поймал beginner-glute overflow: effective-объём
+          // (direct + indirect) не должен выходить за cap × BB_MRV_TOLERANCE.
+          const volume = ((plan as any).weeklyVolume || {})[String(plan.weeks[0].week)] || {};
+          for (const [muscle, raw] of Object.entries(volume as Record<string, any>)) {
+            const cap = Number((plan as any).mrvByMuscle?.[muscle] || 0);
+            if (!cap) continue;
+            expect(Number(raw?.effectiveSets || 0), `${split.id}/${level}/${goal}/${muscle}: effective ${raw?.effectiveSets} > cap ${cap}`).toBeLessThanOrEqual(cap * BB_MRV_TOLERANCE + 1e-6);
           }
           total++;
         }

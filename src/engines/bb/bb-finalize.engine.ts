@@ -4871,6 +4871,7 @@ export function enforceFinalEffectiveMrv(plan: BBPlan): void {
       const targetDirect = Math.max(0, Math.floor(cap * BB_MRV_TOLERANCE - indirect));
       const direct = volume[muscle]?.directSets || 0;
       let need = direct - targetDirect;
+      let remainingDirect = direct;
       if (need <= 0) continue;
       const candidates = week.sessions
         .flatMap(s => s.exercises)
@@ -4882,8 +4883,43 @@ export function enforceFinalEffectiveMrv(plan: BBPlan): void {
         const cut = Math.min(need, (e.sets || 0) - 2);
         if (cut <= 0) continue;
         e.sets -= cut;
+        remainingDirect -= cut;
         if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
         need -= cut;
+      }
+      // Все упражнения уже на полу 2 сета, но effective всё ещё выше допуска
+      // (напр. beginner glute_focus_4 W2: 14 direct при cap 12, все по 2 сета).
+      // Снять целое 2-сетовое изоляционное упражнение — единственный способ
+      // сохранить инвариант без появления 1-сетовых упражнений. Приоритет —
+      // изоляция, затем сессия с наибольшим числом движений этой мышцы, чтобы
+      // не опустошить специализированный день.
+      if (need > 0) {
+        const removalFloor = Math.max(2, targetDirect - 2);
+        const sameMuscleIn = (s: any) => s.exercises.filter((x: any) => !(x as any).warmupActivator && x.muscle === muscle).length;
+        const isIso = (e: any) => String(e.exerciseType || '') === 'isolation' || /^isolation/i.test(String(e.movementPattern || ''));
+        const removable = week.sessions
+          .flatMap((s: any) => s.exercises
+            .filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle
+              && String(e.role) !== 'primary' && (e.sets || 0) >= 2
+              && !/GVT|FST-7|8\s*[x×]\s*8/i.test(String(e.comment || '')))
+            .filter(() => sameMuscleIn(s) > 1)
+            .map((e: any) => ({ e, s, count: sameMuscleIn(s), iso: isIso(e) ? 1 : 0 })))
+          .filter(({ e }) => remainingDirect - (e.sets || 0) >= removalFloor)
+          .sort((a: any, b: any) => (b.iso - a.iso) || ((a.e.sets || 0) - (b.e.sets || 0)) || (b.count - a.count));
+        for (const { e, s } of removable as any[]) {
+          if (need <= 0) break;
+          const oldName = String(e.name || e.exerciseName || '');
+          s.exercises = s.exercises.filter((x: any) => x !== e);
+          for (const other of s.exercises as any[]) {
+            if (other.supersetWith === oldName) {
+              delete other.supersetWith;
+              delete other.supersetGroup;
+              delete other.supersetSlot;
+            }
+          }
+          remainingDirect -= (e.sets || 0);
+          need -= (e.sets || 0);
+        }
       }
     }
   }
