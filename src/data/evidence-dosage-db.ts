@@ -434,7 +434,7 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
     references: [
       'NIH ODS Copper Fact Sheet — RDA 900 мкг, UL 10 мг/сут',
     ],
-    notes: 'Zn >30 мг/сут подавляет абсорбцию Cu. Соотношение Zn:Cu ≈ 15:1.',
+    notes: 'Zn ≥25 мг/сут подавляет абсорбцию Cu — медь 1-2 мг/сут обязательна (цинк ↑ металлотионеин). Соотношение Zn:Cu ≈ 15:1.',
     contraindications: ['Болезнь Вильсона'],
   },
 
@@ -443,9 +443,10 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
     timing: 'Натощак + Vit C',
     duration: 'До нормализации ферритина (50-150 нг/мл)',
     references: [
-      'NIH ODS Iron Fact Sheet — RDA 8 мг муж / 18 мг жен (19-50 лет), UL 45 мг/сут',
+      'EFSA 2024 — Safe Level 40 мг/сут (уровень без наблюдаемых эффектов; НЕ порог токсичности, UL не установлен; PMID 38418076)',
+      'NIH ODS Iron Fact Sheet — RDA 8 мг муж / 18 мг жен (19-50 лет); IOM 2001 — UL 45 мг (прежняя, менее строгая оценка)',
     ],
-    notes: 'Бисглицинат железа — без запоров. На ААС: не назначать без анализов (HCT может расти).',
+    notes: 'Бисглицинат железа — без запоров. На ААС: не назначать без анализов (HCT может расти). ⚠ Выше Safe Level 40 мг/сут — только при подтверждённом дефиците (ферритин <30) и под контролем.',
     contraindications: ['Гемохроматоз', 'Хронические трансфузии'],
   },
 

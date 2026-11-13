@@ -178,8 +178,8 @@ export const ABSORPTION_SITES: Record<string, { site: string; ph: string; note: 
 };
 
 export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string; unit?: string }> = {
-  zn: { minMg: 15, optMg: 30, maxMg: 50, ul: 40, note: 'UL 40 мг. >50 мг → дефицит Cu через 4-8 нед.' },
-  mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'UL 350 мг из добавок. Диарея при >600 мг цитрата.' },
+  zn: { minMg: 15, optMg: 30, maxMg: 50, ul: 40, note: 'UL 40 мг. При ≥25 мг/сут медь 1-2 мг ОБЯЗАТЕЛЬНА; >50 мг — дефицит Cu через 4-8 нед.' },
+  mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'UL 350 мг из добавок: opt 400 — выше UL, только по назначению. Диарея при >600 мг цитрата.' },
   fe: { minMg: 18, optMg: 30, maxMg: 60, ul: 40, note: 'Ориентир 40 мг (Safe Level — НЕ порог токсичности). Гемохроматоз — абс. противопоказание.' },
   ca: { minMg: 500, optMg: 800, maxMg: 1200, ul: 2500, note: 'Разовая доза ≤500 мг элемент. Ca.' },
   se: { minMg: 55, optMg: 100, maxMg: 200, ul: 255, unit: 'мкг', note: 'UL 255 мкг (EFSA 2023). >400 мкг (старый IOM) → селеноз (волосы, ногти).' },

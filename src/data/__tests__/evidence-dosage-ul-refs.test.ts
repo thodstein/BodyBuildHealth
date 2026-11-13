@@ -35,6 +35,14 @@ describe('справка доз: предел = реестр', () => {
     expect(refs('magnesium')).toContain(`${NUTRIENT_LIMITS_V2.magnesium.value}`);
   });
 
+  it('железо — Safe Level 40 (EFSA), IOM 45 помечен как прежняя оценка', () => {
+    const r = refs('iron');
+    expect(r).toContain('Safe Level');
+    expect(r).toContain(`${NUTRIENT_LIMITS_V2.iron.value} мг`);
+    expect(r).toContain('прежняя');
+    expect(notes('copper')).toContain('≥25 мг/сут');
+  });
+
   it('витамин D — 4000 МЕ', () => {
     expect(notes('vitamin_d3')).toContain('UL 4000');
   });
