@@ -156,6 +156,24 @@ export function checkUpperLimits(
 }
 
 /**
+ * Дозы плана (натуральная единица) → единица реестра UL.
+ *
+ * Единственный пересчёт для ВСЕХ потребителей доз плана: UL-проверка
+ * (`checkPlanUpperLimits`) и «Суммарная нагрузка» (`aggregateDailyLoad`).
+ * Сейчас отличается только витамин D: в плане он в МЕ (`DEFAULT_DOSAGES`),
+ * реестр UL — в мкг (1 мкг = 40 МЕ).
+ */
+export function planDosesInUlScale(planDoses: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [id, dose] of Object.entries(planDoses)) {
+    if (!Number.isFinite(dose) || dose <= 0) continue;
+    const c = canonId(id);
+    out[id] = c === 'vitamin_d3' || c === 'vitamin_d' ? vitaminDMcgFromIu(dose) : dose;
+  }
+  return out;
+}
+
+/**
  * UL по ФАКТИЧЕСКИМ дозам плана (`PlanSubstance.doseMg`, натуральная единица).
  *
  * Проблема, которую закрывает: `checkUpperLimits` вызывался с картой титрации
@@ -171,33 +189,44 @@ export function checkPlanUpperLimits(
   planDoses: Record<string, number>,
   appliedDoses?: Record<string, number>,
 ): ULWarning[] {
-  const inUlScale: Record<string, number> = {};
-  for (const [id, dose] of Object.entries(planDoses)) {
-    if (!Number.isFinite(dose) || dose <= 0) continue;
-    const c = canonId(id);
-    // Витамин D в плане — МЕ (`DEFAULT_DOSAGES`), реестр UL — мкг.
-    inUlScale[id] = c === 'vitamin_d3' || c === 'vitamin_d' ? vitaminDMcgFromIu(dose) : dose;
-  }
-  return checkUpperLimits(substances, inUlScale, undefined, { appliedDoses });
+  return checkUpperLimits(substances, planDosesInUlScale(planDoses), undefined, { appliedDoses });
 }
 
 /** Агрегация суммарной суточной нагрузки минералов/витаминов по всем веществам в плане.
- *  Учитывает, что multiple вещества могут содержать один и тот же нутриент. */
+ *  Учитывает, что несколько веществ могут содержать один и тот же нутриент,
+ *  а также алиасы активных форм (`selenium_yeast` → `selenium`, `p5p` → `vitamin_b6`).
+ *
+ *  До этого прохода агрегатор считался по карте ТИТРАЦИИ: B6, витамин A, K2,
+ *  фолат, бор, медь и железо туда не попадают, поэтому блок «Суммарная нагрузка»
+ *  молчал про 25 мг B6 при UL 12 мг — при том что UL-блок рядом уже предупреждал.
+ *  Теперь источник доз — тот же `planDoses`, что и у UL-проверки; если доза
+ *  капнута титрацией (`appliedDoses`), в нагрузку идёт фактический приём.
+ *
+ *  Учитываются только истинные UL: `ClinicalGuidance` (NAC, CoQ10, B12, K2, хром)
+ *  и `SafeLevel` (железо) — не пороги токсичности, в этой сводке их нет.
+ */
 export function aggregateDailyLoad(
   substances: string[],
   doses: Record<string, number>,
+  appliedDoses?: Record<string, number>,
 ): Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }> {
+  const inUlScale = planDosesInUlScale(doses);
   const agg: Record<string, { totalMg: number; contributors: string[]; hasUL: boolean; ulMg?: number }> = {};
   for (const subId of substances) {
-    const doseMg = doses[subId] || 0;
-    if (doseMg <= 0) continue;
-    // Сначала само вещество как нутриент
-    if (NUTRIENT_UL[subId] !== undefined) {
-      if (!agg[subId]) agg[subId] = { totalMg: 0, contributors: [], hasUL: true, ulMg: NUTRIENT_UL[subId] };
-      agg[subId].totalMg += doseMg;
-      agg[subId].contributors.push(subId);
-    }
-    // Дополнительные кроссиды: vitamin_d3 содержит D3, но ID уже vitamin_d3
+    const planned = inUlScale[subId];
+    if (!(planned > 0)) continue;
+    const key = ulLimitKeyOf(subId);
+    // `NUTRIENT_UL` индексирован id ВЕЩЕСТВ (`vitamin_d3`), а тип предела лежит
+    // в реестре по id НУТРИЕНТА (`vitamin_d`) — сопоставляем через `resolveNutrient`.
+    if (!key || ulLimitKindOf(key) !== 'UL') continue;
+    const ul = NUTRIENT_UL[key];
+    if (!(ul > 0)) continue;
+    // Фактический приём: капнутая титрацией доза, иначе — плановая.
+    const applied = appliedDoses?.[subId] ?? appliedDoses?.[canonId(subId)];
+    const doseMg = applied && applied > 0 ? applied : planned;
+    if (!agg[key]) agg[key] = { totalMg: 0, contributors: [], hasUL: true, ulMg: ul };
+    agg[key].totalMg += doseMg;
+    agg[key].contributors.push(subId);
   }
   return agg;
 }

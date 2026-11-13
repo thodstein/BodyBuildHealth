@@ -85,8 +85,10 @@
 ### §6.2 Осталось (низкий риск, отдельным раундом)
 - ✅ `risk-verification.engine.ts` — женские пороги в отчёте верификации выполнены (P1, `7ffd3e93`): femaleThresholds/femaleDirection маркеров + femaleValue/femaleLabel/femaleOnly floors, пол из профиля (`RiskVerificationList`).
 - ✅ `LAB_MONITOR_DB`/`support-phase-labs`/`substance-monitoring-db` — женские пометки текстов выполнены в `support-phase-labs` (K0/K2/K5/K7 femaleNote, рендер при sex=female); `LAB_MONITOR_DB` — покрыт женскими протоколами/паспортом (отдельные пометки не дублируются — см. §6.4).
-- Остаётся (P2): `Calc.mapper.tsx:2349` (HCT-градация), `Calc.labs-derived.ts:247-253`, `risk-engine-v7-matrix`/`training-calendar`, `notification-engine`, `estimateCardioRisk(entries, {sex})` — по желанию.
 - ✅ **Четырнадцатый проход**: `notification-engine` (♀ пороги HCT 48/52, АЛТ 78, E2-диапазон цикла, E2-краш только на ИА), доменная карта гематологии в калькуляторе (♀ 44/48 + Hb 150 + подписи ♀), `estimateCardioRisk` (возрастной порог 55 ♂ / 65 ♀), мёртвый дубль интерпретации анализов в `training-calendar.engine.ts` удалён (единственный источник — `lab-analysis.engine.ts`).
+- ✅ **Пятнадцатый проход**: алерты `notification-engine` (E2/HCT/АЛТ/PRL/ЛПНП/eGFR/D-димер + ♀ пороги) видны в калькуляторе — `CalcNotificationsBanner`, `labs_overdue` не дублируется с `LabsDueBanner`, закрытие стартует cooldown правила (`markNotificationShown`).
+- ✅ **Шестнадцатый проход**: «Суммарная нагрузка / UL» считается по тем же дозам плана, что UL-проверка (`planDosesInUlScale`), с канонизацией алиасов; в сводку входят только истинные `UL` (B6/A/K2/фолат теперь видимы, `ClinicalGuidance`/`SafeLevel` — нет).
+- Остаётся (P2): `risk-engine-v7-matrix`/`training-calendar` и другие дубли порогов, если найдутся; `Calc.labs-derived`/`Calc.mapper` — базовые пороги уже gendered.
 
 ### §6.4 Женские ПРОТОКОЛЫ «Женщины и ААС» — сверка с приложением (P1)
 > ✅ **Выполнено (P1, `7ffd3e93`, без пуша).** Протокол внедрён (13 табов, коммиты `7c9dc7f08/8f0df35f9/e9e9cfdfa/4fe56401`) и покрыт тестами (25/25 + e2e). Согласованность контента протокола с движками после §16.3:
@@ -550,6 +552,32 @@ P2 — вкладка «Анализы»: отображение и индика
 - `notification-female.test.ts` (+1): после `markNotificationShown` правило скрывается на cooldown, остальные не затронуты.
 
 Прогон пятнадцатого прохода: `src/ui/screens/Calculator/__tests__` (19 файлов) — **93 зелёных**; `notification-female` — 12; `npm run type-check` — 0; `npm run verify:apk-design` — OK.
+
+### Шестнадцатый проход (нагрузка и UL — один счёт)
+
+**Проблема.** Блок «Суммарная нагрузка / UL» (`aggregateDailyLoad` → `buildCumulativeLoad` → `SafetyCumulativeLoad`) считался по карте **титрации** `applyTitration`, а там только Mg/Zn/D3/Se/VitC/NAC/ALA/CoQ10/глицин/калий/омега-3. Последствия:
+- B6 25 мг (EFSA UL 12 мг), витамин A, K2, фолат, бор, медь, железо в сводку не попадали вовсе — при этом UL-блок рядом уже предупреждал (проход 13). Два блока на одном экране считали разные дозы;
+- алиасы (`selenium_yeast`, `p5p`) не канонизировались — вместо суммы получались отдельные ряды, и `p5p` вообще терялся;
+- доза в МЕ (`vitamin_d3`) складывалась с UL в мкг — при dosis 2000 «МЕ» процент UL был бы 2000 %;
+- `NUTRIENT_UL` содержит и `ClinicalGuidance` (NAC 1800, CoQ10, B12, K2, калий, хром), и `SafeLevel` (железо) — сводка выдавала их за «UL».
+
+**Решение.**
+- `planDosesInUlScale` — общий пересчёт доз плана в единицу реестра (D3: МЕ→мкг); его используют и `checkPlanUpperLimits`, и `aggregateDailyLoad`, поэтому блоки не расходятся по определению.
+- `aggregateDailyLoad(substances, planDoses, appliedDoses?)` теперь берёт дозы **плана** (все вещества), канонизирует алиасы через `ulLimitKeyOf` (суммирует `p5p` + `vitamin_b6`, `selenium_yeast` + `selenium`), а если доза капнута титрацией — в нагрузку идёт фактический приём (`appliedDoses`).
+- В сводку попадают только истинные `UL`: тип определяется через `resolveNutrient` (ключ `NUTRIENT_UL` — id ВЕЩЕСТВА `vitamin_d3`, а `NUTRIENT_LIMIT_INFO` — id НУТРИЕНТА `vitamin_d`; прямое обращение к `NUTRIENT_LIMIT_INFO[key]` давало `undefined` и молча выключало D3). `ClinicalGuidance` и `SafeLevel` в «нагрузку / UL» не входят — у них другая природа (см. проход 13).
+- `engine.ts`: `aggregateDailyLoad(substances, planDoses, titration)`.
+
+Тесты-гарды (`daily-load-ul-parity.test.ts`, 11):
+- `planDosesInUlScale`: 2000 МЕ → 50 мкг, 4000 → 100; мг/мкг не пересчитываются; 0/NaN/−5 отбрасываются;
+- B6 25 мг виден в нагрузке с UL 12 (раньше строки не было вообще);
+- `p5p` 25 + B6 10 = 35 мг в одной строке `vitamin_b6`;
+- `selenium_yeast` 200 + `selenium` 50 = 250 мкг против UL 255;
+- D3 2000 МЕ = 50 мкг (50 % UL), не 2000 %;
+- кап титрации: план D3 8000 МЕ → в нагрузке 100 мкг; Mg 800 → 350 (UL);
+- `ClinicalGuidance`/`SafeLevel`/`creatine` не создают строк;
+- витамин A 6000 мкг против UL 3000.
+
+Прогон шестнадцатого прохода: `daily-load-ul-parity` + `plan-ul-actual-doses` — 22 зелёных; поддержка/планирование (`support-calc-e2e`, `support-calc-audit`, `plan-mechanisms`, `support-limits-registry`, `ul-single-registry`, `plan-ul-warnings`, `plan-quality-v2`, `support-dose-display-units`) — **150 зелёных**; `npm run type-check` — 0; `npm run verify:apk-design` — OK.
 
 ### Осознанные отклонения
 - Кураторская база + производный fallback вместо ручного переписывания 12k-строчного каталога. Деривация консервативна и всегда помечена `q='C'` — «правдоподобно», а не «доказано».

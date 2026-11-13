@@ -609,7 +609,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     // фолата, бора, меди, железа: их превышения раньше не проверялись вовсе,
     // хотя блок плана назывался «UL по фактическим дозам».
     const ulWarnings = checkPlanUpperLimits(substances, planDoses, titration);
-    const dailyLoad = aggregateDailyLoad(substances, titration);
+    // Нагрузка — по тем же дозам плана, что и UL-проверка (иначе блоки расходятся):
+    // B6/A/K2/фолат раньше не попадали в сводку вовсе, а D3 считался в МЕ.
+    const dailyLoad = aggregateDailyLoad(substances, planDoses, titration);
 
     let overallRaw: number;
     let overallAfterSupport: number;
