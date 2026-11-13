@@ -50,8 +50,11 @@ describe('doseUlHint: верхняя граница выше UL', () => {
     expect(doseUlHint('Селен', '400 мкг')).toContain(ul('selenium'));
   });
 
-  it('железо выше Safe Level 40 подписано', () => {
-    expect(doseUlHint('Железо (бисглицинат)', '100 мг')).toContain(ul('iron'));
+  it('железо выше Safe Level 40 подписано (и это не «UL»)', () => {
+    const hint = doseUlHint('Железо (бисглицинат)', '100 мг');
+    expect(hint).toContain(ul('iron'));
+    expect(hint).toContain('Safe Level');
+    expect(hint).not.toContain('выше UL');
     expect(doseUlHint('Железо', '25 мг')).toBeNull();
   });
 

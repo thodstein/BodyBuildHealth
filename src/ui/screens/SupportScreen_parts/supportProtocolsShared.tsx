@@ -120,7 +120,10 @@ export function doseUlHint(name: string, dose: string): string | null {
       if (v > max) max = v;
     }
     if (max > lim.value) {
-      hits.push({ short: probe.short, text: `выше UL ${lim.value} ${UL_UNIT_RU[lim.unit] || ''}`.trim() });
+      // SafeLevel (железо) — НЕ порог токсичности: реестр прямо запрещает
+      // показывать дозу железа как «превышение нормы» (см. note записи iron).
+      const word = lim.kind === 'SafeLevel' ? 'Safe Level' : 'UL';
+      hits.push({ short: probe.short, text: `выше ${word} ${lim.value} ${UL_UNIT_RU[lim.unit] || ''}`.trim() });
     }
   }
   if (!hits.length) return null;
@@ -134,11 +137,16 @@ export function doseUlHint(name: string, dose: string): string | null {
 export const DoseUlBadge: React.FC<{ name?: string; dose?: string }> = ({ name, dose }) => {
   const hint = doseUlHint(name || '', dose || '');
   if (!hint) return null;
+  // Железо: EFSA не установила UL — 40 мг это safe level. Подсказка не должна
+  // читаться как «токсичная доза».
+  const isSafe = hint.includes('Safe Level');
   return (
     <span
       data-dose-ul
-      title="Клинический диапазон протокола превышает верхний предел добавок — приём выше предела только по назначению/курсом"
-      style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '2px 7px', whiteSpace: 'nowrap' }}
+      title={isSafe
+        ? 'EFSA 2024: UL для железа НЕ установлен, 40 мг — «safe level» (уровень, выше которого не наблюдали побочных эффектов). Перегрузка оценивается по ферритину/TSAT/HCT, а не по дозе'
+        : 'Клинический диапазон протокола превышает верхний предел добавок — приём выше предела только по назначению/курсом'}
+      style={{ fontSize: 10, fontWeight: 800, color: isSafe ? '#38bdf8' : '#f59e0b', background: isSafe ? 'rgba(56,189,248,0.12)' : 'rgba(245,158,11,0.12)', border: isSafe ? '1px solid rgba(56,189,248,0.28)' : '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '2px 7px', whiteSpace: 'nowrap' }}
     >
       ⚠ {hint}
     </span>
