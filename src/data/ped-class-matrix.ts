@@ -63,7 +63,7 @@ export const PED_CLASS_MATRIX: PedClassMatrixEntry[] = [
     labs: ['HCT/HGB/RBC/PLT', 'ферритин/железо/TSAT', 'D-димер'],
     freq: 'ОАК каждые 2-4 нед; ферритин каждые 4 нед',
     mandatory: ['nattokinase', 'serrapeptase', 'bromelain', 'hesperidin'],
-    conditional: ['эритроцитаферез/флеботомия (HCT >52, врач)', 'telmisartan (АД)'],
+    conditional: ['эритроцитаферез/флеботомия (HCT >54%, ♀ >52%, врач)', 'telmisartan (АД)'],
     doctorOnly: ['эритроцитаферез', 'флеботомия'],
     interactions: ['фибринолитики + антикоагулянты — кровотечение', 'высокие дозы → эритроцитоз'],
     assayWarnings: ['HCT/ферритин — контроль эритропоэза', 'TSAT <20% при ферритине ↑ → перегрузка железом'],

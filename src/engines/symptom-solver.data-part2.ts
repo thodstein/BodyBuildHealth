@@ -452,7 +452,7 @@ export const DB_PART2: SymptomEntry[] = [
           { marker: 'D-димер', expectedChange: '↔', targetRange: '<0.5 мкг FEU/мл', when: 'Контроль' },
         ],
         solutions: [
-          { substanceId: 'phlebotomy', name: 'Кровопускание', type: 'lifestyle', dose: '450 мл (1-2 раза в месяц до Hct<50%)', mechanism: 'Прямое ↓вязкости', evidenceLevel: 'A' },
+          { substanceId: 'phlebotomy', name: 'Кровопускание', type: 'lifestyle', dose: '450 мл (1-2 раза в месяц до Hct <50%; порог старта ♂ >54%, ♀ >52%)', mechanism: 'Прямое ↓вязкости', evidenceLevel: 'A' },
           { substanceId: 'nattokinase', name: 'Наттокиназа', type: 'supplement', dose: '2000 FU/день', mechanism: 'Фибринолитик, ↓фибриноген', evidenceLevel: 'C' },
         ],
         expectations: [

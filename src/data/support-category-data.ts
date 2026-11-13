@@ -471,7 +471,7 @@ export const RECOMMENDATIONS_DB: Recommendation[] = [
   { recId: "REC_HEART_ATHEROSCLEROSIS_HIGH", type: "RISK", riskId: "HEART_ATHEROSCLEROSIS", level: "HIGH", title: "Выраженный атеросклероз", text: "Требуется терапия статинами." },
   { recId: "REC_HEART_THROMBOSIS_LOW", type: "RISK", riskId: "HEART_THROMBOSIS", level: "LOW", title: "Риск тромбоза", text: "Аспирин 100 мг/день, обильное питьё." },
   { recId: "REC_HEART_THROMBOSIS_MED", type: "RISK", riskId: "HEART_THROMBOSIS", level: "MEDIUM", title: "Умеренный риск тромбоза", text: "Сдача крови, контроль HCT, омега-3." },
-  { recId: "REC_HEART_THROMBOSIS_HIGH", type: "RISK", riskId: "HEART_THROMBOSIS", level: "HIGH", title: "Высокий риск тромбоза", text: "HCT >54% — кровопускание, антикоагулянты." },
+  { recId: "REC_HEART_THROMBOSIS_HIGH", type: "RISK", riskId: "HEART_THROMBOSIS", level: "HIGH", title: "Высокий риск тромбоза", text: "HCT >54% (♀ >52%) — кровопускание, антикоагулянты." },
 
   // === НЕРВНАЯ СИСТЕМА ===
   { recId: "REC_NEURO_INSOMNIA_LOW", type: "RISK", riskId: "NEURO_INSOMNIA", level: "LOW", title: "Лёгкая бессонница", text: "Магний L-треонат, мелатонин 0.5 мг." },
@@ -498,7 +498,7 @@ export const RECOMMENDATIONS_DB: Recommendation[] = [
   // === КРОВЕТВОРНАЯ СИСТЕМА ===
   { recId: "REC_HEMA_POLYCYTHEMIA_LOW", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "LOW", title: "Лёгкий эритроцитоз", text: "Обильное питьё, контроль HCT." },
   { recId: "REC_HEMA_POLYCYTHEMIA_MED", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "MEDIUM", title: "Эритроцитоз", text: "Кровопускание 450 мл, аспирин." },
-  { recId: "REC_HEMA_POLYCYTHEMIA_HIGH", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "HIGH", title: "Опасный эритроцитоз", text: "HCT >54% — немедленное кровопускание, антикоагулянты." },
+  { recId: "REC_HEMA_POLYCYTHEMIA_HIGH", type: "RISK", riskId: "HEMA_POLYCYTHEMIA", level: "HIGH", title: "Опасный эритроцитоз", text: "HCT >54% (♀ >52%) — немедленное кровопускание, антикоагулянты." },
   { recId: "REC_HEMA_THROMBOSIS_LOW", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "LOW", title: "Риск тромбоза", text: "Аспирин 100 мг, омега-3." },
   { recId: "REC_HEMA_THROMBOSIS_MED", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "MEDIUM", title: "Умеренный риск", text: "Аспирин, контроль D-димера." },
   { recId: "REC_HEMA_THROMBOSIS_HIGH", type: "RISK", riskId: "HEMA_THROMBOSIS_RISK", level: "HIGH", title: "Высокий риск тромбоза", text: "Антикоагулянты, снижение дозы ААС." },

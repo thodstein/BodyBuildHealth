@@ -369,7 +369,7 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
     key: 'boldenone', label: 'Болденон / DHB',
     classes: ['boldenone', 'dht_inject'], attachTo: ['K2'],
     items: [
-      it('ОАК q2–4w (HCT/HGB/RBC/PLT) + ферритин/Fe/TSAT', 'HCT<52%, TSAT 20–45%', 'HCT↑ — только врачебная флеботомия', undefined),
+      it('ОАК q2–4w (HCT/HGB/RBC/PLT) + ферритин/Fe/TSAT', 'HCT<52%, TSAT 20–45%', 'HCT ↑ (♂ >54%, ♀ >52%) — только врачебная флеботомия', undefined),
     ],
   },
   {

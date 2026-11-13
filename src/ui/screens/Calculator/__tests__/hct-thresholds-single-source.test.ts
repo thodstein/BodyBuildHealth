@@ -96,6 +96,25 @@ describe('гематокрит: тексты не вводят своих чис
     expect(bad).toEqual([]);
   });
 
+  it('в данных и движках действия с HCT называют женский порог', () => {
+    const bad: string[] = [];
+    const dirs = ['src/data', 'src/engines'].map(d => resolve(process.cwd(), d));
+    for (const dir of dirs) {
+      for (const p of walk(dir)) {
+        readFileSync(p, 'utf8').split(/\r?\n/).forEach((line, i) => {
+          if (/^\s*(\/\/|\*|\/\*)/.test(line)) return; // комментарий, не текст для пользователя
+          if (!/флеботом|эритроцитаферез|кровопускание|забор крови/i.test(line)) return;
+          // Порог должен стоять РЯДОМ с HCT: иначе «%» из соседнего показателя
+          // (HDL −40%, PLT 400) даёт ложное срабатывание на длинных строках.
+          if (!/[Hh][Cc][Tt][^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
+          if (/♀|женск/i.test(line)) return;
+          bad.push(`${relative(process.cwd(), p)}:${i + 1} — ${line.trim().slice(0, 100)}`);
+        });
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
   it('канонические строки называют оба пола', () => {
     const rows = STOP_COURSE_TABLE.filter(r => /Hct/i.test(r.cond));
     expect(rows.length).toBeGreaterThan(0);

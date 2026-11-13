@@ -1326,7 +1326,7 @@ export function buildMonitoringSchedule(
     week4.push({ marker: 'E2/TT/FT/LH/FSH/SHBG', reason: 'HPTA и эстрогеновый профиль нандролона', target: 'LH/FSH в норме на фоне поддержки hCG' });
   }
   if (flags.hasBold) {
-    week4.push({ marker: 'ОАК (HCT/HGB/RBC/PLT), ferritin/iron/TSAT', reason: 'Эритроцитоз болденона/DHB', target: 'HCT<52%, TSAT 20-45%', escalation: 'HCT↑ — эритроцитаферез/флеботомия ТОЛЬКО с врачом' });
+    week4.push({ marker: 'ОАК (HCT/HGB/RBC/PLT), ferritin/iron/TSAT', reason: 'Эритроцитоз болденона/DHB', target: 'HCT<52%, TSAT 20-45%', escalation: 'HCT ↑ (♂ >54%, ♀ >52%) — эритроцитаферез/флеботомия ТОЛЬКО с врачом' });
   }
   if (flags.hasGH) {
     week4.push({ marker: 'Глюкоза натощак + HbA1c; IGF-1 каждые 6-8 нед', reason: 'Метаболический контроль GH', target: 'HbA1c<5.7%', drug: 'gh' });

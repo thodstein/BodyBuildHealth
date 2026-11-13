@@ -116,7 +116,7 @@ const NOTIFICATION_RULES: NotificationRule[] = [
     id: 'hct_high',
     trigger: 'risk_threshold',
     condition: (s) => !isFemale(s) && (s.labs.hct || 0) >= 52,
-    message: '🩸 Гематокрит ≥52% — повышенный риск тромбоза. Рекомендована флеботомия 300-450 мл + контроль HCT через 3 дня.',
+    message: '🩸 Гематокрит ≥54% (♀ ≥52%) — повышенный риск тромбоза. Рекомендована флеботомия 300-450 мл + контроль HCT через 3 дня.',
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,
