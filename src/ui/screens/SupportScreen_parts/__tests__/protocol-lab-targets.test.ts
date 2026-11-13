@@ -69,3 +69,18 @@ describe('стеатоз и предкурсовой чеклист: те же �
     expect(shared).not.toContain('<28 нг/мл');
   });
 });
+
+describe('мониторинг веществ (LAB_MONITOR_DB): те же нормы', () => {
+  const unified = read('UnifiedSynergyCalculator.tsx');
+
+  it('билирубин — 17.1, а не 21 мкмоль/л', () => {
+    expect(unified).toContain(`target:'<${ucum.BIL.uln} мкмоль/л'`);
+    expect(unified).not.toContain("<21 мкмоль/л'");
+  });
+
+  it('пролактин — 320 мМЕ/л (15 нг/мл), как на экране «Анализы»', () => {
+    expect(unified).toContain("when:'Каждые 4 нед', target:'<320 мМЕ/л'");
+    // <400 у каберголина — терапевтическая цель (не переподавить PRL), это не норма.
+    expect(unified).toContain("Каберголин — мощный D2-агонист");
+  });
+});
