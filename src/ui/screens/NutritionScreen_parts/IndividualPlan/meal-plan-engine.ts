@@ -634,6 +634,138 @@ export function applyMealFairness(
   return changed;
 }
 
+/**
+ * §8.98 (B17): «вёдра» больших атлетов — перенос носителя между приёмами.
+ *
+ * Замер: на 100–160 кг при 4–6 приёмах тарелки выходят 850–1150 г при физической норме
+ * `650 × ws` (аудит §8.97, долг B17): «рис 250 + картофель 300» — это 90 г углеводов
+ * в одном приёме, и никакой кап этого не лечит, потому что день обязан сойтись к 3%.
+ *
+ * Стадия не меняет день: перенос идёт ТЕМ ЖЕ продуктом с той же плотностью
+ * (`scaledCopy`), поэтому калории/Б/Ж/У дня сохраняются бит-в-бит — канон 3% не может
+ * пострадать по построению. Меняется только раскладка по приёмам:
+ *   • донор — приём с тарелкой тяжелее мягкого капа (`650 × ws × 1.25`, §8.97b);
+ *   • отдаёт САМЫЙ крупный гибкий крахмалистый носитель (роль carb_slow/carb_fast,
+ *     не `_fixedGrams`, не ядро рецепта `ingredientIds`, ≥80 г, остаётся ≥40 г);
+ *   • приёмник — другой основной приём с комнатой тарелки ≥40 г; приоритет — приём,
+ *     где ЭТОТ продукт уже есть (тогда это рост существующей порции, а не «чужое блюдо»);
+ *     в приём с ядром рецепта чужой продукт НЕ подселяется (только рост одноимённого);
+ *   • peri-окна (пред/пост-трен, intra) неприкосновенны в обе стороны;
+ *   • качество дня (`scoreDayQuality`) не должно упасть, иначе полный откат шага.
+ *
+ * Возвращает true, если раскладка изменилась (день при этом тот же).
+ */
+export function applyPlateOverflowRelief(
+  meals: any[],
+  totals: any,
+  weightKg: number,
+  notes: string[],
+  opts?: { softCapMult?: number; steps?: number },
+): boolean {
+  const MAIN = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6']);
+  const ws = Math.max(1, Math.min(1.6, (Number(weightKg) || 80) / 80));
+  // Цель переноса — ФИЗИЧЕСКАЯ норма тарелки §8.95 (650 × ws), а не мягкий кап закрывателя:
+  // закрыватель с мягким капом умеет лишь не ДОЛИВАТЬ, а тут задача — разгрузить уже собранное.
+  const softCap = Math.round(650 * ws * (opts?.softCapMult ?? 1));
+  const steps = opts?.steps ?? 6;
+  const isPeri = (m: any): boolean => !!(m?._insulinWindow)
+    || ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m?.type || ''))
+    || /предтрен|пост-трен|intra|перед сном/i.test(String(m?.label || ''));
+  const coreOf = (m: any): Set<string> => new Set([
+    ...(((m?.ingredientIds as any[]) || [])),
+    ...(((m?.recipeIngredientIds as any[]) || [])),
+  ].map(String));
+  const solidOf = (m: any): number => (m?.items || [])
+    .filter((x: any) => !['liquid', 'supplement'].includes(String(x?.role || '')))
+    .reduce((s: number, x: any) => s + (Number(x?.amount) || 0), 0);
+  const scaledCopy = (src: any, grams: number) => {
+    const r = grams / Math.max(1e-6, Number(src?.amount) || 0);
+    const out: any = { ...src, amount: Math.round(grams) };
+    for (const k of ['p', 'f', 'c', 'kcal', 'fiber']) {
+      if (typeof src?.[k] === 'number') out[k] = Math.round(src[k] * r * 10) / 10;
+    }
+    if (typeof src?.leucine_mg === 'number') out.leucine_mg = Math.round(src.leucine_mg * r);
+    return out;
+  };
+  const scoreOf = () => scoreDayQuality(meals as any[], {
+    weightKg: Number(weightKg) || 0,
+    microCoverage: { lowCount: 0, total: 16 },
+  });
+  let changed = false;
+  for (let step = 0; step < steps; step++) {
+    const donor = (meals || [])
+      .filter((m: any) => MAIN.has(String(m.type)) && !isPeri(m))
+      .map((m: any) => ({ m, solid: solidOf(m) }))
+      .filter((x: any) => x.solid > softCap)
+      .sort((a: any, b: any) => b.solid - a.solid)[0];
+    if (!donor) break;
+    const overflow = donor.solid - softCap;
+    const core = coreOf(donor.m);
+    const cands = (donor.m.items || [])
+      .filter((it: any) => (it?.role === 'carb_slow' || it?.role === 'carb_fast')
+        && !it?._fixedGrams && !core.has(String(it.id)) && (Number(it.amount) || 0) >= 80)
+      .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+    if (cands.length === 0) break;
+    const receivers = (meals || [])
+      .filter((m: any) => m !== donor.m && MAIN.has(String(m.type)) && !isPeri(m))
+      .map((m: any) => ({ m, room: softCap - solidOf(m) }))
+      .filter((x: any) => x.room >= 40)
+      .sort((a: any, b: any) => b.room - a.room);
+    if (receivers.length === 0) break;
+    let applied = false;
+    for (const cand of cands) {
+      const amt = Number(cand.amount) || 0;
+      // Приёмник с тем же продуктом — приоритет (рост порции, а не «чужое блюдо»).
+      const ordered = [...receivers].sort((a: any, b: any) => {
+        const ha = (a.m.items || []).some((x: any) => String(x?.id) === String(cand.id)) ? 1 : 0;
+        const hb = (b.m.items || []).some((x: any) => String(x?.id) === String(cand.id)) ? 1 : 0;
+        return (hb - ha) || (b.room - a.room);
+      });
+      for (const r of ordered) {
+        const host: any = (r.m.items || []).find((x: any) => String(x?.id) === String(cand.id) && !x?._fixedGrams);
+        const hostAmt = host ? Number(host.amount) || 0 : 0;
+        // Чужой продукт подселяем только в «гибкий» приём (без ядра рецепта).
+        if (!host && coreOf(r.m).size > 0) continue;
+        const edCap = Math.min(Number(edibilityCapFor(String(cand.id), 600)) || 600, 600);
+        if (host && hostAmt >= edCap) continue;
+        let g = Math.min(overflow, r.room, host ? Math.min(edCap - hostAmt, r.room) : r.room, amt - 40);
+        g = Math.floor(g / 5) * 5;
+        if (g < 40) continue;
+        const snapCand = { ...cand };
+        const snapHost = host ? { ...host } : null;
+        const snapItems = [...(r.m.items || [])];
+        const q0 = scoreOf();
+        const moved = scaledCopy(cand, g);
+        Object.assign(cand, scaledCopy(cand, amt - g));
+        if (host) Object.assign(host, scaledCopy(host, hostAmt + g));
+        else r.m.items = [...(r.m.items || []), moved];
+        recalcMealTotals(meals as any[]);
+        recalcDayTotals(meals as any[], totals);
+        const q1 = scoreOf();
+        if (q1.total < q0.total - 1e-9) {
+          Object.assign(cand, snapCand);
+          if (snapHost) Object.assign(host!, snapHost);
+          else r.m.items = snapItems;
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+          continue;
+        }
+        notes.push(
+          `🍽 «${String(donor.m.label || donor.m.type)}» облегчён: ${cand.name} ${Math.round(amt)} → ${Math.round(amt - g)} г `
+          + `(перенос в «${String(r.m.label || r.m.type)}»${host ? `: ${Math.round(hostAmt)} → ${Math.round(hostAmt + g)} г` : ''}) — `
+          + `тарелка ${Math.round(donor.solid)} → ${Math.round(donor.solid - g)} г, калории дня те же`,
+        );
+        applied = true;
+        changed = true;
+        break;
+      }
+      if (applied) break;
+    }
+    if (!applied) break;
+  }
+  return changed;
+}
+
 // Максимально допустимые порции для добавок (г) — защита от абсурдных доз
 const SUPPLEMENT_MAX_G: Record<string, number> = {
   creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,

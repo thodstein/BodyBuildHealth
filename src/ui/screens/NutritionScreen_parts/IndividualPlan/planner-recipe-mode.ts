@@ -21,7 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolat
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, scaleQuotasForExtreme } from './food-availability';
-import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness } from './meal-plan-engine';
+import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness, applyPlateOverflowRelief } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -3050,6 +3050,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   if (!args.portableMode && outMeals.some((m: any) => !!m?.target)) {
     const _ffTot = sumDayTotals(outMeals as any);
     applyMealFairness(outMeals as any[], _ffTot as any, Number(args.athleteWeightKg) || 0, notes);
+  }
+  // §8.98 (B17): «вёдра» больших атлетов. Перенос крахмалистого носителя из переполненной
+  // тарелки в приём с комнатой — день не меняется (та же плотность того же продукта),
+  // поэтому девиация ниже остаётся той же. Замер: 120 кг mass/5/отд P2.4 тарелка 1155 → ~1000 г.
+  {
+    const _ofTot = sumDayTotals(outMeals as any);
+    applyPlateOverflowRelief(outMeals as any[], _ofTot as any, Number(args.athleteWeightKg) || 80, notes);
   }
 
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
