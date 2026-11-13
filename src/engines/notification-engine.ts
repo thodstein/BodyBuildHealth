@@ -90,7 +90,7 @@ const NOTIFICATION_RULES: NotificationRule[] = [
         : 5;
       return !isFemale(s) && weeksSince >= 4 && s.pharma.phase === 'course' && !!(s.pharma.hasAI || (s.labs.e2 && s.labs.e2 > 80));
     },
-    message: '🔬 Контроль эстрадиола (E2): прошло 4+ нед. При AI-терапии — критично (риск E2-crash <20 или гинекомастия >80).',
+    message: '🔬 Контроль эстрадиола (E2): прошло 4+ нед. При AI-терапии — критично (риск E2-crash <15 или гинекомастия >80).',
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,

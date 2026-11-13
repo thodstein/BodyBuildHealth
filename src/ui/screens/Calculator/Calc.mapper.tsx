@@ -148,7 +148,7 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   ],
   hepatic: [
     { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l, state)=>(l.ALT??0)>normUln('ALT',state,40)||(l.AST??0)>normUln('AST',state,40) },
-    { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l, state)=>(l.GGT??0)>normUln('GGT',state,55)||(l.ALP??0)>normUln('ALP',state,130)||(l.BILIRUBIN??0)>normUln('BIL',state,21) },
+    { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l, state)=>(l.GGT??0)>normUln('GGT',state,55)||(l.ALP??0)>normUln('ALP',state,130)||(l.BILIRUBIN??0)>normUln('BIL',state,17.1) },
     { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
   ],
   renal: [

@@ -54,6 +54,13 @@ describe('notification-engine: гематокрит', () => {
 });
 
 describe('notification-engine: эстрадиол', () => {
+  it('♂ напоминание о E2 не занижает порог краша: <15 (как в e2_crash), не <20', () => {
+    const rules = checkNotifications(state({ labs: { e2: 90 }, pharma: { phase: 'course', hasAI: true } }));
+    const mon = rules.find((r) => r.id === 'e2_monitor');
+    expect(mon).toBeTruthy();
+    expect(mon!.message).toContain('<15');
+    expect(mon!.message).not.toContain('<20');
+  });
   it('♀ E2 120 — физиология цикла, «высокий E2» не срабатывает (у ♂ срабатывает)', () => {
     expect(ids(state({ labs: { e2: 120 }, sex: 'female' }))).not.toContain('e2_high');
     expect(ids(state({ labs: { e2: 120 }, sex: 'male' }))).toContain('e2_high');
