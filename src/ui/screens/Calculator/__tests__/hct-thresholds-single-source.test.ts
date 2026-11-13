@@ -15,6 +15,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { hctCuts, hctGradationLabel, deriveStateFromLabs } from '../Calc.labs-derived';
 import { clinicalFloorsForLabs, HCT_THRESHOLDS } from '../../../../engines/risk-engine-tz-spec';
+import { HCT_THRESHOLDS as HCT_THRESHOLDS_FROM_LAB_NORMS } from '../../../../engines/lab-norms.engine';
 import { STOP_COURSE_TABLE } from '../../SupportScreen_parts/supportProtocolsShared';
 
 const ROOT = resolve(process.cwd(), 'src');
@@ -43,6 +44,13 @@ describe('гематокрит: одна шкала на подпись, бан�
   it('ургент совпадает с порогом флеботомии первичной модели', () => {
     expect(hctCuts('male').urgent).toBe(HCT_THRESHOLDS.male.block);
     expect(hctCuts('female').urgent).toBe(HCT_THRESHOLDS.female.block);
+  });
+
+  it('женские производные пороги резолвера — та же шкала', async () => {
+    const { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT } = await import('../../../../engines/lab-norms.engine');
+    expect(HCT_THRESHOLDS.female.erythrocytosis).toBe(FEMALE_HCT_THERAPY);
+    expect(HCT_THRESHOLDS.female.block).toBe(FEMALE_HCT_URGENT);
+    expect(HCT_THRESHOLDS).toBe(HCT_THRESHOLDS_FROM_LAB_NORMS);
   });
 
   it('подпись и состояние не расходятся: 54 ♂ / 52 ♀ — ургент с двух сторон', () => {

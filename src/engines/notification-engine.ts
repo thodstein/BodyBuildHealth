@@ -4,7 +4,7 @@
 //  ════════════════════════════════════════════════════════════════════════════
 
 import { computeOverdueSystems, type SystemOverdue, type LabSliceLike } from './labs-overdue';
-import { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN } from './lab-norms.engine';
+import { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN, HCT_THRESHOLDS } from './lab-norms.engine';
 
 export type NotificationPriority = 'info' | 'warning' | 'critical';
 export type NotificationChannel = 'telegram' | 'browser' | 'toast';
@@ -113,10 +113,20 @@ const NOTIFICATION_RULES: NotificationRule[] = [
     cooldownHours: 24,
   },
   {
+    // ♂ Норма до 52 %: 51 — эритроцитоз (предупреждение), 54 — порог флеботомии.
     id: 'hct_high',
     trigger: 'risk_threshold',
-    condition: (s) => !isFemale(s) && (s.labs.hct || 0) >= 52,
-    message: '🩸 Гематокрит ≥54% (♀ ≥52%) — повышенный риск тромбоза. Рекомендована флеботомия 300-450 мл + контроль HCT через 3 дня.',
+    condition: (s) => !isFemale(s) && (s.labs.hct || 0) >= HCT_THRESHOLDS.male.erythrocytosis && (s.labs.hct || 0) < HCT_THRESHOLDS.male.block,
+    message: `🩸 Гематокрит ≥${HCT_THRESHOLDS.male.erythrocytosis}% — эритроцитоз. Гидратация, кардио, контроль HCT через 3 дня; при ≥${HCT_THRESHOLDS.male.block}% — флеботомия.`,
+    priority: 'warning',
+    channels: ['browser', 'toast'],
+    cooldownHours: 48,
+  },
+  {
+    id: 'hct_critical',
+    trigger: 'risk_threshold',
+    condition: (s) => !isFemale(s) && (s.labs.hct || 0) >= HCT_THRESHOLDS.male.block,
+    message: `⛔ Гематокрит ≥${HCT_THRESHOLDS.male.block}% (порог флеботомии) — высокий риск тромбоза. Флеботомия 300-450 мл + контроль HCT через 3 дня.`,
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,

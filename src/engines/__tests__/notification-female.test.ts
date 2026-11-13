@@ -26,10 +26,19 @@ beforeEach(() => {
 });
 
 describe('notification-engine: гематокрит', () => {
-  it('♂ и без sex: порог 52, 48 — тишина', () => {
-    expect(ids(state({ labs: { hct: 48 } }))).not.toContain('hct_high');
-    expect(ids(state({ labs: { hct: 52 } }))).toContain('hct_high');
-    expect(ids(state({ labs: { hct: 52 }, sex: 'male' }))).toContain('hct_high');
+  it('♂ и без sex: 51 — эритроцитоз (warning), 54 — флеботомия (critical)', () => {
+    const run = (hct: number, sex?: 'male' | 'female') =>
+      checkNotifications(state({ labs: { hct }, ...(sex ? { sex } : {}) }));
+    expect(run(50).map(r => r.id)).not.toContain('hct_high');
+    const warn = run(51);
+    expect(warn.map(r => r.id)).toContain('hct_high');
+    // Проход 43: предупреждение не должно грозить флеботомией — она с 54.
+    expect(warn.find(r => r.id === 'hct_high')!.message).toMatch(/эритроцитоз/i);
+    expect(warn.find(r => r.id === 'hct_high')!.message).not.toMatch(/Флеботомия 300/);
+    const crit = run(54);
+    expect(crit.map(r => r.id)).toContain('hct_critical');
+    expect(crit.map(r => r.id)).not.toContain('hct_high');
+    expect(crit.find(r => r.id === 'hct_critical')!.message).toMatch(/флеботомия 300-450/i);
   });
 
   it('♀: 48 — предупреждение, 52 — ургент, мужское правило не дублируется', () => {

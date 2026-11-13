@@ -87,6 +87,20 @@ export const FEMALE_HCT_THERAPY = getLabNorm('HCT', 'female')?.uln ?? 48;
 export const FEMALE_HCT_URGENT = FEMALE_HCT_THERAPY + 4;
 export const FEMALE_ALT_2_5_ULN = Math.round((getLabNorm('ALT', 'female')?.uln ?? 31) * 2.5);
 
+/**
+ * Пороги гематокрита — ОДНА шкала на всё приложение (проход 39, перенесено
+ * сюда в проходе 43: резолвер норм — самое лёгкое место, его уже тянут
+ * уведомления и PDF без поддержко-каталога).
+ *  - `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48 — верх нормы WADA);
+ *  - `block` — порог флеботомии/отмены (Endocrine Society: ♂ >54%, ♀ >52%).
+ * Градация калькулятора (`hctCuts`), баннер, уведомления и PDF считают от
+ * этих чисел, а не от литералов.
+ */
+export const HCT_THRESHOLDS = {
+  male: { erythrocytosis: 51, block: 54 },
+  female: { erythrocytosis: FEMALE_HCT_THERAPY, block: FEMALE_HCT_URGENT },
+} as const;
+
 /** Л9: общая легенда женских порогов (показывается только при sex=female). */
 export const FEMALE_LABS_NOTE =
   '♀ Пороги по полу: HCT 36–48%, Hb 120–150 г/л, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ≤31, креатинин ≤97, ферритин ≤200. ' +

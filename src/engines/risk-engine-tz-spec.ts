@@ -3,6 +3,7 @@
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
+import { HCT_THRESHOLDS } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -262,16 +263,14 @@ export function mechanismCoverageOf(tz: TzSpecResult | null | undefined): { cove
 export interface ClinicalFloor{organId:string;label:string;level:number}
 
 /**
- * Пороги гематокрита — ОДНА шкала на всё приложение (проход 39).
- * `block` — порог флеботомии/отмены (Endocrine Society: ♂ >54%, ♀ >52%),
- * `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48 — верх нормы WADA).
- * Раньше те же числа были литералами здесь, в подписи калькулятора (57),
- * в баннере (57) и в состоянии лабораторий (52/56/60) — три шкалы на экране.
+ * Пороги гематокрита — из единого резолвера норм (`lab-norms.engine`,
+ * `HCT_THRESHOLDS`): `block` — порог флеботомии/отмены (Endocrine Society:
+ * ♂ >54%, ♀ >52%), `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48).
+ * Реэкспорт сохранён: первичная модель объявляет шкалу, а живёт она там, где
+ * её могут взять уведомления и PDF без поддержко-каталога.
  */
-export const HCT_THRESHOLDS = {
-  male: { erythrocytosis: 51, block: 54 },
-  female: { erythrocytosis: 48, block: 52 },
-} as const;
+export { HCT_THRESHOLDS } from './lab-norms.engine';
+
 
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];

@@ -1,6 +1,5 @@
 import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
-import { getLabNorm } from '../../../engines/lab-norms.engine';
-import { HCT_THRESHOLDS } from '../../../engines/risk-engine-tz-spec';
+import { getLabNorm, HCT_THRESHOLDS } from '../../../engines/lab-norms.engine';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════

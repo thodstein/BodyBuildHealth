@@ -7,7 +7,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
 import {
-  getLabNorm, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
+  getLabNorm, HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
 } from '../../engines/lab-norms.engine';
 
 /**
@@ -228,9 +228,9 @@ export function buildExportDataFromRec(
   const astUln = Math.round(getLabNorm('AST', sex)?.uln ?? (isFemale ? 31 : 40));
   const ggtUln = Math.round(getLabNorm('GGT', sex)?.uln ?? (isFemale ? 31 : 55));
   const creaUln = Math.round(getLabNorm('CREATININE', sex)?.uln ?? (isFemale ? 97 : 110));
-  // Стоп-пороги: у женщин — проектная градация (HCT ULN+4, АЛТ 2.5×ULN),
-  // у мужчин — 54 % и 200 Ед/л (те же числа, что в стоп-таблицах протоколов).
-  const hctStop = isFemale ? FEMALE_HCT_URGENT : 54;
+  // Стоп-пороги: HCT — из единой шкалы (`HCT_THRESHOLDS`: ♂ 54, ♀ 52),
+  // АЛТ — 2.5× женской ULN у женщин и 200 Ед/л у мужчин (как в стоп-таблицах).
+  const hctStop = isFemale ? HCT_THRESHOLDS.female.block : HCT_THRESHOLDS.male.block;
   const altStop = isFemale ? `${FEMALE_ALT_2_5_ULN}` : '200';
 
   const FALLBACK_LAB_SCHEDULE: ExportLabSchedule[] = [
