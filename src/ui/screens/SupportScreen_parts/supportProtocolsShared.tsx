@@ -53,12 +53,94 @@ export const PhaseLabel: React.FC<{ label: string; color: string }> = ({ label, 
   <span className="sup-phaselabel" style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}30` }}>{label}</span>
 );
 
+// ── UL-контур таблиц протоколов (проход 36) ───────────────────────────────
+// Таблицы протоколов — клинические диапазоны (магний 400–600, цинк 50, B6 25).
+// Правило проекта: такие диапазоны остаются, но верхняя граница выше предела
+// реестра печатается С ПРЕДЕЛОМ РЯДОМ, а не «молча». Здесь один парсер
+// «имя строки → вещество реестра»: иначе подпись пришлось бы дублировать в
+// каждой таблице и она бы снова разошлась с `NUTRIENT_LIMITS_V2`.
+
+type UlProbe = { re: RegExp; nutrient: string; unit: 'mg' | 'mcg' | 'iu'; iuToTarget?: number };
+
+const UL_PROBES: UlProbe[] = [
+  { re: /магн|magnesium/i, nutrient: 'magnesium', unit: 'mg' },
+  { re: /цинк|zinc/i, nutrient: 'zinc', unit: 'mg' },
+  { re: /пиридокс|\bp5p\b|\bb6\b/i, nutrient: 'vitamin_b6', unit: 'mg' },
+  { re: /витамин\s*d|\bd3\b|холекальциферол/i, nutrient: 'vitamin_d', unit: 'iu' },
+  { re: /селен|selenium|\bse\b/i, nutrient: 'selenium', unit: 'mcg' },
+  // Реестр витамина E — мг α-токоферола; в протоколах доза часто в МЕ.
+  { re: /витамин\s*e|токоферол|tocopherol/i, nutrient: 'vitamin_e', unit: 'mg', iuToTarget: 0.67 },
+  { re: /желез|\biron\b/i, nutrient: 'iron', unit: 'mg' },
+];
+
+const UL_UNIT_RU: Record<string, string> = { mg: 'мг', mcg: 'мкг', iu: 'МЕ' };
+
+/** Единица из текста дозы → базовая ('mg' | 'mcg' | 'iu'). */
+function doseUnitOf(raw: string): 'mg' | 'mcg' | 'iu' | null {
+  const u = raw.toLowerCase().replace(/\s+/g, '');
+  if (u === 'мг' || u === 'mg') return 'mg';
+  if (u === 'мкг' || u === 'mcg' || u === 'µg' || u === 'мкгэ') return 'mcg';
+  if (u === 'ме' || u === 'iu' || u === 'ме') return 'iu';
+  return null;
+}
+
+const DOSE_RE = /(\d+(?:[.,]\d+)?)\s*(?:[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(мкг|мг|mg|mcg|µg|МЕ|IU)/gi;
+
+/**
+ * Верхняя граница дозы строки выше UL реестра → подпись «выше UL N ед.».
+ * `null` — строка не про нутриент с пределом, доза вес-зависимая (мг/кг) или
+ * в пределах: тогда таблица остаётся клинической и ничего не печатаем.
+ */
+export function doseUlHint(name: string, dose: string): string | null {
+  const text = `${name || ''} ${dose || ''}`;
+  const probe = UL_PROBES.find(p => p.re.test(name || '') || p.re.test(dose || ''));
+  if (!probe) return null;
+  if (/\/\s*кг/i.test(text)) return null; // вес-зависимую дозу без веса не сравниваем
+  const lim = NUTRIENT_LIMITS_V2[probe.nutrient];
+  if (!lim || !(lim.value > 0) || lim.kind === 'NotEstablished') return null;
+
+  let max = 0;
+  DOSE_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = DOSE_RE.exec(text)) !== null) {
+    const unit = doseUnitOf(m[3]);
+    if (!unit) continue;
+    const nums = [m[1], m[2]].filter(Boolean).map(s => parseFloat(String(s).replace(',', '.')));
+    const hi = Math.max(...nums);
+    let v: number | null = null;
+    if (unit === probe.unit) v = hi;
+    else if (unit === 'iu' && probe.iuToTarget) v = hi * probe.iuToTarget;
+    else if (unit === 'mg' && probe.unit === 'mcg') v = hi * 1000;
+    else if (unit === 'mcg' && probe.unit === 'mg') v = hi / 1000;
+    if (v == null) continue;
+    if (v > max) max = v;
+  }
+  if (!(max > lim.value)) return null;
+  return `выше UL ${lim.value} ${UL_UNIT_RU[lim.unit] || ''}`.trim();
+}
+
+/** Плашка «выше UL» рядом с дозой строки протокола. */
+export const DoseUlBadge: React.FC<{ name?: string; dose?: string }> = ({ name, dose }) => {
+  const hint = doseUlHint(name || '', dose || '');
+  if (!hint) return null;
+  return (
+    <span
+      data-dose-ul
+      title="Клинический диапазон протокола превышает верхний предел добавок — приём выше предела только по назначению/курсом"
+      style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '2px 7px', whiteSpace: 'nowrap' }}
+    >
+      ⚠ {hint}
+    </span>
+  );
+};
+
 export const ItemRow: React.FC<{ name: string; dose: string; timing: string; note: string; color: string }> = ({ name, dose, timing, note, color }) => (
   <div className="sup-itemrow" style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', minWidth: 0 }}>{name}</span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
         <span style={{ fontSize: 12, fontWeight: 800, color }}>{dose}</span>
+        <DoseUlBadge name={name} dose={dose} />
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>{timing}</span>
       </div>
     </div>
@@ -87,6 +169,7 @@ export const ItemRowTriage: React.FC<{ name: string; dose: string; timing: strin
       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>{name}{tier ? triageBadge(tier) : null}{phase ? phaseBadge(phase) : null}</span>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 800, color }}>{dose}</span>
+        <DoseUlBadge name={name} dose={dose} />
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>{timing}</span>
       </div>
     </div>
@@ -99,6 +182,7 @@ export const renderRow = (x: any, i: number, color: string) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
       <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{x.n}</span>
       {x.d ? <span style={{ fontSize: 11, fontWeight: 700, color, background: `${color}14`, padding: '2px 7px', borderRadius: 20, border: `1px solid ${color}22` }}>{x.d}</span> : null}
+      <DoseUlBadge name={x.n} dose={x.d} />
       <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>· {x.t}</span>
     </div>
     {x.o ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', borderLeft: `3px solid ${color}55` }}>💡 {x.o}</div> : null}
@@ -116,6 +200,7 @@ export const renderPhase = (p: any, i: number) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{x.name}</span>
           <span style={{ fontSize: 11, color: p.color, fontWeight: 800, background: `${p.color}14`, padding: '2px 7px', borderRadius: 20, border: `1px solid ${p.color}22` }}>{x.dose}</span>
+          <DoseUlBadge name={x.name} dose={x.dose} />
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>· {x.timing}</span>
         </div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4, lineHeight: 1.4 }}>{x.note}</div>
