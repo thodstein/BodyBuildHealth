@@ -868,6 +868,184 @@ export function closeRecipeDayToCanon(
 }
 
 
+/**
+ * §8.102 (B15a): смена ядра рецепта в слоте.
+ *
+ * Долг B15a: три ячейки держатся за 3% **не из-за капризов закрывателя, а потому что
+ * править нечего**. Замер `70 cut/5/трен P2.4` (1819/157/39/210 при цели 1820/168/40/197):
+ * свободных пунктов в основных приёмах нет — все углеводы сидят в ядрах авторских рецептов
+ * («скир 165 + овсянка 49», «хлеб 34», «макароны 99 + нут 99», «ягоды 85»). Закрыватель
+ * умеет только резать/добавлять СВОБОДНЫЕ пункты, поэтому:
+ *   • пол белка: добавка индейки поднимала ккал и оставляла углеводы на 6.6% → «худшая ось
+ *     не упала» → честный отказ;
+ *   • перебор углеводов: все носители — ядра → отказ.
+ *
+ * Единственный законный рычаг — взять ДРУГОЙ вариант рецепта в том же слоте: он уже был
+ * просчитан движком при посадке (`recipeOptions`, 3 варианта на приём, с `portionScale`),
+ * значит это не выдумка, а равноправный авторский рецепт. Авторские порции не режутся:
+ * новый рецепт берётся в порционном масштабе варианта (`portionScale`; если он дробный, есть
+ * второй кандидат — «не меньше целой порции»), а в `recipeAppliedData.appliedScale` пишется
+ * ЧЕСТНЫЙ масштаб, чтобы проверка «ядро = автор × масштаб» сходилась.
+ *
+ * Приёмка (жёстче, чем у закрывателя): худшая ось дня обязана упасть не меньше чем на 0.05 п.п.,
+ * ни одна ось из канона не выходит, не появляется НИ ОДНОЙ вырожденной позиции в основных
+ * приёмах (белок <40 г, гарнир <15 г), белок не «сваливается» сверх +5% цели (а на дне, который
+ * уже перебирает белок, — не больше +8 г). Оценка — ТОЛЬКО по финальному исходу: пробный свап
+ * прогоняется через закрыватель (`reconverge`) и сравнивается его итог, иначе жадная оценка
+ * «до закрывателя» портила финал (70 cut/5/отд P2.4: 4.3% → 5.0%). Имя нового рецепта
+ * добавляется в `usedNamesAcrossDays`, иначе соседний день может взять тот же рецепт.
+ *
+ * Стадия стоит ПОСЛЕ закрывателя (§8.96) и порционного гигиениста (§8.97): ей нужен уже
+ * уложенный день, а закрыватель внутри `reconverge` добивает остаток после свапа.
+ */
+export function applyRecipeCoreSwap(
+  meals: PlanMealLike[],
+  targets: DayMacroTargets,
+  opts?: { weightKg?: number; reconverge?: () => string[]; maxSwaps?: number; usedNames?: Set<string> },
+): string[] {
+  const notes: string[] = [];
+  const mealAny = meals as any[];
+  const maxSwaps = opts?.maxSwaps ?? 3;
+  const axesOf = (t: any) => {
+    const d = (a: number, b: number) => (b > 0 ? (Math.abs(a - b) / b) * 100 : 0);
+    return {
+      k: d(t.kcal || 0, targets.kcal || 0),
+      f: d(t.f || 0, targets.f || 0),
+      c: d(t.c || 0, targets.c || 0),
+      pUnder: Math.max(0, ((targets.p || 0) - (t.p || 0)) / Math.max(1, targets.p || 1)) * 100,
+    };
+  };
+  const worstOf = (a: { k: number; f: number; c: number; pUnder: number }) =>
+    Math.max(a.k, a.f, a.c, a.pUnder);
+  const isPeriMeal = (m: any): boolean => !!(m as any)?._insulinWindow
+    || ['preworkout', 'postworkout', 'intra'].includes(String((m as any)?.type || ''))
+    || /предтрен|пост-трен|intra/i.test(String((m as any)?.label || ''));
+  const isMainMeal = (m: any): boolean => ['breakfast', 'lunch', 'dinner'].includes(String(m?.type || ''));
+  // §8.102-гард: свап не имеет права создавать «дегустационные» позиции в основных приёмах
+  // (белок <40 г, гарнир <15 г — пороги аудита матрицы `planner-matrix-audit`). Замер после
+  // первой версии свапа: 13 вырожденных позиций вместо 8 (масштаб варианта 0.5 резал курицу до 35 г).
+  const degOf = (items: any[]): number => {
+    let n = 0;
+    for (const it of items) {
+      const amt = Number(it.amount) || 0;
+      if (amt <= 0) continue;
+      const id = String(it.id || '');
+      if (it.role === 'protein' && !id.includes('whey') && !id.includes('casein') && amt < 40) n++;
+      if (it.role === 'carb_slow' && amt < 15) n++;
+    }
+    return n;
+  };
+  const degAll = (): number => mealAny.filter(isMainMeal).reduce((n, mm) => n + degOf((mm.items || []) as any[]), 0);
+  const coreOf = (m: any): Set<string> => {
+    const out = new Set<string>();
+    for (const d of [m?.recipeAppliedData, m?.recipeAppliedData2]) {
+      if (d && Array.isArray((d as any).ingredientIds)) {
+        for (const id of (d as any).ingredientIds) out.add(String(id));
+      }
+    }
+    return out;
+  };
+  // Снимок ВСЕГО дня: пробный свап вызывает reconverge (закрыватель), а он правит и ДРУГИЕ
+  // приёмы — откат обязан вернуть весь день, иначе провалившаяся проба оставляет мусор.
+  const snapDay = () => mealAny.map((m: any) => ({
+    items: (m.items || []).map((x: any) => ({ ...x })),
+    totals: { ...(m.totals || {}) },
+    applied: m.recipeApplied,
+    appliedData: m.recipeAppliedData,
+    rationale: m.rationale ? [...m.rationale] : m.rationale,
+  }));
+  const restoreDay = (s: any[]) => mealAny.forEach((m: any, i: number) => {
+    m.items = s[i].items;
+    m.totals = s[i].totals;
+    m.recipeApplied = s[i].applied;
+    m.recipeAppliedData = s[i].appliedData;
+    m.rationale = s[i].rationale;
+  });
+
+  let a0 = axesOf(sumDayTotals(mealAny));
+  if (worstOf(a0) <= 3 + 1e-9) return notes; // день в каноне — не трогаем
+  let worstBefore = worstOf(a0);
+  let swaps = 0;
+
+  for (const m of mealAny) {
+    if (swaps >= maxSwaps) break;
+    if (isPeriMeal(m)) continue;
+    const optsOf = ((m.recipeOptions || []) as any[]).filter((o: any) => o && o.name && o.name !== m.recipeApplied);
+    if (optsOf.length === 0) continue;
+    const core = coreOf(m);
+    const sides = ((m.items || []) as any[]).filter((it: any) => !core.has(String(it.id)));
+    const snapApplied = m.recipeApplied;
+
+    // Масштаб варианта: `portionScale` посчитал движок при посадке (авторская порция под цель
+    // приёма). Второй кандидат — «не меньше целой порции»: он спасает случаи, где дробный
+    // масштаб даёт вырожденные граммовки (курица 35 г), а такие пункты ловит аудит матрицы.
+    const _clampS = (x: number) => Math.max(0.5, Math.min(3, Math.round(x * 4) / 4)); // шаг 0.25 порции
+
+    for (const o of optsOf) {
+      const built = buildRecipeMealItems(rebuildRecipeFromFlat(o));
+      if (!built || built.length === 0) continue;
+      // Масштаб берём из самого варианта (см. выше): энерго-нейтральный пересчёт по ккал в
+      // замере дал ХУЖЕ (вне канона 3 → 4) — он дробит плотные рецепты до половинных порций.
+      const s0 = Number((o as any).portionScale) || 1;
+      const scales = [...new Set([_clampS(s0), _clampS(Math.max(1, s0))])];
+      let taken = false;
+      for (const s of scales) {
+        const recipeItems = (s !== 1
+          ? built.map(it => scaleItem(it as PlanItemLike, scaleComponentAmount(it.id, it.amount || 0, s)))
+          : built) as any[];
+        const newIds = new Set(recipeItems.map((it: any) => String(it.id)));
+        // Сайды (добавки вне рецепта) остаются, но без дублей id с новым рецептом.
+        const merged = [...recipeItems, ...sides.filter((it: any) => !newIds.has(String(it.id)))];
+        const snap = snapDay();
+        const degBefore = degAll();
+        const dayPBefore = sumDayTotals(mealAny).p || 0;
+        const pTarget = targets.p || 0;
+        // Белок — пол, но не «свалка»: нельзя ВВОДИТЬ перебор сверх +5% цели там, где его не
+        // было (нота «эффективная цель Б» на 1500 ккал дне), а на дне, который уже перебирает
+        // белок, запрещаем только рост сверх +8 г.
+        const pCap = dayPBefore > pTarget * 1.05 + 0.5 ? dayPBefore + 8 : pTarget * 1.05 + 0.5;
+        m.items = merged;
+        m.totals = sumMealTotals(merged as any);
+        m.recipeApplied = o.name;
+        m.recipeAppliedData = { ...(o as any), appliedScale: s } as any;
+        // Приёмка ПО ФИНАЛЬНОМУ ИСХОДУ: пробуем довести день закрывателем и смотрим на его итог.
+        // Без этого жадный свап улучшал промежуточное состояние и портил финал
+        // (70 cut/5/отд P2.4: свап дал 7.6% → 5.4%, а закрыватель после него — 5.0% по жиру
+        // против прежних 4.3%).
+        const reconvergeNotes = opts?.reconverge ? opts.reconverge() : [];
+        const dayAfter = sumDayTotals(mealAny);
+        const a1 = axesOf(dayAfter);
+        const brokeCanon = (['k', 'f', 'c'] as const).some(ax => a0[ax] <= 3 + 1e-9 && a1[ax] > 3 + 1e-9);
+        const brokeDeg = degAll() > degBefore;
+        const brokeProtein = (dayAfter.p || 0) > pCap;
+        if (!brokeCanon && !brokeDeg && !brokeProtein && worstOf(a1) <= worstBefore - 0.05) {
+          m.rationale = [...((m as any).rationale || []),
+            `🔄 «${String(m.label || m.type)}»: рецепт заменён на «${o.name}» ×${s} (сходимость дня)`];
+          notes.push(`🔄 «${String(m.label || m.type)}»: рецепт «${String(snapApplied || '-')}» → «${o.name}» ×${s} — `
+            + `худшая ось ${worstBefore.toFixed(1)}% → ${worstOf(a1).toFixed(1)}%`);
+          if (reconvergeNotes.length > 0) notes.push(...reconvergeNotes);
+          // Разнообразие между днями: имя обязано попасть в usedNames, иначе соседний день
+          // может взять тот же рецепт (замер: 3 дубля между днями).
+          opts?.usedNames?.add(o.name);
+          a0 = a1;
+          worstBefore = worstOf(a1);
+          swaps++;
+          taken = true;
+          break;
+        }
+        restoreDay(snap);
+        if (axesOf(sumDayTotals(mealAny)).c !== a0.c) {
+          // восстановление обязано вернуть прежнее состояние — страховка от рассинхрона
+          a0 = axesOf(sumDayTotals(mealAny));
+          worstBefore = worstOf(a0);
+        }
+      }
+      if (taken) break;
+    }
+  }
+  return notes;
+}
+
 export interface RebalanceResult {
   meals: PlanMealLike[];
   notes: string[];
@@ -3215,6 +3393,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const _hygNotes = applyPortionHygiene(outMeals as any, { weightKg: args.athleteWeightKg ?? 80 });
   if (_hygNotes.length > 0) notes = [...notes, ..._hygNotes];
 
+  // ── §8.102 (B15a): смена ядра рецепта в слоте — ПОСЛЕ закрывателя ───────────────
+  // В cut-ячейках весь перебор сидит в ядрах авторских рецептов: свободных носителей нет,
+  // и закрыватель отказывается честно («худшая ось не упала»). Другой вариант рецепта в том
+  // же слоте — законный рычаг (он уже был просчитан движком при посадке). Оценка свапа —
+  // ТОЛЬКО по финальному исходу: пробный свап + повторный прогон закрывателя (`reconverge`).
+  // Жадная оценка «до закрывателя» портила итог: 70 cut/5/отд P2.4 свап 7.6% → 5.4%, а
+  // закрыватель после него выводил жир в 5.0% против прежних 4.3%.
+  {
+    const _closeArgs = [outMeals, { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c },
+      { excludedIds, weightKg: args.athleteWeightKg ?? 80 }] as const;
+    const _swapNotes = applyRecipeCoreSwap(outMeals as any, targets as any, {
+      weightKg: args.athleteWeightKg ?? 80,
+      usedNames: usedNamesAcrossDays,
+      reconverge: () => closeRecipeDayToCanon(_closeArgs[0] as any, _closeArgs[1] as any, _closeArgs[2] as any),
+    });
+    if (_swapNotes.length > 0) notes = [...notes, ..._swapNotes];
+  }
+
   // ── §8.96: финальное сведение дня в канон 3% — и ДОБОР, и СРЕЗ ────────────────
   // Последняя миля выше умеет только ЛИТЬ. Остатки «+4.5% ккал / −7.5% жира» и
   // «+3.6% углеводов» лечатся только заменой/срезом (см. closeRecipeDayToCanon).
@@ -3224,16 +3420,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     { excludedIds, weightKg: args.athleteWeightKg ?? 80 },
   );
   if (_closeNotes.length > 0) notes = [...notes, ..._closeNotes];
-  {
-    const _tClose = sumDayTotals(outMeals as any);
-    const _devClose = Math.round(maxDeviationPct(
-      _tClose as any,
-      { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any,
-    ) * 10) / 10;
-    notes = [...notes, _devClose <= 3
-      ? `✓ День сведён к цели: ${_devClose}% (${Math.round(_tClose.kcal)}/${Math.round(_tClose.p)}/${Math.round(_tClose.f)}/${Math.round(_tClose.c)})`
-      : `⚠ День не сведён к цели: ${_devClose}% (${Math.round(_tClose.kcal)}/${Math.round(_tClose.p)}/${Math.round(_tClose.f)}/${Math.round(_tClose.c)}) — остаток сидит в ядрах рецептов`];
-  }
+  // §8.103: нота «День сведён/не сведён» печатается ПОСЛЕ всех стадий (ниже). Раньше она
+  // считалась сразу после закрывателя, а §§8.98/8.101/8.102 продолжали менять день — и
+  // фактический итог 3.4% показывался как «✓ День сведён к цели: 3%» (замер 110M5TP2.4).
+  const _closeDev = Math.round(maxDeviationPct(
+    sumDayTotals(outMeals as any) as any,
+    { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any,
+  ) * 10) / 10;
 
   // QG52: справедливость приёмов — ПОСЛЕ посадки блюд (§8.51). В продуктовом контуре её
   // зовёт сам движок; здесь она нужна, потому что до посадки выравнивание меняет выбор
@@ -3274,6 +3467,21 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   };
   const _finDev = _floorDev(_finTot);
   const _finDevR = Math.round(_finDev * 10) / 10;
+  // §8.103: единственная нота о сведении дня — по ФИНАЛЬНЫМ тоталам (после раскладки, переносов
+  // тарелок и овощей). Ядро — авторский рецепт, поэтому когда база не сходится, ккал/Ж/У уже
+  // «упёрлись»; честнее сказать «не сведён».
+  {
+    const _fmt = `${Math.round(_finTot.kcal)}/${Math.round(_finTot.p)}/${Math.round(_finTot.f)}/${Math.round(_finTot.c)}`;
+    if (_finDevR <= 3) {
+      notes = [...notes, `✓ День сведён к цели: ${_finDevR}% (${_fmt})`];
+    } else if (_closeDev <= 3) {
+      // Закрыватель дошёл до канона, но следующий шаг (справедливость/перенос тарелки/овощи)
+      // сдвинул день обратно за 3% — это ДЕФЕКТ раскладки, и он обязан быть видимым.
+      notes = [...notes, `⚠ День не сведён к цели: ${_finDevR}% (${_fmt}) — закрыватель дошёл до ${_closeDev}%, но последующая раскладка увела день обратно`];
+    } else {
+      notes = [...notes, `⚠ День не сведён к цели: ${_finDevR}% (${_fmt}) — остаток сидит в ядрах рецептов`];
+    }
+  }
   // §3E-честность (остаток E): ядра рецептов НЕ режутся (авторские пропорции), поэтому
   // день может перебирать Б (яичница/чечевица/макароны с индейкой). §8.91: белок — ПОЛ,
   // поэтому перебор Б не дефект дня, но он ВИДЕН: называем эффективную цель Б (= факт ядер)
