@@ -10,7 +10,7 @@
  *  - без `sex` — прежний мужской путь (обратная совместимость).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { checkNotifications, type NotificationState } from '../notification-engine';
+import { checkNotifications, markNotificationShown, type NotificationState } from '../notification-engine';
 
 const state = (over: Partial<NotificationState> = {}): NotificationState => ({
   labs: {},
@@ -96,5 +96,15 @@ describe('notification-engine: неизменные пороги', () => {
     expect(out).toContain('hct_high');
     expect(out).toContain('e2_crash');
     expect(out).toContain('alt_critical');
+  });
+
+  it('markNotificationShown стартует cooldown (баннер не мигает на каждом рендере)', () => {
+    const s = state({ labs: { hct: 52 }, sex: 'female' });
+    expect(ids(s)).toContain('hct_critical_female');
+
+    markNotificationShown('hct_critical_female');
+    expect(ids(s)).not.toContain('hct_critical_female');
+    // остальные правила не затронуты
+    expect(ids(state({ labs: { hct: 52 }, sex: 'male' }))).toContain('hct_high');
   });
 });

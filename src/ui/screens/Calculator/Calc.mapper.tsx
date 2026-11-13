@@ -63,9 +63,10 @@ function reboundMemo(input: ReboundInput): any {
   return value;
 }
 import { printProtocol, buildExportDataFromRec } from '../../../ui/components/ProtocolExport';
-import { checkNotifications } from '../../../engines/notification-engine';
+import { checkNotifications, markNotificationShown, type NotificationRule } from '../../../engines/notification-engine';
 import { computeOverdueSystems, type SystemOverdue } from '../../../engines/labs-overdue';
 import { LabsDueBanner } from './LabsDueBanner';
+import { CalcNotificationsBanner, visibleCalcNotifications } from './CalcNotificationsBanner';
 import { getSupportPlanQueueIds, readSupportPlanQueue, removeFromSupportPlanQueue, deleteFavRecommendation, subscribePlanQueueChanged } from '../../../engines/training-plan-save.engine';
 import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
@@ -1056,11 +1057,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     return Array.from(map.values());
   }, [level, selectedStacks]);
 
-  // Реактивная проверка уведомлений (логирует в he_notification_log; UI не здесь).
-  // (Используется для реактивных алертов E2/HCT/ЛПНП/D-димер и т.п.,
-  // отображается в других местах; баннер лаборатории — отдельный useMemo ниже)
+  // Реактивные уведомления движка (E2/HCT/АЛТ/пролактин/липиды и т.п.) —
+  // показываются баннером вверху карточки; labs_overdue остаётся у LabsDueBanner.
+  const [calcNotifs, setCalcNotifs] = useState<NotificationRule[]>([]);
   useEffect(() => {
-    if (!finalRec) return;
+    if (!finalRec) { setCalcNotifs([]); return; }
     try {
       const notifLabs = labSliceToValues(state.labs?.fullPanel ?? null);
       const notifState: any = {
@@ -1087,9 +1088,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         },
         goals: { cycleWeeks: state.goals?.cycleWeeks || 12 },
       };
-      checkNotifications(notifState);
-    } catch {}
-  }, [finalRec, state.labs, rec?.phase]);
+      setCalcNotifs(visibleCalcNotifications(checkNotifications(notifState)));
+    } catch { setCalcNotifs([]); }
+  }, [finalRec, state.labs, rec?.phase, state.profile?.sex]);
 
   // Sticky-баннер «Сдайте анализы»: группировка по системам, не перекрывает нижние кнопки.
   const overdueSystems: SystemOverdue[] = useMemo(() => {
@@ -1149,6 +1150,15 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           try { localStorage.setItem('he_calc_labs_banner_dismissed', overdueSig); } catch {}
         }}
         dismissed={bannerDismissed}
+      />
+
+      {/* Реактивные алерты движка (E2/HCT/АЛТ/PRL/ЛПНП/eGFR/D-димер и женские пороги) */}
+      <CalcNotificationsBanner
+        rules={calcNotifs}
+        onDismiss={(ruleId) => {
+          markNotificationShown(ruleId);
+          setCalcNotifs((prev) => prev.filter((r) => r.id !== ruleId));
+        }}
       />
 
       <div style={{ ...GLASS, padding: 10, marginBottom: 8, border: '2px solid rgba(0,230,138,0.2)' }}>

@@ -339,6 +339,14 @@ export function triggerNotifications(state: NotificationState, onNotification: (
   }
 }
 
+/**
+ * Пометить уведомление показанным (стартует его cooldown) — для собственных
+ * баннеров/тостов UI, которые сами решают, когда скрывать алерт.
+ */
+export function markNotificationShown(ruleId: string): void {
+  try { markTriggered(ruleId); } catch { /* noop */ }
+}
+
 export function showNotificationToast(rule: NotificationRule): void {
   try {
     const tg = (window as any).Telegram?.WebApp;
