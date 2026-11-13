@@ -54,6 +54,12 @@ describe('doseUlHint: верхняя граница выше UL', () => {
     expect(doseUlHint('Железо (бисглицинат)', '100 мг')).toContain(ul('iron'));
     expect(doseUlHint('Железо', '25 мг')).toBeNull();
   });
+
+  it('комбинированная строка: подписаны оба превышения', () => {
+    const hint = doseUlHint('Магний 400-600 мг + B6 25 мг', '400-600+25');
+    expect(hint).toContain(`Mg выше UL ${ul('magnesium')}`);
+    expect(hint).toContain(`B6 выше UL ${ul('vitamin_b6')}`);
+  });
 });
 
 describe('doseUlHint: не сравнивает то, что сравнивать нельзя', () => {

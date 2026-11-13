@@ -60,17 +60,17 @@ export const PhaseLabel: React.FC<{ label: string; color: string }> = ({ label, 
 // «имя строки → вещество реестра»: иначе подпись пришлось бы дублировать в
 // каждой таблице и она бы снова разошлась с `NUTRIENT_LIMITS_V2`.
 
-type UlProbe = { re: RegExp; nutrient: string; unit: 'mg' | 'mcg' | 'iu'; iuToTarget?: number };
+type UlProbe = { re: RegExp; nutrient: string; short: string; unit: 'mg' | 'mcg' | 'iu'; iuToTarget?: number };
 
 const UL_PROBES: UlProbe[] = [
-  { re: /магн|magnesium/i, nutrient: 'magnesium', unit: 'mg' },
-  { re: /цинк|zinc/i, nutrient: 'zinc', unit: 'mg' },
-  { re: /пиридокс|\bp5p\b|\bb6\b/i, nutrient: 'vitamin_b6', unit: 'mg' },
-  { re: /витамин\s*d|\bd3\b|холекальциферол/i, nutrient: 'vitamin_d', unit: 'iu' },
-  { re: /селен|selenium|\bse\b/i, nutrient: 'selenium', unit: 'mcg' },
+  { re: /магн|magnesium/i, nutrient: 'magnesium', short: 'Mg', unit: 'mg' },
+  { re: /цинк|zinc/i, nutrient: 'zinc', short: 'Zn', unit: 'mg' },
+  { re: /пиридокс|\bp5p\b|\bb6\b/i, nutrient: 'vitamin_b6', short: 'B6', unit: 'mg' },
+  { re: /витамин\s*d|\bd3\b|холекальциферол/i, nutrient: 'vitamin_d', short: 'D', unit: 'iu' },
+  { re: /селен|selenium|\bse\b/i, nutrient: 'selenium', short: 'Se', unit: 'mcg' },
   // Реестр витамина E — мг α-токоферола; в протоколах доза часто в МЕ.
-  { re: /витамин\s*e|токоферол|tocopherol/i, nutrient: 'vitamin_e', unit: 'mg', iuToTarget: 0.67 },
-  { re: /желез|\biron\b/i, nutrient: 'iron', unit: 'mg' },
+  { re: /витамин\s*e|токоферол|tocopherol/i, nutrient: 'vitamin_e', short: 'E', unit: 'mg', iuToTarget: 0.67 },
+  { re: /желез|\biron\b/i, nutrient: 'iron', short: 'Fe', unit: 'mg' },
 ];
 
 const UL_UNIT_RU: Record<string, string> = { mg: 'мг', mcg: 'мкг', iu: 'МЕ' };
@@ -90,33 +90,44 @@ const DOSE_RE = /(\d+(?:[.,]\d+)?)\s*(?:[-–—]\s*(\d+(?:[.,]\d+)?))?\s*(мк�
  * Верхняя граница дозы строки выше UL реестра → подпись «выше UL N ед.».
  * `null` — строка не про нутриент с пределом, доза вес-зависимая (мг/кг) или
  * в пределах: тогда таблица остаётся клинической и ничего не печатаем.
+ * Для комбинированной строки («Магний + B6») проверяются все пробы разом.
  */
 export function doseUlHint(name: string, dose: string): string | null {
   const text = `${name || ''} ${dose || ''}`;
-  const probe = UL_PROBES.find(p => p.re.test(name || '') || p.re.test(dose || ''));
-  if (!probe) return null;
+  const probes = UL_PROBES.filter(p => p.re.test(name || '') || p.re.test(dose || ''));
+  if (!probes.length) return null;
   if (/\/\s*кг/i.test(text)) return null; // вес-зависимую дозу без веса не сравниваем
-  const lim = NUTRIENT_LIMITS_V2[probe.nutrient];
-  if (!lim || !(lim.value > 0) || lim.kind === 'NotEstablished') return null;
 
-  let max = 0;
-  DOSE_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = DOSE_RE.exec(text)) !== null) {
-    const unit = doseUnitOf(m[3]);
-    if (!unit) continue;
-    const nums = [m[1], m[2]].filter(Boolean).map(s => parseFloat(String(s).replace(',', '.')));
-    const hi = Math.max(...nums);
-    let v: number | null = null;
-    if (unit === probe.unit) v = hi;
-    else if (unit === 'iu' && probe.iuToTarget) v = hi * probe.iuToTarget;
-    else if (unit === 'mg' && probe.unit === 'mcg') v = hi * 1000;
-    else if (unit === 'mcg' && probe.unit === 'mg') v = hi / 1000;
-    if (v == null) continue;
-    if (v > max) max = v;
+  const hits: Array<{ short: string; text: string }> = [];
+  for (const probe of probes) {
+    const lim = NUTRIENT_LIMITS_V2[probe.nutrient];
+    if (!lim || !(lim.value > 0) || lim.kind === 'NotEstablished') continue;
+
+    let max = 0;
+    DOSE_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = DOSE_RE.exec(text)) !== null) {
+      const unit = doseUnitOf(m[3]);
+      if (!unit) continue;
+      const nums = [m[1], m[2]].filter(Boolean).map(s => parseFloat(String(s).replace(',', '.')));
+      const hi = Math.max(...nums);
+      let v: number | null = null;
+      if (unit === probe.unit) v = hi;
+      else if (unit === 'iu' && probe.iuToTarget) v = hi * probe.iuToTarget;
+      else if (unit === 'mg' && probe.unit === 'mcg') v = hi * 1000;
+      else if (unit === 'mcg' && probe.unit === 'mg') v = hi / 1000;
+      if (v == null) continue;
+      if (v > max) max = v;
+    }
+    if (max > lim.value) {
+      hits.push({ short: probe.short, text: `выше UL ${lim.value} ${UL_UNIT_RU[lim.unit] || ''}`.trim() });
+    }
   }
-  if (!(max > lim.value)) return null;
-  return `выше UL ${lim.value} ${UL_UNIT_RU[lim.unit] || ''}`.trim();
+  if (!hits.length) return null;
+  // Одна проба — без префикса (читается как обычная пометка); несколько —
+  // с короткими именами, иначе непонятно, чей это предел.
+  if (hits.length === 1) return hits[0].text;
+  return hits.map(h => `${h.short} ${h.text}`).join(' · ');
 }
 
 /** Плашка «выше UL» рядом с дозой строки протокола. */
