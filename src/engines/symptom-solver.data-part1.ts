@@ -231,7 +231,7 @@ export const DB_PART1: SymptomEntry[] = [
           { substanceId: 'potassium_citrate', name: 'Калия цитрат', type: 'supplement', dose: '2000-3000 мг/сут', mechanism: '↑ pH мочи → растворение уратных камней', evidenceLevel: 'A' },
           { substanceId: 'magnesium', name: 'Магния цитрат', type: 'supplement', dose: '400-600 мг/сут', mechanism: 'Связывает оксалат в кишечнике', evidenceLevel: 'A' },
           { substanceId: 'hydration_forced', name: 'Форсированная гидратация', type: 'lifestyle', dose: '3-4 л/сут', mechanism: 'Разведение мочи', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_b6', name: 'Витамин B6', type: 'supplement', dose: '50-100 мг/сут', mechanism: '↓ эндогенный синтез оксалата', evidenceLevel: 'B' },
+          { substanceId: 'vitamin_b6', name: 'Витамин B6', type: 'supplement', dose: '50-100 мг/сут (выше UL B6 12 мг — под контролем врача)', mechanism: '↓ эндогенный синтез оксалата', evidenceLevel: 'B' },
         ],
         expectations: [
           { timeline: '24-72 ч', effect: 'Острая колика: консультация уролога, НПВС, УЗИ', sideNote: 'Камень <5 мм — консервативно. >5 мм — литотрипсия' },
@@ -334,9 +334,9 @@ export const DB_PART1: SymptomEntry[] = [
         ],
         solutions: [
           { substanceId: 'cabergoline', name: 'Каберголин (D2-агонист)', type: 'pharma', dose: '0.25-0.5 мг 2×/нед', mechanism: '↓ секреция пролактина', evidenceLevel: 'A' },
-          { substanceId: 'p5p', name: 'P5P (пиридоксаль-5-фосфат)', type: 'supplement', dose: '50-100 мг/сут', mechanism: 'Кофактор DOPA-декарбоксилазы → ↑ дофамин', evidenceLevel: 'B' },
-          { substanceId: 'vitamin_e', name: 'Витамин E', type: 'supplement', dose: '400-800 МЕ/сут', mechanism: 'Защита дофаминергических нейронов', evidenceLevel: 'B' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: '↓ пролактин', evidenceLevel: 'C' },
+          { substanceId: 'p5p', name: 'P5P (пиридоксаль-5-фосфат)', type: 'supplement', dose: '50-100 мг/сут (выше UL B6 12 мг — под контролем врача)', mechanism: 'Кофактор DOPA-декарбоксилазы → ↑ дофамин', evidenceLevel: 'B' },
+          { substanceId: 'vitamin_e', name: 'Витамин E', type: 'supplement', dose: 'до 300 мг/сут (~450 МЕ; UL)', mechanism: 'Защита дофаминергических нейронов', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: '↓ пролактин', evidenceLevel: 'C' },
         ],
         expectations: [
           { timeline: '2-4 ч', effect: 'Каберголин 0.25 мг: начало ↓ пролактина', sideNote: 'Избегать при клапанных пороках сердца' },
@@ -351,7 +351,7 @@ export const DB_PART1: SymptomEntry[] = [
         ],
         solutions: [
           { substanceId: 'anastro', name: 'Анастрозол (при ↑ E2)', type: 'pharma', dose: '0.25 мг 2×/нед', mechanism: 'Ингибитор ароматазы', evidenceLevel: 'A' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: 'Умеренный ингибитор ароматазы', evidenceLevel: 'C' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: 'Умеренный ингибитор ароматазы', evidenceLevel: 'C' },
         ],
         expectations: [
           { timeline: '24-48 ч', effect: 'Анастрозол: начало ↓ E2', sideNote: 'Корректировать дозу по анализам' },
@@ -402,7 +402,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'hcg', name: 'hCG 500 МЕ 2×/нед', type: 'pharma', dose: '500 МЕ 2×/нед (п/к)', mechanism: 'Аналог ЛГ → поддержание клеток Лейдига', evidenceLevel: 'A' },
           { substanceId: 'hmg', name: 'hMG (при подготовке к зачатию)', type: 'pharma', dose: '75-150 МЕ 2-3×/нед', mechanism: 'ФСГ + ЛГ → поддержание сперматогенеза', evidenceLevel: 'A' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: 'Необходим для синтеза T и сперматогенеза', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: 'Необходим для синтеза T и сперматогенеза', evidenceLevel: 'B' },
         ],
         expectations: [
           { timeline: '1-2 нед', effect: 'hCG: остановка атрофии, восстановление объёма', sideNote: 'Начинать с 1-й недели курса' },
@@ -599,7 +599,7 @@ export const DB_PART1: SymptomEntry[] = [
         ],
         solutions: [
           { substanceId: 'isotretinoin', name: 'Изотретиноин (низкодозный)', type: 'pharma', dose: '10-20 мг/сут', mechanism: '↓ размер сальных желёз на 90%', evidenceLevel: 'A' },
-          { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: '50-100 мг/сут', mechanism: '↓ 5α-редуктазу, ↓ воспаление', evidenceLevel: 'A' },
+          { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: '30-40 мг/сут (UL; выше — только под контролем врача)', mechanism: '↓ 5α-редуктазу, ↓ воспаление', evidenceLevel: 'A' },
           { substanceId: 'pantothenic_acid', name: 'Витамин B5', type: 'supplement', dose: '2-5 г/сут', mechanism: '↓ синтез жирных кислот → ↓ себум', evidenceLevel: 'B' },
           { substanceId: 'topical_retinoid', name: 'Адапален / Третиноин местно', type: 'pharma', dose: '1×/день на ночь', mechanism: '↓ кератинизация фолликулов', evidenceLevel: 'A' },
           { substanceId: 'skin_hygiene', name: 'Гигиена кожи', type: 'lifestyle', dose: 'Душ 2×/день, салициловый гель', mechanism: 'Удаление себума, антибактериально', evidenceLevel: 'B' },
@@ -682,7 +682,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'pct_proper', name: 'ПРАВИЛЬНЫЙ ПКТ (SERM + hCG)', type: 'pharma', dose: 'Тамоксифен 20 мг + кломифен 50 мг 4-6 нед', mechanism: 'SERM ↑ ЛГ/ФСГ → ↑ тестостерон', evidenceLevel: 'A' },
           { substanceId: 'hcg', name: 'hCG', type: 'pharma', dose: '500-1000 МЕ 2-3×/нед', mechanism: 'Стимуляция клеток Лейдига', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_d', name: 'Витамин D3', type: 'supplement', dose: '5000-10000 МЕ/сут', mechanism: '↑ синтез серотонина', evidenceLevel: 'A' },
+          { substanceId: 'vitamin_d', name: 'Витамин D3', type: 'supplement', dose: '2000-4000 МЕ/сут (5000-10000 — только при дефиците 25-OH-D3, врач)', mechanism: '↑ синтез серотонина', evidenceLevel: 'A' },
           { substanceId: 'omega3', name: 'Омега-3 (EPA ≥1 г)', type: 'supplement', dose: '2-4 г/сут', mechanism: 'Антидепрессантный эффект, сравнимый с СИОЗС', evidenceLevel: 'A' },
           { substanceId: 'exercise', name: 'Аэробные тренировки', type: 'lifestyle', dose: '30-45 мин 3-5×/нед', mechanism: '↑ BDNF, ↑ эндорфины, ↑ нейрогенез', evidenceLevel: 'A' },
         ],
@@ -796,7 +796,7 @@ export const DB_PART1: SymptomEntry[] = [
           { substanceId: 'finasteride', name: 'Финастерид', type: 'pharma', dose: '5 мг/сут', mechanism: 'Ингибитор 5α-R II типа → ↓ DHT в простате на 80%', evidenceLevel: 'A' },
           { substanceId: 'tamsulosin', name: 'Тамсулозин (α1-блокатор)', type: 'pharma', dose: '0.4 мг/сут', mechanism: '↓ тонус гладкой мускулатуры шейки мочевого пузыря и простаты → ↑ поток', evidenceLevel: 'A' },
           { substanceId: 'saw_palmetto', name: 'Пальма сереноа', type: 'supplement', dose: '320 мг/сут (жирные кислоты)', mechanism: 'Слабый ингибитор 5α-R + ↓ AR в простате', evidenceLevel: 'B' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: '↓ 5α-редуктазу, ↓ воспаление в простате', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: '↓ 5α-редуктазу, ↓ воспаление в простате', evidenceLevel: 'B' },
           { substanceId: 'pygeum', name: 'Пигеум (Pygeum africanum)', type: 'supplement', dose: '100-200 мг/сут', mechanism: '↓ пролиферация фибробластов, ↓ воспаление', evidenceLevel: 'B' },
         ],
         expectations: [
@@ -884,7 +884,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'taper_t3', name: 'Постепенное снижение T3 (титрация вниз)', type: 'lifestyle', dose: '↓ на 12.5-25 мкг каждые 3-4 дня', mechanism: 'Дать время гипофизу восстановить ТТГ', evidenceLevel: 'B' },
           { substanceId: 'selenium', name: 'Селен', type: 'supplement', dose: '200 мкг/сут', mechanism: 'Кофактор дейодиназы D1 (конверсия T4→T3)', evidenceLevel: 'A' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: 'Необходим для синтеза ТТГ и тиреоидных гормонов', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: 'Необходим для синтеза ТТГ и тиреоидных гормонов', evidenceLevel: 'B' },
           { substanceId: 'tyrosine', name: 'L-тирозин', type: 'supplement', dose: '500-1000 мг/сут', mechanism: 'Предшественник тиреоидных гормонов (неэффективен при подавленном ТТГ)', evidenceLevel: 'C' },
           { substanceId: 'ashwagandha', name: 'Ашваганда', type: 'supplement', dose: '300-600 мг/сут', mechanism: 'Может ↑ T4 (осторожно при приёме T3/T4)', evidenceLevel: 'B' },
         ],
@@ -916,7 +916,7 @@ export const DB_PART1: SymptomEntry[] = [
           { substanceId: 'hcg', name: 'hCG (до начала SERM)', type: 'pharma', dose: '500-1000 МЕ 2-3×/нед 2-3 нед', mechanism: 'Стимуляция клеток Лейдига → ↑ T + ↑ E2 (через ароматизацию) → ↓ SERM-индуцированная вялость', evidenceLevel: 'A' },
           { substanceId: 'dhea', name: 'DHEA', type: 'supplement', dose: '25-50 мг/сут', mechanism: 'Предшественник T и E2 → ↑ нейростероиды → улучшение настроения', evidenceLevel: 'B' },
           { substanceId: 'ashwagandha', name: 'Ашваганда (KSM-66)', type: 'supplement', dose: '600 мг/сут', mechanism: '↓ кортизол, адаптоген, ↑ устойчивость к стрессу', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_d', name: 'Витамин D3', type: 'supplement', dose: '5000-10000 МЕ/сут', mechanism: '↑ дофамин, ↑ серотонин, нейростероидогенез', evidenceLevel: 'A' },
+          { substanceId: 'vitamin_d', name: 'Витамин D3', type: 'supplement', dose: '2000-4000 МЕ/сут (5000-10000 — только при дефиците 25-OH-D3, врач)', mechanism: '↑ дофамин, ↑ серотонин, нейростероидогенез', evidenceLevel: 'A' },
           { substanceId: 'enclomiphene', name: 'Энкломифен (вместо кломифена)', type: 'pharma', dose: '25 мг/сут', mechanism: 'Чистый транс-изомер → меньше ER-блокады в ЦНС → меньше вялости', evidenceLevel: 'A' },
           { substanceId: 'exercise_moderate', name: 'Умеренные тренировки', type: 'lifestyle', dose: '3-4×/нед, объём -20%', mechanism: '↑ BDNF, ↑ эндорфины, без перегрузки ЦНС', evidenceLevel: 'B' },
         ],
@@ -944,7 +944,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'with_food', name: 'Принимать препараты С ЕДОЙ', type: 'lifestyle', dose: '—', mechanism: 'Буферизация слизистой желудка пищей', evidenceLevel: 'A' },
           { substanceId: 'ginger', name: 'Имбирь (свежий / экстракт)', type: 'supplement', dose: '500-1000 мг за 30 мин до приёма', mechanism: '5-HT3 антагонист → ↓ тошнота', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_b6', name: 'Витамин B6', type: 'supplement', dose: '50-100 мг', mechanism: '↓ тошнота через ЦНС-механизм (используется при токсикозе беременных)', evidenceLevel: 'A' },
+          { substanceId: 'vitamin_b6', name: 'Витамин B6', type: 'supplement', dose: '50-100 мг (выше UL B6 12 мг — коротким курсом)', mechanism: '↓ тошнота через ЦНС-механизм (используется при токсикозе беременных)', evidenceLevel: 'A' },
         ],
         expectations: [
           { timeline: 'Немедленно', effect: 'Приём с едой: ↓ тошнота на 90% при лекарственной природе' },
@@ -1174,7 +1174,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'reduce_gh_dose', name: 'СНИЗИТЬ дозу GH на 30-50%', type: 'lifestyle', dose: 'С 4-6 МЕ до 2-3 МЕ/сут', mechanism: '↓ отёк мягких тканей → декомпрессия нерва', evidenceLevel: 'A' },
           { substanceId: 'wrist_splint', name: 'Ортез на запястье (ночной)', type: 'lifestyle', dose: 'Носить каждую ночь', mechanism: 'Предотвращение сгибания запястья во сне → ↓ компрессия', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_b6', name: 'P5P (пиридоксаль-5-фосфат)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Нейротрофический эффект, ↓ отёк нерва', evidenceLevel: 'B' },
+          { substanceId: 'vitamin_b6', name: 'P5P (пиридоксаль-5-фосфат)', type: 'supplement', dose: '100-200 мг/сут (выше UL B6 12 мг — под контролем врача)', mechanism: 'Нейротрофический эффект, ↓ отёк нерва', evidenceLevel: 'B' },
           { substanceId: 'alpha_lipoic', name: 'R-ALA', type: 'supplement', dose: '600 мг/сут', mechanism: 'Антиоксидант → защита нерва от компрессионной ишемии', evidenceLevel: 'B' },
           { substanceId: 'split_dose', name: 'Разделение дозы GH на 2 инъекции', type: 'lifestyle', dose: '2×/день вместо 1×', mechanism: '↓ пиковая концентрация → ↓ отёк', evidenceLevel: 'C' },
         ],

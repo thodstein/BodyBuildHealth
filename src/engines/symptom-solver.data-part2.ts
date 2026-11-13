@@ -24,7 +24,7 @@ export const DB_PART2: SymptomEntry[] = [
           { substanceId: 'add_test', name: 'Добавить тестостерон (тестостероновая база)', type: 'pharma', dose: '200-300 мг/нед (минимум)', mechanism: 'Обеспечение DHT через 5α-редукцию T, поддержание андрогеновой сигнализации', evidenceLevel: 'A' },
           { substanceId: 'add_masteron', name: 'Добавить мастерон (DHT-производное)', type: 'pharma', dose: '200-400 мг/нед', mechanism: 'Прямой DHT-агонист → ↑ андрогеновая сигнализация + ↓ E2-рецепторы', evidenceLevel: 'B' },
           { substanceId: 'avoid_tamoxifen', name: 'НЕ использовать тамоксифен!', type: 'pharma', dose: '—', mechanism: 'Тамоксифен ↑ PR-экспрессию → УСУГУБЛЯЕТ прогестагенную активность нандролона', evidenceLevel: 'A' },
-          { substanceId: 'p5p', name: 'P5P (витамин B6 активный)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Кофактор синтеза дофамина → ↓ пролактин', evidenceLevel: 'B' },
+          { substanceId: 'p5p', name: 'P5P (витамин B6 активный)', type: 'supplement', dose: '100-200 мг/сут (выше UL B6 12 мг — под контролем врача)', mechanism: 'Кофактор синтеза дофамина → ↓ пролактин', evidenceLevel: 'B' },
           { substanceId: 'stop_19nor', name: 'ОТМЕНИТЬ 19-нор-производное', type: 'lifestyle', dose: '—', mechanism: 'Устранение первопричины', evidenceLevel: 'A' },
         ],
         expectations: [
@@ -182,7 +182,7 @@ export const DB_PART2: SymptomEntry[] = [
         solutions: [
           { substanceId: 'taper_t3', name: 'ТИТРАЦИЯ ВНИЗ (taper)', type: 'lifestyle', dose: '↓ на 12.5-25 мкг каждые 4-5 дней', mechanism: 'Постепенное ↓ → постепенное ↑ ТТГ → меньше гипотиреозный провал', evidenceLevel: 'A' },
           { substanceId: 'selenium', name: 'Селен', type: 'supplement', dose: '200 мкг/сут', mechanism: 'Кофактор дейодиназы D1 → конверсия T4→T3', evidenceLevel: 'A' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '30-50 мг/сут', mechanism: 'Необходим для синтеза ТТГ и связывания T3 с рецептором', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: 'Необходим для синтеза ТТГ и связывания T3 с рецептором', evidenceLevel: 'B' },
           { substanceId: 'tyrosine', name: 'L-тирозин', type: 'supplement', dose: '500-1000 мг/сут', mechanism: 'Субстрат для синтеза T4/T3', evidenceLevel: 'C' },
           { substanceId: 'iodine_cautious', name: 'Йод (ОСТОРОЖНО)', type: 'supplement', dose: '150 мкг/сут (не больше!)', mechanism: 'Субстрат для T4. НЕ превышать — риск тиреоидита', evidenceLevel: 'B' },
           { substanceId: 'exercise_moderate', name: 'Умеренные нагрузки', type: 'lifestyle', dose: '3-4×/нед, без перегрузки', mechanism: 'Стимуляция метаболизма через мышечную активность', evidenceLevel: 'B' },
@@ -361,7 +361,7 @@ export const DB_PART2: SymptomEntry[] = [
         solutions: [
           { substanceId: 'micro_ai', name: 'Микродоза AI (0.25 мг анастрозола 2×/нед)', type: 'pharma', dose: '0.25 мг 2×/нед', mechanism: 'Контроль ароматизации тестостерона, произведённого под действием hCG', evidenceLevel: 'A' },
           { substanceId: 'reduce_hcg', name: 'Снизить дозу hCG', type: 'lifestyle', dose: '250 МЕ 2×/нед вместо 500 МЕ', mechanism: 'Меньше стимуляции Лейдига → меньше T → меньше E2', evidenceLevel: 'B' },
-          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: '50 мг/сут', mechanism: 'Слабый ингибитор ароматазы', evidenceLevel: 'C' },
+          { substanceId: 'zinc', name: 'Цинк', type: 'supplement', dose: 'до 40 мг/сут (UL)', mechanism: 'Слабый ингибитор ароматазы', evidenceLevel: 'C' },
           { substanceId: 'dim', name: 'DIM (дииндолилметан)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Модуляция метаболизма E2 (2-OH-E1 путь)', evidenceLevel: 'C' },
         ],
         expectations: [
@@ -1014,7 +1014,7 @@ export const DB_PART2: SymptomEntry[] = [
         solutions: [
           { substanceId: 'isotretinoin', name: 'Изотретиноин', type: 'pharma', dose: '0.5-1 мг/кг/день (под контролем АЛТ/АСТ)', mechanism: '↓себум, ↓размер сальных желез, ↑дифференциация', evidenceLevel: 'A' },
           { substanceId: 'finasteride', name: 'Финастерид', type: 'pharma', dose: '1-5 мг/день (топическое)', mechanism: '↓5α-редуктаза → ↓DHT', evidenceLevel: 'B' },
-          { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: '30-50 мг/день', mechanism: '↓5α-редуктаза, ↓воспаление', evidenceLevel: 'B' },
+          { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: 'до 40 мг/день (UL)', mechanism: '↓5α-редуктаза, ↓воспаление', evidenceLevel: 'B' },
           { substanceId: 'saw_palmetto', name: 'Со пальметто', type: 'supplement', dose: '320 мг/день', mechanism: '↓5α-редуктаза, ↓DHT-синтез', evidenceLevel: 'C' },
         ],
         expectations: [

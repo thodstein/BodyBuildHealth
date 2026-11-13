@@ -66,7 +66,7 @@ export const DB_PART3: SymptomEntry[] = [
         ],
         solutions: [
           { substanceId: 'cabergoline', name: 'Каберголин', type: 'pharma', dose: '0.25 мг 2р/нед', mechanism: 'D2-агонист → ↓пролактин', evidenceLevel: 'A' },
-          { substanceId: 'vitamin_b6', name: 'Витамин B6 (P-5-P)', type: 'supplement', dose: '200-400 мг/день', mechanism: '↑dopamine → ↓пролактин', evidenceLevel: 'B' },
+          { substanceId: 'vitamin_b6', name: 'Витамин B6 (P-5-P)', type: 'supplement', dose: '200-400 мг/день (выше UL B6 12 мг — только под контролем врача, риск нейропатии)', mechanism: '↑dopamine → ↓пролактин', evidenceLevel: 'B' },
           { substanceId: 'mucuna_pruriens', name: 'Мукуна жгучая (L-DOPA)', type: 'supplement', dose: '500 мг/день (станд. 15% L-DOPA)', mechanism: '↑dopamine → ↓пролактин', evidenceLevel: 'C' },
         ],
         expectations: [
@@ -502,7 +502,7 @@ export const DB_PART3: SymptomEntry[] = [
           { substanceId: 'ashwagandha', name: 'Ашваганда KSM-66', type: 'supplement', dose: '300-600 мг 2р/день', mechanism: '↓кортизол, ↓депрессия', evidenceLevel: 'B' },
           { substanceId: 'rhodiola', name: 'Родиола розовая', type: 'supplement', dose: '200-400 мг/день', mechanism: '↑адаптогенность, ↓усталость', evidenceLevel: 'B' },
           { substanceId: 'omega3_high', name: 'Омега-3 4 г/день', type: 'supplement', dose: '4 г/день', mechanism: '↑нейрогенез, ↓депрессия', evidenceLevel: 'B' },
-          { substanceId: 'vitamin_d', name: 'Витамин D3 5000 МЕ', type: 'supplement', dose: '5000-10000 МЕ/день', mechanism: '↓депрессия, ↑иммунитет', evidenceLevel: 'B' },
+          { substanceId: 'vitamin_d', name: 'Витамин D3', type: 'supplement', dose: '2000-4000 МЕ/день (5000-10000 — только при дефиците 25-OH-D3, врач)', mechanism: '↓депрессия, ↑иммунитет', evidenceLevel: 'B' },
           { substanceId: 'therapy', name: 'Психотерапия (когнитивная)', type: 'lifestyle', dose: '8-12 сессий', mechanism: '↓симптомы, ↑приверженность', evidenceLevel: 'A' },
         ],
         expectations: [
@@ -643,7 +643,7 @@ export const DB_PART3: SymptomEntry[] = [
       solutions: [
         { substanceId: 'hcg', name: 'hCG 250 МЕ 2×/нед', type: 'pharma', dose: '250 МЕ 2×/нед', mechanism: 'Аналог LH → стимуляция Лейдига', evidenceLevel: 'B' },
         { substanceId: 'enclomiphene', name: 'Энкломифен 12.5 мг/день', type: 'pharma', dose: '12.5 мг/день', mechanism: '↑ GnRH через блокаду ER в гипоталамусе', evidenceLevel: 'B' },
-        { substanceId: 'vitamin_d3', name: 'Витамин D3', type: 'supplement', dose: '2000-5000 МЕ/сут', mechanism: 'Кофактор стероидогенеза', evidenceLevel: 'B' },
+        { substanceId: 'vitamin_d3', name: 'Витамин D3', type: 'supplement', dose: '2000-4000 МЕ/сут (5000 — только при дефиците 25-OH-D3)', mechanism: 'Кофактор стероидогенеза', evidenceLevel: 'B' },
         { substanceId: 'zinc', name: 'Цинк пиколинат', type: 'supplement', dose: '15-30 мг/сут', mechanism: 'Кофактор 17β-HSD и 3β-HSD', evidenceLevel: 'B' },
       ],
       expectations: [
@@ -675,7 +675,7 @@ export const DB_PART3: SymptomEntry[] = [
       solutions: [
         { substanceId: 'hyaluronic_acid', name: 'Гиалуроновая кислота (перорально)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Субстрат для синтеза синовиальной жидкости', evidenceLevel: 'C' },
         { substanceId: 'collagen_uc2', name: 'Коллаген UC-II (неденатурир.)', type: 'supplement', dose: '40 мг/сут', mechanism: 'Иммунная толерантность к хрящу', evidenceLevel: 'B' },
-        { substanceId: 'vitamin_d3', name: 'Витамин D3 + K2', type: 'supplement', dose: '2000-5000 МЕ + 100 мкг', mechanism: 'Кальциевый обмен + GI-белки', evidenceLevel: 'B' },
+        { substanceId: 'vitamin_d3', name: 'Витамин D3 + K2', type: 'supplement', dose: '2000-4000 МЕ + 100 мкг (5000 — только при дефиците)', mechanism: 'Кальциевый обмен + GI-белки', evidenceLevel: 'B' },
       ],
       expectations: [
         { timeline: '2-4 нед', effect: 'Улучшение подвижности на гиалуронате' },
@@ -708,7 +708,7 @@ export const DB_PART3: SymptomEntry[] = [
       ],
       solutions: [
         { substanceId: 'reduce_gh_dose', name: 'Снизить дозу GH 30-50%', type: 'lifestyle', dose: '-30-50%', mechanism: '↓IGF-1 → ↓ гипертрофии', evidenceLevel: 'A' },
-        { substanceId: 'vitamin_b6', name: 'Витамин B6 (пиридоксин)', type: 'supplement', dose: '50-100 мг/сут', mechanism: '↑ ГАМК-ергическое торможение, нейропротекция', evidenceLevel: 'B' },
+        { substanceId: 'vitamin_b6', name: 'Витамин B6 (пиридоксин)', type: 'supplement', dose: '50-100 мг/сут (выше UL B6 12 мг — под контролем врача)', mechanism: '↑ ГАМК-ергическое торможение, нейропротекция', evidenceLevel: 'B' },
         { substanceId: 'nsaids', name: 'НПВС местно (диклофенак-гель)', type: 'pharma', dose: '1-2% 2-3р/день', mechanism: '↓ локального воспаления', evidenceLevel: 'B' },
         { substanceId: 'night_splint', name: 'Ночной ортез кисти', type: 'lifestyle', dose: 'На ночь', mechanism: 'Фиксация кисти в нейтральном положении', evidenceLevel: 'A' },
       ],

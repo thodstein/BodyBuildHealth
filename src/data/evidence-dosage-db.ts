@@ -82,14 +82,14 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
   },
 
   vitamin_d3: {
-    minMg: 2000, optMg: 5000, maxMg: 10000, unit: 'МЕ',
+    minMg: 2000, optMg: 4000, maxMg: 10000, unit: 'МЕ',
     timing: 'С жирной едой',
     duration: 'Длительно, контроль 25(OH)D',
     references: [
       'Endocrine Society 2011 Clinical Practice Guideline — D3 1500-2000 МЕ/сут (поддерживающая), до 10000 МЕ (дефицит)',
       'NIH ODS Vitamin D Fact Sheet — Upper Limit 4000 МЕ (взрослые), 10000 МЕ допустимо',
     ],
-    notes: 'Цель 25(OH)D: 50-80 нг/мл. Поддерживающая: 2000-5000 МЕ. Дефицит: 5000-10000 МЕ 8-12 нед.',
+    notes: 'Цель 25(OH)D: 50-80 нг/мл. Поддерживающая: 2000-4000 МЕ (UL 4000). Дефицит: 5000-10000 МЕ 8-12 нед.',
     adjustments: { weightBased: { perKg: 65, min: 2000, max: 10000 }, phaseMultiplier: { course: 1.0, bridge: 1.0, pct: 1.5, fertility: 1.5 } },
     titration: [2000, 5000, 10000],
     contraindications: ['Саркоидоз', 'Активный туберкулёз', 'Нефролитиаз с гиперкальциемией'],

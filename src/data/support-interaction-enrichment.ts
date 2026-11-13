@@ -65,7 +65,7 @@ export const INTERACTION_ENRICHMENT: Record<string, InteractionEnrichment> = {
   // ── Витамин D ──
   'INT_VITD_K2': {
     riskDescription: 'Без K2 кальций может откладываться в сосудах (кальцификация). Риск ССЗ.',
-    parameters: 'D3: 2000-5000 МЕ + K2 (MK-7): 90-180 мкг. С жирной едой.',
+    parameters: 'D3: 2000-4000 МЕ + K2 (MK-7): 90-180 мкг. С жирной едой.',
     mechanismRu: ['K2 активирует MGP (матриксный GLA-белок)', 'MGP выводит Ca из сосудов', 'K2 активирует остеокальцин → Ca в кости'],
   },
   'INT_VITD_MAGNESIUM': {

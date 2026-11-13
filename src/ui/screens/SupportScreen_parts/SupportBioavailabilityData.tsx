@@ -180,9 +180,9 @@ export const ABSORPTION_SITES: Record<string, { site: string; ph: string; note: 
 export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string; unit?: string }> = {
   zn: { minMg: 15, optMg: 30, maxMg: 50, ul: 40, note: 'UL 40 мг. >50 мг → дефицит Cu через 4-8 нед.' },
   mg: { minMg: 200, optMg: 400, maxMg: 600, ul: 350, note: 'UL 350 мг из добавок. Диарея при >600 мг цитрата.' },
-  fe: { minMg: 18, optMg: 30, maxMg: 60, ul: 45, note: 'UL 45 мг. Гемохроматоз — абс. противопоказание.' },
+  fe: { minMg: 18, optMg: 30, maxMg: 60, ul: 40, note: 'Ориентир 40 мг (Safe Level — НЕ порог токсичности). Гемохроматоз — абс. противопоказание.' },
   ca: { minMg: 500, optMg: 800, maxMg: 1200, ul: 2500, note: 'Разовая доза ≤500 мг элемент. Ca.' },
-  se: { minMg: 55, optMg: 100, maxMg: 200, ul: 300, unit: 'мкг', note: 'UL 300 мкг. >400 мкг → селеноз (волосы, ногти).' },
+  se: { minMg: 55, optMg: 100, maxMg: 200, ul: 255, unit: 'мкг', note: 'UL 255 мкг (EFSA 2023). >400 мкг (старый IOM) → селеноз (волосы, ногти).' },
   d3: { minMg: 400, optMg: 2000, maxMg: 4000, ul: 4000, unit: 'МЕ', note: 'Дозы в МЕ. UL 4000 МЕ/сут.' },
   b12: { minMg: 2.4, optMg: 100, maxMg: 1000, ul: 9999, unit: 'мкг', note: 'Нет UL. Депо в печени 2-5 мг.' },
   vitc: { minMg: 90, optMg: 500, maxMg: 2000, ul: 2000, note: 'UL 2000 мг. >1000 мг → осмотическая диарея.' },

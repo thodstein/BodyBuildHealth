@@ -360,6 +360,28 @@ describe('E0.2 — NUTRIENT_UL выведен из реестра (третья 
   });
 });
 
+describe('проход 23 — THERAPEUTIC_WINDOWS.ul не держит свою копию порогов', () => {
+  // Числа окна — четвёртая копия UL; `doseWindowFor` отдаёт приоритет реестру,
+  // но подпись/фолбэк остаются из таблицы. Ловим расхождение (было: селен 300
+  // против EFSA 255, железо 45 «UL» при Safe Level 40).
+  const MAP = {
+    zn: 'zinc', mg: 'magnesium', ca: 'calcium', se: 'selenium',
+    d3: 'vitamin_d', vitc: 'vitamin_c', iodine: 'iodine', fe: 'iron',
+  } as const;
+
+  it('значения совпадают с NUTRIENT_LIMITS_V2', () => {
+    for (const [k, n] of Object.entries(MAP)) {
+      const ul = (THERAPEUTIC_WINDOWS as any)[k].ul;
+      expect(ul, `окно ${k}`).toBe(NUTRIENT_LIMITS_V2[n as keyof typeof NUTRIENT_LIMITS_V2].value);
+    }
+  });
+
+  it('селен подписан 255 мкг, железо — Safe Level (не порог токсичности)', () => {
+    expect((THERAPEUTIC_WINDOWS as any).se.note).toContain('255');
+    expect((THERAPEUTIC_WINDOWS as any).fe.note).toContain('Safe Level');
+  });
+});
+
 describe('E0.1 — сводка и честность непроверенного', () => {
   it('limitsSummary не выдумывает чисел', () => {
     const s = limitsSummary();
