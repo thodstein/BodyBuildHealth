@@ -4,6 +4,7 @@
  * Карточки с глубиной, чипы крупнее, типографика 12-13px, консистентные отступы.
  */
 import React from 'react';
+import { NUTRIENT_LIMITS_V2 } from '../../../engines/support-limits';
 
 const baseCard: React.CSSProperties = {
   background: 'rgba(24,24,27,0.55)',
@@ -189,15 +190,21 @@ export const IvStationaryGate: React.FC = () => (
 );
 
 // ── P4-аудит 2026-09: живой сумматор кросс-модульных капов ──
+// Проход 25 (2026-11): капы питательных веществ берутся из ЕДИНОГО реестра
+// пределов (`NUTRIENT_LIMITS_V2`), а не держатся своей копией. Было: магний 800
+// при UL 350, цинк 50 при UL 40, NAC 4000 при клиническом капе движка 2400 —
+// калькулятор писал «норма» на суммах, которые план/UL-контур считают перебором.
+// B6 — исключение: 100 мг это ПОТОЛОК ПРОТОКОЛА (пролактин), EFSA UL 12 мг
+// подписан в label; решение продукта — предупреждать, а не молча капать.
 export const CROSS_CAPS: Array<{ key: string; label: string; cap: number; unit: string; step: number }> = [
-  { key: 'nac', label: 'NAC (сумма всех модулей)', cap: 4000, unit: 'мг/сут', step: 100 },
-  { key: 'mg', label: 'Магний (сумма всех модулей)', cap: 800, unit: 'мг/сут', step: 50 },
+  { key: 'nac', label: 'NAC (потолок протокола; движок капит 2400)', cap: 4000, unit: 'мг/сут', step: 100 },
+  { key: 'mg', label: 'Магний (сумма всех модулей; UL добавок)', cap: NUTRIENT_LIMITS_V2.magnesium.value, unit: 'мг/сут', step: 50 },
   { key: 'telmi', label: 'Телмисартан (все модули)', cap: 80, unit: 'мг/сут', step: 10 },
-  { key: 'zn', label: 'Цинк (сумма всех модулей)', cap: 50, unit: 'мг/сут', step: 5 },
+  { key: 'zn', label: 'Цинк (сумма всех модулей; UL)', cap: NUTRIENT_LIMITS_V2.zinc.value, unit: 'мг/сут', step: 5 },
   { key: 'cu', label: 'Медь (обязательна при Zn ≥25 мг)', cap: 2, unit: 'мг/сут', step: 0.5 },
-  { key: 'b6', label: 'Витамин B6 (сумма всех модулей)', cap: 100, unit: 'мг/сут', step: 10 },
-  { key: 'd3', label: 'Витамин D3 (хронически)', cap: 4000, unit: 'МЕ/сут', step: 500 },
-  { key: 'se', label: 'Селен (сумма всех модулей)', cap: 200, unit: 'мкг/сут', step: 25 },
+  { key: 'b6', label: 'Витамин B6 (потолок протокола; EFSA UL 12 мг)', cap: 100, unit: 'мг/сут', step: 10 },
+  { key: 'd3', label: 'Витамин D3 (хронически; UL)', cap: NUTRIENT_LIMITS_V2.vitamin_d.value, unit: 'МЕ/сут', step: 500 },
+  { key: 'se', label: 'Селен (сумма всех модулей; UL)', cap: NUTRIENT_LIMITS_V2.selenium.value, unit: 'мкг/сут', step: 25 },
   { key: 'omega', label: 'Омега-3 (EPA+DHA, сумма; >4 г — осознанно)', cap: 6, unit: 'г/сут', step: 0.5 },
   { key: 'ashwa', label: 'Ашваганда (сумма всех модулей)', cap: 600, unit: 'мг/сут', step: 100 },
 ];
@@ -236,7 +243,7 @@ export const CrossCapCalculator: React.FC = () => {
       )}
       {znVals >= 25 && (vals.cu || 0) === 0 && (
         <div data-capcalc="cu-missing" style={{ fontSize: 11, fontWeight: 800, color: '#fcd34d', marginTop: 6 }}>
-          ⚠ Zn {znVals} мг/сут без меди: при цинке ≥25 мг/сут медь 1-2 мг/сут ОБЯЗАТЕЛЬНА (цинк ↑ металлотионеин → блок всасывания Cu). Без меди 2-3 мес — дефицит Cu: анемия, нейропатия, ↓ ЛПВП. 50 мг Zn — курсом 8-12 нед, не годами
+          ⚠ Zn {znVals} мг/сут без меди: при цинке ≥25 мг/сут медь 1-2 мг/сут ОБЯЗАТЕЛЬНА (цинк ↑ металлотионеин → блок всасывания Cu). Без меди 2-3 мес — дефицит Cu: анемия, нейропатия, ↓ ЛПВП. Дозы выше UL 40 мг — только курсом 8-12 нед под контролем Cu/церулоплазмина, не годами
         </div>
       )}
     </div>
