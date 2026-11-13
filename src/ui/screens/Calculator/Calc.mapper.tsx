@@ -39,7 +39,7 @@ import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCover
 import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
-import { hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
+import { hctCuts, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
 import { getLabNorm } from '../../../engines/lab-norms.engine';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
@@ -404,7 +404,7 @@ const HEMATO_PRESETS: { id: string; name: string; desc: string; subs: string[] }
   { id: 'fibrinolytic_trio', name: 'База: плазма+фибринолиз (LV1)', desc: 'Гидратация+кардио+электролиты+натто+сера+бромелайн+телмисартан. ↓Hct через ↑плазма + ↓тромбоз', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan'] },
   { id: 'rheology', name: 'Реология + антиагрегант (LV2)', desc: 'База + омега + чеснок + цитруллин + NAC + аспирин. При Hct 48-52%', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan','omega3','garlic','citrulline','nac','aspirin'] },
   { id: 'therapy', name: 'Терапия (LV3)', desc: '+лумброкиназа+пентоксифиллин+дипиридамол+пикногенол+гинкго. При Hct 52-54%', subs: ['hydration','cardio_aerobic','electrolyte_balance','nattokinase','serrapeptase','bromelain','telmisartan','omega3','garlic','citrulline','nac','aspirin','lumbrokinase','pentoxifylline','dipyridamole','pycnogenol','ginkgo'] },
-  { id: 'urgent', name: 'Ургент (LV4, по назначению)', desc: 'Антикоагулянты при тромбозе. Hct>54% — эритроцитаферез + STOP AAS', subs: ['enoxaparin','warfarin','sulodexide'] },
+  { id: 'urgent', name: 'Ургент (LV4, по назначению)', desc: 'Антикоагулянты при тромбозе. Hct >54% (♀ >52%) — эритроцитаферез + STOP AAS', subs: ['enoxaparin','warfarin','sulodexide'] },
 ];
 const HEMATO_DOMAINS: DomainCfg[] = [
   { id: 'fibrinolysis', label: 'Фибринолиз', icon: '🩸', color: '#14b8a6',
@@ -2509,10 +2509,10 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     </div>
                   )}
 
-                  {/* Ургентный баннер при Hct>57% */}
-                  {hct != null && hct > 57 && (
+                  {/* Ургентный баннер — порог флеботомии первичной модели (♂ 54 / ♀ 52) */}
+                  {hct != null && hct >= hctCuts(state.profile?.sex === 'female' ? 'female' : 'male').urgent && (
                     <div style={{ padding:'8px 10px', borderRadius:8, marginBottom:8, background:'rgba(239,68,68,0.1)', border:'1.5px solid rgba(239,68,68,0.3)' }}>
-                      <div style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>🚨 УРГЕНТ: Hct {hct}% &gt; 57%</div>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#ef4444' }}>🚨 УРГЕНТ: Hct {hct}% ≥ {hctCuts(state.profile?.sex === 'female' ? 'female' : 'male').urgent}% (порог флеботомии{state.profile?.sex === 'female' ? ', женский' : ''})</div>
                       <div style={{ fontSize:7, color:'rgba(255,255,255,0.6)', marginTop:2, lineHeight:1.4 }}>
                         • <b>Эритроцитаферез</b> — первая линия (1 процедура = 3-4 кровопускания)<br/>
                         • Флеботомия 400-500 мл — fallback (если аферез недоступен)<br/>

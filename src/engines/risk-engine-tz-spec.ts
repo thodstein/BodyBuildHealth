@@ -261,14 +261,27 @@ export function mechanismCoverageOf(tz: TzSpecResult | null | undefined): { cove
 // НЕЗАВИСИМО от таргетов препарата (eGFR 25 опасен и без ренального таргета).
 export interface ClinicalFloor{organId:string;label:string;level:number}
 
+/**
+ * Пороги гематокрита — ОДНА шкала на всё приложение (проход 39).
+ * `block` — порог флеботомии/отмены (Endocrine Society: ♂ >54%, ♀ >52%),
+ * `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48 — верх нормы WADA).
+ * Раньше те же числа были литералами здесь, в подписи калькулятора (57),
+ * в баннере (57) и в состоянии лабораторий (52/56/60) — три шкалы на экране.
+ */
+export const HCT_THRESHOLDS = {
+  male: { erythrocytosis: 51, block: 54 },
+  female: { erythrocytosis: 48, block: 52 },
+} as const;
+
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];
   const fem = sex === 'female';
   const v=(k:string)=>labValues[k];
   const push=(cond:boolean,organId:string,label:string,level:number)=>{if(cond)floors.push({organId,label,level});};
-  // HCT: женские зоны 48/52 (мужские 51/54) — Hct 36–48% норма у женщин (Endocrine/WADA)
-  push(v('HCT')!==undefined&&v('HCT')!>=(fem?52:54),'hematologic',fem?'HCT ≥ 52% — эритроцитоз (женский порог флеботомии)':'HCT ≥ 54% — эритроцитоз (порог флеботомии)',50);
-  push(v('HCT')!==undefined&&v('HCT')!>=(fem?48:51),'hematologic',fem?'HCT ≥ 48% — эритроцитоз (женский порог)':'HCT ≥ 51% — эритроцитоз',25);
+  // HCT: женские зоны 48/52 (мужские 51/54) — из `HCT_THRESHOLDS`
+  const hctCut = fem ? HCT_THRESHOLDS.female : HCT_THRESHOLDS.male;
+  push(v('HCT')!==undefined&&v('HCT')>=hctCut.block,'hematologic',fem?`HCT ≥ ${hctCut.block}% — эритроцитоз (женский порог флеботомии)`:`HCT ≥ ${hctCut.block}% — эритроцитоз (порог флеботомии)`,50);
+  push(v('HCT')!==undefined&&v('HCT')>=hctCut.erythrocytosis,'hematologic',fem?`HCT ≥ ${hctCut.erythrocytosis}% — эритроцитоз (женский порог)`:`HCT ≥ ${hctCut.erythrocytosis}% — эритроцитоз`,25);
   push(v('LDL')!==undefined&&v('LDL')!>=4.9,'cardio','LDL ≥ 4.9 ммоль/л (ESC/EAS: очень высокий риск)',50);
   push(v('LDL')!==undefined&&v('LDL')!>=3.4,'cardio','LDL ≥ 3.4 ммоль/л',25);
   push(v('eGFR')!==undefined&&v('eGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
@@ -293,10 +306,10 @@ export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'mal
 // Клинические вмешательства (не вещества) со своим вкладом в снижение
 // механизмов. Эритроцитаферез/флеботомия — прямое удаление RBC-массы:
 // единственное вмешательство, реально меняющее hem1 (а не только вязкость).
-// Назначаются в tz-mapper (procedures) при HCT ≥ 52 — doctorOnly.
+// Назначаются в tz-mapper (procedures) с порога `HCT_THRESHOLDS`: ♂ 54 / ♀ 52 — doctorOnly.
 export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:number;q:'A'|'B'|'C';source:string}>> = {
   erythrocytapheresis: [
-    {organId:'hematologic',mechId:'hem1',k:0.45,q:'A',source:'Эритроцитаферез — прямое удаление RBC-массы (1-я линия при HCT>52%)'},
+    {organId:'hematologic',mechId:'hem1',k:0.45,q:'A',source:'Эритроцитаферез — прямое удаление RBC-массы (1-я линия при HCT ≥54%, ♀ ≥52%)'},
   ],
   phlebotomy: [
     {organId:'hematologic',mechId:'hem1',k:0.30,q:'A',source:'Флеботомия 450 мл → ↓HCT на 3-5%'},

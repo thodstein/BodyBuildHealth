@@ -1,5 +1,6 @@
 import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
 import { getLabNorm } from '../../../engines/lab-norms.engine';
+import { HCT_THRESHOLDS } from '../../../engines/risk-engine-tz-spec';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -154,22 +155,37 @@ export function labPointsToSlice(input: any): LabSlice | null {
 }
 
 /**
- * §6.2 (P2): UI-градация гематокрита. Мужские пороги 48/52/57 — как было;
- * женские 44/48/52 — паритет с движком (hem1 [44,48,52], floors 48/52).
+ * §6.2 (P2, проход 39): ЕДИНАЯ шкала гематокрита для подписи, баннера и
+ * состояния лабораторий. Границы:
+ *   коррекция = ULN − 4 (♂ 48, ♀ 44)
+ *   терапия   = ULN     (♂ 52, ♀ 48)
+ *   ургент    = порог блока первичной модели (`HCT_THRESHOLDS`: ♂ 54, ♀ 52)
+ * До 39-го прохода на одном экране жили три шкалы: подпись 48/52/57, состояние
+ * 52/56/60 и баннер 57 — при Hct 55 подпись говорила «терапия», баннер молчал,
+ * а контраиндикация тромбофилии включалась только с 60.
  */
+export function hctCuts(sex?: 'male' | 'female'): { correction: number; therapy: number; urgent: number } {
+  const s = sex === 'female' ? 'female' : 'male';
+  const therapy = getLabNorm('HCT', s)?.uln ?? (s === 'female' ? 48 : 52);
+  return { correction: therapy - 4, therapy, urgent: HCT_THRESHOLDS[s].block };
+}
+
+/** UI-градация гематокрита — по `hctCuts` (мужские 48/52/54, женские 44/48/52). */
 export function hctGradationLabel(hct: number, sex?: 'male' | 'female'): string {
-  if (sex === 'female') return hct >= 52 ? '🔴 ургент' : hct >= 48 ? '🟠 терапия' : hct >= 44 ? '🟡 коррекция' : '🟢 норма';
-  return hct >= 57 ? '🔴 ургент' : hct >= 52 ? '🟠 терапия' : hct >= 48 ? '🟡 коррекция' : '🟢 норма';
+  const c = hctCuts(sex);
+  return hct >= c.urgent ? '🔴 ургент'
+    : hct >= c.therapy ? '🟠 терапия'
+    : hct >= c.correction ? '🟡 коррекция'
+    : '🟢 норма';
 }
 
 /**
  * Пороги HCT для доменной карты симптомов (калькулятор): ♂ 48/52, ♀ 44/48.
- * Считаются от ULN единого резолвера (`lab-norms.engine`): коррекция = ULN−4,
- * терапия = ULN. Тот же шаг, что в градации выше (♀ 44/48/52, ♂ 48/52/57).
+ * Считаются от ULN единого резолвера (`lab-norms.engine`) через `hctCuts`.
  */
 export function hctSymptomCuts(sex?: 'male' | 'female'): { correction: number; therapy: number } {
-  const uln = getLabNorm('HCT', sex === 'female' ? 'female' : 'male')?.uln ?? 52;
-  return { correction: uln - 4, therapy: uln };
+  const { correction, therapy } = hctCuts(sex);
+  return { correction, therapy };
 }
 
 /** Порог «Гемоглобин выше нормы» для доменной карты: ♂ 175 (как было), ♀ ULN 150. */
@@ -278,11 +294,12 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   }
 
   if (hct !== null) {
-    // §6.2 (P2, проход 24): один источник — `hctSymptomCuts` (ULN из lab-norms:
-    // ♂ 52, ♀ 48). Градация: норма < ULN, mild < ULN+4, moderate < ULN+8 —
-    // мужской путь байт-в-байт (52/56/60), женский 48/52/56.
-    const therapy = hctSymptomCuts(sex).therapy;
-    const t1 = therapy, t2 = therapy + 4, t3 = therapy + 8;
+    // §6.2 (P2, проход 39): та же шкала, что подпись и баннер (`hctCuts`):
+    // none < ULN−4, mild < ULN, moderate < порог флеботомии, severe ≥ него
+    // (♂ 48/52/54, ♀ 44/48/52). Раньше здесь жили 52/56/60 — Hct 55 давал
+    // «mild», хотя STOP-таблица и гейт курса уже требовали решения.
+    const c = hctCuts(sex);
+    const t1 = c.correction, t2 = c.therapy, t3 = c.urgent;
     if (hct < t1) card.hctElevation = 'none';
     else if (hct < t2) card.hctElevation = 'mild';
     else if (hct < t3) card.hctElevation = 'moderate';

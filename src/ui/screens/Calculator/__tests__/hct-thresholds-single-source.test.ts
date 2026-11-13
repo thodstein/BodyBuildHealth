@@ -1,0 +1,112 @@
+/**
+ * hct-thresholds-single-source.test.ts — проход 39: порог гематокрита один.
+ *
+ * Первичная модель (`risk-engine-tz-spec`, `HCT_THRESHOLDS`): эритроцитоз
+ * ♂ ≥51 / ♀ ≥48, порог флеботомии ♂ ≥54 / ♀ ≥52. От него теперь считаются
+ * ВСЕ три потребителя: подпись уровня, баннер и состояние лабораторий
+ * (`hctCuts`) — 48/52/54 (♂) и 44/48/52 (♀).
+ *
+ * Дефект до прохода: на одном экране жили три шкалы (подпись 48/52/57,
+ * состояние 52/56/60, баннер 57), а в текстах каталога тот же порог стоял
+ * как 55 и 57. Читатель видел четыре разных числа для «флеботомии».
+ */
+import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { hctCuts, hctGradationLabel, deriveStateFromLabs } from '../Calc.labs-derived';
+import { clinicalFloorsForLabs, HCT_THRESHOLDS } from '../../../../engines/risk-engine-tz-spec';
+import { STOP_COURSE_TABLE } from '../../SupportScreen_parts/supportProtocolsShared';
+
+const ROOT = resolve(process.cwd(), 'src');
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    const st = statSync(p);
+    if (st.isDirectory()) {
+      if (name === '__tests__' || name === 'node_modules') continue;
+      walk(p, out);
+    } else if (/\.(ts|tsx)$/.test(name)) {
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+describe('гематокрит: одна шкала на подпись, баннер и состояние', () => {
+  it('hctCuts: ♂ 48/52/54, ♀ 44/48/52', () => {
+    expect(hctCuts('male')).toEqual({ correction: 48, therapy: 52, urgent: 54 });
+    expect(hctCuts('female')).toEqual({ correction: 44, therapy: 48, urgent: 52 });
+    expect(hctCuts()).toEqual(hctCuts('male'));
+  });
+
+  it('ургент совпадает с порогом флеботомии первичной модели', () => {
+    expect(hctCuts('male').urgent).toBe(HCT_THRESHOLDS.male.block);
+    expect(hctCuts('female').urgent).toBe(HCT_THRESHOLDS.female.block);
+  });
+
+  it('подпись и состояние не расходятся: 54 ♂ / 52 ♀ — ургент с двух сторон', () => {
+    expect(hctGradationLabel(53, 'male')).toBe('🟠 терапия');
+    expect(hctGradationLabel(54, 'male')).toBe('🔴 ургент');
+    expect(hctGradationLabel(51, 'female')).toBe('🟠 терапия');
+    expect(hctGradationLabel(52, 'female')).toBe('🔴 ургент');
+    // Состояние: та же граница даёт «severe» (контраиндикация тромбофилии)
+    expect(deriveStateFromLabs(hctSlice(53), 'male').cardio.hctElevation).not.toBe('severe');
+    expect(deriveStateFromLabs(hctSlice(54), 'male').cardio.hctElevation).toBe('severe');
+    expect(deriveStateFromLabs(hctSlice(51), 'female').cardio.hctElevation).not.toBe('severe');
+    expect(deriveStateFromLabs(hctSlice(52), 'female').cardio.hctElevation).toBe('severe');
+  });
+
+  it('нижние ступени тоже из шкалы: 48 ♂ / 44 ♀ — уже коррекция', () => {
+    expect(hctGradationLabel(47, 'male')).toBe('🟢 норма');
+    expect(hctGradationLabel(48, 'male')).toBe('🟡 коррекция');
+    expect(hctGradationLabel(43, 'female')).toBe('🟢 норма');
+    expect(hctGradationLabel(44, 'female')).toBe('🟡 коррекция');
+    expect(deriveStateFromLabs(hctSlice(48), 'male').cardio.hctElevation).toBe('mild');
+    expect(deriveStateFromLabs(hctSlice(44), 'female').cardio.hctElevation).toBe('mild');
+  });
+});
+
+describe('гематокрит: первичная модель', () => {
+  it('clinicalFloorsForLabs: ♂ 51/54, ♀ 48/52', () => {
+    const labels = (hct: number, sex: 'male' | 'female') =>
+      clinicalFloorsForLabs({ HCT: hct }, sex)
+        .filter(f => f.organId === 'hematologic')
+        .map(f => `${f.level}:${f.label}`)
+        .join(' | ');
+    expect(labels(51, 'male')).toMatch(/эритроцитоз/i);
+    expect(labels(54, 'male')).toMatch(/флеботоми/i);
+    expect(labels(50, 'male')).not.toMatch(/флеботоми/i);
+    expect(labels(48, 'female')).toMatch(/эритроцитоз/i);
+    expect(labels(52, 'female')).toMatch(/флеботоми/i);
+    expect(labels(50, 'female')).not.toMatch(/флеботоми/i);
+  });
+});
+
+describe('гематокрит: тексты не вводят своих чисел', () => {
+  it('нигде нет порога HCT 55–59 % (это дрейф между 54 и 60)', () => {
+    const bad: string[] = [];
+    for (const p of walk(ROOT)) {
+      readFileSync(p, 'utf8').split(/\r?\n/).forEach((line, i) => {
+        if (/[Hh][Cc][Tt]\s*(?:>|≥|>=)\s*=?\s*(5[5-9])\s*%/.test(line)) {
+          bad.push(`${relative(process.cwd(), p)}:${i + 1} — ${line.trim().slice(0, 100)}`);
+        }
+      });
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('канонические строки называют оба пола', () => {
+    const rows = STOP_COURSE_TABLE.filter(r => /Hct/i.test(r.cond));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.cond).toMatch(/54/);
+      expect(r.cond).toMatch(/♀\s*>?\s*52|52/);
+    }
+  });
+});
+
+/** Мини-срез лабораторий с одним HCT (панель гематологии). */
+function hctSlice(v: number) {
+  return { panelHematology: { HCT: String(v) } } as never;
+}

@@ -42,7 +42,7 @@ export const DB_PART1: SymptomEntry[] = [
         solutions: [
           { substanceId: 'aspirin', name: 'Аспирин', type: 'pharma', dose: '75-100 мг/сут', mechanism: '↓ агрегация тромбоцитов', evidenceLevel: 'A' },
           { substanceId: 'nattokinase', name: 'Наттокиназа', type: 'supplement', dose: '2000-4000 FU/сут', mechanism: 'Прямой фибринолиз', evidenceLevel: 'B' },
-          { substanceId: 'therapeutic_phlebotomy', name: 'Флеботомия (при Hct>54%)', type: 'lifestyle', dose: '1×/8-12 нед', mechanism: 'Механическое ↓ эритроцитарной массы', evidenceLevel: 'A' },
+          { substanceId: 'therapeutic_phlebotomy', name: 'Флеботомия (при Hct >54%, ♀ >52%)', type: 'lifestyle', dose: '1×/8-12 нед', mechanism: 'Механическое ↓ эритроцитарной массы', evidenceLevel: 'A' },
           { substanceId: 'hydration', name: 'Гидратация 3-4 л/сут', type: 'lifestyle', dose: '3-4 л/сут', mechanism: 'Гемодилюция', evidenceLevel: 'B' },
         ],
         expectations: [

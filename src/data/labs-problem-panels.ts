@@ -256,12 +256,12 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
 
   {
     id: 'polycythemia_workup',
-    title: 'Густая кровь / гематокрит >52 (гематологический сценарий)',
+    title: 'Густая кровь / гематокрит (♂ >54%, ♀ >52%) — гематологический сценарий',
     problem: 'Эритроцитоз на ААС: риск тромбоза, вязкость крови, дифференциал первичного vs вторичного.',
     phase: 'on_cycle',
     urgency: 'urgent',
     markers: [
-      { code: 'HCT', label: 'Гематокрит', importance: 'critical', highMeaning: '>50 — мониторинг; >52 — терапевтическая флеботомия; >55 — опасность', target: '44-49%' },
+      { code: 'HCT', label: 'Гематокрит', importance: 'critical', highMeaning: '>50 — мониторинг; >54% (♀ >52%) — терапевтическая флеботомия; >60 — опасность', target: '44-49%' },
       { code: 'HGB', label: 'Гемоглобин', importance: 'critical', highMeaning: '>175 г/л — полицитемия; >185 — флеботомия', target: '140-165 г/л' },
       { code: 'RBC', label: 'Эритроциты', importance: 'important', highMeaning: '>5.8 млн/мкл — эритроцитоз', target: '4.5-5.5 млн/мкл' },
       { code: 'PLT', label: 'Тромбоциты', importance: 'critical', highMeaning: '>450 — тромбоцитоз (риск тромбоза ×2)', target: '180-380×10⁹/л' },
@@ -272,7 +272,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'D_DIMER', label: 'D-димер', importance: 'critical', highMeaning: '>0.5 — активный тромбоз?', target: '<0.3 мкг/мл' },
       { code: 'FIBRINOGEN', label: 'Фибриноген', importance: 'important', highMeaning: '>4.5 — гиперкоагуляция', target: '2.0-3.5 г/л' },
     ],
-    clinicalNotes: 'Механизм: ААС → ↑ эритропоэтин-чувствительность BFU-E/CFU-E → ↑ эритропоэз → ↑ HCT. Эстрадиол ↑ → ↑ синтез эритропоэтина в почках. HCT>52%: флеботомия 500 мл + регидратация. Аспирин 100 мг/сут при HCT>48% + PLT>400. HCT>55% + PLT>500: госпитализация. Антикоагулянты: серрапептаза 20 мг + наттокиназа 2000 FU.',
+    clinicalNotes: 'Механизм: ААС → ↑ эритропоэтин-чувствительность BFU-E/CFU-E → ↑ эритропоэз → ↑ HCT. Эстрадиол ↑ → ↑ синтез эритропоэтина в почках. HCT >54% (♀ >52%): флеботомия 500 мл + регидратация. Аспирин 100 мг/сут при HCT>48% + PLT>400. HCT ≥54% + PLT>500: госпитализация. Антикоагулянты: серрапептаза 20 мг + наттокиназа 2000 FU.',
     triggerSymptoms: ['flushed_skin', 'headache', 'dizziness', 'hypertension_symptoms', 'dyspnea'],
     recommendedActions: [
       'HCT>52%: флеботомия 500 мл + регидратация 2-3 л/сут',

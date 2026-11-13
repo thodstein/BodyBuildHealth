@@ -1,6 +1,8 @@
 /**
  * calc-labs-female-p2.test.ts — §6.2 (P2): женские ветки производных анализов калькулятора.
- * Мужской путь без sex — байт-в-байт; женские пороги HCT (48/52/56) паритетны движку.
+ * Проход 39: шкала одна — `hctCuts` (♂ 48/52/54, ♀ 44/48/52), где «ургент» это
+ * порог флеботомии первичной модели (`HCT_THRESHOLDS`). Раньше здесь жило
+ * 52/56/60, а подпись — 57.
  */
 import { describe, it, expect } from 'vitest';
 import { deriveStateFromLabs, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from '../Calc.labs-derived';
@@ -8,10 +10,12 @@ import { deriveStateFromLabs, hctGradationLabel, hctSymptomCuts, hgbSymptomCut }
 const fp = (hct: string) => ({ date: '2026-09-01', panelHematology: { HCT: hct } }) as never;
 
 describe('hctGradationLabel', () => {
-  it('мужские пороги 48/52/57', () => {
+  it('мужские пороги 48/52/54', () => {
     expect(hctGradationLabel(47)).toContain('норма');
     expect(hctGradationLabel(48)).toContain('коррекция');
     expect(hctGradationLabel(52)).toContain('терапия');
+    expect(hctGradationLabel(53)).toContain('терапия');
+    expect(hctGradationLabel(54)).toContain('ургент');
     expect(hctGradationLabel(57)).toContain('ургент');
   });
   it('женские пороги 44/48/52', () => {
@@ -19,7 +23,7 @@ describe('hctGradationLabel', () => {
     expect(hctGradationLabel(44, 'female')).toContain('коррекция');
     expect(hctGradationLabel(48, 'female')).toContain('терапия');
     expect(hctGradationLabel(52, 'female')).toContain('ургент');
-    // 50 у женщины уже терапия (муж — ещё нет)
+    // 50 у женщины уже терапия (муж — ещё коррекция)
     expect(hctGradationLabel(50, 'male')).toContain('коррекция');
     expect(hctGradationLabel(50, 'female')).toContain('терапия');
   });
@@ -44,12 +48,16 @@ describe('deriveStateFromLabs: женские пороги HCT', () => {
   });
 
   it('женщина: те же значения дают более высокую градацию', () => {
-    expect(deriveStateFromLabs(fp('50')).cardio.hctElevation).toBe('none');
-    expect(deriveStateFromLabs(fp('50'), 'female').cardio.hctElevation).toBe('mild');
-    expect(deriveStateFromLabs(fp('54')).cardio.hctElevation).toBe('mild');
-    expect(deriveStateFromLabs(fp('54'), 'female').cardio.hctElevation).toBe('moderate');
-    expect(deriveStateFromLabs(fp('57')).cardio.hctElevation).toBe('moderate');
-    expect(deriveStateFromLabs(fp('57'), 'female').cardio.hctElevation).toBe('severe');
+    // Проход 39: ступени из `hctCuts` (♂ 48/52/54, ♀ 44/48/52).
+    expect(deriveStateFromLabs(fp('46')).cardio.hctElevation).toBe('none');
+    expect(deriveStateFromLabs(fp('46'), 'female').cardio.hctElevation).toBe('mild');
+    expect(deriveStateFromLabs(fp('50')).cardio.hctElevation).toBe('mild');
+    expect(deriveStateFromLabs(fp('50'), 'female').cardio.hctElevation).toBe('moderate');
+    expect(deriveStateFromLabs(fp('52')).cardio.hctElevation).toBe('moderate');
+    expect(deriveStateFromLabs(fp('52'), 'female').cardio.hctElevation).toBe('severe');
+    // Порог флеботомии: с него — severe у обоих полов (54 ♂ / 52 ♀)
+    expect(deriveStateFromLabs(fp('54')).cardio.hctElevation).toBe('severe');
+    expect(deriveStateFromLabs(fp('53')).cardio.hctElevation).toBe('moderate');
     // derivedFields маркер на месте в обоих путях
     expect(deriveStateFromLabs(fp('54'), 'female').derivedFields).toContain('cardio.hctElevation');
   });

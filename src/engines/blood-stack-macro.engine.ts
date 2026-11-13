@@ -237,13 +237,13 @@ const BLOOD_MARKERS_DEEP: BloodMarkerDeep[] = [
   {
     code: 'Hematocrit', name: 'Гематокрит (HCT)', fullName: 'Гематокрит', unit: '%',
     optimalRange: '45-50', generalRange: '39-51', onCycleRange: '48-54', criticalLow: '<35', criticalHigh: '>54',
-    whatItMeans: 'Объём эритроцитов. Болденон, тестостерон повышают. >52% = флеботомия.',
+    whatItMeans: 'Объём эритроцитов. Болденон, тестостерон повышают. >54% (♀ >52%) = обязательная флеботомия; 52-54% — рассмотреть.',
     elevatedBy: ['Болденон', 'Тестостерон', 'Оксиметолон', 'Обезвоживание'], decreasedBy: ['Флеботомия', 'Гидратация', 'Кардио'],
     drugAssociations: ['Болденон', 'Тестостерон', 'Оксиметолон'],
     actionPlan: [
-      { condition: 'HCT 50-52%', action: 'Увеличить гидратацию. Кардио 3×/нед.' },
-      { condition: 'HCT 52-54%', action: 'Рассмотреть флеботомию (сдача крови).' },
-      { condition: 'HCT >54%', action: 'Обязательная флеботомия. Риск тромбоза.' },
+      { condition: 'HCT 50-52% (♀ 46-48%)', action: 'Увеличить гидратацию. Кардио 3×/нед.' },
+      { condition: 'HCT 52-54% (♀ 48-52%)', action: 'Рассмотреть флеботомию (сдача крови).' },
+      { condition: 'HCT >54% (♀ >52%)', action: 'Обязательная флеботомия. Риск тромбоза.' },
     ],
     retestFrequency: 'Каждые 4-6 недель', relatedMarkers: ['Hemoglobin', 'RBC', 'Ferritin'],
   },
