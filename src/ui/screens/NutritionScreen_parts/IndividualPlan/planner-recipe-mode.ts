@@ -317,6 +317,63 @@ export function mergeSameIdItems(meals: PlanMealLike[]): void {
 export interface DayMacroTargets { kcal: number; p: number; f: number; c: number }
 
 /**
+ * §8.97 (приоритет владельца «вёдра >500 г и реальные видимые дефекты»): порционная
+ * гигиена дня перед закрывателем. Ни один напиток, сладость, белок-«наполнитель» или
+ * овощной гарнир не может быть «вёдром»:
+ *  • молоко/кефир/айран/ряженка — ≤300 г на приём (стакан), а не 535 г;
+ *  • мёд/джем/варенье — ≤60 г (ложка/порция), а не 115 г = 94 г углеводов;
+ *  • яичный белок как белок-наполнитель — ≤2.5 г/кг (не ниже 200 г: ≈6 белков), а не 326 г.
+ * Овощи сознательно НЕ капятся: замер показал, что жёсткий кап ломает канон дня
+ * (100 кг cut/5/отд P1.8: У −7.4%), потому что овощи там — носитель углеводов (долг B16).
+ * Снимаемые граммы НЕ «выбрасываются» молча: день после этой правки проходит обычный
+ * закрыватель (§8.96), который добирает освободившиеся углеводы плотным носителем в
+ * приёмах с комнатой тарелки. Ядра рецептов (ingredientIds) не трогаются — их напиток
+ * ограничен отдельно на этапе масштабирования (recipe-engine «drink»).
+ */
+export function applyPortionHygiene(meals: PlanMealLike[], opts?: { weightKg?: number }): string[] {
+  const notes: string[] = [];
+  const w = Number(opts?.weightKg) || 80;
+  // Белок-наполнитель масштабируется массой: 70 кг → 200 г (6 белков), 140 кг → 350 г.
+  // Абсолютный кап 200 г срезал Б на 3.5% у 140 кг (protein floor дня).
+  const eggCap = Math.max(200, Math.round(w * 2.5 / 10) * 10);
+  const capOf = (it: any): { cap: number; why: string } | null => {
+    const key = `${it?.id || ''} ${it?.name || ''}`;
+    if (/молок|кефир|айран|ряженк|buttermilk|(^|\s)(milk|kefir|ayran|ryazhenka)/i.test(key)) return { cap: 300, why: 'напиток' };
+    if (/мёд|мед|варень|джем|honey|jam|marmalade/i.test(key)) return { cap: 60, why: 'сладость' };
+    if (/egg_white|яичный белок/i.test(key)) return { cap: eggCap, why: 'белок-наполнитель' };
+    return null;
+  };
+  const _shrink = (m: PlanMealLike, it: PlanItemLike, to: number) => {
+    const from = Number(it.amount) || 0;
+    if (to < 5 || to >= from) return;
+    const r = to / Math.max(1, from);
+    it.amount = Math.round(to);
+    it.p = Math.round((it.p || 0) * r * 10) / 10;
+    it.f = Math.round((it.f || 0) * r * 10) / 10;
+    it.c = Math.round((it.c || 0) * r * 10) / 10;
+    it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
+    if (it.fiber != null) it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+    if ((it as any).leucine_mg != null) (it as any).leucine_mg = Math.round(((it as any).leucine_mg || 0) * r);
+    notes.push(`Порция: ${it.name} ${from} → ${it.amount} г («${String(m.label || (m as any).type)}»: ${capOf(it)?.why || 'порция'} не гарнир)`);
+  };
+  for (const m of meals) {
+    const items = m.items || [];
+    const core = new Set(((m as any).ingredientIds || (m as any).recipeIngredientIds || []).map(String));
+    for (const it of items) {
+      if (core.has(String(it.id))) continue; // ядро рецепта — не наше дело
+      const c = capOf(it);
+      if (c && (it.amount || 0) > c.cap) _shrink(m, it, c.cap);
+    }
+    // §8.97b (долг B16): овощи НЕ каплю. Замер: жёсткий кап 400 г (243×3 = 729 г) срезал
+    // 30 г У у 100 кг cut/5/отд P1.8 и уводил день из канона 3.1% → 7.4% — овощи там
+    // выступают носителем углеводов, а не «салатом». Правильное лечение — модель
+    // «овощ-носитель vs овощ-гарнир», а не бланкетный срез (см. аудит §8.97b).
+    if (notes.length && items.length) m.totals = sumMealTotals(items);
+  }
+  return notes;
+}
+
+/**
  * §8.96 (требование владельца «3% должно быть обеспечено всегда»): финальное сведение
  * РЕЦЕПТУРНОГО дня в канон — и ДОБОР, и СРЕЗ.
  *
@@ -339,11 +396,30 @@ export function closeRecipeDayToCanon(
   meals: any[],
   targets: DayMacroTargets,
   opts?: {
-  excludedIds?: Set<string>; maxSteps?: number },
+    excludedIds?: Set<string>; maxSteps?: number; weightKg?: number },
 ): string[] {
   const notes: string[] = [];
   const excluded = opts?.excludedIds;
   const maxSteps = opts?.maxSteps ?? 10;
+  // §8.97: добор растёт ТОЛЬКО в крахмалистый носитель. До правки закрыватель «доращивал»
+  // то, что было плотнее по углеводам: мёд (115 г = 94 г У) и молоко (535 г = 25 г У) —
+  // завтрак 120 кг mass/5/трен P2.4 весил 1365 г при капе 975. Это не «лёгкий добор»,
+  // это сироп и напиток вместо гарнира.
+  const _sweetOrDrink = /honey|jam|sugar|syrup|condens|milk|kefir|yogurt|juice|smoothie|isotonic|amilo|мед|мёд|варень|сахар|сироп|сгущ|молок|кефир|йогурт|сок|нектар|смузи/i;
+  const isStarchCarrier = (it: any): boolean => {
+    if (_sweetOrDrink.test(`${it?.id || ''} ${it?.name || ''}`)) return false;
+    return ((it?.c || 0) / Math.max(1, it?.amount || 1)) >= 0.10; // ≥10 г У / 100 г
+  };
+  // Та же физическая норма тарелки, что в движке (§8.95): 650 г × ws, якорь 80 кг.
+  // §8.97b: кап здесь МЯГКИЙ (+25% аварийного запаса). Жёсткий кап ломал канон:
+  // 100 кг mass/4/отд P1.8 оставался 3459/190/78/499 (У −7.6%), потому что все
+  // основные приёмы уже стояли у капа и добор был запрещён полностью.
+  const _wsPlate = Math.max(1, Math.min(1.6, (opts?.weightKg || 80) / 80));
+  const plateCap = Math.round(650 * _wsPlate * 1.25);
+  const solidOf = (m: any): number => (m.items || [])
+    .filter((i: any) => !['liquid', 'supplement'].includes(String(i?.role || '')))
+    .reduce((s: number, i: any) => s + (Number(i?.amount) || 0), 0);
+  const plateRoom = (m: any): number => plateCap - solidOf(m);
   const axesOf = (t: any) => {
     const d = (a: number, b: number) => (b > 0 ? (Math.abs(a - b) / b) * 100 : 0);
     return {
@@ -376,9 +452,16 @@ export function closeRecipeDayToCanon(
     if (core && core.has(String(it.id))) return false;
     return true;
   };
-  const flexMeals = () => meals.filter((m: any) => (m.items || []).length > 0 && !(m as any)._insulinWindow);
+  // §8.97b: peri-окна (пред/пост-трен, intra) неприкосновенны для углеводного добора —
+  // их порционность задаёт физиология (R-HV: пред-трен ≤63 г У). Раньше окно спасал
+  // `editable` только при наличии флага `_insulinWindow`; приём с `type: 'preworkout'`
+  // без флага получал +116 г У от закрывателя.
+  const isPeriMeal = (m: any): boolean => !!(m as any)?._insulinWindow
+    || ['preworkout', 'postworkout', 'intra'].includes(String((m as any)?.type || ''))
+    || /предтрен|пост-трен|intra/i.test(String((m as any)?.label || ''));
+  const flexMeals = () => meals.filter((m: any) => (m.items || []).length > 0 && !isPeriMeal(m));
   const mains = () => meals.filter((m: any) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type))
-    && (m.items || []).length > 0 && !(m as any)._insulinWindow);
+    && (m.items || []).length > 0 && !isPeriMeal(m));
   // Снимок ВСЕГО дня: шаг может быть «заменой» (срез жира + добавка белка в разные приёмы),
   // а откат должен возвращать и её вторую половину.
   const snapshotDay = () => meals.map((m: any) => ({
@@ -532,30 +615,40 @@ export function closeRecipeDayToCanon(
         }
       } else {
         const gap = -over;
-        // §8.96b: сначала растим СУЩЕСТВУЮЩИЙ носитель приёма (шаг 5 г) — мелкий остаток
-        // (12–20 г У) не требует нового блюда в тарелке. Новый плотный носитель — только
-        // если растить нечего или текущий уже ведро (>400 г).
-        let grow: { meal: any; it: any; dens: number } | null = null;
+        // §8.96b/§8.97: сначала растим СУЩЕСТВУЮЩИЙ носитель (шаг 5 г) — мелкий остаток
+        // (12–20 г У) не требует нового блюда. Растим только крахмалистый носитель
+        // (не мёд/сироп, не молоко/кефир) и только пока в тарелке есть физическая комната
+        // (650 г × ws). Новый плотный носитель — если растить нечего.
+        let grow: { meal: any; it: any; dens: number; room: number } | null = null;
+        let growFull: { meal: any; it: any; dens: number; room: number } | null = null;
         const poolG = mains().length ? mains() : flexMeals();
         for (const m of poolG) {
+          const room = plateRoom(m);
           for (const it of (m.items || [])) {
             if (!editable(m, it, ['carb_slow', 'carb_fast'])) continue;
+            if (!isStarchCarrier(it)) continue;
             if ((it.c || 0) <= 0 || (it.amount || 0) < 20 || (it.amount || 0) > 400) continue;
             const dens = (it.c || 0) / Math.max(1, it.amount || 1);
-            if (!grow || dens > grow.dens) grow = { meal: m, it, dens };
+            // §8.97b: приём с комнатой тарелки — приоритет; переполненный — только аварийный
+            // вариант (иначе канон дня не закрывается: 100 кг mass/4/отд P1.8, У −7.6%).
+            if (room >= 5) { if (!grow || dens > grow.dens) grow = { meal: m, it, dens, room }; }
+            else if (!growFull || dens > growFull.dens) growFull = { meal: m, it, dens, room };
           }
         }
-        if (grow) {
-          const add = Math.max(5, Math.min(300, Math.round(gap / grow.dens / 5) * 5));
-          move = { meal: grow.meal, why: `Добор углеводов дня: ${grow.it.name} ${grow.it.amount} → ${(grow.it.amount || 0) + add} г`, apply: () => resize(grow!.meal, grow!.it, (grow!.it.amount || 0) + add) };
+        const growPick = grow || growFull;
+        if (growPick) {
+          const add = Math.max(5, Math.min(300, growPick.room >= 5 ? growPick.room : 300, Math.round(gap / growPick.dens / 5) * 5));
+          move = { meal: growPick.meal, why: `Добор углеводов дня: ${growPick.it.name} ${growPick.it.amount} → ${(growPick.it.amount || 0) + add} г (тарелка ${solidOf(growPick.meal)} из ${plateCap} г)`, apply: () => resize(growPick!.meal, growPick!.it, (growPick!.it.amount || 0) + add) };
         } else {
           const denseId = ['rice_white', 'bulgur', 'potato_boiled', 'buckwheat'].find(avail);
           const fd = denseId ? FOOD_DB.find((f: any) => f.id === denseId) : null;
           const host = [...poolG].sort((x: any, y: any) =>
-            ((y.target?.c ?? 0) - (y.totals?.c || 0)) - ((x.target?.c ?? 0) - (x.totals?.c || 0)))[0];
+            (Math.max(0, plateRoom(y)) - Math.max(0, plateRoom(x)))
+            || (((y.target?.c ?? 0) - (y.totals?.c || 0)) - ((x.target?.c ?? 0) - (x.totals?.c || 0))))[0];
           if (host && fd) {
-            const g = Math.max(30, Math.min(300, Math.round((gap / Math.max(1, fd.carbs || 25)) * 100 / 10) * 10));
-            move = { meal: host, why: `Добор углеводов дня: ${fd.name} ${g} г → «${String(host.label || host.type)}»`, apply: () => addItem(host, fd, g, 'carb_slow') };
+            const room = Math.max(30, Math.min(300, plateRoom(host)));
+            const g = Math.max(30, Math.min(room, Math.round((gap / Math.max(1, fd.carbs || 25)) * 100 / 10) * 10));
+            move = { meal: host, why: `Добор углеводов дня: ${fd.name} ${g} г → «${String(host.label || host.type)}» (тарелка ${solidOf(host)} из ${plateCap} г)`, apply: () => addItem(host, fd, g, 'carb_slow') };
           }
         }
       }
@@ -2830,10 +2923,20 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const dpUnder = Math.max(0, _mlTargets.p - (t.p || 0)) / Math.max(1, _mlTargets.p) * 100;
       return Math.max(dk, dpUnder, df, dc);
     };
+    // §8.97: физическая норма тарелки (650 г × ws × 1.25 — мягкий кап, см. §8.97b) —
+    // для последней мили и приёмки «не ведро».
+    const _mlPlateCap = Math.round(650 * Math.max(1, Math.min(1.6, (args.athleteWeightKg ?? 80) / 80)) * 1.25);
+    const _mlSolid = (m: any): number => (m?.items || [])
+      .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+      .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
     const _mlTryAdd = (host: any, fd: any, grams: number, role: string, why: string, floorMode = false): boolean => {
       // §8.94b: минимум 2 г (было 5): жир дня на 96 г не сходится шагом 5 г — разрыв 3–4 г
       // (120 кг mass/5/трен: 92 против 96 = −4.2%) навсегда оставался за каноном.
       if (!host || !fd || grams < 2) return false;
+      // §8.97: последняя миля тоже не имеет права делать «вёдра». Физическая норма тарелки
+      // та же, что в движке (§8.95): 650 г × ws, якорь 80 кг. До правки обед 100 кг mass/4/трен
+      // P1.8 получал рис 250 г + картофель 300 г = 988 г при капе 813.
+      if (role !== 'fat' && _mlSolid(host) + grams > _mlPlateCap) return false;
       const devOf = () => (floorMode ? _mlDevFloor() : _mlDev());
       const snap = _mlSnapOf(host);
       const d0 = devOf();
@@ -2888,7 +2991,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           // оглядки на ккал нельзя — день уходит в +3.5% ккал (живой кейс 2612 при 2524).
           // Перебираем порцию шагом 10 г и берём ту, что минимизирует промах дня.
           const _per100 = Math.max(10, _dense.carbs || 25);
-          const _gMax = Math.max(40, Math.min(400, Math.round((_carbGap2 / _per100) * 100 / 10) * 10));
+          const _room = Math.max(0, _mlPlateCap - _mlSolid(_hostBig));
+          const _gMax = Math.min(
+            Math.floor(_room / 10) * 10,
+            Math.max(40, Math.min(400, Math.round((_carbGap2 / _per100) * 100 / 10) * 10)),
+          );
           const snap = _mlSnapOf(_hostBig);
           const base = _mlDevFloor();
           let bestG = 0, bestDev = base;
@@ -2911,13 +3018,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     }
   }
 
+  // ── §8.97: порционная гигиена (вёдра) — ДО закрывателя, чтобы он мог перераспределить ──
+  const _hygNotes = applyPortionHygiene(outMeals as any, { weightKg: args.athleteWeightKg ?? 80 });
+  if (_hygNotes.length > 0) notes = [...notes, ..._hygNotes];
+
   // ── §8.96: финальное сведение дня в канон 3% — и ДОБОР, и СРЕЗ ────────────────
   // Последняя миля выше умеет только ЛИТЬ. Остатки «+4.5% ккал / −7.5% жира» и
   // «+3.6% углеводов» лечатся только заменой/срезом (см. closeRecipeDayToCanon).
   const _closeNotes = closeRecipeDayToCanon(
     outMeals as any,
     { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c },
-    { excludedIds },
+    { excludedIds, weightKg: args.athleteWeightKg ?? 80 },
   );
   if (_closeNotes.length > 0) notes = [...notes, ..._closeNotes];
   {

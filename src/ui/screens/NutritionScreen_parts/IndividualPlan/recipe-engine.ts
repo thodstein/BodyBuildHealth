@@ -44,13 +44,17 @@ function legacyDecompIds(recipe: Recipe): string[] | null {
  * Раздувание ×4 всего рецепта даёт «специй 15 г, масла 75 г» — вместо этого base
  * (белок/крупа) масштабируется полностью, а жир/приправы/овощи — с потолками.
  */
-export type RecipeComponentClass = 'base' | 'fat' | 'seasoning' | 'veg';
+export type RecipeComponentClass = 'base' | 'fat' | 'seasoning' | 'veg' | 'drink';
 export function recipeComponentClass(foodId: string): RecipeComponentClass {
   const id = (foodId || '').toLowerCase();
   let f: FoodItem | undefined;
   try { f = FOOD_DB.find(x => x.id === foodId); } catch { f = undefined; }
   if (/^(spice_|herb_|sauce_|seed_cumin|seed_coriander)/.test(id) || (f && f.category === 'other')) return 'seasoning';
   if ((f && f.category === 'fat') || (/oil|butter|_nuts|nuts_|_seeds|seeds_|peanut|tahini|urbec/.test(id) && (f?.fat || 0) >= 20)) return 'fat';
+  // §8.97: напитки — не «база». Молоко в каше ×3 давало 535 г (тарелка 1365 г при норме 975):
+  // жидкость растёт с коленом и физическим потолком порции (см. scaleComponentAmount).
+  if (/^(milk|kefir|juice|water|broth|ayran|ryazhenka|buttermilk|soy_milk|almond_milk|oat_milk|smoothie)/.test(id)
+    || /молок|кефир|айран|ряженк|сок|нектар|смузи|морс|компот|бульон/i.test(String(f?.name || ''))) return 'drink';
   // Сладкие фрукты — углеводная база (банан в гейнере масштабируется), несладкие — овощи.
   if (f && f.category === 'veg_fruit') return (f.carbs || 0) >= 15 ? 'base' : 'veg';
   if (/^(veg_|salad|greens_|cabbage|broccoli|cucumber|tomato|pepper|onion|mushroom|spinach|kale|carrot)/.test(id)) return 'veg';
@@ -61,12 +65,16 @@ export function componentScaleFactor(cls: RecipeComponentClass, s: number): numb
   if (s <= 1) return s;
   if (cls === 'fat' || cls === 'seasoning') return Math.min(s, 1.5);
   if (cls === 'veg') return Math.min(s, 2);
+  if (cls === 'drink') return Math.min(s, 2);
   return s;
 }
 /** Масштаб порции ингредиента с учётом класса (авторская пропорция × порции без ломки). */
 export function scaleComponentAmount(foodId: string, amount: number, s: number): number {
-  const f = componentScaleFactor(recipeComponentClass(foodId), s);
-  return Math.max(5, Math.round(((amount || 0) * f) / 5) * 5);
+  const cls = recipeComponentClass(foodId);
+  const f = componentScaleFactor(cls, s);
+  const scaled = Math.round(((amount || 0) * f) / 5) * 5;
+  // §8.97: физический потолок напитка в тарелке — 400 г (стакан 250 × колено 2 = 500 → 400).
+  return Math.max(5, cls === 'drink' ? Math.min(scaled, 400) : scaled);
 }
 
 export type CookSkill = 'basic' | 'medium' | 'advanced';
