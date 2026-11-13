@@ -168,6 +168,7 @@ export const PATTERN_RU: Record<string, string> = {
   isolation_back: 'изоляция спины',
   isolation_shoulders: 'изоляция плеч',
   isolation_arms: 'изоляция рук',
+  isolation_glutes: 'изоляция ягодиц',
   isolation_legs_quad: 'разгибание ног',
   isolation_legs_ham: 'сгибание ног',
   isolation_calves: 'икры',

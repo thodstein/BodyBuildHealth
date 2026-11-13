@@ -1,6 +1,6 @@
 import type { BBPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
-import { tidySessionExercises, orderSessionExercises, isCompoundEx, MUSCLE_RU_SHORT, type SessionMethodology } from './bb-session-order.engine';
+import { tidySessionExercises, orderSessionExercises, isCompoundEx, shouldInterleave, MUSCLE_RU_SHORT, type SessionMethodology } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass, prescribedSessionCap, weeklyCapFor, perSessionMuscleCap, sessionMuscleExerciseCap, distributeSetsByRole } from './bb-volume.engine';
 
 /**
@@ -1526,6 +1526,10 @@ function bbPickCatalog(muscle: string, usedNames: Set<string>, options: BBFinali
       && !isBBJunk(x) && equipmentOk(x)
       && !isMobilityRestricted(x, options.mobilityRestrictions)
       && !(options.avoidAxialLoad && isAxialLoadExercise(x))
+      && !(!((options.bodyweightCapability?.pullUpsStrict ?? 0) >= 5
+        || (options.bodyweightCapability?.chinUpsStrict ?? 0) >= 5
+        || (options.bodyweightCapability?.weightedPullUpLoad ?? 0) > 0)
+        && /подтяг|pull.?up|chin.?up/i.test(String(x.name || '')))
       && !(options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)));
     if (c) return c;
   }
@@ -1590,17 +1594,44 @@ function bbEnsureGluteAnchorAndOrder(week: any, options: BBFinalizeOptions): voi
     const tag = String(s.sessionTag || '');
     if (!/Glutes/i.test(tag)) continue;
     const glutes = bbWorking(s).filter((e: any) => bbMuscleGroup(e.muscle) === 'glutes');
-    const hasAnchor = glutes.some((e: any) => /мост|hip.?thrust|glute.?bridge/i.test(String(e.name || '')));
+    const unilateralHip = /b-?stance|одна нога|одной ног|single.?leg|one.?leg/i;
+    // B-stance/одноножный вариант — вариация, не «якорь» дня: двусторонний
+    // hip thrust/мост должен быть главным движением, если он доступен.
+    const hasAnchor = glutes.some((e: any) => /мост|hip.?thrust|glute.?bridge/i.test(String(e.name || ''))
+      && !unilateralHip.test(String(e.name || '')));
     if (!hasAnchor && glutes.length > 0) {
       const iso = glutes.find((e: any) => /отведен|abduct|kickback|кикбэк|разведен.*ног/i.test(String(e.name || '')))
         || glutes.slice().sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0))[0];
-      const anchor = bbPickCatalog('glutes', usedNames, options);
+      let anchor = bbPickCatalog('glutes', usedNames, options);
+      // Для якоря glute-дня сначала двусторонний hip thrust/мост: B-stance —
+      // вариация для продвинутых, а новичку в главном движении дня нужна
+      // устойчивая двусторонняя опора. Если двусторонний вариант занят другой
+      // сессией недели/недоступен по оборудованию, остаётся B-stance.
+      if (anchor && unilateralHip.test(String(anchor.name || ''))) {
+        const equipmentOk = (c: any) => {
+          if (!options.equipment?.length) return true;
+          const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+          if (!eq.length || eq.includes('bodyweight')) return true;
+          return eq.some((x: string) => options.equipment!.includes(x));
+        };
+        const bilateral = (EXERCISE_CATALOG as any[]).find((c: any) =>
+          trueMuscleOf(c) === 'glutes'
+          && /мост|hip.?thrust|glute.?bridge/i.test(String(c.name || ''))
+          && !unilateralHip.test(String(c.name || ''))
+          && !usedNames.has(c.name) && !isBBJunk(c) && equipmentOk(c)
+          && !isMobilityRestricted(c, options.mobilityRestrictions)
+          && !(options.avoidAxialLoad && isAxialLoadExercise(c))
+          && !(options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name)));
+        if (bilateral) anchor = bilateral;
+      }
       if (iso && anchor && /мост|hip.?thrust|glute.?bridge/i.test(String(anchor.name || ''))) {
         usedNames.delete(String(iso.name || ''));
         iso.name = anchor.name;
         iso.exerciseName = anchor.name;
         iso.muscle = 'glutes';
         iso.character = 'тяж';
+        (iso as any).exerciseType = 'compound';
+        (iso as any).type = 'compound';
         iso.comment = `🍑 Hip-thrust-якорь: ${anchor.name} вместо изоляции — в glute-дне нужен тяжёлый тазобедренный компаунд (Plotkin 2023; Barbalho 2020).`;
         iso.rationale = 'Glute anchor: hip thrust/мост как главное движение дня';
         usedNames.add(String(anchor.name));
@@ -1962,6 +1993,11 @@ export function ensureBodybuildingMinimums(plan: any, options: BBFinalizeOptions
     // Ramp-недели намеренно ниже якоря (G1): добивка до пиковых минимумов
     // съедала 15–20% и ломала сам паттерн разгона. На входной ramp-неделе
     // держим только структурный PPL-инвариант бицепса Pull (8–10).
+    // Glute-anchor/order — НЕ объёмный проход: hip-thrust якорь и порядок
+    // должны быть и на ramp-неделе, иначе первый экран плана женского
+    // glute-сплита открывается кикбэком/изоляцией. Volume top-up ниже
+    // по-прежнему пропускается.
+    if (profile.female) bbEnsureGluteAnchorAndOrder(w, options);
     if (w.week === 1 && typeof w.rampMult === 'number' && w.rampMult < 0.97) {
       guarded(() => bbEnsurePullBicepsInvariant(w, ctx));
       continue;
@@ -2906,6 +2942,13 @@ function ensurePPLRearDelts(session: any, week: any, options: BBFinalizeOptions)
     target.sets -= 1; target.workSets.pop(); total -= 1;
   }
 }
+// Единое имя из каталога: хардкод «Сгибание рук на блоке (бицепс)» не совпадал
+// с каталогом (`cable_curl` = «Сгибания на бицепс в блоке») и проходил
+// equipment-тест только пока late-пасс не добирал второй бицепс.
+const PPL_CABLE_CURL_NAME = String(
+  (EXERCISE_CATALOG as any[]).find((c: any) => c.id === 'cable_curl')?.name
+  || 'Сгибания на бицепс в блоке',
+);
 function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
@@ -2918,10 +2961,10 @@ function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
   const w = (options.workMax && options.workMax.biceps) || 40;
   if (working.length === 0) {
     // bb-safety: трос/штанга — не добавляем при ограничениях.
-    if (!pplPushAllowed(options, 'Сгибание рук на блоке (бицепс)', 'Подъём штанги на бицепс стоя')) return;
+    if (!pplPushAllowed(options, PPL_CABLE_CURL_NAME, 'Подъём штанги на бицепс стоя')) return;
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
-        muscle: 'biceps', name: 'Сгибание рук на блоке (бицепс)', exerciseName: 'Сгибание рук на блоке (бицепс)', role: 'accessory', character: 'памп',
+        muscle: 'biceps', name: PPL_CABLE_CURL_NAME, exerciseName: PPL_CABLE_CURL_NAME, role: 'accessory', character: 'памп',
         sets: 5, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
         workSets: Array.from({ length: 5 }, () => ({ reps: 15, rir: 3, weight: Math.round(w * 0.35 * 10) / 10, restSeconds: 60 })),
         rationale: 'PPL Pull: бицепс памп 5×12-18',
@@ -2946,7 +2989,7 @@ function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
       existing.sets = 5;
     }
     const pumpExists = working.some((e: any) => /блок|cable/i.test(e.name));
-    const fbName = pumpExists ? 'Подъём штанги на бицепс стоя' : 'Сгибание рук на блоке (бицепс)';
+    const fbName = pumpExists ? 'Подъём штанги на бицепс стоя' : PPL_CABLE_CURL_NAME;
     if (!pplPushAllowed(options, fbName)) return;
     if (!session.exercises.some((e: any) => e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
@@ -3424,7 +3467,18 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   // Если день уже содержит thrust/bridge как рабочее движение — активатор не нужен.
   if (lead === 'glutes' && session.exercises.some((e: any) => !(e as any).warmupActivator && /мост|hip.?thrust|glute.?bridge/i.test(e.name || e.exerciseName || ''))) return;
   const base = options.workMax?.[lead] || 50;
-  const weight = Math.max(5, Math.round(base * 0.25 * 10) / 10);
+  // Разминка не может быть тяжелее первого рабочего сета той же мышцы:
+  // 25% от 1RM — ориентир, но у гантельных/блочных движений workMax и вес
+  // рабочего сета считаются в разных единицах (на руку/стек), и 25% иногда
+  // оказывались ВЫШЕ рабочего веса. Ограничиваем половиной минимального
+  // рабочего веса мышцы; если рабочих сетов ещё нет — оставляем 25%.
+  const sameMuscleWork = session.exercises
+    .filter((e: any) => !(e as any).warmupActivator
+      && bbMuscleGroup(e.muscle) === bbMuscleGroup(lead)
+      && Number(e.workSets?.[0]?.weight) > 0)
+    .map((e: any) => Number(e.workSets[0].weight));
+  const workCap = sameMuscleWork.length ? Math.min(...sameMuscleWork) * 0.5 : Infinity;
+  const weight = Math.max(5, Math.round(Math.min(base * 0.25, workCap) * 10) / 10);
   session.exercises.unshift({
     muscle: lead,
     name: candidate.name,
@@ -3564,6 +3618,8 @@ function capAdaptiveSpecializationFrequency(week: any, options: BBFinalizeOption
 export interface BBFinalizeOptions {
   reorder?: boolean;
   methodology?: SessionMethodology;
+  /** Цель мезоцикла — goal-aware порядок упражнений (strength_mass/cut). */
+  goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
   priorityMuscles?: string[];
   /** Расписание блоков специализации — per-week цели для спец-проходов
    *  (RIR 0-1, спец-частота, икры). Без него — старый режим: priorityMuscles
@@ -4709,6 +4765,218 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
   }
 }
 
+/**
+ * Bodyweight safety: подтягивания/подъёмы на перекладине без подтверждённой
+ * способности (pullUpsStrict/chinUpsStrict/weightedPullUpLoad) не остаются в
+ * плане. Раньше это проверяли только builder-пул и `bbPickCatalog`; поздние
+ * аддитивные проходы (back balance/frequency, top-up) могли вернуть подтягивания
+ * новичку. Замена — тяга верхнего блока/вертикальная тяга из каталога; если
+ * оборудования нет — упражнение снимается, сеты переносятся на другую тягу.
+ */
+function enforceBodyweightPullCapability(plan: BBPlan, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  const cap = options.bodyweightCapability;
+  // Неизвестная способность ≠ «не умеет»: builder уже отбирает подтягивания
+  // по своим правилам, а финальный safety-проход включается только когда
+  // пользователь явно сообщил недостаточную способность. Иначе опытный
+  // атлет без заполненного профиля терял pull-up-паттерн (back-quality).
+  const beginner = options.level === 'beginner' || options.level === 'novice';
+  if (!cap && !beginner) return;
+  const canPullUp = !!(cap && ((cap.pullUpsStrict ?? 0) >= 5
+    || (cap.chinUpsStrict ?? 0) >= 5
+    || (cap.weightedPullUpLoad ?? 0) > 0));
+  if (canPullUp) return;
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    return !eq.length || eq.includes('bodyweight') || eq.some((x: string) => options.equipment!.includes(x));
+  };
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    const used = new Set(session.exercises.map((e: any) => String(e.name || '')));
+    for (let i = 0; i < session.exercises.length; i += 1) {
+      const e: any = session.exercises[i];
+      if (!/подтяг|pull.?up|chin.?up/i.test(String(e.name || e.exerciseName || ''))) continue;
+      const alt = (EXERCISE_CATALOG as any[]).find((c: any) => trueMuscleOf(c) === 'back'
+        && /тяга верхн|верхн.*блок|lat.?pull|pulldown/i.test(String(c.name || ''))
+        && !used.has(c.name) && equipmentOk(c)
+        && !options.excludedExercises?.includes(c.id)
+        && !options.excludedExercises?.includes(c.name)
+        && !isMobilityRestricted(c, options.mobilityRestrictions));
+      if (alt) {
+        const oldName = String(e.name || e.exerciseName || '');
+        used.delete(oldName);
+        const sets = Math.max(1, e.sets || 3);
+        const wm = options.workMax?.back || 60;
+        const weight = Math.max(5, Math.round(wm * 0.5 * 10) / 10);
+        Object.assign(e, {
+          name: alt.name, exerciseName: alt.name, muscle: 'back',
+          exerciseType: alt.type || 'compound', type: alt.type || 'compound',
+          sets, repsRange: [10, 12], rir: 3, restSeconds: 90,
+          workSets: Array.from({ length: sets }, () => ({ reps: 10, rir: 3, weight, restSeconds: 90 })),
+          comment: '🛡 Подтягивания заменены тягой верхнего блока: способность к подтягиваниям не подтверждена (bodyweight safety).',
+        });
+        used.add(alt.name);
+        // Перевод имени не должен оставлять партнёра по суперсету со ссылкой
+        // на старый pull-up (иначе dangling superset в валидации/плеере).
+        for (const other of session.exercises as any[]) {
+          if (other !== e && other.supersetWith === oldName) other.supersetWith = alt.name;
+        }
+      } else {
+        const oldName = String(e.name || e.exerciseName || '');
+        const sets = e.sets || 0;
+        session.exercises = session.exercises.filter((x: any) => x !== e);
+        i -= 1;
+        // Партнёр удалённого упражнения не должен ссылаться на несуществующее имя.
+        for (const other of session.exercises as any[]) {
+          if (other.supersetWith === oldName) {
+            delete other.supersetWith;
+            delete other.supersetGroup;
+            delete other.supersetSlot;
+          }
+        }
+        const host = session.exercises
+          .filter((x: any) => x.muscle === 'back' && !x.warmupActivator)
+          .sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))[0];
+        if (host && sets > 0) bbAddSets(host, sets);
+      }
+    }
+  }
+}
+
+/**
+ * Финальный effective-MRV кламп после ВСЕХ аддитивных проходов.
+ *
+ * Основной cap-adjust стоит до поздних top-up/minimum-проходов; они могут
+ * добавить 1–2 сета в мышцу, у которой direct уже у потолка, и WEEK effective
+ * (direct + indirect компаундов) выходит за cap×1.15. Тест-инвариант
+ * `ovf=0` для новичка ловит именно это. Режем только изоляции/аксессуары
+ * с sets > 2, не трогая primary и не создавая 1-сетовых упражнений.
+ */
+export function enforceFinalEffectiveMrv(plan: BBPlan): void {
+  const caps = (plan as any).mrvByMuscle as Record<string, number> | undefined;
+  if (!caps) return;
+  for (const week of plan.weeks) {
+    if ((week as any).phase === 'deload' || (week as any).deload) continue;
+    const volume = aggregateBBVolume(week.sessions);
+    for (const muscle of Object.keys(caps)) {
+      const cap = caps[muscle];
+      if (!cap) continue;
+      const eff = volume[muscle]?.effectiveSets || 0;
+      if (eff <= cap * BB_MRV_TOLERANCE + 1e-6) continue;
+      let indirect = 0;
+      for (const s of week.sessions) for (const e of s.exercises) {
+        if ((e as any).warmupActivator) continue;
+        indirect += indirectToMuscle(e, muscle);
+      }
+      const targetDirect = Math.max(0, Math.floor(cap * BB_MRV_TOLERANCE - indirect));
+      const direct = volume[muscle]?.directSets || 0;
+      let need = direct - targetDirect;
+      if (need <= 0) continue;
+      const candidates = week.sessions
+        .flatMap(s => s.exercises)
+        .filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle
+          && (e.sets || 0) > 2 && String(e.role) !== 'primary')
+        .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+      for (const e of candidates as any[]) {
+        if (need <= 0) break;
+        const cut = Math.min(need, (e.sets || 0) - 2);
+        if (cut <= 0) continue;
+        e.sets -= cut;
+        if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+        need -= cut;
+      }
+    }
+  }
+  syncBBPlanSetShape(plan);
+}
+
+/**
+ * Финальная синхронизация метаданных упражнения с каталогом.
+ *
+ * Поздние проходы финализатора часто меняют только `name`/`exerciseName`
+ * (level-swap, back-frequency, chest/back balance, PPL invariants). При этом
+ * `exerciseType`/`type`/`movementPattern` остаются от прежнего движения:
+ * Butterfly мог числиться «compound», а заменённая тяга — «isolation». Это
+ * ломает порядок (isCompoundEx), дедуп паттернов и UI-бейджи. Каталог —
+ * единственный источник этих полей; `muscle`/`role`/`character` не трогаем,
+ * потому что они контекстные (delt_rear, primary-слот, тяж/памп дня).
+ */
+function syncExerciseMetadataFromCatalog(plan: BBPlan): void {
+  const byName = new Map<string, any>();
+  for (const c of EXERCISE_CATALOG as any[]) if (c?.name) byName.set(String(c.name), c);
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    for (const ex of session.exercises as any[]) {
+      const c = byName.get(String(ex.name || '')) || byName.get(String(ex.exerciseName || ''));
+      if (!c) continue;
+      if (c.type) { ex.exerciseType = c.type; ex.type = c.type; }
+      // movementPattern может быть контекстным (biceps_lengthened/triceps_overhead
+      // у рук) — не затираем уже проставленный аннотатором/пассом акцент.
+      if (c.movementPattern && !ex.movementPattern) ex.movementPattern = c.movementPattern;
+      if (c.equipment && !ex.equipment) ex.equipment = c.equipment;
+      if (c.jointStress && !ex.jointStress) ex.jointStress = c.jointStress;
+    }
+  }
+}
+
+/**
+ * В одной сессии у мышцы не может быть изоляция «primary», если уже есть
+ * компаунд этой мышцы: primary-слот означает главное движение. Поздние
+ * top-up/balance-проходы добавляли кикбэк/бабочку вторым primary — в UI это
+ * выглядело как два «главных» движения, а в отчётах — как будто день строится
+ * вокруг изоляции. Роль понижаем до accessory; сеты/характер не меняем.
+ */
+function normalizeIsolationRoles(plan: BBPlan): void {
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    const byMuscle = new Map<string, any[]>();
+    for (const ex of session.exercises as any[]) {
+      if (ex.warmupActivator) continue;
+      // Точная мышца, а не bbMuscleGroup: delt_rear-изоляция не должна
+      // понижаться из-за жима delt_front — это разные акценты, и в
+      // специализации задней дельты изоляция остаётся главной.
+      const g = String(ex.muscle || '');
+      byMuscle.set(g, [...(byMuscle.get(g) || []), ex]);
+    }
+    for (const [, list] of byMuscle) {
+      const primary = list.filter(ex => ex.role === 'primary');
+      // Только «второй primary»: если изоляция — единственный primary, а
+      // компаунд стоит accessory (pre-exhaust), роль НЕ трогаем: это осознанная
+      // методика, а не поздний top-up.
+      if (!primary.some(ex => ex.exerciseType === 'compound' || ex.type === 'compound')) continue;
+      if (!primary.some(ex => !(ex.exerciseType === 'compound' || ex.type === 'compound'))) continue;
+      for (const ex of primary) {
+        if (!(ex.exerciseType === 'compound' || ex.type === 'compound')) ex.role = 'accessory';
+      }
+    }
+  }
+}
+
+/**
+ * Последняя сортировка после нормализации type/role.
+ *
+ * `syncExerciseMetadataFromCatalog`/`normalizeIsolationRoles` меняют признаки,
+ * по которым строится rankKey (`exerciseType`, `role`). Если не пересортировать,
+ * план остаётся с порядком, посчитанным по устаревшим данным: например,
+ * `Махи гантелями` остаются перед `Жимом гантелей сидя`. Warmup-активатор
+ * по-прежнему первый; остальные — через единый order-engine.
+ */
+function finalOrderSessions(plan: BBPlan, options: BBFinalizeOptions): void {
+  if (options.reorder === false || options.preserveSource) return;
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    const warmups = session.exercises.filter((e: any) => (e as any).warmupActivator);
+    const rest = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+    const ordered = orderSessionExercises(rest as any, {
+      sessionTag: session.sessionTag,
+      methodology: options.methodology,
+      goal: options.goal,
+      priorityMuscles: options.priorityMuscles,
+      leadMuscles: options.priorityMuscles,
+      interleave: shouldInterleave(session.sessionTag, rest as any),
+      axialAware: /Legs|Lower|Glute|FullBody/i.test(String(session.sessionTag || '')),
+    });
+    session.exercises = [...warmups, ...ordered];
+  }
+}
+
 function applyAdaptivePhaseSafety(plan: BBPlan): void {
   for (let index = 1; index < plan.weeks.length; index++) {
     const week = plan.weeks[index];
@@ -5487,6 +5755,7 @@ for (const week of next.weeks) {
           // Про-объём спины (6+ лет) — до 6 back-паттернов; cap 4 срезал бы
           // vertical/lat после allocation (паттерны, а не сеты).
           options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4,
+          options.goal,
         );
         dedupeAdaptivePatterns(session, options.priorityMuscles, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3, isPPLPattern(options, next));
       }
@@ -5980,6 +6249,7 @@ for (const week of next.weeks) {
         {
           sessionTag: session.sessionTag,
           methodology: options.methodology,
+          goal: options.goal,
           priorityMuscles: options.priorityMuscles,
         },
       );
@@ -6119,6 +6389,11 @@ for (const week of next.weeks) {
     dedupeExactExercises(next);
     if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme, { fst7Seven: (options as any).fst7Seven });
   }
+  // Метаданные каталога (type/movementPattern) должны быть проставлены ДО
+  // effective-volume cap-adjust: иначе indirect-вклад компаундов считается по
+  // старым/пустым типам, кап пропускает перебор, а финальный sync «включает»
+  // его уже после резки (напр. glutes 14 > 12×1.15 у новичка).
+  if (!options.preserveSource) syncExerciseMetadataFromCatalog(next);
   if (!options.preserveSource && (next as any).pattern?.id) {
     // Post-hoc cap-adjust для ВСЕХ мышц: фактический effective = direct +
     // indirect от compound может превысить адаптированный MRV (GVT-изоляции
@@ -6170,10 +6445,12 @@ for (const week of next.weeks) {
             pushCnt: (week as any).sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1,
             legsCnt: (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1,
           }, options.level);
-          // Флор ограничен сверху капом: собственный избыток выше MRV режется
-          // (иначе флор цементирует overflow), жертва чужого indirect — защищена.
-          if (minWeekly2 != null && directTotal <= Math.min(minWeekly2, cap)) continue;
-          if (minWeekly2 != null) pplFloor = Math.min(minWeekly2, cap);
+          // Флор ограничен сверху не только капом, но и местом, которое остаётся
+          // после indirect: иначе direct 8 при floor 9 и indirect 6 даёт effective
+          // 14 > 12×1.15, а ранний continue вообще пропускает резку (PPL glutes).
+          const maxDirectWithinTolerance = Math.max(0, Math.floor(cap * BB_MRV_TOLERANCE - indirectTotal));
+          if (minWeekly2 != null && directTotal <= Math.min(minWeekly2, maxDirectWithinTolerance)) continue;
+          if (minWeekly2 != null) pplFloor = Math.min(minWeekly2, cap, maxDirectWithinTolerance);
         }
         let targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
         // Ниже флора не режем — но только если сам флор влезает в cap×1.15
@@ -7263,11 +7540,22 @@ for (const week of next.weeks) {
     if (warmups.length && options.reorder !== false && !options.preserveSource) {
       // Сохраняем порядок остальных через orderSessionExercises, но warmup — вне очереди, первым
       const orderedRest = (() => {
-        try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4) as any; } catch { return rest; }
+        try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4, options.goal) as any; } catch { return rest; }
       })();
       (session as any).exercises = [...warmups, ...orderedRest];
     }
   }
+  // Bodyweight-safety: последний проход, потому что поздние аддитивные пассы
+  // (back balance/frequency/top-up) исторически возвращали подтягивания в
+  // план без bodyweightCapability. Объём сохраняем: замена name-for-name или
+  // перенос сетов на другую тягу.
+  enforceBodyweightPullCapability(next, options);
+  // Метаданные и роли — после всех переименований/замен: к этому моменту
+  // `name` окончательный, и каталог может восстановить type/movementPattern.
+  syncExerciseMetadataFromCatalog(next);
+  enforceFinalEffectiveMrv(next);
+  normalizeIsolationRoles(next);
+  finalOrderSessions(next, options);
   // ── Итерация C (D-1): правило прогрессии на каждое упражнение ──
   // Делается в финализаторе — единственном месте, через которое проходят все
   // пути сборки (сплит / цикл / программа / повторная финализация после правок).

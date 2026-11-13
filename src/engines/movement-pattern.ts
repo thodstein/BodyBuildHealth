@@ -65,9 +65,9 @@ function derivePatternUncached(ex: any): string {
 
   if (type === 'isolation') {
     if (g === 'chest') return 'isolation_chest';
-    if (g === 'shoulders' || g === 'delts' || g === 'delts_rear') return 'isolation_shoulders';
+    if (g === 'shoulders' || g === 'delts' || g === 'delts_rear' || g === 'delt_front' || g === 'delt_mid' || g === 'delt_rear') return 'isolation_shoulders';
     if (g === 'back' || g === 'traps') return 'isolation_back';
-    if (g === 'arms' || g === 'forearms') return 'isolation_arms';
+    if (g === 'arms' || g === 'forearms' || g === 'biceps' || g === 'triceps') return 'isolation_arms';
     if (g === 'legs') {
       if (/икронож|икры|calf|камбалов/.test(hay)) return 'isolation_calves';
       // Аудит Sep 2026: приведение бедра — аддукторы, НЕ бицепс бедра

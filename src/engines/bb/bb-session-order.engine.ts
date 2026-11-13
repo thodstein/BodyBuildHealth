@@ -132,6 +132,13 @@ export interface OrderOpts {
   interleave?: boolean;
   /** O-4: учитывать аксиальную стоимость как тай-брейк внутри одной мышцы/tier. */
   axialAware?: boolean;
+  /**
+   * Цель мезоцикла: масса/сушка/рекомп/поддержание/сила-масса.
+   * Влияет только на порядок, не на объём:
+   *  - strength_mass: ПЛ-спецификации (пауза/доски/цепи) ведут compounds;
+   *  - cut/recomp: тяжёлые осевые движения раньше лёгкой изоляции (свежий ЦНС).
+   */
+  goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 }
 
 export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts = {}): BBExercise[] {
@@ -161,7 +168,24 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     // не biceps (tagMuscles[0]='biceps').
     const tag = opts.sessionTag || '';
     if (tag === 'Arms') primaryMuscle = 'triceps';
-    else if (tag === 'Legs' || tag === 'Lower' || tag === 'LowerPower' || tag === 'LowerHyp' || tag === 'Glutes' || tag === 'GlutesHams') {
+    else if (tag === 'Glutes' || tag === 'GlutesHams') {
+      // Специализированный glute-день: ягодицы — ведущая мышца по определению
+      // тега, даже если хамстринги/квадрицепсы набрали больше тяжёлых сетов.
+      // Раньше heavy-tie-break ставил hamstrings первым, и ягодицы уезжали
+      // в конец сессии (female_glute_3/female_glute_5/female_lower_upper_4).
+      const hasGlutes = forOrder.some(e => collapseMuscle(e.muscle || '') === 'glutes');
+      if (hasGlutes) primaryMuscle = 'glutes';
+      else {
+        let heavy: string | null = null;
+        let bestScore = -1;
+        for (const cand of ['quads', 'hamstrings']) {
+          const score = forOrder.filter(e => e.muscle === cand && (e as any).character === 'тяж').reduce((s, e) => s + (e.sets || 0), 0);
+          if (score > bestScore) { bestScore = score; heavy = cand; }
+        }
+        primaryMuscle = heavy || tagMuscles[0] || 'glutes';
+      }
+    }
+    else if (tag === 'Legs' || tag === 'Lower' || tag === 'LowerPower' || tag === 'LowerHyp') {
       // Ноги: тяжёлая мышца дня должна идти первой.
       // Раньше quads всегда был primary (присед перед RDL), но в день
       // бицепса бедра памп-квадрицепс стоял ПЕРЕД тяжёлым бицепсом бедра.
@@ -189,6 +213,7 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
   const tagMuscleSet = new Set(tagMuscles.map(m => collapseMuscle(m)));
 
   const methodology = opts.methodology || 'compound_first';
+  const goal = opts.goal;
   const priorityMuscles = new Set((opts.priorityMuscles || []).map(collapseMuscle));
   // O-1: lead-мышца учитывается только если у неё в сессии есть compound
   // (иначе изоляция слабой мышцы обошла бы тяжёлый compound другой мышцы).
@@ -212,6 +237,7 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     leadMuscles,
     interleave: !!opts.interleave,
     axialAware: !!opts.axialAware,
+    goal,
   };
   const indexed = forOrder.map((ex, idx) => ({ ex, idx, key: rankKey(ex, ctx, occIndex[idx]) }));
   // Лексикографическое сравнение кортежа.
@@ -262,11 +288,12 @@ interface RankCtx {
   leadMuscles: Set<string>;
   interleave: boolean;
   axialAware: boolean;
+  goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 }
 
 /** Порядок мышц в сессии: см. MUSCLE_ORDER вверху файла (каноника). */
 function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
-  const { primaryMuscle, methodology, priorityMuscles, leadMuscles, interleave, axialAware } = ctx;
+  const { primaryMuscle, methodology, priorityMuscles, leadMuscles, interleave, axialAware, goal } = ctx;
   const exMuscle = collapseMuscle(ex.muscle || '');
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);
   const compound = isCompoundEx(ex);
@@ -277,6 +304,9 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   // In pre-exhaust, a primary-muscle pump isolation is still the pre-fatigue
   // movement, not a finisher that belongs at the end.
   const isPrimaryIsolation = isPrimaryMuscle && !compound;
+  // Силовой мезоцикл: ПЛ-специфика (пауза/доски/цепи/дефицит) — это главное
+  // движение дня, а не «в конец compounds»: tier 0 и ранний subOrder.
+  const strengthSpec = goal === 'strength_mass' && plSpec && compound;
   const exRir = Number.isFinite(ex.rir as number) ? (ex.rir as number) : 2;
   let tier: number;
   if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
@@ -293,7 +323,7 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   else if (methodology === 'fst7' && isStretchHolder(ex.name || '')) tier = 4;
   else if (methodology === 'fst7' && isPrimaryIsolation && exRir >= 3 && ex.character !== 'тяж') tier = -0.5;
   else if (isFinisher) tier = 3;
-  else if (isPrimaryHeavy) tier = 0;
+  else if (isPrimaryHeavy || strengthSpec) tier = 0;
   else if (compound) tier = 1;
   else tier = 2;
 
@@ -321,14 +351,19 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;
   else subOrder = 0;
-  if (plSpec) subOrder += 50;
+  if (plSpec) subOrder += strengthSpec ? -20 : 50;
 
   const load = loadRank(ex);
   // O-4: тай-брейк по аксиальной стоимости. Срабатывает только для ПАРЫ
   // максимально осевых движений (становая/good morning, cost 2) — остальное
   // остаётся байт-в-байт: доказательная база у этого правила тонкая, и
   // перетасовка «присед ↔ жим ногами» меняла бы распределение бюджета сетов.
-  const axial = axialAware ? -Math.max(0, axialCostOf(ex.name || '') - 1) : 0;
+  // На сушке/рекомпе усталость переносится хуже: тяжёлое осевое движение
+  // должно идти на свежую ЦНС, даже если cost 1 vs 0.
+  const axialBase = axialAware ? axialCostOf(ex.name || '') : 0;
+  const axial = axialAware
+    ? -(goal === 'cut' || goal === 'recomp' ? axialBase : Math.max(0, axialBase - 1))
+    : 0;
   if (interleave) {
     // O-2 (FullBody): «круги» — первый круг = тяжёлые базы всех мышц,
     // второй = изоляции/аксессуары; внутри круга чередование по числу
@@ -421,9 +456,10 @@ export function tidySessionExercises(
   priorityMuscles?: string[],
   methodology?: SessionMethodology,
   backCap?: number,
+  goal?: OrderOpts['goal'],
 ): BBExercise[] {
   const capped = capExercisesPerMuscle(exercises, backCap);
-  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: methodology || "compound_first", priorityMuscles });
+  return orderSessionExercises(capped, { primaryMuscle, sessionTag, methodology: methodology || "compound_first", priorityMuscles, goal });
 }
 
 /* ─────────────── O-5: объяснение порядка (карточка сессии в плане) ─────────────── */

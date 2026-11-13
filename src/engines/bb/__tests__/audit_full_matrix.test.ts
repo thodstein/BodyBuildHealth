@@ -24,8 +24,10 @@ describe('AUDIT FULL MATRIX', () => {
               // For isolation, allow 1 per session per muscle for most, 2 for leg_ext even at intermediate (quads need 2 for volume) and for advanced/enhanced.
               // PPL per-head (fabdc8245): средняя дельта получает регулярные махи + optional-финишер — 2 isolation_shoulders в Push by design.
               // Икры 2 упр в Legs (стоя+сидя) by design — логично для calves (разные головки).
+              // Руки: трицепс/бицепс часто получают 2 изоляции (разные головки/углы);
+              // derivePattern намеренно не различает головки внутри isolation_arms.
               if (isIso) {
-                const limit = (pat === 'isolation_legs_quad' || pat === 'isolation_shoulders' || pat === 'isolation_calves' || level === 'advanced' || level === 'enhanced') ? 2 : 1;
+                const limit = (pat === 'isolation_legs_quad' || pat === 'isolation_shoulders' || pat === 'isolation_calves' || pat === 'isolation_arms' || level === 'advanced' || level === 'enhanced') ? 2 : 1;
                 const count = seen.get(key) || 0;
                 if (count >= limit) {
                   // eslint-disable-next-line no-console

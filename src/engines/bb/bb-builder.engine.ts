@@ -64,18 +64,18 @@ function mastersMrvMult(age?: number): number {
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
-import { orderSessionExercises, shouldInterleave, type SessionMethodology } from './bb-session-order.engine';
+import { orderSessionExercises, shouldInterleave, axialCostOf, type SessionMethodology } from './bb-session-order.engine';
 import { methodologySpecFor, applyMethodologyRest } from './bb-methodology-spec';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
 import { ANGLE_CLASSES, lengthenedBonus, lengthenedBonusForExercise, ensureStrictGroupCoverage } from './bb-exercise-selection.engine';
-import { sfrSelectionBonus } from './bb-sfr-db';
+import { sfrSelectionBonus, sfrOf } from './bb-sfr-db';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
-import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules, stampBBPlanFinalizeSignature, repairSingleSetExercises } from './bb-finalize.engine';
+import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules, stampBBPlanFinalizeSignature, repairSingleSetExercises, enforceFinalEffectiveMrv } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE, FEMALE_GLUTE_HIGH_CAP, FEMALE_GLUTE_TARGET_CAP } from './bb-volume.engine';
@@ -1712,6 +1712,8 @@ export interface BuildExercisePoolOpts {
   labMrvMultiplier?: number;
   /** Волна-1: фаза — для фазозависимого SFR/lengthened-бонуса в _score. */
   phase?: string;
+  /** Цель мезоцикла — goal-aware SFR/стабильность/осевая нагрузка в _score. */
+  goal?: BBGoal;
 }
 
 /** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
@@ -1765,6 +1767,7 @@ function exercisePoolKey(muscle: string, role: string, opts: BuildExercisePoolOp
     pedDoses: opts.pedDoses || null,
     labMrvMultiplier: opts.labMrvMultiplier ?? null,
     phase: opts.phase || '',
+    goal: opts.goal || '',
   });
 }
 
@@ -1905,6 +1908,39 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
     // Армейский жим стоя — ПЛ-движение: предпочтительны классические жимы
     // перед собой (Smith широким хватом, жимы гантелей).
     if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
+    // ─── Новичок: стабильная техника и управляемая нагрузка ───
+    // Не хард-фильтр (пул не должен опустеть): мягкий сдвиг к машинам/Смиту/
+    // кабелю/поддержанным вариантам и от свободно-весовых многосуставных
+    // движений, где новичку сложнее держать технику и прогрессию. Это тот же
+    // принцип, что у fewerCompound, но автоматически по уровню, а не по кнопке.
+    if (normLevel(opts.level || 'intermediate') === 'beginner') {
+      // Машина/блок дают новичку стабильную технику, но изоляции не должны
+      // вытеснять компаунды: иначе glute-день набирает 3 изоляции, а косвенная
+      // работа компаундов теряется (MRV-overflow по effective sets).
+      if (/машин|тренаж|machine|блок|cable|смит|smith|гакк|hack|поддержан|chest.?supported|seal|жим.*ног|leg.?press|разводк|сведен|бабоч|пек.?дек/i.test(n)) {
+        score += (ex.type === 'compound' || (ex as any).exerciseType === 'compound') ? 15 : 4;
+      }
+      if (/штанг|barbell|гриф/i.test(n) && /присед|squat|жим.*лёжа|bench|тяга.*наклон|row|становая|deadlift|румын|rdl|жим.*стоя|overhead|армейск/i.test(n)) score -= 15;
+      if (/болгар|bulgarian|выпад|lunge|на одной ног|одной ногой|одна нога|одной ноги|b-?stance|single.?leg|one.?leg|одной рук|одной рукой|one.?arm|single.?arm/i.test(n)) score -= 10;
+    }
+    // ─── Цель: сушка/рекомп — высокий SFR и меньше системной усталости ───
+    // На дефиците калорий восстановление и качество техники падают: среди
+    // кандидатов одного пула выигрывает движение с лучшим стимул/усталость,
+    // а тяжёлые осевые варианты не должны вытеснять управляемую работу.
+    // Объём/сеты не меняются — только приоритет выбора.
+    if (opts.goal === 'cut' || opts.goal === 'recomp') {
+      const sfr = sfrOf(ex);
+      if (sfr != null) score += sfr >= 4 ? 4 : sfr <= 2 ? -4 : 0;
+      const ax = axialCostOf(n);
+      if (ax >= 2) score -= 6;
+      else if (ax === 1) score -= 1;
+      if (/машин|тренаж|machine|блок|cable|смит|smith|поддержан|chest.?supported|seal|жим.*ног|leg.?press/i.test(n)) score += 4;
+    }
+    // ─── Цель: сила-масса — ПЛ-специфика и свободные базовые движения ───
+    if (opts.goal === 'strength_mass') {
+      if (/пауз|pause|доск|board|цеп|chain|резин|band|дефицит|deficit/i.test(n)) score += 8;
+      if (/штанг|barbell|гриф|смит|smith/i.test(n)) score += 3;
+    }
     // Joint-guard штраф (не меняет характер дня, только отбор)
     if (_jgActive) score += jointGuardScorePenalty(ex, _jgInput);
     // Волна-1 (аудит 2026-09): SFR/профиль сопротивления в отборе — мягкий
@@ -2006,6 +2042,8 @@ export interface BuildSessionParams {
   mrvRotByMuscle?: Record<string, number>;
   /** Волна-3.14: эскалация стартового RIR из прошлого мезо (0/1). */
   rirEscalation?: number;
+  /** Цель мезоцикла — goal-aware отбор/порядок (не меняет объёмную модель). */
+  goal?: BBGoal;
 }
 
 function buildSession(
@@ -2064,6 +2102,7 @@ function buildSession(
   cooldownNames: string[] = [],
   mrvRotByMuscle: Record<string, number> = {},
   rirEscalation: number = 0,
+  goal?: BBGoal,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2434,6 +2473,7 @@ function buildSession(
       // intensification) пиннится к нейтральной фазе, иначе primary менялся
       // бы между неделями (паритет с selWeek-пиннингом выше).
       phase: rotationMode === 'forbid' ? 'accumulation' : phase,
+      goal,
     });
     // Pro primary: только канонические tier 1, иначе tier 1-2, чтобы hex/svend/TRX не лезли в primary Pro
     if (role === 'primary' && (level === 'advanced' || level === 'enhanced')) {
@@ -2723,6 +2763,28 @@ function buildSession(
             const comp = pool.find((d: any) => (d as any).type === 'compound' && !usedIds.has((d as any).id) && !sessionSelectedIds.includes((d as any).id));
             if (comp) { exDatas[0] = comp; usedIds.add(comp.id); sessionSelectedIds.push(comp.id); sessionSelectedNames.push(comp.name); }
           }
+        }
+      }
+    }
+
+    // Новичок/изоляция-лид: если ведущая крупная мышца получила только
+    // изоляцию (например, Butterfly/кикбэк) — ставим реальный компаунд из пула
+    // на её место. Объём/сеты не меняются, меняется только движение-лид.
+    // Pre-exhaust и «активационные» методики намеренно начинают с изоляции —
+    // их не трогаем.
+    if (role === 'primary' && exDatas.length > 0
+      && methodology !== 'pre_exhaust' && methodology !== 'mountain_dog' && methodology !== 'fst7'
+      && ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'triceps'].includes(muscle)) {
+      const isComp = (e: any) => (e?.type === 'compound' || e?.exerciseType === 'compound');
+      if (!exDatas.some(isComp)) {
+        const comp = pool.find((e: any) => isComp(e) && !exDatas.some(d => d?.id === e.id) && !sessionSelectedIds.includes(e.id));
+        if (comp) {
+          exDatas[0] = comp;
+          sessionSelectedIds.push(comp.id);
+          sessionSelectedNames.push(comp.name);
+          // Freshness-guard недели: новый лид не должен повторно выбраться
+          // в другой сессии той же недели под старым именем изоляции.
+          weekLocalUsed.get(muscle)?.add(comp.name);
         }
       }
     }
@@ -3158,6 +3220,7 @@ function buildSession(
   const _ordered = orderSessionExercises(exercises, {
     sessionTag: sched.sessionTag,
     methodology,
+    goal,
     primaryMuscle: sessionLeadMuscle || undefined,
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
     // O-1 (итерация B): слабая/фокус-мышца со своим compound — впереди изоляций
@@ -3258,6 +3321,7 @@ function buildSession(
   const finalOrdered = orderSessionExercises(exercises, {
     sessionTag: sched.sessionTag,
     methodology,
+    goal,
     primaryMuscle: sessionLeadMuscle || undefined,
     priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
     leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
@@ -3304,6 +3368,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
     p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {}, p.rirEscalation ?? 0,
+    p.goal,
   );
 }
 
@@ -4029,7 +4094,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0 });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0, goal: input.goal });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -4228,6 +4293,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const reordered = orderSessionExercises(sess.exercises, {
         sessionTag: s.sessionTag,
         methodology: input.methodology as any,
+        goal: input.goal,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         interleave: shouldInterleave(s.sessionTag, sess.exercises),
@@ -4668,6 +4734,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const reordered = orderSessionExercises(s.exercises, {
         sessionTag: s.sessionTag || '',
         methodology: input.methodology,
+        goal: input.goal,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         interleave: shouldInterleave(s.sessionTag, s.exercises),
@@ -5259,6 +5326,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   let finalized = finalizeBBPlan(output, {
     reorder: true,
     methodology: input.methodology,
+    goal: input.goal,
     priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     specExplicitSchedule: hasExplicitSpecSchedule,
@@ -5610,6 +5678,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const ordered = orderSessionExercises(sess.exercises, {
         sessionTag: sess.sessionTag,
         methodology: input.methodology,
+        goal: input.goal,
         priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         leadMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
         interleave: shouldInterleave(sess.sessionTag, sess.exercises),
@@ -5770,6 +5839,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // сетом. Сет не добавляем — переносим один у той же мышцы (donor ≥ 3).
   // Только generic-путь: cycle/program имеют собственные baseline-пост-проходы.
   repairSingleSetExercises(finalized);
+  syncBBPlanSetShape(finalized);
+  // Пост-финализаторные проходы (PED/rep-схемы, BFR, рампа) могут снова
+  // добавить сеты уже после early-guard в finalize. Финальный effective-MRV
+  // кламп — здесь, ДО снимка/сверки целей, чтобы weeklyVolume и validation
+  // описывали уже очищенный план (иначе glutes 14 > 12×1.15 у новичка).
+  enforceFinalEffectiveMrv(finalized);
   syncBBPlanSetShape(finalized);
   // Добивки могли затронуть упражнения со схемами — комментарий снова к факту.
   reconcileSchemeComments(finalized);
