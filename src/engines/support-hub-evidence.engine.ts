@@ -355,7 +355,7 @@ export function limitUnitRu(unit: string | undefined | null): string {
 export function doseWindowFor(
   id: string,
   therapeutic: Record<string, { minMg: number; optMg: number; maxMg: number; ul: number; note: string; unit?: string }>,
-  ranges: Record<string, { therMin: number; therMax: number; label: string }>,
+  ranges: Record<string, { therMin: number; therMax: number; label: string; unit?: string }>,
 ): DoseWindow {
   // 26 сен 2026 (E0.3): резолв через КАНОНИЧЕСКИЙ нутриент (`support-limits.resolveNutrient`).
   //
@@ -417,7 +417,9 @@ export function doseWindowFor(
     return {
       min: r.therMin, opt: (r.therMin + r.therMax) / 2, max: r.therMax,
       ul: reg && reg.value > 0 ? reg.value : null,
-      unit: 'мг', hasData: true, ulKind: reg?.kind ?? 'Unknown',
+      // Проход 26: единица окна из таблицы. Раньше здесь всегда стояло «мг» —
+      // окно фолата (400–1000 мкг) подписывалось миллиграммами.
+      unit: r.unit ?? 'мг', hasData: true, ulKind: reg?.kind ?? 'Unknown',
       ulWarning: reg?.kind === 'UL', ulExcludes: reg?.excludes, ulUnverified: reg ? !reg.verified : true,
       limitNote: reg?.note ?? '',
       note: `Диапазон: ${r.label}. `

@@ -14,25 +14,47 @@ import { getProfile } from '../../../core/profile-manager';
 
 // ─── Therapeutic ranges for key supplements ───
 // Экспортируется для паспорта вещества (единый источник, без дублей таблицы).
-export const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string }> = {
-  nac: { therMin: 600, therMax: 1800, label: 'N-ацетилцистеин' },
-  tudca: { therMin: 500, therMax: 1500, label: 'TUDCA' },
-  milk_thistle: { therMin: 280, therMax: 840, label: 'Силимарин' },
-  alpha_lipoic: { therMin: 300, therMax: 600, label: 'Альфа-липоевая кислота' },
-  curcumin: { therMin: 500, therMax: 2000, label: 'Куркумин (с пиперином)' },
-  coq10: { therMin: 100, therMax: 400, label: 'Коэнзим Q10' },
-  omega3: { therMin: 2000, therMax: 6000, label: 'Омега-3 (EPA+DHA)' },
-  berberine: { therMin: 500, therMax: 1500, label: 'Берберин' },
-  magnesium: { therMin: 300, therMax: 600, label: 'Магний (элемент)' },
-  zinc: { therMin: 15, therMax: 50, label: 'Цинк (элемент)' },
-  vitamin_d3: { therMin: 1000, therMax: 5000, label: 'Витамин D3 (МЕ)' },
-  b12: { therMin: 500, therMax: 2000, label: 'B12 (мкг)' },
-  folate: { therMin: 400, therMax: 1000, label: 'Фолат (мкг)' },
-  iron: { therMin: 18, therMax: 65, label: 'Железо (элемент)' },
-  creatine: { therMin: 3000, therMax: 5000, label: 'Креатин' },
-  ashwagandha: { therMin: 300, therMax: 600, label: 'Ашваганда' },
-  rhodiola: { therMin: 200, therMax: 600, label: 'Родиола' },
+// Проход 26: добавлена ЕДИНИЦА каждого вещества. Раньше справочник печатал
+// «мг» для всех строк — «Витамин D3 (МЕ): 1000–5000 мг» и «B12 (мкг): 500–2000 мг»
+// читались как миллиграммы (5000 мг D3 ≠ 5000 МЕ).
+export const DOSE_RANGES: Record<string, { therMin: number; therMax: number; label: string; unit: string }> = {
+  nac: { therMin: 600, therMax: 1800, label: 'N-ацетилцистеин', unit: 'мг' },
+  tudca: { therMin: 500, therMax: 1500, label: 'TUDCA', unit: 'мг' },
+  milk_thistle: { therMin: 280, therMax: 840, label: 'Силимарин', unit: 'мг' },
+  alpha_lipoic: { therMin: 300, therMax: 600, label: 'Альфа-липоевая кислота', unit: 'мг' },
+  curcumin: { therMin: 500, therMax: 2000, label: 'Куркумин (с пиперином)', unit: 'мг' },
+  coq10: { therMin: 100, therMax: 400, label: 'Коэнзим Q10', unit: 'мг' },
+  omega3: { therMin: 2000, therMax: 6000, label: 'Омега-3 (EPA+DHA)', unit: 'мг' },
+  berberine: { therMin: 500, therMax: 1500, label: 'Берберин', unit: 'мг' },
+  magnesium: { therMin: 300, therMax: 600, label: 'Магний (элемент)', unit: 'мг' },
+  zinc: { therMin: 15, therMax: 50, label: 'Цинк (элемент)', unit: 'мг' },
+  vitamin_d3: { therMin: 1000, therMax: 5000, label: 'Витамин D3', unit: 'МЕ' },
+  b12: { therMin: 500, therMax: 2000, label: 'B12', unit: 'мкг' },
+  folate: { therMin: 400, therMax: 1000, label: 'Фолат', unit: 'мкг' },
+  iron: { therMin: 18, therMax: 65, label: 'Железо (элемент)', unit: 'мг' },
+  creatine: { therMin: 3000, therMax: 5000, label: 'Креатин', unit: 'мг' },
+  ashwagandha: { therMin: 300, therMax: 600, label: 'Ашваганда', unit: 'мг' },
+  rhodiola: { therMin: 200, therMax: 600, label: 'Родиола', unit: 'мг' },
 };
+
+/**
+ * Строка справочника: «Цинк (элемент): 15–50 мг · UL 40 мг».
+ *
+ * Проход 26: верхняя граница диапазона — КЛИНИЧЕСКИЙ стандарт и может быть
+ * выше предела (D3 5000 МЕ против UL 4000, Zn 50 против 40, Mg 600 против 350).
+ * Поэтому предел печатается рядом — иначе строка справочника выглядела как
+ * разрешение на дозу выше UL.
+ */
+export function doseRangeText(key: string): string {
+  const r = DOSE_RANGES[key];
+  if (!r) return '';
+  const canon = resolveNutrient(key);
+  const info = canon ? NUTRIENT_LIMIT_INFO[canon] : undefined;
+  let limit = '';
+  if (info && info.kind === 'UL') limit = ` · UL ${info.value} ${limitUnitRu(info.unit)}`;
+  else if (info && info.kind === 'SafeLevel') limit = ` · Safe Level ${info.value} ${limitUnitRu(info.unit)}`;
+  return `${r.label}: ${r.therMin}–${r.therMax} ${r.unit}${limit}`;
+}
 
 // ─── Props for a DosingCard ───
 interface DosingCardProps {
@@ -534,14 +556,15 @@ export const SupportEffectiveDose: React.FC = () => {
           📈 Протоколы загрузочной фазы
         </div>
         <div style={{ fontSize: 8, color: 'var(--text-dim)', marginBottom: 6, lineHeight: 1.3 }}>
-          Для веществ, требующих насыщения тканевых депо перед поддерживающей дозой:
+          Для веществ, требующих насыщения тканевых депо перед поддерживающей дозой.
+          Насыщение — только при подтверждённом дефиците и под контролем (D3 — 25-OH-D и Ca; железо — ферритин/ОЖСС; Mg — Mg плазмы):
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {([
             { what: 'Креатин', loading: '20 г/день 5-7 дней', main: '3-5 г/день' },
             { what: 'Коэнзим Q10', loading: '200-400 мг/день 2-4 нед', main: '100-200 мг/день' },
-            { what: 'Витамин D3', loading: '5000-10000 МЕ/день 4-8 нед', main: '1000-4000 МЕ/день' },
-            { what: 'Магний (тяжёлый дефицит)', loading: '400-800 мг/день 4 нед', main: '300-400 мг/день' },
+            { what: 'Витамин D3', loading: '5000-10000 МЕ/день 4-8 нед', main: '1000-4000 МЕ/день (UL 4000)' },
+            { what: 'Магний (тяжёлый дефицит)', loading: '400-800 мг/день 4 нед', main: '300-350 мг/день (UL)' },
             { what: 'Железо (дефицит)', loading: '100-200 мг/день 3 мес', main: '18-27 мг/день' },
             { what: 'B12 (дефицит)', loading: '1000 мкг/день 4-8 нед', main: '500-1000 мкг/день' },
           ] as const).map((p, i) => (
@@ -567,19 +590,18 @@ export const SupportEffectiveDose: React.FC = () => {
           Клинически установленные пероральные дозы для ключевых веществ (нескорректированные):
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-          {Object.entries(DOSE_RANGES).slice(0, 12).map(([key, r]) => (
+          {Object.entries(DOSE_RANGES).map(([key]) => (
             <div key={key} style={{
               padding: '3px 6px', borderRadius: 4, fontSize: 7,
               background: 'rgba(167,139,250,0.03)', color: 'var(--text-dim)',
             }}>
-              <span style={{ color: 'var(--text-light)', fontWeight: 600 }}>{r.label}:</span>
-              {' '}{r.therMin}–{r.therMax} мг
+              <span style={{ color: 'var(--text-light)', fontWeight: 600 }}>{doseRangeText(key)}</span>
             </div>
           ))}
         </div>
         <div style={{ fontSize: 7, color: 'rgba(167,139,250,0.4)', marginTop: 4, lineHeight: 1.4 }}>
           * Диапазоны указаны для стандартного перорального приёма. Биодоступность формы может существенно менять усвоенную дозу.
-          Ориентируйтесь на oral-диапазон как на клинический стандарт.
+          Где установлен UL реестра — он приоритетнее верхней границы (показан в строке); дозы выше UL — только при подтверждённом дефиците/по назначению врача.
         </div>
       </div>
     </div>
