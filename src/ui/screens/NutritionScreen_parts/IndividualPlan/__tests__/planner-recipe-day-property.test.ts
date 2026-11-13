@@ -124,16 +124,23 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
       ) * 100;
       expect(afterDev, `seed=${s}: dev ${afterDev.toFixed(1)} > ${beforeDev.toFixed(1)}`).toBeLessThanOrEqual(Math.max(beforeDev, 3) + 0.5);
 
-      // (г) честность флага
+      // (г) честность флага. §8.91 (решение владельца «а»): белок — ПОЛ, а не двусторонняя
+      // цель (ядра рецептов не режутся). Вердикт «≤3%» меряется тем же каноном, что и в
+      // движке: двусторонние ккал/Ж/У + НЕДОБОР белка. Перебор белка не дефект дня, но он
+      // обязан быть ВИДЕН в нотах («белок — пол: … (+N%)»).
       if (res.withinTolerance) {
         tolCount++;
+        const dpUnder = Math.max(0, targets.p - tot.p) / Math.max(1, targets.p);
         const dev = Math.max(
-          Math.abs(tot.kcal - targets.kcal) / targets.kcal,
-          Math.abs(tot.p - targets.p) / targets.p,
-          Math.abs(tot.f - targets.f) / targets.f,
-          Math.abs(tot.c - targets.c) / targets.c,
+          Math.abs(tot.kcal - targets.kcal) / Math.max(1, targets.kcal),
+          dpUnder,
+          Math.abs(tot.f - targets.f) / Math.max(1, targets.f),
+          Math.abs(tot.c - targets.c) / Math.max(1, targets.c),
         ) * 100;
-        expect(dev, `seed=${s} claims ≤3 but dev=${dev.toFixed(1)}%`).toBeLessThanOrEqual(3.05);
+        expect(dev, `seed=${s} claims ≤3 but dev=${dev.toFixed(1)}% (канон §8.91: Б — пол)`).toBeLessThanOrEqual(3.05);
+        if (tot.p > targets.p * 1.05) {
+          expect(res.notes.some((n: string) => String(n).includes('белок — пол')), `seed=${s}: перебор белка не раскрыт в нотах`).toBe(true);
+        }
       } else {
         expect(res.notes.some(n => n.includes('>3%')), `seed=${s}: нет предупреждения о не сходимости`).toBe(true);
       }

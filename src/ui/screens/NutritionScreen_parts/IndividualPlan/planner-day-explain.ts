@@ -43,6 +43,8 @@ export interface DayExplainResult {
   checks: DayExplainReason[];
   /** Шаг 7: журнал проходов (сборка → сведение → P4b → P4c → reconciliation → финал). */
   journal: PassJournalEntry[];
+  /** Реальные числа по осям (факт/цель/разница) — основа человеческой карточки. */
+  axes: DayAxisDeviation[];
 }
 
 interface ExplainPlanLike {
@@ -59,6 +61,17 @@ interface ExplainTargets {
   p?: number;
   f?: number;
   c?: number;
+  /**
+   * Алиасы: `planTargets` в контексте хранит цели как {kcal, protein, fats, carbs}
+   * (имена из настроек КБЖУ), а движок — как {kcal, p, f, c}. Раньше карточка читала
+   * только p/f/c, поэтому у живого плана сравнивалась ОДНА ось — ккал: день с белком
+   * 141 из 112 г и углеводами 337 из 393 объявлялся «сошёлся 0.6%».
+   */
+  protein?: number;
+  fats?: number;
+  carbs?: number;
+  fat?: number;
+  calories?: number;
 }
 
 /** Правила классификации notes. Порядок = порядок показа. */
@@ -137,29 +150,95 @@ const RULES: Array<{ id: string; level: DayExplainLevel; re: RegExp; title: stri
   },
 ];
 
-const MAX_DEVIATIONS = ['kcal', 'p', 'f', 'c'] as const;
+/** Оси дня: подпись для карточки + имена полей цели (движок и настройки КБЖУ). */
+const AXES: Array<{ key: 'kcal' | 'p' | 'f' | 'c'; label: string; unit: string; aliases: string[] }> = [
+  { key: 'kcal', label: 'Ккал', unit: '', aliases: ['kcal', 'calories'] },
+  { key: 'p', label: 'Б', unit: 'г', aliases: ['p', 'protein'] },
+  { key: 'f', label: 'Ж', unit: 'г', aliases: ['f', 'fats', 'fat'] },
+  { key: 'c', label: 'У', unit: 'г', aliases: ['c', 'carbs'] },
+];
 
-/** Отклонение дня от целей (максимум по 4 осям, %). null — нет данных. */
+function goalOf(targets: ExplainTargets | null | undefined, aliases: string[]): number {
+  if (!targets) return 0;
+  for (const a of aliases) {
+    // P2-fix: isFinite-гарды — строковое/битое значение из any-данных (старые сохранённые
+    // планы/импорт) давали NaN, который уезжал в текст объяснения и отклонение.
+    const raw = Number((targets as any)[a]);
+    if (Number.isFinite(raw) && raw > 0) return raw;
+  }
+  return 0;
+}
+
+/** Одна ось дня: факт/цель/разница в единицах оси и в процентах. */
+export interface DayAxisDeviation {
+  key: 'kcal' | 'p' | 'f' | 'c';
+  label: string;
+  unit: string;
+  fact: number;
+  goal: number;
+  /** факт − цель (в единицах оси). */
+  diff: number;
+  /** diff / цель × 100, округлено до 0.1. */
+  diffPct: number;
+  /** §8.91: ось — ПОЛ (белок): перебор не дефект, недобор — дефект. */
+  floor: boolean;
+}
+
+/**
+ * §8.91 (решение владельца «а»): «промах» оси для вердикта дня.
+ * Обычные оси — |отклонение|; белок (пол) — только НЕДОБОР. Перебор белка не делает
+ * день несошедшимся (ядра рецептов и MPS-полы приёмов не режутся), но виден в чипе оси.
+ */
+export function axisMissPct(a: DayAxisDeviation): number {
+  return a.floor ? Math.max(0, -a.diffPct) : Math.abs(a.diffPct);
+}
+
+/** Разбор дня по осям — ровно те числа, что пользователь видит в «ИТОГО ЗА ДЕНЬ». */
+export function dayAxisDeviations(
+  totals: ExplainPlanLike['totals'],
+  targets: ExplainTargets | null | undefined,
+): DayAxisDeviation[] {
+  if (!totals || !targets) return [];
+  const out: DayAxisDeviation[] = [];
+  for (const axis of AXES) {
+    const goal = goalOf(targets, axis.aliases);
+    if (!(goal > 0)) continue;
+    const rawFact = Number((totals as any)[axis.key]);
+    const fact = Number.isFinite(rawFact) ? rawFact : 0;
+    const diff = fact - goal;
+    out.push({
+      key: axis.key,
+      label: axis.label,
+      unit: axis.unit,
+      fact: Math.round(fact),
+      goal: Math.round(goal),
+      diff: Math.round(diff),
+      diffPct: Math.round((diff / goal) * 1000) / 10,
+      floor: axis.key === 'p',
+    });
+  }
+  return out;
+}
+
+/** Ось с максимальным промахом — её и называем в заголовке. */
+export function dayWorstAxis(axes: DayAxisDeviation[]): DayAxisDeviation | null {
+  let worst: DayAxisDeviation | null = null;
+  for (const a of axes) {
+    if (!worst || axisMissPct(a) > axisMissPct(worst)) worst = a;
+  }
+  return worst;
+}
+
+/** Промах дня от целей (максимум по 4 осям, белок — только недобор, %). null — нет данных. */
 export function dayDeviationPct(
   totals: ExplainPlanLike['totals'],
   targets: ExplainTargets | null | undefined,
 ): number | null {
-  if (!totals || !targets) return null;
+  const axes = dayAxisDeviations(totals, targets);
+  if (axes.length === 0) return null;
   let maxDev = 0;
-  let hasAny = false;
-  for (const k of MAX_DEVIATIONS) {
-    // P2-fix: isFinite-гарды — строковое/битое значение из any-данных (старые сохранённые
-    // планы/импорт) давало NaN, который уезжал в текст объяснения и отклонение.
-    const rawGoal = Number((targets as any)[k]);
-    const goal = Number.isFinite(rawGoal) && rawGoal > 0 ? rawGoal : 0;
-    if (!(goal > 0)) continue;
-    const rawFact = Number((totals as any)[k]);
-    const fact = Number.isFinite(rawFact) ? rawFact : 0;
-    hasAny = true;
-    maxDev = Math.max(maxDev, Math.abs(fact - goal) / goal);
-  }
-  if (!hasAny) return null;
-  return Math.round(maxDev * 1000) / 10;
+  for (const a of axes) maxDev = Math.max(maxDev, axisMissPct(a));
+  return Math.round(maxDev * 10) / 10;
 }
 
 /**
@@ -177,15 +256,23 @@ export function explainDayPlan(
     ? plan!.passJournal!.filter(e => e && typeof e.devAfter === 'number').slice(0, 12)
     : [];
   if (!plan) {
-    return { devPct: null, tolerance, within: null, headline: null, causes: [], fixes: [], checks: [], journal: [] };
+    return { devPct: null, tolerance, within: null, headline: null, causes: [], fixes: [], checks: [], journal: [], axes: [] };
   }
+  // Реальные числа дня: считаем ВСЕГДА из фактических тоталов и целей, а не только когда
+  // движок прислал deviationPct. Причина: рецептурный контур и пост-проходы UI меняют
+  // тарелку ПОСЛЕ движка (DIAAS-ремонт, ручные цели приёма, второй рецепт), поэтому
+  // `plan.deviationPct` устаревает. Живой пример: день 2509/141/67/337 при цели
+  // 2524/112/56/393 показывался как «сошёлся 0.6%» — сравнивалась одна ось (ккал).
+  const axes = dayAxisDeviations(plan.totals, targets);
   const computed = dayDeviationPct(plan.totals, targets);
-  const devPct = typeof plan.deviationPct === 'number' && Number.isFinite(plan.deviationPct)
+  const fromPlan = typeof plan.deviationPct === 'number' && Number.isFinite(plan.deviationPct)
     ? Math.round(plan.deviationPct * 10) / 10
-    : computed;
-  const within = typeof plan.withinTolerance === 'boolean'
-    ? plan.withinTolerance
-    : (devPct == null ? null : devPct <= tolerance);
+    : null;
+  // Итоговые числа дня — авторитет; оценка движка нужна только как fallback (нет тоталов).
+  const devPct = computed == null ? fromPlan : computed;
+  // Флаг движка тоже устаревает (считается до пост-проходов): при наличии итоговых чисел
+  // верим им, иначе — флагу/порогу.
+  const within = devPct == null ? null : devPct <= tolerance;
 
   const causes: DayExplainReason[] = [];
   const fixes: DayExplainReason[] = [];
@@ -206,12 +293,45 @@ export function explainDayPlan(
     }
   }
 
+  // ── Вердикт дня приводим к ФИНАЛЬНЫМ числам ────────────────────────────────
+  // Нота «⚠ «Не сошлось»: отклонение дня 3.7%» пишется до пост-проходов (добор,
+  // дотяжка, §8.88/рецепты), поэтому в живом плане спорила с итогами: день
+  // 141/112 г белка объявлял «сошёлся 0.6%», а нота — «не сошлось 3.7%».
+  const worstAxis = axes.length > 0 ? dayWorstAxis(axes) : null;
+  const verdictRaw = () => {
+    if (devPct == null) return '';
+    if (!worstAxis) return `Отклонение дня ${devPct}% — сравнить не с чем: цели не переданы`;
+    return `Отклонение дня ${devPct}% — главная ось «${worstAxis.label}»: ${worstAxis.fact} из ${worstAxis.goal}${worstAxis.unit} (${worstAxis.diff > 0 ? '+' : ''}${worstAxis.diff}${worstAxis.unit}, ${worstAxis.diffPct > 0 ? '+' : ''}${worstAxis.diffPct}%)`;
+  };
+  if (devPct != null) {
+    const nci = causes.findIndex(c => c.id === 'not-converged');
+    // Дневные вердикты (несошедшийся день / корректор / перекос макроса) снимаются, если
+    // ИТОГОВЫЙ день в каноне: они описывают промежуточный проход. Приёмо-уровневые причины
+    // («<60%» в приёме) остаются — это точечная подсказка, а не вердикт дня.
+    const DAY_VERDICTS = new Set(['not-converged', 'corrector-left', 'macro-mismatch']);
+    if (devPct <= tolerance) {
+      for (let i = causes.length - 1; i >= 0; i--) if (DAY_VERDICTS.has(causes[i].id)) causes.splice(i, 1);
+    } else if (nci >= 0) {
+      causes[nci] = { ...causes[nci], raw: verdictRaw() };
+    } else {
+      causes.unshift({
+        id: 'not-converged', level: 'problem', title: 'День не сошёлся с целями',
+        hint: 'Цели/капы порций/квоты не дали закрыть день — различия по осям выше.', raw: verdictRaw(),
+      });
+    }
+  }
+
   const cap = Math.max(1, Number(opts?.maxPerGroup) || 4);
   let headline: string | null = null;
   if (devPct != null) {
+    // Называем ОСЬ, а не абстрактный процент: «белок 141 из 112 г» — это то, что человек
+    // видит в итогах дня. Без этого карточка сообщала «0.6%», пока белок был +26%.
+    const axisNote = worstAxis && worstAxis.key !== 'kcal' && axisMissPct(worstAxis) > tolerance
+      ? ` — главное: ${worstAxis.label} ${worstAxis.fact} из ${worstAxis.goal}${worstAxis.unit}`
+      : '';
     headline = within
       ? `День сошёлся: отклонение ${devPct}% (норма ≤${tolerance}%)`
-      : `Отклонение дня ${devPct}% — выше нормы ≤${tolerance}%`;
+      : `Отклонение дня ${devPct}% — выше нормы ≤${tolerance}%${axisNote}`;
   } else if (causes.length > 0) {
     headline = 'Есть замечания движка — разбор ниже';
   }
@@ -224,5 +344,6 @@ export function explainDayPlan(
     fixes: fixes.slice(0, cap),
     checks: checks.slice(0, cap),
     journal,
+    axes,
   };
 }

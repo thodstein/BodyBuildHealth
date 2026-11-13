@@ -151,7 +151,7 @@ export interface PlanCtx {
   manualC: number | null; setManualC: (v: any) => void;
   resultsRef: React.RefObject<HTMLDivElement | null>;
   budget: BudgetLevel; setBudget: (v: BudgetLevel) => void;
-  /** Эпик 3: белок-пресет (1.6-2.2 г/кг) — единственный «уровень белка» (legacy nutrLevel удалён). */
+  /** Эпик 3: белок-пресет (1.8-2.4 г/кг) — единственный «уровень белка» (legacy nutrLevel удалён). */
   proteinPreset: NutritionLevel; setProteinPreset: (v: NutritionLevel) => void;
   variety: string; setVariety: (v: any) => void;
   diaryAdaptation: boolean; setDiaryAdaptation: (v: boolean) => void;
@@ -1014,8 +1014,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   // Эпик 3: белок-пресет (г/кг) — единственный «уровень белка»; legacy nutrLevel
   // (ложный множитель «план на N% больше») удалён полностью.
-  // База 1.6–2.2 г/кг; legacy 'max' (2.6 г/кг, снят из UI) нормализуется в 'enhanced' (2.2),
-  // чтобы старые сохранения не продолжали молча давать 2.6 г/кг. Выше 2.2 — ручной режим КБЖУ.
+  // Диапазон 1.8–2.4 г/кг; legacy 'max' (2.6 г/кг, снят из UI) нормализуется в 'enhanced' (2.4),
+  // чтобы старые сохранения не продолжали молча давать 2.6 г/кг. Выше 2.4 — ручной режим КБЖУ.
   const _PROTEIN_PRESET_IDS = ['base', 'medium', 'enhanced'] as const;
   const _legacyProteinPreset = (['base', 'medium', 'enhanced', 'max'] as const).includes((_pf as any).proteinPreset as any)
     ? (_pf as any).proteinPreset
@@ -1498,11 +1498,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   useEffect(() => { try { updateSection('nutrition', { tasteProfile: dietPrefs }); } catch {} }, [dietPrefs]);
   const [allergenExcludedCount, setAllergenExcludedCount] = useState(0);
-  const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300 });
+  const [planTargets, setPlanTargets] = useState<{ kcal: number; protein: number; fats: number; carbs: number; p: number; f: number; c: number }>({ kcal: 2500, protein: 160, fats: 70, carbs: 300, p: 160, f: 70, c: 300 });
   // Bug-1 fix: planTargets must mirror effective* so the full nutrition report
   // (generateFullNutritionReport uses `targets: planTargets`, `userTDEE: planTargets.kcal`)
   // compares against the REAL planner targets, not the hardcoded default 2500/160/70/300.
-  useEffect(() => { setPlanTargets({ kcal: effectiveKcal, protein: effectiveP, fats: effectiveF, carbs: effectiveC }); }, [effectiveKcal, effectiveP, effectiveF, effectiveC]);
+  // ⚠ Ключи идут ПАРАМИ: настройки читают protein/fats/carbs, разбор дня — p/f/c.
+  // Без p/f/c карточка «почему день не сошёлся» сравнивала только ккал (0.6%) и
+  // объявляла сошедшимся день с белком 141/112 г — см. planner-day-explain.ts.
+  useEffect(() => { setPlanTargets({ kcal: effectiveKcal, protein: effectiveP, fats: effectiveF, carbs: effectiveC, p: effectiveP, f: effectiveF, c: effectiveC }); }, [effectiveKcal, effectiveP, effectiveF, effectiveC]);
   // Эпик 1: единая периодизация углеводов. Миграция legacy (cyclingMode/dietPauseMode/
   // periodizationEnabled → carbPeriodization) — при инициализации; legacy-поля больше
   // НЕ существуют как state и НЕ читаются генерацией.
@@ -4031,6 +4034,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             }
           });
         }
+        // Вердикт рецептурного контура (считается по ЕГО финальной тарелке). Продуктовый
+        // вердикт движка после посадки рецептов устаревает — см. фильтр нот ниже.
+        let _asmVerdict: { deviationPct: number; withinTolerance: boolean } | null = null;
         if (_genRecipes && _filteredRecipes.length > 0) {
           // A1: сборка рецептурного дня — чистая функция planner-recipe-mode
           const _asm = assembleRecipeDay({
@@ -4071,6 +4077,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             workEndMin: input.workEndMin,
           });
           meals.splice(0, meals.length, ...(_asm.meals as any[]));
+          // Честность вердикта: ноты продуктового контура («⚠ «Не сошлось» 3.7%»,
+          // «✓ Точность рациона … (Б 1%)», «✓ Корректор 19.1% → 18.2%», «LBM-коридор…»)
+          // посчитаны ДО посадки блюд. После рецептов день живёт по своим числам
+          // (замер: 141/112 г белка при ноте «Б 1%»), поэтому устаревшие вердикты
+          // убираем — их место занимает вердикт рецептурного контура ниже.
+          const _STALE_VERDICT = /(«Не сошлось»|Точность рациона:|Корректор дневных целей:|LBM-коридор мешал сходимости)/;
+          if (Array.isArray(v2.notes)) v2.notes = v2.notes.filter((n: any) => typeof n !== 'string' || !_STALE_VERDICT.test(n));
+          _asmVerdict = { deviationPct: _asm.deviationPct, withinTolerance: _asm.withinTolerance };
           if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];
         }
         // Эпик-хвост (4в): внутридневной DIAAS-ремонт — растительный белок в приёме
@@ -4093,10 +4107,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             if (_applied.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._applied.notes];
           }
         } catch {}
-        // 🍳 Режим «по рецептам»: итоги дня пересчитываются из фактических приёмов
-        // (после замены основных приёмов и ребаланса), а не из V2-тоталов.
-        const _finalDayTotals = _genRecipes ? sumDayTotals(meals as any) : null;
-        const dayKcalForPct = Math.max(1, _finalDayTotals ? _finalDayTotals.kcal : v2.totals.kcal);
+        // Итоги дня — ВСЕГДА из фактических приёмов, а не только в рецептурном контуре:
+        // DIAAS-ремонт и ручные цели приёма меняют тарелку ПОСЛЕ движка. Иначе «ИТОГО ЗА ДЕНЬ»
+        // и карточка разбора показывали бы числа, которых нет в списке блюд.
+        const _finalDayTotals = sumDayTotals(meals as any);
+        const _hasFinalTotals = (_finalDayTotals.kcal || 0) > 0;
+        const dayKcalForPct = Math.max(1, _hasFinalTotals ? (_finalDayTotals.kcal || 0) : v2.totals.kcal);
         const mealTimesPro = meals.map((m: { time: string; label: string; totals: { kcal: number } }) => ({ time: m.time, label: m.label, pct: Math.round((m.totals.kcal / dayKcalForPct) * 100) }));
         // FIX allergens-restrictions: пост-генерационная проверка аллергенов в pro-пути
         // (раньше была только в legacy; с резолвером в excludedIds срабатывает редко —
@@ -4139,9 +4155,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           });
         } catch {}
         return {
-          meals, totals: _finalDayTotals
+          meals, totals: _hasFinalTotals
             ? { kcal: _finalDayTotals.kcal, p: _finalDayTotals.p, f: _finalDayTotals.f, c: _finalDayTotals.c, fiber: _finalDayTotals.fiber || 0 }
             : { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
+          // Вердикт рецептурного контура — по его финальной тарелке (продуктовый удалён выше).
+          ...(_asmVerdict ? { deviationPct: _asmVerdict.deviationPct, withinTolerance: _asmVerdict.withinTolerance } : {}),
           isTrainingDay: v2.isTrainingDay,
           allergenWarnings: _allergenWarnings,
           supplementTimeline: buildSupplementTimeline(mealTimesPro, v2.isTrainingDay),

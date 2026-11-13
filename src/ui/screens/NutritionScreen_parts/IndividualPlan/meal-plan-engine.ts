@@ -662,7 +662,9 @@ function maxDryGrainPerMeal(budget?: string, scale = 1): number {
   const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80));
   const base = ((budget === 'max' || budget === 'enhanced') ? 150 : 120);
   const p = _pickCtx.capacity;
-  const cap = p.active ? p.dryGrainCap : 170;
+  // §8.95: сухая крупа — тоже норма по массе (якорь 80 кг = 170 г). Раньше плоский 170
+  // держал завтрак 160 кг на 102 г У при цели 183 г У (недобор дня 142 г У).
+  const cap = p.active ? p.dryGrainCap : Math.round(170 * ws);
   return Math.round(Math.min(cap, base * ws * Math.min(scale, 1.15)));
 }
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
@@ -8179,6 +8181,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String((m as any).type || ''));
       const _solidW = (mm: any) => (mm.items || []).filter((it: any) => it.role !== 'liquid')
         .reduce((s: number, it: any) => s + (it.amount || 0), 0);
+      // §8.95: «потолок тарелки» — физическая норма, а не константа. 650 г — норма
+      // атлета 80 кг; при 160 кг и 5760 ккал/6 приёмов это 960 ккал за приём, и день
+      // честно упирался в 650 г: 160 кг mass/6/отд недобирал 142 г углеводов (18.5%).
+      // Тот же вес-якорь, что уже применён в maxGramPerItem/maxGrainPerMeal/mealCarbCapacityG.
+      const _wsPlate = Math.max(1, Math.min(1.6, (input.weightKg || 80) / 80));
+      const _plateCap = Math.round(650 * _wsPlate);
       const _growIt = (mm: any, it: any, addG: number) => {
         const r = ((it.amount || 0) + addG) / Math.max(1, it.amount || 1);
         it.amount = (it.amount || 0) + addG;
@@ -8358,7 +8366,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               if ((m as any).type === 'breakfast') return false;
               if (morningTrainLoad && (m as any).type === 'dinner') return false;
               if (((m.items || []).length || 0) >= 8) return false;
-              if (_solidW(m) > 650) return false;
+              if (_solidW(m) > _plateCap) return false;
               return !(m.items || []).some((x: any) => x.role === 'fat');
             });
             if (_recips.length === 0) break;
@@ -8388,7 +8396,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const cands: any[] = [];
           for (const m of meals) {
             if (_p0aSkip(m)) continue;
-            if (_solidW(m) > 650) continue;
+            if (_solidW(m) > _plateCap) continue;
             // P1a: stale-цели — гард ниже отключён.
             if (!_staleP0a) {
             {
@@ -9331,6 +9339,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       // запас ограничен +5 г от старта — не раздуваем, но и не блокируем дотяжку.
       const _p5bBaseP = totals.p;
       let _p5bGuard = 6;
+      // §8.95b: порог дотяжки 92% → 97% цели. Дни, севшие на 96% (100 кг mass/5/трен P1.8:
+      // 519 из 540 = −3.9%), не попадали в дотяжку вообще и уходили за канон 3%.
+      // Верхнюю границу держит шаг `_need5 = цель×0.97 − факт` и ккал-гард 102%.
       while (_p5bGuard-- > 0 && totals.c < (input.goalCarbsG || 0) * 0.92 && totals.kcal < (input.goalKcal || 0) * 1.02) {
         const _p5bCands = meals
           .filter((m: any) => _flexMeal(m) && !(m as any)._insulinWindow)
@@ -9342,7 +9353,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // (`carbPortionCap`): сухая крупа 240 г (против «дегустационных» EDIBILITY 150)
             // — иначе хлопья 168 г упирались в 195 и день честно не сходился, хотя место
             // в тарелке было. Обычные дни — прежний EDIBILITY-кап (бит-в-бит).
-            let _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600, _pickCtx.capacity.edibilityMult), 600) : 0;
+            // §8.95: съедобный кап — норма по массе (якорь 80 кг = EDIBILITY). Плоский кап
+            // (рис 450) не давал 160 кг добрать углеводы: 6 приёмов × 126 г = 756 при цели 768.
+            const _ws5 = Math.max(1, Math.min(1.6, (input.weightKg || 80) / 80));
+            let _cap5 = _fd5 ? Math.min(edibilityCapFor(_fd5.id, 600, _pickCtx.capacity.edibilityMult * _ws5), Math.round(600 * _ws5)) : 0;
             if (_fd5 && _pickCtx.capacity.active) _cap5 = Math.max(_cap5, Math.min(600, carbPortionCap(_fd5, mealCapScaleOf(x.m))));
             return { ...x, fd: _fd5, cap: _cap5, room: _cap5 - (x.it.amount || 0) };
           })
@@ -15000,13 +15014,37 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // причиной (несогласованные цели / упор в капы-полы), а не подгонка мусором.
     let _dayDevPctP4 = 0;
     {
+      // §8.91 (решение владельца «а»): белок — ПОЛ. Канон оптимизации/вердикта — ккал/Ж/У
+      // (двусторонние) + недобор белка; перебор Б не дефект дня (ядра рецептов и MPS-полы
+      // не режутся), но он называется явно в ноте ниже. Порог PLANNER_CONVERGENCE_PCT НЕ поднят.
       const _dayDevP4 = Math.max(
         (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
-        (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+        (input.goalProteinG || 0) > 0 ? Math.max(0, (input.goalProteinG || 0) - totals.p) / (input.goalProteinG || 1) : 0,
         (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
         (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
       );
       _dayDevPctP4 = Math.round(_dayDevP4 * 1000) / 10;
+      // §8.91b-честность: «⚠ Перегрузка приёма … углеводы дня НЕ добиваются» пишется в
+      // середине сборки (E4), а финальная дотяжка потом закрывает углеводы. Живой 100 кг:
+      // нота про «не добиваются» висела при факте 565/560. Если по итогу У в каноне —
+      // НЕ выбрасываем предупреждение (совет «увеличьте приёмы» важен), а переписываем
+      // ложную часть: упор гарнира в кап остаётся фактом, «не добиваются» — снимается.
+      if ((input.goalCarbsG || 0) > 0
+        && Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) <= PLANNER_CONVERGENCE_PCT / 100) {
+        for (let _i = 0; _i < notes.length; _i++) {
+          if (!/^⚠ Перегрузка приёма:/.test(notes[_i])) continue;
+          notes[_i] = notes[_i].replace(
+            /Углеводы дня не добиваются: число приёмов план подбирает автоматически \(сейчас \d+\) — распределите углеводы по дневнику вручную или скорректируйте цель\./,
+            'Углеводы дня при этом добраны другими приёмами — упор в кап касается только этого приёма.',
+          );
+        }
+      }
+      {
+        const _gp = input.goalProteinG || 0;
+        if (_gp > 0 && totals.p > _gp * 1.05) {
+          notes.push(`📐 Белок — пол: ${Math.round(totals.p)} г при цели ${Math.round(_gp)} г (+${Math.round(((totals.p - _gp) / _gp) * 100)}%) — ядра/MPS-полы приёмов не режутся; перебор Б не считается расхождением дня`);
+        }
+      }
       if (_dayDevPctP4 > PLANNER_CONVERGENCE_PCT) {
         const _cons = checkTargetsConsistency(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
         if (!_cons.consistent) {
@@ -15040,13 +15078,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _dP = Math.abs(totals.p - _gP) / Math.max(1, _gP);
       const _dC = Math.abs(totals.c - _gC) / Math.max(1, _gC);
       const _dF = Math.abs(totals.f - _gF) / Math.max(1, _gF);
-      const _maxDev = Math.max(_dP, _dC, _dF);
+      // §8.91: в максимум идёт только НЕДОБОР белка — перебор Б показываем как «пол».
+      const _dPUnder = Math.max(0, (_gP - totals.p)) / Math.max(1, _gP);
+      const _pLabel = totals.p > _gP * 1.0005 ? `Б ${totals.p}/${_gP}г (пол, +${Math.round(_dP * 100)}%)` : `Б ${Math.round(_dP * 100)}%`;
+      const _maxDev = Math.max(_dPUnder, _dC, _dF);
       if (_maxDev <= 0.02) {
-        notes.push(`🎯 Точность рациона: Б ${totals.p}/${_gP}г, Ж ${totals.f}/${_gF}г, У ${totals.c}/${_gC}г (отклонение ≤2%)`);
+        notes.push(`🎯 Точность рациона: ${_pLabel}, Ж ${totals.f}/${_gF}г, У ${totals.c}/${_gC}г (отклонение ≤2%)`);
       } else if (_maxDev <= 0.05) {
-        notes.push(`✓ Точность рациона: отклонение ≤5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
+        notes.push(`✓ Точность рациона: отклонение ≤5% (${_pLabel}, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%)`);
       } else {
-        notes.push(`⚠ Точность рациона: отклонение >5% (Б ${Math.round(_dP * 100)}%, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
+        notes.push(`⚠ Точность рациона: отклонение >5% (${_pLabel}, Ж ${Math.round(_dF * 100)}%, У ${Math.round(_dC * 100)}%) — проверьте пулы продуктов`);
       }
       // B38: если движок работал от УЖАТОЙ цели (потолок), называем причину прямо —
       // это ограничение цели, а не потеря продуктов в пулах.

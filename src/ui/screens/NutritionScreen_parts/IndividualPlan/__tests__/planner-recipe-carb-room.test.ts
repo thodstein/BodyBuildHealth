@@ -87,7 +87,8 @@ describe('§3E рецептурный экстрим 1500У: dev ≤12% ИЛИ �
     expect(res.deviationPct <= 12 || effOk, `dev=${res.deviationPct}% eff=${res.deviationToEffectivePct}%`).toBe(true);
     if (res.deviationPct > 12) {
       // Честная строка обязательна: пользователь видит причину (ядра рецептов), а не «ошибку».
-      expect(res.notes.some(n => /эффективная цель Б = \d+ г \(ядра рецептов/.test(n || ''))).toBe(true);
+      // §8.91: строка переписана под семантику «белок — пол».
+      expect(res.notes.some(n => /эффективная цель Б = \d+ г \(ядра рецептов|белок — пол: \d+ г при цели \d+ г/.test(n || ''))).toBe(true);
       expect(res.effectiveProteinTargetG, 'эффективная цель Б').toBeGreaterThan(280);
       expect(Math.round(res.effectiveProteinTargetG!), 'эффективная цель = факт ядер').toBe(Math.round(tot.p));
     }

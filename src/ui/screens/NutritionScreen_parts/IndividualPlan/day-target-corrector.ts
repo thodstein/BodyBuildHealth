@@ -54,6 +54,12 @@ function sumTotals(meals: CorrectorMeal[]): DayTargets & { fiber: number } {
   return { kcal: Math.round(kcal), p: Math.round(p * 10) / 10, f: Math.round(f * 10) / 10, c: Math.round(c * 10) / 10, fiber: Math.round(fiber * 10) / 10 };
 }
 
+/**
+ * §8.91: канон корректора — двусторонний по всем 4 осям. Односторонний белок (только недобор)
+ * был замерен и ОТКАТЕН: корректор перестаёт срезать перебор Б, белок растёт (+рост дней
+ * с перебором >10%: 2→4 из 18), а медиана отклонения дня ухудшается 5.2%→6.0%.
+ * Односторонняя («пол») семантика живёт только в отчётности (карточка/ноты).
+ */
 function maxDevPct(totals: DayTargets, targets: DayTargets): number {
   const dk = targets.kcal ? Math.abs(totals.kcal - targets.kcal) / targets.kcal * 100 : 0;
   const dp = targets.p ? Math.abs(totals.p - targets.p) / targets.p * 100 : 0;

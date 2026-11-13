@@ -49,27 +49,27 @@ describe('BUDGET_LEVELS — 3 уровня (enhanced удалён из UI)', () 
 });
 
 describe('PROTEIN_PRESETS — пресеты г/кг (без ложного множителя)', () => {
-  it('3 пресета в базовом диапазоне 1.6–2.2 г/кг (решение пользователя)', () => {
-    expect(PROTEIN_PRESETS.map(p => p.gPerKg)).toEqual([1.6, 2.0, 2.2]);
+  it('3 пресета в диапазоне 1.8–2.4 г/кг (решение владельца 2026-11)', () => {
+    expect(PROTEIN_PRESETS.map(p => p.gPerKg)).toEqual([1.8, 2.1, 2.4]);
   });
   it('диапазон совпадает с краями пресетов (единый источник)', () => {
     expect(PROTEIN_G_PER_KG_RANGE.min).toBe(PROTEIN_PRESETS[0].gPerKg);
     expect(PROTEIN_G_PER_KG_RANGE.max).toBe(PROTEIN_PRESETS[PROTEIN_PRESETS.length - 1].gPerKg);
   });
-  it('авто-пресет НЕ выходит за 2.2 г/кг даже при legacy-значении выше диапазона', () => {
+  it('авто-пресет НЕ выходит за 2.4 г/кг даже при legacy-значении выше диапазона', () => {
     const legacy = day({ preset: 2.6 });
-    const cap = day({ preset: 2.2 });
+    const cap = day({ preset: 2.4 });
     expect(legacy.protein).toBe(cap.protein);
-    expect(legacy.protein).toBe(Math.round(90 * 2.2));
+    expect(legacy.protein).toBe(Math.round(90 * 2.4));
   });
   it('белок-пресет меняет ТОЛЬКО белок (жиры/угли не трогает напрямую)', () => {
-    const low = day({ preset: 1.6 });
-    const high = day({ preset: 2.2 });
+    const low = day({ preset: 1.8 });
+    const high = day({ preset: 2.4 });
     expect(high.protein).toBeGreaterThan(low.protein);
-    expect(low.protein).toBe(Math.round(90 * 1.6));
-    expect(high.protein).toBe(Math.round(90 * 2.2));
+    expect(low.protein).toBe(Math.round(90 * 1.8));
+    expect(high.protein).toBe(Math.round(90 * 2.4));
   });
-  it('ручной режим НЕ ограничен диапазоном (индивидуальная цель выше 2.2)', () => {
+  it('ручной режим НЕ ограничен диапазоном (индивидуальная цель выше 2.4)', () => {
     const r = buildDayTargets({
       weightKg: 90, presetGPerKg: 2.0, fatFloorGPerKg: 0.8, kbjuMode: 'manual',
       manual: { kcal: 3600, p: 260, f: 90, c: 380 },

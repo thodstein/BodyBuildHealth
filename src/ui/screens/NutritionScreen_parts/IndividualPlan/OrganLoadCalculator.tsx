@@ -478,7 +478,7 @@ export const OrganLoadCalculator: React.FC = () => {
               <div style={barFill(Math.min(100, protein / bw * 14), protein / bw > 2.4 ? '#ef4444' : protein / bw > 1.6 ? '#f59e0b' : '#22c55e')} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 6, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
-              <span>0</span><span>1.6-2.2 г/кг</span><span>3.5+</span>
+              <span>0</span><span>1.8-2.4 г/кг</span><span>3.5+</span>
             </div>
             <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
               {protein / bw > 2.4 ? '⚠️ Высокий белок — контроль RSL и гидратации' : protein / bw > 1.6 ? '✅ Оптимально для спортсменов' : protein / bw > 1.0 ? '🟡 Умеренно' : '🔴 Низкий — риск саркопении'}

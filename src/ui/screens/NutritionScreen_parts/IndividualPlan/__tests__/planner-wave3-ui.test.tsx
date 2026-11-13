@@ -99,6 +99,17 @@ describe('Волна-3 UI: разбор дня и A/B планов', () => {
     expect(card.querySelector('[data-bitexplain-cause="meal-carb-short"]')).toBeTruthy();
     expect(card.querySelector('[data-bitexplain-fixes="1"]')).toBeTruthy();
     expect(card.querySelector('[data-bitexplain-checks="1"]')).toBeTruthy();
+    // §8.89: реальные числа по 4 осям (факт/цель/разница), а не абстрактный процент
+    const axes = card.querySelectorAll('[data-bitexplain-axes="1"] [data-axis]');
+    expect(axes.length).toBe(4);
+    expect(Array.from(axes).map(a => a.getAttribute('data-axis'))).toEqual(['kcal', 'p', 'f', 'c']);
+    // §8.91: белок помечен как ПОЛ, чтобы «Б 141/112» читался как пол, а не как провал
+    const pAxis = card.querySelector('[data-axis="p"]')!;
+    expect(pAxis.getAttribute('data-axis-floor')).toBe('1');
+    expect(pAxis.textContent || '').toMatch(/пол/);
+    // день-фикстура не сходится хотя бы по одной оси — бейдж обязан это показать
+    expect(Array.from(axes).some(a => a.getAttribute('data-axis-ok') === '0')).toBe(true);
+    expect(card.textContent || '').toMatch(/\d+\/\d+/);
   }, 90000);
 
   it('A/B планов: слоты A/B, сравнение и diff-таблица', async () => {

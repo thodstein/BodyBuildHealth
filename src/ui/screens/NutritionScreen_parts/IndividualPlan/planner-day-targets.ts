@@ -51,7 +51,7 @@ export function planTypeFloorMods(planType?: string | null): { pMult: number; cM
 
 export interface DayTargetsInput {
   weightKg: number;
-  presetGPerKg: number;          // пресет белка пользователя (авто: жёстко 1.6–2.2, см. PROTEIN_G_PER_KG_RANGE)
+  presetGPerKg: number;          // пресет белка пользователя (авто: жёстко 1.8–2.4, см. PROTEIN_G_PER_KG_RANGE)
   fatFloorGPerKg: number;        // физиологический пол жиров (0.8)
   kbjuMode: 'auto' | 'manual' | 'profile';
   manual?: { kcal?: number | null; p?: number | null; f?: number | null; c?: number | null; gPerKg?: { protein?: number | null; fat?: number | null; carbs?: number | null } | null };
@@ -105,8 +105,8 @@ const atwater = (p: number, f: number, c: number) => Math.round(p * 4 + f * 9 + 
 
 export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const weight = Math.max(30, Math.min(300, Number(input.weightKg) || 80));
-  // Авто-белок ограничен рабочим диапазоном 1.6–2.2 г/кг (решение пользователя).
-  // Выше 2.2 — только ручной режим КБЖУ ниже: там цели берутся из явных граммов/г-кг пользователя
+  // Авто-белок ограничен рабочим диапазоном 1.8–2.4 г/кг (решение владельца 2026-11).
+  // Выше 2.4 — только ручной режим КБЖУ ниже: там цели берутся из явных граммов/г-кг пользователя
   // и этот клэмп не применяется (mode 'manual' возвращается раньше). Legacy 'max' (2.6) из старых
   // сохранений не может пробить потолок даже при прямом вызове движка.
   const preset = Math.max(PROTEIN_G_PER_KG_RANGE.min, Math.min(PROTEIN_G_PER_KG_RANGE.max, Number(input.presetGPerKg) || 2.0));
@@ -300,9 +300,11 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
 
   // ─── auto: наука = источник калорий, пресет = белок, угли = остаток ─────────
   // P1-фикс: фарма-надбавка белка (ААС/GLP) добавляется к пресету, чтобы цель дня
-  // совпадала с чипом «+ААС +N г». Кап 2.6 г/кг (выше авто-диапазона 2.2, но ниже опасного).
+  // совпадала с чипом «+ААС +N г». Потолок авто-белка = верх диапазона 2.4 г/кг
+  // (решение владельца 2026-11: «от 1.8 — 2.4, больше уже в ручных целях»):
+  // выше 2.4 авто-режим не выходит даже с фарма-надбавкой — только ручное КБЖУ.
   const pharmaBoost = Math.max(0, Number(input.pharmaProteinBoostG) || 0);
-  const protein = Math.round(Math.min(weight * 2.6, weight * preset + pharmaBoost));
+  const protein = Math.round(Math.min(weight * PROTEIN_G_PER_KG_RANGE.max, weight * preset + pharmaBoost));
   // Инсулин: научный кап жира 0.5 г/кг СИЛЬНЕЕ пола (planner-targets правило 6).
   const fatFloorAbs = Math.round(weight * fatFloor);
   const fats = insulinUnits > 0

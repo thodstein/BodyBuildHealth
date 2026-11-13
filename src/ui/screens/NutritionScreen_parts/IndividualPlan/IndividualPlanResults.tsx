@@ -31,7 +31,7 @@ import { readDiaryV2 } from "../diary-storage-v2";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
 import { avgKcalPerDay } from "./planner-average";
-import { explainDayPlan } from "./planner-day-explain";
+import { explainDayPlan, axisMissPct } from "./planner-day-explain";
 import { scoreDayComposition } from "./planner-composition-quality";
 import {
   loadAbSnapshots, saveAbSnapshot, removeAbSnapshot, snapshotFromDayPlan, diffAbSnapshots,
@@ -652,12 +652,20 @@ const doImportPlan = (raw: string): boolean => {
           // точечные проверки (MPS-интервалы, натрий, клетчатка).
           const ex = explainDayPlan(dayPlan as any, planTargets as any);
           const comp = scoreDayComposition(dayPlan as any);
-          // Заголовок честный: причины из notes движка («Не сошлось»/«Корректор…»/<60%)
-          // важнее расчётной девиации — день мог не сойтись и без отдельной ноты.
-          const bad = ex.causes.length > 0 || (ex.devPct != null && ex.devPct > ex.tolerance);
+          // Заголовок честный: «не сошёлся» — только про ИТОГ дня (оси вне канона или
+          // дневной вердикт). Перекос в одном приёме не делает несошедшимся весь день.
+          const dayVerdict = ex.devPct != null
+            ? ex.devPct > ex.tolerance
+            : ex.causes.some((c) => c.id === 'not-converged' || c.id === 'corrector-left');
+          const bad = dayVerdict || ex.causes.some((c) => c.id === 'not-converged');
           const hasContent = ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad || ex.devPct != null;
           if (!hasContent) return null;
           const accent = bad ? '#f59e0b' : '#22c55e';
+          // Нота движка уже содержит конкретику («36У из цели 120У», «+270 ккал»). Показываем
+          // её, а общий совет — второй строкой: раньше карточка состояла из одних советов.
+          const cleanNote = (s: string) => String(s || '')
+            .replace(/^[\s⚠✓➕➖🍚⚖️🥦🥕🧂📐🛡🍎🍽💪☀️⏱🟡🧭🥛•]+/u, '')
+            .trim();
           return (
             <div data-bitexplain="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: bad ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${bad ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.25)'}` }}>
               <div data-bitexplain-head style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{bad ? '🧭 Почему день не сошёлся' : '🧭 Разбор дня (сошёлся)'}</div>
@@ -667,26 +675,40 @@ const doImportPlan = (raw: string): boolean => {
                 </div>
               )}
               {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
-              <div data-composition={comp.grade} style={{ fontSize: 9, color: '#fff', marginBottom: 4, lineHeight: 1.4 }}>
-                🥗 Композиция: <b>{comp.score}/100</b> ({comp.grade})
-                {comp.issues.length === 0 ? ' · замечаний нет' : ` · ${comp.issues.length} замеч.`}
-                {comp.issues.length > 0 && (
-                  <div style={{ marginTop: 2 }}>
-                    {comp.issues.slice(0, 4).map((i, k) => <div key={'ci' + k} style={{ fontSize: 9, color: '#fff' }}>• {i.label} — {i.hint}</div>)}
-                  </div>
-                )}
-                {comp.positives.length > 0 && <div style={{ marginTop: 2, fontSize: 9, color: '#fff' }}>✓ {comp.positives.join(' · ')}</div>}
-              </div>
+              {/* Реальные числа дня: факт/цель/разница по каждой оси — то, что человек
+                  сверяет с «ИТОГО ЗА ДЕНЬ». Без этого карточка показывала «0.6%», пока
+                  белок был 141 из 112 г (сравнивалась одна ось — ккал). */}
+              {ex.axes.length > 0 && (
+                <div data-bitexplain-axes="1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 4, margin: '4px 0 6px' }}>
+                  {ex.axes.map((a) => {
+                    // §8.91: белок — пол: перебор не дефект оси (недобор — дефект).
+                    const ok = axisMissPct(a) <= ex.tolerance;
+                    const isFloorOver = a.floor && a.diff > 0;
+                    return (
+                      <div key={a.key} data-axis={a.key} data-axis-ok={ok ? '1' : '0'} data-axis-floor={a.floor ? '1' : '0'} title={`${a.label}: факт ${a.fact}${a.unit} из ${a.goal}${a.unit}${isFloorOver ? ' — белок: пол, перебор не дефект дня' : ''}`} style={{ padding: '4px 5px', borderRadius: 8, background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.12)', border: `1px solid ${ok ? 'rgba(34,197,94,0.22)' : 'rgba(245,158,11,0.32)'}` }}>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', fontWeight: 700, letterSpacing: '0.3px' }}>{a.label}{a.floor ? ' · пол' : ''}</div>
+                        <div style={{ fontSize: 10, color: '#fff', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                          {a.fact}<span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>/{a.goal}</span>
+                        </div>
+                        <div style={{ fontSize: 9, color: ok ? '#86efac' : '#fbbf24', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          {a.diff >= 0 ? '+' : ''}{a.diff}{a.unit} · {a.diff > 0 ? '+' : ''}{a.diffPct}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {ex.causes.map((r, i) => (
-                <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 3 }}>
-                  <span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span> {r.hint}
+                <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 4 }}>
+                  <div><span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span> {r.raw ? cleanNote(r.raw) : r.hint}</div>
+                  {r.raw && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{r.hint}</div>}
                 </div>
               ))}
               {ex.fixes.length > 0 && (
                 <details data-bitexplain-fixes="1" style={{ marginTop: 2 }}>
                   <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>🔧 Что движок сделал ({ex.fixes.length})</summary>
                   {ex.fixes.map((r, i) => (
-                    <div key={'bf' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.title}: {r.hint}</div>
+                    <div key={'bf' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}</div>
                   ))}
                 </details>
               )}
@@ -694,7 +716,7 @@ const doImportPlan = (raw: string): boolean => {
                 <details data-bitexplain-checks="1" style={{ marginTop: 2 }}>
                   <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>☑ Проверить ({ex.checks.length})</summary>
                   {ex.checks.map((r, i) => (
-                    <div key={'bk' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.title}: {r.hint}</div>
+                    <div key={'bk' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}</div>
                   ))}
                 </details>
               )}
@@ -708,6 +730,17 @@ const doImportPlan = (raw: string): boolean => {
                   ))}
                 </details>
               )}
+              {/* Композиция — справочно, свёрнуто: её «замечания» про повторы гарниров
+                  не объясняют, почему день не сошёлся. */}
+              <details data-composition={comp.grade} style={{ marginTop: 2 }}>
+                <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>
+                  🥗 Композиция: {comp.score}/100 ({comp.grade}){comp.issues.length === 0 ? ' · замечаний нет' : ` · ${comp.issues.length} замеч.`}
+                </summary>
+                <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>
+                  {comp.issues.map((i, k) => <div key={'ci' + k}>• {i.label} — {i.hint}</div>)}
+                  {comp.positives.length > 0 && <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.65)' }}>✓ {comp.positives.join(' · ')}</div>}
+                </div>
+              </details>
             </div>
           );
         })()}

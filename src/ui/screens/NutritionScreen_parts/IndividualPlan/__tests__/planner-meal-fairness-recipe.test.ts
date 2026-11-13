@@ -56,18 +56,20 @@ const starvingMeals = (meals: any[]): string[] => (meals || [])
 
 const CELLS: Array<[string, MealPlanInput, number]> = [
   ['R-1500 rest', base(), 9.9],
-  ['R-1500 train', base({ isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true }), 3.0],
+  ['R-1500 train', base({ isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90, allowIntraWorkout: true }), 2.5],
   ['plain 2600', base({ weightKg: 85, lbmKg: 72, goalKcal: 2600, goalProteinG: 175, goalFatG: 80, goalCarbsG: 320 }), 2.6],
   ['plain 2600 s0', base({ weightKg: 85, lbmKg: 72, goalKcal: 2600, goalProteinG: 175, goalFatG: 80, goalCarbsG: 320, randomSalt: 0 }), 2.9],
 ];
 
 describe('QG52 в рецептурном контуре: приёмы — еда, сходимость не двигается', () => {
   for (const [label, inp, devRef] of CELLS) {
-    it(`${label}: ни одного «не еды», девиация дня ${devRef} % (как до стадии)`, () => {
+    it(`${label}: ни одного «не еды», девиация дня не хуже ${devRef} %`, () => {
       const res: any = assemble(inp);
       const starv = starvingMeals(res.meals as any);
       expect(starv, starv.join(' ')).toHaveLength(0);
-      expect(res.deviationPct, `девиация ${res.deviationPct} %`).toBeCloseTo(devRef, 0);
+      // Опорное значение — девиация до стадии справедливости. §8.91 улучшил канон дня
+      // (крупный углеводный остаток), поэтому проверяем «не хуже», а не точное равенство.
+      expect(res.deviationPct, `девиация ${res.deviationPct} %`).toBeLessThanOrEqual(devRef + 0.5);
       // день нейтрален: сумма приёмов = итог дня (перенос не добавляет/не убирает еду)
       const t = sumDayTotals(res.meals as any);
       const mealsKcal = (res.meals as any[]).reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0);

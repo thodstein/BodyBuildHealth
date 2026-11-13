@@ -75,7 +75,7 @@ describe('P1: фарма-надбавка белка доезжает до дн�
     expect(boosted.protein).toBe(plain.protein + 27);
     expect(boosted.breakdown.some(b => b.includes('Фарма-надбавка белка'))).toBe(true);
   });
-  it('кап 2.6 г/кг соблюдается', () => {
+  it('потолок авто-белка 2.4 г/кг соблюдается (выше — только ручные цели)', () => {
     const r = buildDayTargets({
       weightKg: 90, presetGPerKg: 2.2, fatFloorGPerKg: 0.8, kbjuMode: 'auto',
       calcTargets: computePlannerTargets(base({})),
@@ -83,7 +83,7 @@ describe('P1: фарма-надбавка белка доезжает до дн�
       goal: 'mass', trainingVolumeMinPerWeek: 300, budget: 'medium', insulinTotalUnits: 0,
       pharmaProteinBoostG: 999,
     });
-    expect(r.protein).toBeLessThanOrEqual(Math.round(90 * 2.6));
+    expect(r.protein).toBeLessThanOrEqual(Math.round(90 * 2.4));
   });
 });
 
