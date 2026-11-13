@@ -8,8 +8,9 @@ import type { SubstanceEntry, MasterDB } from '../../../core/types';
 import { INTERACTION_ENRICHMENT } from '../../../data/support-interaction-enrichment';
 import { dedupeDepletions, stackOverlap, stackScore as calcHubStackScore } from '../../../engines/support-hub-stack.engine';
 import { evidenceGradeExFor } from '../../../engines/support-hub-evidence.engine';
-import { getMaxDose } from '../../../data/support-dosing';
-import { stackLimitVerdicts, type StackItem } from '../../../engines/support-limits';
+import { getMaxDose, getDosingRecord } from '../../../data/support-dosing';
+import { IU_PER_MCG_VITAMIN_D } from '../../../data/dose-units';
+import { stackLimitVerdicts, resolveNutrient, NUTRIENT_LIMITS_V2, type StackItem } from '../../../engines/support-limits';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
 
@@ -69,6 +70,34 @@ interface LabMon {
   tier3?: string;     // экстренно
 }
 // Экспортируется для паспорта вещества (единый источник, без дублей таблицы).
+/**
+ * Проход 32: доза из базы веществ → ЕДИНИЦА РЕЕСТРА пределов.
+ *
+ * `doseRange` витамина D — МЕ (до 10000), витамина E — МЕ (до 400), селена —
+ * мкг (200). Реестр для D держит МЕ, для E — мг α-токоферола, для Se — мкг.
+ * Поэтому конвертируем только там, где единица базы ОТЛИЧАЕТСЯ от единицы
+ * реестра: E 400 МЕ сравнивалось напрямую с UL 300 мг → ложное «превышение»
+ * (реально ~268 мг α-токоферола).
+ */
+export function toRegistryAmount(id: string, value: number): number | undefined {
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  const unit = String(getDosingRecord(id)?.doseRange.unit || '').toLowerCase();
+  const norm = resolveNutrient(id);
+  if (!norm) return undefined; // не нутриент (hCG и т.п.) — в сумму по нутриентам не идёт
+  const registryUnit = NUTRIENT_LIMITS_V2[norm]?.unit ?? unit;
+  const toMg = (v: number) => Math.round(v * 100) / 100;
+  if (unit === 'iu') {
+    if (registryUnit === 'iu') return value; // витамин D: база и реестр в МЕ
+    // 1 МЕ d-α-токоферола = 0.67 мг α-токоферола (1 мг = 1.49 МЕ).
+    if (registryUnit === 'mg' && norm === 'vitamin_e') return toMg(value * 0.67);
+    if (registryUnit === 'mcg') return toMg(value / IU_PER_MCG_VITAMIN_D);
+    return undefined; // МЕ без нутриентной шкалы (hCG и т.п.) в сумму не идут
+  }
+  if (unit === 'mcg' && registryUnit === 'mg') return toMg(value / 1000);
+  if (unit === 'mg' && registryUnit === 'mcg') return toMg(value * 1000);
+  return value; // единицы совпадают
+}
+
 export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   // ── AAS & гормональные препараты ── (маркеры общие для всех AAS)
   '': [
@@ -499,13 +528,15 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
   // только карточка сравнения `he_bio_dose_v1`, максимум 2 вещества). Поэтому сумма
   // считается по дозам ИЗ БАЗЫ (верхняя граница диапазона), и это подписано явно.
   // Молча выдавать это за «вашу дозу» было бы тем же враньём, что и `+= 1`.
+  /* ──────────────── CUMULATIVE LOAD ──────────────── */
   const cumulativeLoad = useMemo(() => {
     const items: StackItem[] = [];
     for (const id of validIds) {
       const entry = SUPPORT_CATALOG_DATA[id]; if (!entry) continue;
       const ru = entry.nameRu || entry.name || id;
-      const doseMg = getMaxDose(id);
-      items.push({ id, nameRu: ru, doseMg: doseMg > 0 ? doseMg : undefined, timesPerDay: 1 });
+      const amount = toRegistryAmount(id, getMaxDose(id));
+      if (amount == null) continue;
+      items.push({ id, nameRu: ru, doseMg: amount, timesPerDay: 1 });
     }
     return stackLimitVerdicts(items).map(c => ({
       nutrient: c.nutrient,
@@ -1002,12 +1033,14 @@ export const UnifiedSynergyCalculator: React.FC<{ s?: Record<string,any> }> = ({
                   const warn = l.verdict.color==='warn';
                   const na = l.verdict.limitNotApplicable || l.verdict.kind==='NotEstablished';
                   const accent = over?'#ef4444' : warn?'#f59e0b' : na?'#a1a1aa' : '#60a5fa';
+                  // Проход 32: единица — из предела, а не всегда «мг» (D3 и Se живут в мкг).
+                  const unitRu = lim?.unit === 'mcg' ? 'мкг' : lim?.unit === 'iu' ? 'МЕ' : 'мг';
                   return (
                     <div key={i} style={{ padding:'5px 8px', borderRadius:6, background:over?'rgba(239,68,68,0.04)':'rgba(96,165,250,0.02)', border:`1px solid ${over?'rgba(239,68,68,0.1)':'rgba(96,165,250,0.06)'}` }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                         <span style={{ fontSize:8, fontWeight:600, color:accent }}>{l.nutrient.toUpperCase()}</span>
                         <span style={{ fontSize:7, color:accent, fontWeight:600 }}>
-                          {l.amountPerDay} мг{denom ? ` / ${denom} ${lim!.unit==='mcg'?'мкг':lim!.unit==='iu'?'МЕ':'мг'}` : ''}
+                          {l.amountPerDay} {unitRu}{denom ? ` / ${denom} ${unitRu}` : ''}
                           {over ? ` — превышение UL` : warn ? ' — выше ориентира' : na ? (l.verdict.limitNotApplicable ? ' — предел неприменим' : ' — UL не установлен') : ` (${pct}%)`}
                         </span>
                       </div>
