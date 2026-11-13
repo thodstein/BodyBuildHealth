@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { FEMALE_SUPPORT_PROTOCOLS } from '../supportProtocolWomenData';
 import { NUTRIENT_LIMITS_V2 } from '../../../../engines/support-limits';
+import { CROSS_CAPS } from '../supportProtocolsShared';
 
 const ROWS = FEMALE_SUPPORT_PROTOCOLS.flatMap((p) =>
   p.rows.map((r) => ({ ...r, protocol: p.title })),
@@ -69,6 +70,50 @@ describe('женские протоколы поддержки: дозы в гр
       const max = maxOf(r.dose, 'мг');
       if (max === null || max <= ul) continue;
       expect(`${r.dose} ${r.note}`, r.protocol).toContain('UL B6');
+    }
+  });
+});
+
+// ── Проход 40: правила, которые уже несут мужские протоколы, в женских тоже ──
+describe('женские протоколы: медь, потолок B6, потолок NAC, шкала витамина E', () => {
+  it('цинк ≥25 мг/сут — в строке есть медь (иначе дефицит Cu)', () => {
+    const missing: string[] = [];
+    for (const r of rowsNamed(/цинк/i)) {
+      const max = maxOf(r.dose, 'мг');
+      if (max === null || max < 25) continue;
+      if (!/медь|меди|Cu\b/i.test(`${r.dose} ${r.note}`)) missing.push(`${r.protocol}: ${r.dose} — ${r.note}`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('B6 не выше потолка протокола (кап 100 мг из CROSS_CAPS)', () => {
+    const cap = CROSS_CAPS.find(c => c.key === 'b6')!.cap;
+    for (const r of rowsNamed(/B6|P5P/i)) {
+      const max = maxOf(r.dose, 'мг');
+      if (max === null) continue;
+      expect(max, `${r.protocol}: ${r.dose}`).toBeLessThanOrEqual(cap);
+    }
+  });
+
+  it('NAC: подпись «кросс-кап 4000» называет движковый кап 2400', () => {
+    const bad: string[] = [];
+    for (const r of rowsNamed(/NAC/i)) {
+      if (!/4000/.test(`${r.dose} ${r.note}`)) continue;
+      if (!/2400/.test(r.note)) bad.push(`${r.protocol}: ${r.note}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('витамин E в МЕ: пересчёт в мг α-токоферола в пределах UL 300 мг', () => {
+    const ul = NUTRIENT_LIMITS_V2.vitamin_e.value; // мг α-токоферола
+    const rows = rowsNamed(/витамин\s*E/i);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      const me = maxOf(r.dose, 'МЕ');
+      if (me === null) continue;
+      const mg = me * 0.67; // 1 МЕ = 0.67 мг d-α-токоферола
+      expect(mg, `${r.protocol}: ${r.dose}`).toBeLessThanOrEqual(ul);
+      expect(`${r.dose} ${r.note}`, r.protocol).toMatch(/UL|мг/);
     }
   });
 });

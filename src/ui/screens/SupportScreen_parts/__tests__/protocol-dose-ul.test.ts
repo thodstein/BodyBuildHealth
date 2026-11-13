@@ -88,3 +88,23 @@ describe('плашка вшита во все рендеры строк', () => 
     expect(uses.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+// ── Проход 40: потолок протокола B6 — 100 мг (`CROSS_CAPS.b6`) ──
+describe('потолок B6 в протоколах не превышен', () => {
+  it('ни одна строка протокола не назначает B6 выше 100 мг', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { join, resolve } = await import('node:path');
+    const dir = resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts');
+    const bad: string[] = [];
+    for (const f of readdirSync(dir)) {
+      if (!/^supportProtocol.*\.tsx$/.test(f)) continue;
+      const src = readFileSync(join(dir, f), 'utf8');
+      // Только ИМЕНА строк (доза), а не предупреждения в noteText.
+      for (const m of src.matchAll(/name\s*:\s*'[^']*?\bB6\s*(\d{2,3})\s*мг/g)) {
+        const mg = Number(m[1]);
+        if (mg > 100) bad.push(`${f}: B6 ${mg} мг`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+});
