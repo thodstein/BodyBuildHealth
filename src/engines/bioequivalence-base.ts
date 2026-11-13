@@ -125,7 +125,7 @@ export const FORM_PROFILES: Record<string, FormProfile> = {
     bestTakenWith: 'with_vitamin_c',
     advantages: ['Дёшево'],
     disadvantages: ['Запоры', 'Тошнота', 'Окрашивает зубы'],
-    notes: '100 мг сульфата = 20 мг Fe. UL = 45 мг/день.',
+    notes: '100 мг сульфата = 20 мг Fe. Safe Level 40 мг/день (EFSA 2024; НЕ порог токсичности), IOM 45 — прежняя оценка.',
     evidence: 'A',
   },
   calcium_citrate_form: {
@@ -437,7 +437,7 @@ export const FORM_PROFILES: Record<string, FormProfile> = {
     bestTakenWith: 'anytime', preferredFor: ['Заболевания печени', 'MTHFR'],
     advantages: ['Не требует конверсии', 'Безопаснее при высоких дозах'],
     disadvantages: ['Дороже пиридоксина'],
-    notes: '50-100 мг/день. UL 100 мг (периферическая нейропатия при >200 мг).',
+    notes: '50-100 мг/день — выше UL добавок 12 мг (EFSA 2023): только курсом, не постоянно. Нейропатия при длительном >200 мг; 100 мг — прежняя оценка IOM.',
     evidence: 'A',
   },
   // ── МИНЕРАЛЫ ──
@@ -448,7 +448,7 @@ export const FORM_PROFILES: Record<string, FormProfile> = {
     bestTakenWith: 'with_food', preferredFor: ['Иммунитет', 'Щитовидная железа'],
     advantages: ['90% биодоступность', 'Длительный T½'],
     disadvantages: ['Дороже селенита'],
-    notes: '100-200 мкг/день. UL 400 мкг.',
+    notes: '100-200 мкг/день. UL 255 мкг (EFSA 2023); 400 мкг — прежняя оценка IOM.',
     evidence: 'A',
   },
   cr_picolinate_form: {
