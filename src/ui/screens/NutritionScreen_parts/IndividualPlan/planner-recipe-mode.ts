@@ -330,6 +330,169 @@ export interface DayMacroTargets { kcal: number; p: number; f: number; c: number
  * приёмах с комнатой тарелки. Ядра рецептов (ingredientIds) не трогаются — их напиток
  * ограничен отдельно на этапе масштабирования (recipe-engine «drink»).
  */
+/**
+ * §8.101 (B16): «овощ-носитель» vs «овощ-гарнир».
+ *
+ * Дефект (замер, 56 ячеек): овощи используются как носитель углеводов, когда в приёме нет
+ * места под крахмал. Примеры: `100 cut/5/отд P1.8` — обед «капуста 243 + помидор 243 +
+ * огурец 243» = 729 г, из них 32 г У при 58 г У приёма (55%), тарелка 969 г;
+ * `70 cut/5/отд P1.8` — ужин «брокколи 300 + лук 100», 30 из 42 г У (71%);
+ * `70 cut/4/трен P2.4` — ужин «брокколи 309 + лук 52», 26 из 28 г У (93%).
+ *
+ * Прежняя попытка (жёсткий кап 400 г) срезала 30 г У и уводила день 3.1% → 7.4% — потому что
+ * овощ был НОСИТЕЛЕМ, а замены не было. Здесь не срез, а ПЕРЕНОС: углеводы овоща уезжают в
+ * крахмалистый носитель того же приёма, овощ остаётся гарниром (≥ `250 × ws`), тарелка легчает.
+ *
+ * Приёмка (как у закрывателя §8.96): правка принимается, только если ни одна ось дня не
+ * вышла из канона 3%, худшая ось не хуже `max(до + 0.35 п.п., 3%)` (допуск на округление
+ * порций) и клетчатка дня не упала ниже 25 г (иначе «овощ-носитель» был единственным её
+ * источником). Иначе — полный откат приёма.
+ * Ядра рецептов не трогаются: овощ из `ingredientIds` остаётся как есть.
+ *
+ * Возвращает ноты по совершённым переносам (для честного лога дня).
+ */
+export function applyVegCarrierHygiene(
+  meals: PlanMealLike[],
+  targets: { kcal: number; p: number; f: number; c: number },
+  opts?: { weightKg?: number },
+): string[] {
+  const notes: string[] = [];
+  const ws = Math.max(1, Math.min(1.6, (Number(opts?.weightKg) || 80) / 80));
+  // Гарнирный норм: 250 г × ws (70 кг — 250, 100 кг — 310, 160 кг — 400). Ниже — «салат».
+  const targetVegG = Math.round((250 * ws) / 10) * 10;
+  const _sweetOrDrink = /honey|jam|sugar|syrup|condens|milk|kefir|yogurt|juice|smoothie|isotonic|amilo|мед|мёд|варень|сахар|сироп|сгущ|молок|кефир|йогурт|сок|нектар|смузи/i;
+  const _grain = /круп|хлопь|рис|греч|булгур|кукуруз|полент|макарон|овсян|пшен|перлов|киноа|тальятел|спагетт|кускус|соба|нут\b|чечев/i;
+  const isPeri = (m: any): boolean => !!(m as any)?._insulinWindow
+    || ['preworkout', 'postworkout', 'intra'].includes(String((m as any)?.type || ''))
+    || /предтрен|пост-трен|intra/i.test(String((m as any)?.label || ''));
+  const coreOf = (m: any): Set<string> => new Set([
+    ...(((m as any)?.ingredientIds as any[]) || []),
+    ...(((m as any)?.recipeIngredientIds as any[]) || []),
+  ].map(String));
+  const axesOf = (t: any) => {
+    const d = (a: number, b: number) => (b > 0 ? (Math.abs(a - b) / b) * 100 : 0);
+    return {
+      k: d(t.kcal || 0, targets.kcal || 0),
+      f: d(t.f || 0, targets.f || 0),
+      c: d(t.c || 0, targets.c || 0),
+      pUnder: Math.max(0, ((targets.p || 0) - (t.p || 0)) / Math.max(1, targets.p || 1)) * 100,
+    };
+  };
+  const worstOf = (a: { k: number; f: number; c: number; pUnder: number }) =>
+    Math.max(a.k, a.f, a.c, a.pUnder);
+  const fiberOf = (): number => (meals as any[]).reduce((s: number, m: any) => s
+    + (m.items || []).reduce((ss: number, it: any) => ss + (Number(it.fiber) || 0), 0), 0);
+  const resize = (m: any, it: any, newAmount: number): void => {
+    const r = newAmount / Math.max(1, it.amount || 1);
+    it.amount = Math.round(newAmount);
+    it.p = Math.round((it.p || 0) * r * 10) / 10;
+    it.f = Math.round((it.f || 0) * r * 10) / 10;
+    it.c = Math.round((it.c || 0) * r * 10) / 10;
+    it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
+    if (it.fiber != null) it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+    m.totals = sumMealTotals(m.items as any);
+  };
+
+  for (const m of meals as any[]) {
+    if (isPeri(m)) continue;
+    const items = (m.items || []) as any[];
+    const core = coreOf(m);
+    const veg = items.filter((it: any) => String(it?.role || '') === 'veg' && !core.has(String(it.id)));
+    if (veg.length === 0) continue;
+    const vegG = veg.reduce((s: number, it: any) => s + (Number(it.amount) || 0), 0);
+    if (vegG < targetVegG + 40) continue; // запас <40 г над нормой — салат, а не носитель
+    const vegC = veg.reduce((s: number, it: any) => s + (Number(it.c) || 0), 0);
+    const mealC = items.reduce((s: number, it: any) => s + (Number(it.c) || 0), 0);
+    if (!(mealC > 0) || vegC < 0.4 * mealC) continue; // овощ не несёт углеводы приёма
+
+    const snapItems = items.map((x: any) => ({ ...x }));
+    const snapTotals = { ...(m.totals || {}) };
+    const t0 = sumDayTotals(meals as any);
+    const a0 = axesOf(t0);
+    const worst0 = worstOf(a0);
+    const fiber0 = fiberOf();
+    const carbsBefore = vegC;
+    const kcalVegBefore = veg.reduce((s: number, it: any) => s + (Number(it.kcal) || 0), 0);
+    // 1) Овощ — гарнир: ужимаем пропорционально до нормы, каждый пункт ≥60 г.
+    let left = 0;
+    for (const it of veg) {
+      const share = (Number(it.amount) || 0) / Math.max(1, vegG);
+      const want = Math.max(60, Math.round((targetVegG * share) / 5) * 5);
+      if (want < (Number(it.amount) || 0)) resize(m, it, want);
+      left += Math.max(Number(it.amount) || 0, 0);
+    }
+    const carbsAfter = veg.reduce((s: number, it: any) => s + (Number(it.c) || 0), 0);
+    const freed = carbsBefore - carbsAfter;
+    const kcalFreed = kcalVegBefore - veg.reduce((s: number, it: any) => s + (Number(it.kcal) || 0), 0);
+    if (freed < 8) { m.items = snapItems; m.totals = snapTotals; continue; }
+    // 2) Крахмалистый носитель: сначала существующий в приёме, иначе — плотная крупа.
+    let host: any = items
+      .filter((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast')
+        && !core.has(String(it.id)) && !it._fixedGrams
+        && !_sweetOrDrink.test(`${it.id || ''} ${it.name || ''}`)
+        && ((Number(it.c) || 0) / Math.max(1, Number(it.amount) || 1)) >= 0.15
+        && (Number(it.amount) || 0) < 400)
+      .sort((a: any, b: any) => ((Number(b.c) || 0) / Math.max(1, Number(b.amount) || 1))
+        - ((Number(a.c) || 0) / Math.max(1, Number(a.amount) || 1)))[0];
+    if (host) {
+      const kPerG = Math.max(0.2, (Number(host.kcal) || 0) / Math.max(1, Number(host.amount) || 1));
+      const add = Math.max(10, Math.round(kcalFreed / kPerG / 5) * 5);
+      resize(m, host, Math.min(400, (Number(host.amount) || 0) + add));
+    } else {
+      // Носитель выбираем по МАКРО-НЕЙТРАЛЬНОСТИ, а не по плотности углеводов: овощ отдаёт
+      // почти только углеводы (жир/белок ≈ 0), и «плотная крупа» с 2 г жира на 100 г уводила
+      // жир дня из канона — приёмка справедливо отклоняла перенос (100 cut/5/отд P1.8: 58/58).
+      // Цена 1 г углеводов = 9×жир + 4×белок на 100 г, делённое на углеводы на 100 г.
+      const _costOf = (f: any): number => {
+        const c100 = Number(f.carbs) || 0;
+        return c100 > 0 ? (9 * (Number(f.fat) || 0) + 4 * (Number(f.protein) || 0)) / c100 : Infinity;
+      };
+      const fd = (FOOD_DB as any[])
+        .filter((f: any) => _grain.test(String(f.name || '')) && !_sweetOrDrink.test(String(f.name || ''))
+          && (Number(f.carbs) || 0) >= 12 && (Number(f.fat) || 0) <= 3)
+        .sort((a: any, b: any) => _costOf(a) - _costOf(b)
+          || (Number(b.carbs) || 0) - (Number(a.carbs) || 0))[0];
+      if (!fd) { m.items = snapItems; m.totals = snapTotals; continue; }
+      const dens = Math.max(0.1, (Number(fd.carbs) || 0) / 100);
+      const kPerG = Math.max(0.2, (Number(fd.kcal) || 0) / 100);
+      // Граммы считаем ПО ОСВОБОДИВШИМСЯ ККАЛ, а не по углеводам. Овощ отдаёт воду и
+      // клетчатку, поэтому «1 г У овоща» ≠ «1 г У крупы»: перенос по углеводам поднимал
+      // ккал дня на 12–20 и выбивал день из канона (100 cut/5/отд P1.8: 2.96% → 3.4%,
+      // приёмка отклоняла перенос и вёдра овощей оставались). Ккал-нейтральный перенос
+      // проходит приёмку и на замере 56 ячеек дал лучший канон: 9 ячеек вне 3% против 10,
+      // две ячейки улучшились (70 cut/5/отд P1.8 2.5 → 1.7, 100 cut/5/отд P1.8 3.2 → 2.8).
+      // Остаток углеводов добирает закрыватель — новый пункт не ядро, он редактируем.
+      const grams = Math.max(10, Math.round((kcalFreed > 0 ? kcalFreed / kPerG : freed / dens) / 5) * 5);
+      host = scaleItem({
+        name: fd.name, id: fd.id, amount: 100, kcal: Math.round(fd.kcal || 0),
+        p: fd.protein || 0, f: fd.fat || 0, c: fd.carbs || 0, fiber: fd.fiber || 0, role: 'carb_slow',
+      } as any, grams) as any;
+      m.items = [...(m.items || []), host];
+      m.totals = sumMealTotals(m.items as any);
+    }
+    // 3) Приёмка: день не стал хуже, канон цел, клетчатка дня ≥25 г.
+    const t1 = sumDayTotals(meals as any);
+    const a1 = axesOf(t1);
+    const brokeCanon = (['k', 'f', 'c'] as const).some(ax => a0[ax] <= 3 + 1e-9 && a1[ax] > 3 + 1e-9);
+    const fiber1 = fiberOf();
+    // Допуск приёмки: перенос ккал-нейтрален, но округление порций даёт ±0.3 п.п. Строгий
+    // «не хуже» отбрасывал все переносы на днях, стоящих у самой границы канона
+    // (100 cut/5/отд P1.8: 2.96% ккал), и вёдра овощей оставались. Допуск ±0.35 п.п.
+    // ограничен сверху каноном 3%: замер 56 ячеек — поломок канона 0.
+    if (brokeCanon || worstOf(a1) > Math.max(worst0 + 0.35, 3.0) || fiber1 < 25 || fiber1 < fiber0 - 12) {
+      m.items = snapItems;
+      m.totals = snapTotals;
+      continue;
+    }
+    notes.push(
+      `🥗 «${String(m.label || m.type)}»: овощи ${Math.round(vegG)} → ${Math.round(left)} г, `
+      + `углеводы перенесены в ${host.name} (${Math.round(Number(host.amount) || 0)} г) — `
+      + `тарелка ${Math.round(items.reduce((s: number, it: any) => s + (Number(it.amount) || 0), 0))} г`,
+    );
+  }
+  return notes;
+}
+
 export function applyPortionHygiene(meals: PlanMealLike[], opts?: { weightKg?: number }): string[] {
   const notes: string[] = [];
   const w = Number(opts?.weightKg) || 80;
@@ -340,6 +503,11 @@ export function applyPortionHygiene(meals: PlanMealLike[], opts?: { weightKg?: n
     const key = `${it?.id || ''} ${it?.name || ''}`;
     if (/молок|кефир|айран|ряженк|buttermilk|(^|\s)(milk|kefir|ayran|ryazhenka)/i.test(key)) return { cap: 300, why: 'напиток' };
     if (/мёд|мед|варень|джем|honey|jam|marmalade/i.test(key)) return { cap: 60, why: 'сладость' };
+    // §8.101b: концентрированные приправы в роли «овоща». Замер: `120 mass/5/трен P1.8`,
+    // ужин «помидор 155 + томатная паста 155 + лук 155» — 155 г томатной пасты это
+    // полтора тюбика, а не овощ (47 г У из пасты). Паста/кетчуп — приправа, 50 г хватает
+    // на вкус; снятые углеводы закрыватель добирает крахмалом.
+    if (/томатная паста|паста томатная|томат-паста|tomato paste|кетчуп|ketchup/i.test(key)) return { cap: 50, why: 'приправа' };
     if (/egg_white|яичный белок/i.test(key)) return { cap: eggCap, why: 'белок-наполнитель' };
     return null;
   };
@@ -362,7 +530,14 @@ export function applyPortionHygiene(meals: PlanMealLike[], opts?: { weightKg?: n
     for (const it of items) {
       if (core.has(String(it.id))) continue; // ядро рецепта — не наше дело
       const c = capOf(it);
-      if (c && (it.amount || 0) > c.cap) _shrink(m, it, c.cap);
+      if (c && (it.amount || 0) > c.cap) {
+        _shrink(m, it, c.cap);
+        // Приправа не должна отрасти обратно: закрыватель (§8.96) добирает углеводы в том
+        // числе ростом существующих пунктов, и без метки паста возвращалась к 155 г
+        // (замер: кап применялся, но день заканчивался с пастой 155). `_fixedGrams`
+        // закрыватель уважает (scaleItem → return it).
+        if (c.why === 'приправа') (it as any)._fixedGrams = true;
+      }
     }
     // §8.97b (долг B16): овощи НЕ каплю. Замер: жёсткий кап 400 г (243×3 = 729 г) срезал
     // 30 г У у 100 кг cut/5/отд P1.8 и уводил день из канона 3.1% → 7.4% — овощи там
@@ -3075,6 +3250,16 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   {
     const _ofTot = sumDayTotals(outMeals as any);
     applyPlateOverflowRelief(outMeals as any[], _ofTot as any, Number(args.athleteWeightKg) || 80, notes);
+  }
+
+  // §8.101 (B16): овощ-носитель → овощ-гарнир. ПОСЛЕ всех стадий (закрыватель, выравнивание,
+  // перенос тарелок): раньше день ещё не в финальном виде, и замер показывал ноль переносов,
+  // потому что на промежуточном состоянии овощ ещё не был виден как носитель углеводов.
+  // Приёмка внутри стадии: худшая ось дня не хуже max(до + 0.35, 3%), канон не ломается,
+  // клетчатка дня ≥25 г — иначе полный откат переноса.
+  {
+    const _vegNotes = applyVegCarrierHygiene(outMeals as any, targets as any, { weightKg: args.athleteWeightKg ?? 80 });
+    if (_vegNotes.length > 0) notes = [...notes, ..._vegNotes];
   }
 
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
