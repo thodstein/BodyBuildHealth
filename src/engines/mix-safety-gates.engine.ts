@@ -1,5 +1,10 @@
 /** mix-safety-gates.engine.ts — гейты безопасности миксов (эпик C).
- *  Чистые функции: стек + контекст → список гейтов block/warn/info. */
+ *  Чистые функции: стек + контекст → список гейтов block/warn/info.
+ *
+ *  Числовые пределы (Zn, витамин C) берутся из реестра `NUTRIENT_LIMITS_V2`,
+ *  а не литералами: иначе гейт и UL-контур плана расходятся.
+ */
+import { NUTRIENT_LIMITS_V2 } from './support-limits';
 
 export type GateLevel = 'block' | 'warn' | 'info';
 
@@ -64,16 +69,20 @@ export function mixSafetyGates(
     gates.push({ level: 'block', code: 'insulin_doctor', text: '⛔ Инсулин вне клиники — риск тяжёлой гипогликемии. Рецепт-советы заблокированы: только врач + глюкометр + быстрые угли под рукой. Хаб не дозирует инсулин.' });
   }
 
-  // Цинк-стек UL 40 мг
+  // Цинк: UL из реестра + правило меди (порог 25 мг/сут — как в кросс-капе)
+  const zincUl = NUTRIENT_LIMITS_V2.zinc.value;
   const zinc = ctx.zincMgTotal ?? stack.filter(s => s.id.toLowerCase() === 'zinc').reduce((a, s) => a + (s.mg || 0), 0);
-  if (zinc > 40) {
-    gates.push({ level: 'warn', code: 'zinc_ul', text: `⚠️ Цинк ${Math.round(zinc)} мг > UL 40 мг/сут (сумма пресета + ZMA). Уберите дубль.` });
+  if (zinc > zincUl) {
+    gates.push({ level: 'warn', code: 'zinc_ul', text: `⚠️ Цинк ${Math.round(zinc)} мг > UL ${zincUl} мг/сут (сумма пресета + ZMA). Уберите дубль.` });
+  } else if (zinc >= 25) {
+    gates.push({ level: 'info', code: 'zinc_copper', text: `ℹ️ Цинк ${Math.round(zinc)} мг/сут: медь 1–2 мг обязательна (цинк ↑ металлотионеин → блок всасывания Cu).` });
   }
 
-  // Витамин C UL
+  // Витамин C: гейт ЖКТ строже UL — предел указываем, чтобы числа не спорили
+  const vcUl = NUTRIENT_LIMITS_V2.vitamin_c.value;
   const vc = ctx.vitaminCMgTotal ?? stack.filter(s => s.id.toLowerCase() === 'vitamin_c').reduce((a, s) => a + (s.mg || 0), 0);
   if (vc > 1000) {
-    gates.push({ level: 'warn', code: 'vitc_ul', text: `⚠️ Витамин C ${Math.round(vc)} мг > 1 г/сут — ЖКТ/оксалаты. Достаточно 75–500 мг + коллаген-протокол.` });
+    gates.push({ level: 'warn', code: 'vitc_ul', text: `⚠️ Витамин C ${Math.round(vc)} мг > 1 г/сут — ЖКТ/оксалаты (UL ${vcUl} мг/сут). Достаточно 75–500 мг + коллаген-протокол.` });
   }
 
   // Омега-3 + антикоагулянты

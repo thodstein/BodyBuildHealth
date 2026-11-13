@@ -34,3 +34,37 @@ describe('THERAPEUTIC_WINDOWS: предел и оговорки', () => {
     expect(THERAPEUTIC_WINDOWS.se.note).toContain('старый IOM');
   });
 });
+
+// ── Системный гард по всем окнам ──
+const KEY_TO_NUTRIENT: Record<string, string> = {
+  zn: 'zinc', mg: 'magnesium', magnesium: 'magnesium', fe: 'iron', se: 'selenium',
+  d3: 'vitamin_d', vitc: 'vitamin_c', iodine: 'iodine', copper: 'copper', ca: 'calcium',
+};
+
+describe('THERAPEUTIC_WINDOWS: ни одно окно не молчит', () => {
+  it('где предел реестра есть — поле ul совпадает', () => {
+    const wrong: string[] = [];
+    for (const [key, nutrient] of Object.entries(KEY_TO_NUTRIENT)) {
+      const w = THERAPEUTIC_WINDOWS[key];
+      const lim = NUTRIENT_LIMITS_V2[nutrient];
+      if (!w || !lim) continue;
+      if (lim.kind !== 'UL' && lim.kind !== 'SafeLevel') continue;
+      // calcium в реестре в мг — окно тоже в мг; остальные совпадают по единице
+      if (w.ul !== lim.value) wrong.push(`${key}: ${w.ul} ≠ ${lim.value}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it('верх выше предела реестра → в note есть «UL» или «Safe Level»', () => {
+    const silent = Object.entries(KEY_TO_NUTRIENT)
+      .filter(([key, nutrient]) => {
+        const w = THERAPEUTIC_WINDOWS[key];
+        const lim = NUTRIENT_LIMITS_V2[nutrient];
+        if (!w || !lim || !(lim.value > 0)) return false;
+        if (lim.kind !== 'UL' && lim.kind !== 'SafeLevel') return false;
+        return w.maxMg > w.ul && !/UL|Safe Level/i.test(w.note);
+      })
+      .map(([k]) => k);
+    expect(silent).toEqual([]);
+  });
+});

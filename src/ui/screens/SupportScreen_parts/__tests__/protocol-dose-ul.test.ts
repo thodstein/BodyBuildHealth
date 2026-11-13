@@ -78,3 +78,13 @@ describe('doseUlHint: не сравнивает то, что сравниват�
     expect(doseUlHint('Магний', '')).toBeNull();
   });
 });
+
+describe('плашка вшита во все рендеры строк', () => {
+  it('ItemRow, ItemRowTriage, renderRow, renderPhase + timingBlock используют DoseUlBadge', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts/supportProtocolsShared.tsx'), 'utf8');
+    const uses = src.match(/<DoseUlBadge/g) || [];
+    expect(uses.length).toBeGreaterThanOrEqual(5);
+  });
+});

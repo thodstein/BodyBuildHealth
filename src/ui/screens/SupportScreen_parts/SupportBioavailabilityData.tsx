@@ -190,7 +190,7 @@ export const THERAPEUTIC_WINDOWS: Record<string, { minMg: number; optMg: number;
   nac: { minMg: 600, optMg: 1200, maxMg: 2400, ul: 4000, note: 'Канон кросс-модульного капа 4000 мг/сут (движок капит авто-план на 2400). 2-3 приёма.' },
   coq10: { minMg: 100, optMg: 200, maxMg: 400, ul: 1200, note: 'Убихинол в 3× эффективнее убихинона.' },
   omega3: { minMg: 500, optMg: 1000, maxMg: 3000, ul: 5000, note: 'EPA+DHA. >3000 мг → риск кровотечения.' },
-  cr: { minMg: 25, optMg: 200, maxMg: 1000, ul: 1000, unit: 'мкг', note: 'Cr пиколинат 200-1000 мкг. UL 1000 мкг.' },
+  cr: { minMg: 25, optMg: 200, maxMg: 1000, ul: 1000, unit: 'мкг', note: 'Cr пиколинат 200-1000 мкг. 1000 мкг — клинический потолок (установленного UL нет).' },
   iodine: { minMg: 150, optMg: 225, maxMg: 500, ul: 1100, unit: 'мкг', note: 'Дозы в мкг. UL 1100 мкг/сут.' },
   // ── Расширенные терапевтические окна ──
   berberine: { minMg: 500, optMg: 1000, maxMg: 2000, ul: 3000, note: '500 мг 2-3 р/д с едой. >1500 мг → ЖКТ.' },

@@ -231,6 +231,7 @@ export const timingBlock = (protocol: string, slots: Array<{ time: string; items
         {slot.items.map((x: any, xi: number) => (
           <div key={xi} style={{ padding: '8px 10px', borderRadius: 10, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{x.n}</span>
+            <DoseUlBadge name={x.n} />
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginLeft: 8 }}>— {x.why}</span>
           </div>
         ))}

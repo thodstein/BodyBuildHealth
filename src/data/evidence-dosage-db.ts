@@ -235,7 +235,7 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
       'NIH ODS Folate Fact Sheet — RDA 400 мкг ДФЭ, UL 1000 мкг (фолиевая к-та)',
       'WHO Guideline 2015 — профилактика NTD 400-800 мкг',
     ],
-    notes: 'L-метилфолат (5-МТГФ) при MTHFR-мутации. C677T: 1000-5000 мкг/сут.',
+    notes: 'L-метилфолат (5-МТГФ) при MTHFR-мутации. C677T: 1000-5000 мкг/сут. ⚠ UL 1000 мкг (EFSA 2023) суммирует фолиевую кислоту и соли 5-метил-ТГФ: 5000 мкг — только курсом/по назначению + контроль B12.',
     adjustments: { phaseMultiplier: { course: 1.0, bridge: 1.0, pct: 1.5, fertility: 1.5 } },
     contraindications: ['Пернициозная анемия (маскирует B12-дефицит)'],
   },
@@ -259,7 +259,7 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
     references: [
       'NIH ODS Vitamin C Fact Sheet — RDA 90 муж / 75 жен мг, UL 2000 мг/сут',
     ],
-    notes: 'Ester-C (аскорбат Ca) менее раздражает ЖКТ. >2000 мг → диарея.',
+    notes: 'Ester-C (аскорбат Ca) менее раздражает ЖКТ. ⚠ UL 2000 мг/сут (IOM): >2000 мг → диарея и оксалаты; 3000 мг — только коротким курсом.',
     adjustments: { phaseMultiplier: { course: 1.0, bridge: 1.0, pct: 1.5, fertility: 1.5 } },
     contraindications: ['Гемохроматоз', 'Оксалатный нефролитиаз', 'G6PD дефицит'],
   },

@@ -13,6 +13,8 @@
 import { describe, it, expect } from 'vitest';
 import { DOSE_RANGES, doseRangeText } from '../SupportEffectiveDose';
 import { doseWindowFor } from '../../../../engines/support-hub-evidence.engine';
+import { NUTRIENT_LIMIT_INFO } from '../../../../engines/support-plan/types';
+import { resolveNutrient } from '../../../../engines/support-limits';
 
 describe('справочник доз: единицы', () => {
   it('у каждой строки есть единица', () => {
@@ -43,6 +45,28 @@ describe('справочник доз: единицы', () => {
     const t = doseRangeText('iron');
     expect(t).toContain('Safe Level 40 мг');
     expect(t).not.toContain('UL 40');
+  });
+});
+
+// ── Системный гард: у КАЖДОЙ строки с пределом реестра предел напечатан ──
+describe('справочник доз: предел реестра напечатан у всех строк', () => {
+  it('любая строка с UL/SafeLevel показывает предел и его единицу', () => {
+    const missing: string[] = [];
+    for (const key of Object.keys(DOSE_RANGES)) {
+      const canon = resolveNutrient(key);
+      const info = canon ? NUTRIENT_LIMIT_INFO[canon] : undefined;
+      if (!info || !(info.value > 0)) continue;
+      if (info.kind !== 'UL' && info.kind !== 'SafeLevel') continue;
+      const t = doseRangeText(key);
+      if (!t.includes(String(info.value))) missing.push(`${key}: нет ${info.value} в «${t}»`);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('единица предела не «мг» по умолчанию', () => {
+    // D3 (МЕ), фолат (мкг) — предел обязан быть в их шкале
+    expect(doseRangeText('vitamin_d3')).toContain('UL 4000 МЕ');
+    expect(doseRangeText('folate')).toContain('UL 1000 мкг');
   });
 });
 
