@@ -21,7 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolat
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, scaleQuotasForExtreme } from './food-availability';
-import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness, applyPlateOverflowRelief } from './meal-plan-engine';
+import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness, applyPlateOverflowRelief, mergeDuplicateItems } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -3454,6 +3454,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const _vegNotes = applyVegCarrierHygiene(outMeals as any, targets as any, { weightKg: args.athleteWeightKg ?? 80 });
     if (_vegNotes.length > 0) notes = [...notes, ..._vegNotes];
   }
+
+  // §8.104: один продукт — одна позиция в приёме. Свапы/переносы/овощная гигиена могли
+  // положить в приём «рис 240 + рис 170» (ядро + добивка) — сводим до финального замера,
+  // чтобы и нота, и тарелка говорили одно и то же. Суммы при этом не меняются.
+  mergeDuplicateItems(outMeals as any);
 
   // Тримы/доборы меняют тоталы — пересчитываем честную девиацию (иначе врём на ~1 п.п.).
   const _finTot = sumDayTotals(outMeals);

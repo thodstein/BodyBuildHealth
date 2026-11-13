@@ -371,6 +371,51 @@ function recalcMealTotals(meals: any[]): void {
   for (const m of meals) m.totals = mealTotalsOf(m.items || []);
 }
 /**
+ * §8.104: один продукт — одна позиция в приёме.
+ *
+ * Дефект (замер 56 ячеек): в 25 группах один и тот же продукт показан 2–3 раза подряд —
+ * «рис белый 85 + 170 + 70 г», «масло 2 + 3 г», «индейка 20 + 30 г». Пользователь видит
+ * список, где надо складывать в голове, а приём выглядит длиннее, чем есть. Источников два:
+ * ядро рецепта + добивка тем же продуктом и склейка двух рецептов в одном приёме.
+ *
+ * Правка чисто представительская: позиции с ОДНИМ `id` (настоящий продукт FOOD_DB) сводятся
+ * в одну, граммы и макросы складываются БЕЗ округления — сумма дня остаётся бит-в-бит той же,
+ * поэтому канон 3% не может сдвинуться. Роль берётся первая непустая, `_fixedGrams`
+ * наследуется (фикс-граммовку нельзя случайно начать масштабировать).
+ */
+export function mergeDuplicateItems(meals: any[]): number {
+  let merged = 0;
+  for (const m of meals || []) {
+    const items = m?.items;
+    if (!Array.isArray(items) || items.length < 2) continue;
+    const byId = new Map<string, any>();
+    const out: any[] = [];
+    for (const it of items) {
+      const id = String(it?.id || '');
+      const prev = id ? byId.get(id) : undefined;
+      if (!prev) {
+        if (id) byId.set(id, it);
+        out.push(it);
+        continue;
+      }
+      prev.amount = Math.round((Number(prev.amount) || 0) + (Number(it.amount) || 0));
+      for (const k of ['p', 'f', 'c', 'kcal', 'fiber', 'leucine_mg']) {
+        if (typeof prev[k] === 'number' || typeof it[k] === 'number') {
+          prev[k] = (Number(prev[k]) || 0) + (Number(it[k]) || 0);
+        }
+      }
+      if (!prev.role && it.role) prev.role = it.role;
+      if (it._fixedGrams) prev._fixedGrams = true;
+      merged++;
+    }
+    if (out.length !== items.length) {
+      m.items = out;
+      m.totals = mealTotalsOf(out);
+    }
+  }
+  return merged;
+}
+/**
  * QG45: целостность позиции — граммы и нутриенты не расходятся.
  *
  * Часть стадий меняет `amount`, а макросы позиции остаются от прежнего веса. Замер на
@@ -17191,6 +17236,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         else notes.push(..._fresh64);
       }
     }
+    // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
+    mergeDuplicateItems(meals);
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
