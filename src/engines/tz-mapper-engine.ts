@@ -843,7 +843,7 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
     else aiDose = '1 мг/день (титровать)';
     const hasOxy = peds.some(p => p.pClass === 'aas_oral_oxy');
     const oxyNote = hasOxy ? ' ⚠ Anadrol: AI НЕ работает при гино — нужен Tamoxifen (через «Усилить»)' : '';
-    add('anastrozole', `Anastrozole ${aiDose} — титровать к E2 20-40 pg/mL, НЕ подавлять <15 (боль в суставах, либидо↓, когнитивные)${oxyNote}`, `Σ Ароматизирующих ААС ${aromAAS} мг/нед (тест ${testMg})`, 'pharma');
+    add('anastrozole', `Anastrozole ${aiDose} — титровать к ${AI_E2_TARGET}; ниже 15 пг/мл не подавлять (боль в суставах, либидо↓, когнитивные)${oxyNote}`, `Σ Ароматизирующих ААС ${aromAAS} мг/нед (тест ${testMg})`, 'pharma');
     add('pycnogenol', 'Pycnogenol 150 мг — eNOS + защита эндотелия', 'Тестостерон', 'antioxidant');
     add('citrulline', 'Citrulline 6 г — NO-предшественник', 'Тестостерон', 'amino');
     add('bergamot', 'Bergamot 500 мг — HMG-CoA редуктаза (липиды)', 'Тестостерон', 'cardioprotector');
@@ -852,7 +852,7 @@ function computeProtocol(ctx: MapperCtx): PhaseAssignedDrug[] {
 
   // ─── АРОМАТИЗИРУЮЩИЙ AAS БЕЗ ТЕСТОСТЕРОНА — эстроген-контроль (critical) ───
   if (!flags.hasTest && (flags.hasNandrolone || flags.hasBold || flags.hasTren)) {
-    add('anastrozole', 'Anastrozole 0.25 мг 2р/нед — эстроген-контроль (nandrolone/boldenone ароматизируют); титровать к E2 20-40 pg/mL, НЕ подавлять <15', 'Ароматизирующий AAS без теста', 'pharma');
+    add('anastrozole', `Anastrozole 0.25 мг 2р/нед — эстроген-контроль (nandrolone/boldenone ароматизируют); титровать к ${AI_E2_TARGET}`, 'Ароматизирующий AAS без теста', 'pharma');
   }
 
   // ─── НАНДРОЛОН — особый профиль (progestagen, объём, либидо↓) ───
@@ -1024,7 +1024,7 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
   }
   // CRITICAL: Winstrol + Anadrol — токсичный дуэт (гепато-/нефро- + липидный коллапс, AI не работает при гино)
   if (flags?.isWinnyPlusOxy) {
-    w.push('🛑 WINSTROL + ANADROL — КРИТИЧЕСКАЯ КОМБИНАЦИЯ: крайне гепатотоксична и разрушает липидный профиль (↓HDL до 50%+). ОБЯЗАТЕЛЬНЫЙ ПРОТОКОЛ: NAC 1800 мг + TUDCA 1000 мг + Omega-3 6 г + Силимарин 600 мг + Niacin 1500 мг + CoQ10 200 мг. Контроль АЛТ/АСТ КАЖДЫЕ 2 НЕД — при ALT>2×ULN немедленная отмена. Анастрозол НЕ работает при гинекомастии на оксиметолоне — нужен тамоксифен. НЕ рекомендуется держать комбо дольше 4 нед');
+    w.push(`🛑 WINSTROL + ANADROL — КРИТИЧЕСКАЯ КОМБИНАЦИЯ: крайне гепатотоксична и разрушает липидный профиль (↓HDL до 50%+). ОБЯЗАТЕЛЬНЫЙ ПРОТОКОЛ: NAC 1800 мг + TUDCA 1000 мг + Omega-3 6 г + Силимарин 600 мг + Niacin 1500 мг + CoQ10 200 мг. Контроль АЛТ/АСТ КАЖДЫЕ 2 НЕД — при АЛТ/АСТ >2×ВГН (♂ >${LFT_STAGE_ULN.reduce.male} / ♀ >${LFT_STAGE_ULN.reduce.female}) немедленная отмена. Анастрозол НЕ работает при гинекомастии на оксиметолоне — нужен тамоксифен. НЕ рекомендуется держать комбо дольше 4 нед`);
   }
   // CRITICAL: >1 орал 17α — кумулятивная гепатотоксичность
   if (flags?.isMultiOral) {
@@ -1032,7 +1032,7 @@ function computeProtocolWarnings(protocolIds: string[], flags?: ReturnType<typeo
   }
   // CRITICAL: ароматизирующий AAS без тестостерона → эстроген-контроль обязателен
   if ((flags?.hasNandrolone || flags?.hasBold || flags?.hasTren) && !flags?.hasTest) {
-    w.push('⚠ Ароматизирующий AAS без базового тестостерона: nandrolone/boldenone ароматизируют в эстрадиол. Назначить анастрозол 0.25-0.5 мг 2р/нед (титровать к E2 20-40 пг/мл), контроль пролактина (nandrolone) и гинекомастии');
+    w.push(`⚠ Ароматизирующий AAS без базового тестостерона: nandrolone/boldenone ароматизируют в эстрадиол. Назначить анастрозол 0.25-0.5 мг 2р/нед (титровать к ${AI_E2_TARGET}), контроль пролактина (nandrolone) и гинекомастии`);
   }
   // MED: GH + инсулин — тяжёлый ИР + гипогликемия при инсулине
   if (flags?.isGHPlusInsulin) {
@@ -1063,7 +1063,7 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   if (isInjectableCourse(pedsForBbv, flags)) {
     lines.push('• 0 нед (инъекционный курс): BBV — HIV + HBsAg/anti-HBs + anti-HCV + вакцинация HBV (карточка K10)');
   }
-  if (flags.hasOral17) lines.push('• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). При ALT>2×ULN — снизить/отменить орал');
+  if (flags.hasOral17) lines.push(`• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). ${LFT_REDUCE_BOTH}`);
   else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
   lines.push('• 4 нед: HCT, ферритин (управление эритроцитозом), эстрадиол (титрация AI), пролактин (nandrolone/tren)');
   lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы, D-димер (при HCT>52%)');
@@ -1214,6 +1214,17 @@ const MON_LFT = `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')}`;
 const MON_E2 = `♂ 20–40 пг/мл / ♀ по фазе ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`;
 const MON_PRL = `♂ <25 нг/мл / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`;
 const MON_LFT_STOP = `АЛТ/АСТ >3×ВГН (♂ >${LFT_STAGE_ULN.stopOral.male} / ♀ >${LFT_STAGE_ULN.stopOral.female}) — отмена оралов; >5×ВГН — отмена всего`;
+
+/**
+ * Таргет ингибитора ароматазы. Раньше во всех фарм-нотах стояло «титровать к
+ * E2 20-40 pg/mL, НЕ подавлять <15» — как общая цель. У женщины это неверно:
+ * её E2 фазовый (фолликулярная 40–200, лютеиновая 70–500 пг/мл), и ИА ей
+ * назначают не «к 20–40», а по симптому/фазе. Теперь коридор подписан полом.
+ */
+const AI_E2_TARGET = `E2 20–40 пг/мл (♂; ♀ — не подавлять, норма по фазе ${FEMALE_HORMONE_BANDS.E2.normal})`;
+
+/** Ступень 2×ВГН для оралов — та же подпись, что в карточках K0–K10. */
+const LFT_REDUCE_BOTH = `АЛТ/АСТ >2×ВГН (♂ >${LFT_STAGE_ULN.reduce.male} / ♀ >${LFT_STAGE_ULN.reduce.female}) — снизить/пересмотреть орал`;
 
 export interface MonitoringItemLine {
   marker: string;

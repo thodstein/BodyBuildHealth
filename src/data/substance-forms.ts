@@ -166,7 +166,7 @@ export const SUBSTANCE_FORMS: Record<string, SubstanceForm> = {
     pharmacyBrands: ['Аримидекс'],
     altSubstance: 'letrozole', altForm: 'Летрозол — более мощный (2.5-5 мг, в крайних случаях)',
     bioavailability: '80-90% per os',
-    note: '⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ. E2 цель: 20-40 pg/mL. '
+    note: '⚠ ТОЛЬКО ПОД КОНТРОЛЕМ АНАЛИЗОВ. E2 цель: ♂ 20-40 pg/mL (♀ — не подавлять, норма по фазе). '
         + 'Tитрация: 0.25→0.5→1 мг/д. На курсе судоверна — риск ↓HDL, ↓bone.',
     bestTime: 'утро',
   },

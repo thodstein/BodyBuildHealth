@@ -34,8 +34,8 @@ export const TITRATION_PROTOCOLS: Record<string, TitrationProtocol> = {
     startDose: '0.25 мг 2×/нед',
     maxDose: '1 мг/день',
     steps: [
-      { dose: '0.25 мг 2×/нед', duration: '10-14 дней', trigger: 'Старт при любом test-курсе', labs: 'E2, Estradiol', labTarget: '20-40 pg/mL' },
-      { dose: '0.5 мг 2×/нед', duration: '10-14 дней', trigger: 'E2 > 40 pg/mL', labs: 'E2', labTarget: '20-40 pg/mL' },
+      { dose: '0.25 мг 2×/нед', duration: '10-14 дней', trigger: 'Старт при любом test-курсе', labs: 'E2, Estradiol', labTarget: '♂ 20-40 pg/mL' },
+      { dose: '0.5 мг 2×/нед', duration: '10-14 дней', trigger: 'E2 > 40 pg/mL', labs: 'E2', labTarget: '♂ 20-40 pg/mL' },
       { dose: '1 мг/день', duration: 'на усмотрение', trigger: 'E2 > 60 pg/mL на 0.5 мг', labs: 'E2, lipid panel (HDL)', labTarget: 'E2 20-40, HDL > 0.8' },
     ],
     stopConditions: [

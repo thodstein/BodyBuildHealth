@@ -173,7 +173,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         substances.push('anastrozole'); markUsed('anastrozole');
         phaseAssignedDrugs.push({
           id: 'anastrozole',
-          reason: 'Анастрозол 0.5 мг 2р/нед (титровать по E2). Тестостерон ароматизируется в эстрадиол → контроль E2 (цель 20-40 pg/mL) для профилактики гинекомастии и задержки воды.',
+          reason: 'Анастрозол 0.5 мг 2р/нед (титровать по E2). Тестостерон ароматизируется в эстрадиол → контроль E2 (♂ цель 20-40 pg/mL; ♀ — по фазе) для профилактики гинекомастии и задержки воды.',
           trigger: 'Тестостеронсодержащий AAS в курсе + нет AI/SERM',
           category: 'ai',
         });

@@ -78,7 +78,7 @@ export const PED_CLASS_MATRIX: PedClassMatrixEntry[] = [
     conditional: ['ниацин (HDL)', 'coq10'],
     doctorOnly: [],
     interactions: ['2+ орала — СТОП-комбо', 'орал + GH — синергичная гепатотоксичность'],
-    assayWarnings: ['HDL ↓ до 50% — контроль липидов', 'ALT >2×ULN → снизить/отменить'],
+    assayWarnings: ['HDL ↓ до 50% — контроль липидов', 'АЛТ/АСТ >2×ВГН (♂ >80 / ♀ >62) → снизить/пересмотреть'],
     phase: 'course',
   },
   {

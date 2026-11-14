@@ -1043,7 +1043,7 @@ export const STACKS_PART_1: SupportStack[] = [
         { marker: 'HbA1c', when: 'Каждые 8 нед', targetRange: '<5.7%' },
         { marker: 'Инсулин + HOMA-IR', when: 'Каждые 8 нед', targetRange: 'Инсулин <10 мкЕд/мл, HOMA-IR <2.5' },
         { marker: 'Липидный профиль', when: 'Каждые 8 нед', targetRange: 'ОХ <5.0, ЛПНП <3.0, ТГ <1.7, ЛПВП >1.0' },
-        { marker: 'АЛТ/АСТ (берберин)', when: 'Каждые 4 нед', targetRange: 'АЛТ <40, АСТ <40 Ед/л' },
+        { marker: 'АЛТ/АСТ (берберин)', when: 'Каждые 4 нед', targetRange: 'АЛТ <40 (♀ <31), АСТ <40 (♀ <31) Ед/л' },
       ],
     },
   },

@@ -229,7 +229,9 @@ describe('female-support-layer: integration через resolvePlan', () => {
     const female = resolvePlan(buildMapperCtx(mkState([{ id: 'tren_acet', mgPerWeek: 50 }], 'female'), 'medium'));
     expect(female.protocolWarnings?.some((w) => w.includes('АБСОЛЮТНОЕ ПРОТИВОПОКАЗАНИЕ'))).toBe(true);
     const male = resolvePlan(buildMapperCtx(mkState([{ id: 'tren_acet', mgPerWeek: 50 }], 'male'), 'medium'));
-    expect(male.protocolWarnings?.some((w) => w.includes('♀'))).toBe(false);
+    // Женский слой помечает СВОИ предупреждения символом ♀ с начала строки;
+    // ♀ внутри фарм-ноты (например, цель ИА подписана обоими полами) — не слой.
+    expect(male.protocolWarnings?.some((w) => w.trimStart().startsWith('♀'))).toBe(false);
   });
 
   it('женский без курса → слоя нет', () => {

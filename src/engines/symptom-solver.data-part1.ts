@@ -170,7 +170,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'Массивное повреждение гепатоцитов или блокада желчеоттока → ↑ билирубин. ГГТ >5× ВГН. АЛТ >5-10× ВГН с ↑ билирубина — тяжёлое повреждение.',
         labMarkers: [
           { marker: 'Билирубин общий + прямой', expectedChange: '↑↑', targetRange: 'Общий <21, прямой <5 мкмоль/л', when: 'НЕМЕДЛЕННО' },
-          { marker: 'АЛТ, АСТ, ГГТ, ЩФ', expectedChange: '↑↑↑', targetRange: 'АЛТ <40, ГГТ <55', when: 'НЕМЕДЛЕННО' },
+          { marker: 'АЛТ, АСТ, ГГТ, ЩФ', expectedChange: '↑↑↑', targetRange: 'АЛТ <40 (♀ <31), ГГТ <55 (♀ <31)', when: 'НЕМЕДЛЕННО' },
           { marker: 'УЗИ печени', expectedChange: '↔', targetRange: 'Без обструкции', when: 'НЕМЕДЛЕННО' },
         ],
         solutions: [

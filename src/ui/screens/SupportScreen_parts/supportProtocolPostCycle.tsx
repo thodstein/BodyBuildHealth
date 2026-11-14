@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { FEMALE_HORMONE_BANDS } from '../../../engines/lab-norms.engine';
 
 export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [postCycleTab, setPostCycleTab] = useState('protocol');
@@ -11,6 +12,9 @@ export const SupportProtocolPostCycle: React.FC<{ s: Record<string, any> }> = ({
               <div style={cardBg}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#8b5cf6', marginBottom:2 }}>🔄 Послекурсовая реабилитация (3-6 мес)</div>
                 <p style={{ fontSize:9, color:'var(--text-dim)', margin:0, lineHeight:1.3 }}>Комплексное восстановление HPTA-оси, липидного профиля, гематокрита и нейроэндокринного статуса.</p>
+                <div data-female-protocol-note style={{ marginTop:6, fontSize:9, color:'#f9a8d4', lineHeight:1.45, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.2)', borderRadius:8, padding:'6px 8px' }}>
+                  ♀ Женщины: коридор E2 20–40 пг/мл — мужской таргет. Её норма — по фазе цикла ({FEMALE_HORMONE_BANDS.E2.normal} пг/мл), E2 ей не подавляем.
+                </div>
               </div>
 
               <ContraBanner items={[

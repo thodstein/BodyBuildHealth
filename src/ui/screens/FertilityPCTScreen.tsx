@@ -880,7 +880,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                     <span>Тестостерон общий</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥15 нмоль/л (432 нг/дл)</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', background:'rgba(6,182,212,0.05)', borderRadius:4 }}>
-                    <span>Э2 (эстрадиол)</span><span style={{ fontWeight:600, color:'#f59e0b' }}>20-40 пг/мл</span>
+                    <span>Э2 (эстрадиол)</span><span style={{ fontWeight:600, color:'#f59e0b' }}>♂ 20-40 пг/мл</span>
                   </div>
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'4px 6px', borderRadius:4 }}>
                     <span>Пролактин</span><span style={{ fontWeight:600, color:'#ef4444' }}>{'<'}15 нг/мл (выше → дофамин)</span>
@@ -1213,7 +1213,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
                   <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Обсуждена фертильность — hCG 500 МЕ 2р/нед, 3/1 при желании</div>
                   <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Исключены противопоказания: ПСА {">"}4, Hct {">"}50%, апноэ сна, РПЖ, неконтролируемая СН</div>
                   <div style={{ padding:'4px 6px', borderRadius:4, marginBottom:2 }}>☐ Мониторинг: 6 нед → 3-6 мес → ежегодно</div>
-                  <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Целевые значения: TT 500-850 нг/дл, E2 20-40 пг/мл, Hct {'<'}50%</div>
+                  <div style={{ padding:'4px 6px', background:'rgba(34,197,94,0.05)', borderRadius:4, marginBottom:2 }}>☐ Целевые значения: TT 500-850 нг/дл, E2 ♂ 20-40 пг/мл, Hct {'<'}50%</div>
                   <div style={{ padding:'4px 6px', borderRadius:4 }}>☐ Образ жизни: диета, сон ≥7ч, аэробные нагрузки 150 мин/нед, ограничение алкоголя</div>
                 </div>
               </div>

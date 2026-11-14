@@ -67,7 +67,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'anastrozole', name: 'Anastrozole', nameRu: 'Анастрозол', tier: 'specialty', category: ['pharma', 'hormonal'],
     description: 'Ингибитор ароматазы III поколения: блокирует конверсию тестостерона в эстрадиол. Применяется при E2 >60 пг/мл или симптомах эстрогенизации. Старт 0.5 мг 2×/нед, титрация по E2 (цель 20-40 пг/мл).',
-    monitoring: [{ what: 'E2 (чувствительный), липиды', when: 'каждые 4 нед', targetRange: 'E2 20-40 пг/мл' }],
+    monitoring: [{ what: 'E2 (чувствительный), липиды', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл' }],
     contraindications: ['беременность'],
     sideEffects: ['↓E2 → сухость суставов', 'LDL ↑', 'головная боль'],
     dosage: { mg: 1, timing: 'стабильное время' },
@@ -83,7 +83,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'letrozole', name: 'Letrozole', nameRu: 'Летрозол', tier: 'specialty', category: ['pharma', 'hormonal'],
     description: 'Ингибитор ароматазы (супрессия E2 до 98%). При высоком E2 (>100 пг/мл) или неэффективности анастрозола. Высокий риск чрезмерного ↓E2 — осторожная титрация.',
-    monitoring: [{ what: 'E2 (чувствительный)', when: 'каждые 4 нед', targetRange: 'E2 20-40 пг/мл' }],
+    monitoring: [{ what: 'E2 (чувствительный)', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл' }],
     contraindications: ['беременность'],
     sideEffects: ['суставы', 'головная боль', '↓либидо'],
     dosage: { mg: 2.5, timing: 'стабильное время' },
@@ -91,7 +91,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'atorvastatin', name: 'Atorvastatin', nameRu: 'Аторвастатин', tier: 'specialty', category: ['pharma', 'lipid'],
     description: 'Статин: ↓ЛПНП до 50%. Применяется при ЛПНП >3.0-4.0 на курсе. Контроль АЛТ/КФК (гепатотоксичность и миопатия).',
-    monitoring: [{ what: 'АЛТ, КФК, липиды', when: 'каждые 4 нед', targetRange: 'АЛТ<40, КФК<300, ЛПНП<2.6' }],
+    monitoring: [{ what: 'АЛТ, КФК, липиды', when: 'каждые 4 нед', targetRange: 'АЛТ<40 (♀ <31), КФК<300, ЛПНП<2.6' }],
     contraindications: ['активное заболевание печени', 'беременность'],
     sideEffects: ['миалгия', '↑КФК', 'диспепсия'],
     dosage: { mg: 20, timing: 'вечером' },
@@ -99,7 +99,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'rosuvastatin', name: 'Rosuvastatin', nameRu: 'Розувастатин', tier: 'specialty', category: ['pharma', 'lipid'],
     description: 'Статин с максимальным ↓ЛПНП: 10-20 мг сопоставимы с 40-80 мг аторвастатина.',
-    monitoring: [{ what: 'АЛТ, КФК, липиды', when: 'каждые 4 нед', targetRange: 'АЛТ<40, КФК<300' }],
+    monitoring: [{ what: 'АЛТ, КФК, липиды', when: 'каждые 4 нед', targetRange: 'АЛТ<40 (♀ <31), КФК<300' }],
     contraindications: ['активное заболевание печени'],
     sideEffects: ['миалгия', '↑КФК'],
     dosage: { mg: 10, timing: 'вечером' },
@@ -123,7 +123,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'udca', name: 'UDCA (Ursodeoxycholic acid)', nameRu: 'УДХК (урсодезоксихолевая)', tier: 'advanced', category: ['hepatoprotector', 'choleretic'],
     description: 'Урсодезоксихолевая кислота: ↓ холестатического компонента поражения печени (ГГТ/ЩФ), защита гепатоцитов при холестазе.',
-    monitoring: [{ what: 'ГГТ, ЩФ, билирубин', when: 'каждые 4 нед', targetRange: 'ГГТ<55, ЩФ<120' }],
+    monitoring: [{ what: 'ГГТ, ЩФ, билирубин', when: 'каждые 4 нед', targetRange: 'ГГТ<55 (♀ <31), ЩФ<120' }],
     contraindications: ['непроходимость желчевыводящих путей'],
     sideEffects: ['жидкий стул'],
     dosage: { mg: 500, timing: 'с едой 2 раза в день' },
