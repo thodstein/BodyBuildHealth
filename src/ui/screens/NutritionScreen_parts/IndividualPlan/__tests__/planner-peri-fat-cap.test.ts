@@ -91,10 +91,20 @@ describe('B39: жир в peri-окнах ограничен физиологие
     const c = MATRIX[2]; // 110 кг, 560У
     const plan = build(c, 4, true);
     const t = sum(plan.meals as any[]);
-    expect(t.f).toBeLessThan(c.goalFatG); // предусловие теста
+    // §8.108/§8.110: ручной/согласованный день теперь доводится по ОСИ ЖИРА до цели
+    // (замер: 110.1 из 110 = +0.1%), поэтому «структурного дефицита» как предусловия
+    // больше нет. Инвариант стража проверяем в обе стороны: в дефиците окна не получают
+    // масло вовсе, а на сошедшемся дне жир окна остаётся в пределах капа окна (≤12 г —
+    // первая проверка этого файла).
     const postw = (plan.meals as any[]).find(m => m.type === 'postworkout');
-    // в окне нет жирового пункта вовсе — резать было нечего
     const fatItems = ((postw?.items || []) as any[]).filter(x => x.role === 'fat');
-    expect(fatItems.length, 'пост-трен на дефицитном по жиру дне не должен получать масло').toBe(0);
+    if (t.f < c.goalFatG) {
+      // в окне нет жирового пункта вовсе — резать было нечего
+      expect(fatItems.length, 'пост-трен на дефицитном по жиру дне не должен получать масло').toBe(0);
+    } else {
+      expect(Math.abs(t.f - c.goalFatG) / Math.max(1, c.goalFatG), `жир дня ${t.f}/${c.goalFatG}`)
+        .toBeLessThanOrEqual(0.03);
+      for (const it of fatItems as any[]) expect(it.amount).toBeLessThanOrEqual(12);
+    }
   });
 });
