@@ -75,6 +75,29 @@ describe('buildPlanText / buildDoctorReport: полный состав план�
   });
 });
 
+describe('buildPlanText / buildDoctorReport: предел рядом с дозой выше UL', () => {
+  // B6: план 25 мг при UL 12 мг (EFSA 2023) — план это допускает как потолок
+  // протокола, но текст обязан назвать предел: скопированный «B6 25 мг» без
+  // подписи читается как безопасная доза.
+  const recB6: any = { ...rec, subs: [...subs, mk('vitamin_b6', 'Дофамин')] };
+
+  it('«Копировать»: превышение UL подписано', () => {
+    const text = buildPlanText(recB6, 60);
+    expect(text).toMatch(/Витамин В6[^\n]{0,120}выше UL 12 мг/);
+  });
+
+  it('«Врачу»: превышение UL — отдельной строкой', () => {
+    const text = buildDoctorReport(recB6, state);
+    expect(text).toContain('Предел дозы: ⚠ выше UL 12 мг');
+  });
+
+  it('в пределах предела — ничего не дописываем', () => {
+    const text = buildPlanText(rec, 140); // магний 350 = UL, D3 4000 = UL
+    expect(text).not.toContain('выше UL 350');
+    expect(text).not.toContain('Предел дозы');
+  });
+});
+
 describe('buildPlanText / buildDoctorReport: доза плана, а не DEFAULT×титрация', () => {
   it('«Копировать»: 140 кг → магний 350 мг (как карточка), без титрации ×1.5', () => {
     const text = buildPlanText(rec, 140);

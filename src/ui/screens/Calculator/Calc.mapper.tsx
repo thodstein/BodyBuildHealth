@@ -36,6 +36,7 @@ import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { CONTRAINDICATIONS, getContraindications, checkContraindications } from '../../../data/substance-contraindications';
 import { GLASS, BADGE } from './Calc.types';
 import { CalcSubstanceDetail, buildStackSynergyDescription, filterSynergiesCoveredByNetwork } from './CalcSubstanceDetail';
+import { substanceLimitView } from './Calc.substanceUl';
 import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
@@ -4160,7 +4161,11 @@ export function buildPlanText(rec: SupportRecommendation, weight?: number): stri
       const doseStr = scaled > 0
         ? ` · ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
-      lines.push(`• ${name}${doseStr}${isDoctorControlled(s.substanceId) ? ' [под обязательным контролем врача]' : ''} — ${s.reason}`);
+      // Предел печатаем только при превышении: в норме он ничего не меняет, а в
+      // скопированном плане «B6 25 мг» без предела читается как безопасная доза.
+      const limit = scaled > 0 ? substanceLimitView(s.substanceId, scaled) : null;
+      const limitStr = limit?.over ? ` · ⚠ ${limit.text}` : '';
+      lines.push(`• ${name}${doseStr}${limitStr}${isDoctorControlled(s.substanceId) ? ' [под обязательным контролем врача]' : ''} — ${s.reason}`);
       if (s.mechsCovered.length > 0) lines.push(`  покрывает: ${s.mechsCovered.join(', ')}`);
       lines.push(`  k=${s.k.toFixed(2)} · док.уровень: ${s.q}`);
     }
@@ -4265,6 +4270,10 @@ export function buildDoctorReport(rec: SupportRecommendation, state: CalculatorS
         ? `, ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
       lines.push(`- ${name}${doseStr}`);
+      // Для врача предел печатаем только там, где доза его превышает: остальные
+      // пределы видны в справке, а здесь важен акцент на спорной дозе.
+      const limit = scaled > 0 ? substanceLimitView(s.substanceId, scaled) : null;
+      if (limit?.over) lines.push(`  Предел дозы: ⚠ ${limit.text}`);
       const organGuess = s.mechsCovered[0] ? mechToOrganLabel(s.mechsCovered[0]) : '—';
       lines.push(`  Категория: ${s.category}, система: ${organGuess}`);
       lines.push(`  Механизмы покрытия: ${s.mechsCovered.join(', ')}`);
