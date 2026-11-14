@@ -17,8 +17,19 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { PhaseKey } from './tz-bridge-phase';
-import { lftUlnText, HGB_THRESHOLDS, LFT_STAGE_ULN } from './lab-norms.engine';
+import { lftUlnText, HGB_THRESHOLDS, HCT_THRESHOLDS, LFT_STAGE_ULN, FEMALE_HORMONE_BANDS } from './lab-norms.engine';
 import { ruCount, RU_CARDS, RU_MARKERS } from './ru-plural';
+
+// ── Цели карточек K0–K10: оба пола одной строкой (проход 59) ────────────────
+// Карточки — единственный перечень анализов (UI + печать + текстовые экспорты),
+// и в них стояли мужские литералы как общие: `HCT<50%`, `HGB<170`, `E2 20–40`,
+// `PRL<25`. Женщина читала чужие пороги, хотя резолвер норм знает её границы.
+// Теперь цели собираются здесь, из `HCT_THRESHOLDS`/`HGB_THRESHOLDS`/бэндов.
+const T_HCT = `HCT ♂ <${HCT_THRESHOLDS.male.erythrocytosis}% / ♀ <${HCT_THRESHOLDS.female.erythrocytosis}%`;
+const T_HGB = `HGB ♂ <${HGB_THRESHOLDS.male.upper} / ♀ <${HGB_THRESHOLDS.female.upper} г/л`;
+const T_E2 = `E2 ♂ 20–40 пг/мл / ♀ по фазе ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`;
+const T_PRL = `PRL ♂ <25 нг/мл / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`;
+const T_HCT_STOP = `HCT ≥♂${HCT_THRESHOLDS.male.block}% / ♀${HCT_THRESHOLDS.female.block}%`;
 
 /** Минимальные PED-флаги, нужные карточкам (структурный подтип PEDFlags). */
 export interface PhaseLabFlags {
@@ -91,7 +102,7 @@ const K0_BASELINE: PhaseLabCard = {
   audience: 'все',
   groups: [
     g('Кровь', [
-      it('ОАК с СОЭ: HCT, HGB, RBC, WBC, PLT, ретикулоциты', `HCT<50% (♀ <48%), HGB<${HGB_THRESHOLDS.male.upper} г/л (♀ <${HGB_THRESHOLDS.female.upper}), PLT 150–400, СОЭ<15`, 'HCT >54% (♀ >52%) — старт под вопросом; HCT>60% — гематолог', 'База эритроцитоза (BJGP 2024)'),
+      it('ОАК с СОЭ: HCT, HGB, RBC, WBC, PLT, ретикулоциты', `${T_HCT}, ${T_HGB}, PLT 150–400, СОЭ<15`, 'HCT >54% (♀ >52%) — старт под вопросом; HCT>60% — гематолог', 'База эритроцитоза (BJGP 2024)'),
       it('Ферритин, сыв. железо, TSAT', 'ферритин 50–200, TSAT 20–45%', undefined, 'База для флеботомий и Fe-коррекции'),
       it('Коагулограмма: МНО/АЧТВ/фибриноген/D-димер', 'фибриноген 2–4 г/л, D-димер <0.5', undefined, 'База перед фибринолитиками/антиагрегантами'),
     ]),
@@ -144,7 +155,7 @@ const K1_WEEK2: PhaseLabCard = {
   audience: 'course',
   groups: [
     g('Печень (оралы)', [
-      it('АЛТ/АСТ + КФК', `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')}`, 'ALT>2×ULN — снизить/отменить орал', 'КФК разделяет мышцы/печень; при <3×ULN — повтор через 10–14 дней без тренировок'),
+      it('АЛТ/АСТ + КФК', `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')}`, `АЛТ >2×ВГН (♂ >${LFT_STAGE_ULN.reduce.male} / ♀ >${LFT_STAGE_ULN.reduce.female}) — снизить/пересмотреть орал`, 'КФК разделяет мышцы/печень; при <3×ВГН — повтор через 10–14 дней без тренировок'),
       it('ГГТ/ЩФ/билирубин (при оралах)', undefined, 'Холестаз — врач', 'ГГТ чувствителен к холестазу раньше АЛТ'),
     ]),
     g('Почки/электролиты (трен, клен)', [
@@ -162,8 +173,8 @@ const K2_WEEK4: PhaseLabCard = {
   audience: 'course',
   groups: [
     g('Кровь + давление', [
-      it('ОАК: HCT/HGB + АД/ЧСС', `HCT<50%, HGB<${HGB_THRESHOLDS.male.upper} (♀ <${HGB_THRESHOLDS.female.upper}), АД<130/85`, 'HCT 52–54% — рассмотреть флеботомию (♀ 48–52%); >54% (♀ >52%) — флеботомия; >60% — STOP + гематолог', 'HCT Δ+5 п.п. от baseline — порог вмешательства'),
-      it('HCT + ферритин', 'HCT<50%, ферритин 50–200', undefined, 'Управление эритроцитозом'),
+      it('ОАК: HCT/HGB + АД/ЧСС', `${T_HCT}, ${T_HGB}, АД<130/85`, 'HCT 52–54% — рассмотреть флеботомию (♀ 48–52%); >54% (♀ >52%) — флеботомия; >60% — STOP + гематолог', 'HCT Δ+5 п.п. от baseline — порог вмешательства'),
+      it('HCT + ферритин', `${T_HCT}, ферритин 50–200`, undefined, 'Управление эритроцитозом'),
     ]),
     g('Гормоны', [
       it('E2 чувств. (титрация AI)', '20–40 пг/мл (100–200 пмоль/л)', 'E2 −30% от steady-state — AI избыточен', 'Середина недели, 48 ч после инъекции; в ноль не давить'),
@@ -190,7 +201,7 @@ const K3_WEEK8_12: PhaseLabCard = {
   groups: [
     g('Полный набор', [
       it('ОАК с СОЭ + БХ + липидограмма + АпоВ + hs-CRP', 'ApoB<80/<65, hsCRP<3', undefined, 'АпоВ и hsCRP — динамика риска'),
-      it('Гормоны: E2/PRL/ТТГ/TT/FT/LH/FSH/SHBG', 'E2 20–40, PRL<25', undefined, undefined),
+      it('Гормоны: E2/PRL/ТТГ/TT/FT/LH/FSH/SHBG', `${T_E2}, ${T_PRL}`, undefined, undefined),
       it('Почки: креатинин/eGFR/цистатин C + ОАМ + UACR', 'UACR<30', undefined, undefined),
       it('Глюкоза/HbA1c + Hcy/B12/фолат + D3/ферритин', 'Hcy<10', 'Hcy>15 — B-триада + TMG', 'Метилирование на длинном курсе'),
       it('Коагулограмма + ферритин/железо', 'D-димер<0.5', undefined, undefined),
@@ -210,7 +221,7 @@ const K4_BRIDGE: PhaseLabCard = {
   audience: 'bridge',
   groups: [
     g('Контроль моста', [
-      it('Липиды + ОАК/HCT + АЛТ/АСТ + E2 + АД/ЧСС', 'HCT<50%, E2 20–40', 'HCT≥54% — как на курсе', 'HCT и E2 на мосту не «отпускать»'),
+      it('Липиды + ОАК/HCT + АЛТ/АСТ + E2 + АД/ЧСС', `${T_HCT}, ${T_E2}`, `${T_HCT_STOP} — как на курсе`, 'HCT и E2 на мосту не «отпускать»'),
     ]),
   ],
 };
@@ -223,7 +234,7 @@ const K5_TRT: PhaseLabCard = {
   audience: 'trt',
   groups: [
     g('TRT-контроль', [
-      it('TT (цель — mid-normal) + HCT + PSA + E2 + липиды + АД', 'TT 15–30 нмоль/л, HCT<50%', 'HCT≥54% — отмена/снижение/донация; PSA прирост >1.4 или >4.0 — уролог', 'HCT 48–50% на старте — обсудить риск ДО начала (ES 2018, ICSM)'),
+      it('TT (цель — mid-normal) + HCT + PSA + E2 + липиды + АД', `TT 15–30 нмоль/л, ${T_HCT}`, `${T_HCT_STOP} — отмена/снижение/донация; PSA прирост >1.4 или >4.0 — уролог`, 'HCT 48–50% на старте — обсудить риск ДО начала (ES 2018, ICSM)'),
     ]),
   ],
   femaleNote: '♀ Женщины: PSA не применяется; TRT/ЗГТ — только врач по женским показаниям и женским порогам TT/E2 (см. таб «Лабы»).',
@@ -349,21 +360,21 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
     key: 'testosterone', label: 'Тестостерон (все эфиры)',
     classes: ['testosterone'], attachTo: ['K2', 'K3', 'K5'],
     items: [
-      it('E2 q4w + HCT q4w + PSA-правило + АД', 'E2 20–40, HCT<50%', 'HCT≥54% — стоп; PSA +1.4/>4.0 — уролог', 'Суспензия — чаще (пики)'),
+      it('E2 q4w + HCT q4w + PSA-правило + АД', `${T_E2}, ${T_HCT}`, `${T_HCT_STOP} — стоп; PSA +1.4/>4.0 — уролог`, 'Суспензия — чаще (пики)'),
     ],
   },
   {
     key: 'trenbolone', label: 'Тренболон',
     classes: ['trenbolone'], attachTo: ['K1', 'K2'],
     items: [
-      it('PRL q4w + E2; почки (креатинин/eGFR/UACR/K/Na/Mg) q2–4w', 'PRL<25, eGFR>60', undefined, 'АД/ЧСС ежедневно + сон/тревога-дневник; ЭКГ при симптомах'),
+      it('PRL q4w + E2; почки (креатинин/eGFR/UACR/K/Na/Mg) q2–4w', `${T_PRL}, eGFR>60`, undefined, 'АД/ЧСС ежедневно + сон/тревога-дневник; ЭКГ при симптомах'),
     ],
   },
   {
     key: 'nandrolone', label: 'Нандролон / MENT (трестолон)',
     classes: ['nandrolone'], attachTo: ['K2'],
     items: [
-      it('PRL с подтверждением + E2/TT/FT/LH/FSH/SHBG q4w', 'PRL<25', undefined, 'У MENT — E2 усиленно (ароматизация 0.4); либидо/гино-дневник'),
+      it('PRL с подтверждением + E2/TT/FT/LH/FSH/SHBG q4w', T_PRL, undefined, 'У MENT — E2 усиленно (ароматизация 0.4); либидо/гино-дневник'),
     ],
   },
   {
@@ -377,7 +388,7 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
     key: 'oral_17aa', label: 'Оралы 17α (метан/оксана/стан/турик/гало/супердрол/анаполон)',
     classes: ['oral_17aa'], attachTo: ['K1', 'K2'],
     items: [
-      it('АЛТ/АСТ q2w + ГГТ/ЩФ/билирубин + липиды q4w', `АЛТ ${lftUlnText('ALT')}`, 'АЛТ>2×ULN — снизить/отменить; курс ≤6 нед (супердрол ≤4)', 'Стан — HDL-контроль усиленно'),
+      it('АЛТ/АСТ q2w + ГГТ/ЩФ/билирубин + липиды q4w', `АЛТ ${lftUlnText('ALT')}`, `АЛТ >2×ВГН (♂ >${LFT_STAGE_ULN.reduce.male} / ♀ >${LFT_STAGE_ULN.reduce.female}) — снизить/пересмотреть; курс ≤6 нед (супердрол ≤4)`, 'Стан — HDL-контроль усиленно'),
     ],
   },
   {
@@ -432,7 +443,7 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
   {
     key: 'pct_ai', label: 'AI (анастрозол/экземестан/летрозол)',
     classes: ['anastrozole', 'exemestane', 'letrozole', 'anastro', 'aromatase_inhibitor'], attachTo: ['K2', 'K6'],
-    items: [it('E2 чувств. + липиды; при длинном AI — DEXA 1–2 года', 'E2 20–40', 'E2<10 — снизить', undefined)],
+    items: [it('E2 чувств. + липиды; при длинном AI — DEXA 1–2 года', T_E2, 'E2 ♂ <10 пг/мл / ♀ <30 пг/мл — снизить/отменить ИА', undefined)],
   },
   {
     key: 'pct_serm', label: 'SERM (тамоксифен/кломифен/энкломифен)',
@@ -442,7 +453,7 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
   {
     key: 'pct_da', label: 'Каберголин / hCG',
     classes: ['cabergoline', 'caberg', 'hcg', 'pct_dopamine', 'pct_gonadotropin'], attachTo: ['K2', 'K6'],
-    items: [it('PRL (кабер) / TT/E2 (hCG)', 'PRL<25', 'PRL<5 — STOP кабер; ЭхоКГ ежегодно при >1 мг/нед', undefined)],
+    items: [it('PRL (кабер) / TT/E2 (hCG)', T_PRL, 'PRL переподавлен — STOP кабер; ЭхоКГ ежегодно при >1 мг/нед', undefined)],
   },
 ];
 

@@ -73,6 +73,9 @@ import { applyFemaleSupport } from './female-support-layer';
 import { buildAssayWarningsFromDb } from '../data/assay-interference-db';
 import { getSubstanceMonitoring } from '../data/substance-monitoring-db';
 import { addonsFor, isInjectableCourse, isLongEsterHalfLife } from './support-phase-labs.engine';
+import {
+  HCT_THRESHOLDS, HGB_THRESHOLDS, LFT_STAGE_ULN, lftUlnText, FEMALE_HORMONE_BANDS,
+} from './lab-norms.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
 import { getPrioritySubstances, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
@@ -1199,6 +1202,19 @@ export function buildSupportRisks(subs: RecommendedSub[]): SupportRisk[] {
   return risks;
 }
 
+// ── Пороги-цели графика мониторинга (проход 59) ─────────────────────────────
+// Расписание в движке — структурная копия карточек фаз K0–K10: в UI и в печати
+// оно НЕ печатается (из него берётся только секция `daily`), но в нём были
+// мужские литералы как общие цели: `АЛТ<40`, `HCT<50%`, `HGB<170`, `PRL<25`,
+// `E2 20-40 пг/мл`. Женщина читала чужие пороги. Теперь — из резолвера норм,
+// оба пола одной строкой, ступени печени — из `LFT_STAGE_ULN`.
+const MON_HCT = `♂ <${HCT_THRESHOLDS.male.erythrocytosis}% / ♀ <${HCT_THRESHOLDS.female.erythrocytosis}%`;
+const MON_HGB = `♂ <${HGB_THRESHOLDS.male.upper} / ♀ <${HGB_THRESHOLDS.female.upper} г/л`;
+const MON_LFT = `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')}`;
+const MON_E2 = `♂ 20–40 пг/мл / ♀ по фазе ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`;
+const MON_PRL = `♂ <25 нг/мл / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`;
+const MON_LFT_STOP = `АЛТ/АСТ >3×ВГН (♂ >${LFT_STAGE_ULN.stopOral.male} / ♀ >${LFT_STAGE_ULN.stopOral.female}) — отмена оралов; >5×ВГН — отмена всего`;
+
 export interface MonitoringItemLine {
   marker: string;
   reason: string;
@@ -1233,12 +1249,12 @@ export function buildMonitoringSchedule(
   baseline.push({
     marker: 'ОАК с СОЭ: HCT, HGB, RBC, WBC, PLT, эозинофилы, ретикулоциты, СОЭ/ESR',
     reason: 'База крови до курса; сравнение во время/после',
-    target: 'HCT<50%, HGB<170 г/л, PLT 150-400, СОЭ<15',
+    target: `HCT ${MON_HCT}, HGB ${MON_HGB}, PLT 150-400, СОЭ<15`,
   });
   baseline.push({
     marker: 'БХ: АЛТ/АСТ/ГГТ/билирубин/ЩФ, альбумин, глюкоза/HbA1c, липидограмма (ЛПНП/ЛПВП/ТГ/АпоВ/Лп(а))',
     reason: 'Печень, сахар и липиды — исходная точка',
-    target: 'АЛТ<40, АСТ<40, глюкоза<5.6, HbA1c<5.7%, LDL<3.0',
+    target: `${MON_LFT}, глюкоза<5.6, HbA1c<5.7%, LDL<3.0`,
   });
   baseline.push({
     marker: 'Почечный блок + ОАМ: креатинин, eGFR, цистатин C, мочевина, мочевая кислота, UACR; общий анализ мочи (удельный вес, белок, глюкоза, эритроциты, лейкоциты)',
@@ -1248,20 +1264,20 @@ export function buildMonitoringSchedule(
   baseline.push({
     marker: 'Гормоны: E2, PRL, ТТГ, TT/FT, LH/FSH, SHBG, кортизол',
     reason: 'Гормональный baseline (ароматизация, пролактин, HPTA)',
-    target: 'E2 20-40 пг/мл, PRL<25, ТТГ 0.4-4.0',
+    target: `E2 ${MON_E2}; PRL ${MON_PRL}; ТТГ 0.4-4.0`,
   });
   baseline.push({ marker: 'АД, ЧСС', reason: 'Базовое артериальное давление и пульс', target: 'АД<130/85, ЧСС 60-90' });
   baseline.push({ marker: 'Электролиты Na⁺/K⁺/Mg²⁺', reason: 'База для ARB/диуретиков/кленбутерола', target: 'K 3.5-5.0, Na 135-145, Mg 0.75-1.0' });
   baseline.push({ marker: 'Коагулограмма (МНО/АЧТВ/фибриноген/D-димер)', reason: 'База перед фибринолитиками/антиагрегантами', target: 'фибриноген 2-4 г/л, D-димер <0.5' });
   baseline.push({ marker: 'Ферритин, сыв. железо, витамин D (25-OH), B12, фолат', reason: 'База для управления эритроцитозом и дефицитами', target: 'ферритин 50-200, D3 50-80 нг/мл' });
   baseline.push({ marker: 'ИФР-1 (IGF-1) — при GH/IGF-1', reason: 'База для GH-курса', target: 'верхняя граница возрастной нормы' });
-  baseline.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, ферритин, D3 (25-OH), B12, цинк, PRL', reason: 'Анализы, которые объясняют ОТСУТСТВИЕ прогресса: низкий TT/FT, E2<15 (суставы/стагнация), SHBG↑, IGF-1↓, кортизол↑ (катаболизм), гипотиреоз (ТТГ↑), анемия/ферритин↓, D3↓, B12↓, цинк↓, PRL↑', target: 'TT 15-30 нмоль/л, E2 20-40 пг/мл, кортизол 140-690, D3 50-80 нг/мл, ферритин 50-200' });
+  baseline.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, ферритин, D3 (25-OH), B12, цинк, PRL', reason: 'Анализы, которые объясняют ОТСУТСТВИЕ прогресса: низкий TT/FT, E2<15 (суставы/стагнация), SHBG↑, IGF-1↓, кортизол↑ (катаболизм), гипотиреоз (ТТГ↑), анемия/ферритин↓, D3↓, B12↓, цинк↓, PRL↑', target: `TT 15-30 нмоль/л, E2 ${MON_E2}, кортизол 140-690, D3 50-80 нг/мл, ферритин 50-200` });
   baseline.push({ marker: 'Системные панели до курса — 8 групп (строки ниже, сдаются целиком)', reason: 'Полный перечень маркеров по группам — чек-лист baseline' });
-  baseline.push({ marker: 'Панель 1/8 печёночная: АЛТ, АСТ, ГГТ, ЩФ, билирубин общ/прям, альбумин, ПТИ', reason: 'Группа 1 из 8 системных панелей', target: 'АЛТ<40, АСТ<40' });
+  baseline.push({ marker: 'Панель 1/8 печёночная: АЛТ, АСТ, ГГТ, ЩФ, билирубин общ/прям, альбумин, ПТИ', reason: 'Группа 1 из 8 системных панелей', target: MON_LFT });
   baseline.push({ marker: 'Панель 2/8 кардио-липидная: ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I', reason: 'Группа 2 из 8 системных панелей', target: 'LDL<3.0, HDL>1.0, ТГ<1.7' });
   baseline.push({ marker: 'Панель 3/8 почечная: креатинин, рСКФ (CKD-EPI), цистатин C, мочевина, мочевая кислота, электролиты (Na⁺/K⁺/Cl⁻), белок мочи, микроальбуминурия, ОАМ', reason: 'Группа 3 из 8 системных панелей', target: 'eGFR>90, UACR<30' });
-  baseline.push({ marker: 'Панель 4/8 кровь: HCT, Hgb, RBC, PLT, WBC, СОЭ/ESR, ретикулоциты, ферритин, сыв. железо, коагулограмма', reason: 'Группа 4 из 8 системных панелей', target: 'HCT<50%, HGB<170' });
-  baseline.push({ marker: 'Панель 5/8 гормональная: тестостерон общ/своб, эстрадиол (чувств.), пролактин, ЛГ, ФСГ, SHBG, кортизол (утро), ДГТ, прогестерон', reason: 'Группа 5 из 8 системных панелей', target: 'E2 20–40 пг/мл, PRL<25' });
+  baseline.push({ marker: 'Панель 4/8 кровь: HCT, Hgb, RBC, PLT, WBC, СОЭ/ESR, ретикулоциты, ферритин, сыв. железо, коагулограмма', reason: 'Группа 4 из 8 системных панелей', target: `HCT ${MON_HCT}, HGB ${MON_HGB}` });
+  baseline.push({ marker: 'Панель 5/8 гормональная: тестостерон общ/своб, эстрадиол (чувств.), пролактин, ЛГ, ФСГ, SHBG, кортизол (утро), ДГТ, прогестерон', reason: 'Группа 5 из 8 системных панелей', target: `E2 ${MON_E2}; PRL ${MON_PRL}` });
   baseline.push({ marker: 'Панель 6/8 метаболическая: глюкоза натощак, HbA1c, инсулин, HOMA-IR, ИФР-1 (при GH), гомоцистеин, СРБ', reason: 'Группа 6 из 8 системных панелей', target: 'HOMA-IR<2.5, Hcy<10' });
   baseline.push({ marker: 'Панель 7/8 тиреоидная: ТТГ, Т3 своб., Т4 своб., АТ-ТПО', reason: 'Группа 7 из 8 системных панелей', target: 'ТТГ 0.4–4.0' });
   baseline.push({ marker: 'Панель 8/8 витамины/минералы: D3 (25-OH), B12, фолат, ферритин, Mg²⁺, Zn²⁺, Se, Ca²⁺ общ., фосфор', reason: 'Группа 8 из 8 системных панелей', target: 'D3 50–80 нг/мл' });
@@ -1274,7 +1290,7 @@ export function buildMonitoringSchedule(
     baseline.push({ marker: 'Спермограмма + LH/FSH/TT/E2/PRL', reason: 'Исходный фертильный профиль', drug: 'fertility' });
   }
   if (phase === 'trt') {
-    baseline.push({ marker: 'TT/FT/SHBG + ОАК/HCT', reason: 'Базовый гормональный профиль TRT', target: 'TT 15-30 нмоль/л, HCT<50%' });
+    baseline.push({ marker: 'TT/FT/SHBG + ОАК/HCT', reason: 'Базовый гормональный профиль TRT', target: `TT 15-30 нмоль/л, HCT ${MON_HCT}` });
   }
   add('baseline', 'До курса (исходно)', '0 нед — перед началом', '📋', baseline);
 
@@ -1298,7 +1314,7 @@ export function buildMonitoringSchedule(
   if (phase !== 'pct') {
   const week2: MonitoringItemLine[] = [];
   if (flags.hasOral17) {
-    week2.push({ marker: 'АЛТ/АСТ', reason: 'Оралы 17α — гепатотоксичность', target: 'АЛТ<40, АСТ<40', drug: 'oral17', escalation: 'ALT>2×ULN — снизить/отменить орал' });
+    week2.push({ marker: 'АЛТ/АСТ', reason: 'Оралы 17α — гепатотоксичность', target: MON_LFT, drug: 'oral17', escalation: MON_LFT_STOP });
   }
   if (flags.hasClenbut) {
     week2.push({ marker: 'K⁺, Na⁺, Mg, креатинин', reason: 'Электролитный дисбаланс на кленбутероле', target: 'K 3.5-5.0, Na 135-145, Mg 0.75-1.0' });
@@ -1309,10 +1325,10 @@ export function buildMonitoringSchedule(
   add('week2', 'Через 2 недели', 'каждые 2 нед', '🧪', week2);
 
   const week4: MonitoringItemLine[] = [];
-  week4.push({ marker: 'АД, ЧСС, HCT/HGB, АЛТ/АСТ', reason: 'Базовый контроль на курсе', target: 'HCT<50%, HGB<170 г/л' });
-  week4.push({ marker: 'HCT, ферритин', reason: 'Управление эритроцитозом', target: 'HCT<50%, ферритин 30-300' });
-  week4.push({ marker: 'E2 (титрация AI), PRL', reason: 'Гормональный контроль', target: 'E2 20-40 пг/мл, PRL<25' });
-  week4.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин', reason: 'Причины стагнации на курсе: E2<15 или >60 (стагнация/гино), SHBG↑, IGF-1↓, кортизол↑ (перетренированность), ТТГ↑ (гипотиреоз), PRL↑ (19-нор), ферритин↓', target: 'E2 20-40 пг/мл, кортизол 140-690, ТТГ 0.4-4.0' });
+  week4.push({ marker: 'АД, ЧСС, HCT/HGB, АЛТ/АСТ', reason: 'Базовый контроль на курсе', target: `HCT ${MON_HCT}, HGB ${MON_HGB}, ${MON_LFT}` });
+  week4.push({ marker: 'HCT, ферритин', reason: 'Управление эритроцитозом', target: `HCT ${MON_HCT}, ферритин 30-300` });
+  week4.push({ marker: 'E2 (титрация AI), PRL', reason: 'Гормональный контроль', target: `E2 ${MON_E2}; PRL ${MON_PRL}` });
+  week4.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин', reason: 'Причины стагнации на курсе: E2 вне окна (♂ <15 или >60 пг/мл; ♀ — по фазе цикла), SHBG↑, IGF-1↓, кортизол↑ (перетренированность), ТТГ↑ (гипотиреоз), PRL↑ (19-нор), ферритин↓', target: `E2 ${MON_E2}; кортизол 140-690, ТТГ 0.4-4.0` });
   if ((ctx.pedDoses || []).some(p => (p.mgPerWeek || 0) >= 500)) {
     week4.push({ marker: 'Липидограмма (ЛПНП/ЛПВП/ТГ)', reason: 'Дозы >500 мг/нед — липидный контроль', target: 'LDL<3.0, HDL>1.0, ТГ<1.7' });
   }
@@ -1320,13 +1336,13 @@ export function buildMonitoringSchedule(
     week4.push({ marker: 'Коагулограмма (фибриноген, D-димер)', reason: 'Фибринолитики/антиагреганты в плане', target: 'D-димер <0.5', escalation: 'D-димер>0.5 — срочная оценка тромботического риска' });
   }
   if (flags.hasTren) {
-    week4.push({ marker: 'PRL, E2', reason: '19-nor: пролактин и ароматизация', target: 'PRL<25, E2 20-40' });
+    week4.push({ marker: 'PRL, E2', reason: '19-nor: пролактин и ароматизация', target: `PRL ${MON_PRL}; E2 ${MON_E2}` });
   }
   if (flags.hasNandrolone) {
     week4.push({ marker: 'E2/TT/FT/LH/FSH/SHBG', reason: 'HPTA и эстрогеновый профиль нандролона', target: 'LH/FSH в норме на фоне поддержки hCG' });
   }
   if (flags.hasBold) {
-    week4.push({ marker: 'ОАК (HCT/HGB/RBC/PLT), ferritin/iron/TSAT', reason: 'Эритроцитоз болденона/DHB', target: 'HCT<52%, TSAT 20-45%', escalation: 'HCT ↑ (♂ >54%, ♀ >52%) — эритроцитаферез/флеботомия ТОЛЬКО с врачом' });
+    week4.push({ marker: 'ОАК (HCT/HGB/RBC/PLT), ferritin/iron/TSAT', reason: 'Эритроцитоз болденона/DHB', target: `HCT ${MON_HCT}, TSAT 20-45%`, escalation: `HCT ↑ (♂ >${HCT_THRESHOLDS.male.block}%, ♀ >${HCT_THRESHOLDS.female.block}%) — эритроцитаферез/флеботомия ТОЛЬКО с врачом` });
   }
   if (flags.hasGH) {
     week4.push({ marker: 'Глюкоза натощак + HbA1c; IGF-1 каждые 6-8 нед', reason: 'Метаболический контроль GH', target: 'HbA1c<5.7%', drug: 'gh' });
@@ -1339,9 +1355,9 @@ export function buildMonitoringSchedule(
 
   if (phase !== 'pct') {
   const week8: MonitoringItemLine[] = [];
-  week8.push({ marker: 'ОАК с СОЭ + БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ) + липидограмма + гормоны (E2, PRL, ТТГ, TT/FT, LH/FSH, SHBG) + глюкоза/HbA1c + креатинин/eGFR', reason: 'Полный пересмотр на курсе (неделя 8)', target: 'LDL<3.0, HDL>1.0, ТГ<1.7, E2 20-40, PRL<25, глюкоза<5.6' });
+  week8.push({ marker: 'ОАК с СОЭ + БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ) + липидограмма + гормоны (E2, PRL, ТТГ, TT/FT, LH/FSH, SHBG) + глюкоза/HbA1c + креатинин/eGFR', reason: 'Полный пересмотр на курсе (неделя 8)', target: `LDL<3.0, HDL>1.0, ТГ<1.7; E2 ${MON_E2}; PRL ${MON_PRL}; глюкоза<5.6` });
   week8.push({ marker: 'Коагулограмма (МНО/АЧТВ/фибриноген/D-димер) + ферритин/железо', reason: 'Гемостаз и железо на курсе', target: 'D-димер<0.5, ферритин 50-200', escalation: 'D-димер>0.5 — срочная оценка тромботического риска' });
-  week8.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин', reason: 'Контроль причин стагнации на длинном курсе', target: 'E2 20-40 пг/мл, кортизол 140-690' });
+  week8.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин', reason: 'Контроль причин стагнации на длинном курсе', target: `E2 ${MON_E2}; кортизол 140-690` });
   week8.push({ marker: 'ОАМ (удельный вес, белок, глюкоза, эритроциты, лейкоциты) + UACR', reason: 'Почечный контроль с ОАМ на курсе', target: 'белок мочи <0.15 г/л, UACR<30' });
   week8.push({ marker: 'УЗИ печени (при ААС), PSA (мужчины >40), ЭКГ', reason: 'Органный контроль', escalation: 'Отклонения — профильный врач' });
   week8.push({ marker: 'Повтор полного набора (ОАК+БХ+липиды+гормоны+коагулограмма+ОАМ)', reason: 'Длительные курсы — каждые 12 нед' });
@@ -1360,7 +1376,7 @@ export function buildMonitoringSchedule(
   if (phase !== 'pct') {
   const week12: MonitoringItemLine[] = [];
   week12.push({ marker: 'Полный набор: ОАК с СОЭ, БХ (АЛТ/АСТ/ГГТ/билирубин/ЩФ), липидограмма, E2/PRL/ТТГ/TT/FT/LH/FSH/SHBG, глюкоза/HbA1c, креатинин/eGFR/цистатин C, HCT/ферритин, коагулограмма, ОАМ', reason: 'Длительные курсы (>8 нед) — полный пересмотр каждые 12 нед', target: 'как на 8 нед' });
-  week12.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин, D3, B12, цинк', reason: 'Причины отсутствия прогресса на длинном курсе', target: 'E2 20-40, D3 50-80, ферритин 50-200' });
+  week12.push({ marker: 'Маркеры прогресса: TT/FT, E2, SHBG, IGF-1, кортизол, ТТГ, PRL, ферритин, D3, B12, цинк', reason: 'Причины отсутствия прогресса на длинном курсе', target: `E2 ${MON_E2}, D3 50-80, ферритин 50-200` });
   week12.push({ marker: 'УЗИ печени и предстательной железы, ЭКГ, D-димер', reason: 'Органный контроль длительных курсов', escalation: 'Отклонения — профильный врач' });
   week12.push({ marker: 'Гормоны щитовидной оси (ТТГ, своб. T3/T4), кортизол', reason: 'Эндокринный контроль длительного курса', target: 'ТТГ 0.4-4.0' });
   if (phase === 'bridge') {
@@ -1375,7 +1391,7 @@ export function buildMonitoringSchedule(
     post.push({ marker: 'LH, FSH, TT, E2', reason: 'Нед 6 после отмены — динамика', escalation: 'Не восстановление >6 нед (LH/FSH <50% нормы) — эндокринолог' });
     post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса' });
   } else {
-    post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса', target: 'HCT<50%, АЛТ<40' });
+    post.push({ marker: 'Липиды, ОАК, АЛТ/АСТ, HCT', reason: 'Контроль после курса', target: `HCT ${MON_HCT}, ${MON_LFT}` });
     post.push({ marker: 'LH/FSH/TT/E2/PRL — через 8-12 нед после отмены', reason: 'Проверка восстановления HPTA', escalation: 'Не восстановилось — эндокринолог' });
   }
   add('post', 'После курса (ПКТ/выход)', 'нед 2 и 6 после отмены', '🎯', post);
@@ -1387,7 +1403,7 @@ export function buildMonitoringSchedule(
   urgent.push({ marker: 'Температура >38.5°C, покраснение/абсцесс в месте инъекции', reason: 'Инфекция места инъекции', escalation: 'Срочно врач — абсцесс требует дренирования' });
   urgent.push({ marker: 'Судороги, потеря сознания, нарушение зрения', reason: 'Гипервязкость/неврология', escalation: 'Экстренная госпитализация' });
   if (flags.hasOral17) {
-    urgent.push({ marker: 'ALT >2×ULN', reason: 'Гепатотоксичность оралов', escalation: 'Снизить/отменить орал, врач' });
+    urgent.push({ marker: `АЛТ >3×ВГН (♂ >${LFT_STAGE_ULN.stopOral.male} / ♀ >${LFT_STAGE_ULN.stopOral.female})`, reason: 'Гепатотоксичность оралов', escalation: 'Отмена оралов (17α), врач; >5×ВГН — отмена всего' });
   }
   add('urgent', 'Экстренно при симптомах', 'немедленно', '🚨', urgent);
 

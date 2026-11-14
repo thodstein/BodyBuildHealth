@@ -87,11 +87,12 @@ describe('buildExportDataFromRec — доза и МНН из плана, а не
 });
 
 describe('buildExportDataFromRec — пороги по полу', () => {
-  it('♀: E2 «по фазе цикла», женские пометки карточек в примечаниях, стоп HCT 52 / АЛТ 78', () => {
+  it('♀: E2 «по фазе цикла» из FEMALE_HORMONE_BANDS, женские пометки карточек в примечаниях, стоп HCT 52 / АЛТ 78', () => {
     const fem = buildExportDataFromRec(recWith([]), { ...patient, sex: 'female' }, course);
     const all = JSON.stringify(fem.labSchedule);
-    expect(all).toContain('по фазе цикла (20–200 без ИА)');
-    expect(all).not.toContain('20–40 пг/мл');
+    expect(all).toContain('по фазе цикла');
+    expect(all).toContain('40–200 (фолл.)');   // фазовая модель из женского протокола
+    expect(all).not.toContain('20–40 пг/мл');  // мужской цели в женской печати нет
     expect(fem.protocol.clinicalNotes.join(' ')).toContain('♀');
     expect(fem.protocol.stopCriteria.join(' ')).toContain('>52%');
     expect(fem.protocol.stopCriteria.join(' ')).toContain('>78');

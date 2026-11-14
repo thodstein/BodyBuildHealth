@@ -5,6 +5,10 @@
 //  вместе с назначенными препаратами.
 // ════════════════════════════════════════════════════════════════════
 
+// Цели — из резолвера норм (проход 59): `АЛТ<40` и `E2 20-40 пг/мл` были
+// мужскими литералами и читались как общие.
+import { lftUlnText, FEMALE_HORMONE_BANDS } from '../engines/lab-norms.engine';
+
 export interface SubstanceMonitoring {
   marker: string;
   reason: string;
@@ -27,8 +31,8 @@ export const SUBSTANCE_MONITORING_DB: Record<string, SubstanceMonitoring> = {
   nebivolol: { marker: 'ЧСС, АД, ЭКГ (при симптомах)', reason: 'β-блокатор — брадикардия, АД', target: 'ЧСС 55-85, АД<130/85', freq: 'week4', escalation: 'ЧСС<50 — снизить дозу, врач' },
   tadalafil: { marker: 'АД (ортостаз), ЧСС', reason: 'PDE5i — гипотония, особенно с ARB/β-блокаторами', target: 'сист. >100', freq: 'week4' },
   // Липиды
-  atorvastatin: { marker: 'АЛТ, КФК, липиды (ЛПНП/ЛПВП/ТГ)', reason: 'статин — гепатотоксичность и миопатия', target: 'АЛТ<40, КФК<300, ЛПНП<2.6', freq: 'week4', escalation: 'КФК>2000 или миалгия — STOP' },
-  rosuvastatin: { marker: 'АЛТ, КФК, липиды', reason: 'статин — гепатотоксичность и миопатия', target: 'АЛТ<40, КФК<300', freq: 'week4', escalation: 'КФК>2000 или миалгия — STOP' },
+  atorvastatin: { marker: 'АЛТ, КФК, липиды (ЛПНП/ЛПВП/ТГ)', reason: 'статин — гепатотоксичность и миопатия', target: `АЛТ ${lftUlnText('ALT')}, КФК<300, ЛПНП<2.6`, freq: 'week4', escalation: 'КФК>2000 или миалгия — STOP' },
+  rosuvastatin: { marker: 'АЛТ, КФК, липиды', reason: 'статин — гепатотоксичность и миопатия', target: `АЛТ ${lftUlnText('ALT')}, КФК<300`, freq: 'week4', escalation: 'КФК>2000 или миалгия — STOP' },
   // Метаболизм
   metformin: { marker: 'глюкоза, HbA1c, eGFR, B12', reason: 'метформин — гипогликемия, лактат (eGFR), дефицит B12', target: 'глюкоза 3.9-7.8, eGFR>30', freq: 'week4', escalation: 'гипогликемия — пересмотр дозы' },
   berberine: { marker: 'глюкоза натощак', reason: 'берберин снижает глюкозу — риск гипогликемии с инсулином/GH', target: 'глюкоза >3.9', freq: 'week4' },
@@ -38,10 +42,10 @@ export const SUBSTANCE_MONITORING_DB: Record<string, SubstanceMonitoring> = {
   vitamin_d3: { marker: '25-OH D, кальций', reason: 'D3 — уровень и кальций', target: 'D3 50-80 нг/мл', freq: 'week8' },
   calcium: { marker: 'кальций, 25-OH D, PTH', reason: 'кальций — гиперкальциемия при D3', target: 'Ca 2.15-2.55', freq: 'week8' },
   // Печень
-  milk_thistle: { marker: 'АЛТ/АСТ/ГГТ (сравнение с baseline)', reason: 'силимарин снижает трансаминазы — учитывать при оценке', target: 'АЛТ<40', freq: 'week4' },
+  milk_thistle: { marker: 'АЛТ/АСТ/ГГТ (сравнение с baseline)', reason: 'силимарин снижает трансаминазы — учитывать при оценке', target: `АЛТ ${lftUlnText('ALT')}`, freq: 'week4' },
   curcumin: { marker: 'CRP', reason: 'куркумин снижает hs-СРБ — учитывать', target: 'CRP<3', freq: 'week8' },
   // Гормоны
-  anastrozole: { marker: 'E2 (чувств.), липиды', reason: 'ИА — контроль E2 и липидов', target: 'E2 20-40 пг/мл', freq: 'week4', escalation: 'E2<10 — снизить ИА' },
+  anastrozole: { marker: 'E2 (чувств.), липиды', reason: 'ИА — контроль E2 и липидов', target: `E2 ♂ 20-40 пг/мл / ♀ по фазе ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`, freq: 'week4', escalation: 'E2 ♂ <10 пг/мл — снизить ИА; ♀ — E2 не подавлять (критичен для либидо и костей)' },
   tamoxifen: { marker: 'E2, TT, LH/FSH, липиды, тромботические симптомы', reason: 'SERM — тромбоз, липиды', target: 'без тромбозов', freq: 'week4', escalation: 'боль в ноге/груди — STOP' },
   // ОАК с СОЭ + ИФР + ОАМ — базовые расширения
 };

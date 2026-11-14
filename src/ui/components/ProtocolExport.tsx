@@ -7,7 +7,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
 import {
-  HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE, LFT_STAGE_ULN,
+  HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE, LFT_STAGE_ULN, FEMALE_HORMONE_BANDS,
 } from '../../engines/lab-norms.engine';
 import { phaseCardsFor, addonsFor, isInjectableCourse } from '../../engines/support-phase-labs.engine';
 
@@ -231,6 +231,13 @@ export function buildExportDataFromRec(
   const altStopOral = isFemale ? LFT_STAGE_ULN.stopOral.female : LFT_STAGE_ULN.stopOral.male;
   const altStopAll = isFemale ? LFT_STAGE_ULN.stopAll.female : LFT_STAGE_ULN.stopAll.male;
 
+  // Печать — для конкретного пациента: в женском протоколе из двуполых целей
+  // («HCT ♂ <51% / ♀ <48%», «АЛТ ♂ <40 / ♀ <31») оставляем её половину, иначе
+  // врач вычитает из строки мужской порог. Общие списки (карточки в UI, таблица
+  // «Анализы») продолжают показывать оба пола — это справочник, а не назначение.
+  const patientSexText = (s?: string): string | undefined =>
+    isFemale && s ? s.replace(/♂[^,;]*?\/\s*♀\s*/g, '') : s;
+
   // Единый перечень анализов — карточки фаз K0–K10 (как в UI и в текстовых
   // экспортах). График фазы (`monitoringSchedule`) больше не печатается: он
   // перечислял те же маркеры второй раз, с бедными целями.
@@ -248,15 +255,20 @@ export function buildExportDataFromRec(
     g.items.map(m => ({
       marker: `${c.id} · ${m.marker}`,
       frequency: `${c.title} — ${c.when}`,
-      target: m.target || '—',
-      criticalThreshold: m.red || undefined,
+      target: patientSexText(m.target) || '—',
+      criticalThreshold: patientSexText(m.red) || undefined,
     })),
   ));
   // ♀ E2 нельзя мерить мужской целью 20–40 пг/мл: без фазовой модели цикла
-  // подставляем «по фазе» (женский слой §6), иначе врач читает чужой таргет.
+  // подставляем «по фазе» из `FEMALE_HORMONE_BANDS` (раньше здесь жила четвёртая
+  // копия — «20–200 без ИА / >400», не совпадавшая с женским протоколом).
   const sexAdjustedRows: ExportLabSchedule[] = isFemale
     ? cardRows.map(r => (/E2|Эстрадиол/i.test(r.marker)
-      ? { ...r, target: 'по фазе цикла (20–200 без ИА)', criticalThreshold: '<20 на ИА или >400 вне овуляции' }
+      ? {
+        ...r,
+        target: `по фазе цикла: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`,
+        criticalThreshold: `${FEMALE_HORMONE_BANDS.E2.red} пг/мл`,
+      }
       : r))
     : cardRows;
   const addonRows: ExportLabSchedule[] = addonsFor([
@@ -265,8 +277,8 @@ export function buildExportDataFromRec(
   ]).map(a => ({
     marker: `💊 ${a.label}: ${a.items.map(i => i.marker).join('; ')}`,
     frequency: `аддон к ${a.attachTo.join(', ')}`,
-    target: a.items.map(i => i.target).filter(Boolean).join('; ') || '—',
-    criticalThreshold: a.items.map(i => i.red).filter(Boolean).join('; ') || undefined,
+    target: patientSexText(a.items.map(i => i.target).filter(Boolean).join('; ')) || '—',
+    criticalThreshold: patientSexText(a.items.map(i => i.red).filter(Boolean).join('; ')) || undefined,
   }));
   const labSchedule: ExportLabSchedule[] = [...sexAdjustedRows, ...addonRows];
 
@@ -278,7 +290,9 @@ export function buildExportDataFromRec(
       ? 'E2 <20 пг/мл на ИА — снизить/отменить анастрозол, контроль через 1 нед'
       : 'E2 <15 пг/мл — снизить/отменить анастрозол, контроль через 1 нед',
     'D-димер >500 нг/мл — консультация гематолога, исключить тромбоз',
-    'Пролактин >50 нг/мл — увеличить каберголин, МРТ гипофиза',
+    isFemale
+      ? `Пролактин ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л — каберголин только под контролем врача; ${FEMALE_HORMONE_BANDS.PRL.red} — МРТ гипофиза`
+      : 'Пролактин >50 нг/мл — увеличить каберголин, МРТ гипофиза',
     'Креатинин >200 мкмоль/л или eGFR <30 — стоп ААС, нефролог',
   ];
 

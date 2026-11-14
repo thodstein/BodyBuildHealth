@@ -107,11 +107,11 @@ describe('addonsFor — аддоны классов', () => {
     const a = addonsFor(['tren_acet']);
     expect(a.some(x => x.key === 'trenbolone')).toBe(true);
   });
-  it('алиас anastro → pct_ai; dbol → oral_17aa (стоп при АЛТ>2×ULN)', () => {
+  it('алиас anastro → pct_ai; dbol → oral_17aa (снизить при АЛТ>2×ВГН)', () => {
     expect(addonsFor(['anastro']).some(x => x.key === 'pct_ai')).toBe(true);
     const oral = addonsFor(['dbol']);
     expect(oral.some(x => x.key === 'oral_17aa')).toBe(true);
-    expect(JSON.stringify(oral)).toContain('2×ULN');
+    expect(JSON.stringify(oral)).toContain('2×ВГН');
   });
   it('регистр не важен (TEST_ENAN)', () => {
     expect(addonsFor(['TEST_ENAN']).some(x => x.key === 'testosterone')).toBe(true);
@@ -210,7 +210,7 @@ describe('matrixAddonKeys — мост к фарм-матрице классов
     expect(text(['testosterone'])).toContain('PSA');
     expect(text(['trenbolone'])).toContain('PRL');
     expect(text(['trenbolone'])).toContain('UACR');
-    expect(text(['oral17'])).toContain('2×ULN');
+    expect(text(['oral17'])).toContain('2×ВГН');
     expect(text(['clenbuterol'])).toContain('Mg');
     expect(text(['glp1'])).toContain('HbA1c');
     expect(text(['sarm'])).toContain('♂ >120 / ♀ >93');
