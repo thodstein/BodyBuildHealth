@@ -13,7 +13,7 @@ import { IU_PER_MCG_VITAMIN_D } from '../../../data/dose-units';
 import { stackLimitVerdicts, resolveNutrient, NUTRIENT_LIMITS_V2, type StackItem } from '../../../engines/support-limits';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
-import { HGB_THRESHOLDS } from '../../../engines/lab-norms.engine';
+import { HGB_THRESHOLDS, lftUlnText } from '../../../engines/lab-norms.engine';
 
 /* ──────────────── DEPLETION DB ──────────────── */
 const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }> = [
@@ -99,6 +99,12 @@ export function toRegistryAmount(id: string, value: number): number | undefined 
   return value; // единицы совпадают
 }
 
+// АЛТ/АСТ: ВГН по полу (♂ 40 / ♀ 31–34). Мужское «<40 Ед/л» больше не общее:
+// женщина с АЛТ 35 читала «норма», хотя её ВГН — 31 (проход 55). Ступени
+// терапии — в ×ВГН, чтобы не зависеть от пола читателя.
+const ALT_TARGET = `${lftUlnText('ALT')} Ед/л`;
+const AST_TARGET = `${lftUlnText('AST')} Ед/л`;
+
 export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   // ── AAS & гормональные препараты ── (маркеры общие для всех AAS)
   '': [
@@ -106,24 +112,24 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'Гематокрит (HCT)', markerEn:'HCT', system:'hematologic', when:'Каждые 4 нед', target:'<0.50 L/L', condition:'↑ HCT → ↑ вязкость → ↑ тромбоз', note:'Особенно под болденоном. HCT >0.54 (♀ >0.52) — забор крови (500 мл). >0.60 — STOP AAS.', tier1:'0.48-0.54 (♀ 0.48-0.52) — серрапептаза+наттокиназа, контроль', tier2:'0.54-0.60 (♀ 0.52-0.60) — кровопускание 500 мл, аспирин 100 мг', tier3:'>0.60 — STOP AAS, срочная консультация гематолога' },
     { markerRu:'Гемоглобин (HGB)', markerEn:'HEMOGLOBIN', system:'hematologic', when:'Каждые 4 нед', target:`<${HGB_THRESHOLDS.male.upper} г/л (♀ <${HGB_THRESHOLDS.female.upper})`, condition:'↑ HGB → риск тромбоза', note:`Коррелирует с HCT. HGB >${HGB_THRESHOLDS.male.block} — стоп ААС (Endocrine Society: ≥18.5 г/дл); ♀ >${HGB_THRESHOLDS.female.block} — кровопускание + отмена.`, tier1:`160-${HGB_THRESHOLDS.male.upper} (♀ ${HGB_THRESHOLDS.female.upper}-${HGB_THRESHOLDS.female.block}) — контроль`, tier2:`${HGB_THRESHOLDS.male.upper}-${HGB_THRESHOLDS.male.block} (♀ >${HGB_THRESHOLDS.female.block}) — кровопускание + пересмотр дозы`, tier3:`>${HGB_THRESHOLDS.male.block} (♀ >${HGB_THRESHOLDS.female.block}) — STOP AAS; >200 — экстренно, гематолог` },
     { markerRu:'ЛПНП (LDL)', markerEn:'LDL', system:'cardio', when:'Каждые 4 нед', target:'<3.0 ммоль/л', condition:'↑ LDL → атеросклероз', note:'Оральные AAS ↓ HDL + ↑ LDL — атерогенная дислипидемия.', tier1:'3.0-4.0 — бергамот 500-1000 мг', tier2:'4.0-5.5 — бергамот+чеснок+омега-3', tier3:'>5.5 — добавить розувастатин 5-10 мг' },
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↑ АЛТ → цитолиз гепатоцитов', note:'Оральные 17α-алкилированные (метандростенолон, оксиметолон, станозолол) → ↑ нагрузки.', tier1:'40-80 — NAC 1200 мг, силимарин', tier2:'80-200 — TUDCA 500-1000 мг, NAC, силимарин', tier3:'>200 — STOP оральные AAS' },
-    { markerRu:'АСТ', markerEn:'AST', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↑ АСТ → поражение гепатоцитов + миокарда', note:'Соотношение АЛТ/АСТ: если АСТ > АЛТ — возможна миопатия (CK ↑) или алкоголь.', tier1:'40-80 — наблюдение, NAC', tier2:'80-200 — TUDCA+NAC+силимарин', tier3:'>200 — STOP AAS' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → цитолиз гепатоцитов', note:'Оральные 17α-алкилированные (метандростенолон, оксиметолон, станозолол) → ↑ нагрузки.', tier1:'1–2×ВГН — NAC 1200 мг, силимарин', tier2:'2–5×ВГН — TUDCA 500-1000 мг, NAC, силимарин', tier3:'>5×ВГН — STOP оральные AAS' },
+    { markerRu:'АСТ', markerEn:'AST', system:'hepatic', when:'Каждые 4 нед', target:AST_TARGET, condition:'↑ АСТ → поражение гепатоцитов + миокарда', note:'Соотношение АЛТ/АСТ: если АСТ > АЛТ — возможна миопатия (CK ↑) или алкоголь.', tier1:'1–2×ВГН — наблюдение, NAC', tier2:'2–5×ВГН — TUDCA+NAC+силимарин', tier3:'>5×ВГН — STOP AAS' },
     { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↑ ГГТ → холестаз, алкоголь, микросомальная индукция', note:'Растёт от 17α-алкилированных. Если ↑ ГГТ + ↑ ЩФ — холестатическое поражение.', tier1:'55-100 — TUDCA 500 мг', tier2:'100-200 — TUDCA 1000 мг, NAC, силимарин', tier3:'>200 — STOP оральные AAS, УЗИ печени' },
     { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед (через 48 ч после инъекции)', target:'100-200 пмоль/л (на курсе)', condition:'↑ E2 → гинекомастия, отёки, гипертензия, ↓ E2 → суставы, либидо', note:'Измерять в середине недели между инъекциями. Не подавлять E2 до 0 — это опасно для липидов и костей.', tier1:'>250 — анастрозол 0.25-0.5 мг/день', tier2:'>400 — анастрозол 0.5-1 мг/день', tier3:'E2 <50 — отменить AI, E2 >600 — STOP препарат с ароматизацией' },
     { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Каждые 4 нед', target:'<320 мМЕ/л', condition:'↑ PRL → ↓ либидо, галакторея, импульсивность', note:'Нужен при нандролоне, тренболоне. 320-400 — макропролактин (ПЭГ) и повтор; выше 400 → каберголин по титрации ниже.', tier1:'400-700 — каберголин 0.25 мг/нед', tier2:'700-1000 — каберголин 0.5 мг/нед', tier3:'>1000 — STOP нандролон/трен, МРТ гипофиза' },
   ],
   // ── Гепатопротекторы ──
   nac: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↓ АЛТ → защита гепатоцитов', note:'NAC 1200-1800 мг/сут снижает АЛТ на 30-50% при токсическом поражении. При дозе >2400 мг — тошнота.' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → защита гепатоцитов', note:'NAC 1200-1800 мг/сут снижает АЛТ на 30-50% при токсическом поражении. При дозе >2400 мг — тошнота.' },
     { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↓ ГГТ → улучшение детоксикации', note:'NAC улучшает конъюгацию токсинов, снижая ГГТ на 20-40%.' },
   ],
   tudca: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↓ АЛТ → снижение ER-стресса', note:'TUDCA 500-1000 мг снижает АЛТ за счёт уменьшения ER-стресса и апоптоза гепатоцитов.' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → снижение ER-стресса', note:'TUDCA 500-1000 мг снижает АЛТ за счёт уменьшения ER-стресса и апоптоза гепатоцитов.' },
     { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↓ ГГТ → улучшение желчеоттока', note:'TUDCA стимулирует BSEP, снижая холестатический компонент. Эффект через 2-4 нед.' },
     { markerRu:'Билирубин', markerEn:'BILIRUBIN', system:'hepatic', when:'Каждые 4 нед', target:'<17.1 мкмоль/л', condition:'↓ билирубин → улучшение конъюгации/экскреции', note:'Особенно эффективен при ↑ прямого билирубина (холестатический тип).', tier2:'>50 — TUDCA 1000 мг, STOP гепатотоксичные', tier3:'>100 — STOP AAS, УЗИ' },
   ],
   milk_thistle: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↓ АЛТ → стабилизация мембран', note:'Силимарин стабилизирует мембраны гепатоцитов. Эффект менее выражен, чем у TUDCA.' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → стабилизация мембран', note:'Силимарин стабилизирует мембраны гепатоцитов. Эффект менее выражен, чем у TUDCA.' },
   ],
   alpha_lipoic: [
     { markerRu:'Глюкоза', markerEn:'GLUCOSE', system:'metabolic', when:'Каждые 4 нед', target:'<6.1 ммоль/л', condition:'↓ глюкоза ↑ инсулиночувствительность', note:'АЛЬК 300-600 мг улучшает утилизацию глюкозы мышцами через GLUT4.' },
@@ -156,14 +162,14 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'ЛПВП (HDL)', markerEn:'HDL', system:'cardio', when:'Каждые 4-8 нед', target:'>1.0 ммоль/л', condition:'↑ HDL → антиатерогенный эффект', note:'Высокие дозы омега-3 ↑ HDL на 5-10%. Эффект мал, но стабилен.' },
   ],
   niacin: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 2 нед, затем каждые 4 нед', target:'<40 Ед/л', condition:'↑ АЛТ → гепатотоксичность ниацина', note:'Ниацин SR >500 мг/сут может ↑ АЛТ. Использовать только IR-форму.', tier1:'40-80 — ↓ дозу или ниацин IR, NAC', tier3:'>80 — STOP ниацин' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 2 нед, затем каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → гепатотоксичность ниацина', note:'Ниацин SR >500 мг/сут может ↑ АЛТ. Использовать только IR-форму.', tier1:'1–2×ВГН — ↓ дозу или ниацин IR, NAC', tier3:'>2×ВГН — STOP ниацин' },
     { markerRu:'Глюкоза', markerEn:'GLUCOSE', system:'metabolic', when:'Каждые 4 нед', target:'<6.1 ммоль/л', condition:'↑ глюкоза → инсулинорезистентность от ниацина', note:'Ниацин ↑ глюкозу на 5-10%. При диабете — с осторожностью.', tier1:'6.1-7.0 — контроль, снизить дозу', tier2:'>7.0 — STOP ниацин, добавить берберин' },
     { markerRu:'Мочевая кислота', markerEn:'URIC_ACID', system:'metabolic', when:'Каждые 4 нед', target:'<420 мкмоль/л', condition:'↑ мочевая кислота → риск подагры', note:'Ниацин ↑ реабсорбцию уратов в почках. При подагре — не применять.', tier1:'420-500 — диета', tier2:'>500 — STOP ниацин, аллопуринол?' },
   ],
   berberine: [
     { markerRu:'Глюкоза', markerEn:'GLUCOSE', system:'metabolic', when:'Каждые 4 нед', target:'<5.6 ммоль/л', condition:'↓ глюкоза → ↑ AMPK', note:'Берберин 1000-2000 мг/сут = метформин 2000 мг по эффективности ↓ глюкозы. Действует медленно (2-4 нед).' },
     { markerRu:'HbA1c', markerEn:'HBA1C', system:'metabolic', when:'Каждые 12 нед', target:'<5.7%', condition:'↓ HbA1c → долгосрочный контроль глюкозы', note:'Берберин снижает HbA1c на 0.5-1% за 3 мес.' },
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↓ АЛТ → улучшение стеатоза печени', note:'Берберин ↓ жировую дистрофию печени через AMPK-активацию.' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → улучшение стеатоза печени', note:'Берберин ↓ жировую дистрофию печени через AMPK-активацию.' },
   ],
   // ── Минералы ──
   zinc: [
@@ -208,7 +214,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'ЭхоКГ', markerEn:'—', system:'cardio', when:'Каждые 12 мес при дозе >1 мг/нед', target:'—', condition:'Фиброз клапанов сердца (кумулятивная доза >3 г)', note:'Каберголин в высоких кумулятивных дозах может вызывать фиброз трёхстворчатого клапана. Контроль ЭхоКГ раз в год.' },
   ],
   tamoxifen: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:'<40 Ед/л', condition:'↑ АЛТ → гепатотоксичность тамоксифена', note:'Тамоксифен может ↑ АЛТ на фоне стеатоза печени (жировая инфильтрация от эстрогенной стимуляции).', tier2:'ALT >80 — ↓ дозу, добавить NAC/TUDCA', tier3:'ALT >200 — STOP тамоксифен' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → гепатотоксичность тамоксифена', note:'Тамоксифен может ↑ АЛТ на фоне стеатоза печени (жировая инфильтрация от эстрогенной стимуляции).', tier2:'ALT >2×ВГН — ↓ дозу, добавить NAC/TUDCA', tier3:'ALT >5×ВГН — STOP тамоксифен' },
     { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед', target:'100-200 пмоль/л', condition:'↑ E2 → тамоксифен блокирует рецептор, но E2 циркулирует выше', note:'Тамоксифен — блокатор ER, а не ↓ E2. E2 может ↑ на 50-100% при сохранении продукции. Это нормально.' },
   ],
   spironolactone: [
@@ -251,7 +257,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   ],
   // ── Дополнительно ──
   egcg: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед при дозе >500 мг/сут', target:'<40 Ед/л', condition:'↑ АЛТ → гепатотоксичность EGCG (натощак!)', note:'EGCG >500 мг натощак → ↑ риск токсического гепатита. Принимать с едой. Не превышать 800 мг/сут.', tier2:'ALT 80-200 — STOP EGCG, NAC', tier3:'ALT >200 — STOP, врача' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед при дозе >500 мг/сут', target:ALT_TARGET, condition:'↑ АЛТ → гепатотоксичность EGCG (натощак!)', note:'EGCG >500 мг натощак → ↑ риск токсического гепатита. Принимать с едой. Не превышать 800 мг/сут.', tier2:'ALT 2–5×ВГН — STOP EGCG, NAC', tier3:'ALT >5×ВГН — STOP, врача' },
   ],
   diosmin: [
     { markerRu:'Давление (АД)', markerEn:'BP_SYSTOLIC', system:'cardio', when:'Через 4 нед', target:'<130/80', condition:'↓ АД → венотоник, ↓ периферическое сопротивление', note:'Диосмин/гесперидин улучшают тонус вен. При гипотонии — контролировать АД.' },
@@ -263,7 +269,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'Триглицериды (TG)', markerEn:'TRIGLYCERIDES', system:'cardio', when:'Каждые 8 нед', target:'<1.7 ммоль/л', condition:'↓ TG → ↑ чувствительность к инсулину', note:'Мио-инозитол 4 г/сут ↓ TG на 15-20% за 3 мес. Эффект медленный.' },
   ],
   red_yeast: [
-    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед, затем каждые 8 нед', target:'<40 Ед/л', condition:'↑ АЛТ → статины в составе', note:'Красный рис — природный статин (монаколин K). Контроль АЛТ. Порог отмены — 3×ВГН (>120), а не 80: при 80-120 перепроверить и не наращивать дозу.', tier2:'ALT 120-200 — STOP, 80-120 — перепроверить', tier3:'ALT >200 — STOP, врач' },
+    { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 4 нед, затем каждые 8 нед', target:ALT_TARGET, condition:'↑ АЛТ → статины в составе', note:'Красный рис — природный статин (монаколин K). Контроль АЛТ. Порог отмены — 3×ВГН, а не 2×: при 2–3×ВГН перепроверить и не наращивать дозу.', tier2:'ALT 3–5×ВГН — STOP, 2–3×ВГН — перепроверить', tier3:'ALT >5×ВГН — STOP, врач' },
     { markerRu:'КФК (CK)', markerEn:'CK', system:'metabolic', when:'Через 4 нед, затем каждые 8 нед', target:'<200 Ед/л', condition:'↑ CK → мышечная токсичность (редко для монаколина)', note:'Миопатия от красного риса реже, чем от синтетических статинов, но возможна. При болях в мышцах — контроль CK.', tier2:'CK >1000 — STOP, добавить CoQ10' },
   ],
   metformin_er: [  // alias for metformin

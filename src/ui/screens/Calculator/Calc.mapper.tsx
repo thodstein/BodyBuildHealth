@@ -41,7 +41,7 @@ import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { hctCuts, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
-import { getLabNorm } from '../../../engines/lab-norms.engine';
+import { getLabNorm, LFT_ULN, HCT_THRESHOLDS } from '../../../engines/lab-norms.engine';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 
@@ -712,10 +712,12 @@ function analyzeStackModule(
     if (state.pharma.ghIU) triggers.push('GH');
     if (state.pharma.insulinIU) triggers.push('инсулин');
     if (pedCount > 2) triggers.push('мульти-курс');
+    const fem = state.profile?.sex === 'female';
     const alt = altVal;
-    if (alt && alt > 40) triggers.push(`АЛТ/АСТ ↑ (${alt})`);
+    // ВГН и порог эритроцитоза — по полу, а не мужским литералом (проход 55).
+    if (alt && alt > LFT_ULN.ALT[fem ? 'female' : 'male']) triggers.push(`АЛТ/АСТ ↑ (${alt})`);
     const hct = hctVal;
-    if (hct && hct > 50) triggers.push(`HCT ↑ (${hct})`);
+    if (hct && hct > HCT_THRESHOLDS[fem ? 'female' : 'male'].erythrocytosis) triggers.push(`HCT ↑ (${hct})`);
     contextSummary = triggers.length > 0
       ? 'Активные риски: ' + triggers.join(', ') + ' → максимальная защита показана'
       : 'Максимальная защита — для high-risk курсов (множество PED, оральные, лаб-отклонения)';

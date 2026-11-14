@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, CrossModuleLimitBanner, Phase34RxGate, IvStationaryGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { lftUlnText } from '../../../engines/lab-norms.engine';
 
 export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [hepaticTab, setHepaticTab] = useState('protocol');
@@ -185,8 +186,8 @@ export const SupportProtocolHepatic: React.FC<{ s: Record<string, any> }> = ({ s
                   <div style={cardBg}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#84cc16', marginBottom:6 }}>🧪 Лабораторный мониторинг печени</div>
                     {[
-                      { marker:'АЛТ (аланинаминотрансфераза)', target:'<40 Ед/л', when:'Каждые 2-4 нед (оральные ААС)', action:'>2xВГН — фаза 3. >5xВГН — немедленная отмена оральных, фаза 4, гепатолог' },
-                      { marker:'АСТ (аспартатаминотрансфераза)', target:'<40 Ед/л', when:'Каждые 2-4 нед', action:'АСТ/АЛТ >2 (De Ritis) — алкогольное или митохондриальное повреждение. Тревожный признак' },
+                      { marker:'АЛТ (аланинаминотрансфераза)', target:`${lftUlnText('ALT')} Ед/л`, when:'Каждые 2-4 нед (оральные ААС)', action:'>2xВГН — фаза 3. >5xВГН — немедленная отмена оральных, фаза 4, гепатолог' },
+                      { marker:'АСТ (аспартатаминотрансфераза)', target:`${lftUlnText('AST')} Ед/л`, when:'Каждые 2-4 нед', action:'АСТ/АЛТ >2 (De Ritis) — алкогольное или митохондриальное повреждение. Тревожный признак' },
                       { marker:'ГГТ (гамма-глутамилтрансфераза)', target:'<55 Ед/л', when:'Каждые 4 нед', action:'Маркер холестаза. Повышается раньше ЩФ при холестатическом повреждении' },
                       { marker:'Щелочная фосфатаза (ЩФ)', target:'<130 Ед/л', when:'Каждые 4 нед', action:'Маркер внутрипечёночного холестаза. ЩФ + ГГТ = холестатическая картина → TUDCA/УДХК' },
                       { marker:'Билирубин общий/прямой', target:'<17.1 / <5 мкмоль/л', when:'Каждые 4 нед', action:'Повышение прямого = холестаз. Непрямой + норма АЛТ = синдром Жильбера (доброкачественный)' },

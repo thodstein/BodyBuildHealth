@@ -116,6 +116,25 @@ export const HGB_THRESHOLDS = {
   female: { upper: getLabNorm('HGB', 'female')?.uln ?? 150, block: 165 },
 } as const;
 
+/**
+ * Пороги печёночных трансаминаз (Ед/л) — пара к `HCT_THRESHOLDS`/`HGB_THRESHOLDS`:
+ * у женщины ВГН ниже (31), а таблицы мониторинга и системные панели печатали
+ * мужские «<40 Ед/л» как общий порог. Женщина с АЛТ 35 читала «норма», хотя её
+ * ВГН — 31.
+ *  - `male`/`female` — верх нормы из резолвера полов (`FEMALE_LAB_BOUNDS`);
+ *  - кратные ступени (2×/3×/5×ВГН) считаются от своего пола, а не от литерала.
+ */
+export const LFT_ULN = {
+  ALT: { male: getLabNorm('ALT', 'male')?.uln ?? 40, female: getLabNorm('ALT', 'female')?.uln ?? 31 },
+  AST: { male: getLabNorm('AST', 'male')?.uln ?? 40, female: getLabNorm('AST', 'female')?.uln ?? 31 },
+} as const;
+
+/** ВГН трансаминазы с обоими полами: «♂ <40 / ♀ <31». Одна формулировка на всё приложение. */
+export function lftUlnText(marker: 'ALT' | 'AST'): string {
+  const t = LFT_ULN[marker];
+  return `♂ <${t.male} / ♀ <${t.female}`;
+}
+
 /** Л9: общая легенда женских порогов (показывается только при sex=female). */
 export const FEMALE_LABS_NOTE =
   '♀ Пороги по полу: HCT 36–48%, Hb 120–150 г/л, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ≤31, креатинин ≤97, ферритин ≤200. ' +

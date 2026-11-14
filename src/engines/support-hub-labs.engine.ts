@@ -8,6 +8,8 @@
  * чужие системы дропаются): hepatic/renal/cardio/hematologic/coagulation/metabolic/hormonal/mineral.
  */
 
+import { lftUlnText } from './lab-norms.engine';
+
 export interface HubLabMon {
   markerRu: string; markerEn: string; system: string;
   when: string; target: string;
@@ -99,7 +101,7 @@ export const LAB_TOP20: Record<string, HubLabMon[]> = {
     { markerRu: 'Фолат + гомоцистеин', markerEn: 'FOLATE', system: 'hematologic', when: 'Каждые 6–12 мес', target: 'Фолат >7 нмоль/л; Hcy <12', condition: '↑ Hcy → дефицит фолата/B12', note: 'ВАЖНО: фолат без B12 маскирует мегалобластоз при продолжающейся нейропатии B12-дефицита — всегда смотреть B12 вместе.', tier1: 'Hcy 12–15 — 5-МТГФ 400 мкг + B12' },
   ],
   vitamin_a: [
-    { markerRu: 'Ретинол + АЛТ', markerEn: 'VITAMIN_A', system: 'hepatic', when: 'Каждые 3–6 мес при дозе >3000 мкг/сут', target: 'Ретинол 1.05–2.8 мкмоль/л; АЛТ <40', condition: '↑ АЛТ + ↑ ретинол → гипервитаминоз A', note: 'Хронический избыток → гепатотоксичность, остеопороз, тератогенность. Бета-каротин из еды безопаснее ретинола.', tier2: 'АЛТ 80–200 — STOP ретинол', tier3: 'АЛТ >200 — STOP, врач' },
+    { markerRu: 'Ретинол + АЛТ', markerEn: 'VITAMIN_A', system: 'hepatic', when: 'Каждые 3–6 мес при дозе >3000 мкг/сут', target: `Ретинол 1.05–2.8 мкмоль/л; АЛТ ${lftUlnText('ALT')}`, condition: '↑ АЛТ + ↑ ретинол → гипервитаминоз A', note: 'Хронический избыток → гепатотоксичность, остеопороз, тератогенность. Бета-каротин из еды безопаснее ретинола.', tier2: 'АЛТ 2–5×ВГН — STOP ретинол', tier3: 'АЛТ >5×ВГН — STOP, врач' },
   ],
   rhodiola: [
     { markerRu: 'Дневник АД/ЧСС (маркера нет)', markerEn: '—', system: 'cardio', when: 'Первые 2 нед', target: '<130/80', condition: '↑ АД/возбуждение → избыток дозы', note: 'Лабораторного маркера нет. Принимать утром/днём; вечером может дать бессонницу. При гипертонии — контроль АД.' },

@@ -4,6 +4,7 @@ import { ALL_SUBSTANCES } from '../../../data/support-substances';
 import { ROUTE_LABELS, PEPTIDE_DB } from '../../../engines/peptide-calculator.engine';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { FORM_PROFILES } from '../../../engines/bioequivalence-base';
+import { lftUlnText } from '../../../engines/lab-norms.engine';
 
 // ─── Types ───
 export interface FormWithBio extends CatalogSubstanceForm {
@@ -655,7 +656,7 @@ export const LAB_MARKERS: Record<string, LabMarker[]> = {
     { marker: 'CoQ10 плазмы', what: 'Уровень CoQ10', when: 'Каждые 3–6 мес', target: '>1.0 мг/л', note: '<0.6 = дефицит. Статины ↓ CoQ10 на 20–40%.' },
   ],
   liver: [
-    { marker: 'АЛТ, АСТ', what: 'Цитолиз гепатоцитов', when: 'Каждые 1–3 мес', target: '<40 Ед/л', note: 'Контроль при приёме NAC, ALA, силимарина для оценки гепатопротекции.' },
+    { marker: 'АЛТ, АСТ', what: 'Цитолиз гепатоцитов', when: 'Каждые 1–3 мес', target: `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')} Ед/л`, note: 'Контроль при приёме NAC, ALA, силимарина для оценки гепатопротекции.' },
     { marker: 'ГГТ, ЩФ', what: 'Холестаз', when: 'Каждые 1–3 мес', target: 'ГГТ <55, ЩФ <150 Ед/л', note: 'TUDCA + силимарин ↓ ГГТ и ЩФ.' },
   ],
   kidney: [

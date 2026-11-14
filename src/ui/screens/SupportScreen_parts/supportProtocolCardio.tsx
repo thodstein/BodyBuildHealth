@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, StopBanner, ContraBanner, Phase34RxGate } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
+import { LFT_ULN } from '../../../engines/lab-norms.engine';
 
 export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [cardioTab, setCardioTab] = useState('protocol');
@@ -28,8 +29,8 @@ export const SupportProtocolCardio: React.FC<{ s: Record<string, any> }> = ({ s 
               ]} />
 
               <StopBanner title="⚠ СТАТИНЫ (в т.ч. красный дрожжевой рис) — НЕ при АЛТ/АСТ >3×ВГН" thresholds={[
-                'Рабочий порог отмены — 3×ВГН (АЛТ >120 Ед/л), а не 2×: ACC/AHA 2022 (statin safety) + AASLD допускают статин до 3×ВГН, а при ЖИРОВОЙ болезни печени — и при более высоких цифрах (там статин — лечение)',
-                'АЛТ/АСТ 2-3×ВГН (80-120 Ед/л): НЕ отмена, а «не начинать новый статин + перепроверить через 2-4 нед»; при 17α-алкилах в курсе — сначала снизить/убрать оралку',
+                `Рабочий порог отмены — 3×ВГН (АЛТ: ♂ >${LFT_ULN.ALT.male * 3} / ♀ >${LFT_ULN.ALT.female * 3} Ед/л), а не 2×: ACC/AHA 2022 (statin safety) + AASLD допускают статин до 3×ВГН, а при ЖИРОВОЙ болезни печени — и при более высоких цифрах (там статин — лечение)`,
+                `АЛТ/АСТ 2-3×ВГН (♂ ${LFT_ULN.ALT.male * 2}-${LFT_ULN.ALT.male * 3} / ♀ ${LFT_ULN.ALT.female * 2}-${LFT_ULN.ALT.female * 3} Ед/л): НЕ отмена, а «не начинать новый статин + перепроверить через 2-4 нед»; при 17α-алкилах в курсе — сначала снизить/убрать оралку`,
                 'Отмена статина обязательна при: АЛТ/АСТ >3×ВГН с ростом, билирубине >2×ВГН, КФК >10×ВГН или симптомах (миалгия/тёмная моча — рабдомиолиз)',
                 'Красный дрожжевой рис = тот же монаколин К: правила те же, но контроль АЛТ/АСТ + КФК обязателен (разброс дозы между брендами) [C — нет CV-пользы]',
                 'Не статин-заменитель, а честная опция: эзетимиб (не ЦФК-зависим) + бергамот + омега-3 высокодоза + CoQ10 — эффективность ниже статина',

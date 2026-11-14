@@ -278,6 +278,14 @@ export { HCT_THRESHOLDS } from './lab-norms.engine';
  */
 export { HGB_THRESHOLDS } from './lab-norms.engine';
 
+/**
+ * ВГН печёночных трансаминаз — третья пара к HCT/HGB: ♂ 40/40, ♀ 31/34.
+ * Таблицы мониторинга, системные панели и тексты протоколов берут числа и
+ * формулировку («♂ <40 / ♀ <31») отсюда, чтобы «<40 Ед/л» не выдавалось за
+ * общий порог.
+ */
+export { LFT_ULN, lftUlnText } from './lab-norms.engine';
+
 
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];

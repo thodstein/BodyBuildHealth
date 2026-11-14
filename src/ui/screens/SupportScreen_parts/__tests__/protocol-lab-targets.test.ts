@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { UCUM_MAP } from '../../../../core/constants';
 import { STOP_COURSE_TABLE } from '../supportProtocolsShared';
 import { FEMALE_LAB_GROUPS } from '../supportProtocolWomenData';
+import { LFT_ULN } from '../../../../engines/lab-norms.engine';
 
 const ucum = UCUM_MAP as Record<string, { uln: number }>;
 const read = (name: string) =>
@@ -22,9 +23,16 @@ const hepatic = read('supportProtocolHepatic.tsx');
 const hemato = read('supportProtocolHemato.tsx');
 
 describe('протокол «Печень»: цели мониторинга = нормы приложения', () => {
-  it('АЛТ/АСТ/ГГТ в целях — ULN приложения', () => {
-    expect(hepatic).toContain(`АЛТ (аланинаминотрансфераза)', target:'<${ucum.ALT.uln} Ед/л'`);
-    expect(hepatic).toContain(`АСТ (аспартатаминотрансфераза)', target:'<${ucum.AST.uln} Ед/л'`);
+  it('АЛТ/АСТ в целях — ВГН по полу, а не мужское «<40» как общее', () => {
+    // Числа — из резолвера полов; мужской верх остаётся ULN приложения.
+    expect(LFT_ULN.ALT.male).toBe(ucum.ALT.uln);
+    expect(LFT_ULN.AST.male).toBe(ucum.AST.uln);
+    expect(LFT_ULN.ALT.female).toBe(31);
+    expect(LFT_ULN.AST.female).toBe(31);
+    // И протокол печатает именно оба порога.
+    expect(hepatic).toContain("target:`${lftUlnText('ALT')} Ед/л`");
+    expect(hepatic).toContain("target:`${lftUlnText('AST')} Ед/л`");
+    expect(hepatic).not.toContain("target:'<40 Ед/л'");
     expect(hepatic).toContain(`ГГТ (гамма-глутамилтрансфераза)', target:'<${ucum.GGT.uln} Ед/л'`);
   });
 
