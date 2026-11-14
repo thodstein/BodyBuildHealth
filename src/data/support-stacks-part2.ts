@@ -229,9 +229,9 @@ export const STACKS_PART_2: SupportStack[] = [
     structuredLabControl: {
       markers: [
         { marker: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '15-35 нмоль/л' },
-        { marker: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '40-160 пмоль/л' },
+        { marker: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '40-160 пмоль/л (♀ — по фазе, не подавлять)' },
         { marker: 'ЛГ', when: 'Каждые 4 нед', targetRange: '1.7-8.6 мМЕ/мл' },
-        { marker: 'Пролактин', when: 'Каждые 4 нед', targetRange: '4-23 нг/мл' },
+        { marker: 'Пролактин', when: 'Каждые 4 нед', targetRange: '4-23 нг/мл (♀ <800 мМЕ/л)' },
         { marker: 'IIEF-5', when: '1 раз в 4 нед', targetRange: '>22 баллов' },
       ],
     },

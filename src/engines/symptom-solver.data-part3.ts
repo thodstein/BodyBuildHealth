@@ -60,9 +60,9 @@ export const DB_PART3: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'Тренболон/нандролон имеют прогестиновой активность → ↑пролактина через ↓D2-рецепторный контроль. Печёночный GH ↑пролактин через ↓соматостатин.',
         labMarkers: [
-          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '2-17 нг/мл (муж.)', when: 'Каждые 4 нед на 19-нор' },
+          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '2-17 нг/мл (♂; ♀ <800 мМЕ/л)', when: 'Каждые 4 нед на 19-нор' },
           { marker: 'Прогестерон', expectedChange: '↑', targetRange: '<1.4 нмоль/л (муж.)', when: 'Спец.' },
-          { marker: 'Эстрадиол', expectedChange: '↑', targetRange: '<45 пг/мл', when: 'Контроль' },
+          { marker: 'Эстрадиол', expectedChange: '↑', targetRange: '<45 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Контроль' },
         ],
         solutions: [
           { substanceId: 'cabergoline', name: 'Каберголин', type: 'pharma', dose: '0.25 мг 2р/нед', mechanism: 'D2-агонист → ↓пролактин', evidenceLevel: 'A' },
@@ -96,7 +96,7 @@ export const DB_PART3: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'Кломифен имеет 2 изомера: enclomiphene (анти-E) и zuclomiphene (эстрогенный). Zuclomiphene →↑эстрогенный эффект → эмоциональные перепады, депрессия.',
         labMarkers: [
-          { marker: 'Эстрадиол', expectedChange: '↑↑', targetRange: '<45 пг/мл', when: 'Контроль на SERM' },
+          { marker: 'Эстрадиол', expectedChange: '↑↑', targetRange: '<45 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Контроль на SERM' },
           { marker: 'Тестостерон', expectedChange: '↑', targetRange: '10-35 нмоль/л', when: 'Ответ на SERM' },
           { marker: 'ЛГ/ФСГ', expectedChange: '↑↑', targetRange: 'Восстановление HPTA', when: 'Через 2-4 нед' },
         ],
@@ -231,8 +231,8 @@ export const DB_PART3: SymptomEntry[] = [
         probability: 'high',
         mechanism: '↑Testosterone → ↑конверсия в estradiol (↑E2 → ↓serotonin/ тревожность) + ↑DHT (↓GABA-ergic тонус). Прогестерон-производные (19-нор) усиливают.',
         labMarkers: [
-          { marker: 'Эстрадиол', expectedChange: '↑↑', targetRange: '<45 пг/мл', when: 'Контроль' },
-          { marker: 'Пролактин', expectedChange: '↑', targetRange: '<15 нг/мл', when: 'При депрессии' },
+          { marker: 'Эстрадиол', expectedChange: '↑↑', targetRange: '<45 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Контроль' },
+          { marker: 'Пролактин', expectedChange: '↑', targetRange: '<15 нг/мл (♀ <800 мМЕ/л)', when: 'При депрессии' },
           { marker: 'Тестостерон', expectedChange: '↑↑', targetRange: '20-40 нмоль/л', when: 'Для коррекции' },
           { marker: 'Кортизол', expectedChange: '↑', targetRange: '<500 нмоль/л', when: 'Контроль' },
         ],
@@ -493,7 +493,7 @@ export const DB_PART3: SymptomEntry[] = [
         labMarkers: [
           { marker: 'Тестостерон', expectedChange: '↓↓', targetRange: '10-35 нмоль/л', when: '2-4 нед ПКТ' },
           { marker: 'Кортизол', expectedChange: '↑↑', targetRange: '138-690 нмоль/л', when: 'Контроль' },
-          { marker: 'Эстрадиол', expectedChange: '↓', targetRange: '20-50 пг/мл', when: 'Падает с T' },
+          { marker: 'Эстрадиол', expectedChange: '↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Падает с T' },
           { marker: 'ЛГ/ФСГ', expectedChange: '↔ или ↑', targetRange: 'Восстановление HPTA', when: 'Через 4-6 нед ПКТ' },
         ],
         solutions: [
@@ -670,7 +670,7 @@ export const DB_PART3: SymptomEntry[] = [
       probability: 'medium',
       mechanism: 'SARMs → ↓ GnRH → ↓ LH → ↓ T → ↓ E2 (ароматаза не работает при низком T). E2 стимулирует гиалуронан-синтазу 2 (HAS2) в синовиоцитах. При ↓ E2 — ↓ смазки.',
       labMarkers: [
-        { marker: 'Эстрадиол (E2)', expectedChange: '↓', targetRange: '20-50 пг/мл ♂', when: 'Через 4 нед приёма' },
+        { marker: 'Эстрадиол (E2)', expectedChange: '↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Через 4 нед приёма' },
       ],
       solutions: [
         { substanceId: 'hyaluronic_acid', name: 'Гиалуроновая кислота (перорально)', type: 'supplement', dose: '100-200 мг/сут', mechanism: 'Субстрат для синтеза синовиальной жидкости', evidenceLevel: 'C' },

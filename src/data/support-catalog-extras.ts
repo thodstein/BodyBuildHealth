@@ -67,7 +67,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'anastrozole', name: 'Anastrozole', nameRu: 'Анастрозол', tier: 'specialty', category: ['pharma', 'hormonal'],
     description: 'Ингибитор ароматазы III поколения: блокирует конверсию тестостерона в эстрадиол. Применяется при E2 >60 пг/мл или симптомах эстрогенизации. Старт 0.5 мг 2×/нед, титрация по E2 (цель 20-40 пг/мл).',
-    monitoring: [{ what: 'E2 (чувствительный), липиды', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл' }],
+    monitoring: [{ what: 'E2 (чувствительный), липиды', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл (♀ — по фазе, не подавлять)' }],
     contraindications: ['беременность'],
     sideEffects: ['↓E2 → сухость суставов', 'LDL ↑', 'головная боль'],
     dosage: { mg: 1, timing: 'стабильное время' },
@@ -83,7 +83,7 @@ export const CATALOG_EXTRAS: CatalogExtra[] = [
   {
     id: 'letrozole', name: 'Letrozole', nameRu: 'Летрозол', tier: 'specialty', category: ['pharma', 'hormonal'],
     description: 'Ингибитор ароматазы (супрессия E2 до 98%). При высоком E2 (>100 пг/мл) или неэффективности анастрозола. Высокий риск чрезмерного ↓E2 — осторожная титрация.',
-    monitoring: [{ what: 'E2 (чувствительный)', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл' }],
+    monitoring: [{ what: 'E2 (чувствительный)', when: 'каждые 4 нед', targetRange: 'E2 ♂ 20-40 пг/мл (♀ — по фазе, не подавлять)' }],
     contraindications: ['беременность'],
     sideEffects: ['суставы', 'головная боль', '↓либидо'],
     dosage: { mg: 2.5, timing: 'стабильное время' },

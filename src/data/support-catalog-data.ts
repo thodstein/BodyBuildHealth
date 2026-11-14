@@ -1658,7 +1658,7 @@ hcg: {
       ],
     monitoring: [
       { what: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '12-33 нмоль/л' },
-      { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '<200 пмоль/л' }
+      { what: 'Эстрадиол', when: 'Каждые 4 нед', targetRange: '<200 пмоль/л (♀ — по фазе, не подавлять)' }
     ],
     contraindications: ['Рак яичек', 'Рак простаты', 'Гинекомастия в анамнезе'],
     sideEffects: ['Гинекомастия (без ИА)', 'Задержка жидкости', 'Повышение эстрадиола'],
@@ -8040,7 +8040,7 @@ cabergoline: {
       { with: "testosterone", effect: "Каберголин + тестостерон — восстановление оси", mechanism: "Каберголин ↓ пролактин, тестостерон ↑ обратную связь", severity: "LOW" }
     ],
     monitoring: [
-      { what: 'Пролактин', when: 'Каждые 2 нед', targetRange: '<15 нг/мл' }
+      { what: 'Пролактин', when: 'Каждые 2 нед', targetRange: '<15 нг/мл (♀ <800 мМЕ/л)' }
     ],
     contraindications: ['Фиброз сердца', 'Тяжёлая печёночная недостаточность'],
     sideEffects: ['Тошнота', 'Головокружение', 'Риск фиброза при длительном'],
@@ -10240,7 +10240,7 @@ kpv: {
     bestForCourse: true,
       synergies: [{with:'tamoxifen',effect:'Контроль эстрогена',mechanism:'AI+СЕРМ — полная блокада ER',severity:'MEDIUM'},{with:'zinc',effect:'Поддержка тестостерона',mechanism:'Zn — кофактор стероидогенеза + AI',severity:'LOW'},{with:'vitamin_d3',effect:'Защита костей при подавлении E2',mechanism:'D3 + K2 компенсируют потерю костной плотности от AI',severity:'MEDIUM'},{with:'calcium_d_glucarate',effect:'Детоксикация эстрогеновых метаболитов',mechanism:'Глюкарат поддерживает фазу II детоксикации печени',severity:'MEDIUM'}],
       conflicts: [{with:'letrozole',effect:'Конкуренция за CYP19',mechanism:'Оба AI — избыточное подавление E2',severity:'LOW'},{with:'estrogen_supplements',effect:'Антагонизм эффекта',mechanism:'AI блокирует ароматазу, экзогенный E2 обходит блок',severity:'HIGH'}],
-    monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл'},{what:'ЛПВП',when:'Каждые 8 нед',targetRange:'> 40 мг/дл'},{what:'IGF-1',when:'Каждые 12 нед',targetRange:'> 150 нг/мл'}],
+    monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл (♀ — по фазе, не подавлять)'},{what:'ЛПВП',when:'Каждые 8 нед',targetRange:'> 40 мг/дл'},{what:'IGF-1',when:'Каждые 12 нед',targetRange:'> 150 нг/мл'}],
     contraindications: ['Остеопороз','Тяжелая гиперлипидемия','Беременность'],
     sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Головная боль'],
     analog: ['letrozole', 'exemestane'],
@@ -10266,7 +10266,7 @@ kpv: {
       { with: "pharma_anastrozole", effect: "Избыточное подавление эстрадиола (>95%) — риск остеопороза", mechanism: "Два AI — аддитивный эффект", severity: "HIGH" },
       { with: "tamoxifen", effect: "Конкуренция за CYP — снижение эффективности тамоксифена", mechanism: "Тамоксифен требует CYP2A6/3A4", severity: "MEDIUM" },
     ],
-    monitoring: [{what:'Эстрадиол (E2), ultra-sensitive',when:'Каждые 4 нед',targetRange:'10-20 пг/мл'},{what:'Липидный профиль',when:'Каждые 8 нед',targetRange:'ЛПВП > 35 мг/дл'},{what:'DEXA (плотность костей)',when:'Каждые 12 мес',targetRange:'T-score > -1'},{what:'IGF-1',when:'Каждые 8 нед',targetRange:'> 150 нг/мл'}],
+    monitoring: [{what:'Эстрадиол (E2), ultra-sensitive',when:'Каждые 4 нед',targetRange:'♂ 10-20 пг/мл (♀ — по фазе, не подавлять)'},{what:'Липидный профиль',when:'Каждые 8 нед',targetRange:'ЛПВП > 35 мг/дл'},{what:'DEXA (плотность костей)',when:'Каждые 12 мес',targetRange:'T-score > -1'},{what:'IGF-1',when:'Каждые 8 нед',targetRange:'> 150 нг/мл'}],
     contraindications: ['Остеопороз','Тяжелая гиперлипидемия','Печеночная недостаточность'],
     sideEffects: ['Снижение ЛПВП', 'Артралгия', 'Остеопороз при длительном приёме'],
     analog: ['anastrozole', 'exemestane'],
@@ -10289,7 +10289,7 @@ kpv: {
     bestForCourse: true,
      synergies: [{with:'zinc',effect:'Поддержка тестостерона',mechanism:'Zn — кофактор стероидогенеза + кломифен — SERM',severity:'MEDIUM'},{with:'vitamin_d3',effect:'Общее здоровье HPTA',mechanism:'D3 ↑ рецепторы андрогенов, кломифен ↑ ЛГ/ФСГ',severity:'LOW'},{with:'ashwagandha',effect:'Снижение кортизола на ПКТ',mechanism:'Ашваганда ↓ кортизол, кломифен ↑ тестостерон',severity:'MEDIUM'},{with:'magnesium',effect:'Кофактор стероидогенеза',mechanism:'Mg >300 ферментов, включая стероидогенные',severity:'LOW'}],
      conflicts: [{with:'alcohol',effect:'Гепатотоксичность',mechanism:'Кломифен метаболизируется в печени, алкоголь ↑ нагрузку',severity:'MEDIUM'},{with:'tamoxifen',effect:'Конкуренция за ER',mechanism:'Оба SERM — снижение эффективности друг друга',severity:'MEDIUM'}],
-    monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл'},{what:'ЛГ/ФСГ',when:'Каждые 4 нед',targetRange:'ЛГ 2-8, ФСГ 2-12'}],
+    monitoring: [{what:'Эстрадиол (E2)',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл (♀ — по фазе, не подавлять)'},{what:'ЛГ/ФСГ',when:'Каждые 4 нед',targetRange:'ЛГ 2-8, ФСГ 2-12'}],
     contraindications: ['Гепатоцеллюлярная недостаточность','Киста яичника','Тромбофилия'],
     sideEffects: ['Нарушение зрения', 'Головная боль', 'Желудочно-кишечные расстройства'],
     analog: ['enclomiphene', 'tamoxifen'],
@@ -10312,7 +10312,7 @@ kpv: {
     bestForCourse: true,
      synergies: [{with:'zinc',effect:'Синергия для HPTA',mechanism:'Zn — кофактор + энкломифен — SERM без цитрата',severity:'MEDIUM'},{with:'vitamin_d3',effect:'Общий анаболический фон',mechanism:'D3 ↑ AR-рецепторы, энкломифен ↑ эндогенный Т',severity:'LOW'},{with:'ashwagandha',effect:'Снижение стресса на ПКТ',mechanism:'Ашваганда ↓ кортизол, энкломифен ↑ ЛГ/ФСГ',severity:'MEDIUM'},{with:'boron',effect:'Снижение SHBG',mechanism:'Бор ↓ SHBG, энкломифен ↑ тестостерон — ↑ свободный Т',severity:'MEDIUM'}],
      conflicts: [{with:'tamoxifen',effect:'Конкуренция за ER',mechanism:'Оба SERM — конкуренция за сайты связывания',severity:'LOW'},{with:'alcohol',effect:'Гепатотоксичность',mechanism:'Энкломифен метаболизируется в печени',severity:'MEDIUM'}],
-    monitoring: [{what:'Тестостерон общий',when:'Каждые 4 нед',targetRange:'> 450 нг/дл'},{what:'Эстрадиол',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл'}],
+    monitoring: [{what:'Тестостерон общий',when:'Каждые 4 нед',targetRange:'> 450 нг/дл'},{what:'Эстрадиол',when:'Каждые 4 нед',targetRange:'♂ 20-40 пг/мл (♀ — по фазе, не подавлять)'}],
     contraindications: ['Тромбофилия','Опухоли гипофиза','Выраженная гиперпролактинемия'],
     sideEffects: ['Меньше побочных по сравнению с кломифеном', 'Редко: головная боль'],
     analog: ['clomiphene', 'tamoxifen'],
@@ -10666,7 +10666,7 @@ kpv: {
     bestForCourse: true,
      synergies: [{with:'vitamin_b6',effect:'Снижение пролактина',mechanism:'B6 — кофактор дофаминового синтеза + каберголин — D2-агонист',severity:'LOW'},{with:'zinc',effect:'Тестостерон/пролактин баланс',mechanism:'Zn ↑ тестостерон через стероидогенез, каберголин ↓ пролактин',severity:'LOW'},{with:'vitamin_e',effect:'Защита гипофиза',mechanism:'Вит.E антиоксидант для ткани гипофиза при дофаминовой стимуляции',severity:'LOW'},{with:'apigenin',effect:'Дополнительное снижение пролактина',mechanism:'Апигенин ↓ пролактин через ГАМК-ергический путь, аддитивно',severity:'MEDIUM'}],
      conflicts: [{with:'antipsychotic_drugs',effect:'Снижение эффекта каберголина',mechanism:'Антагонизм D2-рецепторов',severity:'HIGH'},{with:'alcohol',effect:'Усиление седации',mechanism:'Каберголин + алкоголь → ↓ АД и ↑ сонливость',severity:'MEDIUM'}],
-    monitoring: [{what:'Пролактин',when:'Каждые 4 нед',targetRange:'< 15 нг/мл'},{what:'ЛГ, ФСГ',when:'Каждые 8 нед',targetRange:'Восстановление оси'}],
+    monitoring: [{what:'Пролактин',when:'Каждые 4 нед',targetRange:'< 15 нг/мл (♀ <800 мМЕ/л)'},{what:'ЛГ, ФСГ',when:'Каждые 8 нед',targetRange:'Восстановление оси'}],
     contraindications: ['Клапанные пороки сердца','Тяжелая гипертензия','Психоз'],
     sideEffects: ['Тошнота','Головокружение','Ортостатическая гипотензия','Фиброз клапанов (длит. приём >6 мес)'],
     analog: ['cabergoline', 'bromocriptine'],

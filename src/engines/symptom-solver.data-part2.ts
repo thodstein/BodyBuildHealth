@@ -14,10 +14,10 @@ export const DB_PART2: SymptomEntry[] = [
         stopCriteria: ['Free T <6 пг/мл в течение 6+ мес после отмены — требуется эндокринолог/TRT'],
         drugInteractions: ['Финастерид + нандролон → ↓ DHT → ↑ депрессия + ↓ либидо (ДГТ нужен для нейростероидогенеза)', 'Тамоксифен моно — может быть недостаточен при нандролоновой супрессии (нужен hCG + enclomiphene)'],
         labMarkers: [
-          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '86-324 мкМЕ/мл', when: 'Немедленно' },
+          { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
           { marker: 'DHT', expectedChange: '↓↓', targetRange: '0.4-2.5 нмоль/л', when: 'При симптомах' },
           { marker: 'Прогестерон', expectedChange: '↑', targetRange: '<1.2 нмоль/л ♂', when: 'При симптомах' },
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'cabergoline', name: 'Каберголин', type: 'pharma', dose: '0.5 мг 2×/нед', mechanism: 'D2-агонист → ↓ пролактин → восстановление дофамина и либидо', evidenceLevel: 'A' },
@@ -49,8 +49,8 @@ export const DB_PART2: SymptomEntry[] = [
         drugInteractions: ['Тренболон + SSRI → ↑ риск серотонинового синдрома (мания, гипертермия)', 'Тренболон + стимуляторы (амфетамины) → ↑ риск психоза', 'Тренболон + алкоголь → ↑ агрессия + ↓ контроля импульсов'],
         labMarkers: [
           { marker: 'Кортизол (слюна, утро)', expectedChange: '↑', targetRange: '5-20 нмоль/л', when: 'При психических симптомах' },
-          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'При симптомах' },
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл', when: 'Каждые 4 нед' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'При симптомах' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'reduce_tren', name: 'СНИЗИТЬ дозу тренболона', type: 'lifestyle', dose: '↓ с 300-500 мг до 100-200 мг/нед', mechanism: 'Меньше глутаматной активации = меньше психиатрических симптомов', evidenceLevel: 'A' },
@@ -326,7 +326,7 @@ export const DB_PART2: SymptomEntry[] = [
         problem: 'Гипоэстрогения (мастерон + AI)', probability: 'high',
         mechanism: 'Мастерон конкурентно ингибирует ароматазу (более слабо чем анастрозол, но достаточно для ↓ E2 на 20-40%). В комбинации с AI → синергетическое ↓ E2. Результат: E2 <15 пг/мл → ↓ синтез коллагена II → ↓ синовиальная жидкость → боль в суставах. + ↓ нейростероиды → депрессия + потеря либидо.',
         labMarkers: [
-          { marker: 'E2 (чувствительный тест)', expectedChange: '↓↓', targetRange: '20-50 пг/мл ♂', when: 'Немедленно' },
+          { marker: 'E2 (чувствительный тест)', expectedChange: '↓↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно' },
           { marker: 'Тестостерон общий', expectedChange: '↔', targetRange: '12.1-34.7 нмоль/л', when: 'Каждые 4 нед' },
         ],
         solutions: [
@@ -355,7 +355,7 @@ export const DB_PART2: SymptomEntry[] = [
         problem: 'hCG-индуцированная гиперэстрогения', probability: 'high',
         mechanism: 'hCG → активация ЛГ-рецептора на клетках Лейдига → ↑ cAMP → ↑ StAR → ↑ синтез тестостерона из холестерина. Тестостерон диффундирует в кровь и ароматизируется в E2. В отличие от инъекционного T, E2 от hCG менее предсказуем и может расти неравномерно.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↑↑', targetRange: '20-50 пг/мл ♂', when: 'Через 48-72 ч после инъекции hCG' },
+          { marker: 'E2', expectedChange: '↑↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Через 48-72 ч после инъекции hCG' },
           { marker: 'Тестостерон общий', expectedChange: '↑', targetRange: '12.1-34.7 нмоль/л', when: 'Одновременно с E2' },
         ],
         solutions: [

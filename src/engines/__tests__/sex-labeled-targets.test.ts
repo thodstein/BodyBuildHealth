@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { LFT_STAGE_ULN } from '../../engines/lab-norms.engine';
+import { LFT_STAGE_ULN, FEMALE_HORMONE_BANDS } from '../../engines/lab-norms.engine';
 
 const ROOT = resolve(process.cwd(), 'src');
 
@@ -154,6 +154,44 @@ describe('каталог и solver: однозначные пороги назы
     expect(catalog).toContain('<110 мкмоль/л (♀ <97)');
     expect(catalog).toContain('(♀ <150)');
     expect(catalog).toContain('(♀ <48%)');
+  });
+});
+
+describe('каталог и solver: гормональные цели называют пол', () => {
+  // Проход 68: цели `20-50 пг/мл`, `<15 нг/мл` — мужские. У женщины E2 фазовый
+  // (подавлять нельзя), PRL норма до 800 мМЕ/л.
+  const DATA_FILES = [
+    'src/data/support-catalog-data.ts',
+    'src/data/support-catalog-extras.ts',
+    'src/data/support-catalog-supplement.ts',
+    'src/data/support-stacks-part1.ts',
+    'src/data/support-stacks-part2.ts',
+    'src/engines/symptom-solver.data-part1.ts',
+    'src/engines/symptom-solver.data-part2.ts',
+    'src/engines/symptom-solver.data-part3.ts',
+    'src/engines/comprehensive-report.engine.ts',
+  ];
+  const read = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8');
+
+  it('нет мужских E2/PRL целей без женской половины', () => {
+    const bare = [
+      "'20-50 пг/мл'", "'♂ 20-40 пг/мл'", "'10-20 пг/мл'", "'<45 пг/мл'",
+      "'<200 пмоль/л'", "'80-160 пмоль/л'", "'40-160 пг/мл'", "'40-160 пмоль/л'",
+      "'<15 нг/мл'", "'< 15 нг/мл'", "'4-23 нг/мл'", "'86-324 мкМЕ/мл'",
+    ];
+    const bad: string[] = [];
+    for (const f of DATA_FILES) {
+      const src = read(f);
+      for (const b of bare) if (src.includes(b)) bad.push(`${f}: ${b}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('женские числа — из бэндов резолвера', () => {
+    const all = DATA_FILES.map(read).join('\n');
+    expect(all).toContain(`(♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л)`);
+    expect(all).toContain('(♀ — по фазе, не подавлять)');
+    expect(FEMALE_HORMONE_BANDS.E2.normal).toContain('40–200');
   });
 });
 

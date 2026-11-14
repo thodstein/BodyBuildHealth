@@ -89,7 +89,7 @@ export const DB_PART1: SymptomEntry[] = [
           { marker: 'Альдостерон', expectedChange: '↑', targetRange: '40-310 пг/мл', when: 'При выраженных отёках' },
           { marker: 'Na⁺ сыворотки', expectedChange: '↑', targetRange: '135-145 ммоль/л', when: 'Каждые 4 нед' },
           { marker: 'Креатинин', expectedChange: '↔', targetRange: '62-106 мкмоль/л', when: 'Каждые 4 нед' },
-          { marker: 'E2 (эстрадиол)', expectedChange: '↑', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
+          { marker: 'E2 (эстрадиол)', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'telmisartan', name: 'Телмисартан', type: 'pharma', dose: '40-80 мг/сут', mechanism: '↓ альдостерон через AT1-блокаду', evidenceLevel: 'A' },
@@ -275,7 +275,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'ААС ↓ аллопрегнанолон (GABA-A модулятор) → ↓ GABA-тонус → ↑ тревожность. Тренболон активирует NMDA-рецепторы → ↑ глутамат → нейротоксичность + тревога.',
         labMarkers: [
           { marker: 'Кортизол (слюна, утро)', expectedChange: '↑', targetRange: '5-20 нмоль/л', when: 'При тревожности' },
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'ashwagandha', name: 'Ашваганда (KSM-66)', type: 'supplement', dose: '600 мг/сут', mechanism: '↓ кортизол, GABA-миметик', evidenceLevel: 'A' },
@@ -298,7 +298,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Нейровоспаление + оксидативный стресс', probability: 'medium',
         mechanism: 'ААС (тренболон, нандролон) активируют микроглию → ↑ TNF-α, IL-1β в ЦНС. Окислительный стресс → повреждение нейронов.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
           { marker: 'ТТГ', expectedChange: '↔', targetRange: '0.4-4.0 мМЕ/л', when: 'Исключить гипотиреоз' },
           { marker: 'Витамин B12', expectedChange: '↔', targetRange: '200-900 пг/мл', when: 'При когнитивных жалобах' },
           { marker: 'CRP-hs', expectedChange: '↑', targetRange: '<3 мг/л', when: 'Оценка воспаления' },
@@ -328,8 +328,8 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гиперпролактинемия', probability: 'high',
         mechanism: 'Нандролон, тренболон ↑ пролактин через PR-агонизм. Пролактин ↓ дофамин → ↓ либидо + ↓ GnRH → ↓ ЛГ → ↓ тестостерон.',
         labMarkers: [
-          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'При ↓ либидо' },
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'При ↓ либидо' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
           { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T и ↓ либидо' },
         ],
         solutions: [
@@ -347,7 +347,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Эстрогенный дисбаланс (↑ или ↓ E2)', probability: 'high',
         mechanism: 'Ароматизация T → ↑ E2 → ↓ либидо. Избыточное подавление AI → ↓ E2 <15 пг/мл тоже убивает либидо.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
           { substanceId: 'anastro', name: 'Анастрозол (при ↑ E2)', type: 'pharma', dose: '0.25 мг 2×/нед', mechanism: 'Ингибитор ароматазы', evidenceLevel: 'A' },
@@ -370,8 +370,8 @@ export const DB_PART1: SymptomEntry[] = [
         stopCriteria: ['E2 >80 пг/мл + грудь болит/отекает — немедленно начать AI', 'Сформированная фиброзная ткань (1+ год) — AI/тамоксифен не работают, только хирургия'],
         drugInteractions: ['Тамоксифен + AI → риск ↓ IGF-1 + ↓ либидо (E2 слишком низкий)', 'Витамин E + AI → аддитивный антиэстрогенный эффект'],
         labMarkers: [
-          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл ♂', when: 'Немедленно при симптомах' },
-          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'Немедленно' },
+          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно при симптомах' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
           { marker: 'Прогестерон', expectedChange: '↔', targetRange: '<1.2 нмоль/л', when: 'Исключить прогестагенную гин.' },
         ],
         solutions: [
@@ -492,7 +492,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гипоэстрогения (crushed estrogen)', probability: 'high',
         mechanism: 'Избыточный приём AI → E2 <15 пг/мл. E2 критичен для синтеза коллагена II, синовиальной жидкости, эластичности связок.',
         labMarkers: [
-          { marker: 'E2 (чувствительный)', expectedChange: '↓↓', targetRange: '20-50 пг/мл ♂', when: 'Немедленно при болях' },
+          { marker: 'E2 (чувствительный)', expectedChange: '↓↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно при болях' },
         ],
         solutions: [
           { substanceId: 'reduce_ai', name: 'СНИЗИТЬ дозу AI', type: 'pharma', dose: '↓ на 50% или отменить', mechanism: 'Восстановление E2 до 20-50 пг/мл', evidenceLevel: 'A' },
@@ -594,7 +594,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Андроген-индуцированная гиперсеборея и акне', probability: 'high',
         mechanism: 'ААС → AR в себоцитах → ↑ липогенез → ↑ себум + кератинизация → комедоны. P. acnes ферментирует себум → воспаление.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл', when: 'При акне' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'При акне' },
           { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При тяжёлом акне' },
         ],
         solutions: [
@@ -648,7 +648,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'ААС-индуцированная агрессия (серотонин + миндалина)', probability: 'medium',
         mechanism: 'ААС ↓ серотонин (5-HT) → растормаживание агрессии. ↑ активность миндалевидного тела (fMRI). ↑ дофамин → ↑ импульсивность.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл', when: 'При агрессии' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'При агрессии' },
         ],
         solutions: [
           { substanceId: 'l_theanine', name: 'L-теанин', type: 'supplement', dose: '200-400 мг 2-3×/день', mechanism: '↑ α-волны, ↑ GABA, ↑ серотонин', evidenceLevel: 'A' },
@@ -676,7 +676,7 @@ export const DB_PART1: SymptomEntry[] = [
         labMarkers: [
           { marker: 'T общий', expectedChange: '↓↓', targetRange: '12.1-34.7 нмоль/л', when: 'Через 2-4 нед после последней инъекции' },
           { marker: 'ЛГ, ФСГ', expectedChange: '↓', targetRange: 'ЛГ 1.7-8.6, ФСГ 1.5-12.4', when: 'Через 2-4 нед' },
-          { marker: 'E2', expectedChange: '↓', targetRange: '20-50 пг/мл', when: 'Одновременно с T' },
+          { marker: 'E2', expectedChange: '↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Одновременно с T' },
           { marker: 'Витамин D (25-OH)', expectedChange: '↓', targetRange: '50-80 нг/мл', when: 'При депрессии' },
         ],
         solutions: [
@@ -755,8 +755,8 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Эндотелиальная дисфункция + гемореологические нарушения', probability: 'medium',
         mechanism: 'ААС ↓ eNOS → ↓ NO → ↓ вазодилатация кавернозных тел. ↑ Hct → ↑ вязкость → ↓ микроциркуляция. Эндотелиальная дисфункция — ранний и потенциально необратимый эффект длительного применения.',
         labMarkers: [
-          { marker: 'E2 (эстрадиол)', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Немедленно' },
-          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл', when: 'Немедленно' },
+          { marker: 'E2 (эстрадиол)', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно' },
+          { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
           { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T' },
           { marker: 'Гематокрит', expectedChange: '↑', targetRange: '40-50%', when: 'Каждые 4-8 нед' },
           { marker: 'Гомоцистеин', expectedChange: '↔', targetRange: '<15 мкмоль/л', when: 'При ЭД (маркер эндотелиальной дисфункции)' },
@@ -788,7 +788,7 @@ export const DB_PART1: SymptomEntry[] = [
         labMarkers: [
           { marker: 'ПСА общий + свободный', expectedChange: '↔', targetRange: '<4 нг/мл, своб/общ >25%', when: 'До курса, каждые 6 мес' },
           { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При СНМП' },
-          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
           { marker: 'УЗИ простаты (ТРУЗИ)', expectedChange: '↔', targetRange: 'Объём <30 см³', when: 'До курса, при СНМП' },
           { marker: 'IPSS (опросник)', expectedChange: '↔', targetRange: '0-7 баллов (лёгкая)', when: 'При СНМП' },
         ],
@@ -907,7 +907,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'SERM (тамоксифен, кломифен) блокируют ER в ЦНС → несмотря на ↑ Т, мозг "не видит" эстрогены → симптомы гипоэстрогении: вялость, апатия, brain fog. + ↓ аллопрегнанолон (↓ GABA) → тревога + усталость. SERM также ↓ IGF-1 на 20-30% (печёночный эффект).',
         labMarkers: [
           { marker: 'Тестостерон общий', expectedChange: '↔', targetRange: '12.1-34.7 нмоль/л', when: 'Каждые 2-4 нед' },
-          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл ♂', when: 'Каждые 2-4 нед' },
+          { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 2-4 нед' },
           { marker: 'ЛГ, ФСГ', expectedChange: '↑', targetRange: 'ЛГ 1.7-8.6', when: 'Каждые 2-4 нед (оценка ответа на SERM)' },
           { marker: 'IGF-1', expectedChange: '↓', targetRange: 'Возрастная норма', when: 'При выраженной вялости' },
           { marker: 'Кортизол (утро)', expectedChange: '↔', targetRange: '5-20 нмоль/л', when: 'При вялости' },
@@ -1004,7 +1004,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Эстроген/минералокортикоид-индуцированная задержка воды в мягких тканях лица', probability: 'high',
         mechanism: '↑ E2 (ароматизация) → ↑ гиалуроновая кислота в коже → ↑ связывание воды → отёчность. Активация РААС → ↑ Na⁺ → ↑ вода во внеклеточном пространстве → одутловатость. Наиболее заметно утром после горизонтального положения.',
         labMarkers: [
-          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл ♂', when: 'Каждые 4 нед' },
+          { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
           { marker: 'АД', expectedChange: '↑', targetRange: '<130/85', when: 'Ежедневно' },
           { marker: 'Na⁺ сыворотки', expectedChange: '↔', targetRange: '135-145 ммоль/л', when: 'Каждые 4 нед' },
         ],
@@ -1061,7 +1061,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гипоэстрогения (↓ E2) и дисфункция центра терморегуляции', probability: 'medium',
         mechanism: 'E2 модулирует центр терморегуляции в гипоталамусе (преоптическая область). При резком ↓ E2 → сужение термонейтральной зоны → ложное ощущение перегрева → вазодилатация (покраснение) + потоотделение (охлаждение). SERM (тамоксифен) блокируют ER в ЦНС, имитируя гипоэстрогению.',
         labMarkers: [
-          { marker: 'E2 (чувствительный)', expectedChange: '↓', targetRange: '20-50 пг/мл ♂', when: 'Немедленно' },
+          { marker: 'E2 (чувствительный)', expectedChange: '↓', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно' },
         ],
         solutions: [
           { substanceId: 'reduce_ai', name: 'Снизить дозу AI / приостановить SERM', type: 'pharma', dose: '—', mechanism: 'Восстановление E2-сигнализации в ЦНС', evidenceLevel: 'A' },

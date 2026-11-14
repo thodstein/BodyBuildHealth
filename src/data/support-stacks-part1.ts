@@ -509,7 +509,7 @@ export const STACKS_PART_1: SupportStack[] = [
     structuredLabControl: {
       markers: [
         { marker: 'Тестостерон общий', when: 'Каждые 4 нед', targetRange: '12-35 нмоль/л' },
-        { marker: 'E2 (эстрадиол)', when: 'Каждые 4 нед', targetRange: '80-160 пмоль/л' },
+        { marker: 'E2 (эстрадиол)', when: 'Каждые 4 нед', targetRange: '80-160 пмоль/л (♀ — по фазе, не подавлять)' },
         { marker: 'SHBG', when: 'Каждые 4 нед', targetRange: '15-55 нмоль/л' },
         { marker: 'ЛГ', when: 'Каждые 4 нед', targetRange: '1.7-8.6 МЕ/л' },
         { marker: 'ФСГ', when: 'Каждые 4 нед', targetRange: '1.5-12.4 МЕ/л' },
@@ -1459,7 +1459,7 @@ export const STACKS_PART_1: SupportStack[] = [
         { marker: 'ЛГ', when: 'Каждые 2 нед', targetRange: '>3 мМЕ/мл' },
         { marker: 'ФСГ', when: 'Каждые 2 нед', targetRange: '>3 мМЕ/мл' },
         { marker: 'SHBG', when: 'Каждые 2 нед', targetRange: '<40 нмоль/л' },
-        { marker: 'Пролактин', when: 'Каждые 4 нед', targetRange: '4-23 нг/мл' },
+        { marker: 'Пролактин', when: 'Каждые 4 нед', targetRange: '4-23 нг/мл (♀ <800 мМЕ/л)' },
       ],
     },
   },
