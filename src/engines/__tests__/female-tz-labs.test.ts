@@ -56,9 +56,17 @@ describe('female-tz-labs: женские floors', () => {
     expect(clinicalFloorsForLabs({ ALT: 70 }, 'female').some((x) => x.organId === 'hepatic' && x.level === 25)).toBe(true);
     expect(clinicalFloorsForLabs({ ALT: 70 }, 'male').some((x) => x.organId === 'hepatic')).toBe(false);
   });
-  it('ALT 100: female → 50 (3×ULN); male → только 25', () => {
-    expect(clinicalFloorsForLabs({ ALT: 100 }, 'female').some((x) => x.organId === 'hepatic' && x.level === 50)).toBe(true);
-    expect(clinicalFloorsForLabs({ ALT: 100 }, 'male').some((x) => x.organId === 'hepatic' && x.level === 50)).toBe(false);
+  it('ALT 100: female → 40 (3×ВГН — отмена оралов); male → только 25 (2×ВГН)', () => {
+    expect(clinicalFloorsForLabs({ ALT: 100 }, 'female').some((x) => x.organId === 'hepatic' && x.level === 40)).toBe(true);
+    expect(clinicalFloorsForLabs({ ALT: 100 }, 'male').some((x) => x.organId === 'hepatic' && x.level === 40)).toBe(false);
+    expect(clinicalFloorsForLabs({ ALT: 100 }, 'male').some((x) => x.organId === 'hepatic' && x.level === 25)).toBe(true);
+  });
+  it('ALT: ступени одной шкалы (♂ 120 — 3×ВГН, 200 — 5×ВГН; ♀ 93 / 155)', () => {
+    const male = clinicalFloorsForLabs({ ALT: 130 }, 'male');
+    expect(male.some((x) => x.organId === 'hepatic' && x.level === 40)).toBe(true);
+    expect(male.some((x) => x.organId === 'hepatic' && x.level === 50)).toBe(false);
+    expect(clinicalFloorsForLabs({ ALT: 210 }, 'male').some((x) => x.level === 50)).toBe(true);
+    expect(clinicalFloorsForLabs({ ALT: 160 }, 'female').some((x) => x.level === 50)).toBe(true);
   });
   it('TT 7 нмоль/л: female → reproductive 50 (вирилизация); male → нет', () => {
     const f = clinicalFloorsForLabs({ TT: 7 }, 'female');

@@ -3,6 +3,7 @@
 // Каталог маркеров повторяет таблицу T4 движка risk-engine-tz-spec (пороги m_i=1/2/3)
 // и якорные пороги clinicalFloorsForLabs — единый источник для UI-списка «Анализы».
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
+import { LFT_ULN, LFT_STAGE_ULN } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
 
@@ -103,8 +104,8 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'hepatic', name: TZ_SYSTEM_LABELS.hepatic, icon: TZ_SYSTEM_ICONS.hepatic, color: '#f59e0b',
     mechanisms: [
       { id: 'liv1', weight: 1.0, markers: [
-        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
-        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
+        M('ALT', 'АЛТ', 'Ед/л', 'high', [LFT_ULN.ALT.male, LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], { thresholds: [LFT_ULN.ALT.female, LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female] }),
+        M('AST', 'АСТ', 'Ед/л', 'high', [LFT_ULN.AST.male, LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], { thresholds: [LFT_ULN.AST.female, LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female] }),
       ] },
       { id: 'liv2', weight: 0.7, markers: [
         M('GGT', 'ГГТ', 'Ед/л', 'high', [55, 110, 220], { thresholds: [32, 48, 96] }),
@@ -112,15 +113,20 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('ALP', 'Щелочная фосфатаза', 'Ед/л', 'high', [150, 200, 300]),
       ] },
       { id: 'liv3', weight: 1.0, markers: [
-        M('AST', 'АСТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
-        M('ALT', 'АЛТ', 'Ед/л', 'high', [40, 80, 200], { thresholds: [31, 62, 93] }),
+        M('AST', 'АСТ', 'Ед/л', 'high', [LFT_ULN.AST.male, LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], { thresholds: [LFT_ULN.AST.female, LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female] }),
+        M('ALT', 'АЛТ', 'Ед/л', 'high', [LFT_ULN.ALT.male, LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], { thresholds: [LFT_ULN.ALT.female, LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female] }),
       ], note: 'соотношение АСТ/АЛТ > 1.5 (расчёт из значений)' },
     ],
     floors: [
-      { code: 'ALT', op: '>=', value: 200, label: 'АЛТ > 200 Ед/л — гепатотоксичность', risk: 50, femaleValue: 93, femaleLabel: 'АЛТ > 93 Ед/л (3× женской ULN 31) — гепатотоксичность' },
-      { code: 'AST', op: '>=', value: 200, label: 'АСТ > 200 Ед/л — гепатотоксичность', risk: 50, femaleValue: 93, femaleLabel: 'АСТ > 93 Ед/л (3× женской ULN 31) — гепатотоксичность' },
-      { code: 'ALT', op: '>=', value: 80, label: 'АЛТ > 80 Ед/л — 2×ULN', risk: 25, femaleValue: 62, femaleLabel: 'АЛТ > 62 Ед/л (2× женской ULN 31)' },
-      { code: 'AST', op: '>=', value: 80, label: 'АСТ > 80 Ед/л — 2×ULN', risk: 25, femaleValue: 62, femaleLabel: 'АСТ > 62 Ед/л (2× женской ULN 31)' },
+      // Ступени — из `LFT_STAGE_ULN` (2× снизить · 3× отмена оралов · 5× отмена всего).
+      // Раньше мужчина получал «гепатотоксичность» на 5×ВГН, а женщина — на 3×:
+      // один и тот же симптом жил по двум разным ступеням (аудит, проход 57).
+      { code: 'ALT', op: '>=', value: LFT_STAGE_ULN.stopAll.male, label: `АЛТ > ${LFT_STAGE_ULN.stopAll.male} Ед/л (5×ВГН) — отмена всего + гепатолог`, risk: 50, femaleValue: LFT_STAGE_ULN.stopAll.female, femaleLabel: `АЛТ > ${LFT_STAGE_ULN.stopAll.female} Ед/л (5×ВГН) — отмена всего + гепатолог` },
+      { code: 'AST', op: '>=', value: LFT_STAGE_ULN.stopAll.male, label: `АСТ > ${LFT_STAGE_ULN.stopAll.male} Ед/л (5×ВГН) — отмена всего + гепатолог`, risk: 50, femaleValue: LFT_STAGE_ULN.stopAll.female, femaleLabel: `АСТ > ${LFT_STAGE_ULN.stopAll.female} Ед/л (5×ВГН) — отмена всего + гепатолог` },
+      { code: 'ALT', op: '>=', value: LFT_STAGE_ULN.stopOral.male, label: `АЛТ > ${LFT_STAGE_ULN.stopOral.male} Ед/л (3×ВГН) — отмена оралов (17α)`, risk: 40, femaleValue: LFT_STAGE_ULN.stopOral.female, femaleLabel: `АЛТ > ${LFT_STAGE_ULN.stopOral.female} Ед/л (3×ВГН) — отмена оралов (17α)` },
+      { code: 'AST', op: '>=', value: LFT_STAGE_ULN.stopOral.male, label: `АСТ > ${LFT_STAGE_ULN.stopOral.male} Ед/л (3×ВГН) — отмена оралов (17α)`, risk: 40, femaleValue: LFT_STAGE_ULN.stopOral.female, femaleLabel: `АСТ > ${LFT_STAGE_ULN.stopOral.female} Ед/л (3×ВГН) — отмена оралов (17α)` },
+      { code: 'ALT', op: '>=', value: LFT_STAGE_ULN.reduce.male, label: `АЛТ > ${LFT_STAGE_ULN.reduce.male} Ед/л (2×ВГН) — снизить/пересмотреть орал`, risk: 25, femaleValue: LFT_STAGE_ULN.reduce.female, femaleLabel: `АЛТ > ${LFT_STAGE_ULN.reduce.female} Ед/л (2×ВГН) — снизить/пересмотреть орал` },
+      { code: 'AST', op: '>=', value: LFT_STAGE_ULN.reduce.male, label: `АСТ > ${LFT_STAGE_ULN.reduce.male} Ед/л (2×ВГН) — снизить/пересмотреть орал`, risk: 25, femaleValue: LFT_STAGE_ULN.reduce.female, femaleLabel: `АСТ > ${LFT_STAGE_ULN.reduce.female} Ед/л (2×ВГН) — снизить/пересмотреть орал` },
     ],
   },
   {

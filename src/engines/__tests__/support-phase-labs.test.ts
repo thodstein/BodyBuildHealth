@@ -118,7 +118,7 @@ describe('addonsFor — аддоны классов', () => {
   });
   it('sarm/GLP-1/clen/thyroid — свои триггеры', () => {
     expect(addonsFor(['ostarine']).some(x => x.key === 'sarm')).toBe(true);
-    expect(JSON.stringify(addonsFor(['ostarine']))).toContain('♂ >100 / ♀ >78');
+    expect(JSON.stringify(addonsFor(['ostarine']))).toContain('♂ >120 / ♀ >93');
     expect(addonsFor(['semaglutide']).some(x => x.key === 'glp1')).toBe(true);
     expect(JSON.stringify(addonsFor(['clenbuterol']))).toContain('Mg');
     expect(addonsFor(['t3']).some(x => x.key === 'thyroid')).toBe(true);
@@ -213,7 +213,7 @@ describe('matrixAddonKeys — мост к фарм-матрице классов
     expect(text(['oral17'])).toContain('2×ULN');
     expect(text(['clenbuterol'])).toContain('Mg');
     expect(text(['glp1'])).toContain('HbA1c');
-    expect(text(['sarm'])).toContain('♂ >100 / ♀ >78');
+    expect(text(['sarm'])).toContain('♂ >120 / ♀ >93');
   });
 });
 

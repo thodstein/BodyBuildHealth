@@ -17,7 +17,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import type { PhaseKey } from './tz-bridge-phase';
-import { lftUlnText, HGB_THRESHOLDS, FEMALE_ALT_2_5_ULN } from './lab-norms.engine';
+import { lftUlnText, HGB_THRESHOLDS, LFT_STAGE_ULN } from './lab-norms.engine';
 import { ruCount, RU_CARDS, RU_MARKERS } from './ru-plural';
 
 /** Минимальные PED-флаги, нужные карточкам (структурный подтип PEDFlags). */
@@ -395,7 +395,7 @@ export const CLASS_LAB_ADDONS: ClassLabAddon[] = [
   {
     key: 'sarm', label: 'SARM (оста/ЛГД/RAD/S23)',
     classes: ['sarm'], attachTo: ['K1', 'K2'],
-    items: [it('АЛТ/АСТ + липиды + LH/FSH', `АЛТ ${lftUlnText('ALT')}`, `АЛТ/АСТ >2.5×ВГН (♂ >100 / ♀ >${FEMALE_ALT_2_5_ULN}) — стоп`, 'Мини-AAS по мониторингу')],
+    items: [it('АЛТ/АСТ + липиды + LH/FSH', `АЛТ ${lftUlnText('ALT')}`, `АЛТ/АСТ >3×ВГН (♂ >${LFT_STAGE_ULN.stopOral.male} / ♀ >${LFT_STAGE_ULN.stopOral.female}) — отмена оралов; >5×ВГН (♂ >${LFT_STAGE_ULN.stopAll.male} / ♀ >${LFT_STAGE_ULN.stopAll.female}) — отмена всего`, 'Мини-AAS по мониторингу')],
   },
   {
     key: 'gh', label: 'GH / GHRH/GHRP (CJC/GHRP6/ипаморелин/MK677)',

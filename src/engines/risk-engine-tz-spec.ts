@@ -3,7 +3,7 @@
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
-import { HCT_THRESHOLDS } from './lab-norms.engine';
+import { HCT_THRESHOLDS, LFT_STAGE_ULN } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -279,12 +279,12 @@ export { HCT_THRESHOLDS } from './lab-norms.engine';
 export { HGB_THRESHOLDS } from './lab-norms.engine';
 
 /**
- * ВГН печёночных трансаминаз — третья пара к HCT/HGB: ♂ 40/40, ♀ 31/34.
+ * ВГН печёночных трансаминаз — третья пара к HCT/HGB: ♂ 40/40, ♀ 31/31.
  * Таблицы мониторинга, системные панели и тексты протоколов берут числа и
  * формулировку («♂ <40 / ♀ <31») отсюда, чтобы «<40 Ед/л» не выдавалось за
  * общий порог.
  */
-export { LFT_ULN, lftUlnText } from './lab-norms.engine';
+export { LFT_ULN, lftUlnText, LFT_STAGES, LFT_STAGE_ULN } from './lab-norms.engine';
 
 
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
@@ -302,9 +302,15 @@ export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'mal
   push(v('eGFR')!==undefined&&v('eGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
   push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3',50);
   push(v('UACR')!==undefined&&v('UACR')!>30,'renal','UACR > 30 — альбуминурия A2',25);
-  // ALT/AST: женский ULN 31 (женские пороги строже: 2×/3×ULN вместо мужских 80/200)
-  push((v('ALT')!==undefined&&v('ALT')!>(fem?93:200))||(v('AST')!==undefined&&v('AST')!>(fem?93:200)),'hepatic',fem?'АЛТ/АСТ > 3× женской нормы (ULN 31) — гепатоцеллюлярное повреждение':'АЛТ/АСТ > 5×ULN — гепатоцеллюлярное повреждение',50);
-  push((v('ALT')!==undefined&&v('ALT')!>(fem?62:80))||(v('AST')!==undefined&&v('AST')!>(fem?62:80)),'hepatic',fem?'АЛТ/АСТ > 2× женской нормы (ULN 31)':'АЛТ/АСТ > 2×ULN',25);
+  // ALT/AST: три ступени `LFT_STAGE_ULN` (2× — снизить/пересмотреть орал, 3× — отмена
+  // оралов, 5× — отмена всего). Раньше у мужчины были ступени 2×/5×, у женщины
+  // 2×/3× — один и тот же симптом оценивался по разным шкалам (проход 57).
+  const lftCut = (stage: 'reduce' | 'stopOral' | 'stopAll') => (fem ? LFT_STAGE_ULN[stage].female : LFT_STAGE_ULN[stage].male);
+  const lftOver = (t: number) => (v('ALT') !== undefined && v('ALT')! > t) || (v('AST') !== undefined && v('AST')! > t);
+  const lftSex = fem ? '♀' : '♂';
+  push(lftOver(lftCut('stopAll')), 'hepatic', `АЛТ/АСТ > 5×ВГН (${lftSex} >${lftCut('stopAll')} Ед/л) — отмена всего + гепатолог`, 50);
+  push(lftOver(lftCut('stopOral')), 'hepatic', `АЛТ/АСТ > 3×ВГН (${lftSex} >${lftCut('stopOral')} Ед/л) — отмена оралов (17α)`, 40);
+  push(lftOver(lftCut('reduce')), 'hepatic', `АЛТ/АСТ > 2×ВГН (${lftSex} >${lftCut('reduce')} Ед/л) — снизить/пересмотреть орал`, 25);
   push(v('K')!==undefined&&v('K')!<3.0,'cardio','K < 3.0 ммоль/л — аритмогенный риск',50);
   push(v('LH')!==undefined&&v('FSH')!==undefined&&v('LH')!<0.5&&v('FSH')!<0.5,'reproductive','LH/FSH < 0.5 — полная супрессия HPTA',50);
   // Тестостерон: женский порог вирилизации >6 нмоль/л (мужского floor нет — у мужчин низкий TT)

@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import type { TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { rssPct } from '../../../engines/risk-engine-tz-spec';
-import { LFT_ULN, lftUlnText, HGB_THRESHOLDS } from '../../../engines/lab-norms.engine';
+import { LFT_STAGE_ULN, lftUlnText, HGB_THRESHOLDS } from '../../../engines/lab-norms.engine';
 
 // ════════════════════════════════════════════════════════════════════
 //  CalcSystemPanel — панель «Риск системы + под-риски + мониторинг»
@@ -23,7 +23,7 @@ export interface SystemPanelDef {
 
 /** Системные панели мониторинга (единый источник для мониторинга и попапов). */
 export const SYSTEM_PANELS: SystemPanelDef[] = [
-  { id: 'hep', icon: '🫁', name: 'Печёночная панель', color: '#f59e0b', markers: 'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq: 'Каждые 4 нед', targets: `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')} Ед/л, ГГТ <55, билирубин <21 мкмоль/л`, alert: `АЛТ >2×ВГН (♂ ${LFT_ULN.ALT.male * 2} / ♀ ${LFT_ULN.ALT.female * 2}) → снижение доз · >5×ВГН (♂ ${LFT_ULN.ALT.male * 5} / ♀ ${LFT_ULN.ALT.female * 5}) → СТОП` },
+  { id: 'hep', icon: '🫁', name: 'Печёночная панель', color: '#f59e0b', markers: 'АЛТ, АСТ, ГГТ, ЩФ, билирубин общий/прямой, альбумин, ПТИ', freq: 'Каждые 4 нед', targets: `АЛТ ${lftUlnText('ALT')}, АСТ ${lftUlnText('AST')} Ед/л, ГГТ <55, билирубин <21 мкмоль/л`, alert: `АЛТ >2×ВГН (♂ ${LFT_STAGE_ULN.reduce.male} / ♀ ${LFT_STAGE_ULN.reduce.female}) → снижение доз · >3×ВГН (♂ ${LFT_STAGE_ULN.stopOral.male} / ♀ ${LFT_STAGE_ULN.stopOral.female}) → отмена оралов · >5×ВГН (♂ ${LFT_STAGE_ULN.stopAll.male} / ♀ ${LFT_STAGE_ULN.stopAll.female}) → СТОП` },
   { id: 'cardio', icon: '❤️', name: 'Кардио-липидная панель', color: '#f87171', markers: 'ЛПНП, ЛПВП, ТГ, АпоВ, Лп(а), hs-СРБ, Д-димер, тропонин I (при боли)', freq: 'Каждые 4 нед', targets: 'ЛПНП <2.6, ЛПВП >1.0, ТГ <1.7, hs-СРБ <1.0', alert: 'ЛПНП >4.0 → статины · Д-димер >0.5 → УЗДГ вен' },
   { id: 'renal', icon: '💧', name: 'Почечная панель', color: '#38bdf8', markers: 'Креатинин, рСКФ (CKD-EPI), цистатин C, мочевина, мочевая кислота, электролиты (Na⁺, K⁺, Cl⁻), общий белок мочи, микроальбуминурия, ОАМ (удельный вес, белок, глюкоза, эритроциты, лейкоциты)', freq: 'Каждые 4 нед', targets: 'Креатинин <115, рСКФ >90, K⁺ 3.5–5.0, микроальбумин <30 мг/сут', alert: 'Креатинин >130 → УЗИ почек · K⁺ <3.5/>5.5 → ЭКГ' },
   { id: 'hema', icon: '🩸', name: 'Гематологическая панель', color: '#ef4444', markers: 'ОАК: HCT, Hgb, RBC, PLT, WBC, СОЭ/ESR, ретикулоциты, ферритин, сыв. железо, коагулограмма (МНО, АЧТВ, фибриноген, D-димер), JAK2 V617F (при Hct >52%, ♀ >48%)', freq: 'Каждые 2-4 нед (при ↑Hct — каждые 2 нед)', targets: `HCT 40–50% (♂) / 36–48% (♀), Hgb 140–${HGB_THRESHOLDS.male.upper} г/л (♀ 120–${HGB_THRESHOLDS.female.upper}), PLT 150–400×10⁹/л, фибриноген 2-4 г/л, D-димер <0.5`, alert: 'HCT >52% (♀ >48%) → эритроцитаферез (первая линия) / флеботомия · >54% (♀ >52%) → СТОП AAS + эритроцитаферез · >60% → госпитализация' },

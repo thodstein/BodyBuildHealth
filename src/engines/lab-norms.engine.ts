@@ -129,6 +129,35 @@ export const LFT_ULN = {
   AST: { male: getLabNorm('AST', 'male')?.uln ?? 40, female: getLabNorm('AST', 'female')?.uln ?? 31 },
 } as const;
 
+/**
+ * Ступени печёночной токсичности — ОДНА шкала действий на всё приложение.
+ * Раньше на одно событие приходилось три разных числа: 2.5×ВГН (уведомление и
+ * печать — «немедленная отмена ААС»), 3×ВГН (женский протокол, статин-баннер,
+ * стоп-таблицы) и 5×ВГН (STOP-таблицы). Ступень называет действие, а не число:
+ *  - `reduce`   2×ВГН — снизить/пересмотреть орал, повтор через 2–4 нед;
+ *  - `stopOral` 3×ВГН — отмена оралов (17α), инъекции можно оставить;
+ *  - `stopAll`  5×ВГН — отмена всего + гепатолог.
+ * Числа считаются от ВГН своего пола (♂ 40 / ♀ 31), а не от литерала 200.
+ * Отдельный сигнал `FEMALE_ALT_2_5_ULN` (78) — «гепатотоксичность, повторить»,
+ * он не отменяет курс сам по себе.
+ */
+export const LFT_STAGES = { reduce: 2, stopOral: 3, stopAll: 5 } as const;
+
+export const LFT_STAGE_ULN = {
+  reduce: { male: LFT_ULN.ALT.male * LFT_STAGES.reduce, female: LFT_ULN.ALT.female * LFT_STAGES.reduce },
+  stopOral: { male: LFT_ULN.ALT.male * LFT_STAGES.stopOral, female: LFT_ULN.ALT.female * LFT_STAGES.stopOral },
+  stopAll: { male: LFT_ULN.ALT.male * LFT_STAGES.stopAll, female: LFT_ULN.ALT.female * LFT_STAGES.stopAll },
+} as const;
+
+/**
+ * 2.5×ВГН — «сигнал гепатотоксичности»: повтор анализа + TUDCA, сам по себе курс
+ * не отменяет (действия — ступени `LFT_STAGE_ULN`). ♂ 100 / ♀ 78.
+ */
+export const LFT_SIGNAL_ULN = {
+  male: Math.round(LFT_ULN.ALT.male * 2.5),
+  female: FEMALE_ALT_2_5_ULN,
+} as const;
+
 /** ВГН трансаминазы с обоими полами: «♂ <40 / ♀ <31». Одна формулировка на всё приложение. */
 export function lftUlnText(marker: 'ALT' | 'AST'): string {
   const t = LFT_ULN[marker];

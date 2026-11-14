@@ -7,7 +7,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
 import {
-  HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
+  HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE, LFT_STAGE_ULN,
 } from '../../engines/lab-norms.engine';
 import { phaseCardsFor, addonsFor, isInjectableCourse } from '../../engines/support-phase-labs.engine';
 
@@ -223,9 +223,13 @@ export function buildExportDataFromRec(
   });
 
   // Стоп-пороги: HCT — из единой шкалы (`HCT_THRESHOLDS`: ♂ 54, ♀ 52),
-  // АЛТ — 2.5× женской ULN у женщин и 200 Ед/л у мужчин (как в стоп-таблицах).
+  // АЛТ — ступени действий `LFT_STAGE_ULN` (сигнал 2.5×♀ / 2×♂, отмена оралов
+  // 3×ВГН, отмена всего 5×ВГН). Раньше женщина получала «отмену ААС» на 2.5×ВГН,
+  // а мужчина — на 5×ВГН: один и тот же раздел печати жил по двум шкалам.
   const hctStop = isFemale ? HCT_THRESHOLDS.female.block : HCT_THRESHOLDS.male.block;
-  const altStop = isFemale ? `${FEMALE_ALT_2_5_ULN}` : '200';
+  const altSignal = isFemale ? FEMALE_ALT_2_5_ULN : LFT_STAGE_ULN.reduce.male;
+  const altStopOral = isFemale ? LFT_STAGE_ULN.stopOral.female : LFT_STAGE_ULN.stopOral.male;
+  const altStopAll = isFemale ? LFT_STAGE_ULN.stopAll.female : LFT_STAGE_ULN.stopAll.male;
 
   // Единый перечень анализов — карточки фаз K0–K10 (как в UI и в текстовых
   // экспортах). График фазы (`monitoringSchedule`) больше не печатается: он
@@ -267,7 +271,7 @@ export function buildExportDataFromRec(
   const labSchedule: ExportLabSchedule[] = [...sexAdjustedRows, ...addonRows];
 
   const stopCriteria = [
-    `АЛТ/АСТ >${altStop} Ед/л — немедленная отмена ААС, повторить анализ через 7 дней`,
+    `АЛТ/АСТ >${altSignal} Ед/л (${isFemale ? '2.5' : '2'}×ВГН) — сигнал гепатотоксичности: повтор через 2 нед; >${altStopOral} (3×ВГН) — отмена оралов; >${altStopAll} (5×ВГН) — немедленная отмена ААС + гепатолог`,
     `Гематокрит >${hctStop}% — флеботомия 300-450 мл, контроль HCT через 3 дня`,
     'АД >160/100 мм рт.ст. — коррекция дозы телмисартана/небиволола',
     isFemale

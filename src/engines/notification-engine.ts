@@ -4,7 +4,7 @@
 //  ════════════════════════════════════════════════════════════════════════════
 
 import { computeOverdueSystems, type SystemOverdue, type LabSliceLike } from './labs-overdue';
-import { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT, FEMALE_ALT_2_5_ULN, HCT_THRESHOLDS } from './lab-norms.engine';
+import { FEMALE_HCT_THERAPY, FEMALE_HCT_URGENT, LFT_SIGNAL_ULN, LFT_STAGE_ULN, HCT_THRESHOLDS } from './lab-norms.engine';
 
 export type NotificationPriority = 'info' | 'warning' | 'critical';
 export type NotificationChannel = 'telegram' | 'browser' | 'toast';
@@ -192,18 +192,18 @@ const NOTIFICATION_RULES: NotificationRule[] = [
   {
     id: 'alt_critical',
     trigger: 'risk_threshold',
-    condition: (s) => !isFemale(s) && (s.labs.alt || 0) > 100,
-    message: '⛔ АЛТ >100 Ед/л (2.5×ULN) — гепатотоксичность. Немедленно сдать повторно. При >200 — стоп ААС, TUDCA×2.',
+    condition: (s) => !isFemale(s) && (s.labs.alt || 0) > LFT_SIGNAL_ULN.male,
+    message: `⛔ АЛТ >${LFT_SIGNAL_ULN.male} Ед/л (2.5×ВГН 40) — гепатотоксичность: повтор + TUDCA. >${LFT_STAGE_ULN.stopOral.male} — отмена оралов, >${LFT_STAGE_ULN.stopAll.male} — отмена всего.`,
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,
   },
   {
-    // ♀ ULN 31 → 2.5×ULN = 78: порог >100 для женщин — это уже ~3.2×ULN.
+    // ♀ ULN 31 → 2.5×ВГН = 78: порог >100 для женщин — это уже ~3.2×ВГН.
     id: 'alt_critical_female',
     trigger: 'risk_threshold',
-    condition: (s) => isFemale(s) && (s.labs.alt || 0) > FEMALE_ALT_2_5_ULN,
-    message: `⛔ АЛТ >${FEMALE_ALT_2_5_ULN} Ед/л (2.5× женской ULN 31) — гепатотоксичность. Повторить анализ; при росте — стоп ААС, TUDCA.`,
+    condition: (s) => isFemale(s) && (s.labs.alt || 0) > LFT_SIGNAL_ULN.female,
+    message: `⛔ АЛТ >${LFT_SIGNAL_ULN.female} Ед/л (2.5× женской ВГН 31) — гепатотоксичность: повтор + TUDCA. >${LFT_STAGE_ULN.stopOral.female} — отмена оралов, >${LFT_STAGE_ULN.stopAll.female} — отмена всего.`,
     priority: 'critical',
     channels: ['browser', 'toast', 'telegram'],
     cooldownHours: 24,
