@@ -35,4 +35,19 @@ describe('подписи форм: предел = реестр', () => {
   it('цинк: UL 40 мг — паритет с реестром', () => {
     expect(notes('zinc_picolinate_form')).toContain(`${NUTRIENT_LIMITS_V2.zinc.value} мг`);
   });
+
+  it('витамин D3: UL 4000 МЕ, 10000 — только коррекция дефицита', () => {
+    const n = notes('vitamin_d3_cholecalciferol_form');
+    expect(n).toContain(`${NUTRIENT_LIMITS_V2.vitamin_d.value} МЕ`);
+    expect(n).toContain('дефицит');
+    // 10000 без привязки к дефициту читалось как «безопасный верх».
+    expect(n).not.toMatch(/Верх:?\s*10000/);
+  });
+
+  it('NAC: 2400 — клинический ориентир, а не «UL 3000»', () => {
+    const n = notes('nac_n_form');
+    expect(n).toContain('2400');
+    expect(n).toContain('не UL');
+    expect(n).not.toMatch(/UL:?\s*3000/);
+  });
 });

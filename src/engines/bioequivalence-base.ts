@@ -348,7 +348,7 @@ export const FORM_PROFILES: Record<string, FormProfile> = {
     preferredFor: ['Все', 'Особенно зимой'],
     advantages: ['Лучшая форма vs D2'],
     disadvantages: ['Гиперкальциемия при передозировке'],
-    notes: '5000 МЕ = 125 мкг. Верх: 10000 МЕ/день под контролем 25(OH)D.',
+    notes: '5000 МЕ = 125 мкг. UL 4000 МЕ/день; 10000 МЕ — только коррекция подтверждённого дефицита под контролем 25(OH)D.',
     evidence: 'A',
   },
   nac_n_form: {
@@ -362,7 +362,7 @@ export const FORM_PROFILES: Record<string, FormProfile> = {
     preferredFor: ['Детокс', 'Печень'],
     advantages: ['Предшественник глутатиона'],
     disadvantages: ['Серосодержащий → запах', 'Плохая биодоступность'],
-    notes: 'Стандарт: 600-1200 мг/день натощак. UL: 3000 мг.',
+    notes: 'Стандарт: 600-1200 мг/день натощак. 2400 мг — клинический ориентир (не UL); движок капит 2400.',
     evidence: 'A',
   },
   ashwagandha_ksm66_form: {

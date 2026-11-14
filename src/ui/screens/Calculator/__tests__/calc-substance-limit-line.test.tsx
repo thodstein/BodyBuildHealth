@@ -17,6 +17,8 @@ import { render, cleanup } from '@testing-library/react';
 import React from 'react';
 import { CalcSubstanceDetail } from '../CalcSubstanceDetail';
 import { substanceLimitView } from '../Calc.substanceUl';
+import { doseUlHint } from '../../SupportScreen_parts/supportProtocolsShared';
+import { NUTRIENT_LIMITS_V2 } from '../../../../engines/support-limits';
 
 afterEach(() => cleanup());
 
@@ -122,6 +124,39 @@ describe('substanceLimitView: тип предела и честная подпи
   it('нет записи в реестре (НПВС) — строки нет, а не «UL не установлен»', () => {
     expect(substanceLimitView('ibuprofen', 400)).toBeNull();
     expect(substanceLimitView('__нет_такого__', 100)).toBeNull();
+  });
+});
+
+describe('одна шкала: карточка и плашка протоколов', () => {
+  // Карточка считает по числу, протоколы — парсером строки. Оба источника
+  // обязаны дать один и тот же предел и один и тот же факт превышения.
+  const CASES: Array<{ id: string; nutrient: keyof typeof NUTRIENT_LIMITS_V2; name: string; doseText: string; dose: number }> = [
+    { id: 'magnesium', nutrient: 'magnesium', name: 'Магний (глицинат)', doseText: '400 мг', dose: 400 },
+    { id: 'zinc', nutrient: 'zinc', name: 'Цинк (пиколинат)', doseText: '50 мг', dose: 50 },
+    { id: 'vitamin_b6', nutrient: 'vitamin_b6', name: 'Витамин B6 (пиридоксин)', doseText: '25 мг', dose: 25 },
+    { id: 'vitamin_d3', nutrient: 'vitamin_d', name: 'Витамин D3', doseText: '5000 МЕ', dose: 5000 },
+    { id: 'selenium', nutrient: 'selenium', name: 'Селен (селенометионин)', doseText: '300 мкг', dose: 300 },
+    { id: 'vitamin_e', nutrient: 'vitamin_e', name: 'Витамин E', doseText: '800 МЕ', dose: 536 },
+    { id: 'iron', nutrient: 'iron', name: 'Железо (бисглицинат)', doseText: '60 мг', dose: 60 },
+  ];
+
+  it('оба контура называют предел реестра и видят превышение', () => {
+    for (const c of CASES) {
+      const view = substanceLimitView(c.id, c.dose)!;
+      const hint = doseUlHint(c.name, c.doseText)!;
+      const value = String(NUTRIENT_LIMITS_V2[c.nutrient].value);
+      expect(view, c.id).not.toBeNull();
+      expect(hint, c.id).not.toBeNull();
+      expect(view.over, c.id).toBe(true);
+      expect(view.text, c.id).toContain(value);
+      expect(hint, c.id).toContain(value);
+    }
+  });
+
+  it('в пределах предела оба контура молчат о превышении', () => {
+    const view = substanceLimitView('magnesium', 200)!;
+    expect(view.over).toBe(false);
+    expect(doseUlHint('Магний (глицинат)', '200 мг')).toBeNull();
   });
 });
 
