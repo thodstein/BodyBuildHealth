@@ -16,7 +16,8 @@ describe('AUDIT FULL MATRIX', () => {
     for (const split of patterns) {
       for (const level of LEVELS) {
         for (const goal of GOALS) {
-          const plan = buildBBPlan({ patternId: split.id, level, goal, weeks: 1, workMax: WM });
+          const sex = split.id.startsWith('female_') ? 'female' : 'male';
+          const plan = buildBBPlan({ patternId: split.id, level, goal, weeks: 1, workMax: WM, sex });
           for (const sess of plan.weeks[0].sessions) {
             const all = sess.exercises as any[];
             const work = all.filter(ex => !ex.warmupActivator);
