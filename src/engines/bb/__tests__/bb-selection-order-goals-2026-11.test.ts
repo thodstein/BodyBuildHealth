@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildBBPlan, buildExercisePool } from '../bb-builder.engine';
 import { musclesForRole } from '../../movement-pattern';
 import { orderSessionExercises, isCompoundEx } from '../bb-session-order.engine';
-import { getPattern } from '../bb-split-patterns';
+import { getPattern, SPLIT_PATTERNS } from '../bb-split-patterns';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { BBExercise } from '../bb-builder.engine';
 
 const WM = {
@@ -20,7 +21,7 @@ function ex(partial: Partial<BBExercise>): BBExercise {
   } as BBExercise;
 }
 
-function plan(patternId: string, level: 'beginner' | 'intermediate', goal: 'mass' | 'cut' | 'strength_mass', sex: 'male' | 'female' = 'male') {
+function plan(patternId: string, level: 'beginner' | 'intermediate', goal: 'mass' | 'cut' | 'recomp' | 'strength_mass', sex: 'male' | 'female' = 'male') {
   return buildBBPlan({ patternId, level, goal, weeks: 1, workMax: WM, sex } as any);
 }
 
@@ -120,6 +121,28 @@ describe('2026-11: beginner selection + goal-aware ordering', () => {
         }
       }
     }
+  });
+
+  it('новичок: каталожно advanced-движения не попадают в рабочие слоты', () => {
+    const difficulty = new Map(
+      EXERCISE_CATALOG.map((e: any) => [String(e.name || ''), String(e.difficulty || 'beginner')]),
+    );
+    const found: string[] = [];
+    const goals: Array<'mass' | 'cut' | 'recomp' | 'strength_mass'> = ['mass', 'cut', 'recomp', 'strength_mass'];
+    for (const sp of SPLIT_PATTERNS) {
+      const sex = sp.id.startsWith('female_') ? 'female' : 'male';
+      for (const goal of goals) {
+        const p = plan(sp.id, 'beginner', goal, sex);
+        for (const s of p.weeks[0].sessions) {
+          for (const e of working(s)) {
+            if (difficulty.get(String(e.name || '')) === 'advanced') {
+              found.push(`${sp.id}/${goal}/${s.sessionTag}: ${e.name}`);
+            }
+          }
+        }
+      }
+    }
+    expect(found).toEqual([]);
   });
 
   it('финальные метаданные: Butterfly — isolation и не второй primary', () => {
