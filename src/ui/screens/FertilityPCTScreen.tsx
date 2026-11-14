@@ -698,7 +698,7 @@ export const FertilityPCTScreen: React.FC<{ initialTab?: FertTab; restrictToMode
             <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ef4444' }}>⚠ Риски и мифы</h4>
             <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
               {[
-                { name:'Полицитемия', real:'Реальный риск: Hct > 54% — терапевтическая флеботомия или снижение дозы', myth:false },
+                { name:'Полицитемия', real:'Реальный риск: Hct > 54% (♀ > 52%) — терапевтическая флеботомия или снижение дозы', myth:false },
                 { name:'Апноэ сна', real:'Реальный риск: ухудшение или манифестация обструктивного апноэ сна', myth:false },
                 { name:'Рак простаты', real:'Нет доказательств причинно-следственной связи. Риск прогрессии существующего рака.', myth:true },
                 { name:'Сердечно-сосудистый риск', real:'Противоречивые данные. Физиологические дозы ТЗТ: нет повышения риска MACE (TRAVERSE trial, 2023)', myth:false },
