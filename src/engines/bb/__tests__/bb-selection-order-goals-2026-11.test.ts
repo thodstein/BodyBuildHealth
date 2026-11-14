@@ -202,6 +202,13 @@ describe('2026-11: beginner selection + goal-aware ordering', () => {
     const crossMuscle = chestCompound();
     applyPreExhaustLoads([backIso, crossMuscle]);
     expect(crossMuscle.workSets[0].weight).toBe(100);
+
+    // cycle/program-путь не несёт роли источника: главный компаунд может быть
+    // помечен accessory. Методика всё равно должна снизить его вес после
+    // изоляции той же мышцы — роль не является признаком движения.
+    const accessoryCompound = mk({ muscle: 'chest', name: 'Жим штанги лёжа', role: 'accessory', exerciseType: 'compound' } as any);
+    applyPreExhaustLoads([chestFly(), accessoryCompound]);
+    expect(accessoryCompound.workSets[0].weight).toBe(90);
   });
 
   it('compound-first: изоляция не ведёт день, если есть компаунд крупной мышцы', () => {

@@ -998,6 +998,14 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
       return sessSets(s) + needSets <= maxSets && sessCount(s) < maxEx;
     };
     const roomFor = (s: any, sets: number) => ensureRoom(s, sets);
+    // Здесь нужен «сырой» запас без резки чужих сетов: в push_pull_2 первые
+    // Push/Pull уже на капе, а вторая пара сессий имеет место. Раньше покрытие
+    // смотрело только s1/s2 и glutes/calves оставались нулевыми (или резали
+    // аксессуары в переполненной сессии), хотя в неделе есть свободный день.
+    const roomy = (sets: number, ...preferred: any[]): any | null => {
+      const ordered = [...preferred, ...sessions].filter((s: any, i: number, arr: any[]) => !!s && arr.indexOf(s) === i);
+      return ordered.find((s: any) => sessSets(s) + sets <= maxSets && sessCount(s) < maxEx) || null;
+    };
     const used = new Set<string>();
     const quadsCand = excludedMuscles.has('quads') || gradedMuscles.has('quads') ? undefined
       : pick('quads', [/жим.*ног|leg.?press/i, /гакк|hack/i, /присед|squat|гоблет|goblet/i, /выпад|lunge/i], used);
@@ -1029,10 +1037,12 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
     // hams 3, glutes 0). Добавляем hip-thrust-якорь поддерживающим объёмом.
     if (glutesSets < GLUTE_COVERAGE_TARGET && gluteCand) {
       const sets = Math.min(4, GLUTE_COVERAGE_TARGET - glutesSets);
-      if (roomFor(s2, sets)) {
+      let host = roomy(sets, s2);
+      if (!host && roomFor(s2, sets)) host = s2;
+      if (host) {
         const ex = mk(gluteCand, 'glutes', sets, [8, 12], options.workMax?.glutes || 100, 'hip thrust/ягодичный мост');
         ex.character = 'тяж';
-        s2.exercises.push(ex);
+        host.exercises.push(ex);
         used.add(gluteCand.name);
         glutesSets += sets;
       }
@@ -1041,8 +1051,10 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
     // добавляем в любую сессию недели (икры легитимны в любой день).
     if (calvesSets < CALF_COVERAGE_TARGET && calfCand) {
       const sets = Math.min(4, CALF_COVERAGE_TARGET - calvesSets);
-      if (roomFor(s1, sets)) {
-        s1.exercises.push(mk(calfCand, 'calves', sets, [12, 15], options.workMax?.calves || 80, 'подъёмы на носки'));
+      let host = roomy(sets, s1);
+      if (!host && roomFor(s1, sets)) host = s1;
+      if (host) {
+        host.exercises.push(mk(calfCand, 'calves', sets, [12, 15], options.workMax?.calves || 80, 'подъёмы на носки'));
         used.add(calfCand.name);
         calvesSets += sets;
       }
@@ -5424,8 +5436,10 @@ export function repairSingleSetExercises(next: BBPlan): void {
       || (typeof week.prepProtocol === 'string' && week.prepProtocol)) continue;
     for (const session of week.sessions) {
       if (!session || !Array.isArray(session.exercises)) continue;
-      for (const target of session.exercises) {
+      for (const target of [...session.exercises]) {
         if (!target || Number(target.sets) !== 1 || target.optional || target.warmupActivator || isTechnique(target)) continue;
+        // target мог быть удалён предыдущей консолидацией — не трогаем.
+        if (!session.exercises.includes(target)) continue;
         // 1) донор в той же сессии — не меняет структуру дня.
         let donor = session.exercises.find((d: any) => d !== target && sameMuscle(d, target) && canDonate(d));
         // 2) донор в другой сессии той же недели — недельный объём мышцы сохраняется.
@@ -5436,7 +5450,32 @@ export function repairSingleSetExercises(next: BBPlan): void {
             if (donor) break;
           }
         }
-        if (donor) moveOne(donor, target);
+        if (donor) {
+          moveOne(donor, target);
+          continue;
+        }
+        // 3) Донора нет, но в сессии есть второй same-muscle односетовик
+        // (fullbody_2 beginner: два жима на грудь по 1 сету). Это не стимул и
+        // не ремонт «переносом»: объединяем два слота в один, повторяя
+        // собственный шаблон target. Недельный объём мышцы сохраняется —
+        // удалённый сет возвращается как второй рабочий сет target.
+        const twin = session.exercises.find((d: any) =>
+          d !== target && Number(d.sets) === 1 && !d.optional && !d.warmupActivator
+          && !isTechnique(d) && sameMuscle(d, target));
+        if (!twin) continue;
+        // Не удаляем главное движение ради изоляции: при pre_exhaust изоляция
+        // может стоять первой, и target окажется accessory. Оставляем слот с
+        // более сильной ролью/компаундом, второму отдаём его же шаблон сета.
+        const keepRank = (d: any) => (d.role === 'primary' ? 2 : 0) + (isCompoundEx(d) ? 1 : 0);
+        const keeper = keepRank(twin) > keepRank(target) ? twin : target;
+        const loser = keeper === target ? twin : target;
+        if (!Array.isArray(keeper.workSets)) keeper.workSets = [];
+        const template = keeper.workSets[0]
+          || { reps: keeper.repsRange?.[0] || 8, rir: keeper.rir ?? 2, weight: 0 };
+        if (keeper.workSets.length > 2) keeper.workSets = keeper.workSets.slice(0, 2);
+        while (keeper.workSets.length < 2) keeper.workSets.push({ ...template });
+        keeper.sets = 2;
+        session.exercises = session.exercises.filter((x: any) => x !== loser);
       }
     }
   }

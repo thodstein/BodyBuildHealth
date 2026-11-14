@@ -30,6 +30,10 @@ describe('AUDIT FULL MATRIX', () => {
             if (gluteDay && work.length) {
               expect(work[0].muscle, `${split.id}/${level}/${goal}/${sess.sessionTag}: glute lead`).toBe('glutes');
             }
+            for (const ex of work) {
+              if (ex.optional) continue;
+              expect(Number(ex.sets), `${split.id}/${level}/${goal}/${sess.sessionTag}/${ex.name}: single work set`).toBeGreaterThanOrEqual(2);
+            }
             const hasMajorCompound = work.some(ex => isCompoundEx(ex) && MAJOR_LEAD_MUSCLES.has(ex.muscle));
             if (hasMajorCompound && work.length && !gluteDay) {
               expect(isCompoundEx(work[0]),

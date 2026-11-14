@@ -49,6 +49,46 @@ function programWithBenchPause(): any {
   return program;
 }
 
+function cycleWithFlyAndBench(): any {
+  const source = getCyclesByDirection('bodybuilding').find(c => c.meta.id === 'cycle-bb-03');
+  if (!source) throw new Error('cycle-bb-03 не найден');
+  const cycle: any = JSON.parse(JSON.stringify(source));
+  cycle.week1[0].exercises = [
+    { name: 'Разводка гантелей лёжа', group: 'Грудь', coef: 1, mnosz: 1, load: 'Легкая', sets: [{ pct: 0.5, reps: 12, sets: 3, rir: 2 }] },
+    { name: 'Жим штанги лёжа', group: 'Грудь', coef: 1, mnosz: 1, load: 'Тяжелая', sets: [{ pct: 0.7, reps: 6, sets: 4, rir: 2 }] },
+  ];
+  return cycle;
+}
+
+function programWithFlyAndBench(): any {
+  const source = getCyclesByDirection('bodybuilding').find(c => c.meta.id === 'cycle-bb-03');
+  if (!source) throw new Error('cycle-bb-03 не найден');
+  const base = cycleTemplateToFullProgram(source);
+  const program: any = JSON.parse(JSON.stringify(base));
+  const day = JSON.parse(JSON.stringify(program.weeks[0].days[0]));
+  day.focus = 'Грудь';
+  day.exercises = [
+    { name: 'Разводка гантелей лёжа', sets: 3, reps: '12', rpe: 7, rir: 2, restSec: 90 },
+    { name: 'Жим штанги лёжа', sets: 4, reps: '6', rpe: 7, rir: 2, restSec: 180 },
+  ];
+  program.weeks = [{ ...program.weeks[0], week: 1, days: [day] }];
+  program.durationWeeks = 1;
+  program.daysPerWeek = 1;
+  return program;
+}
+
+function chestWork(plan: any): any[] {
+  const session = plan.weeks[0].sessions.find((s: any) =>
+    s.exercises.some((e: any) => /Разводка гантелей/.test(e.name))
+    && s.exercises.some((e: any) => /Жим штанги лёжа/.test(e.name)));
+  if (!session) throw new Error('грудная сессия не найдена');
+  return session.exercises.filter((e: any) => !e.warmupActivator);
+}
+
+function firstWeight(exercises: any[], pattern: RegExp): number {
+  return Number(exercises.find((e: any) => pattern.test(e.name))?.workSets?.[0]?.weight);
+}
+
 const ORDER_OPTS = {
   workMax: WM, level: 'intermediate', trainingYears: 3, mode: 'adapt',
   methodology: 'compound_first',
@@ -91,5 +131,32 @@ describe('cycle-to-plan: goal/sex доезжают до finalize', () => {
       ...ORDER_OPTS, goal: 'cut', sex: 'female',
     } as any);
     expect(plan.buildContext?.sex).toBe('female');
+  });
+
+  it('pre_exhaust: скидка базы применяется в convert-пути после реального праймера', () => {
+    const common = { ...ORDER_OPTS, goal: 'mass' } as any;
+    const plain = convertCycleToBBPlan({ ...common, cycle: cycleWithFlyAndBench(), methodology: 'compound_first' });
+    const pre = convertCycleToBBPlan({ ...common, cycle: cycleWithFlyAndBench(), methodology: 'pre_exhaust' });
+    const plainWork = chestWork(plain);
+    const preWork = chestWork(pre);
+
+    expect(preWork[0].name).toContain('Разводка');
+    expect(firstWeight(preWork, /Жим штанги лёжа/))
+      .toBeCloseTo(firstWeight(plainWork, /Жим штанги лёжа/) * 0.9, 1);
+    // Праймер методика не утяжеляет и не облегчает.
+    expect(firstWeight(preWork, /Разводка/)).toBe(firstWeight(plainWork, /Разводка/));
+  });
+
+  it('pre_exhaust: скидка базы применяется в program-пути после реального праймера', () => {
+    const common = { ...ORDER_OPTS, goal: 'mass' } as any;
+    const plain = programToBBPlan(programWithFlyAndBench(), { ...common, methodology: 'compound_first' });
+    const pre = programToBBPlan(programWithFlyAndBench(), { ...common, methodology: 'pre_exhaust' });
+    const plainWork = chestWork(plain);
+    const preWork = chestWork(pre);
+
+    expect(preWork[0].name).toContain('Разводка');
+    expect(firstWeight(preWork, /Жим штанги лёжа/))
+      .toBeCloseTo(firstWeight(plainWork, /Жим штанги лёжа/) * 0.9, 1);
+    expect(firstWeight(preWork, /Разводка/)).toBe(firstWeight(plainWork, /Разводка/));
   });
 });

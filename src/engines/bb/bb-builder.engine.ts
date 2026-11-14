@@ -1547,7 +1547,10 @@ export function applyPreExhaustLoads(exercises: BBExercise[]): void {
   const work = exercises.filter((e: any) => !(e as any).warmupActivator);
   for (let i = 0; i < work.length; i++) {
     const ex = work[i];
-    if (ex.role !== 'primary' || !isCompoundEx(ex)) continue;
+    // Роль не признак движения: cycle/program-пути часто помечают главный
+    // компаунд accessory (источник не несёт роли). Методика смотрит на факт —
+    // это компаунд, и перед ним в выданной сессии стоит изоляция той же мышцы.
+    if (!isCompoundEx(ex)) continue;
     const hasPrimerBefore = work.some((p: any, j: number) =>
       j < i && p.muscle === ex.muscle && !isCompoundEx(p));
     if (!hasPrimerBefore) continue;
@@ -1569,7 +1572,7 @@ export function applyPreExhaustLoads(exercises: BBExercise[]): void {
 }
 
 /** Plan-level вариант: вызывать только после всех проходов, меняющих состав сессий. */
-function applyPreExhaustLoadsToPlan(plan: BBPlan): void {
+export function applyPreExhaustLoadsToPlan(plan: BBPlan): void {
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
       applyPreExhaustLoads(session.exercises as BBExercise[]);

@@ -9,7 +9,7 @@ import { ruCount, RU_SETS } from '../ru-plural';
 import type { BBPlan, BBWeek, BBSession, BBExercise, BBSet } from './bb-builder.engine';
 import type { BBPhase } from './bb-types';
 import { femalePosteriorBoost, mastersAdjust } from './bb-demographics';
-import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv, WEAK_TO_MUSCLE } from './bb-builder.engine';
+import { getBBVolumeLandmarks, isWeak, abDominantPattern, normalizeWeekMrv, WEAK_TO_MUSCLE, applyPreExhaustLoadsToPlan } from './bb-builder.engine';
 import { syncBBPlanSetShape } from './bb-validator.engine';
 import { aggregateBBVolume, perExerciseCap, exerciseVolumeContributions, BB_MRV_TOLERANCE } from './bb-volume.engine';
 import { buildBBVolumeTarget, computeMrvMult, regimeMrvMultFor, weeklyCapFor, perSessionMuscleCap, type BBVolumeTarget } from './bb-volume.engine';
@@ -2011,6 +2011,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         );
       }
     }
+    // Pre-exhaust: −10 % базы только там, где изоляция-праймер реально осталась
+    // перед компаундом той же мышцы в выданной сессии. Generic-путь делает это
+    // в конце buildBBPlan; cycle/program-путь финализирует план здесь, поэтому
+    // без этого pass'а методика меняла только порядок, но не вес базы.
+    if (input.methodology === 'pre_exhaust') applyPreExhaustLoadsToPlan(finalized);
     // Аудит Y: после недельного MRV-трима план меняет состав/сеты уже ПОСЛЕ
     // finalizeBBPlan, поэтому снимки факта (weeklyVolume/validation/fatigueReport/
     // expandedSummary/report) описывали до-тримовую версию. Замер: cycle-08 —
@@ -3372,6 +3377,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       );
     }
   }
+  // Pre-exhaust: порядок уже финальный (finalize + expand + rehab), поэтому
+  // скидку базе можно считать по фактической сессии. Без этого pass'а
+  // program-adapt менял только порядок, а вес компаунда оставался прежним.
+  if (mode === 'adapt' && opts.methodology === 'pre_exhaust') applyPreExhaustLoadsToPlan(finalized);
   // Аудит Y: тот же класс, что и в цикл-пути — MRV-трим/rehab-relief правят
   // план после finalizeBBPlan, поэтому снимки факта пересобираются последними.
   refreshBBPlanSnapshots(finalized, {

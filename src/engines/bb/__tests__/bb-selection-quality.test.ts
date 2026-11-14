@@ -60,6 +60,17 @@ describe('BB-auto quality of exercise selection & comments', () => {
     expect(built).toBe(SPLIT_PATTERNS.length * levels.length);
   });
 
+  it('upper-only split keeps glute coverage from a later session, not only s1/s2', () => {
+    // push_pull_2: первые Push/Pull уже на капе, glute-anchor не влезал, и
+    // сплит без дня ног оставался с 0 прямыми сетами ягодиц. Покрытие должно
+    // использовать свободную вторую пару сессий.
+    for (const sex of ['male', 'female'] as const) {
+      const plan: any = buildBBPlan({ patternId: 'push_pull_2', level: 'intermediate', goal: 'recomp', weeks: 1, workMax: WM, sex });
+      const volume = plan.weeklyVolume?.[String(plan.weeks[0].week)] || {};
+      expect(Number(volume.glutes?.directSets || 0), `${sex}: glute direct`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
   it('weak-point methodology applies: chest_upper → incline chest in Push, back_width → vertical pull in Pull', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM, weakPoints: ['chest_upper', 'back_width'] });
     const push = plan.weeks[0].sessions.find(s => (s.sessionTag || '').toLowerCase().includes('push'))!;

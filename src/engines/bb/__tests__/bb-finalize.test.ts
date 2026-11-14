@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finalizeBBPlan } from '../bb-finalize.engine';
+import { finalizeBBPlan, repairSingleSetExercises } from '../bb-finalize.engine';
 
 function plan(workSets: number, sets: number) {
   return {
@@ -18,6 +18,38 @@ describe('BB shared finalizer', () => {
     const result = finalizeBBPlan(plan(3, 2), { reorder: false, level: 'intermediate' });
     expect(result.weeks[0].sessions[0].exercises[0].workSets).toHaveLength(2);
     expect(result.volumeTargets).toBeTruthy();
+  });
+
+  it('single-set repair keeps the primary compound when isolation leads', () => {
+    const source: any = {
+      pattern: {} as any,
+      weeks: [{
+        week: 1,
+        sessions: [{
+          day: 1, weekOffset: 1, character: 'тяж', sessionTag: 'Chest',
+          exercises: [
+            {
+              muscle: 'chest', name: 'Разводка гантелей', role: 'accessory', character: 'памп',
+              sets: 1, repsRange: [12, 15], rir: 2,
+              workSets: [{ reps: 12, rir: 2, weight: 20 }], warmupSets: [],
+            },
+            {
+              muscle: 'chest', name: 'Жим штанги лёжа', role: 'primary', character: 'тяж',
+              sets: 1, repsRange: [6, 8], rir: 2,
+              workSets: [{ reps: 6, rir: 2, weight: 80 }], warmupSets: [],
+            },
+          ],
+        }],
+      }],
+      rotationMuscleVolume: {}, rationale: [],
+    };
+    repairSingleSetExercises(source);
+    const work = source.weeks[0].sessions[0].exercises;
+    expect(work).toHaveLength(1);
+    expect(work[0].name).toContain('Жим');
+    expect(work[0].sets).toBe(2);
+    expect(work[0].workSets).toHaveLength(2);
+    expect(work[0].workSets.every((s: any) => s.weight === 80)).toBe(true);
   });
 
   it('rebuilds missing workSets from exercise defaults', () => {

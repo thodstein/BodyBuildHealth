@@ -2649,3 +2649,91 @@ Marketplace 66 мс, остальные < 30 мс. То есть «тормоз�
   (эта зона не трогалась).
 - Полный `npm run test:bb` — 306 файлов passed / 4 skipped;
   3557 тестов passed / 20 skipped / 0 failed (добавленный тест — +1).
+
+## 44. Итерация AT (2026-11-14): pre_exhaust в cycle/program, односетовые слоты и glute-покрытие
+
+### 44.1 P1: cycle/program-путь терял весовую скидку pre_exhaust
+
+`pre_exhaust` в generic-пути менял и порядок, и вес базы. В `convertCycleToBBPlan`
+и `programToBBPlan` финализатор переставлял изоляцию вперёд, но
+`applyPreExhaustLoadsToPlan` не вызывался — методика выглядела применённой, а
+вес компаунда оставался прежним. Замер на тестовом цикле/программе
+(изоляция → жим): `compound_first` и `pre_exhaust` давали одинаковые 77.6 кг
+(цикл) и 94.5 кг (программа).
+
+Дополнительно `applyPreExhaustLoads` требовал `role === 'primary'`. В
+cycle/program-пути главный компаунд часто помечен `accessory` (источник не
+несёт роли), поэтому даже после подключения pass'а скидка бы не сработала.
+
+Исправление:
+
+- `bb-builder.engine.ts:1553` — роль больше не признак движения: скидка
+  считается по факту «compound после non-compound той же мышцы».
+- `bb-builder.engine.ts:1575` — `applyPreExhaustLoadsToPlan` экспортирован.
+- `cycle-to-plan.ts:2018` — вызов в adapt-пути цикла после всех режущих
+  проходов и до `refreshBBPlanSnapshots`.
+- `cycle-to-plan.ts:3383` — тот же вызов в adapt-пути программы (faithful
+  сознательно не трогается: `methodologyApplied = false`).
+
+Регрессии:
+
+- `bb-cycle-program-parity.test.ts:136` — цикл: праймер первым, компаунд
+  ×0.9, вес праймера не меняется.
+- `bb-cycle-program-parity.test.ts:150` — программа: тот же инвариант при
+  `role: 'accessory'` у главного компаунда.
+- `bb-selection-order-goals-2026-11.test.ts:208` — unit-кейс
+  «accessory-компаунд после изоляции всё равно получает ×0.9».
+
+### 44.2 P1: рабочие упражнения с одним сетом в fullbody_2 beginner
+
+Матрица всех сплитов/уровней/целей выявила `fullbody_2` beginner (оба пола):
+два жима на грудь выходили по 1 рабочему сету. `repairSingleSetExercises`
+умел только переносить сет от донора той же мышцы; донора с запасом не было,
+и оба слота оставались односетовыми.
+
+Исправление (`bb-finalize.engine.ts:5376`, fallback `:5462`): если донора нет,
+два same-muscle односетовых слота консолидируются в один двухсетовый. Второй
+сет повторяет шаблон **оставленного** слота, поэтому недельный объём мышцы не
+меняется, а нерабочий «1 сет» исчезает. Если изоляция стоит перед базой
+(`pre_exhaust`), keeper выбирается по роли/компаунду (`:5470`) — главное
+движение не удаляется ради изоляции.
+
+Регрессии:
+
+- `audit_full_matrix.test.ts:35` — во всех 496 планах рабочие не-optional
+  упражнения имеют ≥2 сета.
+- `bb-finalize.test.ts:23` — изоляция первой + primary-компаунд по 1 сету:
+  остаётся компаунд с 2 сетами, изоляция не подменяет базу.
+
+### 44.3 P2: сплит без дня ног оставлял glutes нулевыми
+
+`push_pull_2` (4 сессии Push/Pull) в intermediate/recomp давал `glutes = 0`
+прямых сетов у обоих полов. `ensureLegsCoverageForUpperOnlySplits` добавлял
+hip-thrust только в `s2`, но первые Push/Pull уже стояли на капе 24 сетов,
+хотя вторая пара сессий имела свободное место.
+
+Исправление (`bb-finalize.engine.ts:1005`, `:1038`, `:1052`): покрытие ищет
+«сырой» запас по всем сессиям недели (preferred-сессия первой), и только если
+его нет — пробует освободить место в preferred. После фикса `glutes` = 4
+прямых сета во всех уровнях/целях и обоих полах.
+
+Регрессия: `bb-selection-quality.test.ts:63` — `push_pull_2` intermediate/recomp,
+male и female, `glutes.directSets ≥ 4`.
+
+Отдельное наблюдение P3 (не входит в этот фикс): икры в `push_pull_2`
+по-прежнему могут остаться 0 прямыми сетами — coverage добавляет их, но
+поздние balance/MRV-проходы вытесняют слот. Это вопрос приоритета бюджета
+сессии, а не порядка/методики; менять его без отдельного решения по объёму
+рискованно.
+
+### 44.4 Проверка
+
+- Адресно: `bb-cycle-program-parity`, `bb-selection-order-goals-2026-11`,
+  `bb-selection-quality`, `bb-full-matrix-extended`, `bb-cycle-matrix` —
+  37/37 passed.
+- `audit_full_matrix` (496 планов, все сплиты × уровни × цели + warmup/glute/
+  compound-lead/duplicate/MRV/односетовые) — passed.
+- `bb-auto-audit-2026-10-p0` (81 тест), `bb-split-balance`,
+  `bb-zero-state-snapshots` — passed.
+- `npm run type-check` — по изменённым BB-файлам ошибок нет; общий прогон
+  остаётся красным только на чужих WIP-правках nutrition-planner.
