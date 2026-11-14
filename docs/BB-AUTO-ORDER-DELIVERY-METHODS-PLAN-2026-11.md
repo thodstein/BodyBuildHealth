@@ -2735,5 +2735,10 @@ male и female, `glutes.directSets ≥ 4`.
   compound-lead/duplicate/MRV/односетовые) — passed.
 - `bb-auto-audit-2026-10-p0` (81 тест), `bb-split-balance`,
   `bb-zero-state-snapshots` — passed.
+- Female sex × все сплиты × 4 уровня × 5 целей (620 планов): 0 нарушений
+  warmup/glute-lead/compound-lead/односетовых/MRV/glute-покрытия.
+- Полный `npm run test:bb` — 306 файлов passed / 4 skipped;
+  3561 тест passed / 20 skipped / 0 failed.
 - `npm run type-check` — по изменённым BB-файлам ошибок нет; общий прогон
-  остаётся красным только на чужих WIP-правках nutrition-planner.
+  остаётся красным только на чужой WIP-правке
+  `meal-plan-engine.ts:866` (`Property 'moves' ... on type 'never'`).
