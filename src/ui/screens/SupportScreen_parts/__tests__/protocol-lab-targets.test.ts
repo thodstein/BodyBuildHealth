@@ -11,6 +11,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UCUM_MAP } from '../../../../core/constants';
+import { STOP_COURSE_TABLE } from '../supportProtocolsShared';
+import { FEMALE_LAB_GROUPS } from '../supportProtocolWomenData';
 
 const ucum = UCUM_MAP as Record<string, { uln: number }>;
 const read = (name: string) =>
@@ -82,5 +84,40 @@ describe('мониторинг веществ (LAB_MONITOR_DB): те же нор
     expect(unified).toContain("when:'Каждые 4 нед', target:'<320 мМЕ/л'");
     // <400 у каберголина — терапевтическая цель (не переподавить PRL), это не норма.
     expect(unified).toContain("Каберголин — мощный D2-агонист");
+  });
+});
+
+describe('СТОП-таблица «отмена курса»: гормональные пороги обоих полов', () => {
+  const e2Row = () => STOP_COURSE_TABLE.find((r) => /\bE2\b/.test(r.cond));
+
+  it('E2: мужские 120/20 и женские 800/30 в одной строке', () => {
+    const row = e2Row();
+    expect(row).toBeTruthy();
+    // Раньше строка знала только мужскую шкалу: женщина с E2 300 (норма цикла)
+    // читала «AI-титрация», а с E2 700 — что всё в порядке.
+    expect(row!.cond).toContain('♂');
+    expect(row!.cond).toContain('♀');
+    expect(row!.cond).toContain('800');
+    expect(row!.cond).toContain('30');
+    expect(row!.action).toContain('не обнулять');
+  });
+
+  it('женские числа строки = красная зона женского протокола E2', () => {
+    const e2 = FEMALE_LAB_GROUPS.flatMap((g) => g.rows).find((r) => /Эстрадиол/.test(r.marker));
+    expect(e2?.red).toBeTruthy();
+    const row = e2Row()!;
+    for (const n of (e2!.red || '').match(/\d+/g) ?? []) {
+      expect(row.cond, `женский порог ${n}`).toContain(n);
+    }
+  });
+
+  it('PRL: мужской триггер МРТ 2000 + женский 1500 из женской панели', () => {
+    const row = STOP_COURSE_TABLE.find((r) => /PRL/.test(r.cond));
+    expect(row).toBeTruthy();
+    const prl = FEMALE_LAB_GROUPS.flatMap((g) => g.rows).find((r) => /Пролактин/.test(r.marker));
+    const femaleRed = (prl?.red || '').match(/\d+/g)?.[0];
+    expect(femaleRed).toBeTruthy();
+    expect(row!.cond).toContain('2000');
+    expect(row!.cond).toContain(`♀ >${femaleRed}`);
   });
 });
