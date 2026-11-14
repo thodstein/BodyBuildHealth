@@ -9,6 +9,11 @@
 
 # Description
 
+Пороги анализов (ВГН, ступени печени, женские зоны) живут в одном месте —
+`src/engines/lab-norms.engine.ts`; правила правки и список потребителей —
+`docs/LAB-NORMS-SINGLE-SOURCE.md`. Аудит калькулятора поддержки по проходам —
+`docs/SUPPORT-CALC-FULL-AUDIT-PLAN.md`.
+
 # Example
 
 # Install:
