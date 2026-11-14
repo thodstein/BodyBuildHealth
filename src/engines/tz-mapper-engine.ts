@@ -1789,7 +1789,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     }
   }
   // ── 3d. TIER-ADJUSTMENTS: adaptive (addSubs), titration, nutrition, alerts + синергии ─
-  const tierAdj = computeTierAdjustments(ctx.labs);
+  const tierAdj = computeTierAdjustments(ctx.labs, ctx.sex);
   // Добавить tier-adaptive препараты
   for (const a of tierAdj.addSubs) {
     const canon = canonId(a.id);

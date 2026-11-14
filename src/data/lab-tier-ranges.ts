@@ -6,8 +6,13 @@
 //  TIER 2 = лечение (усиленный стэк, дозы↑, ↓dose AAS)
 //  TIER 3 = ⛔ экстрено (STOP COURSE + к врачу)
 //
-//  deriveTier(marker, value) → 0|1|2|3
+//  deriveTier(marker, value, sex?) → 0|1|2|3
 // ════════════════════════════════════════════════════════════════════════════
+
+import {
+  LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN,
+} from '../engines/lab-norms.engine';
 
 export type Tier = 0 | 1 | 2 | 3;
 
@@ -44,16 +49,16 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   LP_A:             { marker:'LP_A', normal:[0,30], borderline:[30,50], treatment:[50,100], emergencyHigh:100, direction:'high', unit:'mg/dL', label:'Lp(a)' },
 
   // ─── HEPATIC ───
-  ALT:              { marker:'ALT', normal:[0,40], borderline:[40,80], treatment:[80,200], emergencyHigh:200, direction:'high', unit:'U/L', label:'АЛТ' },
-  AST:              { marker:'AST', normal:[0,40], borderline:[40,100], treatment:[100,200], emergencyHigh:200, direction:'high', unit:'U/L', label:'АСТ' },
-  GGT:              { marker:'GGT', normal:[0,55], borderline:[55,110], treatment:[110,200], emergencyHigh:200, direction:'high', unit:'U/L', label:'ГГТ' },
+  ALT:              { marker:'ALT', normal:[0, LFT_ULN.ALT.male], borderline:[LFT_ULN.ALT.male, LFT_STAGE_ULN.reduce.male], treatment:[LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], emergencyHigh:LFT_STAGE_ULN.stopOral.male, direction:'high', unit:'U/L', label:'АЛТ' },
+  AST:              { marker:'AST', normal:[0, LFT_ULN.AST.male], borderline:[LFT_ULN.AST.male, LFT_STAGE_ULN.reduce.male], treatment:[LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], emergencyHigh:LFT_STAGE_ULN.stopOral.male, direction:'high', unit:'U/L', label:'АСТ' },
+  GGT:              { marker:'GGT', normal:[0, GGT_ULN.male], borderline:[GGT_ULN.male, GGT_STAGE_ULN.double.male], treatment:[GGT_STAGE_ULN.double.male, GGT_STAGE_ULN.triple.male], emergencyHigh:GGT_STAGE_ULN.triple.male, direction:'high', unit:'U/L', label:'ГГТ' },
   BILIRUBIN:        { marker:'BILIRUBIN', normal:[0,21], borderline:[21,40], treatment:[40,100], emergencyHigh:100, direction:'high', unit:'mcmol/L', label:'Билирубин' },
   ALP:              { marker:'ALP', normal:[0,120], borderline:[120,200], treatment:[200,400], emergencyHigh:400, direction:'high', unit:'U/L', label:'ЩФ' },
   AMMONIA:          { marker:'AMMONIA', normal:[0,50], borderline:[50,80], treatment:[80,150], emergencyHigh:150, direction:'high', unit:'mcmol/L', label:'Аммиак' },
   BILE_ACIDS:       { marker:'BILE_ACIDS', normal:[0,10], borderline:[10,20], treatment:[20,50], emergencyHigh:50, direction:'high', unit:'mcmol/L', label:'Жёлчные кислоты' },
 
   // ─── RENAL ───
-  CREATININE:       { marker:'CREATININE', normal:[40,105], borderline:[105,130], treatment:[130,200], emergencyHigh:200, direction:'high', unit:'mcmol/L', label:'Креатинин' },
+  CREATININE:       { marker:'CREATININE', normal:[40, CREATININE_ULN.male], borderline:[CREATININE_ULN.male, 130], treatment:[130,200], emergencyHigh:200, direction:'high', unit:'mcmol/L', label:'Креатинин' },
   EGFR:             { marker:'EGFR', normal:[90,200], borderline:[60,90], treatment:[30,60], emergencyLow:30, direction:'low', unit:'mL/min', label:'eGFR' },
   CYSTATIN_C:       { marker:'CYSTATIN_C', normal:[0,1.0], borderline:[1.0,1.3], treatment:[1.3,2], emergencyHigh:2, direction:'high', unit:'mg/L', label:'Цистатин C' },
   UREA:             { marker:'UREA', normal:[2.5,8], borderline:[8,12], treatment:[12,20], emergencyHigh:20, direction:'high', unit:'mmol/L', label:'Мочевина' },
@@ -64,9 +69,9 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   KIM1:             { marker:'KIM1', normal:[0,1.5], borderline:[1.5,3], treatment:[3,6], emergencyHigh:6, direction:'high', unit:'ng/mL', label:'KIM-1' },
 
   // ─── HEMATOLOGIC ───
-  HCT:              { marker:'HCT', normal:[35,50], borderline:[50,54], treatment:[54,58], emergencyHigh:60, direction:'high', unit:'%', label:'Гематокрит' },
-  HEMOGLOBIN:       { marker:'HEMOGLOBIN', normal:[120,175], borderline:[175,185], treatment:[185,200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
-  HGB:              { marker:'HGB', normal:[120,175], borderline:[175,185], treatment:[185,200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
+  HCT:              { marker:'HCT', normal:[36, HCT_THRESHOLDS.male.erythrocytosis], borderline:[HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block], treatment:[HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 6], emergencyHigh:HCT_THRESHOLDS.male.block + 6, direction:'high', unit:'%', label:'Гематокрит' },
+  HEMOGLOBIN:       { marker:'HEMOGLOBIN', normal:[120, HGB_THRESHOLDS.male.upper], borderline:[HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block], treatment:[HGB_THRESHOLDS.male.block, 200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
+  HGB:              { marker:'HGB', normal:[120, HGB_THRESHOLDS.male.upper], borderline:[HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block], treatment:[HGB_THRESHOLDS.male.block, 200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
   PLT:              { marker:'PLT', normal:[150,350], borderline:[350,450], treatment:[450,600], emergencyHigh:600, emergencyLow:100, direction:'both', unit:'10⁹/L', label:'Тромбоциты' },
   RBC:              { marker:'RBC', normal:[4,5.5], borderline:[5.5,6], treatment:[6,6.5], emergencyHigh:6.5, direction:'high', unit:'10¹²/L', label:'Эритроциты' },
   WBC:              { marker:'WBC', normal:[4,10], borderline:[10,12], treatment:[12,20], emergencyHigh:20, emergencyLow:3, direction:'both', unit:'10⁹/L', label:'Лейкоциты' },
@@ -132,13 +137,70 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   VITAMIN_B6:       { marker:'VITAMIN_B6', normal:[20,100], borderline:[10,20], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'B6' },
 };
 
+/**
+ * ♀ Ступени, которые у женщины считаются от её ВГН. `deriveTier` брал мужской
+ * ряд для всех: женщина с АЛТ 35 читала «норма» (её ВГН 31), с ГГТ 40 — «норма»
+ * (ВГН 31), с HCT 49 — «норма» (её эритроцитоз начинается с 48), с гемоглобином
+ * 160 — «норма» (её верх 150), с креатинином 100 — «норма» (её ВГН 97).
+ * Числа — из резолвера норм, не литералы. Крайняя ступень = ступень действия
+ * (`stopOral` для трансаминаз, `triple` для ГГТ, блок флеботомии + 6 п.п. для
+ * HCT, блок + 15 г/л для HGB).
+ */
+const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
+  ALT: {
+    normal: [0, LFT_ULN.ALT.female],
+    borderline: [LFT_ULN.ALT.female, LFT_STAGE_ULN.reduce.female],
+    treatment: [LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female],
+    emergencyHigh: LFT_STAGE_ULN.stopOral.female,
+  },
+  AST: {
+    normal: [0, LFT_ULN.AST.female],
+    borderline: [LFT_ULN.AST.female, LFT_STAGE_ULN.reduce.female],
+    treatment: [LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female],
+    emergencyHigh: LFT_STAGE_ULN.stopOral.female,
+  },
+  GGT: {
+    normal: [0, GGT_ULN.female],
+    borderline: [GGT_ULN.female, GGT_STAGE_ULN.double.female],
+    treatment: [GGT_STAGE_ULN.double.female, GGT_STAGE_ULN.triple.female],
+    emergencyHigh: GGT_STAGE_ULN.triple.female,
+  },
+  HCT: {
+    normal: [36, HCT_THRESHOLDS.female.erythrocytosis],
+    borderline: [HCT_THRESHOLDS.female.erythrocytosis, HCT_THRESHOLDS.female.block],
+    treatment: [HCT_THRESHOLDS.female.block, HCT_THRESHOLDS.female.block + 6],
+    emergencyHigh: HCT_THRESHOLDS.female.block + 6,
+  },
+  HGB: {
+    normal: [120, HGB_THRESHOLDS.female.upper],
+    borderline: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block],
+    treatment: [HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
+    emergencyHigh: HGB_THRESHOLDS.female.block + 15,
+  },
+  HEMOGLOBIN: {
+    normal: [120, HGB_THRESHOLDS.female.upper],
+    borderline: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block],
+    treatment: [HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
+    emergencyHigh: HGB_THRESHOLDS.female.block + 15,
+  },
+  CREATININE: {
+    normal: [44, CREATININE_ULN.female],
+    borderline: [CREATININE_ULN.female, 130],
+    treatment: [130, 200],
+    emergencyHigh: 200,
+  },
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 //  deriveTier — определение уровня по значению маркёра
 // ════════════════════════════════════════════════════════════════════════════
-export function deriveTier(marker: string, value: number): Tier {
+export function deriveTier(marker: string, value: number, sex?: 'male' | 'female'): Tier {
   const key = marker.toUpperCase().replace('-', '');
-  const t = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
-  if (!t) return 0;
+  const base = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
+  if (!base) return 0;
+  // ♀ — женский ряд той же шкалы (ВГН и ступени от неё); мужской ряд не меняем.
+  const override = sex === 'female' ? FEMALE_TIER_OVERRIDES[key] : undefined;
+  const t = override ? { ...base, ...override } : base;
   const b = t.borderline || [0,0];
   const tr = t.treatment || [0,0];
 

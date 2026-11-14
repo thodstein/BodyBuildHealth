@@ -3,7 +3,7 @@
 // Каталог маркеров повторяет таблицу T4 движка risk-engine-tz-spec (пороги m_i=1/2/3)
 // и якорные пороги clinicalFloorsForLabs — единый источник для UI-списка «Анализы».
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
-import { LFT_ULN, LFT_STAGE_ULN } from './lab-norms.engine';
+import { LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
 
@@ -108,7 +108,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('AST', 'АСТ', 'Ед/л', 'high', [LFT_ULN.AST.male, LFT_STAGE_ULN.reduce.male, LFT_STAGE_ULN.stopOral.male], { thresholds: [LFT_ULN.AST.female, LFT_STAGE_ULN.reduce.female, LFT_STAGE_ULN.stopOral.female] }),
       ] },
       { id: 'liv2', weight: 0.7, markers: [
-        M('GGT', 'ГГТ', 'Ед/л', 'high', [55, 110, 220], { thresholds: [32, 48, 96] }),
+        M('GGT', 'ГГТ', 'Ед/л', 'high', [GGT_ULN.male, GGT_STAGE_ULN.double.male, GGT_STAGE_ULN.triple.male], { thresholds: [GGT_ULN.female, GGT_STAGE_ULN.double.female, GGT_STAGE_ULN.triple.female] }),
         M('BIL', 'Билирубин общий', 'мкмоль/л', 'high', [21, 50, 100]),
         M('ALP', 'Щелочная фосфатаза', 'Ед/л', 'high', [150, 200, 300]),
       ] },

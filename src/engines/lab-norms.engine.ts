@@ -159,6 +159,33 @@ export const LFT_SIGNAL_ULN = {
 } as const;
 
 /**
+ * ГГТ (Ед/л): ВГН ♂ 55 / ♀ 31 и кратные ступени 2×/3× — та же шкала действий,
+ * что у трансаминаз. Раньше это число жило тремя способами: `risk-verification`
+ * держал ♂ `[55,110,220]` (1×/2×/4×ВГН) и ♀ `[32,48,96]` (1.03×/1.5×/3×),
+ * таблица тиров — `110/200`, а женский протокол считал от 31. Теперь одна пара
+ * ВГН и одна лестница: ♂ 55/110/165, ♀ 31/62/93.
+ */
+export const GGT_ULN = {
+  male: getLabNorm('GGT', 'male')?.uln ?? 55,
+  female: getLabNorm('GGT', 'female')?.uln ?? 31,
+} as const;
+
+export const GGT_STAGE_ULN = {
+  double: { male: GGT_ULN.male * LFT_STAGES.reduce, female: GGT_ULN.female * LFT_STAGES.reduce },
+  triple: { male: GGT_ULN.male * LFT_STAGES.stopOral, female: GGT_ULN.female * LFT_STAGES.stopOral },
+} as const;
+
+/**
+ * Креатинин (мкмоль/л): ВГН ♂ 110 / ♀ 97. В `risk-engine-tz-spec` мужская первая
+ * ступень стояла на 90 — ниже собственной ВГН, то есть мужчина с креатинином 95
+ * получал «почечный» балл при норме; женской ВГН 97 там же не было.
+ */
+export const CREATININE_ULN = {
+  male: getLabNorm('CREATININE', 'male')?.uln ?? 110,
+  female: FEMALE_LAB_BOUNDS.CREATININE?.uln ?? 97,
+} as const;
+
+/**
  * ♀ Клинические зоны гормонов, которых НЕТ в резолвере: TT/E2/PRL намеренно не
  * переопределяются в V7 (§6.2 — им нужна фазовая модель цикла). Числа взяты из
  * женского протокола (`supportProtocolWomenData`, блок «Лабы»), но живут здесь,

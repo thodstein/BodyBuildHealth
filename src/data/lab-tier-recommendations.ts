@@ -259,7 +259,7 @@ const TIER_RULES: TierRule[] = [
 // ════════════════════════════════════════════════════════════════════════════
 //  computeTierAdjustments — главная функция
 // ════════════════════════════════════════════════════════════════════════════
-export function computeTierAdjustments(labs: Record<string, number>): TierAdjustmentResult {
+export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male' | 'female'): TierAdjustmentResult {
   const addSubs: TierAddSub[] = [];
   const titrations: TierTitration[] = [];
   const nutrition: TierNutritionTip[] = [];
@@ -269,7 +269,7 @@ export function computeTierAdjustments(labs: Record<string, number>): TierAdjust
 
   for (const [marker, value] of Object.entries(labs)) {
     if (typeof value !== 'number' || isNaN(value)) continue;
-    const tier = deriveTier(marker, value);
+    const tier = deriveTier(marker, value, sex);
     if (tier === 0) continue;
 
     const rule = TIER_RULES.find(r => r.marker === marker.toUpperCase());

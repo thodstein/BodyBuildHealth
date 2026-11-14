@@ -3,7 +3,7 @@
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
-import { HCT_THRESHOLDS, LFT_STAGE_ULN } from './lab-norms.engine';
+import { HCT_THRESHOLDS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -429,21 +429,32 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
     }
     case'cv5': { // аритмогенный: K (low), HCT (high = hyperviscosity)
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
-      const hctMi = labMi(hct,fem?[46,50,54]:[50,54,58]);
+      // Ступени HCT — из `HCT_THRESHOLDS` (♂ 51/54, ♀ 48/52): раньше здесь жили
+      // литералы [50,54,58] / [46,50,54], на 1–2 п.п. ниже клинического порога.
+      // Третья ступень — порог флеботомии +4 п.п. (гипервязкость).
+      const hctCut = fem ? HCT_THRESHOLDS.female : HCT_THRESHOLDS.male;
+      const hctMi = labMi(hct,[hctCut.erythrocytosis, hctCut.block, hctCut.block + 4]);
       const vals = [kMi,hctMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     // ── Печень ──
-    case'liv1': { // гепатоцеллюлярная: ALT, AST (женский ULN 31: пороги 31/62/93)
-      const altMi = labMi(alt,fem?[31,62,93]:[40,80,200]);
-      const astMi = labMi(ast,fem?[31,62,93]:[40,80,200]);
+    case'liv1': { // гепатоцеллюлярная: ALT, AST — ВГН + ступени 2×/3× (`LFT_STAGE_ULN`)
+      // Мужская третья ступень была 200 (5×ВГН), женская — 93 (3×ВГН): у одного и
+      // того же симптома две шкалы (проход 57 свёл их в `LFT_STAGE_ULN`; здесь
+      // оставался литерал). Теперь у обоих полов 1×/2×/3× своей ВГН.
+      const lftSex = fem ? 'female' : 'male';
+      const altMi = labMi(alt,[LFT_ULN.ALT[lftSex], LFT_STAGE_ULN.reduce[lftSex], LFT_STAGE_ULN.stopOral[lftSex]]);
+      const astMi = labMi(ast,[LFT_ULN.AST[lftSex], LFT_STAGE_ULN.reduce[lftSex], LFT_STAGE_ULN.stopOral[lftSex]]);
       const vals = [altMi,astMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'liv2': { // холестаз: GGT, Bilirubin (женский ULN ГГТ 32)
-      const ggtMi = labMi(ggt,fem?[32,48,96]:[55,110,220]);
+    case'liv2': { // холестаз: GGT, Bilirubin — ВГН + 2×/3× (`GGT_STAGE_ULN`)
+      // Было ♂ [55,110,220] (1×/2×/4×ВГН) и ♀ [32,48,96] (1.03×/1.5×/3×) — одна
+      // «печёночная» шкала считалась двумя способами, женская ВГН — 32 вместо 31.
+      const ggtCut = fem ? GGT_ULN.female : GGT_ULN.male;
+      const ggtMi = labMi(ggt,[ggtCut, GGT_STAGE_ULN.double[fem ? 'female' : 'male'], GGT_STAGE_ULN.triple[fem ? 'female' : 'male']]);
       const bilMi = labMi(bil,[21,50,100]);
       const vals = [ggtMi,bilMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -460,9 +471,11 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     // ── Почки ──
-    case'ren1': { // гемодинамическое: eGFR, creatinine, urea, uric acid (женский креатинин ниже: 97/110/120)
+    case'ren1': { // гемодинамическое: eGFR, creatinine, urea, uric acid
+      // ВГН креатинина — из резолвера (♂ 110 / ♀ 97); мужская первая ступень
+      // стояла на 90 (ниже своей ВГН) — норма читалась как отклонение.
       const egfrMi = labMiInv(egfr,[90,60,30]);
-      const crMi = labMi(creat,fem?[97,110,120]:[90,130,200]);
+      const crMi = labMi(creat,fem?[CREATININE_ULN.female, 110, 120]:[CREATININE_ULN.male, 130, 200]);
       const ureaMi = labMi(urea,[8,12,20]);
       const uricMi = labMi(uric,[420,480,540]);
       const vals = [egfrMi,crMi,ureaMi,uricMi].filter(v=>v!==undefined) as number[];

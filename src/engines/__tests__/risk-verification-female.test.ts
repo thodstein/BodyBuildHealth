@@ -32,9 +32,11 @@ describe('женские пороги маркеров (паритет с getMiF
     const alt = findMarker('hepatic', 'liv1', 'ALT');
     expect(markerStatus(alt, 70, 'male')).toBe(1);
     expect(markerStatus(alt, 70, 'female')).toBe(2);
+    // ГГТ идёт по той же лестнице 1×/2×/3×ВГН (♂ 55/110/165, ♀ 31/62/93), без
+    // отдельной женской 1.5×-ступени: 70 < 110 → у мужчины грань, ≥ 62 → у женщины m2.
     const ggt = findMarker('hepatic', 'liv2', 'GGT');
-    expect(markerStatus(ggt, 60, 'male')).toBe(1);
-    expect(markerStatus(ggt, 60, 'female')).toBe(2);
+    expect(markerStatus(ggt, 70, 'male')).toBe(1);
+    expect(markerStatus(ggt, 70, 'female')).toBe(2);
   });
 
   it('Креатинин: 125 мкмоль/л → муж m1 / жен m3', () => {
