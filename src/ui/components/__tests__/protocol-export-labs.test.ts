@@ -1,5 +1,7 @@
 /**
- * protocol-export-labs.test.ts — печать берёт персональный график, а не статику.
+ * protocol-export-labs.test.ts — печать берёт карточки фаз K0–K10 (единый перечень),
+ * а не график фазы: в PDF анализа не должно быть дважды (аудит «Мониторинг =
+ * врачебный протокол = K0–K10», проходы 54–56).
  */
 import { describe, it, expect } from 'vitest';
 import { buildExportDataFromRec } from '../ProtocolExport';
@@ -10,6 +12,7 @@ const course = { drugs: ['test_enan'], peds: ['test_enan'], weeks: 12, phase: 'c
 function recWith(schedule: any[], phase = 'course'): any {
   return {
     subs: [],
+    pedFlags: { hasAAS: true },
     phase,
     monitoringSchedule: schedule,
     monitoringPlan: 'line1\nline2',
@@ -17,23 +20,33 @@ function recWith(schedule: any[], phase = 'course'): any {
   };
 }
 
-describe('buildExportDataFromRec — labSchedule из движка', () => {
-  it('персональные пункты (Hcy, преаналитика) попадают в печать', () => {
+const markerText = (data: any) => data.labSchedule.map((l: any) => l.marker).join(' | ');
+
+describe('buildExportDataFromRec — labSchedule = карточки фаз (один перечень)', () => {
+  it('печать берёт K0–K10 и не дублирует график фазы', () => {
     const data = buildExportDataFromRec(recWith([
-      { id: 'baseline', label: 'До курса', period: '0 нед', items: [{ marker: 'Гомоцистеин + B12', reason: 'r', target: 'Hcy<10', escalation: 'Hcy>15 — врач' }] },
-      { id: 'preanalytics', label: 'Преаналитика', period: 'всегда', items: [{ marker: 'Биотин-стоп', reason: 'r' }] },
+      { id: 'baseline', label: 'До курса (исходно)', period: '0 нед', items: [{ marker: 'ОАК с СОЭ', reason: 'r', target: 'HCT<50%' }] },
     ]), patient, course);
     const all = JSON.stringify(data.labSchedule);
-    expect(all).toContain('Гомоцистеин');
-    expect(all).toContain('[До курса]');
-    expect(all).toContain('Биотин-стоп');
-    expect(data.labSchedule[0].criticalThreshold).toBe('Hcy>15 — врач');
+    expect(all).toContain('K0 · ');          // карточка фазы
+    expect(all).toContain('Гомоцистеин');    // персональный пункт карточки
+    expect(all).toContain('Биотин-стоп');    // K9 (преаналитика)
+    expect(all).not.toContain('[До курса');  // второй перечень из графика не печатается
   });
-  it('без графика — честный статический fallback (14 строк)', () => {
+
+  it('состав карточек зависит от фазы: PCT → K6, курс → K1', () => {
+    const pct = buildExportDataFromRec(recWith([], 'pct'), patient, course);
+    expect(markerText(pct)).toContain('K6 · ');
+    expect(markerText(pct)).not.toContain('K1 · ');
+    const on = buildExportDataFromRec(recWith([], 'course'), patient, course);
+    expect(markerText(on)).toContain('K1 · ');
+  });
+
+  it('аддоны класса печатаются строкой 💊 (не теряются при отказе от графика)', () => {
     const data = buildExportDataFromRec(recWith([]), patient, course);
-    expect(data.labSchedule).toHaveLength(14);
-    expect(data.labSchedule.some(l => l.marker === 'АЛТ')).toBe(true);
+    expect(markerText(data)).toContain('💊 ');
   });
+
   it('дельта-правила — только на курсе/мосту/TRT, не в PCT', () => {
     const on = buildExportDataFromRec(recWith([], 'course'), patient, course);
     expect(on.protocol.clinicalNotes.join(' ')).toContain('Дельта-правила');
@@ -74,26 +87,30 @@ describe('buildExportDataFromRec — доза и МНН из плана, а не
 });
 
 describe('buildExportDataFromRec — пороги по полу', () => {
-  const byMarker = (data: any, marker: string) => data.labSchedule.find((l: any) => l.marker === marker);
-
-  it('♀ fallback: HCT 48/52, АЛТ 31/78, креатинин 97, без ПСА', () => {
+  it('♀: E2 «по фазе цикла», женские пометки карточек в примечаниях, стоп HCT 52 / АЛТ 78', () => {
     const fem = buildExportDataFromRec(recWith([]), { ...patient, sex: 'female' }, course);
-    expect(byMarker(fem, 'Гематокрит').target).toBe('<48%');
-    expect(byMarker(fem, 'Гематокрит').criticalThreshold).toContain('>52%');
-    expect(byMarker(fem, 'АЛТ').target).toBe('<31 Ед/л');
-    expect(byMarker(fem, 'АЛТ').criticalThreshold).toContain('>78');
-    expect(byMarker(fem, 'Креатинин').target).toBe('<97 мкмоль/л');
-    expect(byMarker(fem, 'ПСА')).toBeUndefined();
-    expect(fem.protocol.stopCriteria.join(' ')).toContain('>52%');
+    const all = JSON.stringify(fem.labSchedule);
+    expect(all).toContain('по фазе цикла (20–200 без ИА)');
+    expect(all).not.toContain('20–40 пг/мл');
     expect(fem.protocol.clinicalNotes.join(' ')).toContain('♀');
+    expect(fem.protocol.stopCriteria.join(' ')).toContain('>52%');
+    expect(fem.protocol.stopCriteria.join(' ')).toContain('>78');
   });
 
-  it('♂ (и legacy sex=m) — мужской путь байт-в-байт: HCT 54, АЛТ 200, ПСА есть', () => {
+  it('♂ (и legacy sex=m): мужская цель E2 из карточек, без ♀-пометок, стоп HCT 54 / АЛТ 200', () => {
     const male = buildExportDataFromRec(recWith([]), patient, course);
-    expect(byMarker(male, 'Гематокрит').criticalThreshold).toBe('>54% (флеботомия)');
-    expect(byMarker(male, 'АЛТ').criticalThreshold).toBe('>200 (стоп курс)');
-    expect(byMarker(male, 'ПСА')).toBeDefined();
+    const all = JSON.stringify(male.labSchedule);
+    expect(all).toContain('20–40 пг/мл');
+    expect(all).not.toContain('по фазе цикла');
     expect(male.protocol.stopCriteria.join(' ')).toContain('>54%');
+    expect(male.protocol.stopCriteria.join(' ')).toContain('>200');
     expect(male.protocol.clinicalNotes.join(' ')).not.toContain('♀');
+  });
+
+  it('карточки печатают оба пола в целях (мужской порог не выдаётся за общий)', () => {
+    const male = buildExportDataFromRec(recWith([]), patient, course);
+    const all = JSON.stringify(male.labSchedule);
+    expect(all).toContain('♀ <48%');
+    expect(all).toContain('♀ <31');
   });
 });

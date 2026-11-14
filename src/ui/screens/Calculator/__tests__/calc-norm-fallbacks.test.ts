@@ -8,13 +8,13 @@
  * то есть «Холестаз» включался на 20.9 — уже при отклонении.
  *
  * Гард читает исходники (не рендер): каждое запасное число обязано совпадать с
- * ULN канона в `UCUM_MAP`, а женские запасные ветки PDF — с `getLabNorm`.
+ * ULN канона в `UCUM_MAP`, а PDF не держит своей таблицы порогов — он печатает
+ * карточки фаз и стоп-пороги из единой шкалы (проход 56).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UCUM_MAP } from '../../../../core/constants';
-import { getLabNorm } from '../../../../engines/lab-norms.engine';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
@@ -36,21 +36,19 @@ describe('Calc.mapper: запасные ULN совпадают с UCUM_MAP', () 
   });
 });
 
-describe('ProtocolExport: женские запасные пороги совпадают с резолвером', () => {
-  it('getLabNorm(code, sex)?.uln ?? N — N равно резолверу', () => {
+describe('ProtocolExport: пороги — из резолвера и карточек, не литералами', () => {
+  it('собственной таблицы лабораторных порогов больше нет (fallback удалён)', () => {
     const src = read('src/ui/components/ProtocolExport.tsx');
-    const re = /getLabNorm\('([A-Z_]+)',\s*sex\)\?\.uln\s*\?\?\s*\(isFemale\s*\?\s*([\d.]+)\s*:\s*([\d.]+)\)/g;
-    const bad: string[] = [];
-    let count = 0;
-    for (const m of src.matchAll(re)) {
-      count++;
-      const [, code, femFallback, maleFallback] = m;
-      const female = getLabNorm(code, 'female')?.uln;
-      const male = getLabNorm(code, 'male')?.uln;
-      if (female !== Number(femFallback)) bad.push(`${code} ♀: запасное ${femFallback}, резолвер ${female}`);
-      if (male !== Number(maleFallback)) bad.push(`${code} ♂: запасное ${maleFallback}, резолвер ${male}`);
-    }
-    expect(count).toBeGreaterThan(0);
-    expect(bad).toEqual([]);
+    expect(src).not.toContain('FALLBACK_LAB_SCHEDULE');
+    expect(src).not.toContain("getLabNorm('");
+    // Единственный перечень анализов — карточки фаз.
+    expect(src).toContain('phaseCardsFor(');
+  });
+
+  it('стоп-пороги — из единой шкалы (HCT по полу, женская АЛТ 2.5×ULN)', () => {
+    const src = read('src/ui/components/ProtocolExport.tsx');
+    expect(src).toContain('HCT_THRESHOLDS.female.block');
+    expect(src).toContain('HCT_THRESHOLDS.male.block');
+    expect(src).toContain('FEMALE_ALT_2_5_ULN');
   });
 });

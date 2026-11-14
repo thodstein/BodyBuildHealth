@@ -7,8 +7,9 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-catalog-data';
 import {
-  getLabNorm, HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
+  HCT_THRESHOLDS, FEMALE_ALT_2_5_ULN, FEMALE_LABS_NOTE,
 } from '../../engines/lab-norms.engine';
+import { phaseCardsFor, addonsFor, isInjectableCourse } from '../../engines/support-phase-labs.engine';
 
 /**
  * Назначение из карточки плана. Доза уже посчитана движком (`resolvePlanDose`),
@@ -221,51 +222,49 @@ export function buildExportDataFromRec(
     };
   });
 
-  // Пороги — из единого резолвера норм (UCUM_MAP / женский слой), не литералами.
-  const sex = isFemale ? 'female' : 'male';
-  const hctUln = Math.round(getLabNorm('HCT', sex)?.uln ?? (isFemale ? 48 : 52));
-  const altUln = Math.round(getLabNorm('ALT', sex)?.uln ?? (isFemale ? 31 : 40));
-  const astUln = Math.round(getLabNorm('AST', sex)?.uln ?? (isFemale ? 31 : 40));
-  const ggtUln = Math.round(getLabNorm('GGT', sex)?.uln ?? (isFemale ? 31 : 55));
-  const creaUln = Math.round(getLabNorm('CREATININE', sex)?.uln ?? (isFemale ? 97 : 110));
   // Стоп-пороги: HCT — из единой шкалы (`HCT_THRESHOLDS`: ♂ 54, ♀ 52),
   // АЛТ — 2.5× женской ULN у женщин и 200 Ед/л у мужчин (как в стоп-таблицах).
   const hctStop = isFemale ? HCT_THRESHOLDS.female.block : HCT_THRESHOLDS.male.block;
   const altStop = isFemale ? `${FEMALE_ALT_2_5_ULN}` : '200';
 
-  const FALLBACK_LAB_SCHEDULE: ExportLabSchedule[] = [
-    { marker: 'АЛТ', frequency: 'Каждые 4 нед', target: `<${altUln} Ед/л`, criticalThreshold: `>${altStop} (стоп курс)` },
-    { marker: 'АСТ', frequency: 'Каждые 4 нед', target: `<${astUln} Ед/л`, criticalThreshold: `>${altStop} (стоп курс)` },
-    { marker: 'ГГТ', frequency: 'Каждые 4 нед', target: `<${ggtUln} Ед/л` },
-    { marker: 'Билирубин', frequency: 'Каждые 4 нед', target: '<21 мкмоль/л' },
-    { marker: 'ЛПНП', frequency: 'Каждые 6 нед', target: '<3.0 ммоль/л' },
-    { marker: 'ЛПВП', frequency: 'Каждые 6 нед', target: '>1.0 ммоль/л' },
-    { marker: 'ТГ', frequency: 'Каждые 6 нед', target: '<1.7 ммоль/л' },
-    { marker: 'Гематокрит', frequency: 'Каждые 4 нед', target: `<${hctUln}%`, criticalThreshold: `>${hctStop}% (флеботомия)` },
-    isFemale
-      // Без фазовой модели цикла не подставляем мужскую цель 20-40 пг/мл.
-      ? { marker: 'Эстрадиол (E2)', frequency: 'Каждые 4 нед', target: 'по фазе цикла (20–200 без ИА)', criticalThreshold: '<20 на ИА или >400 вне овуляции' }
-      : { marker: 'Эстрадиол (E2)', frequency: 'Каждые 4 нед', target: '20-40 пг/мл', criticalThreshold: '<15 или >80' },
-    { marker: 'Пролактин', frequency: 'Каждые 6 нед', target: '<15 нг/мл' },
-    { marker: 'Креатинин', frequency: 'Каждые 4 нед', target: `<${creaUln} мкмоль/л` },
-    { marker: 'eGFR', frequency: 'Каждые 4 нед', target: '>90 мл/мин' },
-    { marker: 'Глюкоза', frequency: 'Каждые 6 нед', target: '3.9-5.5 ммоль/л' },
-    ...(isFemale ? [] : [{ marker: 'ПСА', frequency: 'Каждые 12 нед (40+ лет)', target: '<4.0 нг/мл' }]),
-  ];
-
-  // Персональный график из движка (фаза + классы + поддержка); fallback — статика выше.
-  const schedSections = (rec.monitoringSchedule || []) as Array<{
-    id: string; label: string; period: string;
-    items: Array<{ marker: string; reason: string; target?: string; escalation?: string }>;
-  }>;
-  const labSchedule: ExportLabSchedule[] = schedSections.length > 0
-    ? schedSections.flatMap(sec => sec.items.map(it => ({
-      marker: `[${sec.label}] ${it.marker}`,
-      frequency: sec.period,
-      target: it.target || '—',
-      criticalThreshold: it.escalation || undefined,
-    })))
-    : FALLBACK_LAB_SCHEDULE;
+  // Единый перечень анализов — карточки фаз K0–K10 (как в UI и в текстовых
+  // экспортах). График фазы (`monitoringSchedule`) больше не печатается: он
+  // перечислял те же маркеры второй раз, с бедными целями.
+  const cards = phaseCardsFor(
+    (rec as any).pedFlags || null,
+    ((rec as any).phase || 'course') as any,
+    {
+      injectable: isInjectableCourse(
+        (course.peds || []).map(id => ({ id })),
+        (rec as any).pedFlags || null,
+      ),
+    },
+  );
+  const cardRows: ExportLabSchedule[] = cards.flatMap(c => c.groups.flatMap(g =>
+    g.items.map(m => ({
+      marker: `${c.id} · ${m.marker}`,
+      frequency: `${c.title} — ${c.when}`,
+      target: m.target || '—',
+      criticalThreshold: m.red || undefined,
+    })),
+  ));
+  // ♀ E2 нельзя мерить мужской целью 20–40 пг/мл: без фазовой модели цикла
+  // подставляем «по фазе» (женский слой §6), иначе врач читает чужой таргет.
+  const sexAdjustedRows: ExportLabSchedule[] = isFemale
+    ? cardRows.map(r => (/E2|Эстрадиол/i.test(r.marker)
+      ? { ...r, target: 'по фазе цикла (20–200 без ИА)', criticalThreshold: '<20 на ИА или >400 вне овуляции' }
+      : r))
+    : cardRows;
+  const addonRows: ExportLabSchedule[] = addonsFor([
+    ...(course.peds || []),
+    ...(rec.subs || []).map((s: any) => s?.substanceId),
+  ]).map(a => ({
+    marker: `💊 ${a.label}: ${a.items.map(i => i.marker).join('; ')}`,
+    frequency: `аддон к ${a.attachTo.join(', ')}`,
+    target: a.items.map(i => i.target).filter(Boolean).join('; ') || '—',
+    criticalThreshold: a.items.map(i => i.red).filter(Boolean).join('; ') || undefined,
+  }));
+  const labSchedule: ExportLabSchedule[] = [...sexAdjustedRows, ...addonRows];
 
   const stopCriteria = [
     `АЛТ/АСТ >${altStop} Ед/л — немедленная отмена ААС, повторить анализ через 7 дней`,
@@ -299,6 +298,10 @@ export function buildExportDataFromRec(
     'Все дозировки указаны для стартового протокола. Корректировать по лабораторным показателям каждые 4 нед.',
     'Препараты с пометкой 💊 — рецептурные. Требуют назначения врача.',
     isFemale ? FEMALE_LABS_NOTE : '',
+    // ♀ пометки карточек фаз — те же, что в UI (иначе женские пороги теряются в печати).
+    isFemale
+      ? Array.from(new Set(cards.map(c => c.femaleNote).filter(Boolean) as string[])).join(' ')
+      : '',
     rec.monitoringPlan ? `График мониторинга: ${rec.monitoringPlan.split('\n')[0]}` : '',
     rec.protocolWarnings?.length ? `Предупреждения: ${rec.protocolWarnings.join('; ')}` : '',
     ['course', 'bridge', 'trt'].includes(rec.phase) ? 'Дельта-правила (нужен baseline K0): HCT Δ+5 п.п. → флеботомия; АЛТ >2× своего baseline; HDL −40%; E2 −30% от steady-state → AI избыточен.' : '',
