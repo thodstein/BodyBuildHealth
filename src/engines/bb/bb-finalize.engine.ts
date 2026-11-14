@@ -4857,10 +4857,13 @@ export function enforceFinalEffectiveMrv(plan: BBPlan): void {
   if (!caps) return;
   for (const week of plan.weeks) {
     if ((week as any).phase === 'deload' || (week as any).deload) continue;
-    const volume = aggregateBBVolume(week.sessions);
     for (const muscle of Object.keys(caps)) {
       const cap = caps[muscle];
       if (!cap) continue;
+      // Пересчёт на каждую мышцу: удаление упражнения для предыдущей мышцы
+      // могло снять и его indirect-вклад в следующую — иначе режем по устаревшему
+      // effective и уходим ниже цели.
+      const volume = aggregateBBVolume(week.sessions);
       const eff = volume[muscle]?.effectiveSets || 0;
       if (eff <= cap * BB_MRV_TOLERANCE + 1e-6) continue;
       let indirect = 0;
