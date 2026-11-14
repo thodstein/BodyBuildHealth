@@ -623,10 +623,10 @@ export const FEMALE_FERTILITY_PLAN: Array<{ when: string; action: string }> = [
 // ── 8.2 Психические эффекты: диагностика и тактика ──
 
 export const FEMALE_PSYCHE_EFFECTS: Array<{ problem: string; trigger: string; action: string }> = [
-  { problem:'Тревожность', trigger:'Тренболон, высокие дозы станозолола', action:'Отмена; L-теанин 200 мг, магний 400 мг' },
+  { problem:'Тревожность', trigger:'Тренболон, высокие дозы станозолола', action:'Отмена; L-теанин 200 мг, магний 350 мг (UL)' },
   { problem:'Агрессия', trigger:'Тренболон, высокий тестостерон', action:'Отмена; родиола 400 мг, ашваганда 600 мг' },
   { problem:'Депрессия (после отмены)', trigger:'Падение E2 в пост-цикле', action:'Витекс 40 мг, ДГЭА (только врач), время; психиатр при затяжной' },
-  { problem:'Бессонница', trigger:'Тренболон, высокие дозы GH', action:'Мелатонин 1–5 мг, магний 400 мг' },
+  { problem:'Бессонница', trigger:'Тренболон, высокие дозы GH', action:'Мелатонин 1–5 мг, магний 350 мг (UL)' },
   { problem:'Дисморфия', trigger:'Все препараты (искажение образа тела)', action:'Психолог; реалистичные цели — не «догонять» дозой' },
   { problem:'Компульсии', trigger:'GH (голод), тренболон (психика)', action:'Снижение дозы; обсудить с врачом' },
   { problem:'Панические атаки', trigger:'Тренболон', action:'НЕМЕДЛЕННАЯ отмена + психиатр' },
@@ -635,7 +635,7 @@ export const FEMALE_PSYCHE_EFFECTS: Array<{ problem: string; trigger: string; ac
 // ── 9. Экстренные ситуации ──
 
 export const FEMALE_EMERGENCY_CRITICAL: Array<{ situation: string; action: string }> = [
-  { situation:'Гематокрит >55%', action:'Флеботомия 500 мл + отмена — тромбоз' },
+  { situation:'Гематокрит >52% (♀ порог; ♂ >54%)', action:'Флеботомия 500 мл + отмена — тромбоз' },
   { situation:'АЛТ >500 или >1000 Ед/л', action:'Отмена оралов/всего + гепатолог' },
   { situation:'Острая депрессия / суицид. мысли', action:'Отмена + психиатр немедленно' },
   { situation:'Желтуха', action:'Отмена + гепатолог (холестаз/некроз)' },
@@ -647,7 +647,7 @@ export const FEMALE_EMERGENCY_CRITICAL: Array<{ situation: string; action: strin
 ];
 
 export const FEMALE_EMERGENCY_URGENT: Array<{ situation: string; action: string }> = [
-  { situation:'Гематокрит 52–55%', action:'Флеботомия + снижение дозы в 24 ч' },
+  { situation:'Гематокрит 48–52%', action:'Флеботомия + снижение дозы в 24 ч' },
   { situation:'АЛТ 200–500 Ед/л', action:'Снижение/отмена оралов + support, 24–48 ч' },
   { situation:'Глюкоза <3.0 ммоль/л', action:'Сахар + снижение инсулина немедленно' },
   { situation:'Пролактин >1500', action:'Каберголин + отмена нандролона, 24–48 ч' },

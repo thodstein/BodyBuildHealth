@@ -526,7 +526,7 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
 
   // ─── ГЕМАТОЛОГИЯ: эритроциты/ретикулоциты ───
   { marker: 'RBC', entries: [
-    { substanceId: 'aspirin', priority: 1, brandName: 'Аспирин 100 мг', reason: 'Антиагрегант при эритроцитозе (HCT>50%)', minSeverity: 'moderate' },
+    { substanceId: 'aspirin', priority: 1, brandName: 'Аспирин 100 мг', reason: 'Антиагрегант при эритроцитозе (HCT >51%, ♀ >48%)', minSeverity: 'moderate' },
     { substanceId: 'omega3', priority: 2, brandName: 'Омега-3 3-4 г', reason: 'Мембранная текучесть эритроцитов', minSeverity: 'moderate' },
     { substanceId: 'naringin', priority: 3, brandName: 'Нарингин 500 мг', reason: ' ↓ гематокрита (↑ фибринолиз)', minSeverity: 'moderate' },
     { substanceId: 'quercetin', priority: 4, brandName: 'Кверцетин 500 мг', reason: ' ↓ вязкости крови через ↑ эластичность RBC', minSeverity: 'severe' },

@@ -377,7 +377,7 @@ export const RISKS_DB: Risk[] = [
   { id: "ENDO_CORTISOL", name: "Дисбаланс кортизола", system: "endocrine", organs: ["Надпочечники"], symptoms: ["Утомляемость", "Мышечная слабость", "Отёки"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение или подавление кортизола на фоне ААС" },
 
   // === КРОВЕТВОРНАЯ СИСТЕМА (hematologic) ===
-  { id: "HEMA_POLYCYTHEMIA", name: "Полицитемия", system: "hematologic", organs: ["Костный мозг"], symptoms: ["Покраснение лица", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение гематокрита >54% на фоне ААС" },
+  { id: "HEMA_POLYCYTHEMIA", name: "Полицитемия", system: "hematologic", organs: ["Костный мозг"], symptoms: ["Покраснение лица", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение гематокрита >54% (♀ >52%) на фоне ААС" },
   { id: "HEMA_THROMBOSIS_RISK", name: "Риск тромбоза", system: "hematologic", organs: ["Сосуды"], symptoms: ["Боль в ноге", "Отёк", "Одышка"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Гиперкоагуляция и полицитемия → тромбоз глубоких вен, ТЭЛА" },
   { id: "HEMA_ANEMIA", name: "Анемия", system: "hematologic", organs: ["Костный мозг"], symptoms: ["Бледность", "Утомляемость", "Одышка при нагрузке"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Снижение гемоглобина и эритроцитов" },
   { id: "HEMA_HIGH_LDL", name: "Дислипидемия", system: "hematologic", organs: ["Печень", "Сосуды"], symptoms: ["Бессимптомно", "Атеросклероз (длительно)"], levels: ["LOW", "MEDIUM", "HIGH"], description: "ЛПНП ↑ ЛПВП ↓ на фоне ААС — основной фактор атеросклероза" },
@@ -415,7 +415,7 @@ export const RISKS_DB: Risk[] = [
   { id: "NEUROTOX_PERIPHERAL", name: "Периферическая нейропатия", system: "neuro_toxicity", organs: ["Периферические нервы"], symptoms: ["Парестезии", "Онемение", "Боль", "Мышечная слабость"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повреждение периферических нервов токсичными метаболитами" },
 
   // === КРОВЬ (blood) ===
-  { id: "BLOOD_POLYCYTHEMIA", name: "Эритроцитоз", system: "blood", organs: ["Костный мозг"], symptoms: ["Покраснение кожи", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Стимуляция эритропоэза ААС → HCT >54%" },
+  { id: "BLOOD_POLYCYTHEMIA", name: "Эритроцитоз", system: "blood", organs: ["Костный мозг"], symptoms: ["Покраснение кожи", "Головная боль", "Затуманивание зрения"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Стимуляция эритропоэза ААС → HCT >54% (♀ >52%)" },
   { id: "BLOOD_COAGULATION", name: "Гиперкоагуляция", system: "blood", organs: ["Плазма"], symptoms: ["Тромбоз", "ТЭЛА (редко)", "D-димер ↑"], levels: ["LOW", "MEDIUM", "HIGH"], description: "Повышение свёртываемости крови на фоне ААС" },
 
   // === СОСУДЫ (vessels) ===

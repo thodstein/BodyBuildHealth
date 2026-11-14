@@ -11,8 +11,14 @@
  * сверяет с `NUTRIENT_LIMITS_V2`.
  */
 import { describe, it, expect } from 'vitest';
-import { FEMALE_SUPPORT_PROTOCOLS } from '../supportProtocolWomenData';
+import {
+  FEMALE_SUPPORT_PROTOCOLS,
+  FEMALE_PSYCHE_EFFECTS,
+  FEMALE_EMERGENCY_CRITICAL,
+  FEMALE_EMERGENCY_URGENT,
+} from '../supportProtocolWomenData';
 import { NUTRIENT_LIMITS_V2 } from '../../../../engines/support-limits';
+import { HCT_THRESHOLDS } from '../../../../engines/lab-norms.engine';
 import { CROSS_CAPS } from '../supportProtocolsShared';
 
 const ROWS = FEMALE_SUPPORT_PROTOCOLS.flatMap((p) =>
@@ -114,6 +120,35 @@ describe('женские протоколы: медь, потолок B6, пот
       const mg = me * 0.67; // 1 МЕ = 0.67 мг d-α-токоферола
       expect(mg, `${r.protocol}: ${r.dose}`).toBeLessThanOrEqual(ul);
       expect(`${r.dose} ${r.note}`, r.protocol).toMatch(/UL|мг/);
+    }
+  });
+});
+
+// ── Проход 45: экстренная лестница HCT и «магний» вне таблиц доз ──
+describe('женский протокол: HCT-лестница и магний в тактике', () => {
+  it('экстренный HCT стоит на женской шкале 48/52, а не на 55', () => {
+    const f = HCT_THRESHOLDS.female;
+    const nums = (s: string) => (s.match(/\d+/g) ?? []).map(Number);
+    const urgent = FEMALE_EMERGENCY_URGENT.find(r => /гематокрит/i.test(r.situation))!;
+    const critical = FEMALE_EMERGENCY_CRITICAL.find(r => /гематокрит/i.test(r.situation))!;
+    expect(urgent, 'нет строки «Гематокрит» в URGENT').toBeTruthy();
+    expect(critical, 'нет строки «Гематокрит» в CRITICAL').toBeTruthy();
+    // URGENT — полоса [эритроцитоз; порог флеботомии], CRITICAL — порог флеботомии + мужской.
+    expect(nums(urgent.situation)).toEqual([f.erythrocytosis, f.block]);
+    expect(nums(critical.situation)).toContain(f.block);
+    expect(nums(critical.situation)).toContain(HCT_THRESHOLDS.male.block);
+    expect(nums(critical.situation)).not.toContain(55);
+  });
+
+  it('магний в тактике (тревожность/бессонница) ≤ UL 350 мг', () => {
+    const ul = NUTRIENT_LIMITS_V2.magnesium.value;
+    const withMg = FEMALE_PSYCHE_EFFECTS.filter(r => /магний/i.test(r.action));
+    expect(withMg.length).toBeGreaterThan(0);
+    for (const r of withMg) {
+      const m = r.action.match(new RegExp(`магний[^\\d]{0,12}(\\d+(?:[.,]\\d+)?)\\s*мг`, 'i'));
+      if (!m) continue;
+      const mg = parseFloat(m[1].replace(',', '.'));
+      expect(mg, `${r.problem}: ${r.action}`).toBeLessThanOrEqual(ul);
     }
   });
 });

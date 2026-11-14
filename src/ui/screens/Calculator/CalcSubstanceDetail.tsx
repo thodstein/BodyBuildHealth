@@ -13,6 +13,7 @@ import { getTitrationProtocol } from '../../../data/titration-protocols';
 import { isCuratedSupport, isSupportSubstanceId } from '../../../data/support-db/mech-map';
 import type { RecommendedSub } from '../../../engines/tz-mapper-engine';
 import { GLASS } from './Calc.types';
+import { substanceLimitView } from './Calc.substanceUl';
 
 interface Props {
   sub: RecommendedSub;
@@ -21,13 +22,19 @@ interface Props {
   subDosage: (id: string) => { mg: number; timing: string } | null;
   /** Доза плана (вес + UL) — та же, что в карточке; если не передана, берётся типовая. */
   planDose?: (id: string) => number;
+  /**
+   * Доза уже в ЭЛЕМЕНТАРНОМ выражении (плановая шкала `resolvePlanDose`).
+   * Тогда масса соли к ней НЕ применяется — иначе 200 мг магния показывались
+   * бы как «≈28 мг элементарного», а предел UL сравнивался бы с заниженной дозой.
+   */
+  doseIsElemental?: boolean;
   subTier: (id: string) => string;
   titrationFactors?: Map<string, number>;
   canonIdLocal: (id: string) => string;
 }
 
 export const CalcSubstanceDetail: React.FC<Props> = ({
-  sub, subNameRu, subDosage, planDose, subTier, titrationFactors, canonIdLocal,
+  sub, subNameRu, subDosage, planDose, doseIsElemental, subTier, titrationFactors, canonIdLocal,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -60,9 +67,33 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
   // Минералы каталога хранят МАССУ СОЛИ («магний цитрат 400 мг»), а UL-проверка и
   // текст рекомендации — элементарное вещество. Показываем пересчёт рядом с дозой,
   // иначе «400 мг» читаются как 400 мг элементарного магния (в 6 раз больше).
+  // ⚠️ Доза плана (`doseIsElemental`) этим свойством уже НЕ обладает: она в
+  // элементарной шкале (потолки `resolvePlanDose` = UL реестра), и повторное
+  // умножение на долю соли занижало её (200 мг Mg → «≈28 мг элементарного»).
   const saltFactor = catalogEntry ? resolveElementalFactor(id, catalogEntry) : undefined;
-  const elementalDose = catalogEntry && doseMg !== null ? elementalMgOf(id, catalogEntry, doseMg) : 0;
-  const showElemental = saltFactor !== undefined && elementalDose > 0;
+  const elementalDose = catalogEntry && doseMg !== null
+    ? (doseIsElemental ? doseMg : elementalMgOf(id, catalogEntry, doseMg))
+    : 0;
+  const showElemental = saltFactor !== undefined && elementalDose > 0 && !doseIsElemental;
+  // Доза для сравнения с пределом — тоже элементарная: у плана она такая изначально,
+  // у каталога — уже пересчитанная выше (масса соли → минерал).
+  const limitDose = doseMg === null
+    ? null
+    : (doseIsElemental || saltFactor === undefined ? doseMg : elementalDose);
+  const limit = substanceLimitView(id, limitDose);
+  // Доза плана у минералов — уже элементарная, но на экране рядом стоит
+  // «200 мг», которое легко прочитать как массу соли: говорим это в tooltip.
+  const limitTitle = limit && doseIsElemental && saltFactor !== undefined
+    ? `${limit.title} Доза плана приведена к элементарному веществу, а не к массе соли.`
+    : limit?.title;
+  // Цвет плашки: превышение UL — янтарный, Safe Level — голубой («не порог
+  // токсичности»), клинический ориентир — фиолетовый; в норме — нейтрально-серый.
+  const limitAccent = limit?.over
+    ? (limit.kind === 'SafeLevel' ? '#38bdf8' : limit.kind === 'ClinicalGuidance' ? '#c4b5fd' : '#f59e0b')
+    : 'rgba(255,255,255,0.55)';
+  const limitBg = limit?.over
+    ? (limit.kind === 'SafeLevel' ? 'rgba(56,189,248,0.12)' : limit.kind === 'ClinicalGuidance' ? 'rgba(168,85,247,0.12)' : 'rgba(245,158,11,0.12)')
+    : 'rgba(255,255,255,0.05)';
 
   return (
     <div className="calc-substdetail" style={{ ...GLASS, padding: 0, marginBottom: 3, fontSize: 8, lineHeight: 1.5, borderLeft: '2px solid rgba(99,102,241,0.3)', overflow: 'hidden' }}>
@@ -88,6 +119,16 @@ export const CalcSubstanceDetail: React.FC<Props> = ({
         )}
         {dose && (
           <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>· {dose.timing}</span>
+        )}
+        {limit && (
+          <span
+            title={limitTitle}
+            data-substance-limit={limit.kind}
+            data-over={limit.over ? '1' : '0'}
+            style={{ fontSize: 7, fontWeight: 700, color: limitAccent, background: limitBg, border: `1px solid ${limit.over ? limitAccent + '55' : 'rgba(255,255,255,0.08)'}`, borderRadius: 4, padding: '1px 5px', whiteSpace: 'nowrap' }}
+          >
+            {limit.over ? '⚠ ' : ''}{limit.text}
+          </span>
         )}
         {isTitrated && (
           <span style={{ fontSize: 7, fontWeight: 700, color: '#f59e0b', padding: '1px 5px', borderRadius: 4, background: 'rgba(245,158,11,0.15)' }}>

@@ -3003,6 +3003,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     subNameRu={subNameRu}
                     subDosage={subDosage}
                     planDose={(id: string) => planDoseOf(id, state.profile?.weight)}
+                    doseIsElemental
                     subTier={subTier}
                     titrationFactors={finalRec.titrationFactors}
                     canonIdLocal={canonIdLocal}

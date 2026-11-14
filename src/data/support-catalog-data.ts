@@ -6626,7 +6626,7 @@ nattokinase: {
     organs: ['BLOOD', 'BLOOD_VESSELS'],
     systems: ['hematologic', 'cardio'],
     mechanisms: ['PDE_INHIBITION', 'CAMP_ELEVATION', 'PLATELET_AGGREGATION_INHIBITION', 'VASODILATION'],
-    description: 'Рецептурный антиагрегант (PDE-ингиб → ↑cAMP) + вазодилататор. На курсе ААС при Hct 52-57% — улучшает микроциркуляцию. Комбинируется с аспирином при гиперкоагуляции.',
+    description: 'Рецептурный антиагрегант (PDE-ингиб → ↑cAMP) + вазодилататор. На курсе ААС при Hct 52-54% (♀ 48-52%) — улучшает микроциркуляцию. Комбинируется с аспирином при гиперкоагуляции.',
     synergies: [
       { with: 'aspirin', effect: 'Двойная антиагрегантная защита', mechanism: 'Аспирин (COX-1) + дипиридамол (PDE) = разные pathway', severity: 'HIGH' },
       { with: 'omega3', effect: 'Антиагрегант + ↓вязкости', mechanism: 'Комплексная защита от тромбоза', severity: 'MEDIUM' },
