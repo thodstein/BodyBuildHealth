@@ -42,6 +42,11 @@
    (`interpretLabs`: печень `/ВГН АЛТ`, почки `/ВГН креатинина`).
 8. **Без `sex` — мужской путь байт-в-байт.** Новый параметр всегда опционален;
    существующие вызовы не меняют поведение.
+9. **Порог действия — тоже порог.** Гейты процедур и подсветка симптомов читают
+   резолвер с полом, а не литералы. Исключение, закреплённое тестом: у HCT две
+   величины — `getLabNorm('HCT').uln` = 52 (норма лаборатории, печатается) и
+   `HCT_THRESHOLDS.male.erythrocytosis` = 51 (порог действия WADA). У мужчины
+   действие ниже нормы — так и задумано; выравнивать одно по другому нельзя.
 
 ## 3. Кто читает что
 
@@ -53,7 +58,15 @@
 - `risk-engine-v7-matrix` / `lab-tier-ranges` — тиры 0–3 и референсы (`deriveTier(marker, value, sex)`).
 - `lab-analysis.engine` — `interpretLabs(labs, sex)` и композитные индексы.
 - `support-phase-labs.engine` — карточки K0–K10 (цели `T_HCT`/`T_HGB`/`T_E2`/`T_PRL`).
-- `tz-mapper-engine` — `monitoringSchedule` (цели `MON_*`) и фарм-примечания.
+- `tz-mapper-engine` — `monitoringSchedule` (цели `MON_*`) и фарм-примечания;
+  процедурные гейты (`buildProcedureRecommendations`) считают от `HCT_THRESHOLDS`/
+  `HGB_THRESHOLDS` с полом пациента: блок ♂ 54/185 vs ♀ 52/165, предупреждение
+  ♂ 51/170 vs ♀ 48/150.
+- `symptom-lab-link` — подсветка симптомов: ВГН берётся из резолвера по полу
+  (`linkSymptomsToLabs(labs, symptoms, sex?)`); общая поверхность печатает
+  `♂ 0–40 / ♀ 7–31`, персональная — только половину пациента.
+- `Calc.labs-derived` — `hctCuts` (норма/терапия/ургент) и `hgbSymptomCut`
+  (♂ 170 / ♀ 150 = `HGB_THRESHOLDS.upper`).
 - `ProtocolExport`, `CalcSystemPanel`, `Calc.mapper`, `notification-engine` — печать,
   панели систем и уведомления.
 - `supportProtocolWomenData` — женский таб (зоны от резолвера и бэндов).

@@ -6,6 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { deriveStateFromLabs, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from '../Calc.labs-derived';
+import { HGB_THRESHOLDS } from '../../../../engines/lab-norms.engine';
 
 const fp = (hct: string) => ({ date: '2026-09-01', panelHematology: { HCT: hct } }) as never;
 
@@ -30,14 +31,18 @@ describe('hctGradationLabel', () => {
 });
 
 describe('hctSymptomCuts / hgbSymptomCut (доменная карта гематологии)', () => {
-  it('♂ — прежние пороги: HCT 48/52, Hb 175', () => {
+  it('♂ — HCT 48/52, Hb — верх нормы 170 из HGB_THRESHOLDS', () => {
     expect(hctSymptomCuts('male')).toEqual({ correction: 48, therapy: 52 });
     expect(hctSymptomCuts()).toEqual({ correction: 48, therapy: 52 });
-    expect(hgbSymptomCut('male')).toBe(175);
+    // Проход 74: было 175 — число не совпадало ни с верхом нормы (170), ни с
+    // порогом вмешательства (185); мужчина с Hb 172 ошибочно читал «норма».
+    expect(hgbSymptomCut('male')).toBe(HGB_THRESHOLDS.male.upper);
+    expect(hgbSymptomCut('male')).toBe(170);
   });
 
   it('♀ — от женских норм: HCT 44/48 (ULN 48), Hb 150', () => {
     expect(hctSymptomCuts('female')).toEqual({ correction: 44, therapy: 48 });
+    expect(hgbSymptomCut('female')).toBe(HGB_THRESHOLDS.female.upper);
     expect(hgbSymptomCut('female')).toBe(150);
   });
 });

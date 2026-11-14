@@ -26,6 +26,7 @@ import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
 import { getSymptomHistory, getSymptomChartData } from '../../../engines/symptom-diary.engine';
 import { linkSymptomsToLabs } from '../../../engines/symptom-lab-link';
+import { getProfile } from '../../../core/profile-manager';
 import {
   getActiveAssignments, addAssignment, stopAssignment, markIntake,
   getAssignmentsForSymptom, getSymptomVsAdherenceData,
@@ -689,10 +690,21 @@ function SymptomLabLinkBlock({ symptomId }: { symptomId: string }) {
     } catch { return {}; }
   }, []);
 
+  // Пол профиля: без него женские ВГН не включаются и женщина читает мужскую
+  // норму (АЛТ 40 вместо 31). Тот же приём, что в `SupportSubstancePassport`.
+  const labSex = React.useMemo<'male' | 'female' | undefined>(() => {
+    try {
+      const raw = String((getProfile() as any)?.personal?.sex || '').toLowerCase();
+      if (raw === 'female' || raw === 'f' || raw === 'женский') return 'female';
+      if (raw === 'male' || raw === 'm' || raw === 'мужской') return 'male';
+      return undefined;
+    } catch { return undefined; }
+  }, []);
+
   const labResult = React.useMemo(() => {
     if (Object.keys(labRaw).length === 0) return null;
-    return linkSymptomsToLabs(labRaw, [symptomId]);
-  }, [labRaw, symptomId]);
+    return linkSymptomsToLabs(labRaw, [symptomId], labSex);
+  }, [labRaw, symptomId, labSex]);
 
   if (!labResult || labResult.linked.length === 0) return null;
 

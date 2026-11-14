@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { hctCuts, hctGradationLabel, deriveStateFromLabs } from '../Calc.labs-derived';
 import { clinicalFloorsForLabs, HCT_THRESHOLDS } from '../../../../engines/risk-engine-tz-spec';
-import { HCT_THRESHOLDS as HCT_THRESHOLDS_FROM_LAB_NORMS } from '../../../../engines/lab-norms.engine';
+import { HCT_THRESHOLDS as HCT_THRESHOLDS_FROM_LAB_NORMS, getLabNorm } from '../../../../engines/lab-norms.engine';
 import { STOP_COURSE_TABLE } from '../../SupportScreen_parts/supportProtocolsShared';
 
 const ROOT = resolve(process.cwd(), 'src');
@@ -170,3 +170,27 @@ describe('гематокрит: тексты не вводят своих чис
 function hctSlice(v: number) {
   return { panelHematology: { HCT: String(v) } } as never;
 }
+
+describe('два числа HCT — намеренно (норма лаборатории ≠ порог действия)', () => {
+  // Проход 74: это единственная пара, которую легко «починить» неправильно.
+  // 52 — верх референсного диапазона (его печатает `labUlnText('HCT')` и
+  // `getLabNorm`), 51 — порог эритроцитоза WADA, от которого считают
+  // `hctCuts`/гейты процедур. Заменять одно другим нельзя: подпись «норма <51%»
+  // была бы ложью, а порог действия 52 — пропуском года эритроцитоза.
+  it('getLabNorm: норма ♂ 52 / ♀ 48; порог действия ♂ 51 / ♀ 48', () => {
+    expect(getLabNorm('HCT', 'male')!.uln).toBe(52);
+    expect(getLabNorm('HCT', 'female')!.uln).toBe(48);
+    expect(HCT_THRESHOLDS_FROM_LAB_NORMS.male.erythrocytosis).toBe(51);
+    expect(HCT_THRESHOLDS_FROM_LAB_NORMS.female.erythrocytosis).toBe(48);
+  });
+
+  it('hctCuts.therapy — ULN (52/48), urgent — порог блока (54/52)', () => {
+    expect(hctCuts('male')).toEqual({ correction: 48, therapy: 52, urgent: 54 });
+    expect(hctCuts('female')).toEqual({ correction: 44, therapy: 48, urgent: 52 });
+  });
+
+  it('порог действия ниже нормы только у мужчин — так и задумано', () => {
+    expect(HCT_THRESHOLDS_FROM_LAB_NORMS.male.erythrocytosis).toBeLessThan(getLabNorm('HCT', 'male')!.uln);
+    expect(HCT_THRESHOLDS_FROM_LAB_NORMS.female.erythrocytosis).toBe(getLabNorm('HCT', 'female')!.uln);
+  });
+});

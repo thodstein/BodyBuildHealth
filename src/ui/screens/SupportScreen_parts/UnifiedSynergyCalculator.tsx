@@ -217,7 +217,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   ],
   tamoxifen: [
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → гепатотоксичность тамоксифена', note:'Тамоксифен может ↑ АЛТ на фоне стеатоза печени (жировая инфильтрация от эстрогенной стимуляции).', tier2:'ALT >2×ВГН — ↓ дозу, добавить NAC/TUDCA', tier3:'ALT >5×ВГН — STOP тамоксифен' },
-    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед', target:'100-200 пмоль/л', condition:'↑ E2 → тамоксифен блокирует рецептор, но E2 циркулирует выше', note:'Тамоксифен — блокатор ER, а не ↓ E2. E2 может ↑ на 50-100% при сохранении продукции. Это нормально.' },
+    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед', target:'♂ 100-200 пмоль/л (♀ — по фазе, не подавлять)', condition:'↑ E2 → тамоксифен блокирует рецептор, но E2 циркулирует выше', note:'Тамоксифен — блокатор ER, а не ↓ E2. E2 может ↑ на 50-100% при сохранении продукции. Это нормально.' },
   ],
   spironolactone: [
     { markerRu:'Калий (K+)', markerEn:'POTASSIUM', system:'renal', when:'Через 2 нед, затем каждые 4 нед', target:'3.5-5.1 ммоль/л', condition:'↑ K+ → антагонист альдостерона', note:'Верошпирон — калийсберегающий диуретик. Не сочетать с ARB/ACEi + K+ препараты.', tier1:'5.2-5.5 — ↓ дозу', tier2:'5.6-6.0 — STOP', tier3:'>6.0 — ЭКГ, госпитализация' },

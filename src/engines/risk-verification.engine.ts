@@ -147,6 +147,9 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ] },
       { id: 'liv2', weight: 0.7, markers: [
         M('GGT', 'ГГТ', 'Ед/л', 'high', [GGT_ULN.male, GGT_STAGE_ULN.double.male, GGT_STAGE_ULN.triple.male], { thresholds: [GGT_ULN.female, GGT_STAGE_ULN.double.female, GGT_STAGE_ULN.triple.female] }),
+        // Билирубин — единственный литерал в рядах намеренно: у него нет половой
+        // нормы (резолвер даёт 17.1 как верх UCUM, а ступени здесь клинические —
+        // 21 верх большинства лабораторий, 50 желтуха/риск, 100 тяжёлый).
         M('BIL', 'Билирубин общий', 'мкмоль/л', 'high', [21, 50, 100]),
         M('ALP', 'Щелочная фосфатаза', 'Ед/л', 'high', [150, 200, 300]),
       ] },

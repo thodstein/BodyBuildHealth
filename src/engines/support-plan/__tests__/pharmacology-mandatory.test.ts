@@ -213,20 +213,42 @@ describe('course pharmacology mandatory rules', () => {
       fullPanel: { date: '2026-01-01', panelHematology: { HCT: hct } } as any,
     });
 
+    // Проход 74: пороги — из HCT_THRESHOLDS/HGB_THRESHOLDS, а не литералами.
+    // Было 52/185 и 48/175: 52 — женский «блок», 175 не было ни в одной шкале,
+    // поэтому мужчина с нормальным HCT 50 получал «оценку гематолога».
+    const hct55 = stateWithAas(['test_enan', 'tren_enan']);
+    hct55.labs = labs('55');
+    const rec55 = resolvePlan(buildMapperCtx(hct55, 'medium'));
+    expect(rec55.procedures?.some(p => p.id === 'erythrocytapheresis')).toBe(true);
+
     const hct53 = stateWithAas(['test_enan', 'tren_enan']);
     hct53.labs = labs('53');
     const rec53 = resolvePlan(buildMapperCtx(hct53, 'medium'));
-    expect(rec53.procedures?.some(p => p.id === 'erythrocytapheresis')).toBe(true);
+    expect(rec53.procedures?.some(p => p.id === 'erythrocytapheresis')).toBe(false);
+    expect(rec53.procedures?.some(p => p.id === 'hematology_review')).toBe(true);
 
     const hct50 = stateWithAas(['test_enan', 'tren_enan']);
     hct50.labs = labs('50');
     const rec50 = resolvePlan(buildMapperCtx(hct50, 'medium'));
-    expect(rec50.procedures?.some(p => p.id === 'erythrocytapheresis')).toBe(false);
-    expect(rec50.procedures?.some(p => p.id === 'hematology_review')).toBe(true);
+    expect(rec50.procedures?.some(p => p.id === 'hematology_review')).toBe(false);
 
     const hct45 = stateWithAas(['test_enan', 'tren_enan']);
     hct45.labs = labs('45');
     const rec45 = resolvePlan(buildMapperCtx(hct45, 'medium'));
     expect(rec45.procedures || []).toHaveLength(0);
+
+    // Женщина: её шкала ниже (блок 52, эритроцитоз 48), и раньше HCT 49–51%
+    // не давал ей ничего — фиксируем, что теперь даёт.
+    const female = stateWithAas(['test_enan', 'tren_enan']);
+    female.profile = { ...female.profile, sex: 'female' } as any;
+    female.labs = labs('53');
+    const recF53 = resolvePlan(buildMapperCtx(female, 'medium'));
+    expect(recF53.procedures?.some(p => p.id === 'erythrocytapheresis')).toBe(true);
+
+    const female49 = stateWithAas(['test_enan', 'tren_enan']);
+    female49.profile = { ...female49.profile, sex: 'female' } as any;
+    female49.labs = labs('49');
+    const recF49 = resolvePlan(buildMapperCtx(female49, 'medium'));
+    expect(recF49.procedures?.some(p => p.id === 'hematology_review')).toBe(true);
   });
 });

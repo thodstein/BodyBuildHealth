@@ -137,6 +137,7 @@ describe('каталог и solver: однозначные пороги назы
   it('нет одиночных мужских порогов без женской половины', () => {
     const bare = [
       "'<40 Ед/л'", "'<55 Ед/л'", "'<110 мкмоль/л'", "'<170 г/л'",
+      "'<35 Ед/л'",
       "'HCT<50%'", "'HCT < 50%'", "'HCT <0.50'", "'<50%'", "'<52%'",
     ];
     const bad: string[] = [];
@@ -267,5 +268,41 @@ describe('мёртвая вкладка «Риски (ТЗ)» не возвра�
   it('в LabsScreen нет ссылки на LabsTzRiskTab', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen.tsx'), 'utf8');
     expect(src).not.toMatch(/from '\.\/LabsScreen_parts\/LabsTzRiskTab'/);
+  });
+});
+
+describe('процедурные гейты и таблица норм симптомов: пороги по полу', () => {
+  // Проход 74: гейты эритроцитафереза/оценки гематолога сравнивали с 52/185 и
+  // 48/175 — 52 это ЖЕНСКИЙ блок, 175 нет ни в одной шкале приложения. Итог был
+  // не косметический: женщина с HCT 49–51% не получала оценки гематолога, а
+  // мужчина с нормальным HCT 50 — получал.
+  const tz = readFileSync(resolve(process.cwd(), 'src/engines/tz-mapper-engine.ts'), 'utf8');
+
+  it('buildProcedureRecommendations берёт пороги из резолвера и пола', () => {
+    const start = tz.indexOf('function buildProcedureRecommendations');
+    expect(start).toBeGreaterThan(0);
+    const body = tz.slice(start, tz.indexOf('if (dDimer', start));
+    expect(body).toContain("ctx.sex === 'female' ? 'female' : 'male'");
+    expect(body).toContain('HCT_THRESHOLDS[sexKey]');
+    expect(body).toContain('HGB_THRESHOLDS[sexKey]');
+    expect(body).not.toMatch(/(hct|hgb)\s*>=\s*\d/);
+  });
+
+  it('D-димер в тексте плана — от порога блока обоих полов, не «HCT>52%»', () => {
+    expect(tz).not.toContain('D-димер (при HCT>52%)');
+    expect(tz).toContain('HCT_THRESHOLDS.male.block}%, ♀ >${HCT_THRESHOLDS.female.block}%');
+  });
+
+  it('symptom-lab-link: женские ВГН — из резолвера, а не из второй таблицы', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/symptom-lab-link.ts'), 'utf8');
+    expect(src).toContain("resolveLabNorm(code, 'female')");
+    expect(src).toContain('linkSymptomsToLabs');
+  });
+
+  it('таблица мониторинга: E2 при тамоксифене называет пол', () => {
+    const unified = readFileSync(
+      resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts/UnifiedSynergyCalculator.tsx'), 'utf8');
+    expect(unified).not.toMatch(/target:\s*'100-200 пмоль\/л'/);
+    expect(unified).toContain('♂ 100-200 пмоль/л (♀ — по фазе, не подавлять)');
   });
 });

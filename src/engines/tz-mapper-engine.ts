@@ -163,7 +163,11 @@ export interface SupportRecommendation {
   procedures?: MedicalProcedureRecommendation[];
   assayWarnings?: string[];
   monitoringPlan?: string;       // H5: структурированный график лаб-мониторинга (строка, legacy)
-  monitoringSchedule?: MonitoringSection[]; // H6: структурированный мониторинг (до курса → экстренно)
+  monitoringSchedule?: MonitoringSection[]; // H6: структурированный мониторинг (до курса → экстренно).
+  // Печатается ТОЛЬКО секция `daily` (Calc.mapper и ProtocolExport читают её одну):
+  // фазовый график дублировал карточки K0–K10 и больше не выводится. Поле остаётся
+  // источником для `daily` и для тестов — не удалять как «мёртвое», не проверив
+  // `monitoring-single-list`.
   supportRisks?: SupportRisk[];  // H7: комбинаторные риски самого плана поддержки
   pedRisk?: PedRiskAssessment;   // v6: оценка PED-риска нейро/суставы (для UI-баннеров)
   /** Женский слой (только sex='female'): что добавлено усилением + флаги риска */
@@ -246,13 +250,23 @@ function buildProcedureRecommendations(ctx: MapperCtx): MedicalProcedureRecommen
   const dDimer = ctx.labs['D_DIMER'];
   const out: MedicalProcedureRecommendation[] = [];
   const bloodMonitoring = ['HCT', 'HGB', 'RBC', 'PLT', 'fibrinogen', 'INR', 'APTT'];
+  // Шкала одна на всё приложение (проход 74). До него здесь стояли 52/185 и
+  // 48/175: 52 — женский «блок», 185 — мужской, а 175 нет ни в одной шкале.
+  // Итог был хуже, чем неверная подпись: женщина с HCT 49–51% (её эритроцитоз
+  // начинается с 48) вообще не получала оценки гематолога, а мужчина с
+  // нормальным HCT 50 — получал.
+  const sexKey = ctx.sex === 'female' ? 'female' : 'male';
+  const blockHct = HCT_THRESHOLDS[sexKey].block;
+  const blockHgb = HGB_THRESHOLDS[sexKey].block;
+  const erythroHct = HCT_THRESHOLDS[sexKey].erythrocytosis;
+  const upperHgb = HGB_THRESHOLDS[sexKey].upper;
 
-  if ((hct != null && hct >= 52) || (hgb != null && hgb >= 185)) {
+  if ((hct != null && hct >= blockHct) || (hgb != null && hgb >= blockHgb)) {
     out.push({
       id: 'erythrocytapheresis',
       label: 'Эритроцитаферез',
       reason: `Выраженный эритроцитоз: ${hct != null ? `HCT ${hct}%` : `HGB ${hgb} г/л`}.`,
-      trigger: 'HCT ≥52% или HGB ≥185 г/л',
+      trigger: `HCT ≥${blockHct}% или HGB ≥${blockHgb} г/л`,
       doctorOnly: true,
       monitoring: bloodMonitoring,
     });
@@ -264,12 +278,12 @@ function buildProcedureRecommendations(ctx: MapperCtx): MedicalProcedureRecommen
       doctorOnly: true,
       monitoring: ['HCT', 'HGB', 'RBC', 'ferritin', 'iron'],
     });
-  } else if ((hct != null && hct >= 48) || (hgb != null && hgb >= 175)) {
+  } else if ((hct != null && hct >= erythroHct) || (hgb != null && hgb >= upperHgb)) {
     out.push({
       id: 'hematology_review',
       label: 'Оценка гематолога',
       reason: 'Пограничное повышение эритроцитарных показателей требует повторного ОАК и оценки причин гемоконцентрации/эритропоэза.',
-      trigger: 'HCT ≥48% или HGB ≥175 г/л',
+      trigger: `HCT ≥${erythroHct}% или HGB ≥${upperHgb} г/л`,
       doctorOnly: true,
       monitoring: ['HCT', 'HGB', 'RBC', 'PLT', 'ferritin'],
     });
@@ -1066,7 +1080,7 @@ function buildMonitoringPlan(ctx: MapperCtx, flags: ReturnType<typeof derivePEDF
   if (flags.hasOral17) lines.push(`• каждые 2 нед: АЛТ/АСТ (орал 17α — гепатотоксичность). ${LFT_REDUCE_BOTH}`);
   else lines.push('• 4 нед: АД, ЧСС, HCT/гемоглобин, АЛТ/АСТ');
   lines.push('• 4 нед: HCT, ферритин (управление эритроцитозом), эстрадиол (титрация AI), пролактин (nandrolone/tren)');
-  lines.push('• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы, D-димер (при HCT>52%)');
+  lines.push(`• 8 нед: ОАК+БХ+липидограмма, эстрадиол, пролактин, ТТГ, УЗИ печени и предстательной железы, D-димер (при HCT>${HCT_THRESHOLDS.male.block}%, ♀ >${HCT_THRESHOLDS.female.block}%)`);
   lines.push('• 8 нед (расширенно): гомоцистеин/B12/фолат + АпоВ + hs-CRP (карточка K3)');
   lines.push('• 12 нед: как на 8 нед');
   if (flags.hasGH) lines.push('• при GH: глюкоза натощак + HbA1c каждые 4 нед, IGF-1 каждые 6-8 нед (титрация дозы, цель — верхняя граница возрастной нормы)');

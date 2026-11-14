@@ -1,5 +1,5 @@
 import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
-import { getLabNorm, HCT_THRESHOLDS } from '../../../engines/lab-norms.engine';
+import { getLabNorm, HCT_THRESHOLDS, HGB_THRESHOLDS } from '../../../engines/lab-norms.engine';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -187,9 +187,15 @@ export function hctSymptomCuts(sex?: 'male' | 'female'): { correction: number; t
   return { correction, therapy };
 }
 
-/** Порог «Гемоглобин выше нормы» для доменной карты: ♂ 175 (как было), ♀ ULN 150. */
+/**
+ * Порог «Гемоглобин выше нормы» для доменной карты: ♂ 170, ♀ 150 — верх нормы
+ * из `HGB_THRESHOLDS` (проход 74). Раньше у мужчины стоял литерал 175: он не
+ * совпадал ни с верхом нормы (170), ни с порогом вмешательства (185), поэтому
+ * мужчина с Hb 172 читал «норма», хотя это уже выше нормы.
+ */
 export function hgbSymptomCut(sex?: 'male' | 'female'): number {
-  return sex === 'female' ? (getLabNorm('HGB', 'female')?.uln ?? 150) : 175;
+  const s = sex === 'female' ? 'female' : 'male';
+  return HGB_THRESHOLDS[s].upper;
 }
 
 export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {

@@ -60,7 +60,7 @@ export const STACKS_PART_3: SupportStack[] = [
     structuredLabControl: {
       markers: [
         { marker: 'АЛТ', when: 'Каждые 5-7 дней', targetRange: '<40 Ед/л (♀ <31)' },
-        { marker: 'АСТ', when: 'Каждые 5-7 дней', targetRange: '<35 Ед/л' },
+        { marker: 'АСТ', when: 'Каждые 5-7 дней', targetRange: '<35 Ед/л (♀ <31)' },
         { marker: 'ГГТ', when: 'Каждые 7 дней', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'Билирубин общий', when: 'Каждые 7 дней', targetRange: '<21 мкмоль/л' },
         { marker: 'Щелочная фосфатаза', when: 'Каждые 7 дней', targetRange: '<150 Ед/л' },

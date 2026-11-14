@@ -95,6 +95,12 @@ export const FEMALE_ALT_2_5_ULN = Math.round((getLabNorm('ALT', 'female')?.uln ?
  *  - `block` — порог флеботомии/отмены (Endocrine Society: ♂ >54%, ♀ >52%).
  * Градация калькулятора (`hctCuts`), баннер, уведомления и PDF считают от
  * этих чисел, а не от литералов.
+ *
+ * ⚠ Не путать с `getLabNorm('HCT').uln` (♂ 52 / ♀ 48): это верх референсного
+ * диапазона, он печатается как «норма <52%» (`labUlnText`). У мужчины порог
+ * действия (51) НИЖЕ лабораторной нормы — так и задумано (WADA), поэтому
+ * `getLabNorm` нельзя «выравнивать» по 51, а гейты — по 52. Пара закреплена
+ * тестом `hct-thresholds-single-source` («два числа HCT — намеренно»).
  */
 export const HCT_THRESHOLDS = {
   male: { erythrocytosis: 51, block: 54 },

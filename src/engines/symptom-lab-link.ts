@@ -8,6 +8,9 @@
  */
 import type { SymptomEntry } from './symptom-solver.types';
 import { findSymptomById } from './symptom-solver.engine';
+// Локальная `getLabNorm(marker)` ниже отдаёт базовую (мужскую) запись для UI —
+// не путать с резолвером норм: он импортируется под своим именем.
+import { getLabNorm as resolveLabNorm } from './lab-norms.engine';
 
 export interface LabLinkedSymptom {
   symptomId: string;
@@ -31,7 +34,8 @@ interface LabLinkRule {
   symptomIds: string[];
   direction: 'high' | 'low';
   relevance: number;
-  explanation: (val: number, uln: number) => string;
+  /** `normText` — готовая подпись нормы: общий список печатает оба пола. */
+  explanation: (val: number, normText: string) => string;
 }
 
 const LAB_LINK_RULES: Record<string, LabLinkRule> = {
@@ -225,10 +229,69 @@ const LAB_NORMS: Record<string, { low: number; high: number; unit: string }> = {
   URIC_ACID: { low: 200, high: 420, unit: 'мкмоль/л' },
 };
 
-/** Основная функция: лаборатория → подсвеченные симптомы */
+/**
+ * Маркеры, у которых ВГН зависит от пола (`FEMALE_LAB_BOUNDS` резолвера).
+ * Ключи здесь — имена в `LAB_NORMS`/`LAB_LINK_RULES`, значения — коды резолвера.
+ */
+const SEX_AWARE_MARKER: Record<string, string> = {
+  ALT: 'ALT',
+  AST: 'AST',
+  GGT: 'GGT',
+  CREATININE: 'CREATININE',
+  HEMOGLOBIN: 'HGB',
+  HEMATOCRIT: 'HCT',
+};
+
+/** Женская половина нормы из резолвера; null — маркер от пола не зависит. */
+function femaleNorm(key: string): { low: number; high: number } | null {
+  const code = SEX_AWARE_MARKER[key];
+  if (!code) return null;
+  const n = resolveLabNorm(code, 'female');
+  return n && n.female ? { low: n.lln, high: n.uln } : null;
+}
+
+/**
+ * Норма для пациента. Без `sex` — прежняя мужская запись байт-в-байт
+ * (женский слой не включается без явного пола), с `female` — женская половина.
+ */
+function patientNorm(
+  key: string,
+  base: { low: number; high: number; unit: string },
+  sex?: 'male' | 'female',
+): { low: number; high: number; unit: string } {
+  if (sex !== 'female') return base;
+  const f = femaleNorm(key);
+  return f ? { low: f.low, high: f.high, unit: base.unit } : base;
+}
+
+/**
+ * Подпись нормы. Общая поверхность (без sex) обязана называть оба пола —
+ * иначе женщина читает мужской порог как свой; персональная — только свой.
+ */
+function normText(
+  key: string,
+  base: { low: number; high: number },
+  sex?: 'male' | 'female',
+): string {
+  const f = femaleNorm(key);
+  if (!f) return `${base.low}–${base.high}`;
+  if (sex === 'female') return `♀ ${f.low}–${f.high}`;
+  if (sex === 'male') return `♂ ${base.low}–${base.high}`;
+  return `♂ ${base.low}–${base.high} / ♀ ${f.low}–${f.high}`;
+}
+
+/**
+ * Основная функция: лаборатория → подсвеченные симптомы.
+ *
+ * `sex` (проход 74) включает женские ВГН: без него сравнение идёт по мужской
+ * записи `LAB_NORMS` — как было до женского слоя. `SymptomSolverTab` передаёт
+ * пол профиля, поэтому у женщины АЛТ 35 считается отклонением (её ВГН 31),
+ * а не «нормой 40».
+ */
 export function linkSymptomsToLabs(
   labValues: Record<string, number>,
-  activeSymptomIds: string[]
+  activeSymptomIds: string[],
+  sex?: 'male' | 'female',
 ): LabLinkResult {
   const linked: LabLinkedSymptom[] = [];
   const alerts: string[] = [];
@@ -238,8 +301,9 @@ export function linkSymptomsToLabs(
     const directKey = marker.toUpperCase();
     const rule = LAB_LINK_RULES[directKey];
     if (rule) {
-      const norm = LAB_NORMS[directKey];
-      if (!norm) continue;
+      const base = LAB_NORMS[directKey];
+      if (!base) continue;
+      const norm = patientNorm(directKey, base, sex);
       const isOutOfRange = rule.direction === 'high'
         ? value > norm.high
         : value < norm.low;
@@ -257,13 +321,13 @@ export function linkSymptomsToLabs(
           labUnit: norm.unit,
           labStatus: rule.direction,
           relevance: rule.relevance,
-          explanation: rule.explanation(value, norm.high),
+          explanation: rule.explanation(value, normText(directKey, base, sex)),
         });
       }
 
       alerts.push(
         `${directKey} ${value} ${norm.unit} — ${rule.direction === 'high' ? '↑' : '↓'} ` +
-        `(норма ${norm.low}–${norm.high})`
+        `(норма ${normText(directKey, base, sex)})`
       );
     }
 
@@ -271,8 +335,9 @@ export function linkSymptomsToLabs(
     const reverseKey = `${directKey}_LOW`;
     const reverseRule = LAB_LINK_RULES[reverseKey];
     if (reverseRule) {
-      const norm = LAB_NORMS[reverseKey];
-      if (!norm) continue;
+      const base = LAB_NORMS[reverseKey];
+      if (!base) continue;
+      const norm = patientNorm(reverseKey, base, sex);
       const isLow = value < norm.low;
       if (!isLow) continue;
 
@@ -287,7 +352,7 @@ export function linkSymptomsToLabs(
           labUnit: norm.unit,
           labStatus: 'low',
           relevance: reverseRule.relevance,
-          explanation: reverseRule.explanation(value, norm.high),
+          explanation: reverseRule.explanation(value, normText(reverseKey, base, sex)),
         });
       }
     }
