@@ -54,6 +54,32 @@ describe('AUDIT FULL MATRIX', () => {
     expect(total).toBeGreaterThan(0);
   });
 
+  it('beginner glute-focus weeks do not overflow MRV when all sets are at the 2-set floor', () => {
+    const patterns = SPLIT_PATTERNS.filter(p => p.id === 'glute_focus_4' || p.id === 'female_upper_glute_4');
+    expect(patterns).toHaveLength(2);
+    for (const split of patterns) {
+      for (const goal of ['mass', 'recomp', 'strength_mass'] as const) {
+        const plan = buildBBPlan({ patternId: split.id, level: 'beginner', goal, weeks: 4, workMax: WM });
+        for (const week of plan.weeks) {
+          if ((week as any).phase === 'deload' || (week as any).deload) continue;
+          const volume = ((plan as any).weeklyVolume || {})[String(week.week)] || {};
+          for (const [muscle, raw] of Object.entries(volume as Record<string, any>)) {
+            const cap = Number((plan as any).mrvByMuscle?.[muscle] || 0);
+            if (!cap) continue;
+            expect(Number(raw?.effectiveSets || 0), `${split.id}/${goal}/W${week.week}/${muscle}`).toBeLessThanOrEqual(cap * BB_MRV_TOLERANCE + 1e-6);
+          }
+          for (const sess of week.sessions) {
+            for (const ex of sess.exercises) {
+              if (!(ex as any).warmupActivator) {
+                expect(Number(ex.sets), `${split.id}/${goal}/W${week.week}/${ex.name}: single work set`).toBeGreaterThanOrEqual(2);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
   it('descriptions are program-specific (contain weak/phase/selection)', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM, weakPoints: ['chest_upper'] });
     const push = plan.weeks[0].sessions.find(s=>s.sessionTag==='Push')!;
