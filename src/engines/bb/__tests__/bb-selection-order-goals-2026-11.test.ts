@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBBPlan, buildExercisePool } from '../bb-builder.engine';
+import { buildBBPlan, buildExercisePool, applyPreExhaustLoads } from '../bb-builder.engine';
 import { musclesForRole } from '../../movement-pattern';
 import { orderSessionExercises, isCompoundEx } from '../bb-session-order.engine';
 import { getPattern, SPLIT_PATTERNS } from '../bb-split-patterns';
@@ -163,6 +163,45 @@ describe('2026-11: beginner selection + goal-aware ordering', () => {
     const work = working(s);
     expect(work[0].muscle).toBe('shoulders');
     expect(work[0].exerciseType || work[0].type).toBe('compound');
+  });
+
+  it('pre_exhaust: −10 % только у compound после реальной изоляции-праймера', () => {
+    const mk = (o: Partial<BBExercise>) => ex({
+      role: 'primary', character: 'тяж', rir: 2,
+      workSets: [{ reps: 8, rir: 2, weight: 100 }],
+      warmupSets: [{ load: 80, reps: 5 }],
+      comment: '🎯 Основное: chest. Накопление, RIR 2 — 3×8 @ 100 кг',
+      ...o,
+    } as any);
+    const chestCompound = () => mk({ muscle: 'chest', name: 'Жим штанги лёжа', exerciseType: 'compound' } as any);
+    const chestFly = () => mk({ muscle: 'chest', name: 'Разводка гантелей', exerciseType: 'isolation', workSets: [{ reps: 12, rir: 2, weight: 30 }], warmupSets: [], comment: '🎯 Основное: chest. 3×12 @ 30 кг' } as any);
+
+    const compound = chestCompound();
+    const fly = chestFly();
+    applyPreExhaustLoads([fly, compound]);
+    expect(compound.workSets[0].weight).toBe(90);
+    expect(compound.warmupSets![0].load).toBe(72);
+    expect(compound.comment).toContain('@ 90 кг');
+    // Сама изоляция-праймер не утяжеляется и не облегчается методикой.
+    expect(fly.workSets[0].weight).toBe(30);
+    expect(fly.comment).toContain('@ 30 кг');
+
+    // Нет праймера — нет скидки (раньше это был скрытый −10 % для всех primary).
+    const noPrimer = chestCompound();
+    applyPreExhaustLoads([noPrimer]);
+    expect(noPrimer.workSets[0].weight).toBe(100);
+    expect(noPrimer.comment).toContain('@ 100 кг');
+
+    // Праймер после compound — это уже не pre-exhaust.
+    const beforePrimer = chestCompound();
+    applyPreExhaustLoads([beforePrimer, chestFly()]);
+    expect(beforePrimer.workSets[0].weight).toBe(100);
+
+    // Изоляция другой мышцы не является праймером для груди.
+    const backIso = mk({ muscle: 'back', name: 'Тяга верхнего блока', exerciseType: 'isolation', workSets: [{ reps: 12, rir: 2, weight: 40 }], warmupSets: [] } as any);
+    const crossMuscle = chestCompound();
+    applyPreExhaustLoads([backIso, crossMuscle]);
+    expect(crossMuscle.workSets[0].weight).toBe(100);
   });
 
   it('compound-first: изоляция не ведёт день, если есть компаунд крупной мышцы', () => {

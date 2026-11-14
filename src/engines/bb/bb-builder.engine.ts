@@ -64,7 +64,7 @@ function mastersMrvMult(age?: number): number {
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
-import { orderSessionExercises, shouldInterleave, axialCostOf, type SessionMethodology } from './bb-session-order.engine';
+import { orderSessionExercises, shouldInterleave, axialCostOf, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
 import { methodologySpecFor, applyMethodologyRest } from './bb-methodology-spec';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -1532,6 +1532,51 @@ export function buildWarmup(workWeight: number, isCompound: boolean): { load: nu
   return warmupRampFor(workWeight, isCompound);
 }
 
+/**
+ * Pre-exhaust: −10 % ТОЛЬКО у базы, перед которой в готовой сессии реально
+ * стоит изоляция той же мышцы.
+ *
+ * Раньше скидка применялась к `pl.weight` primary-мышцы на этапе расчёта, то
+ * есть получала каждая её упражнение — и сама изоляция-праймер, и compound'ы
+ * мышц без праймера (спина в Upper-дне, где предутомлялась только грудь).
+ * Проверка по `pl.exDatas` тоже неверна: отбор может оставить изоляцию в пуле,
+ * а финальный cap/дедуп — убрать её из выданной сессии. Здесь источник правды
+ * один: итоговый порядок упражнений, который увидит пользователь.
+ */
+export function applyPreExhaustLoads(exercises: BBExercise[]): void {
+  const work = exercises.filter((e: any) => !(e as any).warmupActivator);
+  for (let i = 0; i < work.length; i++) {
+    const ex = work[i];
+    if (ex.role !== 'primary' || !isCompoundEx(ex)) continue;
+    const hasPrimerBefore = work.some((p: any, j: number) =>
+      j < i && p.muscle === ex.muscle && !isCompoundEx(p));
+    if (!hasPrimerBefore) continue;
+    for (const ws of (ex.workSets || []) as any[]) {
+      if (Number.isFinite(Number(ws.weight)) && Number(ws.weight) > 0) {
+        ws.weight = Math.round(Number(ws.weight) * 0.9 * 10) / 10;
+      }
+    }
+    for (const ws of ((ex as any).warmupSets || []) as any[]) {
+      if (Number.isFinite(Number(ws.load)) && Number(ws.load) > 0) {
+        ws.load = Math.round(Number(ws.load) * 0.9 * 10) / 10;
+      }
+    }
+    const firstWeight = Number((ex.workSets || [])[0]?.weight);
+    if (ex.comment && Number.isFinite(firstWeight) && firstWeight > 0) {
+      ex.comment = ex.comment.replace(/@\s*\d+(?:[.,]\d+)?\s*кг/, `@ ${firstWeight} кг`);
+    }
+  }
+}
+
+/** Plan-level вариант: вызывать только после всех проходов, меняющих состав сессий. */
+function applyPreExhaustLoadsToPlan(plan: BBPlan): void {
+  for (const week of plan.weeks) {
+    for (const session of week.sessions) {
+      applyPreExhaustLoads(session.exercises as BBExercise[]);
+    }
+  }
+}
+
 // BUG-B13/B21: STRETCH_DB и addStretching удалены как мёртвый код (вызов закомментирован с Jul 16).
 // Растяжка не относится к ББ-гипертрофии и занимала слоты в плане.
 
@@ -2363,11 +2408,15 @@ function buildSession(
       weight = Math.round(weight * eccentricMult * 10) / 10;
     }
     // P1-8 (audit 2026-07): pre_exhaust methodology → compound weight ×0.90.
-    // После pre-exhaust изоляции целевая мышца уже утомлена → compound Fails ниже
-    // обычного на ~10-15% (Augustsson 2003; Gentil 2013). Авто-снижение веса compound.
-    if (methodology === 'pre_exhaust' && role === 'primary') {
-      weight = Math.round(weight * 0.90 * 10) / 10;
-    }
+    // После pre-exhaust изоляции целевая мышца уже утомлена → рабочий вес базы
+    // ниже на ~10-15% (Augustsson 2003; Gentil 2013).
+    //
+    // Сам −10 % начисляется НЕ здесь: на этапе расчёта pl.weight ещё неизвестно,
+    // останется ли изоляция-праймер в финальной сессии (cap/дедуп/бюджет могут её
+    // убрать), и какая мышца окажется ведущей. Итоговый проход
+    // `applyPreExhaustLoadsToPlan` в конце buildBBPlan смотрит только на выданный
+    // порядок: скидку получает compound, перед которым реально стоит изоляция
+    // той же мышцы. Иначе методика была скрытым делодом для всех primary-мышц.
     const accessoryCount = ACCESSORY_2X_GROUPS.has(muscle) ? 2 : 1;
     // exerciseCount зависит от уровня И PED — на курсе больше тяжёлых compounds.
     // В multi-днях (Push/Pull с 3+ мышцами) ограничить big muscle primary до 3 —
@@ -5857,6 +5906,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // синхронизация схем, женские добивки) цель не должна оставаться выше
   // достижимого пика — иначе path-adequacy видит 26.25 < 90% цели 30.
   reconcileVolumeTargets(finalized, { maxWorkingSets: sessLimits.maxWorkingSets });
+  // Pre-exhaust: −10 % базы только там, где изоляция-праймер реально осталась
+  // перед compound'ом в выданной сессии. Раньше скидка ставилась на этапе
+  // расчёта веса и переживала удаление праймера поздними проходами — методика
+  // превращалась в скрытый делод для мышц без предутомления.
+  if (input.methodology === 'pre_exhaust') applyPreExhaustLoadsToPlan(finalized);
   // M/L/K: финальный снимок ФАКТА — одной точкой (bb-plan-snapshot.engine).
   // `finalizeBBPlan` снимает weeklyVolume/validation/balanceReport/report в конце
   // СВОЕГО прохода, но билдер после финализатора ещё меняет план: rehab-возврат,
