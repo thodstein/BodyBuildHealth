@@ -1,21 +1,39 @@
 import { buildBBPlan } from '../bb-builder.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
 import { derivePattern } from '../../movement-pattern';
+import { isCompoundEx } from '../bb-session-order.engine';
 import { BB_MRV_TOLERANCE } from '../bb-validator.engine';
 
 const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
+const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
+const GOALS = ['mass','cut','recomp','maintenance','strength_mass'] as const;
+const MAJOR_LEAD_MUSCLES = new Set(['chest','back','quads','hamstrings','glutes','shoulders','legs']);
 
 describe('AUDIT FULL MATRIX', () => {
-  it('no duplicate isolation patterns per session across all splits/levels/goals', () => {
-    const levels = ['beginner','intermediate','advanced','enhanced'] as const;
-    const goals = ['mass','cut','recomp','strength_mass'] as const;
-    const patterns = SPLIT_PATTERNS.slice(0, 5); // sample 5 splits for speed
+  it('no duplicate isolation / bad lead order across all splits/levels/goals', () => {
+    const patterns = SPLIT_PATTERNS;
     let total = 0;
     for (const split of patterns) {
-      for (const level of levels) {
-        for (const goal of goals) {
+      for (const level of LEVELS) {
+        for (const goal of GOALS) {
           const plan = buildBBPlan({ patternId: split.id, level, goal, weeks: 1, workMax: WM });
           for (const sess of plan.weeks[0].sessions) {
+            const all = sess.exercises as any[];
+            const work = all.filter(ex => !ex.warmupActivator);
+            const firstWorkIndex = all.findIndex(ex => !ex.warmupActivator);
+            if (firstWorkIndex >= 0) {
+              expect(all.slice(firstWorkIndex).some(ex => ex.warmupActivator),
+                `${split.id}/${level}/${goal}/${sess.sessionTag}: warmup after work`).toBe(false);
+            }
+            const gluteDay = /glute/i.test(String(sess.sessionTag || '')) && work.some(ex => ex.muscle === 'glutes');
+            if (gluteDay && work.length) {
+              expect(work[0].muscle, `${split.id}/${level}/${goal}/${sess.sessionTag}: glute lead`).toBe('glutes');
+            }
+            const hasMajorCompound = work.some(ex => isCompoundEx(ex) && MAJOR_LEAD_MUSCLES.has(ex.muscle));
+            if (hasMajorCompound && work.length && !gluteDay) {
+              expect(isCompoundEx(work[0]),
+                `${split.id}/${level}/${goal}/${sess.sessionTag}: lead=${work[0].name}`).toBe(true);
+            }
             const seen = new Map<string, number>();
             for (const ex of sess.exercises) {
               if ((ex as any).warmupActivator) continue;

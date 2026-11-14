@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { orderSessionExercises, explainSessionOrder } from '../bb-session-order.engine';
+import { orderSessionExercises, explainSessionOrder, explainSessionOrderPerExercise } from '../bb-session-order.engine';
 import type { BBExercise } from '../bb-builder.engine';
 
 function exercise(partial: Partial<BBExercise>): BBExercise {
@@ -88,6 +88,36 @@ describe('O-2: FullBody — круги по мышцам вместо групп
     // Никаких «грудь-грудь» подряд? Наоборот: без interleave группировка ЕСТЬ.
     const firstThree = muscles.slice(0, 3);
     expect(new Set(firstThree).size).toBeLessThan(3);
+  });
+});
+
+describe('Hyperemia: памп раньше тяжёлой аксессуарной работы', () => {
+  it('база первой, памп-изоляция перед тяжёлым аксессуаром', () => {
+    const ordered = orderSessionExercises([
+      exercise({ muscle: 'chest', name: 'Разводка гантелей', role: 'accessory', character: 'памп', repsRange: [12, 15], workSets: [{ reps: 15, rir: 1, weight: 12 }] }),
+      exercise({ muscle: 'chest', name: 'Жим штанги лёжа' }),
+      exercise({ muscle: 'chest', name: 'Жим гантелей на наклонной', role: 'accessory', character: 'тяж', repsRange: [8, 10], workSets: [{ reps: 8, rir: 2, weight: 40 }] }),
+    ], { sessionTag: 'ChestBack', methodology: 'hyperemia' });
+    expect(ordered.map(item => item.name)).toEqual(['Жим штанги лёжа', 'Разводка гантелей', 'Жим гантелей на наклонной']);
+  });
+
+  it('loaded stretch остаётся последним', () => {
+    const ordered = orderSessionExercises([
+      exercise({ muscle: 'chest', name: 'Разводка гантелей (растяжка)', role: 'accessory', character: 'памп', repsRange: [15, 20], workSets: [{ reps: 18, rir: 1, weight: 10 }] }),
+      exercise({ muscle: 'chest', name: 'Жим штанги лёжа' }),
+      exercise({ muscle: 'chest', name: 'Разводка гантелей', role: 'accessory', character: 'памп', repsRange: [12, 15], workSets: [{ reps: 15, rir: 1, weight: 12 }] }),
+    ], { sessionTag: 'ChestBack', methodology: 'hyperemia' });
+    expect(ordered[ordered.length - 1].name).toContain('растяжка');
+  });
+
+  it('объяснение слота называет памп-приоритет, а не «после базовых»', () => {
+    const ordered = orderSessionExercises([
+      exercise({ muscle: 'chest', name: 'Жим штанги лёжа' }),
+      exercise({ muscle: 'chest', name: 'Разводка гантелей', role: 'accessory', character: 'памп', repsRange: [12, 15], workSets: [{ reps: 15, rir: 1, weight: 12 }] }),
+    ], { sessionTag: 'ChestBack', methodology: 'hyperemia' });
+    const fly = explainSessionOrderPerExercise(ordered, { sessionTag: 'ChestBack', methodology: 'hyperemia' })
+      .find(item => item.name === 'Разводка гантелей');
+    expect(fly?.reason).toMatch(/памп-изоляция раньше тяжёлой/i);
   });
 });
 

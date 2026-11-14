@@ -343,6 +343,13 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   // Основной 7-сетовый финишер и так последний через isFinisher (tier 3).
   else if (methodology === 'fst7' && isStretchHolder(ex.name || '')) tier = 4;
   else if (methodology === 'fst7' && isPrimaryIsolation && exRir >= 3 && ex.character !== 'тяж') tier = -0.5;
+  // hyperemia (Sarcev): памп-изоляция аксессуара идёт раньше тяжёлой
+  // аксессуарной работы — это обещание методики, а не только порядок внутри
+  // tier. Раньше isFinisher отправлял все памп-изоляции в конец, и hyperemia
+  // давала порядок, идентичный compound_first. База (role=primary) остаётся
+  // первой; loaded stretch — последним.
+  else if (methodology === 'hyperemia' && isStretchHolder(ex.name || '')) tier = 4;
+  else if (methodology === 'hyperemia' && !compound && ex.character === 'памп') tier = 0.5;
   else if (isFinisher) tier = 3;
   else if (isPrimaryHeavy || strengthSpec) tier = 0;
   else if (compound) tier = 1;
@@ -389,6 +396,13 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
     // O-2 (FullBody): «круги» — первый круг = тяжёлые базы всех мышц,
     // второй = изоляции/аксессуары; внутри круга чередование по числу
     // выполненных упражнений этой мышцы (chest→back→legs→chest→…).
+    // hyperemia: памп-изоляции — отдельный слой между base и тяжёлыми
+    // аксессуарами, иначе interleave-ключ игнорировал tier и методика снова
+    // совпадала с compound_first.
+    if (methodology === 'hyperemia') {
+      const bucket = isPrimaryHeavy ? 0 : (tier === 0.5 ? 0.5 : 1);
+      return [bucket, occIndex, muscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
+    }
     const bucket = (isPrimaryMuscle || (compound && ex.character === 'тяж')) ? 0 : 1;
     return [bucket, occIndex, muscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
   }
@@ -620,6 +634,8 @@ export function explainSessionOrderPerExercise(exercises: BBExercise[], opts: Or
       reason = 'добивка сразу после базы: тот же бюджет времени, больше работы в целевой мышце';
     } else if (isStretchHolder(rawName)) {
       reason = 'loaded stretch — последним: растяжение под нагрузкой после объёма';
+    } else if (methodology === 'hyperemia' && !compound && (ex as any).character === 'памп') {
+      reason = 'памп-изоляция раньше тяжёлой работы: кровенаполнение и плотность, а не «больше роста» (Sarcev)';
     } else if (methodology === 'fst7' && ex.role === 'accessory' && !compound) {
       reason = 'FST-7-финишер: серия коротких подходов в конце — памп и объём одной мышцей, без осевой усталости';
     } else if (isHeavy) {
