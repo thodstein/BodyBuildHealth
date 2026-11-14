@@ -126,4 +126,11 @@ describe('source-lock: график фазы не рендерится в мон
     expect(src).not.toContain('Маркеры:</span> {panel.markers}');
     expect(src).not.toContain('Частота:</span> {panel.freq}');
   });
+
+  it('одно имя у списка: нет второго заголовка «Лабораторный мониторинг» и «единый перечень» в шапке карточек', () => {
+    expect(src).not.toContain('🧪 Лабораторный мониторинг');
+    const cards = readFileSync(resolve(process.cwd(), 'src/ui/screens/Calculator/CalcPhaseLabCards.tsx'), 'utf8');
+    expect(cards).toContain('📋 Анализы по фазам');
+    expect(cards).not.toContain('единый перечень K0–K10');
+  });
 });

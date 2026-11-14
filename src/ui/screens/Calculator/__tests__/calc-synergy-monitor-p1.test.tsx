@@ -88,7 +88,7 @@ describe('Д7: мониторинг — один перечень анализо
     fireEvent.click(header);
     await waitFor(
       () => {
-        expect(screen.queryAllByText(/единый перечень K0–K10/).length).toBeGreaterThan(0);
+        expect(screen.queryAllByText(/Единый перечень — карточки фаз K0–K10/).length).toBeGreaterThan(0);
       },
       { timeout: 8000 },
     );

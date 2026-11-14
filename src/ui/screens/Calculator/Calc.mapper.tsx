@@ -3338,10 +3338,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   </div>
                 </div>
 
-                {/* ── Лабораторный мониторинг ── */}
+                {/* ── Лабораторный мониторинг (заголовок = заголовок свёртки, второй не нужен) ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'#60a5fa', marginBottom:3 }}>🧪 Лабораторный мониторинг</div>
-
                   {/* Текущие показатели из анализов пользователя */}
                   {(() => {
                     const labsValues = labSliceToValues(state.labs.fullPanel);

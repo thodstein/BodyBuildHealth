@@ -69,7 +69,7 @@ export const CalcPhaseLabCards: React.FC<Props> = ({ phase, flags, peds, subs, e
   return (
     <div style={{ padding: '6px 7px', borderRadius: 6, background: 'rgba(96,165,250,0.10)', border: '1px solid rgba(96,165,250,0.18)', marginBottom: 4 }}>
       <div style={{ fontSize: 7, fontWeight: 700, color: '#93c5fd', marginBottom: 3 }}>
-        📋 Карточки анализов по фазам ({cards.length}) — единый перечень K0–K10
+        📋 Анализы по фазам ({cards.length})
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {cards.map(card => {
