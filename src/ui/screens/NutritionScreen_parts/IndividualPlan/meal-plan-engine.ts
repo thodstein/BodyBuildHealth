@@ -15230,7 +15230,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_dayDevPctP4 > PLANNER_CONVERGENCE_PCT) {
         const _cons = checkTargetsConsistency(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
         if (!_cons.consistent) {
-          notes.push(`⚠ «Не сошлось»: цели несогласованы (ккал ${input.goalKcal} ≠ 4Б+4У+9Ж = ${_cons.atwaterKcal}, расхождение ${_cons.devPct}%) — день сведён к макросам, ккал-ось честный best-effort`);
+          // §8.106: про несогласованность говорим ДЕЛОМ — сколько дают макросы и что
+          // дописать, чтобы выйти на введённые ккал (раньше день молча подменял углеводы).
+          const _gapK = Math.round((Number(input.goalKcal) || 0) - _cons.atwaterKcal);
+          const _advice = _gapK > 0
+            ? `чтобы выйти на ${Math.round(Number(input.goalKcal) || 0)} ккал — добавьте ~${Math.round(_gapK / 4)} г углеводов или ~${Math.round(_gapK / 9)} г жиров`
+            : `макросы уже дают на ${Math.abs(_gapK)} ккал больше цели — уберите ~${Math.round(-_gapK / 4)} г углеводов или ~${Math.round(-_gapK / 9)} г жиров`;
+          notes.push(`⚠ «Не сошлось»: цели несогласованы (ккал ${input.goalKcal} ≠ 4Б+4У+9Ж = ${_cons.atwaterKcal}, расхождение ${_cons.devPct}%) — день сведён к макросам (Б ${Math.round(input.goalProteinG || 0)} / Ж ${Math.round(input.goalFatG || 0)} / У ${Math.round(input.goalCarbsG || 0)} г), ккал-ось честный best-effort; ${_advice}`);
         } else {
           notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${PLANNER_CONVERGENCE_PCT}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`);
         }
@@ -17316,7 +17322,8 @@ export interface NormalizedMacroTargets {
   p: number;
   f: number;
   c: number;
-  source: 'consistent' | 'kcal-derived-carbs' | 'macro-derived-kcal';
+  // §8.106: вариант 'kcal-derived-carbs' удалён — углеводы больше не выводятся из ккал.
+  source: 'consistent' | 'macro-derived-kcal';
   inputDeviationPct: number;
 }
 
@@ -17329,8 +17336,14 @@ export function normalizeMacroTargets(kcal: number, p: number, f: number, c: num
   const formula = safeP * 4 + safeF * 9 + safeC * 4;
   const deviation = safeKcal > 0 && formula > 0 ? Math.abs(safeKcal - formula) / safeKcal * 100 : 0;
   if (safeKcal > 0 && formula > 0 && deviation > 3) {
-    const derivedC = Math.max(0, Math.round((safeKcal - safeP * 4 - safeF * 9) / 4));
-    return { kcal: safeKcal, p: safeP, f: safeF, c: derivedC, source: 'kcal-derived-carbs', inputDeviationPct: deviation };
+    // §8.106: цели внутренне несогласованы (ккал ≠ 4Б + 9Ж + 4У).
+    // КОНТРАКТ ПОЛЬЗОВАТЕЛЯ — МАКРОСЫ: день строится под заданные Б/Ж/У, а ккал —
+    // следствие (4Б + 9Ж + 4У). Раньше здесь углеводы ВЫВОДИЛИСЬ из ккал, и любой ввод
+    // с расхождением >3% молча получал другие углеводы: замер 3000/240/100/150 →
+    // У 285 вместо 150 («+150 углеводов», факт дня +129…+145 при разных целях).
+    // Теперь макросы не переписываются никогда; про несогласованность движок говорит
+    // нотой (см. checkTargetsConsistency ниже по коду), а не подменой цифр.
+    return { kcal: Math.round(formula), p: safeP, f: safeF, c: safeC, source: 'macro-derived-kcal', inputDeviationPct: deviation };
   }
   return { kcal: safeKcal || Math.round(formula), p: safeP, f: safeF, c: safeC, source: safeKcal > 0 ? 'consistent' : 'macro-derived-kcal', inputDeviationPct: deviation };
 }

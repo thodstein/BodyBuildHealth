@@ -144,7 +144,11 @@ describe('R-HV: products 1500У + инсулин', () => {
 });
 
 describe('R-HV: products 500Б — best-effort + бейдж', () => {
-  const plan = buildDayPlan(base({ goalKcal: 6000, goalProteinG: 500, goalFatG: 120, goalCarbsG: 550 }));
+  // §8.106: цели обязаны быть согласованными — 4×500 + 9×120 + 4×730 = 6000 ккал.
+  // При У 550 те же 6000 ккал противоречили макросам (сумма 5280), движок держал
+  // макросы и вытягивал белок до 493 г, из-за чего завтрак получал 375 г яичного
+  // белка (правило «порция ≤350 г» ломалось на арифметике, а не на продуктах).
+  const plan = buildDayPlan(base({ goalKcal: 6000, goalProteinG: 500, goalFatG: 120, goalCarbsG: 730 }));
 
   it('белок дотянут (dev ≤25%) + бейдж выше потолка', () => {
     expect(Math.abs(plan.totals.p - 500) / 500).toBeLessThanOrEqual(0.25);
