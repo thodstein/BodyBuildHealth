@@ -17,7 +17,7 @@ import { resolve } from 'node:path';
 import { deriveTier, LAB_TIERS } from '../../data/lab-tier-ranges';
 import {
   GGT_ULN, GGT_STAGE_ULN, LFT_ULN, LFT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, RBC_ULN,
 } from '../lab-norms.engine';
 import { VERIFICATION_SYSTEMS, markerThresholds, type VerifMarker } from '../risk-verification.engine';
 
@@ -123,6 +123,25 @@ describe('HCT/HGB: один ряд на маркер во всех систем�
       ]);
       expect(markerThresholds(m, 'female')).toEqual([
         HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15,
+      ]);
+    }
+  });
+
+  it('RBC = RBC_ULN (+0.4 / +0.8): мужской ряд не ниже своей ВГН', () => {
+    const round1 = (v: number) => Math.round(v * 10) / 10;
+    const rbcs: VerifMarker[] = [];
+    for (const sys of VERIFICATION_SYSTEMS) {
+      for (const mech of sys.mechanisms) {
+        for (const mk of mech.markers) if (mk.code === 'RBC') rbcs.push(mk);
+      }
+    }
+    expect(rbcs.length).toBeGreaterThanOrEqual(1);
+    for (const m of rbcs) {
+      expect(markerThresholds(m, 'male')).toEqual([
+        RBC_ULN.male, round1(RBC_ULN.male + 0.4), round1(RBC_ULN.male + 0.8),
+      ]);
+      expect(markerThresholds(m, 'female')).toEqual([
+        RBC_ULN.female, round1(RBC_ULN.female + 0.4), round1(RBC_ULN.female + 0.8),
       ]);
     }
   });

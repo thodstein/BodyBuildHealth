@@ -5,7 +5,7 @@
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, RBC_ULN,
 } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
@@ -73,6 +73,18 @@ const HCT_STEPS: { male: [number, number, number]; female: [number, number, numb
 const HGB_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
   male: [HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block, HGB_THRESHOLDS.male.block + 15],
   female: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
+};
+
+/**
+ * Ступени эритроцитов: ВГН · +0.4 · +0.8 (10¹²/л). Мужской ряд начинался с 5.5
+ * при ВГН 5.8 — норма читалась как эритроцитоз; женский уже совпадал с
+ * резолвером (5.2/5.6/6.0), поэтому ряд просто выведен из `RBC_ULN`.
+ */
+const rbcStep = (uln: number, k: number) => Math.round((uln + k) * 10) / 10;
+
+const RBC_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
+  male: [RBC_ULN.male, rbcStep(RBC_ULN.male, 0.4), rbcStep(RBC_ULN.male, 0.8)],
+  female: [RBC_ULN.female, rbcStep(RBC_ULN.female, 0.4), rbcStep(RBC_ULN.female, 0.8)],
 };
 
 const M = (
@@ -250,7 +262,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       { id: 'hem1', weight: 1.0, markers: [
         M('HCT', 'Гематокрит', '%', 'high', HCT_STEPS.male, { thresholds: HCT_STEPS.female }),
         M('HGB', 'Гемоглобин', 'г/л', 'high', HGB_STEPS.male, { thresholds: HGB_STEPS.female }),
-        M('RBC', 'Эритроциты', '10¹²/л', 'high', [5.5, 6.0, 6.5], { thresholds: [5.2, 5.6, 6.0] }),
+        M('RBC', 'Эритроциты', '10¹²/л', 'high', RBC_STEPS.male, { thresholds: RBC_STEPS.female }),
         M('WBC', 'Лейкоциты', '10⁹/л', 'high', [11, 13, 15]),
       ] },
       { id: 'hem2', weight: 0.7, markers: [
