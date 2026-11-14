@@ -801,7 +801,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     setGoalRecommendations(findSupportByGoal(supportGoal, 20));
 
     const labData = linked.labs || [];
-    const labRes = interpretLabs(labData);
+    const labSex = linked.profile?.settings?.personal?.sex;
+    const labRes = interpretLabs(labData, labSex === 'female' ? 'female' : undefined);
     setLabAnalysis(labRes);
     const mechRep = generateMechanismReport(labRes);
     setMechanismReport(mechRep);

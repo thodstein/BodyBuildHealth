@@ -1828,8 +1828,8 @@ export const LabsRisksTab: React.FC = () => {
 
   const labAnalysisRes = useMemo(() => {
     if (!hasLabs) return null;
-    return interpretLabs(labs);
-  }, [hasLabs, labs]);
+    return interpretLabs(labs, profileSex === 'female' ? 'female' : undefined);
+  }, [hasLabs, labs, profileSex]);
 
   const r = labAnalysisRes;
   const ASI = r ? Math.max(0, Math.round(100 - ((r.hormoneScore||0)*0.4 + Math.min(100, (r.inflammation||0)/6*50)*0.3 + (r.kidneyStress||0)*0.3))) : null;

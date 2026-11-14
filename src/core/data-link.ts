@@ -353,7 +353,13 @@ export function useDataLink(): LinkedData {
   }, [profile, activeDrugs, labs]);
 
   const avg = useMemo(() => computeWeeklyAverages(), []);
-  const labAnalysisMemo = useMemo(() => labs.length > 0 ? interpretLabs(labs) : null, [labs]);
+  // ♀ Женские границы анализов (АЛТ/АСТ/ГГТ 31, HCT 48, HGB 150, креатинин 97,
+  // E2/PRL по фазовой модели) — из резолвера норм, а не мужской ряд для всех.
+  const profileSex = profile?.settings?.personal?.sex;
+  const labAnalysisMemo = useMemo(
+    () => (labs.length > 0 ? interpretLabs(labs, profileSex === 'female' ? 'female' : undefined) : null),
+    [labs, profileSex],
+  );
 
   return useMemo(() => ({
     profile, labs, course, readiness, risk, labAnalysis: labAnalysisMemo,

@@ -493,8 +493,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labAnalysisResult = useMemo(() => {
     if (!hasLabs) return null;
-    return interpretLabs(currentLabs);
-  }, [hasLabs, currentLabs]);
+    return interpretLabs(currentLabs, profileSex === 'female' ? 'female' : undefined);
+  }, [hasLabs, currentLabs, profileSex]);
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];

@@ -1,5 +1,9 @@
 // Lab Analysis Engine — interprets lab values into mechanisms, organs, systems, risks
 import type { LabPoint } from '../core/types';
+import {
+  LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN,
+} from './lab-norms.engine';
 
 export interface LabInterpretation {
   code: string;
@@ -65,6 +69,30 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   THROMBOCYTES: { low: 150, high: 400, criticalHigh: 500, unit: '10^9/л' },
   POTASSIUM: { low: 3.5, high: 5.1, criticalHigh: 6.0, unit: 'ммоль/л' },
   SODIUM: { low: 135, high: 145, criticalHigh: 155, unit: 'ммоль/л' },
+};
+
+/**
+ * ♀ Границы, которые у женщины отличаются от мужских. `interpretLabs` брал
+ * мужской ряд для всех: женщина с АЛТ 35, ГГТ 40, HCT 49, гемоглобином 160,
+ * креатинином 100, эстрадиолом 200 пг/мл или пролактином 600 мЕд/л читала
+ * «норма», а тестостерон 1 нмоль/л давал ей «андрогенный дефицит».
+ * Числа — из резолвера норм, не литералы.
+ *  - ТТ у женщины: низкий не является дефицитом (low = 0), верх 6 нмоль/л —
+ *    порог вирилизации (женский протокол); критический — 10.
+ *  - E2: норма фазовая, поэтому «высоко» — от жёлтого бэнда (>400 пг/мл),
+ *    критично — от красного (>800).
+ */
+const FEMALE_REFERENCE_OVERRIDES: Record<string, { low?: number; high?: number; criticalHigh?: number }> = {
+  ALT: { high: LFT_ULN.ALT.female, criticalHigh: LFT_STAGE_ULN.reduce.female },
+  AST: { high: LFT_ULN.AST.female, criticalHigh: LFT_STAGE_ULN.reduce.female },
+  GGT: { high: GGT_ULN.female, criticalHigh: GGT_STAGE_ULN.double.female },
+  CREATININE: { low: 44, high: CREATININE_ULN.female, criticalHigh: 120 },
+  HEMOGLOBIN: { low: 120, high: HGB_THRESHOLDS.female.upper, criticalHigh: HGB_THRESHOLDS.female.block },
+  HEMATOCRIT: { low: 36, high: HCT_THRESHOLDS.female.erythrocytosis, criticalHigh: HCT_THRESHOLDS.female.block },
+  TESTOSTERONE_TOTAL: { low: 0, high: 6, criticalHigh: 10 },
+  TESTOSTERONE_FREE: { low: 0 },
+  ESTRADIOL: { low: FEMALE_HORMONE_ULN.E2.low, high: FEMALE_HORMONE_ULN.E2.high, criticalHigh: FEMALE_HORMONE_ULN.E2.criticalHigh },
+  PROLACTIN: { high: FEMALE_HORMONE_ULN.PRL.high, criticalHigh: FEMALE_HORMONE_ULN.PRL.criticalHigh },
 };
 
 const LAB_MECHANISM_MAP: Record<string, { mechanism: string; organ: string; system: string; risk: string }> = {
@@ -152,18 +180,22 @@ export function computeHOMA_IR(glucose: number, insulin: number): number {
   return (glucose * insulin) / 22.5;
 }
 
-export function interpretLabs(labs: LabPoint[]): LabCompositeResult {
+export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female'): LabCompositeResult {
+  const fem = sex === 'female';
   const interpretations: LabInterpretation[] = [];
 
   for (const [code, ref] of Object.entries(REFERENCE_RANGES)) {
     const value = findLab(labs, code);
     if (value === null) continue;
 
+    // ♀ — женские границы того же маркера (без sex — прежний мужской ряд).
+    const r = fem ? { ...ref, ...(FEMALE_REFERENCE_OVERRIDES[code] || {}) } : ref;
+
     let status: LabInterpretation['status'] = 'normal';
     // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой)
-    if (value < ref.low) status = 'low';
-    else if (value > ref.criticalHigh) status = 'critical_high';
-    else if (value > ref.high) status = 'high';
+    if (value < r.low) status = 'low';
+    else if (value > r.criticalHigh) status = 'critical_high';
+    else if (value > r.high) status = 'high';
 
     if (status !== 'normal') {
       const mapped = LAB_MECHANISM_MAP[code];
@@ -178,10 +210,15 @@ export function interpretLabs(labs: LabPoint[]): LabCompositeResult {
   const insulin = findLab(labs, 'INSULIN') ?? 0;
   const homaIR = glucose > 0 && insulin > 0 ? computeHOMA_IR(glucose, insulin) : null;
 
-  const alt = findLab(labs, 'ALT') ?? 30;
-  const ast = findLab(labs, 'AST') ?? 30;
-  const ggt = findLab(labs, 'GGT') ?? 30;
-  const liverStress = Math.round(((alt + ast + ggt) / 3 / 40) * 100);
+  // Индекс печени — в долях ВГН пациента (♀ 31, ♂ 40): раньше всегда делили на
+  // мужские 40, и её АЛТ 35 давал заниженный «стресс печени». Пустые значения по
+  // умолчанию держат индекс на прежнем уровне (75) у обоих полов.
+  const lftBase = fem ? LFT_ULN.ALT.female : LFT_ULN.ALT.male;
+  const defaultLft = Math.round(30 * (lftBase / 40));
+  const alt = findLab(labs, 'ALT') ?? defaultLft;
+  const ast = findLab(labs, 'AST') ?? defaultLft;
+  const ggt = findLab(labs, 'GGT') ?? defaultLft;
+  const liverStress = Math.round(((alt + ast + ggt) / 3 / lftBase) * 100);
 
   const ldl = findLab(labs, 'LDL') ?? 2.5;
   const hdl = findLab(labs, 'HDL') ?? 1.3;
@@ -193,19 +230,27 @@ export function interpretLabs(labs: LabPoint[]): LabCompositeResult {
   const ferritin = findLab(labs, 'FERRITIN') ?? 100;
   const inflammation = Math.round(crp + (ferritin / 100));
 
-  const creatinine = findLab(labs, 'CREATININE') ?? 90;
+  // Индекс почек — от ВГН креатинина пациента (♀ 97, ♂ 110), а не от 110 для всех.
+  const crBase = fem ? CREATININE_ULN.female : CREATININE_ULN.male;
+  const creatinine = findLab(labs, 'CREATININE') ?? Math.round(90 * (crBase / 110));
   const urea = findLab(labs, 'UREA') ?? 5;
-  const kidneyStress = Math.round(((creatinine / 110) * 60 + (urea / 8.3) * 40));
+  const kidneyStress = Math.round(((creatinine / crBase) * 60 + (urea / 8.3) * 40));
 
   const testTotal = findLab(labs, 'TESTOSTERONE_TOTAL');
   const testFree = findLab(labs, 'TESTOSTERONE_FREE');
   const e2 = findLab(labs, 'ESTRADIOL');
   const prolactin = findLab(labs, 'PROLACTIN');
   let hormoneScore = 0;
-  if (testTotal !== null && testTotal < 15) hormoneScore += 30;
-  if (testFree !== null && testFree < 0.3) hormoneScore += 25;
-  if (e2 !== null && (e2 > 160 || e2 < 40)) hormoneScore += 25;
-  if (prolactin !== null && prolactin > 350) hormoneScore += 20;
+  // ♀ Низкий тестостерон — не дефицит (у неё нормы другие), штраф только мужчинам.
+  if (!fem && testTotal !== null && testTotal < 15) hormoneScore += 30;
+  if (!fem && testFree !== null && testFree < 0.3) hormoneScore += 25;
+  // E2 у женщины — фазовая модель: штраф только за красный бэнд (<30 / >800), не
+  // за мужское окно 40–160, иначе её норма читалась бы как отклонение.
+  if (e2 !== null) {
+    if (fem ? (e2 < FEMALE_HORMONE_ULN.E2.low || e2 > FEMALE_HORMONE_ULN.E2.criticalHigh) : (e2 > 160 || e2 < 40)) hormoneScore += 25;
+  }
+  const prlCut = fem ? FEMALE_HORMONE_ULN.PRL.high : 350;
+  if (prolactin !== null && prolactin > prlCut) hormoneScore += 20;
   hormoneScore = Math.min(100, hormoneScore);
 
   return { homaIR, liverStress, cardioRisk, inflammation, kidneyStress, hormoneScore, interpretations };
