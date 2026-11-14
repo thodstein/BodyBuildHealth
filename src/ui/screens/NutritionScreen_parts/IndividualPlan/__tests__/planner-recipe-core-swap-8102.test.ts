@@ -279,7 +279,16 @@ describe('§8.102: ячейки B15a сведены в канон 3%', () => {
       const { res, totals, t } = buildCell(w, mode, meals, pPerKg, train);
       expect(worstOf(axesOf(totals, t))).toBeLessThanOrEqual(3);
       const swaps = (res.notes as string[]).filter(n => /🔄/.test(n));
-      expect(swaps.length).toBeGreaterThan(0);
+      // §8.107c: после «последней мили по углеводам» (честный срез излишка из
+      // перекормленного приёма) день может сойтись в канон БЕЗ свапа ядра — тогда
+      // «свап обязан случиться» не инвариант: он был следствием того, что день
+      // выходил за 3%. Проверяем: либо свап был и нота честная (ниже), либо день
+      // сошёлся честными граммами без подмены блюда. Механизм свапа при этом
+      // по-прежнему заперт другими ячейками этой таблицы.
+      if (swaps.length === 0) {
+        expect(worstOf(axesOf(totals, t))).toBeLessThanOrEqual(3);
+        return;
+      }
       // Каждый свап объяснён и ссылается на реальный вариант из `recipeOptions` этого приёма.
       for (const n of swaps) {
         const mm = n.match(/«([^»]+)»: рецепт «([^»]+)» → «([^»]+)»/);

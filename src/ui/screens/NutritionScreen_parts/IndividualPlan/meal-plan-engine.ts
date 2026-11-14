@@ -3855,6 +3855,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     input = { ...input, mealsCount: 5 };
   }
   if (input.mealsCount > 10) input = { ...input, mealsCount: 10 };
+  // §8.107 (требование владельца: «любые цели, включая ручные, ≤3% по ккал и отдельно по Б/Ж/У»):
+  // внутренне противоречивый вход НЕ пересобирается под «правильные» ккал — замер показал,
+  // что день, собранный на 6-18% меньше еды, ломает выверенные правила (творог 70 г при
+  // минимуме 75, тарелка 762 г, витрина клетчатки, 37 инвариантов). Поэтому:
+  //  • макросы остаются ровно те, что ввёл пользователь (никакой подмены углеводов),
+  //  • корректор целится в 4Б + 9Ж + 4У (см. normalizeMacroTargets ниже по коду),
+  //  • расхождение с введёнными ккал объявляется нотой с конкретным советом, а не прячется.
+  const _kcalEntered = Number(input.goalKcal) || 0;
+  // §8.107a (замер и ОТКАТ): сборка дня под согласованный набор (ккал := 4Б+9Ж+4У) — единственное,
+  // что реально сводит противоречивый вход: на сетке 405 дней «все 4 оси в 3%» было бы 86%
+  // (231/270 несогласованных) против 17% (46/270) без неё, а кейс владельца 3000/240/100/150
+  // сходится в 0.8% по всем четырём осям (2457/241/99/150 при эталоне 2460/240/100/150).
+  // НО: уменьшённая сборка пробивает выверенные полы реализма на тесных днях — 2025 тестов
+  // дали 8 красных, среди них QG-пол цельного белка (творог 70 г при минимуме 75 г для
+  // атлета ≥80 кг), шаблон classic_oat без банана, «ккал-комната» микро-добивки, живой кейс
+  // §8.106. По правилу «правка, рушащая выверенный инвариант, откатывается и фиксируется
+  // долгом» подмена калорийности здесь ОТКЛЮЧЕНА; долг и данные замера — B20 в аудите
+  // `docs/NUTRITION-PLANNER-QUALITY-AUDIT-2026-10.md` §8.107.
+  // Что работает вместо неё: макросы не подменяются, белок приёмов не перетирает явную цель
+  // (см. `_pGiven`), а расхождение ккал↔макросы называется нотой с конкретным советом.
   // Guardrail физической вместимости (рекомендация живёт в UI — planner-meal-count).
   // Явный mealsCount пользователя — КОНТРАКТ (D-24: «3→3, 8→8»), поэтому движок
   // расширяет приёмы только когда день физически не влезает:
@@ -3937,24 +3957,33 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ─── Волна 2: Низкокалорийные дни (1200-1500 ккал) ───────────────────────
   // При низкой калорийности приоритет белка над углеводами/жирами,
   // компактные источники клетчатки, адаптивный peri-протокол.
+  // §8.107: «повышение белка до 35% ккал» — только когда белок НЕ задан (0). Явная цифра
+  // пользователя (включая ручную) неприкосновенна: раньше при 55 кг / 1408 ккал цель 88 г
+  // молча превращалась в 105 г, и день честно перебирал белок на 19% — «цель не сходится».
+  let _pGivenNote: string | null = null;
   {
     const _targetKcal = input.goalKcal || 0;
+    const _pGiven = (input.goalProteinG || 0) > 0;
     if (_targetKcal >= 1200 && _targetKcal <= 1500) {
       // Приоритет белка: минимум 35% калорий от белка
       const _w = Math.max(40, input.weightKg || 80);
       const _minProteinG = (_targetKcal * 0.35) / 4;
       const _stdProteinG = _w * 0.45;
       const _boostedProtein = Math.min(_w * 2.0, Math.max(input.goalProteinG || 0, _stdProteinG, _minProteinG));
-      if (_boostedProtein > (input.goalProteinG || 0)) {
+      if (!_pGiven && _boostedProtein > (input.goalProteinG || 0)) {
         input = { ...input, goalProteinG: Math.round(_boostedProtein) };
+      } else if (_pGiven && _boostedProtein > (input.goalProteinG || 0) * 1.03) {
+        _pGivenNote = `🥩 Белок ${Math.round(input.goalProteinG || 0)} г — ваша цифра (${Math.round(((input.goalProteinG || 0) * 4 / _targetKcal) * 100)}% ккал при норме ≥35% на низкой калорийности); план собран по ней, не «доливаем» до ${Math.round(_boostedProtein)} г.`;
       }
     } else if (_targetKcal > 0 && _targetKcal < 1200) {
       // Очень низкая калорийность: экстремальные меры
       const _w = Math.max(40, input.weightKg || 80);
       const _minProteinG = (_targetKcal * 0.40) / 4; // 40% калорий от белка
       const _boostedProtein = Math.min(_w * 2.2, Math.max(input.goalProteinG || 0, _w * 0.45, _minProteinG));
-      if (_boostedProtein > (input.goalProteinG || 0)) {
+      if (!_pGiven && _boostedProtein > (input.goalProteinG || 0)) {
         input = { ...input, goalProteinG: Math.round(_boostedProtein) };
+      } else if (_pGiven && _boostedProtein > (input.goalProteinG || 0) * 1.03) {
+        _pGivenNote = `🥩 Белок ${Math.round(input.goalProteinG || 0)} г — ваша цифра (при норме ≥40% ккал на очень низкой калорийности); план собран по ней.`;
       }
     }
   }
@@ -4094,6 +4123,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Early declarations needed for lab adjustments
   const notes: string[] = [];
   if (_autoMealsNote) notes.push(_autoMealsNote);
+  if (_pGivenNote) notes.push(_pGivenNote);
   // Хвост-3: floor/MPS-модификаторы из ЕДИНОГО источника (planTypeFloorMods), а не из
   // отдельного декоративного planTypeMod. Реальный макро-профиль дня задаёт buildDayTargets.
   const _ptm = planTypeFloorMods(input.planType);
@@ -4780,6 +4810,30 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     mealBudget.breakfast.p += halfP;
     mealBudget.lunch.p += residualP - halfP;
     residualP = 0;
+  }
+  // §8.107 (B19-причина): сумма бюджетов белка не может превышать цель дня. Пока их сумма
+  // шла вразнос (авто-расширение числа приёмов + MPS-пол каждого приёма), день честно
+  // перебирал белок на 10-28%: 55 кг / 88 г на 6 приёмах давал 102-108 г, 70 кг / 112 г —
+  // 118-122 г. Цель Б — контракт пользователя, распределение подстраивается под неё.
+  //
+  // §8.107b: замер по 204 инвариантам показал, что «срезать бюджеты до ровной цели»
+  // ломает правило «белок — ПОЛ» (§8.91): строители приёмов упираются в свои минимумы и
+  // день уходит НИЖЕ цели (QG34: ручной день 7 приёмов). Поэтому бюджеты сводятся не к
+  // цели, а к её коридору 0…+2%: срезаем только перебор сверх этого коридора.
+  {
+    const _pKeys = ['breakfast', 'lunch', 'dinner', 'prew', 'postw', 'snack', 'snack2', 'snack3', 'snack4', 'snack5', 'snack6', 'preSleep'] as const;
+    let _pSum = 0;
+    for (const _k of _pKeys) { const _b: any = (mealBudget as any)[_k]; if (_b && _b.p > 0) _pSum += _b.p; }
+    const _pCeil = goalProteinTarget * 1.02;
+    if (goalProteinTarget > 0 && _pSum > _pCeil) {
+      const _k = _pCeil / _pSum;
+      for (const _key of _pKeys) {
+        const _b: any = (mealBudget as any)[_key];
+        if (!_b || !(_b.p > 0)) continue;
+        // Пол приёма — 8 г: ниже этого приём перестаёт нести белок как таковой.
+        _b.p = Math.max(8, Math.round(_b.p * _k));
+      }
+    }
   }
 
     const allFoodsUsed: string[] = [];
@@ -15194,11 +15248,89 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Считается здесь, ПОСЛЕ всех писателей и reconciliation. Канон допуска —
     // PLANNER_CONVERGENCE_PCT (3%). >3% — только честный best-effort с ЯВНОЙ
     // причиной (несогласованные цели / упор в капы-полы), а не подгонка мусором.
+    // ─── §8.107c (последняя миля по углеводам — только СРЕЗ) ───
+    // После всех поздних проходов (долив снека, капы, гигиена) углеводы дня могут выйти
+    // за канон: поздние проходы идут ПОСЛЕ единственного вызова корректора. Живой кейс
+    // владельца 3000/Б240/Ж100/У150: снек получал 57 г У при собственной квоте 12 г,
+    // а пред- и пост-тренировочный приёмы оставались по 9 и 8 г У при квотах 25/29 —
+    // день заканчивался 2531/243/101/163 (+8.9% У). Здесь срезаем ТОЛЬКО излишек из
+    // самого перекормленного углеводами приёма, по его же квоте: без пересборки дня,
+    // без добавления блюд и без касания белка/жира — поэтому капы, полы и витрины,
+    // которые выставили поздние стадии, остаются в силе.
+    {
+      const _cGoal = input.goalCarbsG || 0;
+      if (_cGoal > 0) {
+        // Канон сверки здесь — МАКРОСЫ пользователя (ккал = 4Б+9Ж+4У), а не введённые ккал:
+        // для противоречивого входа ккал-ось по определению не сходится.
+        const _lmP = input.goalProteinG || 0, _lmF = input.goalFatG || 0;
+        const _lmK = Math.round(4 * _lmP + 9 * _lmF + 4 * _cGoal) || (input.goalKcal || 0);
+        const _devAll = () => Math.max(
+          _lmK > 0 ? Math.abs(totals.kcal - _lmK) / _lmK : 0,
+          _lmP > 0 ? Math.abs(totals.p - _lmP) / _lmP : 0,
+          _lmF > 0 ? Math.abs(totals.f - _lmF) / _lmF : 0,
+          _cGoal > 0 ? Math.abs(totals.c - _cGoal) / _cGoal : 0,
+        ) * 100;
+        let _over = totals.c - _cGoal * 1.005;
+        if (_over > 0) {
+          let _cut = 0;
+          const _order = meals
+            .map((m: any) => ({ m, over: (m?.totals?.c || 0) - (m?.target?.c || 0) }))
+            .filter((x: any) => x.over > 0)
+            .sort((a: any, b: any) => b.over - a.over);
+          for (const { m } of _order) {
+            if (_over <= 0) break;
+            const carriers = (m.items || [])
+              .filter((it: any) => (it.role === 'carb_slow' || it.role === 'carb_fast') && !it._fixedGrams && (it.c || 0) >= 30)
+              .sort((a: any, b: any) => (b.c || 0) - (a.c || 0));
+            for (const it of carriers) {
+              if (_over <= 0) break;
+              const amt = Number(it.amount) || 0;
+              const c = Number(it.c) || 0;
+              if (amt <= 0 || c <= 0) continue;
+              const perG = c / amt;
+              // Пол позиции — 30 г: гарнир остаётся гарниром (QG10), не «крошкой».
+              const roomG = Math.floor(amt - 30);
+              if (roomG < 1) continue;
+              const needG = Math.ceil(_over / perG);
+              const takeG = Math.min(roomG, needG);
+              if (takeG < 1) continue;
+              const _devBefore = _devAll();
+              const _snap = { amount: it.amount, p: it.p, f: it.f, c: it.c, kcal: it.kcal, fiber: it.fiber, leucine_mg: it.leucine_mg };
+              const k = (amt - takeG) / amt;
+              for (const key of ['p', 'f', 'c', 'fiber']) {
+                if (typeof it[key] === 'number') it[key] = Math.round(it[key] * k * 10) / 10;
+              }
+              if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round(it.leucine_mg * k);
+              it.amount = amt - takeG;
+              it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
+              m.totals = mealTotalsOf(m.items);
+              recalcDayTotals(meals, totals);
+              // Срез принимается ТОЛЬКО если канон по четырём осям не ухудшился:
+              // иначе снятие углеводного носителя обнажает перебор по белку/жиру.
+              if (_devAll() > _devBefore + 0.05) {
+                Object.assign(it, _snap);
+                m.totals = mealTotalsOf(m.items);
+                recalcDayTotals(meals, totals);
+                continue;
+              }
+              _cut += takeG;
+              _over = totals.c - _cGoal * 1.005;
+            }
+          }
+          if (_cut > 0) {
+            notes.push(`✂️ Углеводы: излишек дня срезан из перекормленного приёма (−${_cut} г углеводного носителя) — состав блюд не подменялся, белок/жир не тронуты`);
+          }
+        }
+      }
+    }
     let _dayDevPctP4 = 0;
     {
-      // §8.91 (решение владельца «а»): белок — ПОЛ. Канон оптимизации/вердикта — ккал/Ж/У
-      // (двусторонние) + недобор белка; перебор Б не дефект дня (ядра рецептов и MPS-полы
-      // не режутся), но он называется явно в ноте ниже. Порог PLANNER_CONVERGENCE_PCT НЕ поднят.
+      // §8.91 (решение владельца «а») + §8.107b (замер по 204 инвариантам): белок — ПОЛ.
+      // Канон вердикта — ккал/Ж/У (двусторонние) + недобор белка. Перебор Б теперь чинится
+      // СБОРКОЙ (явная цифра пользователя не перетирается — см. `_pGiven` выше, бюджеты
+      // приёмов сводятся к коридору цели), а не отчётностью: двусторонняя Б-ось в вердикте
+      // валила инвариант «канон КБЖУ в 29 из 30 дней» на днях, где день честно упирался в
+      // ядра/MPS-полы. Перебор Б, если он остался, называется нотой ниже.
       const _dayDevP4 = Math.max(
         (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
         (input.goalProteinG || 0) > 0 ? Math.max(0, (input.goalProteinG || 0) - totals.p) / (input.goalProteinG || 1) : 0,
@@ -15224,19 +15356,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       {
         const _gp = input.goalProteinG || 0;
         if (_gp > 0 && totals.p > _gp * 1.05) {
-          notes.push(`📐 Белок — пол: ${Math.round(totals.p)} г при цели ${Math.round(_gp)} г (+${Math.round(((totals.p - _gp) / _gp) * 100)}%) — ядра/MPS-полы приёмов не режутся; перебор Б не считается расхождением дня`);
+          notes.push(`📐 Белок ${Math.round(totals.p)} г при цели ${Math.round(_gp)} г (+${Math.round(((totals.p - _gp) / _gp) * 100)}%) — ядра/MPS-полы приёмов не режутся (§8.91), поэтому день выше вашей цифры; чтобы выйти ровно, снизьте ядро приёма или число приёмов`);
         }
       }
+      // §8.107: если входная арифметика не сходилась (ккал ≠ 4Б+9Ж+4У), говорим об этом
+      // ВСЕГДА и делом — под какие макросы собран план и что дописать, чтобы выйти на
+      // введённые ккал.
+      const _consIn = checkTargetsConsistency(_kcalEntered, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+      if (!_consIn.consistent) {
+        const _gapK = Math.round(_kcalEntered - _consIn.atwaterKcal);
+        const _advice = _gapK > 0
+          ? `чтобы выйти на ${Math.round(_kcalEntered)} ккал — добавьте ~${Math.round(_gapK / 4)} г углеводов или ~${Math.round(_gapK / 9)} г жиров`
+          : `макросы уже дают на ${Math.abs(_gapK)} ккал больше цели — уберите ~${Math.round(-_gapK / 4)} г углеводов или ~${Math.round(-_gapK / 9)} г жиров`;
+        notes.push(`⚖️ Ккал = 4Б + 9Ж + 4У: ваши Б ${Math.round(input.goalProteinG || 0)} / Ж ${Math.round(input.goalFatG || 0)} / У ${Math.round(input.goalCarbsG || 0)} г дают ${_consIn.atwaterKcal} ккал, а ккал-цель была ${Math.round(_kcalEntered)} (расхождение ${_consIn.devPct}%). План собран под ваши макросы (ккал ${_consIn.atwaterKcal}); ${_advice}.`);
+      }
       if (_dayDevPctP4 > PLANNER_CONVERGENCE_PCT) {
-        const _cons = checkTargetsConsistency(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
-        if (!_cons.consistent) {
-          // §8.106: про несогласованность говорим ДЕЛОМ — сколько дают макросы и что
-          // дописать, чтобы выйти на введённые ккал (раньше день молча подменял углеводы).
-          const _gapK = Math.round((Number(input.goalKcal) || 0) - _cons.atwaterKcal);
-          const _advice = _gapK > 0
-            ? `чтобы выйти на ${Math.round(Number(input.goalKcal) || 0)} ккал — добавьте ~${Math.round(_gapK / 4)} г углеводов или ~${Math.round(_gapK / 9)} г жиров`
-            : `макросы уже дают на ${Math.abs(_gapK)} ккал больше цели — уберите ~${Math.round(-_gapK / 4)} г углеводов или ~${Math.round(-_gapK / 9)} г жиров`;
-          notes.push(`⚠ «Не сошлось»: цели несогласованы (ккал ${input.goalKcal} ≠ 4Б+4У+9Ж = ${_cons.atwaterKcal}, расхождение ${_cons.devPct}%) — день сведён к макросам (Б ${Math.round(input.goalProteinG || 0)} / Ж ${Math.round(input.goalFatG || 0)} / У ${Math.round(input.goalCarbsG || 0)} г), ккал-ось честный best-effort; ${_advice}`);
+        if (!_consIn.consistent) {
+          // Ккал-ось вердикта считается от ВВЕДЁННЫХ ккал, а день собран под 4Б+9Ж+4У:
+          // для противоречивого входа «не сошлось» — это свойство входа, а не провал
+          // сборки. Называем оба числа и НЕ приписываем вину пулам/капам.
+          const _macroDev = Math.max(
+            (input.goalProteinG || 0) > 0 ? Math.abs(totals.p - (input.goalProteinG || 0)) / (input.goalProteinG || 1) : 0,
+            (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
+            (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
+          ) * 100;
+          notes.push(`⚠ «Не сошлось»: ккал-ось ${Math.round(totals.kcal)} против введённых ${Math.round(_kcalEntered)} (${_dayDevPctP4}%) — это следствие противоречия ккал↔макросы выше; по вашим макросам день в ${Math.round(_macroDev * 10) / 10}% (канон ${PLANNER_CONVERGENCE_PCT}%, эталон ${_consIn.atwaterKcal} ккал)`);
         } else {
           notes.push(`⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${PLANNER_CONVERGENCE_PCT}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`);
         }
@@ -17244,6 +17388,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
     mergeDuplicateItems(meals);
+    // §8.107d (витрина не врёт): финальная сверка «Сводки MPS» и клетчатки с ФАКТОМ
+    // тарелки. Пересборка раньше шла только в отдельных ветках финальных стадий; если
+    // день заканчивался в другой ветке (замер: salt 5, C5-fix), витрина отставала на
+    // 2 г клетчатки. Это последняя точка, после которой тарелки не меняются.
+    _resyncMps();
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
