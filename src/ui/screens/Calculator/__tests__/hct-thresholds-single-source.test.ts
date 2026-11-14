@@ -128,6 +128,32 @@ describe('гематокрит: тексты не вводят своих чис
     expect(bad).toEqual([]);
   });
 
+  it('в карточках протоколов действия с HCT называют женский порог', () => {
+    // Та же проверка для `src/ui`, куда прежний гард не смотрел: «При Hct >54% —
+    // флеботомия» в общей карточке читала женщина, у которой порог 52.
+    // Исключение — файл с явной оговоркой, что лестница ниже мужская (Гематология).
+    const dir = resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts');
+    const bad: string[] = [];
+    let scanned = 0;
+    for (const f of readdirSync(dir)) {
+      if (!/^supportProtocol.*\.tsx$/.test(f)) continue;
+      const p = join(dir, f);
+      if (!statSync(p).isFile()) continue;
+      const src = readFileSync(p, 'utf8');
+      if (/♀ Женщины|к женщинам не применяются/.test(src)) continue;
+      scanned++;
+      src.split(/\r?\n/).forEach((line, i) => {
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+        if (!/флеботом|эритроцитаферез|кровопускание|забор крови/i.test(line)) return;
+        if (!/[Hh][Cc][Tt][^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
+        if (/♀|женск/i.test(line)) return;
+        bad.push(`${f}:${i + 1} — ${line.trim().slice(0, 100)}`);
+      });
+    }
+    expect(scanned).toBeGreaterThan(10);
+    expect(bad).toEqual([]);
+  });
+
   it('канонические строки называют оба пола', () => {
     const rows = STOP_COURSE_TABLE.filter(r => /Hct/i.test(r.cond));
     expect(rows.length).toBeGreaterThan(0);
