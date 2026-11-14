@@ -5067,9 +5067,15 @@ function enrichExerciseRationale(plan: BBPlan): void {
  * Гейт уровней — backstop поверх всех добавляющих проходов: движения
  * HARD-списка (присед/становая/гудморнинг/пистолетик/плио/взвешенные скиллы)
  * меняются на регрессию той же мышцы (объём цел — только имя/вес).
- * Intermediate-движения разрешены всем по ACSM 2009 — гейтим только hard.
+ * Intermediate-движения разрешены всем по ACSM 2009.
+ * Для beginner дополнительно гейтится любой каталожный advanced (JM-жим,
+ * паузные/соревновательные варианты): недельная ротация выбирает кандидатов
+ * по offset, а не только по _score, поэтому мягкого штрафа в пуле мало —
+ * advanced-движение всплывало в 5–7-й неделе. Если регрессии той же мышцы
+ * нет, swapExerciseForLevel возвращает null, и исходник остаётся (объём
+ * важнее косметической замены).
  * Явный источник (preserveSource/faithful) не трогаем.
- * Advanced/enhanced/неизвестный уровень — без гейта (как пул).
+ * Advanced/enhanced/неизвестный уровень — без нового гейта (как пул).
  */
 function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
   const lvl = String((options as any)?.level || '').toLowerCase();
@@ -5081,7 +5087,9 @@ function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
       for (const ex of session.exercises) {
         if ((ex as any).warmupActivator) continue;
         const cat = EXERCISE_CATALOG.find((c: any) => c.name === (ex as any).name || c.id === (ex as any).exerciseName);
-        if (!isHardAdvanced({ id: (cat as any)?.id || (ex as any).exerciseName, name: (ex as any).name })) continue;
+        const catalogDifficulty = String((cat as any)?.difficulty || (ex as any).difficulty || '').toLowerCase();
+        const advancedForBeginner = lvl === 'beginner' && catalogDifficulty === 'advanced';
+        if (!advancedForBeginner && !isHardAdvanced({ id: (cat as any)?.id || (ex as any).exerciseName, name: (ex as any).name })) continue;
         const swapped = swapExerciseForLevel(
           { id: (cat as any)?.id || (ex as any).exerciseName, name: (ex as any).name },
           lvl,

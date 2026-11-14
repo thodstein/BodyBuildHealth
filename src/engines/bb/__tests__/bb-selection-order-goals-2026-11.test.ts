@@ -21,8 +21,8 @@ function ex(partial: Partial<BBExercise>): BBExercise {
   } as BBExercise;
 }
 
-function plan(patternId: string, level: 'beginner' | 'intermediate', goal: 'mass' | 'cut' | 'recomp' | 'strength_mass', sex: 'male' | 'female' = 'male') {
-  return buildBBPlan({ patternId, level, goal, weeks: 1, workMax: WM, sex } as any);
+function plan(patternId: string, level: 'beginner' | 'intermediate', goal: 'mass' | 'cut' | 'recomp' | 'strength_mass', sex: 'male' | 'female' = 'male', weeks = 1) {
+  return buildBBPlan({ patternId, level, goal, weeks, workMax: WM, sex } as any);
 }
 
 function working(session: any) {
@@ -132,11 +132,13 @@ describe('2026-11: beginner selection + goal-aware ordering', () => {
     for (const sp of SPLIT_PATTERNS) {
       const sex = sp.id.startsWith('female_') ? 'female' : 'male';
       for (const goal of goals) {
-        const p = plan(sp.id, 'beginner', goal, sex);
-        for (const s of p.weeks[0].sessions) {
-          for (const e of working(s)) {
-            if (difficulty.get(String(e.name || '')) === 'advanced') {
-              found.push(`${sp.id}/${goal}/${s.sessionTag}: ${e.name}`);
+        const p = plan(sp.id, 'beginner', goal, sex, 8);
+        for (const w of p.weeks) {
+          for (const s of w.sessions) {
+            for (const e of working(s)) {
+              if (difficulty.get(String(e.name || '')) === 'advanced') {
+                found.push(`${sp.id}/${goal}/w${w.week}/${s.sessionTag}: ${e.name}`);
+              }
             }
           }
         }
