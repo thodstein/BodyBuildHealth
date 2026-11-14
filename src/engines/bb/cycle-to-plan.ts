@@ -37,7 +37,7 @@ import { acuteChronicRatio, toDailyLoads } from '../pro/training-load.engine';
 import type { FullProgram, ProgramWeek, ProgramDay } from '../../engines/complete-program-library.engine';
 import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
-import { finalizeBBPlan, reconcileVolumeTargets } from './bb-finalize.engine';
+import { finalizeBBPlan, reconcileVolumeTargets, type BBFinalizeOptions } from './bb-finalize.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBPlanReport } from './bb-report.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
@@ -1800,6 +1800,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     methodology: input.methodology,
+    // Паритет с generic-путём: goal управляет порядком (strength_mass/cut),
+    // sex включает женские минимумы и female-проходы финалайзера. Без
+    // проброса цикловой adapt-путь терял goal-aware порядок и женские полы.
+    goal: input.goal as BBFinalizeOptions['goal'],
+    sex: input.sex,
     level,
     volumeGoal,
     // Phase invariants are safety checks, not an adaptive rewrite. Faithful
@@ -3060,6 +3065,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     specializationSchedule: specSchedule,
     methodology: opts.methodology,
+    // Паритет с generic/convert: goal-aware порядок и female-минимумы
+    // должны работать и в program-пути (см. аналогичный комментарий выше).
+    goal: opts.goal as BBFinalizeOptions['goal'],
+    sex: opts.sex,
     level: opts.level ?? levelForLandmarks,
     volumeGoal: opts.volumeGoal,
     phaseSafety: true,
