@@ -101,6 +101,21 @@ export const HCT_THRESHOLDS = {
   female: { erythrocytosis: FEMALE_HCT_THERAPY, block: FEMALE_HCT_URGENT },
 } as const;
 
+/**
+ * Пороги гемоглобина (г/л) — пара к `HCT_THRESHOLDS`: тот же эритроцитоз, та же
+ * шкала «верх нормы → флеботомия/отмена».
+ *  - `upper` — верх нормы: из резолвера (♂ 170, ♀ 150), а не литерал;
+ *  - `block` — порог вмешательства: ♂ 185 (Endocrine Society: HCT >54% ≈ Hb 18.5 г/дл),
+ *    ♀ 165 (женский протокол: «>165 → флеботомия + отмена», `supportProtocolWomenData`).
+ *
+ * Зачем: таблицы мониторинга (`LAB_MONITOR_DB`) и протоколы печатали только
+ * мужское «<170 г/л» — женщина читала порог, к ней не относящийся (её 150).
+ */
+export const HGB_THRESHOLDS = {
+  male: { upper: getLabNorm('HGB', 'male')?.uln ?? 170, block: 185 },
+  female: { upper: getLabNorm('HGB', 'female')?.uln ?? 150, block: 165 },
+} as const;
+
 /** Л9: общая легенда женских порогов (показывается только при sex=female). */
 export const FEMALE_LABS_NOTE =
   '♀ Пороги по полу: HCT 36–48%, Hb 120–150 г/л, RBC 4.0–5.2, АЛТ/АСТ/ГГТ ≤31, креатинин ≤97, ферритин ≤200. ' +

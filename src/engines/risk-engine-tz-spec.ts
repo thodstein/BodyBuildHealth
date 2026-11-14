@@ -271,6 +271,13 @@ export interface ClinicalFloor{organId:string;label:string;level:number}
  */
 export { HCT_THRESHOLDS } from './lab-norms.engine';
 
+/**
+ * Пороги гемоглобина — та же пара, что у гематокрита: `upper` (верх нормы
+ * ♂ 170 / ♀ 150) и `block` (вмешательство ♂ 185 / ♀ 165). Таблицы мониторинга
+ * берут числа отсюда, чтобы «<170 г/л» не выдавалось за общий порог.
+ */
+export { HGB_THRESHOLDS } from './lab-norms.engine';
+
 
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];
