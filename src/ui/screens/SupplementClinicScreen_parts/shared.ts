@@ -12,6 +12,10 @@ import {
 import type { MasterDB, SubstanceEntry, InteractionEntry } from '../../../core/types';
 import { loadBioStackProfile } from '../../../engines/biostack-ai.engine';
 import type { BioStackProfile } from '../../../engines/biostack-ai.engine';
+// Единый резолвер окна дозы: реестр UL → таблица окон → диапазоны → «нет данных».
+import { doseWindowFor } from '../../../engines/support-hub-evidence.engine';
+import type { DoseWindow } from '../../../engines/support-hub-evidence.engine';
+import { DOSE_RANGES } from '../SupportScreen_parts/SupportEffectiveDose';
 
 // ── Styles ──
 export const card: React.CSSProperties = {
@@ -150,39 +154,24 @@ export interface DoseInfo {
   id: string;
   name: string;
   defaultDose: { mg: number; timing: string } | null;
-  window: { minMg: number; optMg: number; maxMg: number; ul: number; note: string } | null;
+  /** Окно дозы из ЕДИНОГО резолвера (`doseWindowFor`): реестр UL приоритетнее
+   *  таблицы окон, тип предела назван в `limitText`. Своей карты «вещество →
+   *  чужое окно» здесь больше нет. */
+  window: DoseWindow | null;
   bestForm: { name: string; bio: number } | null;
 }
-const WINDOW_BY_ID: Record<string, string> = {
-  zinc: 'zn', magnesium: 'mg', iron: 'fe', calcium: 'ca', selenium: 'se',
-  vitamin_d3: 'd3', vitamin_c: 'vitc', alpha_lipoic: 'ala', nac: 'nac',
-  coq10: 'coq10', omega3: 'omega3', chromium: 'cr', vitamin_b12: 'b12',
-  vitamin_e: 'vitc', vitamin_b6: 'b12', folate: 'b12',
-  // Расширенные маппингы
-  iodine: 'iodine', copper: 'zn', potassium: 'mg', iron_bisglycinate: 'fe',
-  berberine: 'nac', curcumin: 'coq10', milk_thistle: 'nac', tudca: 'nac',
-  ashwagandha: 'mg', glycine: 'mg', theanine: 'mg', taurine: 'nac',
-  l_carnitine: 'nac', phosphatidylserine: 'coq10', phosphatidylcholine: 'coq10',
-  quercetin: 'coq10', garlic: 'vitc', beetroot: 'vitc', bergamot: 'coq10',
-  astaxanthin: 'coq10', pycnogenol: 'coq10', hesperidin: 'coq10',
-  niacin: 'vitc', tmG: 'nac', agmatine: 'nac', citrulline: 'nac',
-  collagen: 'd3', glucosamine: 'd3', chondroitin: 'd3', msm: 'd3',
-  vitamin_k2: 'd3', vitamin_a: 'd3',
-  serrapeptase: 'nac', nattokinase: 'nac', bromelain: 'nac',
-  melatonin: 'mg', probiotics: 'nac', egcg: 'coq10',
-  astragalus: 'nac', cordyceps: 'nac',
-};
+
 export function getDoseInfo(id: string): DoseInfo {
   const e = getEntry(id);
   const name = e?.nameRu || e?.name || id;
   const defaultDose = DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
-  const base = id.split('_')[0];
-  const winKey = WINDOW_BY_ID[id] || WINDOW_BY_ID[base] || THERAPEUTIC_WINDOWS[id] ? id : base;
-  const window =
-    THERAPEUTIC_WINDOWS[winKey] ||
-    THERAPEUTIC_WINDOWS[id] ||
-    THERAPEUTIC_WINDOWS[base] ||
-    null;
+  // БЫЛО: карта `WINDOW_BY_ID` подставляла ЧУЖОЕ окно — витамин E получал окно
+  // витамина C (90–2000 мг), B6 и фолат — окно B12 (2.4–1000 мкг), медь — окно
+  // цинка (15–50 мг), калий и ашваганда — окно магния. Отсюда «UL 40 мг» у меди
+  // и «UL 2000» у B12, а сравнение дозы шло с чужим числом. Теперь — тот же
+  // резолвер, что у «Биодоступности»/паспорта: реестр → окно → диапазон → нет.
+  const win = doseWindowFor(id, THERAPEUTIC_WINDOWS as never, DOSE_RANGES as never);
+  const window = win.ulKind === 'Unknown' && !win.hasData && win.ul == null ? null : win;
   let bestForm: { name: string; bio: number } | null = null;
   if (e?.forms?.length) {
     for (const f of e.forms) {

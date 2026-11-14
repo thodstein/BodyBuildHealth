@@ -126,7 +126,7 @@ export const SupportSubstancePassport: React.FC = () => {
           </div>
           {passport.bio && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Био: {passport.bio.label} ({passport.bio.evidence}){passport.bio.marketing ? ' · ⚠ маркетинг' : ''}</div>}
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>
-            Доза: {passport.dose.hasData ? `${passport.dose.min}–${passport.dose.max} ${passport.dose.unit} (опт. ${passport.dose.opt}) · UL ${passport.dose.ul} · ${passport.dose.note}` : passport.dose.note}
+            Доза: {passport.dose.hasData ? `${passport.dose.min}–${passport.dose.max} ${passport.dose.unit} (опт. ${passport.dose.opt})${passport.dose.limitText ? ` · ${passport.dose.limitText}` : ''} · ${passport.dose.note}` : passport.dose.note}
           </div>
           {passport.personHints.slice(0, 3).map((h, i) => <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.4 }}>• {h}</div>)}
           {passport.outcomes.length > 0 && (

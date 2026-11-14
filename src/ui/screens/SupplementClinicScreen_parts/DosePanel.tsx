@@ -1,6 +1,7 @@
 // SupplementClinicScreen_parts/DosePanel.tsx — эффективная дозировка стека.
 import React, { useMemo } from 'react';
 import { getDoseInfo, card, sectionTitle } from './shared';
+import { formatDefaultDose } from '../../../data/dose-units';
 
 export const DosePanel: React.FC<{ stackIds: string[] }> = ({ stackIds }) => {
   const rows = useMemo(() => stackIds.map((id) => getDoseInfo(id)), [stackIds]);
@@ -21,8 +22,14 @@ export const DosePanel: React.FC<{ stackIds: string[] }> = ({ stackIds }) => {
       <div style={sectionTitle}>Эффективная дозировка · {rows.length} веществ</div>
       {rows.map((r) => {
         const w = r.window;
-        const pct = w && r.defaultDose ? Math.round((r.defaultDose.mg / w.optMg) * 100) : 0;
-        const overUl = w && r.defaultDose && r.defaultDose.mg > w.ul;
+        const ul = w && w.ul != null && w.ul > 0 ? w.ul : null;
+        const dose = r.defaultDose ? r.defaultDose.mg : null;
+        // Красным — только настоящее превышение UL. Safe Level / клинический
+        // ориентир / потолок протокола дают жёлтую строку, а не «риск токсичности».
+        const overUl = !!(w && ul != null && w.ulWarning && dose != null && dose > ul);
+        const overOther = !!(w && ul != null && !w.ulWarning && dose != null && dose > ul);
+        const scale = ul != null && ul > 0 ? ul : (w && w.max > 0 ? w.max : null);
+        const pct = w && dose != null && w.opt > 0 ? Math.round((dose / w.opt) * 100) : 0;
         return (
           <div key={r.id} style={card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -39,41 +46,53 @@ export const DosePanel: React.FC<{ stackIds: string[] }> = ({ stackIds }) => {
 
             {r.defaultDose ? (
               <div style={{ marginTop: 8, fontSize: 14 }}>
-                <b style={{ color: 'var(--accent)' }}>{r.defaultDose.mg} мг</b> · {r.defaultDose.timing}
+                {/* Единица — натуральная для вещества: D3 в МЕ, Se/фолат в мкг.
+                    БЫЛО: `${mg} мг` для всех → «5000 мг» витамина D вместо 5000 МЕ. */}
+                <b style={{ color: 'var(--accent)' }}>{formatDefaultDose(r.id, r.defaultDose.mg)}</b> · {r.defaultDose.timing}
               </div>
             ) : (
               <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-dim)' }}>Базовая доза не задана в справочнике</div>
             )}
 
-            {w && (
+            {w && w.hasData && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>
-                  <span>цель {w.minMg}–{w.maxMg} мг</span>
-                  <span>UL {w.ul} мг</span>
+                  <span>цель {w.min}–{w.max} {w.unit}</span>
+                  <span>{w.limitText || 'предел не установлен'}</span>
                 </div>
-                <div style={{
-                  position: 'relative', height: 10, borderRadius: 6, overflow: 'hidden',
-                  background: 'rgba(255,255,255,0.08)',
-                }}>
+                {scale != null && scale > 0 && (
                   <div style={{
-                    position: 'absolute', left: 0, top: 0, bottom: 0,
-                    width: Math.min(100, Math.round((w.optMg / w.ul) * 100)) + '%',
-                    background: 'rgba(0,230,138,0.25)', borderRight: '2px solid var(--accent)',
-                  }} />
-                  {r.defaultDose && (
+                    position: 'relative', height: 10, borderRadius: 6, overflow: 'hidden',
+                    background: 'rgba(255,255,255,0.08)',
+                  }}>
                     <div style={{
-                      position: 'absolute', top: -2, bottom: -2,
-                      left: Math.min(100, Math.round((r.defaultDose.mg / w.ul) * 100)) + '%',
-                      width: 3, background: overUl ? '#ef4444' : '#fff',
+                      position: 'absolute', left: 0, top: 0, bottom: 0,
+                      width: Math.min(100, Math.round((w.opt / scale) * 100)) + '%',
+                      background: 'rgba(0,230,138,0.25)', borderRight: '2px solid var(--accent)',
                     }} />
-                  )}
-                </div>
+                    {dose != null && (
+                      <div style={{
+                        position: 'absolute', top: -2, bottom: -2,
+                        left: Math.min(100, Math.round((dose / scale) * 100)) + '%',
+                        width: 3, background: overUl ? '#ef4444' : '#fff',
+                      }} />
+                    )}
+                  </div>
+                )}
                 <div style={{ marginTop: 4, fontSize: 12, color: overUl ? '#ff8a9b' : 'var(--text-dim)' }}>
                   {overUl
-                    ? `⚠ Превышен UL (${w.ul} мг) — риск токсичности`
-                    : `Доза составляет ${pct}% от оптимальной (${w.optMg} мг)`}
+                    ? `⚠ Превышен UL (${w.ul} ${w.unit}) — риск токсичности`
+                    : overOther
+                      ? `Выше предела «${w.limitText}» — дозу оценивает врач`
+                      : `Доза составляет ${pct}% от оптимальной (${w.opt} ${w.unit})`}
                   {w.note ? ` · ${w.note}` : ''}
                 </div>
+              </div>
+            )}
+            {w && !w.hasData && w.limitText && (
+              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+                {w.limitText}
+                {w.limitNote ? ` · ${w.limitNote}` : ''}
               </div>
             )}
           </div>

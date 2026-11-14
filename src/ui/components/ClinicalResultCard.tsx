@@ -261,7 +261,9 @@ export const ClinicalResultCard: React.FC<{
                   }} />
                 </div>
                 <span style={{ fontSize:10,fontWeight:700,color:'rgba(255,255,255,0.6)',whiteSpace:'nowrap' }}>
-                  {u.totalDose} / {u.ul} мг · {Math.round(u.percentUL || 0)}%
+                  {/* Единица — из реестра («200 мкг / 255 мкг»), а не жёсткое «мг»:
+                      селен 0.2 мг показывался как «0.2 / 0.26 мг» вместо 200/255 мкг. */}
+                  {u.doseText || `${u.totalDose} мг`} / {u.limitText || `${u.ul} мг`} · {Math.round(u.percentUL || 0)}%
                 </span>
               </div>
               <div style={{ fontSize:10,color:'rgba(255,255,255,0.4)',lineHeight:1.3 }}>{u.message}</div>

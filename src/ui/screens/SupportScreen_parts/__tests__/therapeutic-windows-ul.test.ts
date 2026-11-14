@@ -9,6 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import { THERAPEUTIC_WINDOWS } from '../SupportBioavailabilityData';
 import { NUTRIENT_LIMITS_V2 } from '../../../../engines/support-limits';
+import { doseWindowFor } from '../../../../engines/support-hub-evidence.engine';
+import { buildSubstancePassport } from '../../../../engines/support-hub-passport.engine';
+import { DOSE_RANGES } from '../SupportEffectiveDose';
 
 describe('THERAPEUTIC_WINDOWS: предел и оговорки', () => {
   it('ul совпадает с реестром (Zn 40, Mg 350, Se 255, D 4000)', () => {
@@ -66,5 +69,48 @@ describe('THERAPEUTIC_WINDOWS: ни одно окно не молчит', () => 
       })
       .map(([k]) => k);
     expect(silent).toEqual([]);
+  });
+});
+
+// ── Проход 51: тип предела назван словом ──
+describe('предел в окне дозы: тип — часть утверждения', () => {
+  const win = (id: string) => doseWindowFor(id, THERAPEUTIC_WINDOWS as never, DOSE_RANGES as never);
+
+  it('реестр: UL, Safe Level и клинический ориентир подписаны по-разному', () => {
+    expect(win('zinc').limitText).toBe('UL 40 мг');
+    expect(win('vitamin_d3').limitText).toBe('UL 4000 МЕ');
+    expect(win('iron').limitText).toContain('Safe Level 40 мг');
+    expect(win('iron').limitText).toContain('не порог токсичности');
+    expect(win('nac').limitText).toContain('2400 мг');
+    expect(win('nac').limitText).toContain('не UL');
+    expect(win('b12').limitText).toContain('клинический ориентир 2000 мкг');
+  });
+
+  it('числа без записи в реестре — потолок протокола, а не UL', () => {
+    // Берберин 3000, омега-3 5000, мелатонин 10, EGCG 1200, ашваганда 2000 —
+    // регуляторных UL у них нет; паспорт печатал «UL <число>».
+    for (const id of ['berberine', 'omega3', 'melatonin', 'egcg', 'ashwagandha']) {
+      const w = win(id);
+      expect(w.ulKind, id).not.toBe('UL');
+      expect(w.ulWarning, id).toBe(false);
+      expect(w.limitText, id).toContain('потолок протокола');
+      expect(w.limitText, id).toContain('не UL');
+    }
+  });
+
+  it('паспорт вещества печатает подпись предела, а не «UL null»', () => {
+    const passport = buildSubstancePassport({
+      id: 'b12', nameRu: 'Витамин B12', maxBio: 0.5,
+      therapeutic: THERAPEUTIC_WINDOWS as never, ranges: DOSE_RANGES as never,
+      category: ['vitamin'],
+    });
+    expect(passport.dose.limitText).toContain('клинический ориентир');
+    expect(passport.dose.limitText).not.toContain('null');
+    const berberine = buildSubstancePassport({
+      id: 'berberine', nameRu: 'Берберин', maxBio: 0.3,
+      therapeutic: THERAPEUTIC_WINDOWS as never, ranges: DOSE_RANGES as never,
+      category: ['herb'],
+    });
+    expect(berberine.dose.limitText).not.toMatch(/^UL /);
   });
 });

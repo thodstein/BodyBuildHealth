@@ -289,6 +289,10 @@ export const SupportEffectiveDose: React.FC = () => {
       ulWarning = `Превышен верхний предел (${win.ul} ${win.unit}). Риск побочных эффектов.`;
     } else if (win.ul != null && win.ulKind === 'SafeLevel' && doseMg > win.ul) {
       ulWarning = `Выше ориентира «безопасный уровень потребления» (${win.ul} ${win.unit}) — это НЕ предел токсичности.`;
+    } else if (win.ul != null && win.ulKind === 'ClinicalGuidance' && doseMg > win.ul) {
+      // Потолок протокола/клинический ориентир — не UL. БЫЛО: такие числа вовсе
+      // не давали строки (ветка отсутствовала), хотя выше них доза уже вне практики.
+      ulWarning = `Выше предела: ${win.limitText || `${win.ul} ${win.unit}`}. Это не UL — регуляторного порога нет, дозу оценивает врач.`;
     } else if (win.ulKind === 'NotEstablished') {
       ulWarning = `Предел не установлен (${win.ul ?? '—'}) — дозу оценивает врач, самостоятельно не превышать.`;
     }

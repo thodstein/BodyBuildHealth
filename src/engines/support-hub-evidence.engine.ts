@@ -336,6 +336,15 @@ export interface DoseWindow {
    *  Класс дефекта тот же, что E0.12 (write-only) и E1.5 (единицы): «написано честно —
    *  пользователь этого не видит». */
   limitNote: string;
+  /** Готовая подпись предела — ТИП входит в текст: «UL 40 мг»,
+   *  «Safe Level 40 мг — не порог токсичности», «клинический ориентир 2000 мкг · не UL»,
+   *  «потолок протокола 3000 мг · не UL». Пустая строка — предела нет вовсе.
+   *
+   *  Зачем полем: паспорт вещества печатал `UL ${ul}` для ЛЮБОГО окна — железо
+   *  («Safe Level») подписывалось как UL, B12 («клинический ориентир») тоже, а
+   *  берберин/омега-3/мелатонин получали «UL» из таблицы окон, хотя регуляторного
+   *  предела у них не существует. Тип предела — часть утверждения. */
+  limitText: string;
   }
 
 /** Единая подпись единицы измерения (E1.5, класс E1.2: одно значение — одна подпись).
@@ -350,6 +359,35 @@ export function limitUnitRu(unit: string | undefined | null): string {
   if (u === 'mg') return 'мг';
   // неизвестную единицу НЕ подменяем молча — показываем как есть
   return unit || 'мг';
+}
+
+/**
+ * Подпись предела одним предложением — одна на все поверхности (паспорт
+ * вещества, клиника добавок, окно дозы). Тип предела входит в текст, потому что
+ * `UL`, «safe level» и «клинический ориентир» — разные утверждения:
+ *  - `UL` — регуляторный верхний допустимый уровень (= «выше — риск»);
+ *  - `SafeLevel` — уровень, выше которого не наблюдали эффектов (НЕ порог);
+ *  - `ClinicalGuidance` — практика/потолок протокола, регуляторного UL нет.
+ *
+ * @param fromRegistry — значение из `NUTRIENT_LIMITS_V2`. `false` = число из
+ *   таблицы окон (берберин, омега-3, мелатонин…): это потолок протокола, и
+ *   печатать его как «UL» запрещено — класс E1.6 «выдуманная уверенность».
+ */
+export function limitLineOf(
+  kind: DoseWindow['ulKind'],
+  value: number | null,
+  unit: string | undefined,
+  fromRegistry: boolean,
+): string {
+  if (value == null || !(value > 0)) return kind === 'NotEstablished' ? 'предел не установлен' : '';
+  const v = Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+  const txt = `${v} ${limitUnitRu(unit)}`;
+  if (kind === 'UL') return `UL ${txt}`;
+  if (kind === 'SafeLevel') return `Safe Level ${txt} — не порог токсичности`;
+  if (kind === 'ClinicalGuidance') {
+    return fromRegistry ? `клинический ориентир ${txt} · не UL` : `потолок протокола ${txt} · не UL`;
+  }
+  return '';
 }
 
 export function doseWindowFor(
@@ -390,7 +428,13 @@ export function doseWindowFor(
     const tableUl = t.ul >= 9999 ? null : t.ul;
     // Приоритет у реестра: он несёт актуальное (EFSA 2023–2026) значение + тип + исключения.
     const ulNum = reg ? (reg.value > 0 ? reg.value : null) : tableUl;
-    const ulKind = reg?.kind ?? (tableUl == null ? 'NotEstablished' : 'UL');
+    // Записи в реестре нет → число из таблицы окон — это ПОТОЛОК ПРОТОКОЛА, а не UL.
+    // БЫЛО: `'UL'` по умолчанию, и паспорт/клиника печатали «UL 3000 мг» для
+    // берберина, «UL 5000 мг» для омега-3, «UL 10 мг» для мелатонина — пределов,
+    // которых регулятор не устанавливал (класс E1.6, выдуманная уверенность).
+    const ulKind: DoseWindow['ulKind'] = reg
+      ? reg.kind
+      : (tableUl == null ? 'NotEstablished' : 'ClinicalGuidance');
     return {
       min: t.minMg, opt: t.optMg, max: t.maxMg, ul: ulNum, unit: t.unit || 'мг', note: t.note, hasData: true,
       ulKind,
@@ -402,6 +446,7 @@ export function doseWindowFor(
       // первоисточником в этом раунде (правило плана: непроверенное → помечаем).
       ulUnverified: reg ? !reg.verified : true,
       limitNote: reg?.note ?? '',
+      limitText: limitLineOf(ulKind, ulNum, reg?.unit ?? t.unit, !!reg),
     };
   }
   // 26 сен 2026 (E0.3): тот же substring-матч остался в фолбэке по `ranges` — убран.
@@ -414,14 +459,18 @@ export function doseWindowFor(
   const reg = canon ? NUTRIENT_LIMITS_V2[canon] : undefined;
   if (rangeKey) {
     const r = ranges[rangeKey];
+    // NotEstablished (value = 0) не должен считаться пределом: `ul` = null, тип назван.
+    const ulKind: DoseWindow['ulKind'] = reg ? (reg.value > 0 ? reg.kind : 'NotEstablished') : 'Unknown';
+    const ulNum = reg && reg.value > 0 ? reg.value : null;
     return {
       min: r.therMin, opt: (r.therMin + r.therMax) / 2, max: r.therMax,
-      ul: reg && reg.value > 0 ? reg.value : null,
+      ul: ulNum,
       // Проход 26: единица окна из таблицы. Раньше здесь всегда стояло «мг» —
       // окно фолата (400–1000 мкг) подписывалось миллиграммами.
-      unit: r.unit ?? 'мг', hasData: true, ulKind: reg?.kind ?? 'Unknown',
-      ulWarning: reg?.kind === 'UL', ulExcludes: reg?.excludes, ulUnverified: reg ? !reg.verified : true,
+      unit: r.unit ?? 'мг', hasData: true, ulKind,
+      ulWarning: ulKind === 'UL', ulExcludes: reg?.excludes, ulUnverified: reg ? !reg.verified : true,
       limitNote: reg?.note ?? '',
+      limitText: limitLineOf(ulKind, ulNum, reg?.unit ?? r.unit, !!reg),
       note: `Диапазон: ${r.label}. `
         + (reg
           ? `Предел: ${reg.jurisdiction} ${reg.year} ${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`
@@ -431,13 +480,16 @@ export function doseWindowFor(
   // Окна нет — но если нутриент в реестре, ЕГО предел всё равно известен и полезен.
   // Не молчим о нём вместе с окном.
   if (reg) {
+    const kind: DoseWindow['ulKind'] = reg.value > 0 ? reg.kind : 'NotEstablished';
+    const num = reg.value > 0 ? reg.value : null;
     return {
       min: 0, opt: 0, max: 0,
-      ul: reg.value > 0 ? reg.value : null,
+      ul: num,
       unit: limitUnitRu(reg.unit),
-      hasData: false, ulKind: reg.kind, ulWarning: reg.kind === 'UL', ulExcludes: reg.excludes,
+      hasData: false, ulKind: kind, ulWarning: kind === 'UL', ulExcludes: reg.excludes,
       ulUnverified: !reg.verified,
       limitNote: reg.note ?? '',
+      limitText: limitLineOf(kind, num, reg.unit, true),
       note: `Терапевтического окна в базе нет. Предел: ${reg.jurisdiction} ${reg.year} `
         + `${reg.kind === 'NotEstablished' ? 'НЕ УСТАНОВЛЕН' : reg.value} (${reg.criticalEffect}).`,
     };
@@ -448,6 +500,7 @@ export function doseWindowFor(
     hasData: false, ulKind: 'Unknown', ulWarning: false, ulUnverified: true,
     // вещества нет в реестре → оговорки не существует, выдумывать нечего
     limitNote: '',
+    limitText: '',
   };
 }
 
