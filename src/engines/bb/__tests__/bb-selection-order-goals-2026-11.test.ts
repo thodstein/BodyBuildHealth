@@ -139,4 +139,30 @@ describe('2026-11: beginner selection + goal-aware ordering', () => {
     expect(work[0].muscle).toBe('shoulders');
     expect(work[0].exerciseType || work[0].type).toBe('compound');
   });
+
+  it('compound-first: изоляция не ведёт день, если есть компаунд крупной мышцы', () => {
+    const major = new Set(['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders']);
+    const check = (patternId: string, level: 'beginner' | 'intermediate', goal: 'mass' | 'cut', sessionTag?: string) => {
+      const p = plan(patternId, level, goal);
+      const sessions = p.weeks[0].sessions.filter((s: any) => !sessionTag || s.sessionTag === sessionTag);
+      expect(sessions.length).toBeGreaterThan(0);
+      for (const s of sessions) {
+        const list = working(s);
+        const hasMajorCompound = list.some((e: any) => e.exerciseType === 'compound' && major.has(e.muscle));
+        if (hasMajorCompound) {
+          expect(list[0].exerciseType, `${patternId}/${level}/${goal}/${s.sessionTag}: first=${list[0].name}`).toBe('compound');
+        }
+      }
+    };
+    check('fullbody_3', 'beginner', 'mass');
+    check('bro_5', 'intermediate', 'mass', 'Legs');
+  });
+
+  it('pre_exhaust сохраняет изоляцию первой (исключение из compound-first)', () => {
+    const ordered = orderSessionExercises([
+      ex({ muscle: 'chest', name: 'Жим штанги лёжа', role: 'primary', character: 'тяж', sets: 3 }),
+      ex({ muscle: 'chest', name: 'Разводка гантелей лёжа', role: 'accessory', character: 'памп', sets: 3 }),
+    ], { sessionTag: 'ChestBack', methodology: 'pre_exhaust' });
+    expect(ordered[0].name).toContain('Разводка');
+  });
 });

@@ -160,9 +160,15 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
   if (opts.primaryMuscle) {
     primaryMuscle = opts.primaryMuscle;
   } else if (isFullBody) {
-    // FB: primary = первый primary+тяж exercise из списка (отражает fbSchedule из buildBBPlan)
+    // FB: primary = первый primary+тяж exercise из списка (отражает fbSchedule из buildBBPlan).
+    // Если primary-слотов нет (fullbody_3/2/4/5 — дни собраны из аксессуаров),
+    // ведём день от первого КОМПАУНДА, а не от первой изоляции: иначе
+    // FullBody начинался с разгибания ног/подъёма на носки, а тяга/жим
+    // оставались в середине сессии.
     const firstPrimary = forOrder.find(e => e.role === 'primary' && (e as any).character === 'тяж');
-    primaryMuscle = firstPrimary?.muscle || forOrder.find(e => e.role === 'primary')?.muscle || '';
+    const firstCompound = forOrder.find(e => isCompoundEx(e) && (e as any).character === 'тяж')
+      || forOrder.find(e => isCompoundEx(e));
+    primaryMuscle = firstPrimary?.muscle || firstCompound?.muscle || forOrder.find(e => e.role === 'primary')?.muscle || '';
   } else {
     // ★ Arms day: triceps первым (compound-first — больше мышечная масса, жим узким хватом),
     // не biceps (tagMuscles[0]='biceps').
@@ -193,7 +199,9 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
       let heavy: string | null = null;
       let bestScore = -1;
       for (const cand of ['quads', 'hamstrings', 'glutes']) {
-        const score = forOrder.filter(e => e.muscle === cand && (e as any).character === 'тяж').reduce((s, e) => s + (e.sets || 0), 0);
+        // Только КОМПАУНДЫ: тяжёлая изоляция (кикбэк/мост-изоляция) не должна
+        // объявлять свою мышцу «мышцей дня» и уводить день в изоляцию вперёд базы.
+        const score = forOrder.filter(e => e.muscle === cand && (e as any).character === 'тяж' && isCompoundEx(e)).reduce((s, e) => s + (e.sets || 0), 0);
         if (score > bestScore) { bestScore = score; heavy = cand; }
       }
       if (heavy && bestScore > 0) primaryMuscle = heavy;
@@ -249,6 +257,19 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     return a.idx - b.idx; // стабильность при полном равенстве
   });
   const sortedRest = indexed.map(x => x.ex);
+  // Правило №1 модуля: compound раньше изоляции. Кортеж группирует мышцы и в
+  // FB/Legs может поставить изоляцию «мышцы дня» (или первую изоляцию списка)
+  // перед базой другой мышцы. Один финальный перенос ведущего компаунда
+  // выправляет первый слот, не перетасовывая остальную сессию.
+  // Методики, где изоляция-праймер намеренно первая, не трогаем.
+  const isolationFirstMethod = methodology === 'pre_exhaust' || methodology === 'mountain_dog'
+    || methodology === 'fst7' || methodology === 'hyperemia';
+  if (!isolationFirstMethod) {
+    const gluteDay = /Glutes/i.test(opts.sessionTag || '');
+    const leadIdx = sortedRest.findIndex(e => isMajorLeadCompound(e)
+      && (!gluteDay || collapseMuscle(e.muscle || '') === 'glutes'));
+    if (leadIdx > 0) sortedRest.unshift(sortedRest.splice(leadIdx, 1)[0]);
+  }
   return warmups.length ? ([...warmups, ...sortedRest] as BBExercise[]) : sortedRest;
 }
 
@@ -378,6 +399,16 @@ function collapseMuscle(m: string): string {
   if (m === 'delt_front' || m === 'delt_mid' || m === 'delt_rear') return 'shoulders';
   if (m === 'lower_back') return 'core';
   return m;
+}
+
+/** Компаунд крупной мышцы, который может вести сессию. abs/икры/предплечья —
+ *  не ведущие: их «компаунд» (скручивание/подъём ног) не должен вставать перед
+ *  жимом/тягой. */
+function isMajorLeadCompound(ex: BBExercise): boolean {
+  if (!isCompoundEx(ex)) return false;
+  const m = collapseMuscle(ex.muscle || '');
+  return m === 'chest' || m === 'back' || m === 'quads' || m === 'hamstrings'
+    || m === 'glutes' || m === 'shoulders' || m === 'legs';
 }
 
 /** Порядок жимов: горизонтальный жим (грудь) раньше вертикального (плечи) в день с акцентом на грудь. */
