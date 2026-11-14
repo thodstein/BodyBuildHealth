@@ -22,10 +22,10 @@ const findMarker = (systemId: string, mechId: string, code: string): VerifMarker
 };
 
 describe('женские пороги маркеров (паритет с getMiFromLab)', () => {
-  it('HCT: hem1 50% → m1 муж / m2 жен', () => {
+  it('HCT: hem1 53% → m1 муж / m2 жен (♂ 51/54/58, ♀ 48/52/56)', () => {
     const m = findMarker('hematologic', 'hem1', 'HCT');
-    expect(markerStatus(m, 50, 'male')).toBe(1);
-    expect(markerStatus(m, 50, 'female')).toBe(2);
+    expect(markerStatus(m, 53, 'male')).toBe(1);
+    expect(markerStatus(m, 53, 'female')).toBe(2);
   });
 
   it('АЛТ/ГГТ: женский ULN 31 (70 Ед/л → m2)', () => {
@@ -60,9 +60,12 @@ describe('женские пороги маркеров (паритет с getMiF
 
   it('thresholdText показывает женские числа при sex=female', () => {
     const hct = findMarker('hematologic', 'hem1', 'HCT');
-    expect(thresholdText(hct, 'male')).toBe('≥48 · ≥51 · ≥54');
-    expect(thresholdText(hct, 'female')).toBe('≥44 · ≥48 · ≥52');
-    expect(markerThresholds(hct, 'female')).toEqual([44, 48, 52]);
+    expect(thresholdText(hct, 'male')).toBe('≥51 · ≥54 · ≥58');
+    expect(thresholdText(hct, 'female')).toBe('≥48 · ≥52 · ≥56');
+    expect(markerThresholds(hct, 'female')).toEqual([48, 52, 56]);
+    // Один ряд на маркер: в cv4/cv5/hem1 те же числа, что в hem1.
+    expect(markerThresholds(findMarker('cardio', 'cv5', 'HCT'), 'female')).toEqual([48, 52, 56]);
+    expect(markerThresholds(findMarker('cardio', 'cv4', 'HCT'), 'male')).toEqual([51, 54, 58]);
   });
 });
 
@@ -102,11 +105,11 @@ describe('мужской путь байт-в-байт', () => {
   it('женский экспорт помечает пороги и отличается от мужского', () => {
     const fem = buildVerificationText(labs, 'female');
     expect(fem).toContain('♀ женские пороги');
-    expect(fem).toContain('≥44 · ≥48 · ≥52');
+    expect(fem).toContain('≥48 · ≥52 · ≥56');
     expect(fem).not.toBe(buildVerificationText(labs, 'male'));
     const html = buildVerificationHtml(labs, 'female');
     expect(html).toContain('женские пороги');
     const csv = buildVerificationCsv(labs, 'female');
-    expect(csv).toContain('44;48;52');
+    expect(csv).toContain('48;52;56');
   });
 });

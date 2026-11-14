@@ -3,7 +3,10 @@
 // Каталог маркеров повторяет таблицу T4 движка risk-engine-tz-spec (пороги m_i=1/2/3)
 // и якорные пороги clinicalFloorsForLabs — единый источник для UI-списка «Анализы».
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
-import { LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN } from './lab-norms.engine';
+import {
+  LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS,
+} from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
 
@@ -49,6 +52,29 @@ export interface VerifSystem {
 }
 
 // ── Каталог маркеров (T4) — пороги m_i: 1/2/3 ──
+
+/**
+ * Ступени гематокрита и гемоглобина — ОДИН ряд на маркер, из резолвера.
+ * Раньше в трёх механизмах жили три разных HCT-ряда: `[48,51,54]`/`[44,48,52]`
+ * (cv4, hem1) и `[50,54,58]`/`[46,50,54]` (cv5) — «верх нормы», «эритроцитоз» и
+ * «флеботомия» были перемешаны, и один и тот же HCT 50 давал разный статус в
+ * сердце и в крови. Теперь ступень называется действием:
+ *  1) `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48);
+ *  2) `block` — флеботомия/отмена (♂ 54, ♀ 52);
+ *  3) `block + 4 п.п.` — гипервязкость (♂ 58, ♀ 56).
+ * Гемоглобин — та же пара: `upper` (♂ 170 / ♀ 150), `block` (♂ 185 / ♀ 165),
+ * далее +15 г/л.
+ */
+const HCT_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
+  male: [HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 4],
+  female: [HCT_THRESHOLDS.female.erythrocytosis, HCT_THRESHOLDS.female.block, HCT_THRESHOLDS.female.block + 4],
+};
+
+const HGB_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
+  male: [HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block, HGB_THRESHOLDS.male.block + 15],
+  female: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
+};
+
 const M = (
   code: string,
   name: string,
@@ -85,14 +111,14 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('NA', 'Натрий', 'ммоль/л', 'high', [145, 148, 155]),
       ] },
       { id: 'cv4', weight: 1.0, markers: [
-        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54], { thresholds: [44, 48, 52] }),
+        M('HCT', 'Гематокрит', '%', 'high', HCT_STEPS.male, { thresholds: HCT_STEPS.female }),
         M('D_DIMER', 'D-димер', 'мг/л', 'high', [0.5, 1.0, 2.0]),
         M('FIBRINOGEN', 'Фибриноген', 'г/л', 'high', [4.0, 5.0, 6.0]),
         M('PLT', 'Тромбоциты', '10⁹/л', 'high', [400, 500, 600]),
       ] },
       { id: 'cv5', weight: 0.7, markers: [
         M('K', 'Калий', 'ммоль/л', 'low', [3.5, 3.0, 2.5]),
-        M('HCT', 'Гематокрит', '%', 'high', [50, 54, 58], { thresholds: [46, 50, 54] }),
+        M('HCT', 'Гематокрит', '%', 'high', HCT_STEPS.male, { thresholds: HCT_STEPS.female }),
       ] },
     ],
     floors: [
@@ -222,8 +248,8 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'hematologic', name: TZ_SYSTEM_LABELS.hematologic, icon: TZ_SYSTEM_ICONS.hematologic, color: '#14b8a6',
     mechanisms: [
       { id: 'hem1', weight: 1.0, markers: [
-        M('HCT', 'Гематокрит', '%', 'high', [48, 51, 54], { thresholds: [44, 48, 52] }),
-        M('HGB', 'Гемоглобин', 'г/л', 'high', [170, 180, 190], { thresholds: [150, 165, 180] }),
+        M('HCT', 'Гематокрит', '%', 'high', HCT_STEPS.male, { thresholds: HCT_STEPS.female }),
+        M('HGB', 'Гемоглобин', 'г/л', 'high', HGB_STEPS.male, { thresholds: HGB_STEPS.female }),
         M('RBC', 'Эритроциты', '10¹²/л', 'high', [5.5, 6.0, 6.5], { thresholds: [5.2, 5.6, 6.0] }),
         M('WBC', 'Лейкоциты', '10⁹/л', 'high', [11, 13, 15]),
       ] },

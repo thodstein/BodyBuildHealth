@@ -94,6 +94,40 @@ describe('deriveTier знает пол (женский ряд — от её ВГ
   });
 });
 
+describe('HCT/HGB: один ряд на маркер во всех системах', () => {
+  it('HCT = HCT_THRESHOLDS (+4 п.п.), HGB = HGB_THRESHOLDS (+15 г/л)', () => {
+    const hcts: VerifMarker[] = [];
+    const hgbs: VerifMarker[] = [];
+    for (const sys of VERIFICATION_SYSTEMS) {
+      for (const mech of sys.mechanisms) {
+        for (const mk of mech.markers) {
+          if (mk.code === 'HCT') hcts.push(mk);
+          if (mk.code === 'HGB') hgbs.push(mk);
+        }
+      }
+    }
+    // cv4, cv5, hem1 — раньше у них были три разных ряда.
+    expect(hcts.length).toBeGreaterThanOrEqual(3);
+    for (const m of hcts) {
+      expect(markerThresholds(m, 'male')).toEqual([
+        HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 4,
+      ]);
+      expect(markerThresholds(m, 'female')).toEqual([
+        HCT_THRESHOLDS.female.erythrocytosis, HCT_THRESHOLDS.female.block, HCT_THRESHOLDS.female.block + 4,
+      ]);
+    }
+    expect(hgbs.length).toBeGreaterThanOrEqual(1);
+    for (const m of hgbs) {
+      expect(markerThresholds(m, 'male')).toEqual([
+        HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block, HGB_THRESHOLDS.male.block + 15,
+      ]);
+      expect(markerThresholds(m, 'female')).toEqual([
+        HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15,
+      ]);
+    }
+  });
+});
+
 describe('исходник главной модели: литеральные ступени печени/ГГТ убраны', () => {
   // Комментарии объясняют, какие литералы убраны, — сканируем только код.
   const tz = readFileSync(resolve(process.cwd(), 'src/engines/risk-engine-tz-spec.ts'), 'utf8')

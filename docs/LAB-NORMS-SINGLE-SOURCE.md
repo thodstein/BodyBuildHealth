@@ -48,7 +48,8 @@
 - `risk-engine-tz-spec` — механизм-ориентированная модель риска (главная):
   `HCT_THRESHOLDS`, `LFT_*`, `GGT_*`, `CREATININE_ULN` в `clinicalFloorsForLabs` и
   `getMiFromLab`.
-- `risk-verification.engine` — маркеры верификации и флоры.
+- `risk-verification.engine` — маркеры верификации и флоры: HCT/HGB/АЛТ/АСТ/ГГТ
+  держат те же ступени, что резолвер (один ряд на маркер во всех механизмах).
 - `risk-engine-v7-matrix` / `lab-tier-ranges` — тиры 0–3 и референсы (`deriveTier(marker, value, sex)`).
 - `lab-analysis.engine` — `interpretLabs(labs, sex)` и композитные индексы.
 - `support-phase-labs.engine` — карточки K0–K10 (цели `T_HCT`/`T_HGB`/`T_E2`/`T_PRL`).
@@ -61,9 +62,6 @@
 
 ## 4. Что ещё не сведено
 
-- `risk-verification`: ряды HCT `[48,51,54]`/`[44,48,52]` и `[50,54,58]`/`[46,50,54]`
-  — смесь «верх нормы / эритроцитоз / блок»; нужно свести к `HCT_THRESHOLDS` с
-  подписью ступени.
 - Каталог (`support-stacks-*`, `support-catalog-*`) печатает `ГГТ<55`, `АЛТ<40` как
   общие цели.
 - Фарм-примечания анастрозола в `tz-mapper-engine` («титровать к E2 20-40 pg/mL») —
