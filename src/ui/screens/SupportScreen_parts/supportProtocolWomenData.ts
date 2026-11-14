@@ -2,7 +2,18 @@
  * supportProtocolWomenData.ts — данные раунда «Женщины и ААС: практические схемы, поддержка, лабы».
  * Источник: docs/FEMALE_AAS_PROTOCOLS.md (Endocrine Society, WADA/IOC, harm-reduction практика).
  * ВАЖНО: справочные ориентиры для обсуждения с врачом, не назначение. Рецептурные позиции — только врач.
+ *
+ * Пороги не дублируются литералами: печёночные зоны считаются от ВГН резолвера
+ * (`FEMALE_LAB_BOUNDS`), гормональные — из `FEMALE_HORMONE_BANDS`. Иначе эта
+ * таблица и карточки/печать расходились (АСТ 34 против 31, ГГТ 32 против 31).
  */
+import { FEMALE_LAB_BOUNDS, FEMALE_HORMONE_BANDS } from '../../../engines/lab-norms.engine';
+
+/** Женская ВГН кода: из резолвера, с запасным 31 (АЛТ/АСТ/ГГТ — Endocrine/WADA §6.2). */
+const wUln = (code: 'ALT' | 'AST' | 'GGT'): number => FEMALE_LAB_BOUNDS[code]?.uln ?? 31;
+const wX15 = (u: number): number => Math.round(u * 1.5);
+const wX3 = (u: number): number => Math.round(u * 3);
+const W_LFT = { ALT: wUln('ALT'), AST: wUln('AST'), GGT: wUln('GGT') };
 
 // ── 2. Дозы веществ: женские пороги (вирилизация / либидо / риски) ──
 
@@ -361,9 +372,9 @@ export const FEMALE_LAB_GROUPS: FemaleLabGroup[] = [
   {
     id:'liver', icon:'🫁', title:'Печень (оралы — строже)',
     rows:[
-      { marker:'АЛТ', normal:'7–31 Ед/л', green:'<45 (1.5×)', yellow:'45–93 (1.5–3×)', red:'>93 (>3× ВГН)', symptom:'Некроз печени — отмена оралов' },
-      { marker:'АСТ', normal:'8–34 Ед/л', green:'<51 (1.5×)', yellow:'51–102', red:'>102' },
-      { marker:'ГГТ', normal:'7–32 Ед/л', green:'<48', yellow:'48–96', red:'>96' },
+      { marker:'АЛТ', normal:`7–${W_LFT.ALT} Ед/л`, green:`<${wX15(W_LFT.ALT)} (1.5×)`, yellow:`${wX15(W_LFT.ALT)}–${wX3(W_LFT.ALT)} (1.5–3×)`, red:`>${wX3(W_LFT.ALT)} (>3× ВГН)`, symptom:'Некроз печени — отмена оралов' },
+      { marker:'АСТ', normal:`8–${W_LFT.AST} Ед/л`, green:`<${wX15(W_LFT.AST)} (1.5×)`, yellow:`${wX15(W_LFT.AST)}–${wX3(W_LFT.AST)}`, red:`>${wX3(W_LFT.AST)}` },
+      { marker:'ГГТ', normal:`7–${W_LFT.GGT} Ед/л`, green:`<${wX15(W_LFT.GGT)}`, yellow:`${wX15(W_LFT.GGT)}–${wX3(W_LFT.GGT)}`, red:`>${wX3(W_LFT.GGT)}` },
       { marker:'Билирубин общий', normal:'3.4–17.1 мкмоль/л', green:'<25', yellow:'25–34', red:'>34', symptom:'Холестаз' },
       { marker:'ЩФ', normal:'35–104 Ед/л', green:'<150', yellow:'150–200', red:'>200' },
       { marker:'Альбумин', normal:'35–50 г/л', green:'>32', yellow:'28–32', red:'<28' },
@@ -372,7 +383,7 @@ export const FEMALE_LAB_GROUPS: FemaleLabGroup[] = [
   {
     id:'renal', icon:'💧', title:'Почки',
     rows:[
-      { marker:'Креатинин', normal:'44–80 мкмоль/л', green:'<97', yellow:'97–120', red:'>120', symptom:'Нефролог' },
+      { marker:'Креатинин', normal:`${FEMALE_LAB_BOUNDS.CREATININE.lln}–80 мкмоль/л`, green:`<${FEMALE_LAB_BOUNDS.CREATININE.uln}`, yellow:`${FEMALE_LAB_BOUNDS.CREATININE.uln}–120`, red:'>120', symptom:'Нефролог' },
       { marker:'Мочевина', normal:'2.5–6.4 ммоль/л', green:'<8.0', yellow:'8.0–10', red:'>10' },
       { marker:'СКФ (eGFR)', normal:'>90 мл/мин', green:'>60', yellow:'45–60', red:'<45', symptom:'Нефролог' },
       { marker:'Мочевая кислота', normal:'150–350 мкмоль/л', green:'<420', yellow:'420–500', red:'>500' },
@@ -396,11 +407,11 @@ export const FEMALE_LAB_GROUPS: FemaleLabGroup[] = [
     rows:[
       { marker:'Тестостерон общий', normal:'0.3–2.5 нмоль/л', green:'<4.0', yellow:'4.0–6.0', red:'>6.0', symptom:'ВИРИЛИЗАЦИЯ — отмена' },
       { marker:'Свободный тестостерон', normal:'2.5–10 пг/мл', green:'<15', yellow:'15–25', red:'>25' },
-      { marker:'Эстрадиол (E2)', normal:'40–200 (фолл.) / 70–500 (лют.)', green:'40–400', yellow:'400–800', red:'>800 или <30', symptom:'Дефицит E2 = остеопороз' },
+      { marker:'Эстрадиол (E2)', normal:`${FEMALE_HORMONE_BANDS.E2.normal} ${FEMALE_HORMONE_BANDS.E2.unit}`, green:FEMALE_HORMONE_BANDS.E2.green, yellow:FEMALE_HORMONE_BANDS.E2.yellow, red:FEMALE_HORMONE_BANDS.E2.red, symptom:'Дефицит E2 = остеопороз' },
       { marker:'Прогестерон', normal:'<3.0 (фолл.) / 5–30 (лют.) нмоль/л', green:'<10', yellow:'10–20', red:'>20' },
       { marker:'ЛГ', normal:'2–10 (фолл.) / 5–25 (лют.) МЕ/л', green:'<2', yellow:'2–8', red:'>8', symptom:'Подавление оси = аменорея' },
       { marker:'ФСГ', normal:'3–10 (фолл.) / 1.5–8 (лют.) МЕ/л', green:'<2', yellow:'2–8', red:'>8' },
-      { marker:'Пролактин', normal:'100–500 мМЕ/л', green:'<800', yellow:'800–1500', red:'>1500', symptom:'Пролактинома? МРТ' },
+      { marker:'Пролактин', normal:`${FEMALE_HORMONE_BANDS.PRL.normal} ${FEMALE_HORMONE_BANDS.PRL.unit}`, green:FEMALE_HORMONE_BANDS.PRL.green, yellow:FEMALE_HORMONE_BANDS.PRL.yellow, red:FEMALE_HORMONE_BANDS.PRL.red, symptom:'Пролактинома? МРТ' },
       { marker:'ГСПГ (SHBG)', normal:'30–90 нмоль/л', green:'20–100', yellow:'100–150', red:'>150' },
       { marker:'ДГЭА-С', normal:'2–10 мкмоль/л', green:'<15', yellow:'15–20', red:'>20' },
       { marker:'Кортизол', normal:'140–690 нмоль/л', green:'100–800', yellow:'800–1000', red:'>1000 или <100' },

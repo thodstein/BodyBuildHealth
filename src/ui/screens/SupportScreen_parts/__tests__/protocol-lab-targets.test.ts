@@ -88,8 +88,8 @@ describe('мониторинг веществ (LAB_MONITOR_DB): те же нор
     expect(unified).not.toContain("<21 мкмоль/л'");
   });
 
-  it('пролактин — 320 мМЕ/л (15 нг/мл), как на экране «Анализы»', () => {
-    expect(unified).toContain("when:'Каждые 4 нед', target:'<320 мМЕ/л'");
+  it('пролактин — 320 мМЕ/л у мужчины и женский порог 800 рядом (не «общий <320»)', () => {
+    expect(unified).toContain('target:`♂ <320 / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`');
     // <400 у каберголина — терапевтическая цель (не переподавить PRL), это не норма.
     expect(unified).toContain("Каберголин — мощный D2-агонист");
   });

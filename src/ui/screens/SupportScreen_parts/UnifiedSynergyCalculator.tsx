@@ -13,7 +13,7 @@ import { IU_PER_MCG_VITAMIN_D } from '../../../data/dose-units';
 import { stackLimitVerdicts, resolveNutrient, NUTRIENT_LIMITS_V2, type StackItem } from '../../../engines/support-limits';
 import { isAASHonest } from '../../../engines/support-hub-aas.engine';
 import { LAB_TOP20, resolveLabMonitor } from '../../../engines/support-hub-labs.engine';
-import { HGB_THRESHOLDS, lftUlnText } from '../../../engines/lab-norms.engine';
+import { HGB_THRESHOLDS, lftUlnText, labUlnText, FEMALE_HORMONE_BANDS } from '../../../engines/lab-norms.engine';
 
 /* ──────────────── DEPLETION DB ──────────────── */
 const DEPLETION_DB: Array<{ depleter: string; depleted: string; mechanism: string; severity: string; recommendation: string }> = [
@@ -115,8 +115,8 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → цитолиз гепатоцитов', note:'Оральные 17α-алкилированные (метандростенолон, оксиметолон, станозолол) → ↑ нагрузки.', tier1:'1–2×ВГН — NAC 1200 мг, силимарин', tier2:'2–5×ВГН — TUDCA 500-1000 мг, NAC, силимарин', tier3:'>5×ВГН — STOP оральные AAS' },
     { markerRu:'АСТ', markerEn:'AST', system:'hepatic', when:'Каждые 4 нед', target:AST_TARGET, condition:'↑ АСТ → поражение гепатоцитов + миокарда', note:'Соотношение АЛТ/АСТ: если АСТ > АЛТ — возможна миопатия (CK ↑) или алкоголь.', tier1:'1–2×ВГН — наблюдение, NAC', tier2:'2–5×ВГН — TUDCA+NAC+силимарин', tier3:'>5×ВГН — STOP AAS' },
     { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↑ ГГТ → холестаз, алкоголь, микросомальная индукция', note:'Растёт от 17α-алкилированных. Если ↑ ГГТ + ↑ ЩФ — холестатическое поражение.', tier1:'55-100 — TUDCA 500 мг', tier2:'100-200 — TUDCA 1000 мг, NAC, силимарин', tier3:'>200 — STOP оральные AAS, УЗИ печени' },
-    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед (через 48 ч после инъекции)', target:'100-200 пмоль/л (на курсе)', condition:'↑ E2 → гинекомастия, отёки, гипертензия, ↓ E2 → суставы, либидо', note:'Измерять в середине недели между инъекциями. Не подавлять E2 до 0 — это опасно для липидов и костей.', tier1:'>250 — анастрозол 0.25-0.5 мг/день', tier2:'>400 — анастрозол 0.5-1 мг/день', tier3:'E2 <50 — отменить AI, E2 >600 — STOP препарат с ароматизацией' },
-    { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Каждые 4 нед', target:'<320 мМЕ/л', condition:'↑ PRL → ↓ либидо, галакторея, импульсивность', note:'Нужен при нандролоне, тренболоне. 320-400 — макропролактин (ПЭГ) и повтор; выше 400 → каберголин по титрации ниже.', tier1:'400-700 — каберголин 0.25 мг/нед', tier2:'700-1000 — каберголин 0.5 мг/нед', tier3:'>1000 — STOP нандролон/трен, МРТ гипофиза' },
+    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед (через 48 ч после инъекции)', target:`♂ 100-200 пмоль/л (на курсе) / ♀ по фазе: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`, condition:'↑ E2 → гинекомастия, отёки, гипертензия, ↓ E2 → суставы, либидо', note:'Измерять в середине недели между инъекциями. Не подавлять E2 до 0 — это опасно для липидов и костей.', tier1:'>250 — анастрозол 0.25-0.5 мг/день', tier2:'>400 — анастрозол 0.5-1 мг/день', tier3:'E2 <50 — отменить AI, E2 >600 — STOP препарат с ароматизацией' },
+    { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Каждые 4 нед', target:`♂ <320 / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`, condition:'↑ PRL → ↓ либидо, галакторея, импульсивность', note:'Нужен при нандролоне, тренболоне. 320-400 — макропролактин (ПЭГ) и повтор; выше 400 → каберголин по титрации ниже.', tier1:'400-700 — каберголин 0.25 мг/нед', tier2:'700-1000 — каберголин 0.5 мг/нед', tier3:'>1000 — STOP нандролон/трен, МРТ гипофиза' },
   ],
   // ── Гепатопротекторы ──
   nac: [
@@ -207,10 +207,10 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   ],
   // ── Гормональные модуляторы ──
   anastro: [
-    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Через 2 нед после старта, затем каждые 4 нед', target:'100-200 пмоль/л (на курсе)', condition:'↓ E2 → риск остеопении, ↓ HDL, суставные боли', note:'Переподавление E2 (<50 пмоль/л) → ↓ HDL, ↑ риск сердечно-сосудистых событий, боли в суставах. Не подавлять до нуля.', tier1:'E2 50-100 — ↓ анастрозол', tier3:'E2 <50 — STOP AI, контроль через 2 нед' },
+    { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Через 2 нед после старта, затем каждые 4 нед', target:`♂ 100-200 пмоль/л (на курсе) / ♀ по фазе: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`, condition:'↓ E2 → риск остеопении, ↓ HDL, суставные боли', note:'Переподавление E2 (<50 пмоль/л) → ↓ HDL, ↑ риск сердечно-сосудистых событий, боли в суставах. Не подавлять до нуля.', tier1:'E2 50-100 — ↓ анастрозол', tier3:'E2 <50 — STOP AI, контроль через 2 нед' },
   ],
   cabergoline: [
-    { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Через 2 нед после старта, затем каждые 4 нед', target:'<400 мМЕ/л', condition:'↓ PRL → риск ↓ дофамина (депрессия, импульсивность)', note:'Каберголин — мощный D2-агонист. Переподавление PRL (<50) → ↓ дофамина → депрессия, импульсивность, игровая зависимость.', tier1:'PRL <50 — ↓ дозу', tier3:'PRL <5 — STOP каберголин' },
+    { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Через 2 нед после старта, затем каждые 4 нед', target:`♂ <400 / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`, condition:'↓ PRL → риск ↓ дофамина (депрессия, импульсивность)', note:'Каберголин — мощный D2-агонист. Переподавление PRL (<50) → ↓ дофамина → депрессия, импульсивность, игровая зависимость.', tier1:'PRL <50 — ↓ дозу', tier3:'PRL <5 — STOP каберголин' },
     { markerRu:'ЭхоКГ', markerEn:'—', system:'cardio', when:'Каждые 12 мес при дозе >1 мг/нед', target:'—', condition:'Фиброз клапанов сердца (кумулятивная доза >3 г)', note:'Каберголин в высоких кумулятивных дозах может вызывать фиброз трёхстворчатого клапана. Контроль ЭхоКГ раз в год.' },
   ],
   tamoxifen: [
@@ -220,7 +220,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   spironolactone: [
     { markerRu:'Калий (K+)', markerEn:'POTASSIUM', system:'renal', when:'Через 2 нед, затем каждые 4 нед', target:'3.5-5.1 ммоль/л', condition:'↑ K+ → антагонист альдостерона', note:'Верошпирон — калийсберегающий диуретик. Не сочетать с ARB/ACEi + K+ препараты.', tier1:'5.2-5.5 — ↓ дозу', tier2:'5.6-6.0 — STOP', tier3:'>6.0 — ЭКГ, госпитализация' },
     { markerRu:'Натрий (Na+)', markerEn:'SODIUM', system:'renal', when:'Каждые 4 нед', target:'135-155 ммоль/л', condition:'↓ Na+ → диуретический эффект', note:'Мочегонное — может ↓ Na+. Контроль при длительном приёме.', tier3:'Na+ <125 — STOP, госпитализация' },
-    { markerRu:'Креатинин', markerEn:'CREATININE', system:'renal', when:'Каждые 4 нед', target:'<110 мкмоль/л', condition:'↑ креатинин → ↓ функции почек', note:'Контроль функции почек на фоне диуретика.', tier2:'креатинин ↑ >30% — STOP' },
+    { markerRu:'Креатинин', markerEn:'CREATININE', system:'renal', when:'Каждые 4 нед', target:`${labUlnText('CREATININE')} мкмоль/л`, condition:'↑ креатинин → ↓ функции почек', note:'Контроль функции почек на фоне диуретика.', tier2:'креатинин ↑ >30% — STOP' },
   ],
   saw_palmetto: [
     { markerRu:'ПСА (PSA)', markerEn:'—', system:'hormonal', when:'Каждые 3-6 мес', target:'<4.0 нг/мл', condition:'↓ DHT → ↓ ПСА', note:'Пальметто ингибирует 5α-редуктазу → ↓ DHT и ↓ ПСА на 30-40%. Может маскировать рак простаты. Контроль ПСА + пальцевое ректальное исследование раз в год.' },

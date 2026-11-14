@@ -158,6 +158,33 @@ export const LFT_SIGNAL_ULN = {
   female: FEMALE_ALT_2_5_ULN,
 } as const;
 
+/**
+ * ♀ Клинические зоны гормонов, которых НЕТ в резолвере: TT/E2/PRL намеренно не
+ * переопределяются в V7 (§6.2 — им нужна фазовая модель цикла). Числа взяты из
+ * женского протокола (`supportProtocolWomenData`, блок «Лабы»), но живут здесь,
+ * чтобы таблица мониторинга, печать для врача и женский таб читали ОДНУ запись
+ * и не расходились при правке.
+ *
+ * Единицы: E2 — пг/мл (фазовая модель), PRL — мМЕ/л. Мужская цель E2 на курсе
+ * (100–200 пмоль/л) женщине не подходит: это подавление, а не норма.
+ */
+export const FEMALE_HORMONE_BANDS = {
+  E2: { unit: 'пг/мл', normal: '40–200 (фолл.) / 70–500 (лют.)', green: '40–400', yellow: '400–800', red: '>800 или <30' },
+  PRL: { unit: 'мМЕ/л', normal: '100–500', green: '<800', yellow: '800–1500', red: '>1500' },
+} as const;
+
+/**
+ * ВГН с обоими полами для любого кода резолвера: «♂ <110 / ♀ <97»; код без
+ * женской границы — просто «<N». Одна формулировка для таблиц мониторинга,
+ * карточек и протоколов (чтобы мужской порог не выдавался за общий).
+ */
+export function labUlnText(code: string): string {
+  const male = getLabNorm(code, 'male')?.uln;
+  if (male === undefined) return '—';
+  const fem = FEMALE_LAB_BOUNDS[String(code || '').trim().toUpperCase()]?.uln;
+  return fem === undefined ? `<${male}` : `♂ <${male} / ♀ <${fem}`;
+}
+
 /** ВГН трансаминазы с обоими полами: «♂ <40 / ♀ <31». Одна формулировка на всё приложение. */
 export function lftUlnText(marker: 'ALT' | 'AST'): string {
   const t = LFT_ULN[marker];

@@ -286,6 +286,12 @@ export { HGB_THRESHOLDS } from './lab-norms.engine';
  */
 export { LFT_ULN, lftUlnText, LFT_STAGES, LFT_STAGE_ULN } from './lab-norms.engine';
 
+/**
+ * ♀ гормональные зоны (E2/PRL) и общий форматтер ВГН «♂ <… / ♀ <…» — из того же
+ * резолвера: таблицы мониторинга и печать не держат собственных копий порогов.
+ */
+export { FEMALE_HORMONE_BANDS, labUlnText } from './lab-norms.engine';
+
 
 export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];
