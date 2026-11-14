@@ -1039,7 +1039,7 @@ export const DB_PART3: SymptomEntry[] = [
           { marker: 'ЭКГ в 12 отведениях', expectedChange: '↑', targetRange: 'Без ишемии', when: 'НЕМЕДЛЕННО' },
           { marker: 'D-димер', expectedChange: '↔', targetRange: '<500 нг/мл', when: 'Для исключения ТЭЛА' },
           { marker: 'CK-MB', expectedChange: '↑↑', targetRange: '<24 Ед/л', when: 'Через 6-8 ч после боли' },
-          { marker: 'Гематокрит, вязкость', expectedChange: '↑', targetRange: '<52%', when: 'Контроль' },
+          { marker: 'Гематокрит, вязкость', expectedChange: '↑', targetRange: '<52% (♀ <48%)', when: 'Контроль' },
         ],
         solutions: [
           { substanceId: 'emergency_call', name: 'НЕМЕДЛЕННО вызвать скорую', type: 'lifestyle', dose: 'срочно', mechanism: 'Время — миокард. Каждая минута задержки = больше некроза', evidenceLevel: 'A' },
@@ -1087,7 +1087,7 @@ export const DB_PART3: SymptomEntry[] = [
         labMarkers: [
           { marker: 'АД (каждые 15 мин)', expectedChange: '↑↑', targetRange: '<180/120', when: 'НЕМЕДЛЕННО' },
           { marker: 'ЭКГ', expectedChange: '↑', targetRange: 'Без ишемии', when: 'НЕМЕДЛЕННО' },
-          { marker: 'Креатинин сыворотки', expectedChange: '↔', targetRange: '<110 мкмоль/л', when: 'НЕМЕДЛЕННО' },
+          { marker: 'Креатинин сыворотки', expectedChange: '↔', targetRange: '<110 мкмоль/л (♀ <97)', when: 'НЕМЕДЛЕННО' },
           { marker: 'Мочевина', expectedChange: '↔', targetRange: '2.5-8.3 ммоль/л', when: 'НЕМЕДЛЕННО' },
         ],
         solutions: [
@@ -1110,7 +1110,7 @@ export const DB_PART3: SymptomEntry[] = [
         labMarkers: [
           { marker: 'МРТ/КТ головы', expectedChange: '↑', targetRange: 'Без отёка/кровоизлияния', when: 'При ↓ сознания' },
           { marker: 'КТ грудной аорты', expectedChange: '↑', targetRange: 'Без расслоения', when: 'При рвущей боли' },
-          { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Креатинин <110', when: 'Контроль' },
+          { marker: 'Мочевина/креатинин', expectedChange: '↑', targetRange: 'Креатинин <110 (♀ <97)', when: 'Контроль' },
         ],
         solutions: [
           { substanceId: 'emergency_hospitalization', name: 'ЭКСТРЕННАЯ ГОСПИТАЛИЗАЦИЯ', type: 'lifestyle', dose: 'срочно', mechanism: 'Требуется внутривенная гипотензивная терапия', evidenceLevel: 'A' },

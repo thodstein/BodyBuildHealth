@@ -35,7 +35,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'ААС стимулируют эритропоэз через ↑ эндогенного EPO и чувствительности костного мозга → ↑ Hct >50% → ↑ периферическое сопротивление + риск тромбоза.',
         labMarkers: [
           { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50%', when: 'До курса, каждые 4-8 нед' },
-          { marker: 'Гемоглобин (Hb)', expectedChange: '↑', targetRange: '130-170 г/л ♂', when: 'До курса, каждые 4-8 нед' },
+          { marker: 'Гемоглобин (Hb)', expectedChange: '↑', targetRange: '130-170 г/л (♂; ♀ 120-150)', when: 'До курса, каждые 4-8 нед' },
           { marker: 'Ферритин', expectedChange: '↓', targetRange: '30-300 мкг/л', when: 'При Hct >52%' },
           { marker: 'D-димер', expectedChange: '↔', targetRange: '<500 нг/мл', when: 'При Hct >54%' },
         ],
@@ -138,9 +138,9 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Холестаз (17α-алкилированные ААС)', probability: 'high',
         mechanism: '17α-алкилирование ингибирует BSEP (bile salt export pump) → нарушение оттока желчи → внутрипечёночный холестаз → цитолиз + боль.',
         labMarkers: [
-          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л ♂', when: 'До курса, каждые 2-4 нед на ор. ААС' },
-          { marker: 'АСТ', expectedChange: '↑', targetRange: '<40 Ед/л ♂', when: 'До курса, каждые 2-4 нед' },
-          { marker: 'ГГТ', expectedChange: '↑↑↑', targetRange: '<55 Ед/л ♂', when: 'Каждые 4 нед' },
+          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л (♂; ♀ <31)', when: 'До курса, каждые 2-4 нед на ор. ААС' },
+          { marker: 'АСТ', expectedChange: '↑', targetRange: '<40 Ед/л (♂; ♀ <31)', when: 'До курса, каждые 2-4 нед' },
+          { marker: 'ГГТ', expectedChange: '↑↑↑', targetRange: '<55 Ед/л (♂; ♀ <31)', when: 'Каждые 4 нед' },
           { marker: 'ЩФ', expectedChange: '↑↑', targetRange: '<150 Ед/л', when: 'Каждые 4 нед' },
           { marker: 'Билирубин общий', expectedChange: '↑', targetRange: '<21 мкмоль/л', when: 'Каждые 4 нед' },
           { marker: 'УЗИ печени + желчного', expectedChange: '↔', targetRange: 'Норма', when: 'До курса, при болях' },
@@ -939,7 +939,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Пероральные ААС / добавки на голодный желудок', probability: 'high',
         mechanism: '17α-алкилированные ААС и некоторые добавки (цинк натощак, АЛЬК, NAC высокие дозы) раздражают слизистую желудка → тошнота. Причина: прямой контакт с mucosa + стимуляция хеморецепторов.',
         labMarkers: [
-          { marker: 'АЛТ, АСТ (исключить гепатотоксичность)', expectedChange: '↔', targetRange: '<40 Ед/л', when: 'При постоянной тошноте' },
+          { marker: 'АЛТ, АСТ (исключить гепатотоксичность)', expectedChange: '↔', targetRange: '<40 Ед/л (♀ <31)', when: 'При постоянной тошноте' },
         ],
         solutions: [
           { substanceId: 'with_food', name: 'Принимать препараты С ЕДОЙ', type: 'lifestyle', dose: '—', mechanism: 'Буферизация слизистой желудка пищей', evidenceLevel: 'A' },
@@ -955,7 +955,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гепатотоксичность + уремия (тошнота как признак печёночной/почечной недостаточности)', probability: 'low',
         mechanism: 'Тяжёлая гепатотоксичность (АЛТ >5× ВГН) → ↓ детоксикация → накопление токсинов → тошнота + отвращение к мясу. Почечная недостаточность → ↑ мочевина → уремическая тошнота.',
         labMarkers: [
-          { marker: 'АЛТ, АСТ, ГГТ', expectedChange: '↑↑', targetRange: '<40, <40, <55', when: 'НЕМЕДЛЕННО' },
+          { marker: 'АЛТ, АСТ, ГГТ', expectedChange: '↑↑', targetRange: '<40, <40, <55 (♀ <31, <31, <31)', when: 'НЕМЕДЛЕННО' },
           { marker: 'Мочевина, креатинин', expectedChange: '↑', targetRange: 'Мочевина 2.5-8.3, креатинин 62-106', when: 'НЕМЕДЛЕННО' },
         ],
         solutions: [
@@ -1085,7 +1085,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Гепатотоксичность-индуцированная анорексия', probability: 'medium',
         mechanism: 'Повреждение гепатоцитов → ↓ синтез белков плазмы → ↑ аммиак → тошнота + анорексия. Нарушение метаболизма желчных кислот → диспепсия → отвращение к жирной пище. Характерный признак: отвращение к мясу/белковой пище (специфично для печёночного генеза).',
         labMarkers: [
-          { marker: 'АЛТ, АСТ, ГГТ', expectedChange: '↑', targetRange: '<40, <40, <55', when: 'НЕМЕДЛЕННО' },
+          { marker: 'АЛТ, АСТ, ГГТ', expectedChange: '↑', targetRange: '<40, <40, <55 (♀ <31, <31, <31)', when: 'НЕМЕДЛЕННО' },
           { marker: 'Билирубин', expectedChange: '↔', targetRange: '<21 мкмоль/л', when: 'НЕМЕДЛЕННО' },
           { marker: 'Аммиак', expectedChange: '↑', targetRange: '15-45 мкмоль/л', when: 'При выраженной анорексии' },
         ],

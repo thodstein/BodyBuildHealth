@@ -103,7 +103,7 @@ describe('женские протоколы сопровождения: поме
 });
 
 describe('ступень 2×ВГН — везде в единицах обоих полов', () => {
-  it('нет `>2×ULN` в коде (комментарии не считаются)', () => {
+  it('нет `2×ULN` в коде (комментарии не считаются)', () => {
     const bad: string[] = [];
     for (const file of walk(ROOT)) {
       const code = readFileSync(file, 'utf8')
@@ -114,5 +114,73 @@ describe('ступень 2×ВГН — везде в единицах обоих
       if (/2\s*[×x]\s*ULN/.test(code)) bad.push(file.replace(/\\/g, '/'));
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('каталог и solver: однозначные пороги называют оба пола', () => {
+  // Проход 67: `targetRange: '<40 Ед/л'` в 60+ строках каталога, стеков и
+  // symptom-solver печатался как общий порог. Женщина читала 40 при своём ВГН 31.
+  const DATA_FILES = [
+    'src/data/support-catalog-data.ts',
+    'src/data/support-catalog-extras.ts',
+    'src/data/support-catalog-supplement.ts',
+    'src/data/support-stacks-part1.ts',
+    'src/data/support-stacks-part2.ts',
+    'src/data/support-stacks-late.ts',
+    'src/engines/symptom-solver.data-part1.ts',
+    'src/engines/symptom-solver.data-part2.ts',
+    'src/engines/symptom-solver.data-part3.ts',
+    'src/engines/comprehensive-report.engine.ts',
+  ];
+  const read = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8');
+
+  it('нет одиночных мужских порогов без женской половины', () => {
+    const bare = [
+      "'<40 Ед/л'", "'<55 Ед/л'", "'<110 мкмоль/л'", "'<170 г/л'",
+      "'HCT<50%'", "'HCT < 50%'", "'HCT <0.50'", "'<50%'", "'<52%'",
+    ];
+    const bad: string[] = [];
+    for (const f of DATA_FILES) {
+      const src = read(f);
+      for (const b of bare) if (src.includes(b)) bad.push(`${f}: ${b}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('женские половины совпадают с резолвером', () => {
+    const catalog = DATA_FILES.filter(f => !/engines/.test(f)).map(read).join('\n');
+    const lft = LFT_STAGE_ULN.reduce.female; // 2×ВГН ♀ = 62 → ВГН 31
+    expect(catalog).toContain(`<40 Ед/л (♀ <${lft / 2})`);
+    expect(catalog).toContain('<110 мкмоль/л (♀ <97)');
+    expect(catalog).toContain('(♀ <150)');
+    expect(catalog).toContain('(♀ <48%)');
+  });
+});
+
+describe('placeholder-нормы формы ввода лаборатории — из резолвера', () => {
+  // Вкладка TZ не смонтирована в LabsScreen, но живёт в тестах и как форма
+  // ввода. Её женские placeholder'ы раньше были литералами и разъехались:
+  // HGB «120-140» (верх 150), ГГТ «<32» (ВГН 31), креатинин «44-80» (верх 97).
+  const src = readFileSync(
+    resolve(process.cwd(), 'src/ui/screens/LabsScreen_parts/LabsTzRiskTab.tsx'), 'utf8');
+
+  it('женские границы берутся из резолвера', () => {
+    expect(src).toContain('HCT_THRESHOLDS.female.erythrocytosis');
+    expect(src).toContain('HGB_THRESHOLDS.female.upper');
+    expect(src).toContain('LFT_ULN.ALT.female');
+    expect(src).toContain('LFT_ULN.AST.female');
+    expect(src).toContain('GGT_ULN.female');
+    expect(src).toContain('CREATININE_ULN.female');
+    expect(src).toContain('FEMALE_HORMONE_BANDS.PRL');
+  });
+
+  it('разъехавшихся литералов больше нет', () => {
+    expect(src).not.toContain("'120-140'");
+    expect(src).not.toContain("'<32'");
+    expect(src).not.toContain("'44-80'");
+    expect(src).not.toContain("'<48'");
+    // E2 в этой таблице — пмоль/л; прежний женский «30-400» был в пг/мл без пометки.
+    expect(src).not.toContain("E2: '30-400'");
+    expect(src).toContain('FEMALE_HORMONE_BANDS.E2.normal');
   });
 });

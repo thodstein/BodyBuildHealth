@@ -79,8 +79,8 @@ export const DB_PART2: SymptomEntry[] = [
         problem: 'Гепатотоксическая астения + гипогликемия на ор. ААС', probability: 'high',
         mechanism: '17α-алкилированные ААС → гепатотоксичность → ↓ глюконеогенез → гипогликемия через 2-3 ч после приёма → сонливость. + ↓ клиренс аммиака и других метаболитов → системная интоксикация → астения. Наиболее выражен при приёме натощак (быстрая абсорбция → высокий first-pass → большая нагрузка на печень).',
         labMarkers: [
-          { marker: 'АЛТ, АСТ', expectedChange: '↑', targetRange: '<40 Ед/л', when: 'При вялости на ор. ААС' },
-          { marker: 'ГГТ', expectedChange: '↔', targetRange: '<55 Ед/л', when: 'Каждые 2-4 нед' },
+          { marker: 'АЛТ, АСТ', expectedChange: '↑', targetRange: '<40 Ед/л (♀ <31)', when: 'При вялости на ор. ААС' },
+          { marker: 'ГГТ', expectedChange: '↔', targetRange: '<55 Ед/л (♀ <31)', when: 'Каждые 2-4 нед' },
           { marker: 'Глюкоза (через 2-3 ч после таблетки)', expectedChange: '↓', targetRange: '4-6 ммоль/л', when: 'Для диф. диагностики гипогликемии' },
         ],
         solutions: [
@@ -236,7 +236,7 @@ export const DB_PART2: SymptomEntry[] = [
         stopCriteria: ['ГГТ/ЩФ >3×ВГН + зуд — прекратить оральные ААС', 'Билирубин >50 мкмоль/л — риск печёночной недостаточности', 'Желтуха (склеры/кожа) — НЕМЕДЛЕННО прекратить все гепатотоксичные препараты'],
         drugInteractions: ['Рифампицин + TUDCA — конкуренция за BSEP, снижение эффективности TUDCA', 'Холестирамин + TUDCA — сорбция TUDCA, интервал ≥4 ч', 'Опиоиды + холестаз — ↑ центрального компонента зуда'],
         labMarkers: [
-          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'НЕМЕДЛЕННО' },
+          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л (♀ <31)', when: 'НЕМЕДЛЕННО' },
           { marker: 'ЩФ', expectedChange: '↑↑', targetRange: '<150 Ед/л', when: 'НЕМЕДЛЕННО' },
           { marker: 'Желчные кислоты сыворотки', expectedChange: '↑', targetRange: '<10 мкмоль/л', when: 'При ↑ ГГТ + зуд' },
           { marker: 'Билирубин общий + прямой', expectedChange: '↔', targetRange: 'Общий <21, прямой <5', when: 'НЕМЕДЛЕННО' },
@@ -268,8 +268,8 @@ export const DB_PART2: SymptomEntry[] = [
         problem: 'Оксиметолон-индуцированная гепатотоксическая анорексия', probability: 'high',
         mechanism: 'Оксиметолон — 17α-алкилированный + обладает прямым митохондриальным токсическим действием на гепатоциты → АЛТ ↑ >100 Ед/л за 2-3 нед → "больная печень" сигнализирует в ЦНС (через блуждающий нерв и цитокины) → анорексия. + Оксиметолон ↑ TNF-α → воспаление → анорексия.',
         labMarkers: [
-          { marker: 'АЛТ, АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л', when: 'Каждые 1-2 нед на оксиметолоне!' },
-          { marker: 'ГГТ, ЩФ', expectedChange: '↑', targetRange: '<55, <150', when: 'Каждые 2 нед' },
+          { marker: 'АЛТ, АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Каждые 1-2 нед на оксиметолоне!' },
+          { marker: 'ГГТ, ЩФ', expectedChange: '↑', targetRange: '<55, <150 (♀ <31, <150)', when: 'Каждые 2 нед' },
         ],
         solutions: [
           { substanceId: 'stop_anadrol', name: 'ОТМЕНИТЬ оксиметолон', type: 'lifestyle', dose: '—', mechanism: 'Единственный реальный способ восстановить аппетит', evidenceLevel: 'A' },
@@ -424,7 +424,7 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'ААС стимулируют эритропоэтин (EPO) через AR-рецепторы почечных клеток. Орал-testosterone и equipoise особенно активны. Повышенная масса эритроцитов → ↑вязкость → ↓микроциркуляция → риск тромбоза.',
         labMarkers: [
-          { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52%', when: 'Каждые 4 нед на курсе' },
+          { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52% (♀ <48%)', when: 'Каждые 4 нед на курсе' },
           { marker: 'Гемоглобин', expectedChange: '↑↑', targetRange: '<180 г/л', when: 'Каждые 4 нед' },
           { marker: 'Эритроциты', expectedChange: '↑↑', targetRange: '<6.0×10¹²/л', when: 'Каждые 4 нед' },
           { marker: 'Ферритин', expectedChange: '↑', targetRange: '<300 мкг/л', when: 'Контроль' },
@@ -485,7 +485,7 @@ export const DB_PART2: SymptomEntry[] = [
           { marker: 'D-димер', expectedChange: '↑', targetRange: '<0.5 мкг FEU/мл', when: 'Контроль каждые 4-8 нед' },
           { marker: 'Антитромбин III', expectedChange: '↓', targetRange: '80-120%', when: 'Контроль' },
           { marker: 'Фибриноген', expectedChange: '↑', targetRange: '2-4 г/л', when: 'Контроль' },
-          { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52%', when: 'Каждые 4 нед' },
+          { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52% (♀ <48%)', when: 'Каждые 4 нед' },
           { marker: 'PAI-1', expectedChange: '↑', targetRange: '<20 Ед/мл', when: 'Спец. анализ' },
         ],
         solutions: [
@@ -526,7 +526,7 @@ export const DB_PART2: SymptomEntry[] = [
           { marker: 'Ферритин', expectedChange: '↑↑', targetRange: '30-300 мкг/л', when: 'Каждые 8 нед' },
           { marker: 'Сывороточное железо', expectedChange: '↑', targetRange: '11-30 мкмоль/л', when: 'Контроль' },
           { marker: 'Коэффициент насыщения трансферрина', expectedChange: '↑', targetRange: '<45%', when: 'Контроль' },
-          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л', when: '↑ при накоплении Fe в печени' },
+          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л (♀ <31)', when: '↑ при накоплении Fe в печени' },
         ],
         solutions: [
           { substanceId: 'phlebotomy_preventive', name: 'Профилактическое кровопускание', type: 'lifestyle', dose: '450 мл каждые 8-12 нед (при ферритине>200)', mechanism: 'Прямое выведение железа', evidenceLevel: 'A' },
@@ -645,7 +645,7 @@ export const DB_PART2: SymptomEntry[] = [
         labMarkers: [
           { marker: 'Тромбоциты', expectedChange: '↓↓', targetRange: '150-400×10⁹/л', when: 'Каждые 4 нед' },
           { marker: 'Лейкоциты', expectedChange: '↓', targetRange: '4-10×10⁹/л', when: 'Контроль' },
-          { marker: 'Гемоглобин', expectedChange: '↓', targetRange: '>130 г/л', when: 'Контроль' },
+          { marker: 'Гемоглобин', expectedChange: '↓', targetRange: '>130 г/л (♀ >120)', when: 'Контроль' },
         ],
         solutions: [
           { substanceId: 'reduce_aas', name: 'Снизить дозу или сменить орал на инъекцию', type: 'lifestyle', dose: 'Testosterone инж. (no 17α-alkyl)', mechanism: 'Устранить гепатотоксичный агент', evidenceLevel: 'A' },
@@ -842,8 +842,8 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'Инсулинорезистентность + ↑синтез липидов в печени + ↑окисление→↓β-окисление→ накопление триглицеридов. GH снижает липолиз печени, но повышает IGF-1.',
         labMarkers: [
-          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л', when: 'Каждые 4 нед' },
-          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'Каждые 4 нед' },
+          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Каждые 4 нед' },
+          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л (♀ <31)', when: 'Каждые 4 нед' },
           { marker: 'Липидограмма', expectedChange: '↑', targetRange: 'Контроль ТГ', when: 'Каждые 8 нед' },
           { marker: 'УЗИ печени', expectedChange: '↑', targetRange: 'Нет гиперэхогенности', when: 'Каждые 6 мес' },
         ],
@@ -880,7 +880,7 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: '17α-алкилы угнетают BSEP (bile salt export pump) → накопление жёлчных кислот в гепатоцитах → токсичность → ↑ГГТ, ↑прямой билирубин.',
         labMarkers: [
-          { marker: 'ГГТ', expectedChange: '↑↑↑', targetRange: '<55 Ед/л', when: 'Каждые 4 нед' },
+          { marker: 'ГГТ', expectedChange: '↑↑↑', targetRange: '<55 Ед/л (♀ <31)', when: 'Каждые 4 нед' },
           { marker: 'Прямой билирубин', expectedChange: '↑', targetRange: '<5 мкмоль/л', when: 'Контроль' },
           { marker: 'ЩФ', expectedChange: '↑', targetRange: '<150 Ед/л', when: 'Контроль' },
           { marker: 'Жёлчные кислоты', expectedChange: '↑↑', targetRange: '<10 мкмоль/л', when: 'При зуде' },
@@ -917,10 +917,10 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'Скелетные мышцы содержат АСТ (больше) и АЛТ (меньше). Тяжёлые тренировки ↑проницаемость мембран → ↑ферменты в крови.',
         labMarkers: [
-          { marker: 'АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л', when: 'Отдых 48ч до анализа' },
-          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л', when: 'Отдых 48ч до анализа' },
+          { marker: 'АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Отдых 48ч до анализа' },
+          { marker: 'АЛТ', expectedChange: '↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Отдых 48ч до анализа' },
           { marker: 'КФК', expectedChange: '↑↑↑', targetRange: '<200 Ед/л', when: 'Дифференциальный маркер' },
-          { marker: 'ГГТ', expectedChange: '↔', targetRange: '<55 Ед/л', when: 'Специфичный печёночный' },
+          { marker: 'ГГТ', expectedChange: '↔', targetRange: '<55 Ед/л (♀ <31)', when: 'Специфичный печёночный' },
         ],
         solutions: [
           { substanceId: 'rest_before_test', name: 'Отдых 48ч перед анализом', type: 'lifestyle', dose: '48-72 ч без тренировок', mechanism: '↓мембранная проницаемость, ↓мышечный вклад', evidenceLevel: 'A' },
@@ -934,9 +934,9 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'medium',
         mechanism: '17α-алкил ААС → гепатотоксичность → ↑АЛТ/ГГТ. Тренболон не 17α-алкил, но тоже негативно влияет.',
         labMarkers: [
-          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л', when: 'Каждые 4 нед' },
+          { marker: 'ГГТ', expectedChange: '↑↑', targetRange: '<55 Ед/л (♀ <31)', when: 'Каждые 4 нед' },
           { marker: 'Билирубин', expectedChange: '↑', targetRange: '<21 мкмоль/л', when: 'Контроль' },
-          { marker: 'АЛТ', expectedChange: '↑↑', targetRange: '<40 Ед/л', when: 'Отдых 48ч' },
+          { marker: 'АЛТ', expectedChange: '↑↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Отдых 48ч' },
         ],
         solutions: [
           { substanceId: 'tudca', name: 'TUDCA', type: 'supplement', dose: '500-1000 мг/день', mechanism: 'Защита гепатоцитов, холерез', evidenceLevel: 'A' },
@@ -971,7 +971,7 @@ export const DB_PART2: SymptomEntry[] = [
         mechanism: 'Портальная гипертензия + гипоальбуминемия + ↓инактивация альдостерона → задержка Na + воды.',
         labMarkers: [
           { marker: 'Альбумин', expectedChange: '↓↓', targetRange: '>35 г/л', when: 'Срочно' },
-          { marker: 'АЛТ/АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л', when: 'Срочно' },
+          { marker: 'АЛТ/АСТ', expectedChange: '↑↑', targetRange: '<40 Ед/л (♀ <31)', when: 'Срочно' },
           { marker: 'ПТИ/МНО', expectedChange: '↑', targetRange: '70-130%', when: 'Срочно' },
           { marker: 'УЗИ брюшной полости', expectedChange: '↑', targetRange: 'Жидкость', when: 'Срочно' },
         ],

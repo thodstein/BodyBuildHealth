@@ -49,9 +49,9 @@ export const STACKS_PART_1: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
         { marker: 'Билирубин общий', when: 'Каждые 4 нед', targetRange: '<21 мкмоль/л' },
       ],
@@ -166,7 +166,7 @@ export const STACKS_PART_1: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '<110 мкмоль/л' },
+        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '<110 мкмоль/л (♀ <97)' },
         { marker: 'eGFR (CKD-EPI)', when: 'Каждые 4 нед', targetRange: '>90 мл/мин' },
         { marker: 'Калий', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
         { marker: 'Мочевина', when: 'Каждые 4 нед', targetRange: '<8.3 ммоль/л' },
@@ -627,7 +627,7 @@ export const STACKS_PART_1: SupportStack[] = [
         { marker: 'Когнитивный тест (Струп)', when: 'Еженедельно', targetRange: '+20% ко времени' },
         { marker: 'BDNF', when: 'Каждые 8 нед', targetRange: '>20 нг/мл' },
         { marker: 'Кортизол', when: 'Каждые 4 нед', targetRange: '150-650 нмоль/л' },
-        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '<110 мкмоль/л' },
+        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '<110 мкмоль/л (♀ <97)' },
         { marker: 'АД', when: 'Еженедельно', targetRange: '<130/85 мм рт.ст.' },
       ],
     },
@@ -858,7 +858,7 @@ export const STACKS_PART_1: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
         { marker: 'MDA (малоновый диальдегид)', when: 'Каждые 8 нед', targetRange: '<2.5 мкмоль/л' },
         { marker: 'GSH (эритроциты)', when: 'Каждые 8 нед', targetRange: '>800 мкмоль/л' },
         { marker: 'Se', when: 'Каждые 4 нед', targetRange: '80-150 мкг/л' },
@@ -1278,9 +1278,9 @@ export const STACKS_PART_1: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'Глутатион эритроцитарный', when: '1 раз в 3 мес', targetRange: '<2.5 ммоль/л' },
         { marker: 'Мочевина/креатинин', when: 'Каждые 4 нед', targetRange: '<8.3 ммоль/л / <106 мкмоль/л' },
       ],

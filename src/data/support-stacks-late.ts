@@ -59,9 +59,9 @@ export const STACKS_PART_3: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 5-7 дней', targetRange: '<40 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 5-7 дней', targetRange: '<40 Ед/л (♀ <31)' },
         { marker: 'АСТ', when: 'Каждые 5-7 дней', targetRange: '<35 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 7 дней', targetRange: '<55 Ед/л' },
+        { marker: 'ГГТ', when: 'Каждые 7 дней', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'Билирубин общий', when: 'Каждые 7 дней', targetRange: '<21 мкмоль/л' },
         { marker: 'Щелочная фосфатаза', when: 'Каждые 7 дней', targetRange: '<150 Ед/л' },
         { marker: 'Альбумин', when: 'Каждые 14 дней', targetRange: '35-55 г/л' },
@@ -241,9 +241,9 @@ export const STACKS_PART_3: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
         { marker: 'Билирубин общий', when: 'Каждые 4 нед', targetRange: '<21 мкмоль/л' },
         { marker: 'ОХ, ЛПНП, ЛПВП, ТГ', when: 'Каждые 4-6 нед', targetRange: 'ЛПНП <2.6, ТГ <1.7, ЛПВП >1.0' },
@@ -254,7 +254,7 @@ export const STACKS_PART_3: SupportStack[] = [
         { marker: '25(OH)D', when: 'Каждые 8 нед', targetRange: '50-80 нг/мл' },
         { marker: 'Кальций, Mg', when: 'Каждые 8 нед', targetRange: 'Ca 2.1-2.6, Mg 0.75-1.0' },
         { marker: 'АД, ЧСС', when: 'Ежедневно', targetRange: 'АД <130/80, ЧСС 60-80' },
-        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '<54% (без кроводачи)' },
+        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '<54% (♀ <52%) (без кроводачи)' },
       ],
     },
   },

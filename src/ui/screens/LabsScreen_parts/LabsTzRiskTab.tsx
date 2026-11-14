@@ -1,8 +1,17 @@
 // Вкладка «Риски (ТЗ)» — лабораторные маркеры для механизм-ориентированной модели
+//
+// ⚠ Вкладка НЕ смонтирована в `LabsScreen` (импорт закомментирован: маркеры T4
+//   переехали в фазы анализа). Файл живёт как форма ввода и в тестах; при
+//   возврате в UI placeholder'ы брать из резолвера норм
+//   (`docs/LAB-NORMS-SINGLE-SOURCE.md`), а не литералами.
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, type TzSpecResult, type TzSpecOrganResult } from '../../../engines/risk-engine-tz-spec';
 import { useDataLink } from '../../../core/data-link';
 import { NativeIcon } from '../../native/NativeIcons';
+import {
+  HCT_THRESHOLDS, HGB_THRESHOLDS, LFT_ULN, GGT_ULN, CREATININE_ULN,
+  FEMALE_HORMONE_BANDS, getLabNorm,
+} from '../../../engines/lab-norms.engine';
 
 const ACCENT = 'var(--labs-accent, #00e68a)';
 const ACCENT_RGB = 'var(--labs-accent-rgb, 0,230,138)';
@@ -20,18 +29,20 @@ export const REP_DRUG: Record<'aas' | 'gh' | 'insulin', { id: string; label: str
 };
 
 // ── Лабораторные маркеры из таблицы T4 ──
+// Верх нормы у половых маркеров — из резолвера (`lab-norms.engine`), не литералом:
+// иначе форма ввода показывала мужские числа как общие, а «<40» расходилось с ВГН.
 const LAB_MARKERS_CONFIG: { code: string; name: string; unit: string; systems: string[]; normalRange: string }[] = [
   { code: 'LDL', name: 'ЛПНП', unit: 'ммоль/л', systems: ['cardio'], normalRange: '<2.6' },
   { code: 'HDL', name: 'ЛПВП', unit: 'ммоль/л', systems: ['cardio'], normalRange: '>1.0' },
   { code: 'TG', name: 'Триглицериды', unit: 'ммоль/л', systems: ['cardio'], normalRange: '<1.7' },
-  { code: 'HCT', name: 'Гематокрит', unit: '%', systems: ['cardio', 'hematologic'], normalRange: '<48' },
-  { code: 'HGB', name: 'Гемоглобин', unit: 'г/л', systems: ['cardio', 'hematologic'], normalRange: '130-170' },
-  { code: 'ALT', name: 'АЛТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: '<40' },
-  { code: 'AST', name: 'АСТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: '<40' },
-  { code: 'GGT', name: 'ГГТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: '<55' },
+  { code: 'HCT', name: 'Гематокрит', unit: '%', systems: ['cardio', 'hematologic'], normalRange: `<${HCT_THRESHOLDS.male.erythrocytosis}` },
+  { code: 'HGB', name: 'Гемоглобин', unit: 'г/л', systems: ['cardio', 'hematologic'], normalRange: `${getLabNorm('HGB', 'male')?.lln ?? 130}-${HGB_THRESHOLDS.male.upper}` },
+  { code: 'ALT', name: 'АЛТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: `<${LFT_ULN.ALT.male}` },
+  { code: 'AST', name: 'АСТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: `<${LFT_ULN.AST.male}` },
+  { code: 'GGT', name: 'ГГТ', unit: 'Ед/л', systems: ['hepatic'], normalRange: `<${GGT_ULN.male}` },
   { code: 'ALP', name: 'Щелочная фосфатаза', unit: 'Ед/л', systems: ['hepatic'], normalRange: '<150' },
   { code: 'BILIRUBIN', name: 'Билирубин общий', unit: 'мкмоль/л', systems: ['hepatic'], normalRange: '<21' },
-  { code: 'CREATININE', name: 'Креатинин', unit: 'мкмоль/л', systems: ['renal'], normalRange: '60-110' },
+  { code: 'CREATININE', name: 'Креатинин', unit: 'мкмоль/л', systems: ['renal'], normalRange: `${getLabNorm('CREATININE', 'male')?.lln ?? 60}-${CREATININE_ULN.male}` },
   { code: 'eGFR', name: 'СКФ (eGFR)', unit: 'мл/мин', systems: ['renal'], normalRange: '>90' },
   { code: 'UACR', name: 'Альбумин/креатинин мочи', unit: 'мг/г', systems: ['renal'], normalRange: '<30' },
   { code: 'K', name: 'Калий (K+)', unit: 'ммоль/л', systems: ['cardio', 'renal', 'cns', 'hematologic'], normalRange: '3.5-5.0' },
@@ -50,7 +61,23 @@ export const LabsTzRiskTab: React.FC = () => {
   const labs = linked.labs || [];
   // Женский слой: женские референсы подписей (HCT/HGB/ALT/TT/E2) — только отображение placeholder.
   const profileSex: 'male' | 'female' = (linked as any)?.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
-  const FEMALE_RANGE: Record<string, string> = { HCT: '<48', HGB: '120-140', ALT: '<31', AST: '<31', GGT: '<32', CREATININE: '44-80', TT: '0.5-2.5', E2: '30-400', PRL: '100-500' };
+  // Женские placeholder'ы — из резолвера норм, а не литералами: в прежней карте
+  // HGB стоял «120-140» (её верх 150), ГГТ «<32» (ВГН 31), креатинин «44-80»
+  // (верх 97), пролактин «100-500» — из бэнда. Гормональные строки
+  // ориентировочные: E2 фазовый, низкий ТТ у женщины — не дефицит.
+  const FEMALE_RANGE: Record<string, string> = {
+    HCT: `<${HCT_THRESHOLDS.female.erythrocytosis}`,
+    HGB: `${getLabNorm('HGB', 'female')?.lln ?? 120}-${HGB_THRESHOLDS.female.upper}`,
+    ALT: `<${LFT_ULN.ALT.female}`,
+    AST: `<${LFT_ULN.AST.female}`,
+    GGT: `<${GGT_ULN.female}`,
+    CREATININE: `${getLabNorm('CREATININE', 'female')?.lln ?? 44}-${CREATININE_ULN.female}`,
+    TT: '0.5-2.5',
+    // E2 фазовый, а колонка таблицы — в пмоль/л: печатаем бэнд вместе с его
+    // единицей, чтобы женские пг/мл не читались как пмоль/л.
+    E2: `${FEMALE_HORMONE_BANDS.E2.normal} ${FEMALE_HORMONE_BANDS.E2.unit}`,
+    PRL: FEMALE_HORMONE_BANDS.PRL.normal.replace(/[–—]/g, '-'),
+  };
   const rangeFor = (m: { code: string; normalRange: string }) => (profileSex === 'female' ? FEMALE_RANGE[m.code] || m.normalRange : m.normalRange);
 
   const [labValues, setLabValues] = useState<Record<string, string>>(() => {

@@ -460,7 +460,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
-    case'liv3': { // пренеопластический: AST/ALT ratio, GGT>2×ULN
+    case'liv3': { // пренеопластический: соотношение АСТ/АЛТ (ГГТ в балл не входит)
       if (alt !== undefined && ast !== undefined) {
         const ratio = ast / alt;
         if (ratio > 2) labResult = 3;

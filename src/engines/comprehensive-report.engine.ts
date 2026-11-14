@@ -646,7 +646,7 @@ function gatherSupportSchedule(): SupportScheduleSection {
     { marker: 'Липидный профиль', when: course.isActive ? 'Каждые 4 недели на курсе' : 'Каждые 3 мес', targetRange: 'ЛПНП < 3.0 ммоль/л' },
     { marker: 'АЛТ/АСТ/ГГТ', when: course.isActive ? 'Каждые 4 недели' : 'Каждые 6 мес', targetRange: 'АЛТ < 40 U/L (♀ <31)' },
     { marker: 'Гормональный профиль', when: course.isActive ? 'Перед курсом + через 4 нед' : 'Каждые 6 мес', targetRange: 'Т 10-35, E2 40-160' },
-    { marker: 'Гематокрит', when: course.isActive ? 'Каждые 4 недели' : 'Каждые 6 мес', targetRange: 'HCT < 50%' },
+    { marker: 'Гематокрит', when: course.isActive ? 'Каждые 4 недели' : 'Каждые 6 мес', targetRange: 'HCT < 50% (♀ <48%)' },
     { marker: 'Глюкоза + инсулин', when: 'Каждые 6 недель', targetRange: 'Глюкоза 3.5-5.5' },
     { marker: 'Пролактин', when: course.isActive ? 'Каждые 6 недель' : 'Каждые 12 мес', targetRange: 'Прл 80-400 mIU/L' },
     { marker: 'СКФ + креатинин', when: course.isActive ? 'Каждые 8 недель' : 'Каждые 12 мес', targetRange: 'СКФ > 90 ml/min' },

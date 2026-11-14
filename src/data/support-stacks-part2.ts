@@ -582,9 +582,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'Амилаза', when: 'Каждые 4 нед', targetRange: '<100 Ед/л' },
         { marker: 'HOMA-IR', when: 'Каждые 4 нед', targetRange: '<2.5' },
         { marker: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '<5.6 ммоль/л' },
@@ -1001,9 +1001,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
         { marker: 'Билирубин общий', when: 'Каждые 4 нед', targetRange: '<21 мкмоль/л' },
       ],
@@ -1056,9 +1056,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 2 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 2 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 2 нед', targetRange: '<150 Ед/л' },
         { marker: 'Билирубин общий', when: 'Каждые 2 нед', targetRange: '<21 мкмоль/л' },
         { marker: 'Билирубин прямой', when: 'Каждые 2 нед', targetRange: '<5 мкмоль/л' },
@@ -1116,9 +1116,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
         { marker: 'Билирубин общий', when: 'Каждые 4 нед', targetRange: '<21 мкмоль/л' },
         { marker: 'Холестерин общий', when: 'Каждые 8 нед', targetRange: '<5.2 ммоль/л' },
@@ -1177,9 +1177,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'ЩФ', when: 'Каждые 4 нед', targetRange: '<150 Ед/л' },
         { marker: 'TNF-α', when: '1 раз в 8 нед', targetRange: '<8 пг/мл' },
         { marker: 'IL-6', when: '1 раз в 8 нед', targetRange: '<5 пг/мл' },
@@ -1241,9 +1241,9 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л' },
-        { marker: 'АСТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л' },
+        { marker: 'АЛТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'АСТ', when: 'Каждые 2 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<55 Ед/л (♀ <31)' },
         { marker: 'СРБ', when: 'Каждые 8 нед', targetRange: '<1 мг/л' },
         { marker: 'TNF-α', when: '1 раз в 8 нед', targetRange: '<8 пг/мл' },
         { marker: 'Иммуноглобулин G', when: '1 раз в 12 нед', targetRange: '7-16 г/л' },
@@ -1645,8 +1645,8 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
-        { marker: 'ГГТ, ЩФ', when: 'Каждые 4 нед', targetRange: '<55/<150 Ед/л' },
+        { marker: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
+        { marker: 'ГГТ, ЩФ', when: 'Каждые 4 нед', targetRange: '<55/<150 Ед/л (♀ <31/<150)' },
         { marker: 'Креатинин, мочевина', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л / 2.5-8.3 ммоль/л' },
         { marker: 'Липидный профиль (ОХ, ЛПНП, ЛПВП, ТГ)', when: 'Каждые 8 нед', targetRange: 'ОХ<5.2, ЛПНП<3.0, ЛПВП>1.0, ТГ<1.7' },
         { marker: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '7-10 мкмоль/л' },

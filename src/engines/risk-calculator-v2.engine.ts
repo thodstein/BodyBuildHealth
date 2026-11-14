@@ -235,7 +235,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
       if (ALL_RISK_SYSTEMS.includes(system as any)) {
         const w = Number(weight) || 0;
         // Contribution is deviation * weight * 25
-        // Allows 2×ULN → 25%, 3×ULN → 50%, 5×ULN → 100%
+        // Отклонение приходит в долях ВГН (своего пола): 2×ВГН → 25%, 3×ВГН → 50%, 5×ВГН → 100%
         const contribution = Math.min(100, Math.max(0, deviation * w * 25));
         systemContributions[system] += contribution;
       }

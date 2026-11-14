@@ -320,7 +320,7 @@ milk_thistle: {
         { with: 'fexofenadine', effect: 'Снижение уровня фексофенадина', mechanism: 'Силимарин ингибирует OATP-транспорт', severity: 'MEDIUM' },
       ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
     ],
     contraindications: ['Желчнокаменная болезнь (с осторожностью)', 'Аллергия на астровые'],
     sideEffects: ['Редко: диарея', 'Редко: аллергия'],
@@ -364,7 +364,7 @@ curcumin: {
       { with: 'quercetin', effect: 'Конкуренция за сульфатацию', mechanism: 'Оба конкурируют за SULT-ферменты — ↓ биодоступности', severity: 'MEDIUM' },
     ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л (♀ <31)' },
       { what: 'СРБ', when: 'Каждые 8 нед', targetRange: '<5 мг/л' },
     ],
     contraindications: ['Желчнокаменная болезнь', 'Приём антикоагулянтов', 'Беременность'],
@@ -490,7 +490,7 @@ taurine: {
       { with: 'loop_diuretics', effect: 'Депотация таурина', mechanism: 'Петлевые диуретики ↑ экскрецию таурина с мочой', severity: 'MEDIUM' },
     ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 12 нед', targetRange: '<40 Ед/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 12 нед', targetRange: '<40 Ед/л (♀ <31)' },
       { what: 'АД', when: 'Ежемесячно', targetRange: '<130/85 мм рт.ст.' },
     ],
     contraindications: ['Тяжёлая почечная недостаточность'],
@@ -577,7 +577,7 @@ berberine: {
     ],
     monitoring: [
       { what: 'Глюкоза натощак', when: 'Каждые 4 нед', targetRange: '3.9-5.5 ммоль/л' },
-      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 6 нед', targetRange: '<40 Ед/л (♀ <31)' },
     ],
     contraindications: ['Приём CYP3A4-субстратов', 'Беременность', 'Тяжёлая печёночная недостаточность'],
     sideEffects: ['Запор', 'Тошнота при высоких дозах', 'Взаимодействие с лекарствами (CYP3A4)'],
@@ -781,7 +781,7 @@ telmisartan: {
     monitoring: [
       { what: 'АД', when: 'Ежедневно', targetRange: '<130/85 мм рт.ст.' },
       { what: 'Калий', when: 'Каждые 4 нед', targetRange: '3.5-5.0 ммоль/л' },
-      { what: 'Креатинин', when: 'Каждые 8 нед', targetRange: '<110 мкмоль/л' },
+      { what: 'Креатинин', when: 'Каждые 8 нед', targetRange: '<110 мкмоль/л (♀ <97)' },
     ],
     contraindications: ['Беременность', 'Двусторонний стеноз почечных артерий', 'Тяжёлая печёночная недостаточность'],
     sideEffects: ['Головокружение при первом приёме', 'Редко: гипотония', 'Гиперкалиемия при комбинировании с калийсберегающими'],
@@ -861,7 +861,7 @@ iron: {
     ],
     monitoring: [
       { what: 'Ферритин', when: 'Каждые 8 нед', targetRange: '30-150 нг/мл' },
-      { what: 'Гемоглобин', when: 'Каждые 8 нед', targetRange: '>130 г/л' },
+      { what: 'Гемоглобин', when: 'Каждые 8 нед', targetRange: '>130 г/л (♀ >120)' },
     ],
     contraindications: ['Гемохроматоз', 'Гемосидероз', 'Талассемия'],
     sideEffects: ['Запор (при сульфате)', 'Тёмный стул (норма)', 'Тошнота натощак'],
@@ -1490,7 +1490,7 @@ betaine: {
     ],
     monitoring: [
       { what: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '<15 мкмоль/л' },
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' }
     ],
     contraindications: ['Тяжёлая почечная недостаточность'],
     sideEffects: ['Диарея при высоких дозах', 'Тошнота'],
@@ -1742,7 +1742,7 @@ phosphatidylcholine: {
       { with: "pharma", effect: "PPC меняет всасывание жирорастворимых ЛС", mechanism: "PPC ↑ текучесть мембран → изменение всасывания жирорастворимых ЛС", severity: "HIGH" }
     ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' },
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
       { what: 'ГГТ', when: 'Каждые 4 нед', targetRange: '<50 Ед/л' },
       { what: 'УЗИ печени', when: 'Каждые 12 нед' }
     ],
@@ -3516,7 +3516,7 @@ s_adenosyl_methionine: {
       ],
     monitoring: [
       { what: 'Настроение', when: 'Субъективно' },
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' }
     ],
     contraindications: ['Биполярное расстройство (может вызвать манию)'],
     sideEffects: ['Тошнота натощак', 'Редко: мания при биполярном расстройстве'],
@@ -3929,7 +3929,7 @@ schisandra: {
       { with: "pharma", effect: "Снижение эффективности иммуносупрессоров", mechanism: "Стимуляция иммунной системы", severity: "MEDIUM" },
     ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' }
     ],
     contraindications: ['Индивидуальная непереносимость', 'Гиперацидный гастрит (с осторожностью)', 'Эпилепсия (с осторожностью — возможна стимуляция ЦНС)', 'Беременность'],
     sideEffects: ['Редко: бессонница при приёме вечером'],
@@ -4116,7 +4116,7 @@ egcg: {
         {with: "iron", effect: "Снижение всасывания Fe", mechanism: "Дубильные вещества связывают Fe", severity: "MEDIUM"},
       ],
     monitoring: [
-      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л' }
+      { what: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' }
     ],
     contraindications: ['Беременность', 'Тяжёлая анемия'],
     sideEffects: ['Тошнота натощак'],
@@ -11284,7 +11284,7 @@ kpv: {
      ],
      conflicts: [{with:'ssri',effect:'Риск серотонинового синдрома',mechanism:'Адеметионин + СИОЗС — ↑↑ серотонина',severity:'MEDIUM'},{with:'mao_inhibitors',effect:'Риск гипертонического криза',mechanism:'SAMe + МАО-ингибиторы — избыток моноаминов',severity:'HIGH'}],
     monitoring: [
-      {what:'АЛТ/АСТ',when:'Каждые 4 недели',targetRange:'<40 Ед/л'},
+      {what:'АЛТ/АСТ',when:'Каждые 4 недели',targetRange:'<40 Ед/л (♀ <31)'},
       {what:'Билирубин',when:'Каждые 4 недели',targetRange:'<21 мкмоль/л'},
       {what:'ГГТП',when:'Каждые 8 нед',targetRange:'<61 Ед/л'},
     ],
@@ -11319,7 +11319,7 @@ kpv: {
      ],
      conflicts: [{with:'iron',effect:'Снижение абсорбции железа',mechanism:'Силимарин хелатирует Fe в кишечнике',severity:'LOW'},{with:'oral_contraceptives',effect:'Снижение эффективности КОК',mechanism:'Силимарин ↓ CYP3A4 — метаболизм эстрогенов',severity:'MEDIUM'}],
     monitoring: [
-      {what:'АЛТ/АСТ',when:'Каждые 4 нед',targetRange:'<40 Ед/л'},
+      {what:'АЛТ/АСТ',when:'Каждые 4 нед',targetRange:'<40 Ед/л (♀ <31)'},
       {what:'Билирубин',when:'Каждые 8 нед',targetRange:'Нормализация'},
     ],
     contraindications: ['Аллергия на расторопшу','Желчнокаменная болезнь (стадия обострения)'],
@@ -11740,7 +11740,7 @@ kpv: {
       {with:'berberine',effect:'Увеличение метаболического эффекта',mechanism:'CYP3A4 + P-gp ингибиция → ↑ AUC берберина',severity:'MEDIUM'},
      ],
       conflicts: [{with:'cyp3a4_substrates',effect:'Увеличение AUC препаратов-субстратов CYP3A4 в 2-3 раза',mechanism:'Ингибирование CYP3A4',severity:'HIGH'},{with:'narrow_therapeutic_drugs',effect:'Риск токсичности узко-терапевтических препаратов',mechanism:'Ингибиция CYP3A4 → ↑ концентрация',severity:'HIGH'}],
-     monitoring: [{what:'Ферменты печени (АЛТ/АСТ)',when:'Каждые 8 нед',targetRange:'<40 Ед/л'}],
+     monitoring: [{what:'Ферменты печени (АЛТ/АСТ)',when:'Каждые 8 нед',targetRange:'<40 Ед/л (♀ <31)'}],
      contraindications: ['Язвенная болезнь ЖКТ (обострение)','Беременность','Приём узкого терапевтического индекса (с осторожностью)'],
      sideEffects: ['Изжога','Раздражение слизистой ЖКТ','Гиперемия (редко)'],
    },
@@ -12240,7 +12240,7 @@ kpv: {
     ],
     conflicts: [],
     monitoring: [
-      { what: 'HCT/HGB', when: 'каждые 2-4 нед на курсе', targetRange: 'HCT < 50%, HGB < 170 г/л' },
+      { what: 'HCT/HGB', when: 'каждые 2-4 нед на курсе', targetRange: 'HCT < 50% (♀ <48%), HGB < 170 г/л (♀ <150)' },
       { what: 'Na/K', when: 'при нарушениях баланса', targetRange: 'Na 135-145, K 3.5-5.0' },
     ],
     contraindications: ['декомпенсированная сердечная недостаточность (перегрузка объёмом)'],
@@ -12350,7 +12350,7 @@ kpv: {
     ],
     conflicts: [],
     monitoring: [
-      { what: 'HCT/HGB', when: 'каждые 4 нед', targetRange: 'HCT<50%' },
+      { what: 'HCT/HGB', when: 'каждые 4 нед', targetRange: 'HCT<50% (♀ <48%)' },
     ],
     contraindications: [],
     sideEffects: ['никотиновая ломка первые 1-2 недели'],
