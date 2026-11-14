@@ -74,7 +74,7 @@ import { CalcPhaseLabCards } from './CalcPhaseLabCards';
 import { LAB_MONITOR_DB } from '../SupportScreen_parts/UnifiedSynergyCalculator';
 import { LAB_TOP20, resolveLabMonitor, type HubLabMon } from '../../../engines/support-hub-labs.engine';
 import { getSubstanceMonitoring } from '../../../data/substance-monitoring-db';
-import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming, phaseLabTeaser, matrixAddonKeys } from '../../../engines/support-phase-labs.engine';
+import { phaseCardsFor, addonsFor, isInjectableCourse, mergeMonitoringLists, withLabTiming, phaseLabTeaser, matrixAddonKeys, cardMarkerList, markerCoveredByMarkers } from '../../../engines/support-phase-labs.engine';
 
 // ── Конфигурация суставного модуля ──────────────────────────────────────────
 interface JointPreset {
@@ -3274,44 +3274,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
 
         // ── Персональный список маркеров: единый мердж трех источников (§2-дефект №8) ──
         // catalog.monitoring (приоритет, поведение 1-в-1) + LAB_MONITOR_DB/LAB_TOP20 +
-        // SUBSTANCE_MONITORING_DB. Дедуп по нормализованному what через mergeMonitoringLists.
-        const personalMarkers = (() => {
-          const map: Record<string, { what: string; when: string; target: string; subs: string[] }> = {};
-          const pushMerged = (items: Array<{ what: string; when: string; target: string }>, subName: string) => {
-            const merged = mergeMonitoringLists(items);
-            for (const m of merged) {
-              const key = (m.what || '').trim().toLowerCase();
-              if (!key) continue;
-              if (!map[key]) map[key] = { what: m.what, when: m.when || '', target: m.target || '', subs: [] };
-              else {
-                if (!map[key].when && m.when) map[key].when = m.when;
-                if (!map[key].target && m.target) map[key].target = m.target;
-              }
-              if (!map[key].subs.includes(subName)) map[key].subs.push(subName);
-            }
-          };
-          const FREQ_RU: Record<string, string> = { daily: 'Ежедневно', week2: 'Каждые 2 нед', week4: 'Каждые 4 нед', week8: 'Каждые 8 нед' };
-          let labDb: Record<string, HubLabMon[]> = {};
-          try {
-            labDb = { ...(LAB_MONITOR_DB as Record<string, HubLabMon[]>), ...LAB_TOP20 };
-          } catch { labDb = {}; }
-          for (const s of subs) {
-            const cat = SUPPORT_CATALOG_DATA[s.substanceId];
-            const nm = (cat as any)?.nameRu || (cat as any)?.name || s.substanceId;
-            if ((cat as any)?.monitoring) {
-              pushMerged(((cat as any).monitoring as Array<{ what: string; when?: string; targetRange?: string }>).map(m => ({ what: m.what, when: m.when || '', target: m.targetRange || '' })), nm);
-            }
-            try {
-              const dbLabs = resolveLabMonitor(labDb, s.substanceId) || [];
-              pushMerged(dbLabs.map(e => ({ what: e.markerRu, when: e.when || '', target: e.target || '' })), nm);
-            } catch { /* мониторинг не должен ронять карточку */ }
-            try {
-              const sm = getSubstanceMonitoring([s.substanceId]) || [];
-              pushMerged(sm.map(e => ({ what: e.marker, when: FREQ_RU[e.freq] || e.freq, target: e.target || '' })), nm);
-            } catch { /* мониторинг не должен ронять карточку */ }
-          }
-          return withLabTiming(Object.values(map)).sort((a, b) => b.subs.length - a.subs.length);
-        })();
+        // SUBSTANCE_MONITORING_DB — см. personalMonitoringMarkers (общая с экспортами).
+        const personalMarkers = personalMonitoringMarkers(subs.map(s => s.substanceId));
+        // Единый перечень анализов — карточки фаз. Здесь только привязка
+        // «маркер → вещества плана»: сроки/цели уже напечатаны в K-карточках,
+        // второй раз их не дублируем (аудит «Мониторинг = врачебный протокол = K0–K10»).
+        const phaseCards = phaseCardsFor(((finalRec as any)?.pedFlags || null) as any, (((finalRec as any)?.phase || 'course') as PhaseKey));
+        const cardMarkers = cardMarkerList(phaseCards);
 
         // ── Ведущие вещества по каждой системе (привязка панелей к плану) ──
         const driversBySystem: Record<string, string[]> = {
@@ -3330,7 +3299,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             <div onClick={() => setShowMonitoring(!showMonitoring)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showMonitoring ? '8px 8px 0 0' : 8, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)' }}>
               <span style={{ fontSize:10, fontWeight:700, color:'#60a5fa', display:'flex', alignItems:'center', gap:5 }}>
                 🩻 Мониторинг анализов и показателей
-                <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>врачебный протокол</span>
+                <span style={{ fontSize:7, fontWeight:600, color:'rgba(96,165,250,0.5)', padding:'1px 5px', borderRadius:4, background:'rgba(96,165,250,0.1)' }}>K0–K10</span>
                 <span style={{ fontSize:7, fontWeight:600, color:'rgba(255,255,255,0.45)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{(() => {
                   try {
                     return phaseLabTeaser((finalRec as any)?.pedFlags || null, (((finalRec as any)?.phase || 'course') as PhaseKey), personalMarkers.length);
@@ -3394,24 +3363,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     );
                   })()}
 
-                  {/* Полный структурированный график: до курса → ежедневно → 2/4/8 нед → после → экстренно.
-                      Д7: явная подпись источника — протокол фазы; ниже персональные маркеры (приоритетные) и свод панелей. */}
+                  {/* Один перечень: карточки фаз K0–K10. Раньше рядом печатался ещё и
+                      график фазы (monitoringSchedule) — те же маркеры, но без целей и
+                      красных флагов: пользователь видел «Мониторинг», «врачебный
+                      протокол» и «K0–K10» как три копии одного списка. */}
                   <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', marginBottom:3, lineHeight:1.4 }}>
-                    🗓 Источник: график фазы курса (клинический протокол) — пересечения с панелями ниже сняты подписями источников.
+                    🗓 Единый перечень — карточки фаз K0–K10 (это и есть врачебный протокол мониторинга). Ниже: привязка к веществам плана, системы, инструменты, экстренные признаки.
                   </div>
-                  {(finalRec.monitoringSchedule || []).map(sec => (
-                    <div key={sec.id} style={{ padding:'5px 7px', borderRadius:6, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.1)', marginBottom:4 }}>
-                      <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:2 }}>{sec.icon} {sec.label} <span style={{ color:'#60a5fa', fontWeight:600 }}>· {sec.period}</span></div>
-                      {sec.items.map((it, i) => (
-                        <div key={i} style={{ fontSize:6, color:'rgba(255,255,255,0.65)', lineHeight:1.55, paddingLeft:6, borderLeft:'2px solid rgba(96,165,250,0.25)', marginBottom:3 }}>
-                          <b style={{ color:'#e2e8f0' }}>{it.marker}</b> — {it.reason}
-                          {it.target && <span style={{ color:'#4ade80' }}> · 🎯 {it.target}</span>}
-                          {it.drug && <span style={{ color:'rgba(255,255,255,0.5)' }}> · 💊 {subNameRu(it.drug)}</span>}
-                          {it.escalation && <div style={{ color: '#fca5a5' }}>⚠ {it.escalation}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
 
                   {/* ── Карточки анализов по фазам K0–K10 (единый движок support-phase-labs) ── */}
                   <CalcPhaseLabCards
@@ -3423,34 +3381,42 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     sex={state.profile?.sex === 'female' ? 'female' : 'male'}
                   />
 
-                  {/* Персональный список маркеров (привязка к веществам плана) */}
+                  {/* Привязка «маркер → вещества плана». Сроки и цели — в K-карточках
+                      выше: у маркеров, которые там уже описаны, повторяем только
+                      привязку (аудит «одно и то же» — без второй копии текста). */}
                   <div style={{ padding:'6px 7px', borderRadius:6, background:'rgba(96,165,250,0.10)', border:'1px solid rgba(96,165,250,0.18)', marginBottom:4 }}>
-                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>🎯 Персональные маркеры ({personalMarkers.length}) — приоритетный источник: привязка к веществам плана ({subs.length})</div>
+                    <div style={{ fontSize:7, fontWeight:700, color:'#93c5fd', marginBottom:3 }}>💊 Анализы по веществам плана ({personalMarkers.length}) — что требует каждый маркер; сроки и цели — в K-карточках ({subs.length} веществ)</div>
                     {personalMarkers.length === 0 && (
-                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>Для назначенных веществ не заданы специфические маркеры мониторинга — см. базовые панели ниже.</div>
+                      <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.4 }}>Для назначенных веществ не заданы специфические маркеры мониторинга — см. базовые панели в K-карточках.</div>
                     )}
                     <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                      {personalMarkers.map((m, mi) => (
+                      {personalMarkers.map((m, mi) => {
+                        const covered = markerCoveredByMarkers(m.what, cardMarkers);
+                        return (
                         <div key={mi} style={{ padding:'4px 6px', borderRadius:5, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                           <div style={{ fontSize:7, fontWeight:700, color:'#bfdbfe', marginBottom:1 }}>{m.what}</div>
-                          <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4 }}>
-                            <span style={{ color:'#94a3b8', fontWeight:600 }}>Когда:</span> {m.when || '—'}
-                            {m.target ? <> · <span style={{ color:'#94a3b8', fontWeight:600 }}>Цель:</span> {m.target}</> : null}
-                          </div>
+                          {!covered && (
+                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', lineHeight:1.4 }}>
+                              <span style={{ color:'#94a3b8', fontWeight:600 }}>Когда:</span> {m.when || '—'}
+                              {m.target ? <> · <span style={{ color:'#94a3b8', fontWeight:600 }}>Цель:</span> {m.target}</> : null}
+                            </div>
+                          )}
                           <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:2 }}>
                             {m.subs.map((sn, si) => (
                               <span key={si} style={{ fontSize:6, color:'#e2e8f0', padding:'1px 4px', borderRadius:3, background:'rgba(96,165,250,0.14)', border:'1px solid rgba(96,165,250,0.22)' }}>{sn}</span>
                             ))}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                   </div>
 
-                  {/* ── Панели по системам (с привязкой к веществам) ── */}
+                  {/* ── Системы плана: вещества и пороги тревог. Маркеры/частоты здесь
+                      не повторяем — единый перечень выше, в карточках фаз. ── */}
                 <div style={{ marginBottom:7 }}>
-                  <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системные панели ({subs.length} веществ в плане) — свод по системам (включает маркеры выше; частота/цели базовые)</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:'#ffffff', marginBottom:4 }}>📋 Системы плана ({subs.length} веществ) — вещества и пороги тревог; маркеры и сроки — в K-карточках</div>
 
                   {SYSTEM_PANELS.map(panel => {
                     const drivers = driversBySystem[panel.id] || [];
@@ -3463,10 +3429,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                         {!isActive && <span style={{ fontSize:6, color:'rgba(255,255,255,0.3)', padding:'1px 4px', borderRadius:3, background:'rgba(255,255,255,0.04)' }}>плановая</span>}
                       </div>
                       <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', lineHeight:1.5, marginLeft:16 }}>
-                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Маркеры:</span> {panel.markers}<br/>
-                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Частота:</span> {panel.freq}<br/>
-                        <span style={{ fontWeight:600, color:'rgba(255,255,255,0.6)' }}>Цели:</span> {panel.targets}
-                        {isActive && <><br/><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>}
+                        {isActive
+                          ? <><span style={{ fontWeight:600, color:panel.color }}>⚠ Тревога:</span> <span style={{ color:panel.color, opacity:0.85 }}>{panel.alert}</span></>
+                          : <span>система не задействована планом — анализы появятся вместе с препаратами этой системы</span>}
                       </div>
                       {isActive && drivers.length > 0 && (
                         <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:3, marginLeft:16 }}>
@@ -4129,6 +4094,92 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   );
 };
 
+// ── Единый перечень анализов: сборка персональных маркеров ───────────────
+// Аудит «Мониторинг / врачебный протокол / K0–K10 — одно и то же»: перечень
+// один — карточки фаз (support-phase-labs). Отдельно считается ТОЛЬКО
+// привязка «маркер → вещества плана» (три источника ниже) и быт (daily).
+interface PersonalMonitorMarker { what: string; when: string; target: string; subs: string[] }
+
+const LAB_FREQ_RU: Record<string, string> = { daily: 'Ежедневно', week2: 'Каждые 2 нед', week4: 'Каждые 4 нед', week8: 'Каждые 8 нед' };
+
+/** Маркеры мониторинга по веществам плана: catalog.monitoring + LAB_MONITOR_DB/LAB_TOP20 + SUBSTANCE_MONITORING_DB (§2-дефект №8). */
+function personalMonitoringMarkers(substanceIds: Array<string | null | undefined>): PersonalMonitorMarker[] {
+  const map: Record<string, PersonalMonitorMarker> = {};
+  const pushMerged = (items: Array<{ what: string; when: string; target: string }>, subName: string) => {
+    const merged = mergeMonitoringLists(items);
+    for (const m of merged) {
+      const key = (m.what || '').trim().toLowerCase();
+      if (!key) continue;
+      if (!map[key]) map[key] = { what: m.what, when: m.when || '', target: m.target || '', subs: [] };
+      else {
+        if (!map[key].when && m.when) map[key].when = m.when;
+        if (!map[key].target && m.target) map[key].target = m.target;
+      }
+      if (!map[key].subs.includes(subName)) map[key].subs.push(subName);
+    }
+  };
+  let labDb: Record<string, HubLabMon[]> = {};
+  try {
+    labDb = { ...(LAB_MONITOR_DB as Record<string, HubLabMon[]>), ...LAB_TOP20 };
+  } catch { labDb = {}; }
+  for (const sid of substanceIds) {
+    if (!sid) continue;
+    const cat = SUPPORT_CATALOG_DATA[sid];
+    const nm = (cat as any)?.nameRu || (cat as any)?.name || sid;
+    if ((cat as any)?.monitoring) {
+      pushMerged(((cat as any).monitoring as Array<{ what: string; when?: string; targetRange?: string }>).map(m => ({ what: m.what, when: m.when || '', target: m.targetRange || '' })), nm);
+    }
+    try {
+      const dbLabs = resolveLabMonitor(labDb, sid) || [];
+      pushMerged(dbLabs.map(e => ({ what: e.markerRu, when: e.when || '', target: e.target || '' })), nm);
+    } catch { /* мониторинг не должен ронять карточку */ }
+    try {
+      const sm = getSubstanceMonitoring([sid]) || [];
+      pushMerged(sm.map(e => ({ what: e.marker, when: LAB_FREQ_RU[e.freq] || e.freq, target: e.target || '' })), nm);
+    } catch { /* мониторинг не должен ронять карточку */ }
+  }
+  return withLabTiming(Object.values(map)).sort((a, b) => b.subs.length - a.subs.length);
+}
+
+/**
+ * Печать единого перечня анализов (K0–K10) + привязки к веществам + быта.
+ * График фазы (monitoringSchedule) в текст НЕ идёт: он перечисляет те же
+ * маркеры второй раз, но без целей и красных флагов.
+ */
+function pushLabMonitoring(lines: string[], rec: SupportRecommendation, opts: { bullet: string; injectable?: boolean; addonSubs?: string[] }): void {
+  const recSubs = (rec.subs || []).map(s => s?.substanceId).filter(Boolean) as string[];
+  lines.push('АНАЛИЗЫ ПО ФАЗАМ (K0–K10) — единый перечень: сроки, цели, красные флаги:');
+  const cards = phaseCardsFor((rec as any)?.pedFlags || null, (rec as any)?.phase, { injectable: opts.injectable });
+  for (const c of cards) {
+    lines.push(`${opts.bullet} ${c.id} · ${c.title} (${c.when}):`);
+    for (const gr of c.groups) {
+      lines.push(`  ${gr.label}:`);
+      for (const m of gr.items) {
+        lines.push(`    ${m.marker}${m.target ? ` (цель: ${m.target})` : ''}${m.red ? ` ⚠ ${m.red}` : ''}`);
+      }
+    }
+  }
+  for (const a of addonsFor([...(opts.addonSubs || []), ...recSubs])) {
+    lines.push(`${opts.bullet} 💊 ${a.label} → ${a.attachTo.join(', ')}: ${a.items.map(m => m.marker).join('; ')}`);
+  }
+  const personal = personalMonitoringMarkers(recSubs);
+  if (personal.length > 0) {
+    lines.push('');
+    lines.push('МОНИТОРИНГ ПО ПРЕПАРАТАМ ПЛАНА (что требует каждое вещество; сроки и цели — в карточках):');
+    for (const m of personal) {
+      lines.push(`${opts.bullet} ${m.what}${m.when ? ` · ${m.when}` : ''}${m.target ? ` · цель: ${m.target}` : ''} — ${m.subs.join(', ')}`);
+    }
+  }
+  const daily = (rec.monitoringSchedule || []).find(s => s.id === 'daily');
+  if (daily && daily.items.length > 0) {
+    lines.push('');
+    lines.push('ЕЖЕДНЕВНО (быт, не анализы):');
+    for (const it of daily.items) {
+      lines.push(`${opts.bullet} ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}`);
+    }
+  }
+}
+
 function canonIdLocal(id: string): string {
   const map: Record<string, string> = {
     telmi: 'telmisartan', tmg: 'betaine', pharma_anastrozole: 'anastrozole',
@@ -4190,31 +4241,11 @@ export function buildPlanText(rec: SupportRecommendation, weight?: number): stri
     lines.push('РИСКИ ПОДДЕРЖКИ:');
     for (const r of rec.supportRisks) lines.push(`• [${r.level.toUpperCase()}] ${r.label}: ${r.detail}`);
   }
-  if (rec.monitoringSchedule && rec.monitoringSchedule.length > 0) {
-    lines.push('');
-    lines.push('МОНИТОРИНГ И АНАЛИЗЫ:');
-    for (const sec of rec.monitoringSchedule) {
-      lines.push(`• ${sec.label} (${sec.period}):`);
-      for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
-    }
-  }
-  try {
-    const recSubs: string[] = (rec.subs || []).map((s: any) => s?.substanceId).filter(Boolean);
-    const cards = phaseCardsFor((rec as any)?.pedFlags || null, (rec as any)?.phase);
-    const addons = addonsFor(recSubs);
-    if (cards.length > 0 || addons.length > 0) {
-      lines.push('');
-      lines.push('КАРТОЧКИ АНАЛИЗОВ ПО ФАЗАМ (K0–K10):');
-      for (const c of cards) {
-        lines.push(`• ${c.id} · ${c.title} (${c.when}):`);
-        for (const gr of c.groups) {
-          lines.push(`  ${gr.label}:`);
-          for (const m of gr.items) lines.push(`    ${m.marker}${m.target ? ` (цель: ${m.target})` : ''}${m.red ? ` ⚠ ${m.red}` : ''}`);
-        }
-      }
-      for (const a of addons) lines.push(`• 💊 ${a.label} → ${a.attachTo.join(', ')}: ${a.items.map(m => m.marker).join('; ')}`);
-    }
-  } catch {}
+  // Один перечень анализов: карточки фаз + привязка к веществам + быт.
+  // График фазы (monitoringSchedule) печатался здесь отдельно и дублировал
+  // те же маркеры — убран (аудит «Мониторинг = врачебный протокол = K0–K10»).
+  lines.push('');
+  pushLabMonitoring(lines, rec, { bullet: '•' });
   if (rec.guardrails.length > 0) {
     lines.push('');
     lines.push('GUARDRAILS:');
@@ -4376,35 +4407,17 @@ export function buildDoctorReport(rec: SupportRecommendation, state: CalculatorS
       }
     }
   } catch {}
-  // Мониторинг
-  if (rec.monitoringSchedule && rec.monitoringSchedule.length > 0) {
-    lines.push('');
-    lines.push('МОНИТОРИНГ И АНАЛИЗЫ:');
-    for (const sec of rec.monitoringSchedule) {
-      lines.push(`- ${sec.label} (${sec.period}):`);
-      for (const it of sec.items) lines.push(`    ${it.marker} — ${it.reason}${it.target ? ` (цель: ${it.target})` : ''}${it.escalation ? ` ⚠ ${it.escalation}` : ''}`);
-    }
+  // Мониторинг — ОДИН перечень (K0–K10), как и в UI: график фазы не дублируем.
+  lines.push('');
+  {
+    let injectable: boolean | undefined;
+    let aasIds: string[] = [];
+    try {
+      aasIds = (((state as any)?.pharma?.aas || []).map((a: any) => a?.id).filter(Boolean)) as string[];
+      injectable = isInjectableCourse(aasIds.map(id => ({ id })), (rec as any)?.pedFlags || null);
+    } catch { injectable = undefined; }
+    pushLabMonitoring(lines, rec, { bullet: '-', injectable, addonSubs: aasIds });
   }
-  try {
-    const aasIds: string[] = (((state as any)?.pharma?.aas || []).map((a: any) => a?.id).filter(Boolean)) as string[];
-    const recSubs: string[] = (rec.subs || []).map((s: any) => s?.substanceId).filter(Boolean);
-    const cards = phaseCardsFor((rec as any)?.pedFlags || null, (rec as any)?.phase, {
-      injectable: isInjectableCourse(aasIds.map(id => ({ id })), (rec as any)?.pedFlags || null),
-    });
-    const addons = addonsFor([...aasIds, ...recSubs]);
-    if (cards.length > 0 || addons.length > 0) {
-      lines.push('');
-      lines.push('КАРТОЧКИ АНАЛИЗОВ ПО ФАЗАМ (K0–K10):');
-      for (const c of cards) {
-        lines.push(`- ${c.id} · ${c.title} (${c.when}):`);
-        for (const gr of c.groups) {
-          lines.push(`  ${gr.label}:`);
-          for (const m of gr.items) lines.push(`    ${m.marker}${m.target ? ` (цель: ${m.target})` : ''}${m.red ? ` ⚠ ${m.red}` : ''}`);
-        }
-      }
-      for (const a of addons) lines.push(`- 💊 ${a.label} → ${a.attachTo.join(', ')}: ${a.items.map(m => m.marker).join('; ')}`);
-    }
-  } catch {}
   lines.push('');
   lines.push('СВОДКА ДВИЖКА:');
   lines.push(rec.summary);

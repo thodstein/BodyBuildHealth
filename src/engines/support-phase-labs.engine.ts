@@ -767,6 +767,57 @@ export function normalizeLabMarker(s: string): string {
     .trim();
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ОДИН ПЕРЕЧЕНЬ АНАЛИЗОВ (аудит «Мониторинг / врачебный протокол /
+//  K0–K10 — одно и то же»). Карточки фаз — единственный перечень:
+//  график фазы (buildMonitoringSchedule) и персональные маркеры лишь
+//  дополняют его, поэтому перед печатью второй раз сверяемся с
+//  карточками по токенам маркера, а не по точной строке — «АЛТ/АСТ»
+//  и «АЛТ/АСТ/ГГТ/ЩФ/билирубин...» описывают один и тот же забор.
+// ════════════════════════════════════════════════════════════════════
+const MARKER_TOKEN_RE = /[a-zа-яё0-9⁺⁻¹²³⁴]+/gi;
+
+/** Токены маркера: «Креатинин/eGFR/UACR» → {креатинин, egfr, uacr}. */
+export function markerTokens(s: string): Set<string> {
+  const out = new Set<string>();
+  for (const t of normalizeLabMarker(s).match(MARKER_TOKEN_RE) || []) {
+    if (t.length >= 2) out.add(t);
+  }
+  return out;
+}
+
+/** Все маркеры выбранных карточек — вход для markerCoveredByMarkers. */
+export function cardMarkerList(cards: PhaseLabCard[]): string[] {
+  const out: string[] = [];
+  for (const c of cards || []) {
+    for (const gr of c.groups || []) {
+      for (const m of gr.items || []) out.push(m.marker);
+    }
+  }
+  return out;
+}
+
+/**
+ * Маркер уже описан карточками? Токены одного маркера — подмножество токенов
+ * другого (в обе стороны): «АЛТ/АСТ» ⊂ «АЛТ/АСТ/ГГТ/ЩФ/…», «PRL» ⊂ «PRL (19-nor)».
+ * Пустой набор токенов (мусорная строка) не считается покрытием.
+ */
+export function markerCoveredByMarkers(marker: string, cardMarkers: string[]): boolean {
+  const a = markerTokens(marker);
+  if (a.size === 0) return false;
+  for (const cm of cardMarkers || []) {
+    const b = markerTokens(cm);
+    if (b.size === 0) continue;
+    const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+    let subset = true;
+    for (const t of small) {
+      if (!big.has(t)) { subset = false; break; }
+    }
+    if (subset) return true;
+  }
+  return false;
+}
+
 export interface DuplicateLabMarker {
   marker: string;
   where: string[];

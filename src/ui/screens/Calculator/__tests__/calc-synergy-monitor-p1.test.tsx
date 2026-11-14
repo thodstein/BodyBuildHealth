@@ -5,7 +5,8 @@
  *     не покрытых сетью (filterSynergiesCoveredByNetwork + synergyLinePairs).
  * Д6: взаимодействия — один блок с приоритетом checkInteractions (source-lock: SafetyConflicts
  *     вызывается только при пустой drug-DB или при ≤1 веществе в плане).
- * Д7: мониторинг — у всех 4 перечней есть явные подписи «источник».
+ * Д7: мониторинг — ОДИН перечень: карточки фаз K0–K10. График фазы (monitoringSchedule)
+ *     и «Системные панели» больше не печатают те же маркеры второй раз.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -69,8 +70,8 @@ describe('Д6: взаимодействия — один блок (source-lock)'
   });
 });
 
-describe('Д7: подписи источников мониторинга', () => {
-  it('раскрытый мониторинг содержит 4 подписи-источника', async () => {
+describe('Д7: мониторинг — один перечень анализов', () => {
+  it('раскрытый мониторинг: карточки K0–K10 + привязка к веществам, без графика фазы', async () => {
     localStorage.setItem(
       'he_autocalc_state',
       JSON.stringify({ labs: { fullPanel: { date: '2026-09-01', panelBiochem: { ALT: '60' } } } }),
@@ -87,12 +88,16 @@ describe('Д7: подписи источников мониторинга', () =
     fireEvent.click(header);
     await waitFor(
       () => {
-        expect(screen.queryAllByText(/график фазы курса \(клинический протокол\)/).length).toBeGreaterThan(0);
+        expect(screen.queryAllByText(/единый перечень K0–K10/).length).toBeGreaterThan(0);
       },
       { timeout: 8000 },
     );
-    expect(screen.queryAllByText(/единый перечень K0–K10/).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/приоритетный источник: привязка к веществам плана/).length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/свод по системам \(включает маркеры выше/).length).toBeGreaterThan(0);
+    // Привязка «маркер → вещества плана» осталась (уникальные данные).
+    expect(screen.queryAllByText(/Анализы по веществам плана/).length).toBeGreaterThan(0);
+    // Второй и третий перечни (график фазы, свод панелей) больше не печатаются.
+    expect(screen.queryAllByText(/график фазы курса \(клинический протокол\)/).length).toBe(0);
+    expect(screen.queryAllByText(/свод по системам \(включает маркеры выше/).length).toBe(0);
+    // Один заголовок-пояснение, что перечень действительно один.
+    expect(screen.queryAllByText(/Единый перечень — карточки фаз K0–K10/).length).toBe(1);
   });
 });
