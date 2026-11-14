@@ -450,15 +450,20 @@ export const DYNAMIC_REFS: Record<string, DynamicRefRange> = {
 // Re-export PHARMA_DB from pharma-database
 export { PHARMA_DB } from './pharma-database';
 
-// НОВЫЕ: Микронутриенты (расширено)
-export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: string; upperLimit?: number }> = {
-  Mg: { amount: 400, unit: 'mg', upperLimit: 700 }, Zn: { amount: 15, unit: 'mg', upperLimit: 40 },
-  VitD: { amount: 3000, unit: 'IU', upperLimit: 10000 }, VitC: { amount: 1000, unit: 'mg', upperLimit: 2000 },
-  VitB12: { amount: 2.4, unit: 'mcg', upperLimit: 50 }, Omega3_EPA_DHA: { amount: 2000, unit: 'mg', upperLimit: 5000 },
-  Potassium: { amount: 3500, unit: 'mg', upperLimit: 4700 }, Sodium: { amount: 2300, unit: 'mg', upperLimit: 5000 },
-  Iron: { amount: 8, unit: 'mg', upperLimit: 45 }, Calcium: { amount: 1000, unit: 'mg', upperLimit: 2500 },
-  Iodine: { amount: 150, unit: 'mcg', upperLimit: 1100 }, Selenium: { amount: 55, unit: 'mcg', upperLimit: 400 },
-  Copper: { amount: 0.9, unit: 'mg', upperLimit: 10 }, Chromium: { amount: 35, unit: 'mcg', upperLimit: 1000 }
+// НОВЫЕ: Микронутриенты (расширено).
+// ⚠️ Здесь только ЦЕЛЬ/норма потребления. Пределов (UL) тут нет намеренно:
+// раньше в этом объекте жила ШЕСТАЯ копия пределов (`upperLimit`) с числами,
+// расходившимися с реестром (магний 700 вместо 350, витамин D 10000 МЕ вместо
+// 4000, B12 50 мкг, железо 45 мг как UL при safe level 40) — и не читалась
+// нигде. Единственный источник пределов — `engines/support-limits.NUTRIENT_LIMITS_V2`.
+export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: string }> = {
+  Mg: { amount: 400, unit: 'mg' }, Zn: { amount: 15, unit: 'mg' },
+  VitD: { amount: 3000, unit: 'IU' }, VitC: { amount: 1000, unit: 'mg' },
+  VitB12: { amount: 2.4, unit: 'mcg' }, Omega3_EPA_DHA: { amount: 2000, unit: 'mg' },
+  Potassium: { amount: 3500, unit: 'mg' }, Sodium: { amount: 2300, unit: 'mg' },
+  Iron: { amount: 8, unit: 'mg' }, Calcium: { amount: 1000, unit: 'mg' },
+  Iodine: { amount: 150, unit: 'mcg' }, Selenium: { amount: 55, unit: 'mcg' },
+  Copper: { amount: 0.9, unit: 'mg' }, Chromium: { amount: 35, unit: 'mcg' }
 } as const;
 
 // НОВЫЕ: Лабораторные маркеры (расширено до 30+)
