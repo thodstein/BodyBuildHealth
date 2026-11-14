@@ -238,7 +238,7 @@ export const CONTRAINDICATIONS: Record<string, ContraindicationRule> = {
   },
   testosterone: {
     substanceId: 'testosterone',
-    absolute: ['Рак простаты', 'Рак груди (мужчины редко)', 'Беременность (категория X)', 'Тяжёлая полицитемия (Hct>54% — риск тромбоза)', 'Тяжёлая ОСН (NYHA III-IV)', 'Тяжёлое обструктивное апноэ сна (некомпенсированное)'],
+    absolute: ['Рак простаты', 'Рак груди (мужчины редко)', 'Беременность (категория X)', 'Тяжёлая полицитемия (Hct >54%, ♀ >52% — риск тромбоза)', 'Тяжёлая ОСН (NYHA III-IV)', 'Тяжёлое обструктивное апноэ сна (некомпенсированное)'],
     absoluteConditions: ['prostate_cancer', 'breast_cancer', 'pregnancy', 'severe_polycythemia', 'severe_chf', 'severe_osa'],
     relative: ['СД (↑инсулинорезистентность)', 'Доброкачественная гиперплазия простаты (контроль PSA)', 'Эпилепсия (↑seizure threshold редко)', 'Микроцитарная анемия (T может маскировать)'],
     relativeConditions: ['diabetes', 'bph', 'epilepsy', 'anemia'],

@@ -104,6 +104,8 @@ export function toRegistryAmount(id: string, value: number): number | undefined 
 // терапии — в ×ВГН, чтобы не зависеть от пола читателя.
 const ALT_TARGET = `${lftUlnText('ALT')} Ед/л`;
 const AST_TARGET = `${lftUlnText('AST')} Ед/л`;
+// ГГТ печатался мужским `<55` — у женщины ВГН 31 (проход 71).
+const GGT_TARGET = `${labUlnText('GGT')} Ед/л`;
 
 export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   // ── AAS & гормональные препараты ── (маркеры общие для всех AAS)
@@ -114,18 +116,18 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
     { markerRu:'ЛПНП (LDL)', markerEn:'LDL', system:'cardio', when:'Каждые 4 нед', target:'<3.0 ммоль/л', condition:'↑ LDL → атеросклероз', note:'Оральные AAS ↓ HDL + ↑ LDL — атерогенная дислипидемия.', tier1:'3.0-4.0 — бергамот 500-1000 мг', tier2:'4.0-5.5 — бергамот+чеснок+омега-3', tier3:'>5.5 — добавить розувастатин 5-10 мг' },
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → цитолиз гепатоцитов', note:'Оральные 17α-алкилированные (метандростенолон, оксиметолон, станозолол) → ↑ нагрузки.', tier1:'1–2×ВГН — NAC 1200 мг, силимарин', tier2:'2–5×ВГН — TUDCA 500-1000 мг, NAC, силимарин', tier3:'>5×ВГН — STOP оральные AAS' },
     { markerRu:'АСТ', markerEn:'AST', system:'hepatic', when:'Каждые 4 нед', target:AST_TARGET, condition:'↑ АСТ → поражение гепатоцитов + миокарда', note:'Соотношение АЛТ/АСТ: если АСТ > АЛТ — возможна миопатия (CK ↑) или алкоголь.', tier1:'1–2×ВГН — наблюдение, NAC', tier2:'2–5×ВГН — TUDCA+NAC+силимарин', tier3:'>5×ВГН — STOP AAS' },
-    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↑ ГГТ → холестаз, алкоголь, микросомальная индукция', note:'Растёт от 17α-алкилированных. Если ↑ ГГТ + ↑ ЩФ — холестатическое поражение.', tier1:'55-100 — TUDCA 500 мг', tier2:'100-200 — TUDCA 1000 мг, NAC, силимарин', tier3:'>200 — STOP оральные AAS, УЗИ печени' },
+    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:GGT_TARGET, condition:'↑ ГГТ → холестаз, алкоголь, микросомальная индукция', note:'Растёт от 17α-алкилированных. Если ↑ ГГТ + ↑ ЩФ — холестатическое поражение.', tier1:'55-100 — TUDCA 500 мг', tier2:'100-200 — TUDCA 1000 мг, NAC, силимарин', tier3:'>200 — STOP оральные AAS, УЗИ печени' },
     { markerRu:'Эстрадиол (E2)', markerEn:'ESTRADIOL', system:'hormonal', when:'Каждые 4 нед (через 48 ч после инъекции)', target:`♂ 100-200 пмоль/л (на курсе) / ♀ по фазе: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл`, condition:'↑ E2 → гинекомастия, отёки, гипертензия, ↓ E2 → суставы, либидо', note:'Измерять в середине недели между инъекциями. Не подавлять E2 до 0 — это опасно для липидов и костей.', tier1:'>250 — анастрозол 0.25-0.5 мг/день', tier2:'>400 — анастрозол 0.5-1 мг/день', tier3:'E2 <50 — отменить AI, E2 >600 — STOP препарат с ароматизацией' },
     { markerRu:'Пролактин (PRL)', markerEn:'PRL', system:'hormonal', when:'Каждые 4 нед', target:`♂ <320 / ♀ ${FEMALE_HORMONE_BANDS.PRL.green} мМЕ/л`, condition:'↑ PRL → ↓ либидо, галакторея, импульсивность', note:'Нужен при нандролоне, тренболоне. 320-400 — макропролактин (ПЭГ) и повтор; выше 400 → каберголин по титрации ниже.', tier1:'400-700 — каберголин 0.25 мг/нед', tier2:'700-1000 — каберголин 0.5 мг/нед', tier3:'>1000 — STOP нандролон/трен, МРТ гипофиза' },
   ],
   // ── Гепатопротекторы ──
   nac: [
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → защита гепатоцитов', note:'NAC 1200-1800 мг/сут снижает АЛТ на 30-50% при токсическом поражении. При дозе >2400 мг — тошнота.' },
-    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↓ ГГТ → улучшение детоксикации', note:'NAC улучшает конъюгацию токсинов, снижая ГГТ на 20-40%.' },
+    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:GGT_TARGET, condition:'↓ ГГТ → улучшение детоксикации', note:'NAC улучшает конъюгацию токсинов, снижая ГГТ на 20-40%.' },
   ],
   tudca: [
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Каждые 4 нед', target:ALT_TARGET, condition:'↓ АЛТ → снижение ER-стресса', note:'TUDCA 500-1000 мг снижает АЛТ за счёт уменьшения ER-стресса и апоптоза гепатоцитов.' },
-    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:'<55 Ед/л', condition:'↓ ГГТ → улучшение желчеоттока', note:'TUDCA стимулирует BSEP, снижая холестатический компонент. Эффект через 2-4 нед.' },
+    { markerRu:'ГГТ', markerEn:'GGT', system:'hepatic', when:'Каждые 4 нед', target:GGT_TARGET, condition:'↓ ГГТ → улучшение желчеоттока', note:'TUDCA стимулирует BSEP, снижая холестатический компонент. Эффект через 2-4 нед.' },
     { markerRu:'Билирубин', markerEn:'BILIRUBIN', system:'hepatic', when:'Каждые 4 нед', target:'<17.1 мкмоль/л', condition:'↓ билирубин → улучшение конъюгации/экскреции', note:'Особенно эффективен при ↑ прямого билирубина (холестатический тип).', tier2:'>50 — TUDCA 1000 мг, STOP гепатотоксичные', tier3:'>100 — STOP AAS, УЗИ' },
   ],
   milk_thistle: [

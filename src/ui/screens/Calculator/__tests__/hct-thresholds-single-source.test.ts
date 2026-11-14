@@ -114,12 +114,15 @@ describe('гематокрит: тексты не вводят своих чис
     const dirs = ['src/data', 'src/engines'].map(d => resolve(process.cwd(), d));
     for (const dir of dirs) {
       for (const p of walk(dir)) {
+        // Специализированный женский блок («Женщины и ААС», правило 4): его
+        // пороги женские по определению, мужской половины там нет.
+        if (/supportProtocolWomen/.test(p)) continue;
         readFileSync(p, 'utf8').split(/\r?\n/).forEach((line, i) => {
           if (/^\s*(\/\/|\*|\/\*)/.test(line)) return; // комментарий, не текст для пользователя
           if (!/флеботом|эритроцитаферез|кровопускание|забор крови/i.test(line)) return;
           // Порог должен стоять РЯДОМ с HCT: иначе «%» из соседнего показателя
           // (HDL −40%, PLT 400) даёт ложное срабатывание на длинных строках.
-          if (!/[Hh][Cc][Tt][^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
+          if (!/(?:[Hh][Cc][Tt]|[Гг]ематокрит)[^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
           if (/♀|женск/i.test(line)) return;
           bad.push(`${relative(process.cwd(), p)}:${i + 1} — ${line.trim().slice(0, 100)}`);
         });
@@ -136,13 +139,15 @@ describe('гематокрит: тексты не вводят своих чис
     const bad: string[] = [];
     let scanned = 0;
     for (const p of walk(root)) {
+      // Специализированный женский блок — только женские пороги по замыслу.
+      if (/supportProtocolWomen/.test(p)) continue;
       const src = readFileSync(p, 'utf8');
       if (/♀ Женщины|к женщинам не применяются/.test(src)) continue;
       scanned++;
       src.split(/\r?\n/).forEach((line, i) => {
         if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
         if (!/флеботом|эритроцитаферез|кровопускание|забор крови/i.test(line)) return;
-        if (!/[Hh][Cc][Tt][^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
+        if (!/(?:[Hh][Cc][Tt]|[Гг]ематокрит)[^.;]{0,45}?\d{2}(?:[.,]\d+)?\s*%/.test(line)) return;
         if (/♀|женск/i.test(line)) return;
         bad.push(`${relative(process.cwd(), p)}:${i + 1} — ${line.trim().slice(0, 100)}`);
       });

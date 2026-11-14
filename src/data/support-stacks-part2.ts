@@ -349,7 +349,7 @@ export const STACKS_PART_2: SupportStack[] = [
         { marker: 'Кортизол утренний', when: 'Каждые 4 нед', targetRange: '140-690 нмоль/л' },
         { marker: 'BDNF плазма', when: '1 раз в 8 нед', targetRange: '>7500 пг/мл' },
         { marker: 'MMSE (когнитивный тест)', when: '1 раз в 4 нед', targetRange: '>27 баллов' },
-        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л' },
+        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л (♀ 44-97)' },
         { marker: 'ДГЭА-С', when: '1 раз в 8 нед', targetRange: '2.2-11.3 мкмоль/л' },
       ],
     },
@@ -409,7 +409,7 @@ export const STACKS_PART_2: SupportStack[] = [
         { marker: '3-метилгистидин (моча)', when: '1 раз в 4 нед', targetRange: '<300 мкмоль/г креатинина' },
         { marker: 'Кортизол', when: 'Каждые 4 нед', targetRange: '140-690 нмоль/л' },
         { marker: 'IGF-1', when: '1 раз в 8 нед', targetRange: '100-300 нг/мл' },
-        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л' },
+        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л (♀ 44-97)' },
       ],
     },
   },
@@ -465,7 +465,7 @@ export const STACKS_PART_2: SupportStack[] = [
     structuredLabControl: {
       markers: [
         { marker: 'АД систолическое', when: 'Ежедневно', targetRange: '110-130 мм рт.ст.' },
-        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '40-48%' },
+        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '40-48% (♀ 36-48%)' },
         { marker: 'NO метаболиты (нитриты)', when: '1 раз в 4 нед', targetRange: '>0.5 мкмоль/л' },
         { marker: 'Вязкость крови', when: '1 раз в 8 нед', targetRange: '4.0-5.4 мПа·с' },
         { marker: 'АД диастолическое', when: 'Ежедневно', targetRange: '70-85 мм рт.ст.' },
@@ -647,7 +647,7 @@ export const STACKS_PART_2: SupportStack[] = [
       markers: [
         { marker: 'Ферритин', when: 'Каждые 2 нед', targetRange: '30-150 мкг/л' },
         { marker: 'Сывороточное железо', when: 'Каждые 2 нед', targetRange: '11-32 мкмоль/л' },
-        { marker: 'Hb (гемоглобин)', when: 'Каждые 2 нед', targetRange: '130-160 г/л' },
+        { marker: 'Hb (гемоглобин)', when: 'Каждые 2 нед', targetRange: '130-160 г/л (♀ 120-150)' },
         { marker: 'Cu в сыворотке', when: 'Каждые 4 нед', targetRange: '10-25 мкмоль/л' },
         { marker: 'Насыщение трансферрина', when: 'Каждые 4 нед', targetRange: '20-50%' },
         { marker: 'ОЖСС', when: 'Каждые 4 нед', targetRange: '45-72 мкмоль/л' },
@@ -716,7 +716,7 @@ export const STACKS_PART_2: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'Hb (гемоглобин)', when: 'Каждые 2 нед', targetRange: '130-160 г/л' },
+        { marker: 'Hb (гемоглобин)', when: 'Каждые 2 нед', targetRange: '130-160 г/л (♀ 120-150)' },
         { marker: 'Ферритин', when: 'Каждые 4 нед', targetRange: '30-150 мкг/л' },
         { marker: 'Фолат эритроцитарный', when: 'Каждые 8 нед', targetRange: '>400 нг/мл' },
         { marker: 'B12', when: 'Каждые 8 нед', targetRange: '200-900 пг/мл' },
@@ -830,7 +830,7 @@ export const STACKS_PART_2: SupportStack[] = [
         { marker: 'D-димер', when: 'Каждые 4 нед', targetRange: '<0.5 мг/л' },
         { marker: 'Фибриноген', when: 'Каждые 4 нед', targetRange: '2-4 г/л' },
         { marker: 'МНО', when: 'Каждые 4 нед', targetRange: '0.8-1.2' },
-        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '40-48%' },
+        { marker: 'Гематокрит', when: 'Каждые 4 нед', targetRange: '40-48% (♀ 36-48%)' },
         { marker: 'Тромбоциты', when: 'Каждые 4 нед', targetRange: '150-400 ×10⁹/л' },
       ],
     },
@@ -887,7 +887,7 @@ export const STACKS_PART_2: SupportStack[] = [
         { marker: 'D-димер', when: 'Каждые 2 нед', targetRange: '<0.3 мг/л' },
         { marker: 'Фибриноген', when: 'Каждые 2 нед', targetRange: '2-4 г/л' },
         { marker: 'МНО', when: 'Каждые 2 нед', targetRange: '0.8-1.2' },
-        { marker: 'Гематокрит', when: 'Каждые 2 нед', targetRange: '40-48%' },
+        { marker: 'Гематокрит', when: 'Каждые 2 нед', targetRange: '40-48% (♀ 36-48%)' },
         { marker: 'Тромбоциты', when: 'Каждые 4 нед', targetRange: '150-400 ×10⁹/л' },
         { marker: 'АД', when: 'Ежедневно', targetRange: '<130/85 мм рт.ст.' },
       ],
@@ -1647,7 +1647,7 @@ export const STACKS_PART_2: SupportStack[] = [
       markers: [
         { marker: 'АЛТ/АСТ', when: 'Каждые 4 нед', targetRange: '<40 Ед/л (♀ <31)' },
         { marker: 'ГГТ, ЩФ', when: 'Каждые 4 нед', targetRange: '<55/<150 Ед/л (♀ <31/<150)' },
-        { marker: 'Креатинин, мочевина', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л / 2.5-8.3 ммоль/л' },
+        { marker: 'Креатинин, мочевина', when: 'Каждые 4 нед', targetRange: '62-106 мкмоль/л (♀ 44-97) / 2.5-8.3 ммоль/л' },
         { marker: 'Липидный профиль (ОХ, ЛПНП, ЛПВП, ТГ)', when: 'Каждые 8 нед', targetRange: 'ОХ<5.2, ЛПНП<3.0, ЛПВП>1.0, ТГ<1.7' },
         { marker: 'Гомоцистеин', when: 'Каждые 8 нед', targetRange: '7-10 мкмоль/л' },
         { marker: '25(OH) витамин D', when: 'Каждые 8 нед', targetRange: '50-80 нг/мл' },

@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { LFT_STAGE_ULN, FEMALE_HORMONE_BANDS } from '../../engines/lab-norms.engine';
+import { LFT_STAGE_ULN, FEMALE_HORMONE_BANDS, FEMALE_LAB_BOUNDS } from '../../engines/lab-norms.engine';
 
 const ROOT = resolve(process.cwd(), 'src');
 
@@ -195,30 +195,77 @@ describe('каталог и solver: гормональные цели назыв
   });
 });
 
-describe('placeholder-нормы формы ввода лаборатории — из резолвера', () => {
-  // Вкладка TZ не смонтирована в LabsScreen, но живёт в тестах и как форма
-  // ввода. Её женские placeholder'ы раньше были литералами и разъехались:
-  // HGB «120-140» (верх 150), ГГТ «<32» (ВГН 31), креатинин «44-80» (верх 97).
-  const src = readFileSync(
-    resolve(process.cwd(), 'src/ui/screens/LabsScreen_parts/LabsTzRiskTab.tsx'), 'utf8');
+describe('диапазоны целей называют оба пола', () => {
+  // Проход 70: мужские диапазоны (Hct 42-50 %, креатинин 62-106, HGB 130-160)
+  // печатались как общие. Женские половины — из `FEMALE_LAB_BOUNDS`.
+  const DATA_FILES = [
+    'src/data/support-catalog-data.ts',
+    'src/data/support-catalog-supplement.ts',
+    'src/data/support-stacks-part1.ts',
+    'src/data/support-stacks-part2.ts',
+    'src/engines/symptom-solver.data-part1.ts',
+    'src/engines/symptom-solver.data-part2.ts',
+  ];
+  const all = () => DATA_FILES.map(f => readFileSync(resolve(process.cwd(), f), 'utf8')).join('\n');
 
-  it('женские границы берутся из резолвера', () => {
-    expect(src).toContain('HCT_THRESHOLDS.female.erythrocytosis');
-    expect(src).toContain('HGB_THRESHOLDS.female.upper');
-    expect(src).toContain('LFT_ULN.ALT.female');
-    expect(src).toContain('LFT_ULN.AST.female');
-    expect(src).toContain('GGT_ULN.female');
-    expect(src).toContain('CREATININE_ULN.female');
-    expect(src).toContain('FEMALE_HORMONE_BANDS.PRL');
+  it('нет голых мужских диапазонов', () => {
+    const src = all();
+    for (const bare of [
+      "'Hct 42-50%'", "'40-50%'", "'40-48%'",
+      "'62-106 мкмоль/л'", "'60-110 мкмоль/л'", "'70-110 мкмоль/л'",
+      "'130-160 г/л'",
+    ]) {
+      expect(src, bare).not.toContain(bare);
+    }
   });
 
-  it('разъехавшихся литералов больше нет', () => {
-    expect(src).not.toContain("'120-140'");
-    expect(src).not.toContain("'<32'");
-    expect(src).not.toContain("'44-80'");
-    expect(src).not.toContain("'<48'");
-    // E2 в этой таблице — пмоль/л; прежний женский «30-400» был в пг/мл без пометки.
-    expect(src).not.toContain("E2: '30-400'");
-    expect(src).toContain('FEMALE_HORMONE_BANDS.E2.normal');
+  it('женские диапазоны совпадают с FEMALE_LAB_BOUNDS', () => {
+    const src = all();
+    const hct = FEMALE_LAB_BOUNDS.HCT;
+    const crea = FEMALE_LAB_BOUNDS.CREATININE;
+    const hgb = FEMALE_LAB_BOUNDS.HGB;
+    expect(src).toContain(`(♀ ${hct.lln}-${hct.uln}%)`);
+    expect(src).toContain(`(♀ ${crea.lln}-${crea.uln})`);
+    expect(src).toContain(`(♀ ${hgb.lln}-${hgb.uln})`);
+  });
+});
+
+describe('панели проблем и таблица мониторинга: пороги называют оба пола', () => {
+  // Проход 71: «Густая кровь», «Печень», «Почки» и таблица `LAB_MONITOR_DB`
+  // печатали мужские цели и пороги как общие, хотя рядом уже был резолвер.
+  const panels = readFileSync(resolve(process.cwd(), 'src/data/labs-problem-panels.ts'), 'utf8');
+  const unified = readFileSync(
+    resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts/UnifiedSynergyCalculator.tsx'), 'utf8');
+  const hepatic = readFileSync(
+    resolve(process.cwd(), 'src/ui/screens/SupportScreen_parts/supportProtocolHepatic.tsx'), 'utf8');
+
+  it('панели: цели и пороги с женской половиной', () => {
+    for (const bare of [
+      "target: '<45 Ед/л'", "target: '<40 Ед/л'", "target: '<55 Ед/л'",
+      "target: '44-49%'", "target: '140-165 г/л'", "target: '4.5-5.5 млн/мкл'",
+      "target: '<105 мкмоль/л'",
+    ]) {
+      expect(panels, bare).not.toContain(bare);
+    }
+    expect(panels).toContain('(♀ 36-48%)');
+    expect(panels).toContain('(♀ 4.0-5.2)');
+    expect(panels).toContain('(♀ <97)');
+  });
+
+  it('ГГТ в таблице мониторинга — из резолвера, не литерал `<55`', () => {
+    expect(unified).toContain('GGT_TARGET');
+    expect(unified).not.toContain("target:'<55 Ед/л'");
+    expect(hepatic).toContain("labUlnText('GGT')");
+    expect(hepatic).not.toContain("target:'<55 Ед/л'");
+  });
+});
+
+describe('мёртвая вкладка «Риски (ТЗ)» не возвращается', () => {
+  // Проход 69: компонент не был смонтирован (импорт закомментирован), дублировал
+  // механизм-модель LabsScreen и жил только в тестах — удалён вместе с тестом.
+  // Модель по классу препарата заменена фактическими препаратами курса.
+  it('в LabsScreen нет ссылки на LabsTzRiskTab', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen.tsx'), 'utf8');
+    expect(src).not.toMatch(/from '\.\/LabsScreen_parts\/LabsTzRiskTab'/);
   });
 });

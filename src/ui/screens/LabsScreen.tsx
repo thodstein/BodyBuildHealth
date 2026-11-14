@@ -16,7 +16,8 @@ import { LabsScoreCard } from '../components/LabsScoreCard';
 import { LABS_ACCENT, LABS_CARD, LABS_SYSTEM_GROUPS } from './LabsScreen_parts/LabsUI';
 import { labsWithAlpha } from './LabsScreen_parts/LabsUI';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
-// import { LabsTzRiskTab } from './LabsScreen_parts/LabsTzRiskTab'; // удалено — T4 маркеры интегрированы в фазы
+// Вкладка «Риски (ТЗ)» удалена (аудит, проход 69): маркеры T4 интегрированы в фазы,
+// а механизм-модель считается ниже по фактическим препаратам курса (`calculateTzSpecRisk`).
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../engines/risk-engine-tz-spec';

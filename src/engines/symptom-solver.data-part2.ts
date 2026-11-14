@@ -412,7 +412,7 @@ export const DB_PART2: SymptomEntry[] = [
     linkedDrugs: ['testosterone', 'equipoise', 'anadrol'],
     relatedSymptoms: ['hypertension', 'nosebleeds', 'vision_changes', 'excessive_sweating'],
     quickFacts: [
-      'Гематокрит >54% — риск тромбоза, инфаркта, инсульта',
+      'Гематокрит >54% (♀ >52%) — риск тромбоза, инфаркта, инсульта',
       'Тестостерон ≥300 мг/нед → гематокрит +5-10% от базового',
       ' Equipoise (EQ) — самый сильный эритропоэтический эффект среди ААС',
       'Донорство крови (450 мл) → гематокрит −3-5%',
@@ -420,15 +420,15 @@ export const DB_PART2: SymptomEntry[] = [
     generalInfo: 'Эритроцитоз — характерное осложнение ААС-курса. Повышенный гематокрит увеличивает вязкость крови, ухудшая микроциркуляцию и повышая риск тромбоэмболии.',
     problems: [
       {
-        problem: 'ААС-индуцированный эритроцитоз (Hct >52%)',
+        problem: 'ААС-индуцированный эритроцитоз (Hct >51%, ♀ >48%)',
         probability: 'high',
         mechanism: 'ААС стимулируют эритропоэтин (EPO) через AR-рецепторы почечных клеток. Орал-testosterone и equipoise особенно активны. Повышенная масса эритроцитов → ↑вязкость → ↓микроциркуляция → риск тромбоза.',
         labMarkers: [
           { marker: 'Гематокрит', expectedChange: '↑↑', targetRange: '<52% (♀ <48%)', when: 'Каждые 4 нед на курсе' },
-          { marker: 'Гемоглобин', expectedChange: '↑↑', targetRange: '<180 г/л', when: 'Каждые 4 нед' },
-          { marker: 'Эритроциты', expectedChange: '↑↑', targetRange: '<6.0×10¹²/л', when: 'Каждые 4 нед' },
+          { marker: 'Гемоглобин', expectedChange: '↑↑', targetRange: '<180 г/л (♀ <165)', when: 'Каждые 4 нед' },
+          { marker: 'Эритроциты', expectedChange: '↑↑', targetRange: '<6.0×10¹²/л (♀ <5.2)', when: 'Каждые 4 нед' },
           { marker: 'Ферритин', expectedChange: '↑', targetRange: '<300 мкг/л', when: 'Контроль' },
-          { marker: 'Вязкость крови', expectedChange: '↑', targetRange: '<4.5 мПа·с', when: 'При Hct>54%' },
+          { marker: 'Вязкость крови', expectedChange: '↑', targetRange: '<4.5 мПа·с', when: 'При Hct>54% (♀ >52%)' },
         ],
         solutions: [
           { substanceId: 'phlebotomy', name: 'Кровопускание / донорство', type: 'lifestyle', dose: '450 мл крови → −3-5% Hct (1-2 раза в месяц)', mechanism: 'Прямое снижение массы эритроцитов и вязкости крови', evidenceLevel: 'A' },
@@ -445,9 +445,9 @@ export const DB_PART2: SymptomEntry[] = [
       {
         problem: 'Аномальная вязкость крови (синдром гиперязкости)',
         probability: 'medium',
-        mechanism: 'Hct>54% + ↑фибриноген + ↑фактор VIII → синдром гиперязкости → нарушение микроциркуляции → эндотелиальная дисфункция',
+        mechanism: 'Hct>54% (♀ >52%) + ↑фибриноген + ↑фактор VIII → синдром гиперязкости → нарушение микроциркуляции → эндотелиальная дисфункция',
         labMarkers: [
-          { marker: 'Вязкость крови', expectedChange: '↑↑', targetRange: '<4.5 мПа·с', when: 'При Hct>54%' },
+          { marker: 'Вязкость крови', expectedChange: '↑↑', targetRange: '<4.5 мПа·с', when: 'При Hct>54% (♀ >52%)' },
           { marker: 'Фибриноген', expectedChange: '↑', targetRange: '2-4 г/л', when: 'Контроль' },
           { marker: 'D-димер', expectedChange: '↔', targetRange: '<0.5 мкг FEU/мл', when: 'Контроль' },
         ],
@@ -682,7 +682,7 @@ export const DB_PART2: SymptomEntry[] = [
         mechanism: 'ААС повышают мышечную массу → ↑креатинин сыворотки (функция СКФ при этом обычно сохранна) → гломерулярная гипертензия → микроальбуминурия. Симпато-адреналовая активация + ↑АД вносят вклад.',
         labMarkers: [
           { marker: 'Микроальбуминурия', expectedChange: '↑', targetRange: '<30 мг/сут', when: 'Каждые 8 нед' },
-          { marker: 'Креатинин', expectedChange: '↑', targetRange: '70-110 мкмоль/л', when: 'Контроль' },
+          { marker: 'Креатинин', expectedChange: '↑', targetRange: '70-110 мкмоль/л (♀ 44-97)', when: 'Контроль' },
           { marker: 'Расчётная СКФ (eGFR)', expectedChange: '↔ или ↑', targetRange: '>60 мл/мин/1.73м²', when: 'Контроль' },
           { marker: 'Мочевина', expectedChange: '↑', targetRange: '2.5-8.3 ммоль/л', when: 'Контроль' },
         ],

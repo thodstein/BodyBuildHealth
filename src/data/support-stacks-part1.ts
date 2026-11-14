@@ -565,7 +565,7 @@ export const STACKS_PART_1: SupportStack[] = [
     },
     structuredLabControl: {
       markers: [
-        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '60-110 мкмоль/л' },
+        { marker: 'Креатинин', when: 'Каждые 4 нед', targetRange: '60-110 мкмоль/л (♀ 44-97)' },
         { marker: 'КФК (креатинфосфокиназа)', when: 'Каждые 4 нед', targetRange: '<200 Ед/л' },
         { marker: 'ЛДГ', when: 'Каждые 4 нед', targetRange: '140-280 Ед/л' },
         { marker: 'Т3/T4', when: 'При карнитине', targetRange: 'T3 2.5-5.8 пмоль/л' },
@@ -1102,7 +1102,7 @@ export const STACKS_PART_1: SupportStack[] = [
         { marker: 'АД (систолическое/диастолическое)', when: 'Ежедневно', targetRange: '<130/85 мм рт.ст.' },
         { marker: 'NO-метаболиты (NOx) плазмы', when: 'Каждые 8 нед', targetRange: '20-40 мкмоль/л' },
         { marker: 'Аргинин/АДМА', when: 'Каждые 8 нед', targetRange: 'Arg/ADMA >200' },
-        { marker: 'Мочевина/креатинин (цитруллин)', when: 'Каждые 4 нед', targetRange: 'Мочевина 2.5-8.3, Креатинин 60-110' },
+        { marker: 'Мочевина/креатинин (цитруллин)', when: 'Каждые 4 нед', targetRange: 'Мочевина 2.5-8.3, Креатинин 60-110 (♀ 44-97)' },
         { marker: 'Высокочувств. СРБ', when: 'Каждые 8 нед', targetRange: '<1 мг/л' },
       ],
     },

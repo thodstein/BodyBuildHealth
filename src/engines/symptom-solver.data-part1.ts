@@ -32,12 +32,12 @@ export const DB_PART1: SymptomEntry[] = [
       },
       {
         problem: 'Эритроцитоз и ↑ вязкость крови', probability: 'high',
-        mechanism: 'ААС стимулируют эритропоэз через ↑ эндогенного EPO и чувствительности костного мозга → ↑ Hct >50% → ↑ периферическое сопротивление + риск тромбоза.',
+        mechanism: 'ААС стимулируют эритропоэз через ↑ эндогенного EPO и чувствительности костного мозга → ↑ Hct >51% (♀ >48%) → ↑ периферическое сопротивление + риск тромбоза.',
         labMarkers: [
-          { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50%', when: 'До курса, каждые 4-8 нед' },
+          { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50% (♀ 36-48%)', when: 'До курса, каждые 4-8 нед' },
           { marker: 'Гемоглобин (Hb)', expectedChange: '↑', targetRange: '130-170 г/л (♂; ♀ 120-150)', when: 'До курса, каждые 4-8 нед' },
-          { marker: 'Ферритин', expectedChange: '↓', targetRange: '30-300 мкг/л', when: 'При Hct >52%' },
-          { marker: 'D-димер', expectedChange: '↔', targetRange: '<500 нг/мл', when: 'При Hct >54%' },
+          { marker: 'Ферритин', expectedChange: '↓', targetRange: '30-300 мкг/л', when: 'При Hct >52% (♀ >48%)' },
+          { marker: 'D-димер', expectedChange: '↔', targetRange: '<500 нг/мл', when: 'При Hct >54% (♀ >52%)' },
         ],
         solutions: [
           { substanceId: 'aspirin', name: 'Аспирин', type: 'pharma', dose: '75-100 мг/сут', mechanism: '↓ агрегация тромбоцитов', evidenceLevel: 'A' },
@@ -88,7 +88,7 @@ export const DB_PART1: SymptomEntry[] = [
         labMarkers: [
           { marker: 'Альдостерон', expectedChange: '↑', targetRange: '40-310 пг/мл', when: 'При выраженных отёках' },
           { marker: 'Na⁺ сыворотки', expectedChange: '↑', targetRange: '135-145 ммоль/л', when: 'Каждые 4 нед' },
-          { marker: 'Креатинин', expectedChange: '↔', targetRange: '62-106 мкмоль/л', when: 'Каждые 4 нед' },
+          { marker: 'Креатинин', expectedChange: '↔', targetRange: '62-106 мкмоль/л (♀ 44-97)', when: 'Каждые 4 нед' },
           { marker: 'E2 (эстрадиол)', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
         solutions: [
@@ -113,7 +113,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'ААС-гипертензия + ↑ Hct → ↑ давление в капиллярах → разрыв поверхностных сосудов носовой перегородки.',
         labMarkers: [
           { marker: 'АД', expectedChange: '↑', targetRange: '<130/85 мм рт.ст.', when: 'Измерить немедленно' },
-          { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50%', when: 'При рецидивах' },
+          { marker: 'Гематокрит (Hct)', expectedChange: '↑', targetRange: '40-50% (♀ 36-48%)', when: 'При рецидивах' },
           { marker: 'Коагулограмма (ПВ, АЧТВ)', expectedChange: '↔', targetRange: 'ПВ 11-13.5 с', when: 'При частых кровотечениях' },
         ],
         solutions: [
@@ -565,7 +565,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'Дефицит Fe / B12 / фолата (анемия)', probability: 'medium',
         mechanism: 'ААС ↑ эритропоэз → ↑ потребление Fe, B12, фолата. При недостатке → анемия → слабость, ↓ производительность.',
         labMarkers: [
-          { marker: 'ОАК (Hb, MCV)', expectedChange: '↔', targetRange: 'Hb 130-170, MCV 80-100', when: 'При усталости' },
+          { marker: 'ОАК (Hb, MCV)', expectedChange: '↔', targetRange: 'Hb 130-170 (♀ 120-150), MCV 80-100', when: 'При усталости' },
           { marker: 'Ферритин', expectedChange: '↓', targetRange: '30-300 (оптимум >100)', when: 'При усталости' },
           { marker: 'B12', expectedChange: '↓', targetRange: '200-900 (оптимум >400)', when: 'При усталости' },
           { marker: 'Фолат', expectedChange: '↓', targetRange: '3-17 нг/мл', when: 'При усталости' },
@@ -758,7 +758,7 @@ export const DB_PART1: SymptomEntry[] = [
           { marker: 'E2 (эстрадиол)', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно' },
           { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
           { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T' },
-          { marker: 'Гематокрит', expectedChange: '↑', targetRange: '40-50%', when: 'Каждые 4-8 нед' },
+          { marker: 'Гематокрит', expectedChange: '↑', targetRange: '40-50% (♀ 36-48%)', when: 'Каждые 4-8 нед' },
           { marker: 'Гомоцистеин', expectedChange: '↔', targetRange: '<15 мкмоль/л', when: 'При ЭД (маркер эндотелиальной дисфункции)' },
         ],
         solutions: [
@@ -956,7 +956,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'Тяжёлая гепатотоксичность (АЛТ >5× ВГН) → ↓ детоксикация → накопление токсинов → тошнота + отвращение к мясу. Почечная недостаточность → ↑ мочевина → уремическая тошнота.',
         labMarkers: [
           { marker: 'АЛТ, АСТ, ГГТ', expectedChange: '↑↑', targetRange: '<40, <40, <55 (♀ <31, <31, <31)', when: 'НЕМЕДЛЕННО' },
-          { marker: 'Мочевина, креатинин', expectedChange: '↑', targetRange: 'Мочевина 2.5-8.3, креатинин 62-106', when: 'НЕМЕДЛЕННО' },
+          { marker: 'Мочевина, креатинин', expectedChange: '↑', targetRange: 'Мочевина 2.5-8.3, креатинин 62-106 (♀ 44-97)', when: 'НЕМЕДЛЕННО' },
         ],
         solutions: [
           { substanceId: 'stop_aas', name: 'ОТМЕНИТЬ все ААС', type: 'lifestyle', dose: '—', mechanism: 'Устранение источника', evidenceLevel: 'A' },

@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { UCUM_MAP } from '../../../../core/constants';
 import { STOP_COURSE_TABLE } from '../supportProtocolsShared';
 import { FEMALE_LAB_GROUPS } from '../supportProtocolWomenData';
-import { LFT_ULN } from '../../../../engines/lab-norms.engine';
+import { LFT_ULN, GGT_ULN, labUlnText } from '../../../../engines/lab-norms.engine';
 
 const ucum = UCUM_MAP as Record<string, { uln: number }>;
 const read = (name: string) =>
@@ -33,7 +33,11 @@ describe('протокол «Печень»: цели мониторинга = �
     expect(hepatic).toContain("target:`${lftUlnText('ALT')} Ед/л`");
     expect(hepatic).toContain("target:`${lftUlnText('AST')} Ед/л`");
     expect(hepatic).not.toContain("target:'<40 Ед/л'");
-    expect(hepatic).toContain(`ГГТ (гамма-глутамилтрансфераза)', target:'<${ucum.GGT.uln} Ед/л'`);
+    // ГГТ тоже по полу (проход 71): «♂ <55 / ♀ <31», а не мужское «<55» как общее.
+    expect(GGT_ULN.male).toBe(ucum.GGT.uln);
+    expect(labUlnText('GGT')).toContain('<31');
+    expect(hepatic).toContain("target:`${labUlnText('GGT')} Ед/л`");
+    expect(hepatic).not.toContain("target:'<55 Ед/л'");
   });
 
   it('ЩФ и билирубин не обещают больше нормы экрана «Анализы»', () => {

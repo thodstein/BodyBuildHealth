@@ -3294,7 +3294,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
   const supApk = isNativeApp() ? ' train-sup sup-apk' : ' train-sup';
   return (
     <Suspense fallback={<SupportLazyFallback />}>
-    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
+    <div ref={rootRef} className={`screen support-screen support-root${supApk}`} data-sup="root" data-sec={section} data-ptab={protocolTab || undefined} style={{ paddingTop: section === 'protocols' ? '60px' : section === 'generator' ? '108px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '112px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(16px + var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', overflowX: 'clip', minHeight: '100%', boxSizing: 'border-box' }}>
 
       {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (

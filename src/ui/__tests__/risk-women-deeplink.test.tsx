@@ -21,9 +21,15 @@ describe('Ж1/Ж5: кросс-ссылка из «Рисков» в «Женщи
 
   it("initialSubTab='women' открывает detail протокола (Вирилизация)", async () => {
     render(<SupportScreen initialSubTab="women" />);
+    // Протоколы грузятся React.lazy-чанком (SupportProtocols), поэтому сначала
+    // ждём переключения секции/таба (они же пишутся в data-атрибуты корня),
+    // и только потом — самого текста detail.
     await waitFor(() => {
-      expect(screen.getByText(/Женский цикл и ААС/)).toBeTruthy();
-    });
+      const root = document.querySelector('[data-sup="root"]') as HTMLElement | null;
+      expect(root?.dataset.sec).toBe('protocols');
+      expect(root?.dataset.ptab).toBe('women');
+    }, { timeout: 15000 });
+    expect(screen.getByText(/Женский цикл и ААС/)).toBeTruthy();
     // табы протокола видны (detail, не меню)
     expect(screen.getAllByText(/Вирилизация/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Дозы веществ/).length).toBeGreaterThan(0);

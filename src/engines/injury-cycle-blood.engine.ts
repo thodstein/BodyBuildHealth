@@ -344,7 +344,7 @@ const BLOOD_PANELS: Record<string, BloodWorkPanel> = {
   coagulation: {
     name: 'Коагулограмма',
     markers: ['Фибриноген', 'D-димер', 'АЧТВ', 'ПТИ/INR', 'Антитромбин III'],
-    frequency: 'При HCT >50% или использовании станазолола',
+    frequency: 'При HCT >51% (♀ >48%) или использовании станазолола',
     estimatedCost: '2,500-3,500 ₽',
   },
 };

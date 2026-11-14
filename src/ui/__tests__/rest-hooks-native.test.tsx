@@ -18,7 +18,6 @@ import { ProMetricsPanel } from '../screens/SRCBBScreen_parts/ProMetricsPanel';
 import { AutoregPanel } from '../screens/SRCBBScreen_parts/AutoregPanel';
 import { SupplementComplianceCard } from '../screens/SupportScreen_parts/SupplementComplianceCard';
 import { default as ExtendedLabsTab } from '../screens/LabsScreen_parts/ExtendedLabsTab';
-import { LabsTzRiskTab } from '../screens/LabsScreen_parts/LabsTzRiskTab';
 import { TimersTab } from '../screens/TrainingScreen_parts/TimersTab';
 import { PlateCalcTab } from '../screens/TrainingScreen_parts/PlateCalcTab';
 import { OneRmCalcTab } from '../screens/TrainingScreen_parts/OneRmCalcTab';
@@ -450,8 +449,6 @@ describe('market + pharma + labs roots', () => {
     );
     expect(c1.querySelector('.labs-extended'), 'extended').not.toBeNull();
     cleanup();
-    const { container: c2 } = render(<LabsTzRiskTab />);
-    expect(c2.querySelector('.labs-tzrisk'), 'tzrisk').not.toBeNull();
     // DailyDietDashboard рендерится только при наличии плана (null без него) —
     // хук .nut-dailydiet живёт в прод-ветке, здесь не проверяется.
   });
