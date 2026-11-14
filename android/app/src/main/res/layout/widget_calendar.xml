@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Виджет «Календарь» — агенда дня в духе TickTick:
-    дата, счётчик сделанных задач, до трёх задач с отметкой и «＋ Задача».
+    Виджет «Календарь» — агенда в духе TickTick с режимами день / неделя / месяц.
+    Режим и опорная дата хранятся per-widget (WidgetStore), поэтому листать
+    календарь можно без открытия приложения. «＋ Задача» открывает компактный
+    нативный редактор (RemoteViews не умеет EditText).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_cal_root"
@@ -14,6 +16,7 @@
     android:paddingTop="10dp"
     android:paddingBottom="10dp">
 
+    <!-- Шапка: бренд + счётчик -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -21,26 +24,15 @@
         android:orientation="horizontal">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/w_cal_brand"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:includeFontPadding="false"
             android:text="HE · КАЛЕНДАРЬ"
             android:textColor="#C9F73A"
             android:textSize="10sp"
             android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/w_cal_date"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="#8FA3C4"
-            android:textSize="9sp" />
 
         <TextView
             android:id="@+id/w_cal_count"
@@ -53,7 +45,296 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Переключатель день / неделя / месяц -->
     <LinearLayout
+        android:id="@+id/w_cal_modes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_cal_chip_day"
+            android:layout_width="0dp"
+            android:layout_height="26dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="День"
+            android:textColor="#E2ECFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cal_chip_week"
+            android:layout_width="0dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Неделя"
+            android:textColor="#E2ECFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cal_chip_month"
+            android:layout_width="0dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Месяц"
+            android:textColor="#E2ECFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Навигация по выбранному периоду -->
+    <LinearLayout
+        android:id="@+id/w_cal_nav_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_cal_nav_prev"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="‹"
+            android:textColor="#C9F73A"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cal_nav_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cal_nav_today"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:text="Сегодня"
+            android:textColor="#8FA3C4"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_cal_nav_next"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="›"
+            android:textColor="#C9F73A"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Дни недели (режим «месяц») -->
+    <LinearLayout
+        android:id="@+id/w_cal_weekday_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Пн"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Вт"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Ср"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Чт"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Пт"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Сб"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Вс"
+            android:textColor="#8FA3C4"
+            android:textSize="8sp" />
+    </LinearLayout>
+
+    <!-- Сетка месяца: 6 строк по 7 ячеек -->
+    <LinearLayout
+        android:id="@+id/w_cal_g1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g1c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g1c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_cal_g2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g2c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g2c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_cal_g3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g3c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g3c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_cal_g4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g4c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g4c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_cal_g5"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g5c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g5c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_cal_g6"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone">
+        <TextView android:id="@+id/w_cal_g6c1" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c2" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c3" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c4" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c5" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c6" style="@style/WidgetCalendarCell" />
+        <TextView android:id="@+id/w_cal_g6c7" style="@style/WidgetCalendarCell" />
+    </LinearLayout>
+
+    <!-- Агенда: до 7 строк (день — 4, неделя — 7, месяц — 2) -->
+    <LinearLayout
+        android:id="@+id/w_cal_agenda"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
@@ -64,31 +345,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:minHeight="26dp"
+            android:minHeight="25dp"
             android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/w_cal_check1"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="○"
-                android:textColor="#8FA3C4"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/w_cal_title1"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
+            <TextView android:id="@+id/w_cal_check1" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title1" style="@style/WidgetCalendarTitle" />
         </LinearLayout>
 
         <LinearLayout
@@ -96,31 +356,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:minHeight="26dp"
+            android:minHeight="25dp"
             android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/w_cal_check2"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="○"
-                android:textColor="#8FA3C4"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/w_cal_title2"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
+            <TextView android:id="@+id/w_cal_check2" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title2" style="@style/WidgetCalendarTitle" />
         </LinearLayout>
 
         <LinearLayout
@@ -128,34 +367,71 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:minHeight="26dp"
+            android:minHeight="25dp"
             android:orientation="horizontal">
+            <TextView android:id="@+id/w_cal_check3" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title3" style="@style/WidgetCalendarTitle" />
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/w_cal_check3"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="○"
-                android:textColor="#8FA3C4"
-                android:textSize="12sp" />
+        <LinearLayout
+            android:id="@+id/w_cal_row4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="25dp"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/w_cal_check4" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title4" style="@style/WidgetCalendarTitle" />
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/w_cal_title3"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="11sp" />
+        <LinearLayout
+            android:id="@+id/w_cal_row5"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="25dp"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/w_cal_check5" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title5" style="@style/WidgetCalendarTitle" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/w_cal_row6"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="25dp"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/w_cal_check6" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title6" style="@style/WidgetCalendarTitle" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/w_cal_row7"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="25dp"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/w_cal_check7" style="@style/WidgetCalendarCheck" />
+            <TextView android:id="@+id/w_cal_title7" style="@style/WidgetCalendarTitle" />
         </LinearLayout>
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/w_cal_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="2"
+        android:text=""
+        android:textColor="#8FA3C4"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <!-- Подвал: просрочено + быстрое добавление -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -181,9 +457,9 @@
             android:visibility="gone" />
 
         <TextView
-            android:id="@+id/w_cal_open"
+            android:id="@+id/w_cal_add"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="32dp"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_action"

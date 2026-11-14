@@ -33,4 +33,48 @@
         <item name="windowSplashScreenIconBackgroundColor">@color/pro_navy</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
+
+    <!-- Виджет-календарь: ячейки сетки и строки агенды -->
+    <style name="WidgetCalendarCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textColor">#E2ECFF</item>
+        <item name="android:textSize">9sp</item>
+    </style>
+
+    <style name="WidgetCalendarCheck">
+        <item name="android:layout_width">30dp</item>
+        <item name="android:layout_height">22dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textColor">#8FA3C4</item>
+        <item name="android:textSize">9sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="WidgetCalendarTitle">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">4dp</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+
+    <!-- Компактный редактор задачи/заметки с рабочего стола -->
+    <style name="WidgetQuickAddTheme" parent="@android:style/Theme.Material.Dialog">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@drawable/widget_dialog_bg</item>
+        <item name="android:colorAccent">#C9F73A</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+    </style>
 </resources>

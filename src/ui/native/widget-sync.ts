@@ -36,14 +36,18 @@ import {
   readCoachPlanner,
   writeCoachPlanner,
   tasksForDate,
+  tasksInRange,
   overdueCoachTasks,
   updateCoachTask,
+  addCoachTask,
   coachTaskPriority,
 } from '../../engines/coach/coach-planner.engine';
 import {
   readCoachNotes,
+  writeCoachNotes,
   sortCoachNotes,
   noteChecklistProgress,
+  addCoachNote,
 } from '../../engines/coach/coach-notes.engine';
 
 export type WidgetNavTarget = 'training' | 'nutrition' | 'support' | 'calendar' | 'notes' | 'home';
@@ -73,10 +77,25 @@ function isoFromTs(ts: number): string {
   }
 }
 
+/** Сдвиг календарного дня без UTC (локальная дата остаётся локальной). */
+export function addDaysIso(iso: string, days: number): string {
+  try {
+    const [y, m, d] = iso.split('-').map(Number);
+    if (!y || !m || !d) return iso;
+    return todayLocalISO(new Date(y, m - 1, d + days));
+  } catch {
+    return iso;
+  }
+}
+
 export interface WidgetSyncResult {
   drainedWaterMl: number;
   drainedFoods: number;
   tasksToggled: number;
+  /** Новые задачи, добавленные из быстрого редактора виджета. */
+  tasksAdded: number;
+  /** Новые заметки, добавленные из быстрого редактора виджета. */
+  notesAdded: number;
   trainingOk: boolean;
   complianceOk: boolean;
   nutritionOk: boolean;
@@ -261,6 +280,7 @@ function collectCalendar(): {
   total: number;
   done: number;
   overdue: number;
+  items: { id: string; date: string; title: string; time: string; done: boolean; priority: string }[];
 } {
   const today = todayLocalISO();
   let dateLabel = today;
@@ -276,6 +296,10 @@ function collectCalendar(): {
   const store = safe(() => readCoachPlanner(localStorageRef()), { version: 1 as const, items: [] });
   const dayTasks = safe(() => tasksForDate(store, today), []);
   const overdue = safe(() => overdueCoachTasks(store, today).length, 0);
+  // Режимы «неделя»/«месяц» рисуются нативно: отдаём запас задач вокруг
+  // сегодняшнего дня, чтобы листать календарь без WebView. Кап — 800 строк,
+  // SharedPreferences не резиновые.
+  const rangeTasks = safe(() => tasksInRange(store, addDaysIso(today, -90), addDaysIso(today, 365)), []);
   return {
     date: today,
     dateLabel,
@@ -289,6 +313,14 @@ function collectCalendar(): {
     total: dayTasks.length,
     done: dayTasks.filter(t => t.done).length,
     overdue,
+    items: rangeTasks.slice(0, 800).map(t => ({
+      id: t.id,
+      date: t.date,
+      title: String(t.title).slice(0, 120),
+      time: t.time ?? '',
+      done: !!t.done,
+      priority: coachTaskPriority(t),
+    })),
   };
 }
 
@@ -323,16 +355,34 @@ function localStorageRef(): Storage | null {
   }
 }
 
+/** Порядок применения: 0 — создание сущности, 1 — всё остальное. */
+function addRank(item: { type?: string } | null | undefined): number {
+  const type = item?.type;
+  return type === 'task_add' || type === 'note_add' ? 0 : 1;
+}
+
 /**
  * Применить очередь виджета к журналам: вода -> he_water_log,
  * еда -> nutrition_diary_v2 в день из метки времени,
  * задача -> статус «сделано» в планшете (he_coach_planner).
  */
-export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods: number; tasks: number } {
+export function applyWidgetQueue(items: QueuedItem[]): {
+  waterMl: number;
+  foods: number;
+  tasks: number;
+  tasksAdded: number;
+  notesAdded: number;
+} {
   let waterMl = 0;
   let foods = 0;
   let tasks = 0;
-  for (const it of items) {
+  let tasksAdded = 0;
+  let notesAdded = 0;
+  // Сначала создаём быстрые задачи/заметки, потом применяем остальное:
+  // иначе отметка «сделано» у только что добавленной с виджета задачи
+  // пришла бы раньше создания и потерялась бы.
+  const ordered = [...items].sort((a, b) => addRank(a) - addRank(b));
+  for (const it of ordered) {
     try {
       if (it.type === 'water') {
         const ml = Math.max(0, Math.min(2000, Math.round(it.ml ?? 0)));
@@ -364,12 +414,58 @@ export function applyWidgetQueue(items: QueuedItem[]): { waterMl: number; foods:
           writeCoachPlanner(storage, next);
           tasks += 1;
         }
+      } else if (it.type === 'task_add' && it.title) {
+        // Быстрый редактор виджета: задача создаётся без открытия приложения,
+        // id пришёл с нативной стороны — повторный drain не плодит дубли.
+        const storage = localStorageRef();
+        const store = readCoachPlanner(storage);
+        const res = addCoachTask(
+          store,
+          {
+            title: it.title,
+            date: it.date,
+            time: it.time ?? null,
+            priority: (it.priority as 'none' | 'low' | 'medium' | 'high' | undefined) ?? 'none',
+            list: 'inbox',
+          },
+          {
+            id: it.id,
+            now: it.ts ? new Date(it.ts).toISOString() : undefined,
+          },
+        );
+        if (res.task) {
+          writeCoachPlanner(storage, res.store);
+          tasksAdded += 1;
+        }
+      } else if (it.type === 'note_add' && (it.title || it.body || it.checklist?.length)) {
+        const storage = localStorageRef();
+        const store = readCoachNotes(storage);
+        const res = addCoachNote(
+          store,
+          {
+            title: it.title,
+            body: it.body,
+            checklist: it.checklist?.map((c, i) => ({
+              id: c.id || `c_${i + 1}`,
+              text: c.text,
+              done: c.done === true,
+            })),
+          },
+          {
+            id: it.id,
+            now: it.ts ? new Date(it.ts).toISOString() : undefined,
+          },
+        );
+        if (res.note) {
+          writeCoachNotes(storage, res.store);
+          notesAdded += 1;
+        }
       }
     } catch {
       /* один битый элемент не роняет остальные */
     }
   }
-  return { waterMl, foods, tasks };
+  return { waterMl, foods, tasks, tasksAdded, notesAdded };
 }
 
 /** Только виджет тренировки — живой прогресс во время проведения (APK). */
@@ -389,6 +485,8 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   let drainedWaterMl = 0;
   let drainedFoods = 0;
   let tasksToggled = 0;
+  let tasksAdded = 0;
+  let notesAdded = 0;
   try {
     const items = await drainWidgetQueue();
     if (items.length > 0) {
@@ -396,6 +494,8 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       drainedWaterMl = applied.waterMl;
       drainedFoods = applied.foods;
       tasksToggled = applied.tasks;
+      tasksAdded = applied.tasksAdded;
+      notesAdded = applied.notesAdded;
     }
   } catch {
     /* очередь недоступна */
@@ -427,6 +527,8 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     drainedWaterMl,
     drainedFoods,
     tasksToggled,
+    tasksAdded,
+    notesAdded,
     trainingOk,
     complianceOk,
     nutritionOk,

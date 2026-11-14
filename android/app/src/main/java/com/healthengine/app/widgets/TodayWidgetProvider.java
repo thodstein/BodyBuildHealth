@@ -27,16 +27,15 @@ public class TodayWidgetProvider extends AppWidgetProvider {
             ComponentName cn = new ComponentName(context, TodayWidgetProvider.class);
             int[] ids = mgr.getAppWidgetIds(cn);
             for (int id : ids) {
-                mgr.updateAppWidget(id, build(context));
+                mgr.updateAppWidget(id, CalendarWidgetProvider.buildFor(
+                        context, id, CalendarWidgetProvider.MODE_DAY));
             }
         } catch (Exception ignored) {}
     }
 
     static RemoteViews build(Context context) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_today);
-        v.setOnClickPendingIntent(R.id.w_today_root, openApp(context, WidgetStore.TARGET_TRAINING_RUN, 41));
-        v.setOnClickPendingIntent(R.id.w_today_act, openApp(context, WidgetStore.TARGET_TRAINING_RUN, 42));
-        return v;
+        return CalendarWidgetProvider.buildFor(
+                context, AppWidgetManager.INVALID_APPWIDGET_ID, CalendarWidgetProvider.MODE_DAY);
     }
 
     static PendingIntent openApp(Context context, String target, int code) {

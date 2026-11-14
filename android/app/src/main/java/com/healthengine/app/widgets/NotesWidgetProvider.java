@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -18,6 +19,9 @@ import org.json.JSONObject;
  * чек-листов, как в TickTick. Тап открывает вкладку «Заметки».
  */
 public class NotesWidgetProvider extends AppWidgetProvider {
+
+    /** Action только для PendingIntent-а «＋ Заметка» (в фильтрах не нужен). */
+    static final String ACTION_QUICK_NOTE = "com.healthengine.app.action.WIDGET_NOTE_ADD";
 
     private static final int C_TEXT = 0xFFFFFFFF;
     private static final int C_MUTED = 0xFF8FA3C4;
@@ -59,6 +63,13 @@ public class NotesWidgetProvider extends AppWidgetProvider {
         int shown = notes == null ? 0 : Math.min(notes.length(), ROWS);
         for (int i = 0; i < ROWS; i++) {
             if (i >= shown) {
+                if (i == 0 && total <= 0) {
+                    v.setViewVisibility(rowIds[i], View.VISIBLE);
+                    v.setTextViewText(titleIds[i], "Заметок пока нет — нажмите ＋ Заметка");
+                    v.setTextColor(titleIds[i], C_MUTED);
+                    v.setTextViewText(progIds[i], "");
+                    continue;
+                }
                 v.setViewVisibility(rowIds[i], View.GONE);
                 continue;
             }
@@ -82,13 +93,49 @@ public class NotesWidgetProvider extends AppWidgetProvider {
 
         v.setOnClickPendingIntent(R.id.w_notes_root,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NOTES, 81));
+        // «＋ Заметка» больше не уводит в приложение: открывает компактный
+        // нативный редактор и сразу пишет заметку в очередь.
         v.setOnClickPendingIntent(R.id.w_notes_open,
-                TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NOTES, 82));
+                quickAddNote(context));
 
         String a11y = total > 0
                 ? ("Заметки: " + total + (pinned > 0 ? (", закреплено " + pinned) : ""))
                 : "Заметки: пока пусто";
         v.setContentDescription(R.id.w_notes_root, a11y);
         return v;
+    }
+
+    private static PendingIntent quickAddNote(Context context) {
+        Intent i = new Intent(context, WidgetQuickAddActivity.class);
+        // Отдельный action, чтобы PendingIntent не совпал с «＋ Задача» календаря.
+        i.setAction(ACTION_QUICK_NOTE);
+        i.putExtra(WidgetQuickAddActivity.EXTRA_KIND, WidgetQuickAddActivity.KIND_NOTE);
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(context, 8201, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Быстрая заметка из нативного редактора: сразу видна в снапшоте. */
+    static void optimisticNoteAdd(Context context, String id, String title, int checklistTotal) {
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NOTES);
+            JSONArray notes = d.optJSONArray("notes");
+            if (notes == null) notes = new JSONArray();
+            JSONObject note = new JSONObject();
+            note.put("id", id);
+            note.put("title", title == null || title.isEmpty() ? "Без названия" : title);
+            note.put("done", 0);
+            note.put("total", Math.max(0, checklistTotal));
+            // Новые заметки в приложении идут первыми; закреплённые остаются сверху.
+            JSONArray next = new JSONArray();
+            next.put(note);
+            for (int i = 0; i < notes.length() && next.length() < 5; i++) {
+                JSONObject row = notes.optJSONObject(i);
+                if (row != null) next.put(row);
+            }
+            d.put("notes", next);
+            d.put("total", d.optInt("total", 0) + 1);
+            WidgetStore.putJson(context, WidgetStore.KEY_NOTES, d);
+        } catch (Exception ignored) {}
     }
 }

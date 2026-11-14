@@ -453,6 +453,95 @@ export default function App() {
     go(target.tab, target.subTab ?? null);
   }, [go]);
 
+  // APK: виджеты должны получать свежие данные при любом возврате в приложение,
+  // а не только когда открыта Главная. Иначе тап по виджету «просто открывает
+  // приложение» со старым/пустым снапшотом. Синк — фоновый, без блокировки UI.
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let alive = true;
+    let lastAt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const sync = () => {
+      if (!alive) return;
+      const now = Date.now();
+      // focus + visibilitychange часто приходят парой — не дублируем работу.
+      if (now - lastAt < 8000) return;
+      lastAt = now;
+      void import('./ui/native/widget-sync')
+        .then((m) => m.syncAllWidgets())
+        .catch(() => {
+          /* виджеты — необязательный слой */
+        });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        if (timer) clearTimeout(timer);
+        // Даём WebView восстановиться после фона, затем отдаём данные.
+        timer = setTimeout(sync, 350);
+      }
+    };
+    timer = setTimeout(sync, 1200);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, []);
+
+  // APK: one-shot deep-link из виджета обрабатываем на уровне App, а не только
+  // на Главной. Приложение может восстановиться на последней вкладке — тогда
+  // DashboardNative не смонтирован и target раньше «залипал» до возврата на
+  // Главную (тап по виджету выглядел как обычный запуск приложения).
+  useEffect(() => {
+    if (!isNativeApp() || !initialized) return;
+    let alive = true;
+    const applyTarget = async () => {
+      try {
+        const { consumeWidgetLaunchTarget } = await import('./core/widget-bridge');
+        const target = await consumeWidgetLaunchTarget();
+        if (!alive || !target || target === 'home') return;
+        if (target === 'training_run') {
+          go('training', 'runtime');
+          window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'runtime' }));
+          return;
+        }
+        if (target === 'training_quick') {
+          go('training', 'runtime');
+          window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'runtime' }));
+          window.setTimeout(() => {
+            if (alive) window.dispatchEvent(new Event('he-workout-quick-set'));
+          }, 700);
+          return;
+        }
+        if (
+          target === 'training' ||
+          target === 'nutrition' ||
+          target === 'support' ||
+          target === 'calendar' ||
+          target === 'notes'
+        ) {
+          handleNavigate(target);
+        }
+      } catch {
+        /* deep-link — необязательный слой */
+      }
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void applyTarget();
+    };
+    void applyTarget();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [initialized, go, handleNavigate]);
+
   // Deep-link: #pl-plan-<cycleId> или Telegram startapp=pl-plan-<cycleId>.
   // Маркер в sessionStorage читает SRCBBScreen и выбирает нужный цикл.
   useEffect(() => {

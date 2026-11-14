@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Компактный редактор задачи/заметки с рабочего стола (без WebView). -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:id="@+id/qa_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="18dp"
+        android:paddingRight="18dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@+id/qa_title_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:text="Новая задача"
+            android:textColor="#C9F73A"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/qa_date_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:includeFontPadding="false"
+            android:text=""
+            android:textColor="#8FA3C4"
+            android:textSize="10sp" />
+
+        <EditText
+            android:id="@+id/qa_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/widget_input_bg"
+            android:hint="Что сделать?"
+            android:imeOptions="actionNext"
+            android:inputType="textCapSentences"
+            android:maxLength="140"
+            android:minHeight="44dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#607492"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/qa_date_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/qa_date_today"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Сегодня"
+                android:textColor="#E2ECFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/qa_date_tomorrow"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Завтра"
+                android:textColor="#E2ECFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <EditText
+            android:id="@+id/qa_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/widget_input_bg"
+            android:hint="Время, напр. 18:00 (необязательно)"
+            android:imeOptions="actionNext"
+            android:inputType="text"
+            android:maxLength="5"
+            android:minHeight="44dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#607492"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/qa_priority_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/qa_prio_none"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Обычная"
+                android:textColor="#E2ECFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/qa_prio_medium"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Средняя"
+                android:textColor="#E2ECFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/qa_prio_high"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Высокая"
+                android:textColor="#E2ECFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/qa_checklist_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:includeFontPadding="false"
+            android:text="Пункты чек-листа — по одному в строке"
+            android:textColor="#8FA3C4"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <EditText
+            android:id="@+id/qa_checklist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/widget_input_bg"
+            android:gravity="top|start"
+            android:hint="Например:&#10;Растяжка 10 мин&#10;Протеин"
+            android:inputType="textMultiLine|textCapSentences"
+            android:maxLength="3000"
+            android:minHeight="80dp"
+            android:padding="12dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#607492"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/qa_msg"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:includeFontPadding="false"
+            android:text=""
+            android:textColor="#FF6B6B"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/qa_cancel"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Отмена"
+                android:textColor="#8FA3C4"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/qa_save"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/widget_action"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Сохранить"
+                android:textColor="#C9F73A"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

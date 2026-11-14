@@ -24,7 +24,7 @@ export type WidgetTarget =
 export type TimerAction = 'preset' | 'start' | 'pause' | 'toggle' | 'reset';
 
 export interface QueuedItem {
-  type: 'water' | 'food' | 'task';
+  type: 'water' | 'food' | 'task' | 'task_add' | 'note_add';
   ml?: number;
   name?: string;
   kcal?: number;
@@ -35,6 +35,16 @@ export interface QueuedItem {
   /** Для type='task': id задачи и её новое состояние «сделано». */
   id?: string;
   done?: boolean;
+  /** Для type='task_add': дата YYYY-MM-DD, время HH:MM и приоритет. */
+  date?: string;
+  time?: string | null;
+  priority?: string;
+  /** Для type='task_add' / 'note_add': заголовок быстрого добавления. */
+  title?: string;
+  /** Для type='note_add': текст заметки. */
+  body?: string;
+  /** Для type='note_add': пункты чек-листа из быстрого редактора. */
+  checklist?: { id: string; text: string; done?: boolean }[];
   ts: number;
 }
 
@@ -72,6 +82,15 @@ export interface CalendarWidgetTask {
   priority: string;
 }
 
+/**
+ * Задача широкого диапазона для режимов «неделя»/«месяц»: виджет рисует
+ * календарь без WebView, поэтому дата едет вместе с задачей.
+ */
+export interface CalendarWidgetItem extends CalendarWidgetTask {
+  /** YYYY-MM-DD локальная дата задачи. */
+  date: string;
+}
+
 export interface CalendarWidgetSnapshot {
   /** YYYY-MM-DD локальная дата дня. */
   date: string;
@@ -83,6 +102,12 @@ export interface CalendarWidgetSnapshot {
   done: number;
   /** Просроченных задач (до сегодня, не закрыты). */
   overdue: number;
+  /**
+   * Задачи вокруг сегодняшнего дня (прошлое+будущее) для переключения
+   * «день / неделя / месяц» прямо на рабочем столе. Опционально — старые
+   * снапшоты без items продолжают работать.
+   */
+  items?: CalendarWidgetItem[];
 }
 
 /** Заметка для виджета «Заметки». */
@@ -204,7 +229,11 @@ export function parseQueueItems(raw: string): QueuedItem[] {
       (it): it is QueuedItem =>
         !!it &&
         typeof it === 'object' &&
-        (it.type === 'water' || it.type === 'food' || it.type === 'task'),
+        (it.type === 'water' ||
+          it.type === 'food' ||
+          it.type === 'task' ||
+          it.type === 'task_add' ||
+          it.type === 'note_add'),
     );
   } catch {
     return [];

@@ -18,8 +18,8 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
   { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Остаток ккал, БЖУ, вода +250/+500 в один тап' },
   { kind: 'water', icon: 'droplet', name: 'Вода', desc: 'Прогресс воды дня и +250 мл в один тап' },
-  { kind: 'calendar', icon: 'clock', name: 'Календарь', desc: 'Задачи на сегодня и отметка «сделано» с рабочего стола' },
-  { kind: 'notes', icon: 'notebook', name: 'Заметки', desc: 'Закреплённые и свежие заметки, прогресс чек-листов' },
+  { kind: 'calendar', icon: 'clock', name: 'Календарь', desc: 'День / неделя / месяц и новая задача прямо с рабочего стола' },
+  { kind: 'notes', icon: 'notebook', name: 'Заметки', desc: 'Закреплённые и свежие заметки; новая заметка — без открытия приложения' },
 ];
 
 const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
@@ -28,8 +28,8 @@ const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
   { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Kcal left, macros, water +250/+500 in one tap' },
   { kind: 'water', icon: 'droplet', name: 'Water', desc: 'Daily water progress and +250 ml in one tap' },
-  { kind: 'calendar', icon: 'clock', name: 'Calendar', desc: "Today's tasks and one-tap done from the home screen" },
-  { kind: 'notes', icon: 'notebook', name: 'Notes', desc: 'Pinned and recent notes with checklist progress' },
+  { kind: 'calendar', icon: 'clock', name: 'Calendar', desc: 'Day / week / month and a new task right from the home screen' },
+  { kind: 'notes', icon: 'notebook', name: 'Notes', desc: 'Pinned and recent notes; add a note without opening the app' },
 ];
 
 const PIN_REASON_RU: Record<string, string> = {
@@ -64,6 +64,8 @@ function strings() {
       refreshWater: (ml: number) => `widget water: +${ml} ml`,
       refreshFoods: (n: number) => `widget dishes: ${n}`,
       refreshTasks: (n: number) => `widget tasks: ${n}`,
+      refreshTasksAdded: (n: number) => `new tasks: ${n}`,
+      refreshNotesAdded: (n: number) => `new notes: ${n}`,
       refreshFail: 'Could not refresh widgets',
       manualTitle: 'How to add manually',
       manual: (
@@ -96,6 +98,8 @@ function strings() {
     refreshWater: (ml: number) => `вода из виджета: +${ml} мл`,
     refreshFoods: (n: number) => `блюд из виджета: ${n}`,
     refreshTasks: (n: number) => `задач с виджета: ${n}`,
+    refreshTasksAdded: (n: number) => `новых задач: ${n}`,
+    refreshNotesAdded: (n: number) => `новых заметок: ${n}`,
     refreshFail: 'Не удалось обновить виджеты',
     manualTitle: 'Как добавить вручную',
     manual: (
@@ -145,6 +149,8 @@ export const WidgetsSetupCard: React.FC = () => {
       if (r.drainedWaterMl > 0) parts.push(T.refreshWater(r.drainedWaterMl));
       if (r.drainedFoods > 0) parts.push(T.refreshFoods(r.drainedFoods));
       if (r.tasksToggled > 0) parts.push(T.refreshTasks(r.tasksToggled));
+      if (r.tasksAdded > 0) parts.push(T.refreshTasksAdded(r.tasksAdded));
+      if (r.notesAdded > 0) parts.push(T.refreshNotesAdded(r.notesAdded));
       setMsg(parts.join(' · '));
     } catch {
       setMsg(T.refreshFail);

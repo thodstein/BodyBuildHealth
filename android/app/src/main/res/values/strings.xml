@@ -19,11 +19,11 @@
     <string name="widget_waterquick_label">HE · Вода</string>
     <string name="widget_waterquick_desc">Прогресс воды за день и +250 мл в один тап</string>
     <string name="widget_calendar_label">HE · Календарь</string>
-    <string name="widget_calendar_desc">Задачи на сегодня и отметка «сделано» с рабочего стола</string>
+    <string name="widget_calendar_desc">День / неделя / месяц, отметка «сделано» и новая задача с рабочего стола</string>
     <string name="widget_notes_label">HE · Заметки</string>
-    <string name="widget_notes_desc">Закреплённые и свежие заметки, прогресс чек-листов</string>
+    <string name="widget_notes_desc">Заметки с прогрессом чек-листа и быстрая заметка без открытия приложения</string>
     <string name="widget_today_label">HE Сегодня</string>
-    <string name="widget_today_desc">План дня и переход в проведение</string>
+    <string name="widget_today_desc">Задачи на сегодня с календаря</string>
     <string name="widget_week_label">HE Неделя</string>
-    <string name="widget_week_desc">Обзор недели и переход в дневник</string>
+    <string name="widget_week_desc">Неделя календаря: задачи по дням</string>
 </resources>

@@ -40,6 +40,17 @@
 
         </activity>
 
+        <!-- Быстрый редактор задачи/заметки с рабочего стола: диалог поверх
+             лаунчера, без запуска основного WebView-интерфейса. -->
+        <activity
+            android:name=".widgets.WidgetQuickAddActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTop"
+            android:theme="@style/WidgetQuickAddTheme"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- TOP: Quick Settings Tile «Вода +250» (шторка, без открытия приложения) -->
         <service
             android:name=".WaterTileService"
@@ -140,6 +151,10 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.healthengine.app.action.WIDGET_TASK" />
+                <action android:name="com.healthengine.app.action.WIDGET_CAL_MODE" />
+                <action android:name="com.healthengine.app.action.WIDGET_CAL_NAV" />
+                <action android:name="com.healthengine.app.action.WIDGET_CAL_TODAY" />
+                <action android:name="com.healthengine.app.action.WIDGET_CAL_DAY" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

@@ -163,6 +163,9 @@ public class WidgetBridgePlugin extends Plugin {
             obj.put("dateLabel", call.getString("dateLabel", ""));
             JSArray tasks = call.getArray("tasks");
             obj.put("tasks", tasks == null ? new JSONArray() : tasks);
+            // Широкий диапазон задач для нативных режимов «неделя»/«месяц».
+            JSArray items = call.getArray("items");
+            if (items != null) obj.put("items", items);
             obj.put("total", Math.max(0, call.getInt("total", 0)));
             obj.put("done", Math.max(0, call.getInt("done", 0)));
             obj.put("overdue", Math.max(0, call.getInt("overdue", 0)));

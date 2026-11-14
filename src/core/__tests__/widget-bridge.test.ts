@@ -162,7 +162,7 @@ describe('очередь -> дневники', () => {
     await queueWaterMl(250);
     await queueWaterMl(500);
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 750, foods: 0, tasks: 0 });
+    expect(applied).toEqual({ waterMl: 750, foods: 0, tasks: 0, tasksAdded: 0, notesAdded: 0 });
     const log = JSON.parse(localStorage.getItem('he_water_log') || '[]');
     // Канон даты — локальный календарь (`local-date`), а не UTC: `toISOString()`
     // в UTC+10 до 10:00 утра отдаёт «вчера», и тест падал только по утрам.
@@ -174,7 +174,7 @@ describe('очередь -> дневники', () => {
   it('10. еда из виджета падает в nutrition_diary_v2', async () => {
     await queueFood({ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 55, meal: 'breakfast' });
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 0, foods: 1, tasks: 0 });
+    expect(applied).toEqual({ waterMl: 0, foods: 1, tasks: 0, tasksAdded: 0, notesAdded: 0 });
     const diary = JSON.parse(localStorage.getItem('nutrition_diary_v2') || '{}');
     const dates = Object.keys(diary).filter((k) => k !== '__version');
     expect(dates.length).toBe(1);
@@ -205,5 +205,66 @@ describe('очередь -> дневники', () => {
     expect(applied.tasks).toBe(1);
     const stored = readCoachPlanner(localStorage);
     expect(stored.items.find(t => t.id === added.task!.id)?.done).toBe(true);
+  });
+
+  it('13. быстрая задача из виджета создаётся с нативным id', async () => {
+    const { readCoachPlanner } = await import('../../engines/coach/coach-planner.engine');
+    const applied = applyWidgetQueue([
+      {
+        type: 'task_add',
+        id: 'w_task_1',
+        title: 'Позвонить тренеру',
+        date: localIsoDate(),
+        time: '18:00',
+        priority: 'high',
+        ts: Date.now(),
+      },
+    ]);
+    expect(applied.tasksAdded).toBe(1);
+    const stored = readCoachPlanner(localStorage);
+    const task = stored.items.find(t => t.id === 'w_task_1');
+    expect(task?.title).toBe('Позвонить тренеру');
+    expect(task?.time).toBe('18:00');
+    expect(task?.priority).toBe('high');
+  });
+
+  it('14. быстрая заметка из виджета создаётся с чек-листом', async () => {
+    const { readCoachNotes } = await import('../../engines/coach/coach-notes.engine');
+    const applied = applyWidgetQueue([
+      {
+        type: 'note_add',
+        id: 'w_note_1',
+        title: 'После тренировки',
+        checklist: [
+          { id: 'c_1', text: 'Растяжка', done: false },
+          { id: 'c_2', text: 'Протеин', done: false },
+        ],
+        ts: Date.now(),
+      },
+    ]);
+    expect(applied.notesAdded).toBe(1);
+    const note = readCoachNotes(localStorage).items.find(n => n.id === 'w_note_1');
+    expect(note?.title).toBe('После тренировки');
+    expect(note?.checklist?.length).toBe(2);
+  });
+
+  it('15. отметка «сделано» у только что добавленной с виджета задачи не теряется', async () => {
+    const { readCoachPlanner } = await import('../../engines/coach/coach-planner.engine');
+    // Порядок как в очереди: сначала задача, потом её отметка.
+    const applied = applyWidgetQueue([
+      { type: 'task', id: 'w_task_2', done: true, ts: Date.now() },
+      {
+        type: 'task_add',
+        id: 'w_task_2',
+        title: 'Выпить креатин',
+        date: localIsoDate(),
+        ts: Date.now(),
+      },
+    ]);
+    expect(applied.tasksAdded).toBe(1);
+    const stored = readCoachPlanner(localStorage);
+    const task = stored.items.find(t => t.id === 'w_task_2');
+    expect(task?.title).toBe('Выпить креатин');
+    expect(task?.done).toBe(true);
   });
 });

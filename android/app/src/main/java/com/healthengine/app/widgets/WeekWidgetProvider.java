@@ -27,16 +27,15 @@ public class WeekWidgetProvider extends AppWidgetProvider {
             ComponentName cn = new ComponentName(context, WeekWidgetProvider.class);
             int[] ids = mgr.getAppWidgetIds(cn);
             for (int id : ids) {
-                mgr.updateAppWidget(id, build(context));
+                mgr.updateAppWidget(id, CalendarWidgetProvider.buildFor(
+                        context, id, CalendarWidgetProvider.MODE_WEEK));
             }
         } catch (Exception ignored) {}
     }
 
     static RemoteViews build(Context context) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_week);
-        v.setOnClickPendingIntent(R.id.w_week_root, openApp(context, WidgetStore.TARGET_TRAINING, 51));
-        v.setOnClickPendingIntent(R.id.w_week_act, openApp(context, WidgetStore.TARGET_TRAINING, 52));
-        return v;
+        return CalendarWidgetProvider.buildFor(
+                context, AppWidgetManager.INVALID_APPWIDGET_ID, CalendarWidgetProvider.MODE_WEEK);
     }
 
     static PendingIntent openApp(Context context, String target, int code) {

@@ -26,6 +26,10 @@ public final class WidgetStore {
     public static final String KEY_TIMER = "timer_json";
     public static final String KEY_LAUNCH_TARGET = "launch_target";
 
+    /** Per-widget состояние календаря: режим день/неделя/месяц и опорная дата. */
+    public static final String KEY_CAL_MODE_PREFIX = "calendar_mode_";
+    public static final String KEY_CAL_ANCHOR_PREFIX = "calendar_anchor_";
+
     /** Intent action: открыть приложение из виджета. */
     public static final String ACTION_OPEN = "com.healthengine.app.action.WIDGET_OPEN";
     public static final String EXTRA_TARGET = "target";
@@ -103,6 +107,36 @@ public final class WidgetStore {
         String t = prefs(ctx).getString(KEY_LAUNCH_TARGET, null);
         if (t != null) prefs(ctx).edit().remove(KEY_LAUNCH_TARGET).apply();
         return t;
+    }
+
+    // ---- Calendar widget view state ----
+
+    public static String getCalendarMode(Context ctx, int widgetId) {
+        String v = prefs(ctx).getString(KEY_CAL_MODE_PREFIX + widgetId, "day");
+        if ("week".equals(v) || "month".equals(v)) return v;
+        return "day";
+    }
+
+    public static void setCalendarMode(Context ctx, int widgetId, String mode) {
+        if (mode == null) mode = "day";
+        if (!"day".equals(mode) && !"week".equals(mode) && !"month".equals(mode)) mode = "day";
+        prefs(ctx).edit().putString(KEY_CAL_MODE_PREFIX + widgetId, mode).apply();
+    }
+
+    public static String getCalendarAnchor(Context ctx, int widgetId) {
+        return prefs(ctx).getString(KEY_CAL_ANCHOR_PREFIX + widgetId, "");
+    }
+
+    public static void setCalendarAnchor(Context ctx, int widgetId, String isoDate) {
+        if (isoDate == null || isoDate.isEmpty()) return;
+        prefs(ctx).edit().putString(KEY_CAL_ANCHOR_PREFIX + widgetId, isoDate).apply();
+    }
+
+    public static void clearCalendarState(Context ctx, int widgetId) {
+        prefs(ctx).edit()
+                .remove(KEY_CAL_MODE_PREFIX + widgetId)
+                .remove(KEY_CAL_ANCHOR_PREFIX + widgetId)
+                .apply();
     }
 
     // ---- Timer state ----
