@@ -707,15 +707,26 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
 // Российские лаборатории используют специфичные единицы для ряда гормонов.
 // Функция определяет единицу по величине значения и приводит к стандарту, используемому в UCUM_MAP.
 //
+// Множители — единственный дом (проход 100): те же числа нужны резолверу норм
+// (`lab-norms.engine` ре-экспортирует их) и приведению единицы при чтении. Раньше
+// E2 жил здесь как 3.67, а в резолвере как 3.671 — расхождение в третьем знаке.
+//
 // Целевые единицы (после нормализации):
-//   E2 (Эстрадиол) → pg/mL (РФ-лаборатории: pmol/L, 1 pg/mL = 3.67 pmol/L)
+//   E2 (Эстрадиол) → pg/mL (РФ-лаборатории: pmol/L, 1 pg/mL = 3.671 pmol/L)
 //   Prolactin → ng/mL (РФ-лаборатории: mIU/L, 1 ng/mL = 21.2 mIU/L)
-//   Total T → nmol/L (РФ-лаборатории: nmol/L или ng/dL, 1 nmol/L = 28.8 ng/dL)
+//   Total T → nmol/L (РФ-лаборатории: nmol/L или ng/dL, 1 nmol/L = 28.84 ng/dL)
 //   Free T → pg/mL (РФ-лаборатории: pg/mL)
 //   Cortisol → nmol/L (РФ-лаборатории: nmol/L)
 //   DHEA-S → μg/dL (РФ-лаборатории: μg/dL или μmol/L, 1 μg/dL = 0.0271 μmol/L)
 //
 // Эвристика: если значение > порога — считаем что оно в «нецелевой» единице и конвертируем.
+export const E2_PG_TO_PMOL = 3.671;      // 1 pg/mL = 3.671 pmol/L
+export const PRL_NG_TO_MIU = 21.2;       // 1 ng/mL = 21.2 mIU/L
+export const PROG_NG_TO_NMOL = 3.18;     // 1 ng/mL = 3.18 nmol/L
+export const TT_NMOL_TO_NG_DL = 28.84;   // 1 nmol/L = 28.84 ng/dL
+export const CORTISOL_UG_DL_TO_NMOL = 27.59;
+export const DHEAS_UMOL_TO_UG_DL = 36.9;
+
 export function normalizeLabValue(marker: string, rawValue: number): number {
   if (isNaN(rawValue)) return rawValue;
   switch (marker) {
@@ -727,7 +738,7 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
       // Теперь: если значение > 300 — считаем pmol/L (pg/mL > 300 = нереально для мужчин),
       // иначе оставляем как есть (предполагаем pg/mL).
       // Пользователь должен указать единицы в UI — это безопаснее.
-      if (rawValue > 300) return Math.round(rawValue / 3.67 * 10) / 10;
+      if (rawValue > 300) return Math.round(rawValue / E2_PG_TO_PMOL * 10) / 10;
       return rawValue;
 
     case 'Prolactin':
@@ -735,7 +746,7 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
     case 'PRL':
       // РФ: mIU/L (мужчины: 50-350). Цель: ng/mL (мужчины: 3-15).
       // Если > 100 — точно mIU/L (ng/mL > 100 = нереально)
-      if (rawValue > 100) return Math.round(rawValue / 21.2 * 10) / 10;
+      if (rawValue > 100) return Math.round(rawValue / PRL_NG_TO_MIU * 10) / 10;
       return rawValue;
 
     case 'Total T':
@@ -743,7 +754,7 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
     case 'Тестостерон общий':
       // РФ: nmol/L (мужчины: 12-33). Может быть ng/dL (300-1000).
       // Если > 100 — точно ng/dL. Конвертируем в nmol/L.
-      if (rawValue > 100) return Math.round(rawValue * 0.0347 * 10) / 10;
+      if (rawValue > 100) return Math.round(rawValue / TT_NMOL_TO_NG_DL * 10) / 10;
       return rawValue;
 
     case 'Cortisol':
@@ -752,7 +763,7 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
       // ⚠ Эвристика <50 убрана: nmol/L=40 (Addisonian crisis) ложно конвертировалось → 1103 nmol/L.
       // Теперь: если значение < 5 — считаем μg/dL (nmol/L < 5 = нереально),
       // иначе оставляем nmol/L.
-      if (rawValue < 5) return Math.round(rawValue * 27.59 * 10) / 10;
+      if (rawValue < 5) return Math.round(rawValue * CORTISOL_UG_DL_TO_NMOL * 10) / 10;
       return rawValue;
 
     case 'DHEA-S':
@@ -761,7 +772,7 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
       // ⚠ Эвристика <20 убрана: μg/dL=10 (надпочечниковая недостаточность) ложно конвертировалось → 738 μg/dL.
       // Теперь: если значение < 2 — считаем μmol/L (μg/dL < 2 = нереально),
       // иначе оставляем μg/dL.
-      if (rawValue < 2) return Math.round(rawValue * 36.9 * 10) / 10;
+      if (rawValue < 2) return Math.round(rawValue * DHEAS_UMOL_TO_UG_DL * 10) / 10;
       return rawValue;
 
     case 'SHBG':

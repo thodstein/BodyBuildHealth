@@ -1,5 +1,5 @@
 import synonyms from '../data/labs-synonyms.json';
-import { UCUM_MAP, DYNAMIC_REFS } from './constants';
+import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL } from './constants';
 import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
@@ -385,7 +385,7 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
       else if (from.includes('miu') || from.includes('uiu')) { factor = 1 / PRL_NG_TO_MIU; converted = true; }
       break;
     case 'TT':
-      if (from.includes('nmol')) { factor = 28.84; converted = true; }
+      if (from.includes('nmol')) { factor = TT_NMOL_TO_NG_DL; converted = true; }
       else if (from.includes('ng/ml')) { factor = 100; converted = true; }
       break;
     case 'FT':

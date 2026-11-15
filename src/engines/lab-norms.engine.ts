@@ -8,7 +8,7 @@
  *
  * Правило проекта: без sex/male getLabNorm возвращает ровно пару UCUM_MAP (lln/uln).
  */
-import { UCUM_MAP } from '../core/constants';
+import { UCUM_MAP, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../core/constants';
 import { LAB_REFERENCES_FEMALE } from './risk-engine-v7-matrix';
 
 export interface LabNorm {
@@ -333,14 +333,13 @@ export const FEMALE_HORMONE_BANDS = {
 } as const;
 
 /**
- * Множители пересчёта гормонов — одни на всё приложение (те же, что в
- * `labs-mapping`): E2 1 пг/мл = 3.671 пмоль/л, PRL 1 нг/мл = 21.2 мМЕ/л,
- * прогестерон 1 нг/мл = 3.18 нмоль/л. Нужны там, где резолверная норма
- * (нг/мл, пг/мл) печатается в единицах отчёта/бланка (пмоль/л, мМЕ/л).
+ * Множители пересчёта гормонов — один дом: `core/constants` (рядом с
+ * `normalizeLabValue`, который ими же и пользуется). Резолвер их ре-экспортирует,
+ * чтобы клинические шкалы (`comprehensive-report`, `labs-mapping`, UI) читали
+ * множитель из одного места: E2 1 пг/мл = 3.671 пмоль/л, PRL 1 нг/мл = 21.2 мМЕ/л,
+ * прогестерон 1 нг/мл = 3.18 нмоль/л (проход 100).
  */
-export const E2_PG_TO_PMOL = 3.671;
-export const PRL_NG_TO_MIU = 21.2;
-export const PROG_NG_TO_NMOL = 3.18;
+export { E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL };
 
 /**
  * Эстрадиол в пг/мл из значения бланка (проход 84).
