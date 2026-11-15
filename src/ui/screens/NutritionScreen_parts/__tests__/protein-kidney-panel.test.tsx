@@ -6,9 +6,18 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
-import { ProteinKidneyPanel } from '../ProteinKidneyPanel';
+import { ProteinKidneyPanel, buildRetestIcs } from '../ProteinKidneyPanel';
 import { NutritionScreen } from '../../NutritionScreen';
 import { PROTEIN_KIDNEY_INPUT_KEY } from '../../../../engines/protein-kidney-tolerance.engine';
+
+/** Выбрать вариант в ScorePicker по подписи поля (например, «Белок в тест-полоске» → «отр»). */
+function pickScore(label: string, option: string) {
+  const labelEl = Array.from(document.querySelectorAll('span')).find((el) => el.textContent === label);
+  const root = labelEl?.closest('div')?.parentElement;
+  const btn = root ? Array.from(root.querySelectorAll('button')).find((b) => b.textContent === option) : null;
+  if (!btn) throw new Error(`Не найден вариант «${option}» у поля «${label}»`);
+  fireEvent.click(btn);
+}
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -97,6 +106,7 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     setNumber('Мочевина', 5);
     setNumber('Креатинин', 80);
     setNumber('Плотность (SG)', 1.015);
+    pickScore('Белок в тест-полоске', 'отр');
 
     // Прямой ответ на вопрос пользователя — в отдельном блоке, а не только цифры.
     expect(bodyText()).toContain('Усваивается ли белок');
@@ -109,13 +119,15 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     expect(bodyText()).toContain('Через 14 дней после первого шага');
   });
 
-  it('7. кнопка ААС расширяет переносимость до 3.2 и просит цистатин C', () => {
+  it('7. кнопка ААС + цистатин C расширяет переносимость до 3.2', () => {
     render(<ProteinKidneyPanel />);
     setNumber('Белок сейчас', 240);
     setNumber('Вода (необяз.)', 3000);
     setNumber('Мочевина', 5);
     setNumber('Креатинин', 80);
+    setNumber('Цистатин C', 0.8);
     setNumber('Плотность (SG)', 1.015);
+    pickScore('Белок в тест-полоске', 'отр');
 
     const aas = document.querySelector('button[aria-label="Принимаю ААС"]') as HTMLElement | null;
     expect(aas).toBeTruthy();
@@ -133,5 +145,53 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     expect(bodyText()).toContain('Пересдать через 2–3 дня');
     expect(bodyText()).toContain('через 3 дн.');
     expect(bodyText()).toMatch(/\d{2}\.\d{2}\.\d{4}/);
+  });
+
+  it('9. мочевина 0 — это ошибка ввода, а не «чистые почки»', () => {
+    render(<ProteinKidneyPanel />);
+    setNumber('Мочевина', 0);
+    setNumber('Креатинин', 80);
+    setNumber('Плотность (SG)', 1.015);
+    pickScore('Белок в тест-полоске', 'отр');
+    expect(bodyText()).toContain('Проверьте единицы');
+    expect(bodyText()).toContain('Сначала проверьте данные');
+  });
+
+  it('10. ААС без цистатина C: 2.8, а не 3.2', () => {
+    render(<ProteinKidneyPanel />);
+    setNumber('Белок сейчас', 240);
+    setNumber('Вода (необяз.)', 3000);
+    setNumber('Мочевина', 5);
+    setNumber('Креатинин', 80);
+    setNumber('Плотность (SG)', 1.015);
+    pickScore('Белок в тест-полоске', 'отр');
+    fireEvent.click(document.querySelector('button[aria-label="Принимаю ААС"]') as HTMLElement);
+    expect(bodyText()).toContain('2.8');
+    expect(bodyText()).toContain('без цистатина C');
+  });
+
+  it('11. сушка + % жира поднимает ориентир пользы по тощей массе', () => {
+    render(<ProteinKidneyPanel />);
+    fireEvent.click(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Сушка') as HTMLElement);
+    setNumber('% жира (необяз.)', 10);
+    // 80 кг, 10% жира → 72 кг LBM × 3.0 = 216 г → 2.7 г/кг массы.
+    expect(bodyText()).toContain('2.7');
+  });
+
+  it('12. что-если: если выше переносимости — так и пишет, без зелёного текста', () => {
+    render(<ProteinKidneyPanel />);
+    setNumber('Мочевина', 9);
+    setNumber('Планируемая прибавка', 20);
+    expect(bodyText()).toContain('Выше потолка переносимости');
+    expect(bodyText()).not.toContain('Влезает в потолок пользы');
+  });
+
+  it('13. .ics — корректное событие на дату пересдачи', () => {
+    const ics = buildRetestIcs('2026-12-15', 'Пересдать: белок, почки', 'Сдать ОАМ; urea');
+    expect(ics).toContain('DTSTART;VALUE=DATE:20261215');
+    expect(ics).toContain('DTEND;VALUE=DATE:20261216');
+    expect(ics).toContain('SUMMARY:Пересдать: белок\\, почки');
+    expect(ics).toContain('DESCRIPTION:Сдать ОАМ\\; urea');
+    expect(ics).toContain('END:VCALENDAR');
   });
 });

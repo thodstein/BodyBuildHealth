@@ -27,6 +27,7 @@ import {
   ALBUMINURIA_LABEL,
   GFR_CATEGORY_LABEL,
   PROTEIN_KIDNEY_INPUT_KEY,
+  buildDoctorSummary,
   calcProteinKidney,
   clearProteinKidneyHistory,
   loadProteinKidneyHistory,
@@ -47,6 +48,7 @@ type OptionalNumKey =
   | 'ureaMmolL'
   | 'creatinineUmolL'
   | 'egfrMeasured'
+  | 'cystatinCMgL'
   | 'dietarySodiumG'
   | 'dietaryPotassiumG'
   | 'urineSg'
@@ -79,9 +81,13 @@ interface PanelState {
   creatineUse: boolean;
   knownCkd: boolean;
   aasUse?: boolean;
+  hypertension?: boolean;
+  diabetes?: boolean;
+  nsaidUse?: boolean;
   ureaMmolL?: number;
   creatinineUmolL?: number;
   egfrMeasured?: number;
+  cystatinCMgL?: number;
   dietarySodiumG?: number;
   dietaryPotassiumG?: number;
   urineSg?: number;
@@ -103,7 +109,7 @@ interface PanelState {
 
 /** Лабораторные поля, которые можно подтянуть из профиля (и не затирать ручной ввод). */
 const LAB_KEYS: Array<OptionalNumKey> = [
-  'ureaMmolL', 'creatinineUmolL', 'egfrMeasured', 'urineSg', 'urinePh',
+  'ureaMmolL', 'creatinineUmolL', 'egfrMeasured', 'cystatinCMgL', 'urineSg', 'urinePh',
   'urineProteinScore', 'urineProteinGL', 'urineCreatinineMmolL', 'microalbuminMgL',
   'uacrMgMmol', 'urineVolume24hMl', 'urineLeuPerUl', 'urineEryPerUl',
   'urineNitriteScore', 'urineGlucoseScore', 'urineKetonesScore', 'urineCastsPerUl',
@@ -119,10 +125,10 @@ const SCORE_OPTIONS = [
 ];
 
 const TRAIN_OPTIONS: Array<{ v: PkTraining; t: string; d: string }> = [
-  { v: 'sedentary', t: 'Без тренировок', d: 'потолок 1.6 г/кг' },
-  { v: 'recreational', t: 'Любитель', d: 'потолок 1.8 г/кг' },
-  { v: 'resistance', t: 'Силовой', d: 'потолок 2.2 г/кг' },
-  { v: 'athlete', t: 'Спортсмен', d: 'потолок 2.2 г/кг' },
+  { v: 'sedentary', t: 'Без тренировок', d: 'польза до 1.6 г/кг' },
+  { v: 'recreational', t: 'Любитель', d: 'польза до 1.8 г/кг' },
+  { v: 'resistance', t: 'Силовой', d: 'польза до 2.2 г/кг' },
+  { v: 'athlete', t: 'Спортсмен', d: 'польза до 2.2 г/кг' },
 ];
 
 const GOAL_OPTIONS: Array<{ v: PkGoal; t: string }> = [
@@ -148,6 +154,44 @@ const RISK_LABEL: Record<ProteinKidneyResult['concentrationRisk'], string> = {
 function formatRuDate(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
+}
+
+const MANUAL_KEY = `${PROTEIN_KIDNEY_INPUT_KEY}_manual`;
+
+function readManualFlags(): Record<string, boolean> {
+  try {
+    const parsed = safeRead<Record<string, boolean>>(MANUAL_KEY);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** .ics для календаря: напоминание о пересдаче, без серверов и разрешений. */
+export function buildRetestIcs(dateIso: string, title: string, description: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
+  const start = m ? `${m[1]}${m[2]}${m[3]}` : dateIso.replace(/-/g, '');
+  const d = new Date(`${dateIso}T12:00:00`);
+  const next = new Date(d.getTime() + 86400000);
+  const end = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, '0')}${String(next.getDate()).padStart(2, '0')}`;
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const esc = (s: string): string => s.replace(/\\/g, '\\\\').replace(/[,;]/g, (c) => `\\${c}`).replace(/\r?\n/g, '\\n');
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BodyBuildHealth//ProteinKidney//RU',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:pk-${start}@bodybuildhealth`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${start}`,
+    `DTEND;VALUE=DATE:${end}`,
+    `SUMMARY:${esc(title)}`,
+    `DESCRIPTION:${esc(description)}`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+    '',
+  ].join('\r\n');
 }
 
 const STATUS_META: Record<ProteinKidneyResult['status'], { text: string; color: string }> = {
@@ -189,40 +233,58 @@ function safeRead<T>(key: string): T | null {
 function pickLab(
   labs: Record<string, { value?: unknown; unit?: unknown }>,
   aliases: string[],
-): { value: number; unit: string } | null {
+): { key: string; value: number; unit: string } | null {
   for (const key of aliases) {
     const entry = labs[key];
     if (!entry) continue;
     const value = Number(entry.value);
-    if (Number.isFinite(value)) return { value, unit: String(entry.unit ?? '').toLowerCase() };
+    if (Number.isFinite(value)) {
+      const unit = String(entry.unit ?? '')
+        .toLowerCase()
+        .replace(/мг/g, 'mg')
+        .replace(/дл/g, 'dl')
+        .replace(/мкмоль/g, 'µmol')
+        .replace(/ммоль/g, 'mmol');
+      return { key, value, unit };
+    }
   }
   return null;
 }
 
 /** Приводим лабораторные единицы к тем, на которых считает движок. */
-function ureaMmol(value: number, unit: string): number {
-  return /mg/.test(unit) ? value / 6.0 : value;
+function ureaMmol(value: number, unit: string, labKey: string): number {
+  const isBun = /bun/i.test(labKey);
+  if (/mg/.test(unit)) return isBun ? value / 2.8 : value / 6.0;
+  if (/(µmol|umol|mcmol)/.test(unit)) return value / 1000;
+  return value;
 }
 function creatinineUmol(value: number, unit: string): number {
   return /mg/.test(unit) ? value * 88.4 : value;
 }
 function specificGravity(value: number): number {
   if (value >= 1000 && value <= 1060) return value / 1000;
-  if (value > 1.5 && value < 100) return value / 10;
   return value;
 }
 function proteinGL(value: number, unit: string): number {
-  return /mg/.test(unit) ? value / 1000 : value;
+  if (/mg\/dl/.test(unit)) return value / 100;
+  if (/mg/.test(unit)) return value / 1000;
+  return value;
 }
 function urineCreatinineMmol(value: number, unit: string): number {
-  return /(µmol|umol|mcmol)/.test(unit) ? value / 1000 : value;
+  if (/mg\/dl/.test(unit)) return value * 0.0884;
+  if (/(µmol|umol|mcmol)/.test(unit)) return value / 1000;
+  return value;
 }
 function microalbuminMgL(value: number, unit: string): number {
-  return /mg\/?(dl|100)/.test(unit) ? value * 10 : value;
+  if (/mg\/dl/.test(unit)) return value * 10;
+  if (/g\/l/.test(unit)) return value * 1000;
+  return value;
+}
+function cystatinMgL(value: number, unit: string): number {
+  return /mg\/dl/.test(unit) ? value * 10 : value;
 }
 function uacrMgMmol(value: number, unit: string): number {
-  if (/\/g/.test(unit) && !/mmol/.test(unit)) return value / 8.84;
-  if (/mg\/dl/.test(unit)) return value;
+  if (/mg\/g|\/g\b/.test(unit) && !/mmol/.test(unit)) return value / 8.84;
   return value;
 }
 
@@ -392,7 +454,7 @@ export const ProteinKidneyPanel: React.FC = () => {
     return { ...base, ...saved };
   });
 
-  const manualRef = useRef<Record<string, boolean>>({});
+  const manualRef = useRef<Record<string, boolean>>(readManualFlags());
   const pulledRef = useRef<Record<string, boolean>>({});
   const [history, setHistory] = useState<ProteinKidneySnapshot[]>(() => loadProteinKidneyHistory());
   const [showMethod, setShowMethod] = useState(false);
@@ -405,6 +467,7 @@ export const ProteinKidneyPanel: React.FC = () => {
 
   const setRequired = useCallback((key: 'weightKg' | 'heightCm' | 'age' | 'proteinGPerDay' | 'mealsPerDay', v: number | undefined) => {
     if (v == null || !Number.isFinite(v)) return;
+    if (key === 'proteinGPerDay') manualRef.current.proteinGPerDay = true;
     setState((s) => ({ ...s, [key]: v }));
   }, []);
 
@@ -422,20 +485,31 @@ export const ProteinKidneyPanel: React.FC = () => {
     if (!labs || typeof labs !== 'object') return;
 
     const cur = valuesRef.current;
-    const apply = (key: OptionalNumKey, raw: { value: number; unit: string } | null, convert?: (v: number, u: string) => number) => {
+    const apply = (key: OptionalNumKey, raw: { key: string; value: number; unit: string } | null, convert?: (v: number, u: string, labKey: string) => number) => {
       if (!raw) return;
       if (!force && manualRef.current[key]) return;
       // Не перетираем уже показанное значение (ручное или ранее подтянутое).
       if (!force && cur[key] != null) return;
-      const value = convert ? convert(raw.value, raw.unit) : raw.value;
+      const value = convert ? convert(raw.value, raw.unit, raw.key) : raw.value;
       if (!Number.isFinite(value)) return;
       pulledRef.current[key] = true;
       setState((s) => ({ ...s, [key]: value }));
     };
 
+    // «Белок сейчас» следует за планом, пока пользователь не поправил его вручную.
+    if (!manualRef.current.proteinGPerDay) {
+      const planProtein = (() => {
+        try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
+      })();
+      if (planProtein > 0 && Math.abs(cur.proteinGPerDay - planProtein) > 1) {
+        setState((s) => ({ ...s, proteinGPerDay: Math.round(planProtein) }));
+      }
+    }
+
     apply('ureaMmolL', pickLab(labs, ['UREA', 'Urea', 'urea', 'Мочевина', 'BUN']), ureaMmol);
     apply('creatinineUmolL', pickLab(labs, ['CREATININE', 'Creatinine', 'creatinine', 'Креатинин']), creatinineUmol);
     apply('egfrMeasured', pickLab(labs, ['EGFR', 'eGFR', 'GFR', 'gfr', 'СКФ']));
+    apply('cystatinCMgL', pickLab(labs, ['CYSTATIN_C', 'Cystatin C', 'cystatin_c', 'Цистатин C']), cystatinMgL);
     apply('urineSg', pickLab(labs, ['URINE_SG', 'urine_sg', 'USG', 'sg', 'Плотность мочи']), (v) => specificGravity(v));
     apply('urinePh', pickLab(labs, ['URINE_PH', 'urine_ph', 'pH мочи']));
     apply('urineProteinScore', pickLab(labs, ['URINE_PROTEIN_QR', 'PROTEIN_QR', 'urine_protein_qr']), (v) => Math.max(0, Math.min(4, v)));
@@ -454,7 +528,7 @@ export const ProteinKidneyPanel: React.FC = () => {
 
   useEffect(() => {
     pullLabs();
-    const id = setInterval(() => pullLabs(), 8000);
+    const id = setInterval(() => { if (!document.hidden) pullLabs(); }, 8000);
     const onStorage = (e: StorageEvent) => {
       if (e.key && (e.key.includes('he_profile') || e.key.includes('he_labs') || e.key.includes('profile'))) pullLabs();
     };
@@ -471,15 +545,33 @@ export const ProteinKidneyPanel: React.FC = () => {
   // Персист ввода: переживает перезагрузку и уход на другую вкладку.
   useEffect(() => {
     try { localStorage.setItem(PROTEIN_KIDNEY_INPUT_KEY, JSON.stringify(state)); } catch { /* quota */ }
+    try { localStorage.setItem(MANUAL_KEY, JSON.stringify(manualRef.current)); } catch { /* quota */ }
   }, [state]);
 
   const input: ProteinKidneyInput = useMemo(() => ({ ...state }), [state]);
   const result = useMemo(() => calcProteinKidney(input), [input]);
 
   const statusMeta = STATUS_META[result.status];
+  // «Переносится» можно говорить только когда потолок подтверждён анализами.
+  const statusText = result.status === 'above_benefit' && !result.toleranceVerified
+    ? 'Выше пользы'
+    : statusMeta.text;
   const overToleranceG = Math.max(0, result.proteinGPerDay - result.capGPerDay);
   const overBenefitG = Math.max(0, result.proteinGPerDay - result.benefitCapGPerDay);
   const util = result.utilization;
+  const toleranceValue = result.toleranceAssessed ? `${result.capGPerKg}` : '—';
+  const toleranceSub = !result.toleranceAssessed
+    ? 'нужны анализы'
+    : result.capGPerKg < result.benefitCapGPerKg - 1e-9
+      ? `${result.capGPerDay} г/сут · ограничение`
+      : result.toleranceVerified
+        ? `${result.capGPerDay} г/сут`
+        : `${result.capGPerDay} г/сут · не подтверждено`;
+  const toleranceHeadValue = !result.toleranceAssessed
+    ? '—'
+    : result.toleranceHeadroomGPerDay > 0 ? `+${result.toleranceHeadroomGPerDay}` : `−${overToleranceG}`;
+  const toleranceHeadSub = result.toleranceAssessed ? 'г/сут' : 'после анализов';
+  const barMax = Math.max(result.toleranceAssessed ? result.capGPerKg : result.benefitCapGPerKg, result.proteinGPerKg);
   const planTone = result.increaseAllowed && !result.increasePaused ? '#22c55e'
     : result.canIncreaseToTolerance ? '#eab308'
       : result.increasePaused ? '#f59e0b' : '#ef4444';
@@ -505,6 +597,41 @@ export const ProteinKidneyPanel: React.FC = () => {
     setHistory([]);
     setSavedMsg('История очищена');
     setTimeout(() => setSavedMsg(''), 2200);
+  };
+
+  const onCopySummary = async () => {
+    const text = buildDoctorSummary(input, result);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('no clipboard');
+      await navigator.clipboard.writeText(text);
+      setSavedMsg('Сводка для врача скопирована');
+    } catch {
+      setSavedMsg('Не удалось скопировать — буфер обмена недоступен');
+    }
+    setTimeout(() => setSavedMsg(''), 2600);
+  };
+
+  const onDownloadIcs = () => {
+    try {
+      const ics = buildRetestIcs(
+        result.retest.date,
+        'Пересдать анализы: белок и почки',
+        `Что сдать: ${result.retest.items.join(', ')}. ${result.retest.reason}`,
+      );
+      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `belok-pochki-${result.retest.date}.ics`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setSavedMsg('Файл календаря скачан');
+    } catch {
+      setSavedMsg('Не удалось создать файл календаря');
+    }
+    setTimeout(() => setSavedMsg(''), 2600);
   };
 
   const resetFromProfile = () => {
@@ -564,6 +691,22 @@ export const ProteinKidneyPanel: React.FC = () => {
           }}
         >↻ Профиль</button>
       </div>
+
+      {result.dataIssues.length > 0 && (
+        <div role="alert" style={{
+          marginBottom: 8, padding: '9px 11px', borderRadius: 12,
+          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
+            Проверьте единицы — иначе вывод будет неверным
+          </div>
+          {result.dataIssues.map((d) => (
+            <div key={d.code} style={{ fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45 }}>
+              • <strong>{d.title}</strong> — {d.hint}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Тело и белок ──────────────────────────────────────────────────── */}
       <MhSection icon="⚖️" title="Тело и белок" hint="Отсюда берётся знаменатель для г/кг" accent="#60a5fa">
@@ -644,14 +787,42 @@ export const ProteinKidneyPanel: React.FC = () => {
             accent="#f97316"
             compact
           />
+          <MhToggle
+            checked={state.hypertension === true}
+            onChange={(v) => setState((s) => ({ ...s, hypertension: v }))}
+            icon="🫀"
+            title="Есть гипертония"
+            desc="цель АД <130/80"
+            accent="#ef4444"
+            compact
+          />
+          <MhToggle
+            checked={state.diabetes === true}
+            onChange={(v) => setState((s) => ({ ...s, diabetes: v }))}
+            icon="🩸"
+            title="Есть диабет"
+            desc="UACR раз в год"
+            accent="#eab308"
+            compact
+          />
+          <MhToggle
+            checked={state.nsaidUse === true}
+            onChange={(v) => setState((s) => ({ ...s, nsaidUse: v }))}
+            icon="💊"
+            title="Принимаю НПВС"
+            desc="ибупрофен/напроксен"
+            accent="#f59e0b"
+            compact
+          />
         </div>
       </MhSection>
 
       {/* ── Кровь ─────────────────────────────────────────────────────────── */}
-      <MhSection icon="🩸" title="Кровь" hint="Мочевина и креатинин; СКФ считается по CKD-EPI 2021" accent="#f97316">
+      <MhSection icon="🩸" title="Кровь" hint="CKD-EPI 2021; цистатин C точнее на ААС/креатине" accent="#f97316">
         <MhGrid cols={3}>
           <MhNum label="Мочевина" {...numberProps('ureaMmolL')} min={0} max={60} step={0.1} suffix=" ммоль/л" optional />
           <MhNum label="Креатинин" {...numberProps('creatinineUmolL')} min={0} max={2000} step={1} suffix=" мкмоль/л" optional />
+          <MhNum label="Цистатин C" {...numberProps('cystatinCMgL')} min={0.2} max={10} step={0.01} suffix=" мг/л" optional hint="если есть в бланке" />
           <MhNum label="СКФ (из лабы)" {...numberProps('egfrMeasured')} min={0} max={200} suffix=" мл/мин" optional />
         </MhGrid>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
@@ -739,14 +910,14 @@ export const ProteinKidneyPanel: React.FC = () => {
       <MhSection
         icon="🎯"
         title="Вердикт"
-        hint="Два потолка: польза (1.6–2.2 г/кг) и переносимость по анализам"
+        hint="Два потолка: польза — плато дозы, переносимость — по анализам"
         accent={result.color}
         right={<Pep color={result.color}>{result.levelLabel}</Pep>}
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6 }}>
           <MhTile label="Индекс" value={result.score} sub="из 100" color={result.color} accent={result.color} />
           <MhTile label="Польза" value={`${result.benefitCapGPerKg}`} sub={`${result.benefitCapGPerDay} г/сут`} color="#fff" accent="#60a5fa" />
-          <MhTile label="Переносимость" value={`${result.capGPerKg}`} sub={`${result.capGPerDay} г/сут`} color="#fff" accent="#a78bfa" />
+          <MhTile label="Переносимость" value={toleranceValue} sub={toleranceSub} color="#fff" accent="#a78bfa" />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 6, marginTop: 6 }}>
           <MhTile
@@ -758,17 +929,17 @@ export const ProteinKidneyPanel: React.FC = () => {
           />
           <MhTile
             label="Запас переносимости"
-            value={result.toleranceHeadroomGPerDay > 0 ? `+${result.toleranceHeadroomGPerDay}` : `−${overToleranceG}`}
-            sub="г/сут"
-            color={result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : '#ef4444'}
-            accent={result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : '#ef4444'}
+            value={toleranceHeadValue}
+            sub={toleranceHeadSub}
+            color={result.toleranceAssessed && result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : result.toleranceAssessed ? '#ef4444' : '#94a3b8'}
+            accent={result.toleranceAssessed && result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : result.toleranceAssessed ? '#ef4444' : '#94a3b8'}
           />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 6px' }}>
-          <MhBar v={result.proteinGPerKg} max={Math.max(result.capGPerKg, result.proteinGPerKg)} color={statusMeta.color} label={`Сейчас ${result.proteinGPerKg} г/кг`} />
+          <MhBar v={result.proteinGPerKg} max={barMax} color={statusMeta.color} label={`Сейчас ${result.proteinGPerKg} г/кг`} />
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
-            переносимость {result.capGPerKg}
+            {result.toleranceAssessed ? `переносимость ${result.capGPerKg}` : `польза ${result.benefitCapGPerKg}`}
           </span>
         </div>
 
@@ -776,17 +947,21 @@ export const ProteinKidneyPanel: React.FC = () => {
           padding: '8px 10px', borderRadius: 10, fontSize: 10, lineHeight: 1.45,
           background: `${statusMeta.color}10`, border: `1px solid ${statusMeta.color}33`, color: '#fff',
         }}>
-          <strong style={{ color: statusMeta.color }}>{statusMeta.text}.</strong>{' '}
+          <strong style={{ color: statusMeta.color }}>{statusText}.</strong>{' '}
           Сейчас {result.proteinGPerDay} г/сут ({result.proteinGPerKg} г/кг).
           {result.status === 'above_tolerance'
             ? ` Это на ${overToleranceG} г/сут больше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение, потом любые прибавки.`
             : result.status === 'above_benefit'
-              ? ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), но переносимость позволяет до ${result.capGPerDay} г/сут.`
+              ? result.aasEgfrUnverified
+                ? ' Выше ориентира пользы. Снижать до потолка не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но наращивать можно только после цистатина C.'
+                : result.toleranceVerified
+                  ? ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), но переносимость позволяет до ${result.capGPerDay} г/сут.`
+                  : ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), а переносимость выше не подтверждена — для роста нужны чистые анализы.`
               : result.status === 'within'
                 ? ` В пределах ориентира пользы — до ${result.benefitCapGPerDay} г/сут.`
                 : ' Ниже физиологичного минимума: сначала доберите базовый белок.'}
           {result.increaseAllowed && !result.increasePaused
-            ? ` Прибавка рекомендуется: +${result.headroomGPerDay} г/сут шагами по 10–15 г.`
+            ? ` Прибавка рекомендуется: +${result.headroomGPerDay} г/сут шагами по 5–15 г.`
             : result.increasePaused
               ? ' Прибавка на паузе до нормализации анализов.'
               : result.canIncreaseToTolerance
@@ -797,7 +972,7 @@ export const ProteinKidneyPanel: React.FC = () => {
         {result.capReasons.length > 1 && (
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-              Почему потолок такой
+              Почему потолки такие
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {result.capReasons.map((r, i) => <Pep key={i} color={i === 0 ? '#60a5fa' : '#f59e0b'}>{r}</Pep>)}
@@ -825,7 +1000,7 @@ export const ProteinKidneyPanel: React.FC = () => {
         <div style={{
           display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, padding: '10px 12px', borderRadius: 12,
           background: `${result.retest.color}10`, border: `1px solid ${result.retest.color}38`,
-        }}>
+        }} role="status" aria-live="polite">
           <div style={{ fontSize: 20, fontWeight: 900, color: result.retest.color, letterSpacing: -0.3 }}>
             {formatRuDate(result.retest.date)}
           </div>
@@ -837,6 +1012,29 @@ export const ProteinKidneyPanel: React.FC = () => {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 7 }}>
           {result.retest.items.map((it) => <Pep key={it} color={result.retest.color}>{it}</Pep>)}
         </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onCopySummary}
+            style={{
+              flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
+              background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.35)', color: '#93c5fd',
+            }}
+          >Скопировать для врача</button>
+          <button
+            type="button"
+            onClick={onDownloadIcs}
+            style={{
+              flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
+              background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.28)', color: '#cbd5e1',
+            }}
+          >В календарь (.ics)</button>
+        </div>
+        {savedMsg && (
+          <div role="status" aria-live="polite" style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
+            {savedMsg}
+          </div>
+        )}
       </MhSection>
 
       {/* ── Сигналы ───────────────────────────────────────────────────────── */}
@@ -884,7 +1082,7 @@ export const ProteinKidneyPanel: React.FC = () => {
       <MhSection
         icon="🪜"
         title="План прибавки"
-        hint={result.canIncreaseToTolerance && !result.increaseAllowed ? 'Выше пользы — только по переносимости, с контролем' : 'Шаг 10–15 г/сут, контроль через 10–14 дней'}
+        hint={result.canIncreaseToTolerance && !result.increaseAllowed ? 'Выше пользы — только по переносимости, с контролем' : 'Шаг 5–15 г/сут, контроль через 10–14 дней'}
         accent={planTone}
         right={<Pep color={planTone}>{planLabel}</Pep>}
       >
@@ -936,24 +1134,23 @@ export const ProteinKidneyPanel: React.FC = () => {
             suffix=" г/сут"
             optional
           />
-          {result.planned && (
-            <div style={{
-              marginTop: 6, padding: '7px 9px', borderRadius: 9, fontSize: 10, lineHeight: 1.45,
-              background: result.planned.withinTolerance
-                ? (result.planned.withinBenefit ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)')
-                : 'rgba(239,68,68,0.08)',
-              border: `1px solid ${result.planned.withinTolerance
-                ? (result.planned.withinBenefit ? 'rgba(34,197,94,0.25)' : 'rgba(234,179,8,0.25)')
-                : 'rgba(239,68,68,0.25)'}`,
-            }}>
-              Итого {result.planned.totalG} г/сут · {result.planned.gPerKg} г/кг.{' '}
-              {result.planned.withinBenefit
-                ? `Влезает в потолок пользы. Добавьте ~${result.planned.extraWaterMl} мл воды, чтобы вывести новые осмоли.`
-                : result.planned.withinTolerance
-                  ? `Переносимость это позволяет, но дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано: мышцам добавка ничего не даст, только лишний азот. Только при реальной причине и с контролем анализов.`
-                  : 'Выше потолка переносимости — так делать не стоит до повторных анализов.'}
-            </div>
-          )}
+          {result.planned && (() => {
+            const withinBoth = result.planned.withinBenefit && result.planned.withinTolerance;
+            const tone = withinBoth ? '#22c55e' : result.planned.withinTolerance ? '#eab308' : '#ef4444';
+            return (
+              <div style={{
+                marginTop: 6, padding: '7px 9px', borderRadius: 9, fontSize: 10, lineHeight: 1.45,
+                background: `${tone}14`, border: `1px solid ${tone}40`,
+              }}>
+                Итого {result.planned.totalG} г/сут · {result.planned.gPerKg} г/кг.{' '}
+                {!result.planned.withinTolerance
+                  ? 'Выше потолка переносимости — так делать не стоит до повторных анализов.'
+                  : result.planned.withinBenefit
+                    ? `Влезает в потолок пользы. Добавьте ~${result.planned.extraWaterMl} мл воды, чтобы вывести новые осмоли.`
+                    : `Переносимость это позволяет, но дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано: мышцам добавка ничего не даст, только лишний азот. Только при реальной причине и с контролем анализов.`}
+              </div>
+            );
+          })()}
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
@@ -1025,7 +1222,7 @@ export const ProteinKidneyPanel: React.FC = () => {
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', minWidth: 58 }}>{h.date.slice(5)}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', minWidth: 58 }}>{h.proteinGPerKg} г/кг</span>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', flex: 1 }}>
-                    {h.egfr != null ? `СКФ ${h.egfr}` : 'СКФ —'}{h.urineSg != null ? ` · SG ${h.urineSg}` : ''}{h.uacrMgMmol != null ? ` · UACR ${h.uacrMgMmol}` : ''}
+                    {h.egfr != null ? `СКФ ${h.egfr}` : 'СКФ —'}{h.ureaMmolL != null ? ` · мочевина ${h.ureaMmolL}` : ''}{h.creatinineUmolL != null ? ` · креатинин ${h.creatinineUmolL}` : ''}{h.urineSg != null ? ` · SG ${h.urineSg}` : ''}{h.uacrMgMmol != null ? ` · UACR ${h.uacrMgMmol}` : ''}
                   </span>
                   <span style={{
                     fontSize: 9, fontWeight: 800,

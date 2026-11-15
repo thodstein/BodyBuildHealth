@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDoctorSummary,
   calcProteinKidney,
   ckdEpi2021,
+  ckdEpi2021CrCys,
+  ckdEpi2021Cys,
   classifyAlbuminuria,
   estimateUrineOsmolality,
   gfrCategoryOf,
+  loadProteinKidneyHistory,
+  PROTEIN_KIDNEY_HISTORY_KEY,
   proteinToleranceCap,
   renalSoluteLoad,
   type ProteinKidneyInput,
@@ -22,6 +27,7 @@ const base = (over: Partial<ProteinKidneyInput> = {}): ProteinKidneyInput => ({
   ureaMmolL: 5,
   creatinineUmolL: 80,
   urineSg: 1.015,
+  urineProteinScore: 0,
   ...over,
 });
 
@@ -89,11 +95,13 @@ describe('protein-kidney-tolerance: потолок белка', () => {
   });
 
   it('расширяет до переносимости только при чистых маркерах', () => {
-    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.015 }).cap).toBe(3.0);
+    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.015, hasProteinuriaData: true }).cap).toBe(3.0);
     // Следы белка — уже не «чисто».
-    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, proteinuriaScore: 0.5 }).cap).toBe(2.2);
+    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, proteinuriaScore: 0.5, hasProteinuriaData: true }).cap).toBe(2.2);
     // Концентрированная моча — сначала вода.
-    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.035 }).cap).toBe(2.2);
+    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.035, hasProteinuriaData: true }).cap).toBe(2.2);
+    // Без белка мочи расширения нет: «не проверено» ≠ «чисто».
+    expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.015 }).cap).toBe(2.2);
   });
 });
 
@@ -151,20 +159,29 @@ describe('protein-kidney-tolerance: вердикт', () => {
     expect(r.capGPerKg).toBe(2.2);
   });
 
-  it('ААС + чистые анализы: переносимость до 3.2 г/кг, СКФ — с оговоркой', () => {
-    const r = calcProteinKidney(base({ aasUse: true, proteinGPerDay: 240 }));
+  it('ААС + чистые анализы и цистатин C: переносимость до 3.2 г/кг', () => {
+    const r = calcProteinKidney(base({ aasUse: true, cystatinCMgL: 0.8, proteinGPerDay: 240 }));
     expect(r.capGPerKg).toBe(3.2);
     expect(r.proteinGPerKg).toBe(3);
     expect(r.status).toBe('above_benefit');
     expect(r.utilization.status).toBe('handled');
-    expect(r.utilization.confidence).toBe('medium');
+    expect(r.egfrSource).toBe('ckd-epi-cr-cys');
     expect(r.flags.some((f) => f.code === 'aas')).toBe(true);
   });
 
-  it('ААС: СКФ 78 по креатинину не блокирует расширение, без ААС — блокирует', () => {
-    const withAas = proteinToleranceCap({ training: 'resistance', age: 30, aasUse: true, egfr: 78, ureaMmolL: 5, urineSg: 1.015 });
-    expect(withAas.cap).toBe(3.2);
-    const plain = proteinToleranceCap({ training: 'resistance', age: 30, egfr: 78, ureaMmolL: 5, urineSg: 1.015 });
+  it('ААС без цистатина C: расширение только до 2.8, 3.2 требует подтверждения', () => {
+    const r = calcProteinKidney(base({ aasUse: true, proteinGPerDay: 240 }));
+    expect(r.capGPerKg).toBe(2.8);
+    expect(r.flags.some((f) => f.code === 'aas_creatinine_only')).toBe(true);
+    // 3.0 > 2.8: вывод об усвоении не должен говорить «переносится».
+    expect(r.status).toBe('above_tolerance');
+    expect(r.utilization.status).toBe('excess');
+  });
+
+  it('ААС: СКФ 78 по креатинину даёт 2.8, без ААС — не расширяет', () => {
+    const withAas = proteinToleranceCap({ training: 'resistance', age: 30, aasUse: true, aasCreatinineOnly: true, egfr: 78, ureaMmolL: 5, urineSg: 1.015, hasProteinuriaData: true });
+    expect(withAas.cap).toBe(2.8);
+    const plain = proteinToleranceCap({ training: 'resistance', age: 30, egfr: 78, ureaMmolL: 5, urineSg: 1.015, hasProteinuriaData: true });
     expect(plain.cap).toBe(2.2);
   });
 
@@ -198,9 +215,17 @@ describe('protein-kidney-tolerance: вердикт', () => {
     const r = calcProteinKidney(base({ bodyFatPct: 10 }));
     expect(r.leanMassKg).toBe(72);
     expect(r.proteinGPerKgLbm).toBe(2);
-    expect(r.benefitCapLbmGPerKg).toBe(2.4);
+    // Набор: ориентир по LBM (Helms) даёт 2.3 г/кг массы.
+    expect(r.benefitCapGPerKg).toBe(2.3);
+    expect(r.benefitCapLbmGPerKg).toBe(2.6);
     expect(r.toleranceCapLbmGPerKg).toBe(3.3);
     expect(r.benefitBasis).toMatch(/Morton/);
+  });
+
+  it('сушка: ориентир пользы выше за счёт тощей массы', () => {
+    const r = calcProteinKidney(base({ goal: 'cut', bodyFatPct: 10, proteinGPerDay: 192 }));
+    expect(r.benefitCapGPerKg).toBeGreaterThan(2.2);
+    expect(r.benefitBasis).toMatch(/Helms/);
   });
 
   it('BUN/креатинин считается в привычных единицах (10–20)', () => {
@@ -265,5 +290,130 @@ describe('protein-kidney-tolerance: вердикт', () => {
     expect(r.bunCrPattern).toBe('unknown');
     expect(r.hydrationStatus).toBe('unknown');
     expect(r.score).toBeLessThan(20);
+  });
+});
+
+describe('protein-kidney-tolerance: защита от мусорных данных', () => {
+  it('нулевая мочевина не считается «чистой» и не расширяет потолок', () => {
+    const r = calcProteinKidney(base({ ureaMmolL: 0, proteinGPerDay: 192 }));
+    expect(r.capGPerKg).toBe(2.2);
+    expect(r.dataIssues.some((d) => d.code === 'urea')).toBe(true);
+    expect(r.utilization.status).toBe('unknown');
+    expect(r.retest.title).toMatch(/Проверьте/);
+    expect(r.status).toBe('above_benefit');
+  });
+
+  it('SG 0.5 не расширяет потолок', () => {
+    const r = calcProteinKidney(base({ urineSg: 0.5 }));
+    expect(r.dataIssues.some((d) => d.code === 'urine_sg')).toBe(true);
+    expect(r.capGPerKg).toBe(2.2);
+  });
+
+  it('отрицательный UACR не превращается в A1', () => {
+    const r = calcProteinKidney(base({ uacrMgMmol: -5 }));
+    expect(r.dataIssues.some((d) => d.code === 'uacr')).toBe(true);
+    expect(r.albuminuriaCategory).toBe('unknown');
+    expect(r.capGPerKg).toBe(2.2);
+  });
+
+  it('тест-полоска 3+ — это A3, а не «умеренная» A2', () => {
+    const r = calcProteinKidney(base({ urineProteinScore: 3, uacrMgMmol: undefined }));
+    expect(r.albuminuriaCategory).toBe('A3');
+    expect(r.capGPerKg).toBe(1.0);
+  });
+
+  it('до 18 лет взрослая CKD-EPI не расширяет потолок', () => {
+    const r = calcProteinKidney(base({ age: 16 }));
+    expect(r.capGPerKg).toBe(2.2);
+    expect(r.flags.some((f) => f.code === 'pediatric')).toBe(true);
+    expect(r.utilization.status).toBe('unknown');
+    expect(r.retest.items.join(' ')).toMatch(/детск/i);
+  });
+
+  it('без белка мочи расширения нет: «не проверено» ≠ «чисто»', () => {
+    const r = calcProteinKidney({ ...base(), urineProteinScore: undefined });
+    expect(r.capGPerKg).toBe(2.2);
+    expect(r.flags.some((f) => f.code === 'urine_protein_missing')).toBe(true);
+    expect(r.utilization.label).toBe('Нужен белок мочи');
+    expect(r.retest.title).toMatch(/ОАМ с белком/);
+  });
+});
+
+describe('protein-kidney-tolerance: клинические уточнения', () => {
+  it('CKD-EPI по цистатину C и комбинированная формула физиологичны', () => {
+    const cys = ckdEpi2021Cys(0.8, 40, 'male');
+    expect(cys).toBeGreaterThan(100);
+    expect(cys).toBeLessThan(125);
+    const both = ckdEpi2021CrCys(80, 0.8, 40, 'male');
+    expect(both).toBeGreaterThan(100);
+    expect(both).toBeLessThan(130);
+    expect(ckdEpi2021Cys(0.8, 40, 'female')).toBeLessThan(ckdEpi2021Cys(0.8, 40, 'male'));
+  });
+
+  it('низкая вода не маскируется нормальным SG', () => {
+    const r = calcProteinKidney(base({ waterMlPerDay: 1200, urineSg: 1.015 }));
+    expect(r.hydrationStatus).toBe('dehydrated');
+    expect(r.increasePaused).toBe(true);
+  });
+
+  it('ААС + СКФ 68 по креатинину: не «снизьте», а «нужен цистатин C»', () => {
+    const r = calcProteinKidney(base({ aasUse: true, creatinineUmolL: 130, proteinGPerDay: 192 }));
+    expect(r.egfrSource).toBe('ckd-epi');
+    expect(r.egfr).toBeGreaterThan(60);
+    expect(r.egfr).toBeLessThan(75);
+    expect(r.status).toBe('above_benefit');
+    expect(r.utilization.label).toMatch(/цистатин/i);
+    expect(r.capGPerKg).toBe(2.2);
+  });
+
+  it('сушка с LBM поднимает ориентир пользы, поддержание — нет', () => {
+    const cut = calcProteinKidney(base({ goal: 'cut', bodyFatPct: 10 }));
+    const maintain = calcProteinKidney(base({ goal: 'maintain', bodyFatPct: 10 }));
+    expect(cut.benefitCapGPerKg).toBeGreaterThan(maintain.benefitCapGPerKg);
+    expect(cut.benefitBasis).toMatch(/Helms/);
+  });
+
+  it('pH и суточный диурез дают флаги', () => {
+    const r = calcProteinKidney(base({ urinePh: 5, urineVolume24hMl: 700 }));
+    expect(r.flags.some((f) => f.code === 'acid_urine')).toBe(true);
+    expect(r.flags.some((f) => f.code === 'low_diuresis')).toBe(true);
+  });
+
+  it('НПВС + обезвоживание блокируют расширение', () => {
+    const r = calcProteinKidney(base({ nsaidUse: true, waterMlPerDay: 1200 }));
+    expect(r.capGPerKg).toBe(2.2);
+    expect(r.flags.some((f) => f.code === 'nsaid_dehydrated')).toBe(true);
+  });
+
+  it('гипертония и диабет добавляют наблюдение, но не режут белок сами по себе', () => {
+    const r = calcProteinKidney(base({ hypertension: true, diabetes: true }));
+    expect(r.flags.some((f) => f.code === 'hypertension')).toBe(true);
+    expect(r.flags.some((f) => f.code === 'diabetes')).toBe(true);
+    expect(r.capGPerKg).toBe(3.0);
+  });
+
+  it('при ХБП цель по воде ограничена 2.5 л', () => {
+    const r = calcProteinKidney(base({ knownCkd: true, waterMlPerDay: 2000 }));
+    expect(r.waterTargetMl).toBe(2500);
+    expect(r.flags.some((f) => f.code === 'water_ckd')).toBe(true);
+  });
+
+  it('сводка для врача содержит дату, потолки и план пересдачи', () => {
+    const input = base();
+    const r = calcProteinKidney(input);
+    const text = buildDoctorSummary(input, r, '2026-01-01');
+    expect(text).toContain('01.01.2026');
+    expect(text).toContain('Потолок пользы');
+    expect(text).toContain('Пересдать');
+  });
+
+  it('история игнорирует битые записи', () => {
+    localStorage.setItem(PROTEIN_KIDNEY_HISTORY_KEY, JSON.stringify([
+      { date: '2026-01-01', score: 'нет', proteinGPerKg: 2 },
+      { date: '2026-01-02', score: 10, proteinGPerKg: 2, level: 'low', capGPerKg: 3, headroomGPerDay: 10, proteinGPerDay: 160 },
+    ]));
+    const h = loadProteinKidneyHistory();
+    expect(h).toHaveLength(1);
+    expect(h[0]?.date).toBe('2026-01-02');
   });
 });
