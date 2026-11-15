@@ -6,9 +6,10 @@
  *   не падают TypeError'ом на плане без `weeks` (импорт/частичный снапшот);
  * - P2-5: пустой `weeklyVolume` больше не печатает «-Infinity» в сообщении
  *   `target_volume_deficit`.
- * - P2-1: головки дельт (`delt_*`) делят общий лимит упражнений «плечи».
- * - P2-2: добивка дельт в финализаторе расходует место и по УПРАЖНЕНИЯМ, а не
- *   только по сетам (иначе `session_exercise_cap`).
+ * - P2-1 (финализация): головки дельт (`delt_*`) делят общий лимит упражнений «плечи».
+ * - P2-2 (финализация): добивка дельт в финализаторе расходует место и по УПРАЖНЕНИЯМ,
+ *   а не только по сетам (иначе `session_exercise_cap`).
+ * - P2-1 (ядро): auto-MEV-feeder не добавляет упражнения в делод/тапер-недели.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -18,6 +19,8 @@ import { calculatePlanSafetyScore } from '../bb-safety-score.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { capExercisesPerMuscle } from '../bb-session-order.engine';
+import { buildBBPlan } from '../bb-builder.engine';
+import { makeInput } from './bb-test-helpers';
 
 describe('P2-6: отчёт качества переживает план без weeks', () => {
   it('buildBBQualityReport({}) не бросает и даёт числовой скор', () => {
@@ -59,7 +62,7 @@ describe('P2-5: пустой weeklyVolume не даёт «-Infinity» в тек�
   });
 });
 
-describe('P2-1: головки дельт делят общий лимит «плечи»', () => {
+describe('P2-1 (финализация): головки дельт делят общий лимит «плечи»', () => {
   const ex = (muscle: string, name: string, weight: number) => ({
     muscle, name, exerciseName: name, role: 'accessory' as const, character: 'памп' as const,
     sets: 3, repsRange: [12, 15] as [number, number], rir: 2,
@@ -96,5 +99,23 @@ describe('P2-2: добивка дельт не выходит за лимит у
     // добавление требует roomEx >= 1.
     expect(src).toMatch(/roomSets -= sideSets;\s*\n\s*roomEx -= 1;/);
     expect(src).toMatch(/roomEx >= 1 && roomSets >= 2/);
+  });
+});
+
+describe('P2-1 (ядро): auto-MEV-feeder не добивает разгрузочные недели', () => {
+  const isDeload = (w: any) => String(w?.phase || '').toLowerCase() === 'deload' || !!w?.deload;
+  const feedersOf = (weeks: any[]) => weeks
+    .flatMap((w: any) => w.sessions || [])
+    .flatMap((s: any) => s.exercises || [])
+    .filter((e: any) => /auto-mev-feeder/i.test(String(e.comment || '')));
+
+  it('в deload-неделе нет feeder-упражнений, в рабочих неделях — есть', () => {
+    const plan = buildBBPlan(makeInput({ patternId: 'bro_5', weeks: 8 })) as any;
+    const deload = plan.weeks.filter(isDeload);
+    const working = plan.weeks.filter((w: any) => !isDeload(w));
+    expect(deload.length).toBeGreaterThan(0);
+    // Гейт не отключил проход целиком: в рабочих неделях фидер остаётся.
+    expect(feedersOf(working).length).toBeGreaterThan(0);
+    expect(feedersOf(deload)).toHaveLength(0);
   });
 });

@@ -4950,6 +4950,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const fName2 = fData2 ? (fData2.name || fData2.id) : null;
       // Добавить feeder в каждую неделю
       for (const w of finalPlan.weeks) {
+        // P2-1 (аудит 2026-11): feeder добивает НЕДЕЛЬНЫЙ MEV, но разгрузочная и
+        // тапер-неделя снижены намеренно (делод — минус объём, тапер — снятие
+        // накопленной усталости). Добивать их до MEV = отменять саму разгрузку.
+        // У cross-day аналога (compensateCrossDayWeakPoints) такой гейт был, здесь — нет.
+        const wPhase = String((w as any).phase || '').toLowerCase();
+        if (wPhase === 'deload' || (w as any).deload || (w as any).taper || (w as any).taperApplied || wPhase === 'peaking') continue;
         for (const s of w.sessions) {
           const tag = (s.sessionTag || '').toLowerCase();
           if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
