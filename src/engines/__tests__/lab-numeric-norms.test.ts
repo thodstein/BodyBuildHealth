@@ -18,6 +18,7 @@ import { deriveTier, LAB_TIERS } from '../../data/lab-tier-ranges';
 import {
   GGT_ULN, GGT_STAGE_ULN, LFT_ULN, LFT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, RBC_ULN,
+  UA_ULN, UA_STAGE_ULN,
 } from '../lab-norms.engine';
 import { VERIFICATION_SYSTEMS, markerThresholds, type VerifMarker } from '../risk-verification.engine';
 
@@ -167,5 +168,33 @@ describe('исходник главной модели: литеральные �
     expect(tz).toContain('hctCut.erythrocytosis');
     expect(tz).not.toContain('[90,130,200]');
     expect(tz).not.toContain('[50,54,58]');
+  });
+
+  // Проход 77: мочевая кислота держала мужской литерал, поэтому у женщины 380
+  // мкмоль/л не давало вклада в риск, хотя её ВГН 350.
+  it('мочевая кислота — от UA_STAGE_ULN, литерала [420,480,540] нет', () => {
+    expect(tz).toContain('UA_STAGE_ULN');
+    expect(tz).not.toContain('[420,480,540]');
+  });
+});
+
+describe('мочевая кислота: ВГН и ступени половые (проход 77)', () => {
+  it('одна пара ВГН и одна лестница ступеней', () => {
+    expect(UA_ULN).toEqual({ male: 420, female: 350 });
+    expect(UA_STAGE_ULN.male).toEqual([420, 480, 540]);
+    expect(UA_STAGE_ULN.female).toEqual([350, 400, 450]);
+  });
+
+  it('risk-verification: те же ступени, что в резолвере', () => {
+    const ua = findMarker('renal', 'ren1', 'URIC');
+    expect(markerThresholds(ua, 'male')).toEqual(UA_STAGE_ULN.male);
+    expect(markerThresholds(ua, 'female')).toEqual(UA_STAGE_ULN.female);
+  });
+
+  it('тиры: 380 у мужчины — норма, у женщины — грань (её ВГН 350)', () => {
+    expect(LAB_TIERS.URIC_ACID.normal[1]).toBe(UA_STAGE_ULN.male[0]);
+    expect(deriveTier('URIC_ACID', 380, 'male')).toBe(0);
+    expect(deriveTier('URIC_ACID', 380, 'female')).toBe(1);
+    expect(deriveTier('URIC_ACID', 380)).toBe(0); // без sex — прежний мужской путь
   });
 });

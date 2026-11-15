@@ -240,6 +240,9 @@ const SEX_AWARE_MARKER: Record<string, string> = {
   CREATININE: 'CREATININE',
   HEMOGLOBIN: 'HGB',
   HEMATOCRIT: 'HCT',
+  // Проход 77: у женщины ВГН мочевой кислоты 350, а не общий 420 — иначе 380
+  // подсвечивалась как норма при симптомах подагры/камней.
+  URIC_ACID: 'UA',
 };
 
 /** Женская половина нормы из резолвера; null — маркер от пола не зависит. */

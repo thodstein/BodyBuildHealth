@@ -9,6 +9,7 @@ import { acuteChronicRatio, toDailyLoads } from '../engines/pro/training-load.en
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
+import { cycleStateFromProfile } from '../engines/female-cycle-phase.engine';
 import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
 import { mapCourseToSubstances, hasCourseDiff, derivePedFlagsFromCourse } from './course-sync';
@@ -356,9 +357,13 @@ export function useDataLink(): LinkedData {
   // ♀ Женские границы анализов (АЛТ/АСТ/ГГТ 31, HCT 48, HGB 150, креатинин 97,
   // E2/PRL по фазовой модели) — из резолвера норм, а не мужской ряд для всех.
   const profileSex = profile?.settings?.personal?.sex;
+  // Проход 77: фаза цикла из профиля (дата последней менструации) — E2 у женщины
+  // оценивается по коридору её фазы, а не по красному бэнду 800.
   const labAnalysisMemo = useMemo(
-    () => (labs.length > 0 ? interpretLabs(labs, profileSex === 'female' ? 'female' : undefined) : null),
-    [labs, profileSex],
+    () => (labs.length > 0
+      ? interpretLabs(labs, profileSex === 'female' ? 'female' : undefined, cycleStateFromProfile(profile))
+      : null),
+    [labs, profileSex, profile],
   );
 
   return useMemo(() => ({

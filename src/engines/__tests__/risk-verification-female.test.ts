@@ -58,6 +58,14 @@ describe('женские пороги маркеров (паритет с getMiF
     expect(markerStatus(e2, 100, 'female')).toBe(0);
   });
 
+  it('Мочевая кислота: 380 — у женщины уже m1, у мужчины m0 (♀ 350/400/450)', () => {
+    const ua = findMarker('renal', 'ren1', 'URIC');
+    expect(markerThresholds(ua, 'male')).toEqual([420, 480, 540]);
+    expect(markerThresholds(ua, 'female')).toEqual([350, 400, 450]);
+    expect(markerStatus(ua, 380, 'male')).toBe(0);
+    expect(markerStatus(ua, 380, 'female')).toBe(1);
+  });
+
   it('thresholdText показывает женские числа при sex=female', () => {
     const hct = findMarker('hematologic', 'hem1', 'HCT');
     expect(thresholdText(hct, 'male')).toBe('≥51 · ≥54 · ≥58');

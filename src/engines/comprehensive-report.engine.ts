@@ -14,9 +14,10 @@ import { analyzeMeasurements, loadMeasurements } from './log-analytics-progressi
 import { getExerciseById } from '../core/exercise-catalog';
 import { readRiskBridge } from './risk-bridge';
 import {
-  getLabNorm, LFT_ULN, GGT_ULN, CREATININE_ULN, FEMALE_HORMONE_ULN, FEMALE_HORMONE_BANDS,
-  HCT_THRESHOLDS, LFT_STAGE_ULN, E2_PG_TO_PMOL, PRL_NG_TO_MIU,
+  getLabNorm, LFT_ULN, GGT_ULN, CREATININE_ULN, UA_ULN, FEMALE_HORMONE_ULN, FEMALE_HORMONE_BANDS,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, LFT_STAGE_ULN, E2_PG_TO_PMOL, PRL_NG_TO_MIU,
 } from './lab-norms.engine';
+import { cycleState, phaseHormoneBand, phaseUnionBand, type CycleState, type PhaseHormone } from './female-cycle-phase.engine';
 import { DEFAULT_DOSAGES } from '../data/support-database';
 import { defaultDoseUnit } from '../data/dose-units';
 import { supportNameRu } from '../data/support-names';
@@ -38,6 +39,8 @@ export interface ReportMeta {
   period: 'mass' | 'cut' | 'maintenance';
   courseWeek?: number;
   coursePhase?: string;
+  /** Проход 77: фаза цикла на дату отчёта (только для женского профиля с датой). */
+  cyclePhase?: { label: string; cycleDay: number; cycleLength: number };
 }
 
 export interface ReportMetric {
@@ -243,15 +246,17 @@ function gatherAnthropometry(dateFrom: string, dateTo: string): ReportSection {
 type ReportSex = 'male' | 'female';
 
 /**
- * Объединение фазовых коридоров женского гормона: одного числа у неё нет, но
- * мужское не годится. Так отчёт не «изобретает» фазу (её знает только женский
- * таб) и не будит тревогу в лютеиновую половину цикла.
+ * Женский гормональный референс: фаза известна — её коридор, иначе объединение
+ * фаз (`phaseUnionBand`). Пересчёт в единицы отчёта — только для E2: бэнды E2 в
+ * пг/мл, а колонка отчёта в пмоль/л. ЛГ/ФСГ не округляем — 1.5 МЕ/л это норма,
+ * а не «2».
  */
-function phaseUnion(phases: { follicular: { low: number; high: number }; luteal: { low: number; high: number } }): { low: number; high: number } {
-  return {
-    low: Math.min(phases.follicular.low, phases.luteal.low),
-    high: Math.max(phases.follicular.high, phases.luteal.high),
-  };
+function femalePhaseRefs(marker: PhaseHormone, cycle: CycleState | null): { refLow: number; refHigh: number } {
+  const band = phaseHormoneBand(marker, cycle?.phase) ?? phaseUnionBand(marker);
+  if (marker === 'E2') {
+    return { refLow: Math.round(band.low * E2_PG_TO_PMOL), refHigh: Math.round(band.high * E2_PG_TO_PMOL) };
+  }
+  return { refLow: band.low, refHigh: band.high };
 }
 
 /**
@@ -263,10 +268,15 @@ function phaseUnion(phases: { follicular: { low: number; high: number }; luteal:
  * «Референс: 0 – 40» у АЛТ (её ВГН 31), «120 – 160 г/л» у HGB (её 120–150),
  * «36 – 50 %» у HCT (её верх 48) — и получала статус «норма» на отклонении.
  *
+ * `cycle` (проход 77) — фаза цикла на дату отчёта: когда дата последней
+ * менструации известна, женские E2/ЛГ/ФСГ печатаются коридором ЭТОЙ фазы, а не
+ * объединением («лютеиновая 70–500 пг/мл» вместо «по фазе»). Нет даты — прежнее
+ * объединение фаз.
+ *
  * `null` — маркера нет в резолвере (электролиты, липиды, СРБ, Д-димер):
  * у них остаются прежние числа из таблицы.
  */
-function sexRefs(code: string, sex: ReportSex): { refLow?: number; refHigh?: number } | null {
+function sexRefs(code: string, sex: ReportSex, cycle: CycleState | null): { refLow?: number; refHigh?: number } | null {
   switch (code) {
     case 'АЛТ':
       return { refLow: 0, refHigh: LFT_ULN.ALT[sex] };
@@ -303,14 +313,10 @@ function sexRefs(code: string, sex: ReportSex): { refLow?: number; refHigh?: num
         refHigh: n ? Math.round(n.uln * PRL_NG_TO_MIU) : 400,
       };
     }
-    case 'Эстрадиол': {
-      if (sex !== 'female') return null; // мужская строка (40–160 пмоль/л) не меняется
-      // У женщины норма фазовая — одного числа нет. Показываем объединение
-      // фазовых коридоров (40–500 пг/мл → пмоль/л): фаза печатается в женском
-      // табе, а отчёт не должен выдавать мужскую норму за её.
-      const u = phaseUnion(FEMALE_HORMONE_BANDS.E2.phases);
-      return { refLow: Math.round(u.low * E2_PG_TO_PMOL), refHigh: Math.round(u.high * E2_PG_TO_PMOL) };
-    }
+    case 'Эстрадиол':
+      // Мужская строка (40–160 пмоль/л) не меняется. У женщины — коридор ЕЁ фазы
+      // (фолл. 40–200 / лют. 70–500 пг/мл), а без даты цикла — объединение фаз.
+      return sex === 'female' ? femalePhaseRefs('E2', cycle) : null;
     // Женские половины гормонов, которых в резолвере нет. Мужские числа таблицы
     // (TT 10–35 нмоль/л, ЛГ 1.5–9.3, ФСГ 1.4–18.1) у женщины означали бы, что
     // вирилизация (TT 5) — «норма», а подавление оси (ЛГ 0.5) — тем более.
@@ -318,22 +324,22 @@ function sexRefs(code: string, sex: ReportSex): { refLow?: number; refHigh?: num
       return sex === 'female'
         ? { refLow: FEMALE_HORMONE_BANDS.TT.range.low, refHigh: FEMALE_HORMONE_BANDS.TT.range.high }
         : null;
-    case 'ЛГ': {
-      if (sex !== 'female') return null;
-      const u = phaseUnion(FEMALE_HORMONE_BANDS.LH.phases);
-      return { refLow: u.low, refHigh: u.high };
-    }
-    case 'ФСГ': {
-      if (sex !== 'female') return null;
-      const u = phaseUnion(FEMALE_HORMONE_BANDS.FSH.phases);
-      return { refLow: u.low, refHigh: u.high };
+    case 'ЛГ':
+      return sex === 'female' ? femalePhaseRefs('LH', cycle) : null;
+    case 'ФСГ':
+      return sex === 'female' ? femalePhaseRefs('FSH', cycle) : null;
+    // Мочевая кислота: ♂ 200–420 / ♀ 150–350 (женский протокол). Женщина с 380
+    // мкмоль/л читала «норма» по общему верху 420.
+    case 'Мочевая кислота': {
+      const n = getLabNorm('UA', sex);
+      return { refLow: n?.lln, refHigh: UA_ULN[sex] };
     }
     default:
       return null;
   }
 }
 
-function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male'): ReportSection {
+function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', cycle: CycleState | null = null): ReportSection {
   const diary = getLabDiary();
 
   const groups: Array<{ title: string; markers: Array<{ code: string; name: string; refLow?: number; refHigh?: number; unit: string }> }> = [
@@ -400,8 +406,8 @@ function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male'): 
       const current = recent.length > 0 ? recent[recent.length - 1].value : null;
       const prevVal = prev.length > 0 ? prev[0].value : null;
       const { delta, deltaPct, trend } = computeDelta(prevVal, current);
-      // Проход 76: числа референса — из резолвера по полу (там, где он есть).
-      const refs = sexRefs(marker.code, sex);
+      // Проход 76/77: числа референса — из резолвера по полу и фазе цикла.
+      const refs = sexRefs(marker.code, sex, cycle);
 
       const m: ReportMetric = {
         label: marker.name, unit: marker.unit, prev: prevVal, current: current ?? 'Нет данных',
@@ -881,14 +887,20 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
   else if (glucose != null && glucose > 5.5) recs.push({ section: 'Метаболизм', priority: 'warning', text: `Глюкоза ${glucose} ммоль/л — на границе. Ограничение быстрых углеводов, контроль инсулинорезистентности.` });
 
   const uric = numVal(findMetric('Мочевая кислота'));
-  if (uric != null && uric > 420) recs.push({ section: 'Метаболизм', priority: 'warning', text: `Мочевая кислота ${uric} µmol/L — гиперурикемия. Ограничение пуринов, гидратация, аллопуринол при подагре.` });
+  // Проход 77: ВГН мочевой кислоты половая — ♂ 420 / ♀ 350 (женский протокол).
+  // Женщина с 380 мкмоль/л получала «норма» и не видела рекомендации.
+  const uricUln = UA_ULN[sex];
+  if (uric != null && uric > uricUln) recs.push({ section: 'Метаболизм', priority: 'warning', text: `Мочевая кислота ${uric} µmol/L — гиперурикемия (ВГН ${uricUln}). Ограничение пуринов, гидратация, аллопуринол при подагре.` });
 
   const tsh = numVal(findMetric('ТТГ'));
   if (tsh != null && tsh > 4.0) recs.push({ section: 'Гормоны', priority: 'warning', text: `ТТГ ${tsh} mIU/L — гипотиреоз. Консультация эндокринолога, Т3/Т4, анти-ТПО/ТГ.` });
   else if (tsh != null && tsh < 0.4) recs.push({ section: 'Гормоны', priority: 'warning', text: `ТТГ ${tsh} mIU/L — гипертиреоз. Консультация эндокринолога, Т3/Т4 свободный.` });
 
   const hb = numVal(findMetric('Гемоглобин'));
-  if (hb != null && hb > 180) recs.push({ section: 'Кровь', priority: 'critical', text: `Гемоглобин ${hb} г/Л — риск тромбоза. Флеботомия, антиагреганты (аспирин 75-100мг).` });
+  // Проход 77: порог вязкости половой — ♂ 185 / ♀ 165 (`HGB_THRESHOLDS.block`).
+  // Литерал 180 был «средним»: женщина приходила к нему позже своего порога.
+  const hbBlock = HGB_THRESHOLDS[sex].block;
+  if (hb != null && hb >= hbBlock) recs.push({ section: 'Кровь', priority: 'critical', text: `Гемоглобин ${hb} г/Л — риск тромбоза (порог ${hbBlock}). Флеботомия, антиагреганты (аспирин 75-100мг).` });
   else if (hb != null && hb < 120) recs.push({ section: 'Кровь', priority: 'warning', text: `Гемоглобин ${hb} г/Л — анемия. Ферритин, сывороточное железо, B12/фолат.` });
 
   const wbc = numVal(findMetric('Лейкоциты'));
@@ -1015,6 +1027,15 @@ export async function generateComprehensiveReport(input: {
   // Проход 76: пол пациента для референсов и порогов отчёта (женский слой
   // резолвера включается только явно, как и во всех остальных вызовах).
   const sex: ReportSex = (personal as any).sex === 'female' ? 'female' : 'male';
+  // Проход 77: фаза цикла на дату отчёта. Дату последней менструации и длину
+  // цикла профиль уже хранит (`settings.lifestyle` — те же поля читают
+  // кардио-автотюн и пик-неделя). Нет даты — `cycle = null`, и женские гормоны
+  // печатаются объединением фаз, как раньше.
+  const cycle = cycleState({
+    sex,
+    lastPeriodStart: settings.lifestyle?.lastPeriodStart,
+    cycleLengthDays: settings.lifestyle?.cycleLengthDays,
+  }, dateTo);
 
   const courseWeek = pharma.courseStartDate ? Math.floor(Math.max(1, daysBetween(pharma.courseStartDate, dateTo)) / 7) + 1 : undefined;
 
@@ -1026,11 +1047,12 @@ export async function generateComprehensiveReport(input: {
     age: personal.age, sex: personal.sex,
     period: (goals.primaryGoal as any) || 'maintenance',
     courseWeek, coursePhase: pharma.phase,
+    cyclePhase: cycle ? { label: cycle.label, cycleDay: cycle.cycleDay, cycleLength: cycle.cycleLength } : undefined,
   };
 
   const sections = await Promise.all([
     gatherAnthropometry(dateFrom, dateTo),
-    gatherLabs(dateFrom, dateTo, sex),
+    gatherLabs(dateFrom, dateTo, sex, cycle),
     gatherRisks(dateFrom, dateTo),
     gatherCourse(dateFrom, dateTo),
     gatherTraining(dateFrom, dateTo),

@@ -9,6 +9,7 @@ import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine'
 import { LabDiaryTab } from './LabsScreen_parts/LabDiaryTab';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab-effects';
 import { PHARMA_DB } from '../../core/pharma-database';
@@ -494,8 +495,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const labAnalysisResult = useMemo(() => {
     if (!hasLabs) return null;
-    return interpretLabs(currentLabs, profileSex === 'female' ? 'female' : undefined);
-  }, [hasLabs, currentLabs, profileSex]);
+    // Проход 77: фаза цикла из профиля — E2 у женщины по коридору её фазы.
+    return interpretLabs(currentLabs, profileSex === 'female' ? 'female' : undefined, cycleStateFromProfile(linked.profile));
+  }, [hasLabs, currentLabs, profileSex, linked.profile]);
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];

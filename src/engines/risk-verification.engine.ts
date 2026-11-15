@@ -5,7 +5,7 @@
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, RBC_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, RBC_ULN, UA_STAGE_ULN,
 } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
@@ -177,7 +177,10 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'low', [90, 60, 30]),
         M('CREAT', 'Креатинин', 'мкмоль/л', 'high', [90, 130, 200], { thresholds: [97, 110, 120] }),
         M('UREA', 'Мочевина', 'ммоль/л', 'high', [8, 12, 20]),
-        M('URIC', 'Мочевая кислота', 'мкмоль/л', 'high', [420, 480, 540]),
+        // Ступени — из резолвера (`UA_STAGE_ULN`): ♂ 420/480/540, ♀ 350/400/450.
+        // До прохода 77 у женщины не было ни ВГН, ни ступеней: 380 мкмоль/л не
+        // давало вклада в риск, хотя её норма (350) уже превышена.
+        M('URIC', 'Мочевая кислота', 'мкмоль/л', 'high', UA_STAGE_ULN.male, { thresholds: UA_STAGE_ULN.female }),
       ] },
       { id: 'ren2', weight: 0.6, markers: [
         M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'high', [120, 140, 160]),

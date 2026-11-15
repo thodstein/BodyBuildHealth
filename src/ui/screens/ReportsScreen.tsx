@@ -146,6 +146,7 @@ export const ReportsScreen: React.FC = () => {
           <b style={{ color: colors.text }}>{report.meta.userName}</b> | {report.meta.age || '—'} лет | {report.meta.sex === 'male' ? '♂' : report.meta.sex === 'female' ? '♀' : '—'} |
           <b> {periodLabel}</b> | {report.meta.dateFrom} — {report.meta.dateTo}
           {report.meta.courseWeek && <span> | Курс: нед. {report.meta.courseWeek} ({report.meta.coursePhase || 'course'})</span>}
+          {report.meta.cyclePhase && <span> | Цикл: {report.meta.cyclePhase.label.toLowerCase()}, {report.meta.cyclePhase.cycleDay}-й день (из {report.meta.cyclePhase.cycleLength})</span>}
         </div>
 
         <div style={{ ...glassCard, marginBottom: 12 }}>

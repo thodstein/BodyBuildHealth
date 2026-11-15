@@ -10,6 +10,9 @@
  * Стало: женские границы из резолвера (`LFT_ULN`, `GGT_ULN`, `HCT_THRESHOLDS`,
  * `HGB_THRESHOLDS`, `CREATININE_ULN`, `FEMALE_HORMONE_ULN`) и индексы в долях
  * ВГН пациента. Без `sex` — прежний мужской путь байт-в-байт.
+ *
+ * Проход 77: у женщины верх E2 — коридор её фазы (`cycle`), и значок маркера, и
+ * гормональный балл читают его; красный бэнд 800 не меняется.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -83,6 +86,41 @@ describe('гормоны: мужское окно не выдаётся за о�
   it('E2 у женщины не штрафует гормональный балл в фазовой норме', () => {
     expect(interpretLabs(one('ESTRADIOL', 200), 'female').hormoneScore).toBe(0);
     expect(interpretLabs(one('ESTRADIOL', 200), 'male').hormoneScore).toBe(25);
+  });
+
+  // Проход 77: верхняя граница E2 — коридор ЕЁ фазы, а не красный бэнд 800.
+  // Иначе нормальная лютеиновая 450 и фолликулярная 300 оценивались одинаково.
+  it('E2 по фазе: 300 в лютеиновую — норма, в фолликулярную — высоко', () => {
+    const luteal = { phase: 'luteal' as const, cycleDay: 21, cycleLength: 28, label: 'Лютеиновая' };
+    const follicular = { phase: 'follicular' as const, cycleDay: 8, cycleLength: 28, label: 'Фолликулярная' };
+    expect(interpretLabs(one('ESTRADIOL', 300), 'female', luteal).hormoneScore).toBe(0);
+    expect(interpretLabs(one('ESTRADIOL', 300), 'female', follicular).hormoneScore).toBe(25);
+  });
+
+  it('E2 в овуляторную и менструальную — без ложных срабатываний', () => {
+    // Овуляторная: своего коридора нет (пик шире любого), остаётся бэнд 800.
+    const ovul = { phase: 'ovulatory' as const, cycleDay: 14, cycleLength: 28, label: 'Овуляторная' };
+    expect(interpretLabs(one('ESTRADIOL', 600), 'female', ovul).hormoneScore).toBe(0);
+    // Менструальная: E2 низкий по природе — нижняя граница остаётся красной (<30).
+    const menstr = { phase: 'menstrual' as const, cycleDay: 2, cycleLength: 28, label: 'Менструальная' };
+    expect(interpretLabs(one('ESTRADIOL', 35), 'female', menstr).hormoneScore).toBe(0);
+    expect(interpretLabs(one('ESTRADIOL', 25), 'female', menstr).hormoneScore).toBe(25);
+  });
+
+  // Значок маркера и балл — один источник: иначе Labs показывал «высоко» там,
+  // где балл уже считал норму (и наоборот).
+  it('значок E2 читает тот же коридор фазы, что и балл', () => {
+    const luteal = { phase: 'luteal' as const, cycleDay: 21, cycleLength: 28, label: 'Лютеиновая' };
+    const follicular = { phase: 'follicular' as const, cycleDay: 8, cycleLength: 28, label: 'Фолликулярная' };
+    const badge = (v: number, cyc?: typeof luteal | typeof follicular) =>
+      interpretLabs(one('ESTRADIOL', v), 'female', cyc).interpretations.find(i => i.code === 'ESTRADIOL')?.status;
+    expect(badge(300, follicular)).toBe('high'); // верх фолликулярной — 200
+    expect(badge(300, luteal)).toBeUndefined(); // в лютеиновой до 500 — норма
+    expect(badge(300)).toBeUndefined(); // без фазы — прежние 400
+    expect(badge(450, luteal)).toBeUndefined();
+    expect(badge(450)).toBe('high');
+    // Красный бэнд 800 остаётся: фаза не поднимает критический порог.
+    expect(badge(900, luteal)).toBe('critical_high');
   });
 });
 

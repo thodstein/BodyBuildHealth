@@ -3,7 +3,7 @@
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
-import { HCT_THRESHOLDS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN } from './lab-norms.engine';
+import { HCT_THRESHOLDS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, UA_STAGE_ULN } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -477,7 +477,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       const egfrMi = labMiInv(egfr,[90,60,30]);
       const crMi = labMi(creat,fem?[CREATININE_ULN.female, 110, 120]:[CREATININE_ULN.male, 130, 200]);
       const ureaMi = labMi(urea,[8,12,20]);
-      const uricMi = labMi(uric,[420,480,540]);
+      // ВГН мочевой кислоты — из резолвера (♂ 420 / ♀ 350), ступени `UA_STAGE_ULN`
+      // (♀ 350/400/450): 380 у женщины — ступень внимания, а не норма (проход 77).
+      const uricMi = labMi(uric,fem?UA_STAGE_ULN.female:UA_STAGE_ULN.male);
       const vals = [egfrMi,crMi,ureaMi,uricMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;

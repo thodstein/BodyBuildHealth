@@ -30,6 +30,7 @@ const LABS: Record<string, Array<{ date: string; value: number }>> = {
   'Тестостерон': [{ date: '2026-11-10', value: 3 }],
   'ЛГ': [{ date: '2026-11-10', value: 30 }],
   'ФСГ': [{ date: '2026-11-10', value: 12 }],
+  'Мочевая кислота': [{ date: '2026-11-10', value: 380 }],
 };
 
 const hoisted = vi.hoisted(() => ({ labs: {} as Record<string, Array<{ date: string; value: number }>> }));
@@ -60,21 +61,25 @@ vi.mock('../../engines/profile-settings.engine', () => ({ loadMetrics: vi.fn(() 
 vi.mock('../../core/bp-hr-data', () => ({ getBpEntries: vi.fn(() => []) }));
 vi.mock('../../engines/score-history', () => ({ getScoreHistory: vi.fn(() => []) }));
 
-const profile = (sex: 'male' | 'female') => ({
+const profile = (sex: 'male' | 'female', opts: { lastPeriodStart?: string; cycleLengthDays?: number } = {}) => ({
   settings: {
     personal: { age: 30, sex, weight: 85, height: 180, bodyFat: 15 },
     pharma: { courseStartDate: '2026-09-01', trainingCycleWeeks: 16, phase: 'course', currentSubstances: [] },
     goals: { primaryGoal: 'mass' },
     nutrition: { proteinPerKg: 2, mealsPerDay: 5 },
-    lifestyle: { sleepHours: 7, stressLevel: 5, morningHRV: 65, restingHR: 60, dailySteps: 8000 },
+    lifestyle: {
+      sleepHours: 7, stressLevel: 5, morningHRV: 65, restingHR: 60, dailySteps: 8000,
+      ...(opts.lastPeriodStart ? { lastPeriodStart: opts.lastPeriodStart } : {}),
+      ...(opts.cycleLengthDays ? { cycleLengthDays: opts.cycleLengthDays } : {}),
+    },
   },
   name: 'Тест',
 });
 
 const RANGE = { type: 'weekly' as const, dateFrom: '2026-11-01', dateTo: '2026-11-14' };
 
-async function reportFor(sex: 'male' | 'female') {
-  (getProfile as any).mockReturnValue(profile(sex));
+async function reportFor(sex: 'male' | 'female', opts: { lastPeriodStart?: string; cycleLengthDays?: number } = {}) {
+  (getProfile as any).mockReturnValue(profile(sex, opts));
   const report = await generateComprehensiveReport(RANGE);
   const labOf = (label: string) =>
     report.sections.find(s => s.id === 'labs')!.metrics.find(m => m.label === label)!;
@@ -199,5 +204,84 @@ describe('сводный отчёт: пороги рекомендаций по 
   it('мужчина: PRL 850 → критично (его порог 600)', async () => {
     const { recOf } = await reportFor('male');
     expect(recOf('Гормоны').some(r => r.priority === 'critical')).toBe(true);
+  });
+});
+
+describe('сводный отчёт: фазовая модель E2/ЛГ/ФСГ по дню цикла (проход 77)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.labs = LABS;
+    localStorage.removeItem('he_support_plan_result');
+    localStorage.removeItem('he_risk_bridge');
+  });
+
+  it('лютеиновая (16-й день): E2 70–500 пг/мл в пмоль/л, ЛГ 5–25, ФСГ 1.5–8', async () => {
+    const { labOf, report } = await reportFor('female', { lastPeriodStart: '2026-10-30' });
+    expect(report.meta.cyclePhase).toEqual({ label: 'Лютеиновая', cycleDay: 16, cycleLength: 28 });
+    const e2 = FEMALE_HORMONE_BANDS.E2.phases.luteal;
+    expect(labOf('Эстрадиол').refLow).toBe(Math.round(e2.low * E2_PG_TO_PMOL));
+    expect(labOf('Эстрадиол').refHigh).toBe(Math.round(e2.high * E2_PG_TO_PMOL));
+    expect(labOf('ЛГ').refLow).toBe(5);
+    expect(labOf('ЛГ').refHigh).toBe(25);
+    expect(labOf('ФСГ').refLow).toBe(1.5);
+    expect(labOf('ФСГ').refHigh).toBe(8);
+  });
+
+  it('фолликулярная (7-й день): E2 800 пмоль/л выше нормы фазы, в лютеиновую — норма', async () => {
+    hoisted.labs = { ...LABS, 'Эстрадиол': [{ date: '2026-11-10', value: 800 }] };
+    const foll = await reportFor('female', { lastPeriodStart: '2026-11-08' });
+    expect(foll.report.meta.cyclePhase?.label).toBe('Фолликулярная');
+    expect(foll.labOf('Эстрадиол').refHigh)
+      .toBe(Math.round(FEMALE_HORMONE_BANDS.E2.phases.follicular.high * E2_PG_TO_PMOL));
+    expect(foll.labOf('Эстрадиол').status).toBe('warning');
+    const lut = await reportFor('female', { lastPeriodStart: '2026-10-30' });
+    expect(lut.labOf('Эстрадиол').status).toBe('normal');
+  });
+
+  it('нет даты цикла — объединение фаз и никакой фазы в meta', async () => {
+    const { labOf, report } = await reportFor('female');
+    expect(report.meta.cyclePhase).toBeUndefined();
+    const p = FEMALE_HORMONE_BANDS.E2.phases;
+    expect(labOf('Эстрадиол').refHigh).toBe(Math.round(Math.max(p.follicular.high, p.luteal.high) * E2_PG_TO_PMOL));
+    expect(labOf('ЛГ').refHigh).toBe(25);
+    expect(labOf('ФСГ').refLow).toBe(1.5);
+  });
+
+  it('мужчине дата цикла ничего не меняет', async () => {
+    const { labOf, report } = await reportFor('male', { lastPeriodStart: '2026-10-30' });
+    expect(report.meta.cyclePhase).toBeUndefined();
+    expect(labOf('Эстрадиол').refHigh).toBe(160);
+  });
+
+  it('овуляторная — коридора нет, остаётся объединение фаз (пик не наказываем)', async () => {
+    const { labOf, report } = await reportFor('female', { lastPeriodStart: '2026-11-02' });
+    expect(report.meta.cyclePhase).toEqual({ label: 'Овуляторная', cycleDay: 13, cycleLength: 28 });
+    const p = FEMALE_HORMONE_BANDS.E2.phases;
+    expect(labOf('Эстрадиол').refHigh).toBe(Math.round(Math.max(p.follicular.high, p.luteal.high) * E2_PG_TO_PMOL));
+  });
+});
+
+describe('сводный отчёт: мочевая кислота по полу (проход 77)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.labs = LABS;
+    localStorage.removeItem('he_support_plan_result');
+    localStorage.removeItem('he_risk_bridge');
+  });
+
+  it('женщина: 380 мкмоль/л выше её ВГН 350 — и в референсе, и в рекомендации', async () => {
+    const { labOf, recOf } = await reportFor('female');
+    expect(labOf('Мочевая кислота').refLow).toBe(150);
+    expect(labOf('Мочевая кислота').refHigh).toBe(350);
+    expect(labOf('Мочевая кислота').status).toBe('warning');
+    expect(recOf('Метаболизм').some(r => r.text.includes('гиперурикемия') && r.text.includes('350'))).toBe(true);
+  });
+
+  it('мужчина: те же 380 — в его норме до 420, рекомендации нет', async () => {
+    const { labOf, recOf } = await reportFor('male');
+    expect(labOf('Мочевая кислота').refLow).toBe(200);
+    expect(labOf('Мочевая кислота').refHigh).toBe(420);
+    expect(labOf('Мочевая кислота').status).toBe('normal');
+    expect(recOf('Метаболизм').some(r => r.text.includes('гиперурикемия'))).toBe(false);
   });
 });

@@ -34,6 +34,7 @@ import {
   computePharmaAdjustedDose,
   RISK_MODEL_LABELS, type RiskModelType, type LabCompositeResult,
 } from '../../engines/lab-analysis.engine';
+import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import {
   generateWeeklyPlan,
   type RiskCalcMethod, type WeeklyPlan, type SupplementPlanEntry, type DailySchedule,
@@ -802,7 +803,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
 
     const labData = linked.labs || [];
     const labSex = linked.profile?.settings?.personal?.sex;
-    const labRes = interpretLabs(labData, labSex === 'female' ? 'female' : undefined);
+    // Проход 77: фаза цикла из профиля — E2 у женщины по коридору её фазы.
+    const labRes = interpretLabs(labData, labSex === 'female' ? 'female' : undefined, cycleStateFromProfile(linked.profile));
     setLabAnalysis(labRes);
     const mechRep = generateMechanismReport(labRes);
     setMechanismReport(mechRep);

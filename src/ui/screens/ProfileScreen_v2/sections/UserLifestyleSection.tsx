@@ -6,6 +6,7 @@ import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, colors } from '../ui';
 import { NativeIcon } from '../../../native/NativeIcons';
+import { cycleState } from '../../../../engines/female-cycle-phase.engine';
 
 const CHRONOTYPES = [
   { id: 'lark', label: 'Жаворонок' },
@@ -20,6 +21,15 @@ const SLEEP_QUALITY = [
 
 export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleSection() {
   const [lifestyle, updateLifestyle] = useSectionState('lifestyle');
+  const [personal] = useSectionState('personal');
+  // Проход 77: дата последней менструации — единственный вход фазовой модели.
+  // Считаю фазу здесь же, чтобы женщина видела, что поле реально работает.
+  const cycle = cycleState({
+    sex: personal?.sex,
+    lastPeriodStart: lifestyle.lastPeriodStart,
+    cycleLengthDays: lifestyle.cycleLengthDays,
+  });
+  const cycleDateRaw = String(lifestyle.lastPeriodStart ?? '').trim();
 
   return (
     <AccordionSection
@@ -124,6 +134,37 @@ export const UserLifestyleSection: React.FC = React.memo(function UserLifestyleS
           placeholder="—"
         />
       </FieldRow>
+
+      {personal?.sex === 'female' && (
+        <>
+          <div style={{ height: 1, background: colors.border, margin: '12px 0' }} />
+          <FieldRow cols={2}>
+            <PopupValueEditor
+              label="Последняя менструация"
+              value={lifestyle.lastPeriodStart}
+              type="text"
+              onChange={v => updateLifestyle({ lastPeriodStart: String(v ?? '').trim() })}
+              placeholder="ГГГГ-ММ-ДД"
+            />
+            <PopupValueEditor
+              label="Длина цикла"
+              value={lifestyle.cycleLengthDays}
+              unit="дн"
+              type="number"
+              min={21} max={35} step={1}
+              onChange={v => updateLifestyle({ cycleLengthDays: v ?? 28 })}
+              placeholder="28"
+            />
+          </FieldRow>
+          <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+            {cycle
+              ? `Сейчас: ${cycle.label.toLowerCase()} фаза, ${cycle.cycleDay}-й день из ${cycle.cycleLength}. По ней считаются женские E2/ЛГ/ФСГ — в анализе лабораторий и в отчёте.`
+              : cycleDateRaw
+                ? 'Дату не удалось разобрать — нужен формат ГГГГ-ММ-ДД (например 2026-11-01). Пока дата не читается, женские гормоны оцениваются по объединению фаз.'
+                : 'Укажите дату — женские E2/ЛГ/ФСГ будут сравниваться с коридором текущей фазы, а не «по фазе» вообще.'}
+          </div>
+        </>
+      )}
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <BoolChip

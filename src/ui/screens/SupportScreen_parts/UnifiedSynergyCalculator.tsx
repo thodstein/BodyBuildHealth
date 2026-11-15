@@ -106,6 +106,8 @@ const ALT_TARGET = `${lftUlnText('ALT')} Ед/л`;
 const AST_TARGET = `${lftUlnText('AST')} Ед/л`;
 // ГГТ печатался мужским `<55` — у женщины ВГН 31 (проход 71).
 const GGT_TARGET = `${labUlnText('GGT')} Ед/л`;
+// Мочевая кислота: ♂ <420 / ♀ <350 — женская ВГН из резолвера (проход 77).
+const UA_TARGET = `${labUlnText('UA')} мкмоль/л`;
 
 export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   // ── AAS & гормональные препараты ── (маркеры общие для всех AAS)
@@ -166,7 +168,7 @@ export const LAB_MONITOR_DB: Record<string, LabMon[]> = {
   niacin: [
     { markerRu:'АЛТ', markerEn:'ALT', system:'hepatic', when:'Через 2 нед, затем каждые 4 нед', target:ALT_TARGET, condition:'↑ АЛТ → гепатотоксичность ниацина', note:'Ниацин SR >500 мг/сут может ↑ АЛТ. Использовать только IR-форму.', tier1:'1–2×ВГН — ↓ дозу или ниацин IR, NAC', tier3:'>2×ВГН — STOP ниацин' },
     { markerRu:'Глюкоза', markerEn:'GLUCOSE', system:'metabolic', when:'Каждые 4 нед', target:'<6.1 ммоль/л', condition:'↑ глюкоза → инсулинорезистентность от ниацина', note:'Ниацин ↑ глюкозу на 5-10%. При диабете — с осторожностью.', tier1:'6.1-7.0 — контроль, снизить дозу', tier2:'>7.0 — STOP ниацин, добавить берберин' },
-    { markerRu:'Мочевая кислота', markerEn:'URIC_ACID', system:'metabolic', when:'Каждые 4 нед', target:'<420 мкмоль/л', condition:'↑ мочевая кислота → риск подагры', note:'Ниацин ↑ реабсорбцию уратов в почках. При подагре — не применять.', tier1:'420-500 — диета', tier2:'>500 — STOP ниацин, аллопуринол?' },
+    { markerRu:'Мочевая кислота', markerEn:'URIC_ACID', system:'metabolic', when:'Каждые 4 нед', target:UA_TARGET, condition:'↑ мочевая кислота → риск подагры', note:'Ниацин ↑ реабсорбцию уратов в почках. При подагре — не применять.', tier1:'420-500 — диета', tier2:'>500 — STOP ниацин, аллопуринол?' },
   ],
   berberine: [
     { markerRu:'Глюкоза', markerEn:'GLUCOSE', system:'metabolic', when:'Каждые 4 нед', target:'<5.6 ммоль/л', condition:'↓ глюкоза → ↑ AMPK', note:'Берберин 1000-2000 мг/сут = метформин 2000 мг по эффективности ↓ глюкозы. Действует медленно (2-4 нед).' },

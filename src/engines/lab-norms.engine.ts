@@ -57,6 +57,15 @@ export const FEMALE_LAB_BOUNDS: Record<string, { lln: number; uln: number }> = (
   return out;
 })();
 
+/**
+ * Мочевая кислота: женская норма 150–350 мкмоль/л (женский протокол, блок
+ * «Лабы» — `supportProtocolWomenData`, там же зелёная зона `<420`). В UCUM общий
+ * верх 420 остаётся верхом нормы **мужчины**: у женщины 380 — это уже выше её
+ * нормы, хотя «по общей таблице» выглядит нормально. Пара закреплена кросс-локом
+ * `female-hormone-bands` (строка женского таба ↔ `FEMALE_LAB_BOUNDS.UA`).
+ */
+FEMALE_LAB_BOUNDS.UA = { lln: 150, uln: 350 };
+
 /** Есть ли у кода женские границы (для бейджа «♀»). */
 export function hasFemaleLabBound(code: string): boolean {
   return !!FEMALE_LAB_BOUNDS[String(code || '').trim().toUpperCase()];
@@ -190,6 +199,30 @@ export const CREATININE_ULN = {
   male: getLabNorm('CREATININE', 'male')?.uln ?? 110,
   female: FEMALE_LAB_BOUNDS.CREATININE?.uln ?? 97,
 } as const;
+
+/**
+ * Мочевая кислота (мкмоль/л): ВГН ♂ 420 / ♀ 350. Общий верх 420 был единственным
+ * числом во всех поверхностях, и женщина с 380 читала «норма» (её норма — до 350,
+ * женский протокол). Мужские 420 не меняются.
+ */
+export const UA_ULN = {
+  male: getLabNorm('UA', 'male')?.uln ?? 420,
+  female: FEMALE_LAB_BOUNDS.UA?.uln ?? 350,
+} as const;
+
+/**
+ * Ступени мочевой кислоты (мкмоль/л): ВГН · ×1.14 · ×1.29 — одна лестница на
+ * главную модель (`risk-engine-tz-spec`) и верификацию (`risk-verification`).
+ * Общий ряд 420/480/540 — гиперурикемия «7 мг/дл и выше»; женский выводится из
+ * её ВГН 350 теми же множителями (350/400/450), поэтому 380 у женщины — уже
+ * ступень внимания, а не «норма» (проход 77).
+ */
+const uaStage = (uln: number, k: number) => Math.round(uln * k);
+
+export const UA_STAGE_ULN: { male: [number, number, number]; female: [number, number, number] } = {
+  male: [UA_ULN.male, uaStage(UA_ULN.male, 480 / 420), uaStage(UA_ULN.male, 540 / 420)],
+  female: [UA_ULN.female, uaStage(UA_ULN.female, 480 / 420), uaStage(UA_ULN.female, 540 / 420)],
+};
 
 /**
  * Эритроциты (10¹²/л): ВГН ♂ 5.8 / ♀ 5.2. В `risk-verification` мужской ряд

@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  FEMALE_HORMONE_BANDS, FEMALE_LAB_BOUNDS, labUlnText, E2_PG_TO_PMOL,
+  FEMALE_HORMONE_BANDS, FEMALE_LAB_BOUNDS, labUlnText, E2_PG_TO_PMOL, getLabNorm, UA_ULN,
 } from '../../../../engines/lab-norms.engine';
 import { LAB_MONITOR_DB } from '../../SupportScreen_parts/UnifiedSynergyCalculator';
 import { FEMALE_LAB_GROUPS } from '../../SupportScreen_parts/supportProtocolWomenData';
@@ -158,5 +158,25 @@ describe('LAB_MONITOR_DB: каждая гормональная/почечная
       expect(r.target).toContain('♀ по фазе');
       expect(r.target).toContain(FEMALE_HORMONE_BANDS.E2.normal);
     }
+  });
+});
+
+// Проход 77: мочевая кислота была единственным маркером почек, у которого
+// женской границы в резолвере не было вовсе — женщина с 380 мкмоль/л читала
+// «норма» по общему верху 420, хотя её ВГН 350 (женский протокол).
+describe('мочевая кислота: ♀ 150–350 из одного источника', () => {
+  it('резолвер: ♂ 200–420 / ♀ 150–350, текст с полом', () => {
+    expect(getLabNorm('UA', 'male')).toMatchObject({ lln: 200, uln: 420, female: false });
+    expect(getLabNorm('UA', 'female')).toMatchObject({ lln: 150, uln: 350, female: true });
+    expect(FEMALE_LAB_BOUNDS.UA).toEqual({ lln: 150, uln: 350 });
+    expect(UA_ULN).toEqual({ male: 420, female: 350 });
+    expect(labUlnText('UA')).toBe('♂ <420 / ♀ <350');
+  });
+
+  it('женский таб печатает ту же пару, а «зелёная» зона — общий верх 420', () => {
+    const row = FEMALE_LAB_GROUPS.flatMap(g => g.rows as Array<Record<string, string>>)
+      .find(r => r.marker === 'Мочевая кислота')!;
+    expect(row.normal).toContain(`${FEMALE_LAB_BOUNDS.UA.lln}–${FEMALE_LAB_BOUNDS.UA.uln}`);
+    expect(row.green).toBe(`<${UA_ULN.male}`);
   });
 });

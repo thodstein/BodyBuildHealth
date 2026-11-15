@@ -45,6 +45,13 @@ describe('symptom-lab-link: ВГН по полу', () => {
     expect(female.alerts[0]).toContain(`♀ ${FEMALE_LAB_BOUNDS.CREATININE.lln}–${FEMALE_LAB_BOUNDS.CREATININE.uln}`);
   });
 
+  it('мочевая кислота 380: у мужчины норма (420), у женщины — нет (350)', () => {
+    expect(linkSymptomsToLabs({ URIC_ACID: 380 }, ['joint_pain'], 'male').linked).toHaveLength(0);
+    const female = linkSymptomsToLabs({ URIC_ACID: 380 }, ['joint_pain'], 'female');
+    expect(female.linked).toHaveLength(1);
+    expect(female.alerts[0]).toContain(`♀ ${FEMALE_LAB_BOUNDS.UA.lln}–${FEMALE_LAB_BOUNDS.UA.uln}`);
+  });
+
   it('пол-нейтральные маркеры не получают ♀-подписи', () => {
     const r = linkSymptomsToLabs({ TROPONIN: 0.2 }, ['chest_pain'], 'female');
     expect(r.alerts[0]).toContain('(норма 0–0.04)');

@@ -11,7 +11,7 @@
 
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN,
 } from '../engines/lab-norms.engine';
 
 export type Tier = 0 | 1 | 2 | 3;
@@ -62,7 +62,7 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   EGFR:             { marker:'EGFR', normal:[90,200], borderline:[60,90], treatment:[30,60], emergencyLow:30, direction:'low', unit:'mL/min', label:'eGFR' },
   CYSTATIN_C:       { marker:'CYSTATIN_C', normal:[0,1.0], borderline:[1.0,1.3], treatment:[1.3,2], emergencyHigh:2, direction:'high', unit:'mg/L', label:'Цистатин C' },
   UREA:             { marker:'UREA', normal:[2.5,8], borderline:[8,12], treatment:[12,20], emergencyHigh:20, direction:'high', unit:'mmol/L', label:'Мочевина' },
-  URIC_ACID:        { marker:'URIC_ACID', normal:[200,420], borderline:[420,480], treatment:[480,600], emergencyHigh:600, direction:'high', unit:'mcmol/L', label:'Мочевая кислота' },
+  URIC_ACID:        { marker:'URIC_ACID', normal:[150, UA_STAGE_ULN.male[0]], borderline:[UA_STAGE_ULN.male[0], UA_STAGE_ULN.male[1]], treatment:[UA_STAGE_ULN.male[1], 600], emergencyHigh:600, direction:'high', unit:'mcmol/L', label:'Мочевая кислота' },
   PROTEIN_URINE:    { marker:'PROTEIN_URINE', normal:[0,0.15], borderline:[0.15,0.5], treatment:[0.5,1.0], emergencyHigh:1.0, direction:'high', unit:'g/L', label:'Протеинурия' },
   MICROALB:         { marker:'MICROALB', normal:[0,20], borderline:[20,30], treatment:[30,300], emergencyHigh:300, direction:'high', unit:'mg/L', label:'Микроальбумин' },
   NGAL:             { marker:'NGAL', normal:[0,100], borderline:[100,200], treatment:[200,500], emergencyHigh:500, direction:'high', unit:'ng/mL', label:'NGAL' },
@@ -188,6 +188,16 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
     borderline: [CREATININE_ULN.female, 130],
     treatment: [130, 200],
     emergencyHigh: 200,
+  },
+  // Мочевая кислота: у женщины ВГН 350 (женский протокол, `UA_STAGE_ULN.female`),
+  // поэтому «внимание» начинается с неё, а не с общего 420; переход к «лечению» —
+  // по тому же множителю ×1.14 (400), а экстренный 600 остаётся клиническим
+  // порогом (подагра с приступом), а не половым.
+  URIC_ACID: {
+    normal: [150, UA_STAGE_ULN.female[0]],
+    borderline: [UA_STAGE_ULN.female[0], UA_STAGE_ULN.female[1]],
+    treatment: [UA_STAGE_ULN.female[1], 600],
+    emergencyHigh: 600,
   },
 };
 

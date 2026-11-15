@@ -29,6 +29,7 @@ import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } fro
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
 import { LABS_CARD, labsWithAlpha } from './LabsScreen_parts/LabsUI';
@@ -1828,8 +1829,9 @@ export const LabsRisksTab: React.FC = () => {
 
   const labAnalysisRes = useMemo(() => {
     if (!hasLabs) return null;
-    return interpretLabs(labs, profileSex === 'female' ? 'female' : undefined);
-  }, [hasLabs, labs, profileSex]);
+    // Проход 77: фаза цикла из профиля — E2 у женщины по коридору её фазы.
+    return interpretLabs(labs, profileSex === 'female' ? 'female' : undefined, cycleStateFromProfile(linked.profile));
+  }, [hasLabs, labs, profileSex, linked.profile]);
 
   const r = labAnalysisRes;
   const ASI = r ? Math.max(0, Math.round(100 - ((r.hormoneScore||0)*0.4 + Math.min(100, (r.inflammation||0)/6*50)*0.3 + (r.kidneyStress||0)*0.3))) : null;

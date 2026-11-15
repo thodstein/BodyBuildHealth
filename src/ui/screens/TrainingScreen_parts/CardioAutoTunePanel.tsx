@@ -93,6 +93,10 @@ export const CardioAutoTunePanel: React.FC<{
   const applyPeriodAware = () => {
     if (!cycle || !periodStart) { flashMsg('⚠ Укажите дату начала цикла'); return; }
     const len = Math.max(21, Math.min(35, Number(periodLen) || 28));
+    // Проход 77: эта же дата — вход фазовой модели (лаборатории, отчёт). Раньше
+    // она жила только в попапе и никуда не сохранялась: приложение считало кардио
+    // по фазе, но женские гормоны продолжали читать «по фазе» вообще.
+    try { updateSection('lifestyle', { lastPeriodStart: periodStart, cycleLengthDays: len }); } catch { /* профиль недоступен — кардио-коррекция всё равно применится */ }
     const r = cardioCyclePeriodAware(cycle, { lastPeriodStartIso: periodStart, cycleLengthDays: len });
     if (r.changes.length === 0) { flashMsg('✅ Коррекций по циклу не требуется (не лютеиновая фаза или нет HIIT)'); return; }
     saveCardioCycleVersion(cycle, '🌸 период-коррекция');

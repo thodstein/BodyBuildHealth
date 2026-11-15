@@ -4,6 +4,7 @@ import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN,
 } from './lab-norms.engine';
+import { phaseHormoneBand, type CycleState } from './female-cycle-phase.engine';
 
 export interface LabInterpretation {
   code: string;
@@ -180,7 +181,7 @@ export function computeHOMA_IR(glucose: number, insulin: number): number {
   return (glucose * insulin) / 22.5;
 }
 
-export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female'): LabCompositeResult {
+export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?: CycleState | null): LabCompositeResult {
   const fem = sex === 'female';
   const interpretations: LabInterpretation[] = [];
 
@@ -191,11 +192,20 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female'): LabCom
     // ♀ — женские границы того же маркера (без sex — прежний мужской ряд).
     const r = fem ? { ...ref, ...(FEMALE_REFERENCE_OVERRIDES[code] || {}) } : ref;
 
+    // Проход 77: у женщины верх E2 — коридор её фазы (фолл. 200 / лют. 500 пг/мл),
+    // а не общий жёлтый бэнд 400: значок маркера и гормональный балл должны читать
+    // одно и то же число. Без фазы (и в овуляторную) — прежние 400/800.
+    let bounds = r;
+    if (fem && code === 'ESTRADIOL') {
+      const band = phaseHormoneBand('E2', cycle?.phase);
+      if (band) bounds = { ...r, high: band.high };
+    }
+
     let status: LabInterpretation['status'] = 'normal';
     // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой)
-    if (value < r.low) status = 'low';
-    else if (value > r.criticalHigh) status = 'critical_high';
-    else if (value > r.high) status = 'high';
+    if (value < bounds.low) status = 'low';
+    else if (value > bounds.criticalHigh) status = 'critical_high';
+    else if (value > bounds.high) status = 'high';
 
     if (status !== 'normal') {
       const mapped = LAB_MECHANISM_MAP[code];
@@ -244,10 +254,19 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female'): LabCom
   // ♀ Низкий тестостерон — не дефицит (у неё нормы другие), штраф только мужчинам.
   if (!fem && testTotal !== null && testTotal < 15) hormoneScore += 30;
   if (!fem && testFree !== null && testFree < 0.3) hormoneScore += 25;
-  // E2 у женщины — фазовая модель: штраф только за красный бэнд (<30 / >800), не
-  // за мужское окно 40–160, иначе её норма читалась бы как отклонение.
+  // E2 у женщины — фазовая модель: нижняя граница остаётся красным бэндом (<30),
+  // потому что в менструальную фазу E2 низкий по природе; верхняя берётся из
+  // коридора ЕЁ фазы (фолл. 200 / лют. 500 пг/мл), а когда фазы нет (или она
+  // овуляторная) — прежний красный бэнд 800. Без этого её нормальная 450 в
+  // лютеиновую читалась бы по мужскому окну, а 300 в фолликулярную — как «норма».
   if (e2 !== null) {
-    if (fem ? (e2 < FEMALE_HORMONE_ULN.E2.low || e2 > FEMALE_HORMONE_ULN.E2.criticalHigh) : (e2 > 160 || e2 < 40)) hormoneScore += 25;
+    if (fem) {
+      const band = phaseHormoneBand('E2', cycle?.phase);
+      const highCut = band ? band.high : FEMALE_HORMONE_ULN.E2.criticalHigh;
+      if (e2 < FEMALE_HORMONE_ULN.E2.low || e2 > highCut) hormoneScore += 25;
+    } else if (e2 > 160 || e2 < 40) {
+      hormoneScore += 25;
+    }
   }
   const prlCut = fem ? FEMALE_HORMONE_ULN.PRL.high : 350;
   if (prolactin !== null && prolactin > prlCut) hormoneScore += 20;
