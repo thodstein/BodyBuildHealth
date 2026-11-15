@@ -235,3 +235,47 @@ describe('проход 89: прогестерон — женский лютеи�
     expect(src).toContain('ANOVULATION');
   });
 });
+
+describe('проход 90: высокие гонадотропины у женщины — своя линия, базовая фаза', () => {
+  const follicular = cycleState({ sex: 'female', lastPeriodStart: '2026-11-05', cycleLengthDays: 28 }, '2026-11-14');
+  const luteal = cycleState({ sex: 'female', lastPeriodStart: '2026-10-30', cycleLengthDays: 28 }, '2026-11-14');
+  const ovulatory = cycleState({ sex: 'female', lastPeriodStart: '2026-11-02', cycleLengthDays: 28 }, '2026-11-14');
+  const both = (lh: number, fsh: number, sex: 'male' | 'female', cycle: ReturnType<typeof cycleState> | null) =>
+    interpretLabs([{ code: 'LH', value: lh } as any, { code: 'FSH', value: fsh } as any], sex, cycle).interpretations;
+
+  it('базовая фаза: ФСГ 14 — снижение овариального резерва', () => {
+    const r = both(5, 14, 'female', follicular).find(i => i.code === 'FSH');
+    expect(r?.status).toBe('high');
+    expect(r?.mechanism).toBe('OVARIAN_RESERVE_LOW');
+    expect(r?.risk).toBe('FERTILITY_LOW_RESERVE');
+  });
+
+  it('базовая фаза: ЛГ 18 при ФСГ 7 — повод исключить СПКЯ', () => {
+    expect(both(18, 7, 'female', follicular).find(i => i.code === 'LH')?.mechanism).toBe('PCOS_SUSPECT');
+  });
+
+  it('базовая фаза: ЛГ 12 при ФСГ 9 (отношение 1.3) — не СПКЯ', () => {
+    expect(both(12, 9, 'female', follicular).some(i => i.mechanism === 'PCOS_SUSPECT')).toBe(false);
+  });
+
+  it('лютеиновая ЛГ 20 — физиология: ни СПКЯ, ни резерва', () => {
+    const r = both(20, 6, 'female', luteal);
+    expect(r.some(i => i.mechanism === 'PCOS_SUSPECT')).toBe(false);
+    expect(r.some(i => i.mechanism === 'OVARIAN_RESERVE_LOW')).toBe(false);
+  });
+
+  it('пик овуляции ЛГ 60 — тоже не СПКЯ', () => {
+    expect(both(60, 8, 'female', ovulatory).some(i => i.mechanism === 'PCOS_SUSPECT')).toBe(false);
+  });
+
+  it('мужчине эта линия не применяется', () => {
+    expect(both(18, 14, 'male', follicular)
+      .some(i => i.mechanism === 'PCOS_SUSPECT' || i.mechanism === 'OVARIAN_RESERVE_LOW')).toBe(false);
+  });
+
+  it('источник: линия гейтится базовыми фазами', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
+    expect(src).toContain("cycle?.phase === 'follicular' || cycle?.phase === 'menstrual'");
+    expect(src).toContain('PCOS_SUSPECT');
+  });
+});

@@ -269,6 +269,45 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     }
   }
 
+  // Проход 90: у женщины высокие ЛГ/ФСГ разбираются своей линией — и только в
+  // базовой фазе (2–5 день), где они вообще интерпретируемы. Пик овуляции и
+  // лютеиновая ЛГ — физиология, а не СПКЯ, поэтому в других фазах молчим.
+  // ЛГ > 10 при ЛГ/ФСГ > 2 — повод исключить СПКЯ; ФСГ выше верха фолликулярного
+  // коридора (10 МЕ/л) на базовой линии — снижение овариального резерва. Оба
+  // порога — те же, что в панелях либидо и фертильности, не новые числа.
+  if (fem && (cycle?.phase === 'follicular' || cycle?.phase === 'menstrual')) {
+    const lh = findLab(labs, 'LH');
+    const fsh = findLab(labs, 'FSH');
+    const fshBand = phaseHormoneBand('FSH', 'follicular');
+    const lhBaseHigh = fshBand ? fshBand.high : null;
+    if (lhBaseHigh !== null) {
+      if (fsh !== null && fsh > lhBaseHigh) {
+        interpretations.push({
+          code: 'FSH',
+          value: fsh,
+          status: 'high',
+          mechanism: 'OVARIAN_RESERVE_LOW',
+          organ: 'ovary',
+          system: 'endocrine',
+          risk: 'FERTILITY_LOW_RESERVE',
+          riskPercent: 15,
+        });
+      }
+      if (lh !== null && fsh !== null && fsh > 0 && lh > lhBaseHigh && lh / fsh > 2) {
+        interpretations.push({
+          code: 'LH',
+          value: lh,
+          status: 'high',
+          mechanism: 'PCOS_SUSPECT',
+          organ: 'ovary',
+          system: 'endocrine',
+          risk: 'PCOS_SUSPECT',
+          riskPercent: 15,
+        });
+      }
+    }
+  }
+
   const glucose = findLab(labs, 'GLUCOSE') ?? 0;
   const insulin = findLab(labs, 'INSULIN') ?? 0;
   const homaIR = glucose > 0 && insulin > 0 ? computeHOMA_IR(glucose, insulin) : null;
