@@ -13,11 +13,14 @@
  *
  * Проход 77: у женщины верх E2 — коридор её фазы (`cycle`), и значок маркера, и
  * гормональный балл читают его; красный бэнд 800 не меняется.
+ * Проход 82: ЛГ и ФСГ у женщины — тоже фазовые, а высокий гонадотропин не
+ * получает мужской механизм «подавление оси» (это не подавление).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { interpretLabs } from '../lab-analysis.engine';
+import { cycleState } from '../female-cycle-phase.engine';
 import {
   LFT_ULN, GGT_ULN, HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN,
   FEMALE_HORMONE_BANDS, FEMALE_HORMONE_ULN,
@@ -154,5 +157,41 @@ describe('исходник: мужские знаменатели индексо
     expect(src).toContain('CREATININE_ULN.female');
     expect(src).not.toContain('/ 3 / 40)');
     expect(src).not.toContain('creatinine / 110');
+  });
+});
+
+describe('проход 82: женские ЛГ и ФСГ — по фазе, без мужской механики', () => {
+  const luteal = cycleState({ sex: 'female', lastPeriodStart: '2026-10-30', cycleLengthDays: 28 }, '2026-11-14');
+  const ovulatory = cycleState({ sex: 'female', lastPeriodStart: '2026-11-02', cycleLengthDays: 28 }, '2026-11-14');
+  const female = (code: string, value: number, cycle = luteal) =>
+    interpretLabs(one(code, value), 'female', cycle).interpretations.find(i => i.code === code);
+
+  it('ЛГ 20 в лютеиновую — внутри 5–25, значка нет; мужчине та же 20 — «критично»', () => {
+    expect(female('LH', 20)).toBeUndefined();
+    expect(interp('LH', 20, 'male')?.status).toBe('critical_high');
+    expect(interp('LH', 20, 'male')?.mechanism).toBe('HPTA_SUPPRESSION');
+  });
+
+  it('ЛГ 60 (пик овуляции) женщине не «критично»: мужского порога 15 у неё нет', () => {
+    expect(female('LH', 60, ovulatory)).toBeUndefined();
+    expect(interp('LH', 60, 'male')?.status).toBe('critical_high');
+  });
+
+  it('ФСГ 20: мужчине «критично», женщине — ни значка, ни механизма', () => {
+    expect(interp('FSH', 20, 'male')?.status).toBe('critical_high');
+    expect(female('FSH', 20)).toBeUndefined();
+  });
+
+  it('низкий ЛГ у женщины остаётся сигналом подавления оси', () => {
+    const low = female('LH', 0.5);
+    expect(low?.status).toBe('low');
+    expect(low?.mechanism).toBe('HPTA_SUPPRESSION');
+  });
+
+  it('источник: у женщины верх ЛГ/ФСГ из фазового коридора и без красной границы', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
+    expect(src).toContain("code === 'LH' || code === 'FSH'");
+    expect(src).toContain('criticalHigh: Number.POSITIVE_INFINITY');
+    expect(src).toContain('maleFramedHigh');
   });
 });

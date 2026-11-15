@@ -4,7 +4,7 @@ import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN,
 } from './lab-norms.engine';
-import { phaseHormoneBand, type CycleState } from './female-cycle-phase.engine';
+import { phaseHormoneBand, phaseUnionBand, type CycleState } from './female-cycle-phase.engine';
 
 export interface LabInterpretation {
   code: string;
@@ -201,6 +201,17 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
       if (band) bounds = { ...r, high: band.high };
     }
 
+    // Проход 82: у женщины ЛГ и ФСГ — тоже фазовые. Мужская строка (ЛГ 1–10,
+    // «критично» от 15; ФСГ 1–12, «критично» от 18) её нормальную лютеиновую ЛГ 20
+    // и пик овуляции читала как «критично». Верх — коридор её фазы (или
+    // объединение фаз, если даты нет): красной границы у женщины нет вовсе, пик
+    // овуляции не «экстрено». Низ оставляем прежним (1 МЕ/л): подавление оси на
+    // курсе — как раз то, что этот порог и должен ловить.
+    if (fem && (code === 'LH' || code === 'FSH')) {
+      const band = phaseHormoneBand(code, cycle?.phase) ?? phaseUnionBand(code);
+      bounds = { ...r, high: band.high, criticalHigh: Number.POSITIVE_INFINITY };
+    }
+
     let status: LabInterpretation['status'] = 'normal';
     // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой)
     if (value < bounds.low) status = 'low';
@@ -208,8 +219,15 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     else if (value > bounds.high) status = 'high';
 
     if (status !== 'normal') {
+      // Проход 82: женщине высокий ЛГ/ФСГ не приписываем мужской механизм
+      // «подавление оси» и риск «низкий тестостерон». Высокий гонадотропин у неё
+      // — не подавление, а пик овуляции / СПКЯ / перименопауза, и разбирается он
+      // фазой (строка результата уже фазово-честная) и клиникой, а не этой
+      // механикой. Низкий гонадотропин остаётся: подавление оси на курсе — ровно
+      // то, что этот механизм и должен ловить.
+      const maleFramedHigh = fem && (code === 'LH' || code === 'FSH') && status !== 'low';
       const mapped = LAB_MECHANISM_MAP[code];
-      if (mapped) {
+      if (mapped && !maleFramedHigh) {
         const riskPct = status === 'critical_high' ? 40 : status === 'high' ? 25 : 15;
         interpretations.push({ code, value, status, ...mapped, riskPercent: riskPct });
       }
