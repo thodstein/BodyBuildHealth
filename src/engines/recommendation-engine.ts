@@ -8,7 +8,7 @@ import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '
 import { normalizeLabValue } from '../core/constants';
 import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
-import { HCT_STEPS } from './lab-norms.engine';
+import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU } from './lab-norms.engine';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -111,6 +111,24 @@ function findSupportByCategoryAndMech(category: string, ...mechs: string[]): str
   const catIds = new Set((CATEGORY_TO_SUPPORT[category] || []).filter((id: string) => !REC_BLACKLIST.has(id)));
   const mechIds = new Set(findSupportByMechanisms(mechs, 50));
   return [...catIds].filter(x => mechIds.has(x)).slice(0, 4);
+}
+
+/**
+ * Скрининговые маркеры, у которых в таблице `labRules` стоят МУЖСКИЕ пороги и
+ * мужской смысл (проход 99). Женщине эти строки не выдаются:
+ *  - `E2` (порог 40 пг/мл) — её коридор 40–200 / 70–500 по фазе: нормальная
+ *    лютеиновая E2 70 давала «E2: 70 > 40» и совет снижать эстроген (DIM/индинол);
+ *  - `Prolactin` (25) — мужская шкала в нг/мл, у женщины норма 100–500 мМЕ/л:
+ *    значение 300 давало ratio 12 → `severe` и каберголин в списке добавок;
+ *  - `DHEA-S` (возрастные 200/150/100/50) — мужские границы, у женщины они ниже.
+ * Женские пути для этих маркеров — `femaleHormoneAlert`/`femaleHormoneSteps`
+ * (пороги `FEMALE_HORMONE_ULN`, шаги диагностические) и фазовые блоки
+ * `interpretLabs`; единицу бланка они тоже учитывают.
+ */
+const MALE_ONLY_SCREEN = new Set(['E2', 'Prolactin', 'DHEA-S']);
+
+export function isMaleOnlyScreenMarker(marker: string): boolean {
+  return MALE_ONLY_SCREEN.has(marker);
 }
 
 export function evaluateRecommendations(state: CalculatorState, result: CalculatorResult, courseWeek?: number): Recommendation[] {
@@ -305,14 +323,22 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── Aromatization → E2 control (priority: E2) ──
   const e2Val = getV(fp, 'panelSex', 'E2');
-  if ((e2Val !== null && e2Val > 40) || state.epicrisis.pastGyno) {
-    const e2Sev: SeverityLevel = (e2Val !== null && e2Val > 55) ? 'severe' : 'moderate';
+  // Проход 99: у женщины «ароматизация» меряется её коридором, а не мужскими 40/55.
+  // E2 70 pg/mL — нормальная лютеиновая, и анастрозол на неё не назначается; её
+  // тревожные бэнды (400/800) и шаги живут в `FEMALE_HORMONE_ULN`, `femaleHormoneAlert`
+  // и `femaleHormoneSteps`.
+  const e2Trigger = sex === 'female' ? FEMALE_HORMONE_ULN.E2.high : 40;
+  const e2SevereAt = sex === 'female' ? FEMALE_HORMONE_ULN.E2.criticalHigh : 55;
+  const maleGynoRisk = sex !== 'female' && state.epicrisis.pastGyno;
+  if ((e2Val !== null && e2Val > e2Trigger) || maleGynoRisk) {
+    const e2Sev: SeverityLevel = (e2Val !== null && e2Val > e2SevereAt) ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('E2', e2Sev).map(e => e.substanceId);
     let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['AROMATASE_INHIBITION', 'ESTROGEN_MODULATION']);
     if (ids.length === 0) ids = ['dim', 'indinol'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('E2', id) || 'контроль ароматизации эстрогенов'; });
-    if (e2Val !== null && e2Val > 55) {
+    // Женщине ИА не назначаем: её высокая E2 — вопрос фазы, дозы и гинеколога, а не таблетки.
+    if (sex !== 'female' && e2Val !== null && e2Val > 55) {
       if (!ids.includes('anastrozole') && !ids.some(id => id.toLowerCase() === 'pharma_anastrozole')) {
         ids.push('anastrozole');
         reasoning['anastrozole'] = 'Фарма-антиароматазин: контроль E2 (только при лаб. подтверждении E2 >55)';
@@ -326,33 +352,49 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       });
       ids = newIds;
     }
-    addRec('estradiol', (e2Val !== null && e2Val > 55) ? 'critical' : 'high', 'endocrine', 'Гормоны',
-      `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
+    addRec('estradiol', (e2Val !== null && e2Val > e2SevereAt) ? 'critical' : 'high', 'endocrine', 'Гормоны',
+      sex === 'female'
+        ? `E2 выше её коридора${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}`
+        : `Ароматизация${e2Val !== null ? ' (E2: ' + e2Val + ' pg/mL)' : ''} от ${drugNames.join(', ')}${state.epicrisis.pastGyno ? ' · гинекомастия в анамнезе' : ''}`,
       ids, reasoning,
-      'E2 > 55 pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <10 — прекратить AI (краш). Контроль E2 каждые 4 нед.',
-      'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
+      sex === 'female'
+        ? `E2 > ${e2Trigger} pg/mL: пересдать на 2-5 день цикла (без стимуляции овуляции), УЗИ яичников — исключить кисту и гиперстимуляцию. AI без гинеколога не назначать, дозу тестостерона не повышать.`
+        : 'E2 > 55 pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <10 — прекратить AI (краш). Контроль E2 каждые 4 нед.',
+      sex === 'female' ? 'E2, прогестерон, ЛГ, ФСГ каждые 4 нед' : 'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
       'E2');
   }
 
   // ── Progestogenic / 19-nor → prolactin control (priority: PRL) — только по лаб. подтверждению ──
-  const prolVal = getV(fp, 'panelSex', 'Prolactin');
-  if ((prolVal !== null && prolVal > 25) || (has19Nor && prolVal !== null && prolVal > 25)) {
-    const prolSev: SeverityLevel = (prolVal !== null && prolVal > 40) ? 'severe' : 'moderate';
+  const prolVal = getV(fp, 'panelSex', 'Prolactin');   // нг/мл: normalizeLabValue приводит мМЕ/л
+  // Проход 99: у женщины порог — `FEMALE_HORMONE_ULN.PRL` (мМЕ/л), а значение выше уже в нг/мл;
+  // переводим одним множителем `PRL_NG_TO_MIU` (800 → 38, 1500 → 71 нг/мл).
+  const prlTriggerNg = sex === 'female' ? FEMALE_HORMONE_ULN.PRL.high / PRL_NG_TO_MIU : 25;
+  const prlSevereNg = sex === 'female' ? FEMALE_HORMONE_ULN.PRL.criticalHigh / PRL_NG_TO_MIU : 40;
+  if (prolVal !== null && prolVal > prlTriggerNg) {
+    const prolSev: SeverityLevel = prolVal > prlSevereNg ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('PRL', prolSev).map(e => e.substanceId);
     let ids: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PROLACTIN_SUPPRESSION', 'DOPAMINE_PRECURSOR']);
     if (ids.length === 0) ids = ['vitex', 'p5p'];
+    // Женщине каберголин не выводим на пограничном пролактине: сначала макропролактин и ТТГ.
+    if (sex === 'female') ids = ids.filter(id => id.toLowerCase() !== 'cabergoline');
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('PRL', id) || 'Снижение пролактина'; });
-    if (prolVal !== null && prolVal > 40) {
+    if (prolVal > prlSevereNg) {
       if (!ids.includes('cabergoline')) {
         ids.push('cabergoline');
-        reasoning['cabergoline'] = 'D2-агонист — доза и приём по пролактину (только при лаб. подтверждении PRL >40). Перед назначением: проверка на макропролактин';
+        reasoning['cabergoline'] = sex === 'female'
+          ? 'D2-агонист — только после подтверждения (макропролактин, ТТГ) и назначения врача'
+          : 'D2-агонист — доза и приём по пролактину (только при лаб. подтверждении PRL >40). Перед назначением: проверка на макропролактин';
       }
     }
-    addRec('prolactin', (prolVal !== null && prolVal > 40) ? 'critical' : 'high', 'endocrine', 'Пролактин',
-      `Прогестиновая активность от ${drugNames.filter(n => ['tren','nandrolone','deca','npp','trest'].some(x => n.toLowerCase().includes(x))).join(', ')}${prolVal !== null ? ' (пролактин: ' + prolVal + ')' : ''}`,
+    addRec('prolactin', prolVal > prlSevereNg ? 'critical' : 'high', 'endocrine', 'Пролактин',
+      sex === 'female'
+        ? `Пролактин выше её коридора${' (пролактин: ' + Math.round(prolVal * 10) / 10 + ' нг/мл)'}`
+        : `Прогестиновая активность от ${drugNames.filter(n => ['tren','nandrolone','deca','npp','trest'].some(x => n.toLowerCase().includes(x))).join(', ')}${' (пролактин: ' + prolVal + ')'}`,
       ids, reasoning,
-      'Пролактин > 40: +Каберголин 0.25 мг 2×/нед. Перед назначением — макропролактин (без теста — ложные назначения каждому 4-му). ЭхоКГ при длительности >6 мес. Контроль пролактина каждые 4 нед.',
+      sex === 'female'
+        ? `Пролактин > ${Math.round(prlTriggerNg)} нг/мл: повторить утром натощак, без физнагрузки и стресса, вместе с ТТГ и макропролактином. Каберголин — только по назначению врача.`
+        : 'Пролактин > 40: +Каберголин 0.25 мг 2×/нед. Перед назначением — макропролактин (без теста — ложные назначения каждому 4-му). ЭхоКГ при длительности >6 мес. Контроль пролактина каждые 4 нед.',
       'Пролактин, E2, ЛГ, ФСГ каждые 4 нед',
       'PRL');
   }
@@ -577,6 +619,9 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   for (const rule of labRules) {
     const val = rule.panels.reduce((acc, p) => acc ?? getV(fp, p, rule.marker), null as number | null);
     if (val === null) continue;
+    // Проход 99: мужские скрининговые пороги женщине не применяются —
+    // её пути живут в `femaleHormoneAlert`/`femaleHormoneSteps` (см. MALE_ONLY_SCREEN).
+    if (sex === 'female' && isMaleOnlyScreenMarker(rule.marker)) continue;
     const triggered = rule.threshold.higherIsWorse ? val > rule.threshold.value : val < rule.threshold.value;
     if (!triggered) continue;
 
