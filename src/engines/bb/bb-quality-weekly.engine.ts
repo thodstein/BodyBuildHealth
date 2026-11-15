@@ -566,6 +566,22 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
     }
   }
 
+  // P1-3 (аудит 2026-11): неделя без единого рабочего подхода — это «нет данных»,
+  // а не идеальное соответствие. Раньше `score` стартовал со 100 и не получал ни
+  // одного штрафа → пустой план показывал 🟢 Отлично. Источник объёма тот же, что
+  // у всей шкалы (`weekVolumeOf`: сохранённая сводка недели или сессии).
+  const weekPlannedSets = Object.values(vol).reduce((sum, v) => sum + Math.max(Number(v?.directSets) || 0, Number(v?.effectiveSets) || 0), 0);
+  if (weekPlannedSets === 0) {
+    issues.push({
+      week: week.week,
+      severity: 'error',
+      code: 'no_working_sets',
+      message: 'Неделя без единого рабочего подхода — оценивать нечего',
+      source: 'факт недели',
+    });
+    score = 0;
+  }
+
   score = Math.max(0, Math.min(100, Math.round(score)));
   const recommendations: string[] = [];
   for (const i of issues.filter(x => x.severity !== 'info').slice(0, 5)) {
@@ -826,6 +842,15 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
     minus(3, `🎯 ${goalIssue}`, `→ ${goalRec}`);
   } else {
     goalRec = 'Цель и фокус согласованы (факт параметров)';
+  }
+
+  // P1-3 (аудит 2026-11): пустой скоуп — 0, а не «100/100» из стартового значения.
+  // Объём берём тем же источником, что и шкала (`weekVolumeOf`).
+  const scopePlannedSets = scopeWeeks.reduce((sum: number, w: any) =>
+    sum + Object.values(weekVolumeOf(plan, w)).reduce((a: number, v: any) => a + Math.max(Number(v?.directSets) || 0, Number(v?.effectiveSets) || 0), 0), 0);
+  if (scopeWeeks.length > 0 && scopePlannedSets === 0) {
+    score = 0;
+    issues.push('🚫 Нет ни одного рабочего подхода в скоупе — оценивать нечего (факт плана)');
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)));

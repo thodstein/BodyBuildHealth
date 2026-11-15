@@ -88,6 +88,15 @@ describe('BB controlled accessory rotation', () => {
       ], rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: true, controlledRotation: true, level: 'intermediate', excludedMuscles: ['chest'] });
-    expect(result.weeks[1].sessions[0].exercises[0].name).toBe('Разводка гантелей лёжа');
+    // P1-2 (аудит 2026-11): исключённая мышца не может вернуться ни ротацией, ни
+    // ремонтом — упражнения этой мышцы удаляются из плана. Раньше проверялось
+    // «имя осталось прежним», т.е. план с упражнением травмированной мышцы
+    // считался нормой, а валидатор навсегда держал `excluded_muscle_present`.
+    const chestLeft = result.weeks
+      .flatMap(w => w.sessions)
+      .flatMap(s => s.exercises)
+      .filter(e => e.muscle === 'chest');
+    expect(chestLeft).toHaveLength(0);
+    expect((result.validation?.issues || []).some(i => i.code === 'excluded_muscle_present')).toBe(false);
   });
 });

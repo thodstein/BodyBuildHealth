@@ -4745,8 +4745,9 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     };
     const catalogExercise = findCatalogExercise(exercise.name) || findCatalogExercise(exercise.exerciseName);
     const unknownWithEquipmentRestriction = equipment.length > 0 && !catalogExercise;
-    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || excludedMuscles.has(exercise.muscle) || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
-    if (excludedMuscles.has(exercise.muscle)) continue;
+    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
+    // Исключённые мышцы здесь не ремонтируются: замена упражнением той же мышцы
+    // снова нарушит ограничение — их удаляет purgeExcludedMuscleExercises.
     if (!unsafe) continue;
     const replacement = bestReplacementFor(
       catalogByMuscle(exercise.muscle),
@@ -4775,6 +4776,41 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     exercise.comment = [exercise.comment?.replace(/\.\s*$/, ''), `Safety repair: ${oldName} → ${replacement.name}; вес скорректирован ×${ratio.toFixed(2)}`].filter(Boolean).join('. ');
     exercise.rationale = [exercise.rationale, 'Adaptive safety replacement'].filter(Boolean).join(' | ');
   }
+}
+
+/**
+ * P1-2 (аудит 2026-11): исключённая мышца — единственный случай, когда упражнение
+ * нельзя «починить» заменой: замена упражнением той же мышцы снова нарушает
+ * ограничение. Валидатор ставит за это ERROR `excluded_muscle_present`, а
+ * `repairAdaptiveSafety` делал `continue` ДО поиска замены — то есть ремонт был
+ * мёртвым кодом, и план с исключённой мышцей навсегда оставался невалидным.
+ *
+ * Здесь такие упражнения именно УДАЛЯЮТСЯ из готовых сессий; если вместе с ними
+ * ушёл `primary`, роль поднимается у первого оставшегося (день не должен
+ * остаться без основного движения). Проход работает и в faithful-режиме
+ * (`reorder:false`) — удаление не является перестановкой.
+ */
+function purgeExcludedMuscleExercises(plan: BBPlan, options: BBFinalizeOptions): void {
+  const excludedMuscles = new Set(options.excludedMuscles || []);
+  if (!excludedMuscles.size) return;
+  const removedNames: string[] = [];
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    const kept = session.exercises.filter(exercise => !excludedMuscles.has(exercise.muscle));
+    if (kept.length === session.exercises.length) continue;
+    for (const exercise of session.exercises) {
+      if (excludedMuscles.has(exercise.muscle)) removedNames.push(exercise.name || exercise.exerciseName || exercise.muscle);
+    }
+    session.exercises = kept;
+    if (kept.length > 0 && !kept.some(exercise => exercise.role === 'primary')) {
+      const promoted = kept.find(exercise => exercise.role === 'accessory') || kept[0];
+      promoted.role = 'primary';
+      promoted.comment = [promoted.comment?.replace(/\.\s*$/, ''), 'Роль primary: прежнее основное движение исключено ограничениями травм'].filter(Boolean).join('. ');
+    }
+  }
+  if (!removedNames.length) return;
+  const unique = [...new Set(removedNames)];
+  const note = `🚫 Исключённые мышцы (${[...excludedMuscles].join(', ')}): убрано упражнений ${removedNames.length} (${unique.slice(0, 4).join(', ')}${unique.length > 4 ? '…' : ''}).`;
+  if (!plan.rationale.some(line => line.startsWith('🚫 Исключённые мышцы'))) plan.rationale.push(note);
 }
 
 /**
@@ -5726,6 +5762,10 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     }
   }
   }
+  // P1-2 (аудит 2026-11): исключённые мышцы убираем всегда (и в faithful-режиме) —
+  // это выполнение ограничения травм, а не перестановка упражнений. До
+  // syncBBPlanSetShape, чтобы итоговые сеты/счётчики считались уже без них.
+  if (!options.preserveSource) purgeExcludedMuscleExercises(next, options);
   syncBBPlanSetShape(next);
   if (!options.preserveSource && options.phaseSafety) applyAdaptivePhaseSafety(next);
   if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);

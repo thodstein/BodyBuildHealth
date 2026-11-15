@@ -262,6 +262,33 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
   const resolvedOptions = { ...options, patternId: (options as any).patternId || (options as any).splitId || (plan as any).pattern?.id } as BBPlanValidationOptions;
   const issues: BBPlanValidationIssue[] = [];
   if (!plan.weeks.length) issues.push({ level: 'error', code: 'empty_plan', message: 'План не содержит недель.' });
+  // P1-1 (аудит 2026-11): повреждённые/импортированные недели и сессии не должны
+  // давать TypeError — валидатор обязан вернуть issue (как `malformed_session`),
+  // а не уронивший UI revalidate. Раньше `s.exercises.flatMap` в deload-ветке
+  // падал на сессии без `exercises`.
+  const sessionsOf = (w: any): any[] => (Array.isArray(w?.sessions) ? w.sessions.filter(Boolean) : []);
+  const exercisesOf = (s: any): any[] => (Array.isArray(s?.exercises) ? s.exercises.filter(Boolean) : []);
+  // P1-3 (аудит 2026-11): план без единого рабочего подхода — дефект генерации
+  // (пул опустел после ограничений) или импорт «скелета», а не идеальный план.
+  // Раньше такой план получал `valid: true` и 95/100 «🟢 Профессионально».
+  // Агрегат `weeklyVolume` учитываем отдельно: план-производная (например,
+  // собранная из другой структуры) может описывать объём сводкой без сессий.
+  if (plan.weeks.length > 0) {
+    const totalWorkingSets = plan.weeks.reduce((sum, week: any) => sum + sessionsOf(week).reduce((sessionSum, session: any) =>
+      sessionSum + exercisesOf(session)
+        .filter((e: any) => !e.warmupActivator && !e.optional)
+        .reduce((a: number, e: any) => a + (Number(e.sets) || 0), 0), 0), 0);
+    const weeklyVolumeSets = Object.values(((plan as any).weeklyVolume || {}) as Record<string, Record<string, any>>)
+      .reduce((sum: number, byMuscle: any) => sum + Object.values(byMuscle || {})
+        .reduce((a: number, v: any) => a + Math.max(Number(v?.directSets) || 0, Number(v?.effectiveSets) || 0), 0), 0);
+    if (totalWorkingSets === 0 && weeklyVolumeSets === 0) {
+      issues.push({
+        level: 'error',
+        code: 'no_working_sets',
+        message: 'План не содержит ни одного рабочего подхода — проверьте ограничения (оборудование, травмы, уровень) и пересоберите план.',
+      });
+    }
+  }
   plan.weeks.forEach((week, wi) => {
     if (!week || !Array.isArray((week as any).sessions)) return;
     week.sessions.forEach((session, si) => {
@@ -328,9 +355,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     const phase = String(week.phase || '').toLowerCase();
     if (phase !== 'deload' && phase !== 'transition') continue;
     const setsOf = (sessions: any[]) => (Array.isArray(sessions) ? sessions : []).reduce((sum: number, s: any) =>
-      sum + (Array.isArray(s?.exercises)
-        ? s.exercises.filter(Boolean).reduce((a: number, e: any) => a + (Number(e?.sets) || 0), 0)
-        : 0), 0);
+      sum + exercisesOf(s).reduce((a: number, e: any) => a + (Number(e?.sets) || 0), 0), 0);
     const currentSets = setsOf(week.sessions);
     const previousSets = setsOf(previous.sessions);
     // Ф1.1 (CYCLE-SYSTEM-FULL-AUDIT): pump-семантика делода — сеты сохраняются,
@@ -338,11 +363,11 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     // (средний вес рабочих ≤ 0.8× предыдущей недели при RIR ≥ 3), валиден и
     // без срезки объёма — срезка была только один из двух каналов разгрузки.
     const meanWeightOf = (w: any): number => {
-      const ws = w.sessions.flatMap((s: any) => s.exercises.flatMap((e: any) => (e.workSets || []).map((x: any) => x.weight || 0))).filter((x: number) => x > 0);
+      const ws = sessionsOf(w).flatMap((s: any) => exercisesOf(s).flatMap((e: any) => (Array.isArray(e?.workSets) ? e.workSets : []).map((x: any) => Number(x?.weight) || 0))).filter((x: number) => x > 0);
       return ws.length ? ws.reduce((a: number, b: number) => a + b, 0) / ws.length : 0;
     };
     const minRirOf = (w: any): number => {
-      const rirs = w.sessions.flatMap((s: any) => s.exercises.map((e: any) => e.rir)).filter((x: any) => Number.isFinite(x));
+      const rirs = sessionsOf(w).flatMap((s: any) => exercisesOf(s).map((e: any) => e?.rir)).filter((x: any) => Number.isFinite(x));
       return rirs.length ? Math.min(...rirs) : 99;
     };
     const effortDeload = previousSets > 0
@@ -352,7 +377,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     if (currentSets > Math.ceil(previousSets * 0.75) && !effortDeload) {
       issues.push({ level: 'warning', code: 'deload_volume_not_reduced', message: `Неделя ${week.week}: deload объём ${currentSets} не снижен относительно ${previousSets}.` });
     }
-    const rirValues = week.sessions.flatMap((session: BBSession) => session.exercises.map(exercise => exercise.rir));
+    const rirValues = sessionsOf(week).flatMap((session: any) => exercisesOf(session).map((exercise: any) => exercise.rir));
     if (rirValues.length > 0 && Math.min(...rirValues) < 3) {
       issues.push({ level: 'warning', code: 'deload_rir_too_low', message: `Неделя ${week.week}: deload содержит RIR ниже 3.` });
     }
@@ -367,18 +392,18 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
   // пропускаются: тейпер по построению стартует выше делода), а внутри серии
   // каждая неделя сравнивается с предыдущей (монотонность серии).
   const taperFlags = plan.weeks.map((week: any) => {
-    const phase = String(week.phase || '').toLowerCase();
-    return Boolean(week.taper) || /taper|тапер/i.test(String(week.rationale || '')) || phase === 'peaking';
+    const phase = String(week?.phase || '').toLowerCase();
+    return Boolean(week?.taper) || /taper|тапер/i.test(String(week?.rationale || '')) || phase === 'peaking';
   });
   const deloadFlags = plan.weeks.map((week: any) => {
-    const phase = String(week.phase || '').toLowerCase();
-    return phase === 'deload' || phase === 'transition' || Boolean((week as any).deload);
+    const phase = String(week?.phase || '').toLowerCase();
+    return phase === 'deload' || phase === 'transition' || Boolean((week as any)?.deload);
   });
   if (plan.weeks.length > 4) {
     // Ф1.1: короткие embed-блоки (2-4 недели, спец-вливания) — их «peak» это
     // бласт-неделя, объём в ней растёт по построению; правило тапера
     // (снижение к старту) относится к полным мезоциклам.
-    const setsOfWeek = plan.weeks.map(week => week.sessions.reduce((sum: number, session: BBSession) => sum + session.exercises.reduce((s, exercise) => s + exercise.sets, 0), 0));
+    const setsOfWeek = plan.weeks.map((week: any) => sessionsOf(week).reduce((sum: number, session: any) => sum + exercisesOf(session).reduce((s: number, exercise: any) => s + (Number(exercise.sets) || 0), 0), 0));
     for (let index = 1; index < plan.weeks.length; index++) {
       if (!taperFlags[index]) continue;
       const previousInRun = taperFlags[index - 1];
@@ -400,7 +425,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
   if (options.level && plan.weeks.length > 0) {
     const specTargets = new Set((options.specializationTargets || []).map(t => String(t || '').toLowerCase()));
     for (const week of plan.weeks) {
-      const volume = aggregateBBVolume(week.sessions);
+      const volume = aggregateBBVolume(sessionsOf(week));
       for (const [muscle, values] of Object.entries(volume)) {
         // Фактический per-muscle MRV-кап после всех множителей (PED/recovery/
         // lab/стаж) имеет приоритет над landmarks.mrv — иначе enhanced-планы

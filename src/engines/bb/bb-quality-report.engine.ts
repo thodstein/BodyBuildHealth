@@ -165,6 +165,19 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
     if (i) raw.push(i);
   };
   const validationValid = plan.validation?.valid === true;
+  // P1-3 (аудит 2026-11): план без единого рабочего подхода не может быть
+  // «95/100 · ok». Источник — сводка (`expandedSummary.totalWorkingSets`), если
+  // она есть; иначе считаем по факту недель (у импортированного/повреждённого
+  // плана сводки может не быть).
+  const summaryWorkingSets = typeof plan.expandedSummary?.totalWorkingSets === 'number'
+    ? plan.expandedSummary.totalWorkingSets
+    : null;
+  const plannedWorkingSets = summaryWorkingSets ?? (plan.weeks || []).reduce((sum, week: any) => sum + (Array.isArray(week?.sessions) ? week.sessions : []).reduce((sessionSum: number, session: any) =>
+    sessionSum + (Array.isArray(session?.exercises) ? session.exercises : []).reduce((a: number, e: any) => a + (Number(e?.sets) || 0), 0), 0), 0);
+  const weeklyVolumeSets = Object.values((plan.weeklyVolume || {}) as Record<string, Record<string, any>>)
+    .reduce((sum: number, byMuscle: any) => sum + Object.values(byMuscle || {})
+      .reduce((a: number, v: any) => a + Math.max(Number(v?.directSets) || 0, Number(v?.effectiveSets) || 0), 0), 0);
+  const emptyPlan = (plan.weeks || []).length > 0 && plannedWorkingSets <= 0 && weeklyVolumeSets <= 0;
 
   if (!plan.validation) {
     push({
@@ -176,6 +189,15 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   }
   for (const item of plan.validation?.issues ?? []) push(toIssue('validation', item));
   for (const item of plan.balanceReport?.issues ?? []) push(toIssue('balance', item));
+  // P1-3 (аудит 2026-11): пустой план — явное замечание, а не «зелёный» отчёт.
+  if (emptyPlan) {
+    push({
+      source: 'validation',
+      level: 'error',
+      code: 'no_working_sets',
+      message: 'План не содержит ни одного рабочего подхода — оценивать нечего; проверьте ограничения и пересоберите.',
+    });
+  }
   for (const item of plan.rotationReport?.issues ?? []) push(toIssue('rotation', item));
   for (const item of safety.issues ?? []) push(toIssue('safety', item));
 
@@ -187,8 +209,8 @@ export function buildBBQualityReport(plan: QualityPlanLike, opts: {
   // повторный штраф был бы двойным учётом и давал 0 на обычных планах).
   const errCodes = raw.filter(i => i.source === 'validation' && i.level === 'error').map(i => i.code);
   const warnCodes = raw.filter(i => i.source === 'validation' && i.level === 'warning').map(i => i.code);
-  const score = Math.max(0, Math.min(100, Math.round(safety.score - penaltyForUniqueCodes(errCodes, warnCodes))));
-  const riskLevel: BBQualityReport['riskLevel'] = !validationValid || score < 60 ? 'danger' : score < 75 ? 'caution' : 'ok';
+  const score = emptyPlan ? 0 : Math.max(0, Math.min(100, Math.round(safety.score - penaltyForUniqueCodes(errCodes, warnCodes))));
+  const riskLevel: BBQualityReport['riskLevel'] = emptyPlan || !validationValid || score < 60 ? 'danger' : score < 75 ? 'caution' : 'ok';
 
   const totalWorkingSets = typeof plan.expandedSummary?.totalWorkingSets === 'number'
     ? plan.expandedSummary.totalWorkingSets

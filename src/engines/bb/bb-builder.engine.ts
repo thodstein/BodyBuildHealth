@@ -1819,6 +1819,23 @@ function exercisePoolKey(muscle: string, role: string, opts: BuildExercisePoolOp
   });
 }
 
+/**
+ * Запреты пула, не зависящие от контекста дня: эксцентрик-скилл новичку и
+ * становая/сумо/жим стоя без явного разрешения пользователя.
+ *
+ * Вынесено в предикат (аудит 2026-11, P1-2): основной фильтр и fallback-пул
+ * держали эти правила по отдельности, и fallback их терял — ровно тогда, когда
+ * пользователь сильнее всего ограничен инвентарём.
+ */
+function isPoolPolicyBlocked(ex: any, opts: { level?: string; allowStrengthLifts?: boolean }): boolean {
+  if (normLevel(opts.level || 'intermediate') === 'beginner' && isSkillEccentric(ex)) return true;
+  if (opts.allowStrengthLifts !== true) {
+    const n = (ex.name || '').toLowerCase();
+    if (n.includes('становая') || n.includes('сумо') || n.includes('армейский') || n.includes('жим стоя') || n.includes('швунг') || n.includes('мертв')) return true;
+  }
+  return false;
+}
+
 function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExercisePoolOpts): any[] {
   const tag = (opts.sessionTag || '').toLowerCase();
   // Гейт уровней — в swap-backstop финализатора (пул НЕ трогаем: удаление
@@ -1831,12 +1848,7 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
     if (tm === null || !opts.roleMuscles.includes(tm)) return false;
     if (isBBJunk(ex)) return false;
     { const _t = bbExerciseTier(ex); if (_t === 4 || (!opts.allowExotic && _t === 3)) return false; }
-    { if (normLevel(opts.level || 'intermediate') === 'beginner' && isSkillEccentric(ex)) return false; }
-    // Становая/сумо/жим стоя — только в силовом цикле и по кнопке пользователя.
-    if (opts.allowStrengthLifts !== true) {
-      const n = (ex.name || '').toLowerCase();
-      if (n.includes('становая') || n.includes('сумо') || n.includes('армейский') || n.includes('жим стоя') || n.includes('швунг') || n.includes('мертв')) return false;
-    }
+    { if (isPoolPolicyBlocked(ex, opts)) return false; }
     if (!opts.isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
     if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
     if (opts.mobilityRestrictions && isMobilityRestricted(ex, opts.mobilityRestrictions)) return false;
@@ -1884,12 +1896,14 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
     if (tm === null || !opts.roleMuscles.includes(tm)) return false;
     if (isBBJunk(ex)) return false;
     { const _t = bbExerciseTier(ex); if (_t === 4 || (!opts.allowExotic && _t === 3)) return false; }
-    // B12: equipment-fallback ТОЛЬКО если оборудование НЕ указано или совпадает (иначе — нет упражнений).
-    if (opts.equipmentList.length > 0) {
-      const rawEq = ex.equipment;
-      const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-      if (exEq.length > 0 && !exEq.includes('bodyweight') && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
-    }
+    // P1-2 (аудит 2026-11): fallback не должен снимать политические запреты
+    // (эксцентрик-скилл новичку, становая/жим стоя без явного разрешения) —
+    // раньше здесь их не было, и запреты переставали действовать именно при
+    // узком инвентаре, т.е. когда пул и опустел.
+    if (isPoolPolicyBlocked(ex, opts)) return false;
+    // B12: equipment-fallback — через единое правило (пустой список = без
+    // ограничений, `bodyweight` разрешён всегда, `equipment` бывает массивом).
+    if (!equipmentAllows(opts.equipmentList, ex.equipment as any)) return false;
     // B5: avAxial — даже в fallback НЕ берём осевые упражнения
     if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
     // Bodyweight capability — и в fallback не берём подтягивания без способности.
@@ -3956,8 +3970,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   // P0-7 (audit 2026-07): ACWR thresholds — 1.3 = caution (display only),
   // 1.5 = enforce deload (Grgic 2020; optimum 0.8-1.3, caution 1.3-1.5, danger >1.5).
-  const acwrCaution = acwrRatio > 1.3 && acwrRatio <= 1.5 && input.weeks >= 3;
-  const acwrDanger = acwrRatio > 1.5 && input.weeks >= 3;
+  // P1-1 (аудит 2026-11): тоггл «Авто-разгрузка» из UI обязан управлять этим
+  // блоком. Раньше ACWR (из localStorage sRPE) учащал делоды и добавлял
+  // предупреждения безусловно — план противоречил выключенному флагу, а при
+  // пересборке на другом устройстве менялся без изменения входа.
+  // `undefined` = прежнее поведение (включено).
+  const acwrAuto = input.autoDeload !== false;
+  const acwrCaution = acwrAuto && acwrRatio > 1.3 && acwrRatio <= 1.5 && input.weeks >= 3;
+  const acwrDanger = acwrAuto && acwrRatio > 1.5 && input.weeks >= 3;
   if (acwrDanger) {
     deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
@@ -4831,7 +4851,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
             if (isBBJunk(e)) return false;
             if (isInappropriateBB(e)) return false;
-            if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+            // P1-3 (аудит 2026-11): единое правило оборудования. Раньше было
+            // `eqList.includes(e.equipment)`, а каталог после дедупа хранит
+            // МАССИВ снарядов → сравнение всегда false, и все «добивающие»
+            // проходы молча теряли упражнения на узком инвентаре.
+            if (!equipmentAllows(eqList, e.equipment)) return false;
             return true;
           });
           if (!pool.length) continue;
@@ -4905,7 +4929,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
         if (isBBJunk(e)) return false;
         if (isInappropriateBB(e)) return false;
-        if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+        if (!equipmentAllows(eqList, e.equipment)) return false;
         if (avAxial && isAxialLoadExercise(e as any)) return false;
         return true;
       });
@@ -5058,7 +5082,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
             if (isBBJunk(e)) return false;
             if (isInappropriateBB(e)) return false;
-            if (eqList?.length && e.equipment && !eqList.includes(e.equipment)) return false;
+            if (!equipmentAllows(eqList, e.equipment)) return false;
             if (avAxial && isAxialLoadExercise(e as any)) return false;
             if (best.exercises.some((x: any) => (x.exerciseName || x.name) === (e.name || e.id))) return false;
             return true;
@@ -5137,7 +5161,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
               if (c.exerciseType === 'isolation' || (c as any).type === 'isolation') return false;
               if (c.type !== 'compound' && (c as any).exerciseType !== 'compound') return false;
               if (isBBJunk(c)) return false;
-              if (eqList?.length && c.equipment && !eqList.includes(c.equipment)) return false;
+              if (!equipmentAllows(eqList, c.equipment)) return false;
               if (excludedMuscles.has(cm)) return false;
               return true;
             });
