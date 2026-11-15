@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
-import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { getLabNorm, FEMALE_HORMONE_ULN, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import {
+  phaseHormoneBand, phaseHormoneUnit, phaseUnionBand,
+  type CycleState, type PhaseHormone,
+} from '../../../engines/female-cycle-phase.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, LabsEmpty, sysPillStyle, labsWithAlpha, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
@@ -9,11 +13,56 @@ const sysLabels: Record<string, string> = LABS_SYS_LABEL;
 const sysColors: Record<string, string> = LABS_SYS_COLOR;
 const sysIcons: Record<string, NativeIconName> = LABS_SYS_ICON;
 
-function getLabStatus(lab: LabPoint, sex?: 'male' | 'female'): 'normal' | 'high' | 'low' | 'unknown' {
+/** Женские гормоны, у которых норма зависит от фазы цикла (и только они). */
+const PHASE_MARKER: Record<string, PhaseHormone> = {
+  E2: 'E2', ESTRADIOL: 'E2', 'ЭСТРАДИОЛ': 'E2',
+  LH: 'LH', 'ЛГ': 'LH',
+  FSH: 'FSH', 'ФСГ': 'FSH',
+};
+
+/**
+ * Фазовый коридор гормона для строки результата. Возвращает `null` для мужчины
+ * и для маркеров без фазовой нормы: у них остаётся прежняя строка резолвера.
+ * Фаза неизвестна (или овуляторная) — объединение фаз и подпись «по фазе».
+ */
+function phaseRef(
+  code: string,
+  sex?: 'male' | 'female',
+  cycle?: CycleState | null,
+): { marker: PhaseHormone; low: number; high: number; unit: string; phaseLabel: string | null } | null {
+  if (sex !== 'female') return null;
+  const marker = PHASE_MARKER[String(code || '').trim().toUpperCase()];
+  if (!marker) return null;
+  const band = phaseHormoneBand(marker, cycle?.phase);
+  const b = band ?? phaseUnionBand(marker);
+  return {
+    marker, low: b.low, high: b.high, unit: phaseHormoneUnit(marker),
+    phaseLabel: band ? (cycle?.label ?? null) : null,
+  };
+}
+
+/** Чип референса под названием маркера (одна форма для обоих путей). */
+const REF_CHIP_STYLE: React.CSSProperties = {
+  padding: '2px 7px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+};
+
+function getLabStatus(lab: LabPoint, sex?: 'male' | 'female', cycle?: CycleState | null): 'normal' | 'high' | 'low' | 'unknown' {
   // Сохранённые диапазоны из бланка лаборатории приоритетнее справочных.
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
     if (lab.value > lab.refHigh) return 'high';
     if (lab.value < lab.refLow) return 'low';
+    return 'normal';
+  }
+  // ♀ E2/ЛГ/ФСГ: одной нормы на весь цикл не бывает — сравниваем с коридором ЕЁ
+  // фазы, а не с мужской строкой (E2 10–40 пг/мл, ЛГ 1–12), которую резолвер
+  // отдаёт женщине, потому что половой нормы у этих гормонов нет вовсе.
+  const ph = phaseRef(lab.code, sex, cycle);
+  if (ph) {
+    // Низ E2 — красная граница 30, а не низ коридора: в менструальную фазу он
+    // физиологически низкий, а «<30» — уже дефицит.
+    const lowCut = ph.marker === 'E2' ? FEMALE_HORMONE_ULN.E2.low : ph.low;
+    if (lab.value > ph.high) return 'high';
+    if (lab.value < lowCut) return 'low';
     return 'normal';
   }
   const norm = getLabNorm(lab.code, sex);
@@ -29,7 +78,12 @@ function getLabStatus(lab: LabPoint, sex?: 'male' | 'female'): 'normal' | 'high'
   return 'normal';
 }
 
-export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }> = ({ labs, sex }) => {
+export const LabsResults: React.FC<{
+  labs: LabPoint[];
+  sex?: 'male' | 'female';
+  /** Фаза цикла на сегодня (женщина с датой последней менструации). */
+  cycle?: CycleState | null;
+}> = ({ labs, sex, cycle }) => {
   const [filterSystem, setFilterSystem] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set([labs[0]?.date].filter(Boolean) as string[]));
 
@@ -42,7 +96,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
   const toggleDate = (date: string) => setExpandedDates(prev=>{ const n=new Set(prev); if(n.has(date)) n.delete(date); else n.add(date); return n; });
 
   // summary for filter bar
-  const abnormalCount = useMemo(()=> filteredLabs.filter(l=> { const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length, [filteredLabs, sex]);
+  const abnormalCount = useMemo(()=> filteredLabs.filter(l=> { const s=getLabStatus(l, sex, cycle); return s==='high'||s==='low'; }).length, [filteredLabs, sex, cycle]);
 
   return (
     <div className="labs-results">
@@ -50,6 +104,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
       {sex === 'female' && (
         <div data-female-labs-note style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
           {FEMALE_LABS_TAB_NOTE}
+          {cycle && ` Сейчас: ${cycle.label.toLowerCase()} фаза, ${cycle.cycleDay}-й день из ${cycle.cycleLength} — E2/ЛГ/ФСГ сравниваются с коридором этой фазы.`}
         </div>
       )}
       {/* Filters — TOP APK pills 44px, скролл-лента */}
@@ -73,7 +128,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {Object.entries(groupedByDate).map(([date, dateLabs])=>{
             const isOpen = expandedDates.has(date);
-            const dateAbn = dateLabs.filter(l=>{ const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length;
+            const dateAbn = dateLabs.filter(l=>{ const s=getLabStatus(l, sex, cycle); return s==='high'||s==='low'; }).length;
             const dateStr = new Date(date).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
             return (
               <div key={date} style={{ ...LABS_CARD, padding:0, overflow:'hidden', background:'rgba(20,22,30,0.40)', backdropFilter:'blur(10px)' }}>
@@ -93,8 +148,14 @@ export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                 {isOpen && (
                   <div style={{ padding:'10px 10px 10px', display:'grid', gap:6, background:'rgba(0,0,0,0.08)' }}>
                     {dateLabs.map(lab=>{
-                      const status=getLabStatus(lab, sex);
+                      const status=getLabStatus(lab, sex, cycle);
                       const norm = getLabNorm(lab.code, sex);
+                      // Свой диапазон из бланка приоритетнее и для статуса, и для
+                      // подписи — фазовый коридор печатаем только там, где бланк
+                      // границ не дал (ручной ввод, импорт без референсов).
+                      const ph = lab.refLow !== undefined && lab.refHigh !== undefined
+                        ? null
+                        : phaseRef(lab.code, sex, cycle);
                       const info = norm ?? (UCUM_MAP[lab.code.toUpperCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lab.code.toLowerCase())?.[1] as any));
                       const sys=getLabsSystem(lab.code)||'other';
                       const sysColor=sysColors[sys]||'#6b7280';
@@ -112,7 +173,15 @@ export const LabsResults: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                             <div style={{ fontWeight:800, fontSize:13, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
                             <div style={{ fontSize:11, color:'#fff', marginTop:2, display:'flex', gap:6, alignItems:'center' }}>
                               <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><NativeIcon name={sysIcons[sys] || 'file'} size={11} /> {sysLabels[sys]||sys}</span>
-                              {info && <span style={{ padding:'2px 7px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{info.lln}–{info.uln} {(info as any).prefUnit || (info as any).unit || ''}{norm?.female ? ' ♀' : ''}</span>}
+                              {ph ? (
+                                <span style={REF_CHIP_STYLE} data-phase-ref={ph.marker}>
+                                  {ph.low}–{ph.high} {ph.unit}{ph.phaseLabel ? ` (${ph.phaseLabel.toLowerCase()})` : ' (по фазе)'}
+                                </span>
+                              ) : info && (
+                                <span style={REF_CHIP_STYLE}>
+                                  {info.lln}–{info.uln} {(info as any).prefUnit || (info as any).unit || ''}{norm?.female ? ' ♀' : ''}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:92 }}>

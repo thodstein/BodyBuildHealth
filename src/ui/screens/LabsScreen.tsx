@@ -493,11 +493,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     return computeLabIndexDetails(currentLabs, profileSex as 'male' | 'female');
   }, [hasLabs, currentLabs, profileSex]);
 
+  // Проход 77/78: фаза цикла из профиля — один расчёт на экран. Её читают и
+  // лабораторный разбор (значок/балл E2), и строка результата (коридор фазы).
+  const cyclePhase = useMemo(() => cycleStateFromProfile(linked.profile), [linked.profile]);
+
   const labAnalysisResult = useMemo(() => {
     if (!hasLabs) return null;
     // Проход 77: фаза цикла из профиля — E2 у женщины по коридору её фазы.
-    return interpretLabs(currentLabs, profileSex === 'female' ? 'female' : undefined, cycleStateFromProfile(linked.profile));
-  }, [hasLabs, currentLabs, profileSex, linked.profile]);
+    return interpretLabs(currentLabs, profileSex === 'female' ? 'female' : undefined, cyclePhase);
+  }, [hasLabs, currentLabs, profileSex, cyclePhase]);
 
   const labPharmaAlerts = useMemo(() => {
     if (!hasLabs || linked.course.length === 0) return [];
@@ -1250,7 +1254,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {currentLabs.length > 0 && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>📋 Результаты текущей фазы</div>
-              <LabsResults labs={currentLabs} sex={profileSex as 'male' | 'female'} />
+              <LabsResults labs={currentLabs} sex={profileSex as 'male' | 'female'} cycle={cyclePhase} />
             </div>
           )}
 
@@ -1469,6 +1473,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
                 <span style={{ fontSize: 11, color: '#fff', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
               </div>
+              {/* Фазу не передаю: архив — это старые даты, а фаза посчитана на
+                  сегодня. Женские E2/ЛГ/ФСГ покажут объединение фаз («по фазе»),
+                  а не чужую фазу. */}
               <LabsResults labs={archiveLabs} sex={profileSex as 'male' | 'female'} />
             </div>
           )}
