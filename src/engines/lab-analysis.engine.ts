@@ -244,6 +244,31 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     }
   }
 
+  // Проход 89: прогестерон в разборе — женский и строго фазовый.
+  //
+  // Мужской шкалы не заводим намеренно: у мужчины прогестерон почти не
+  // заказывают, а «норма 0.3–1.5 нг/мл» без клинической линии дала бы ложные
+  // значки ровно там, где ничего не значит. Женский сигнал один: в лютеиновую
+  // прогестерон ниже 5 нг/мл означает, что овуляции, вероятно, не было (жёлтое
+  // тело не сформировалось). В фолликулярную низкий прогестерон — норма, а без
+  // дня цикла судить нельзя вовсе, поэтому фазы нет — молчим.
+  if (fem && cycle?.phase === 'luteal') {
+    const prog = findLab(labs, 'PROGESTERONE');
+    const band = phaseHormoneBand('PROG', 'luteal');
+    if (prog !== null && band && prog < band.low) {
+      interpretations.push({
+        code: 'PROGESTERONE',
+        value: prog,
+        status: 'low',
+        mechanism: 'ANOVULATION',
+        organ: 'ovary',
+        system: 'endocrine',
+        risk: 'HORMONE_LOW_PROG',
+        riskPercent: 25,
+      });
+    }
+  }
+
   const glucose = findLab(labs, 'GLUCOSE') ?? 0;
   const insulin = findLab(labs, 'INSULIN') ?? 0;
   const homaIR = glucose > 0 && insulin > 0 ? computeHOMA_IR(glucose, insulin) : null;

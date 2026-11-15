@@ -15,6 +15,8 @@
  * гормональный балл читают его; красный бэнд 800 не меняется.
  * Проход 82: ЛГ и ФСГ у женщины — тоже фазовые, а высокий гонадотропин не
  * получает мужской механизм «подавление оси» (это не подавление).
+ * Проход 89: прогестерон у женщины — лютеиновый сигнал ановуляции; мужской шкалы
+ * у него нет вовсе, а без дня цикла он не судится.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -193,5 +195,43 @@ describe('проход 82: женские ЛГ и ФСГ — по фазе, бе
     expect(src).toContain("code === 'LH' || code === 'FSH'");
     expect(src).toContain('criticalHigh: Number.POSITIVE_INFINITY');
     expect(src).toContain('maleFramedHigh');
+  });
+});
+
+describe('проход 89: прогестерон — женский лютеиновый сигнал, а не общая норма', () => {
+  const luteal = cycleState({ sex: 'female', lastPeriodStart: '2026-10-30', cycleLengthDays: 28 }, '2026-11-14');
+  const follicular = cycleState({ sex: 'female', lastPeriodStart: '2026-11-05', cycleLengthDays: 28 }, '2026-11-14');
+  const prog = (value: number, sex?: 'male' | 'female', cycle?: ReturnType<typeof cycleState> | null) =>
+    interpretLabs(one('PROG', value), sex, cycle).interpretations.find(i => i.code === 'PROGESTERONE');
+
+  it('лютеиновая 2 нг/мл — овуляции, вероятно, не было', () => {
+    const r = prog(2, 'female', luteal);
+    expect(r?.status).toBe('low');
+    expect(r?.mechanism).toBe('ANOVULATION');
+    expect(r?.risk).toBe('HORMONE_LOW_PROG');
+  });
+
+  it('лютеиновая 12 нг/мл — в коридоре 5–20, значка нет', () => {
+    expect(prog(12, 'female', luteal)).toBeUndefined();
+  });
+
+  it('фолликулярная 0.5 — норма: низкий прогестерон в этой фазе ожидаем', () => {
+    expect(prog(0.5, 'female', follicular)).toBeUndefined();
+  });
+
+  it('без дня цикла не судим вовсе', () => {
+    expect(prog(2, 'female', null)).toBeUndefined();
+    expect(prog(2, 'female')).toBeUndefined();
+  });
+
+  it('мужчине и без пола прогестерон не «низкий»: мужской шкалы нет', () => {
+    expect(prog(2, 'male')).toBeUndefined();
+    expect(prog(0.2)).toBeUndefined();
+  });
+
+  it('источник: блок гейтится лютеиновой фазой, а не полом целиком', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
+    expect(src).toContain("if (fem && cycle?.phase === 'luteal')");
+    expect(src).toContain('ANOVULATION');
   });
 });
