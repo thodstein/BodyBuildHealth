@@ -158,6 +158,64 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   },
 
   {
+    id: 'female_libido_workup',
+    title: 'Женское либидо: гормоны, цикл и не только (женский сценарий)',
+    sex: 'female', // женский путь вместо «Нет либидо / эректильная дисфункция»
+    phase: 'any',
+    urgency: 'routine',
+    problem: 'Снижение либидо у женщины — обычно не «низкий тестостерон»: сначала фаза цикла и контрацептивы, потом пролактин, щитовидная, железо, сон и стресс. Задача панели — найти обратимую причину, а не выдать мужскую цель TT.',
+    markers: [
+      { code: 'E2', label: 'Эстрадиол', importance: 'critical', lowMeaning: '↓ <30 пг/мл — дефицит эстрогенов: либидо, сухость, кости', highMeaning: '↑ выше коридора фазы — проверить день замера и КОК/ЗГТ', target: `по фазе: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл` },
+      { code: 'TT', label: 'Тестостерон общий', importance: 'important', lowMeaning: `↓ ниже ${FEMALE_HORMONE_BANDS.TT.range.low} нмоль/л — бывает при подавлении оси`, highMeaning: '↑ >6 нмоль/л — вирилизация, искать источник', target: `${FEMALE_HORMONE_BANDS.TT.range.low}–${FEMALE_HORMONE_BANDS.TT.range.high} нмоль/л (женская норма)` },
+      { code: 'SHBG', label: 'ГСПГ', importance: 'important', highMeaning: '↑ на эстрогенах/КОК — свободного тестостерона меньше', lowMeaning: '↓ при инсулинорезистентности', target: '20-45 нмоль/л' },
+      { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '↑ >800 мМЕ/л — гасит либидо и цикл: макропролактин, МРТ', target: `${FEMALE_HORMONE_BANDS.PRL.normal} мМЕ/л` },
+      { code: 'TSH', label: 'ТТГ', importance: 'critical', highMeaning: '>3.0 — субклинический гипотиреоз (усталость, либидо)', target: '0.5-2.5 мМЕ/л' },
+      { code: 'FT4', label: 'Т4 свободный', importance: 'important', lowMeaning: '↓ гипотиреоз', target: '12-18 пмоль/л' },
+      { code: 'PROG', label: 'Прогестерон', importance: 'important', lowMeaning: '↓ <10 в середине лютеиновой — нет овуляции / лютеиновая недостаточность', target: `лютеиновая: ${PROG_PHASES.luteal.low}–${PROG_PHASES.luteal.high} нг/мл (за 7 дней до менструации)` },
+      { code: 'FERRITIN', label: 'Ферритин', importance: 'important', lowMeaning: '↓ <30 — железодефицит (менструальные потери): усталость, апатия', target: '>50 мкг/л' },
+      { code: 'VITAMIN_D', label: '25(OH)D', importance: 'optional', lowMeaning: '↓ <30 нг/мл — дефицит (усталость, настроение)', target: '30-50 нг/мл' },
+    ],
+    clinicalNotes: 'Либидо у женщины складывается из гормонов, фазы, сна, стресса и отношений — панель ищет обратимые причины, а не «низкий тестостерон». Забор: E2/ЛГ/ФСГ на 2–5 день, прогестерон за 7 дней до менструации. КОК повышают ГСПГ и снижают свободный тестостерон; на курсе ААС ось подавлена (ЛГ/ФСГ <2) — это ожидаемо, а не «дефицит». Тестостерон женщине не «возвращают» мужскими дозами: при TT >6 сначала ищут источник (СПКЯ, надпочечники).',
+    triggerSymptoms: ['libido_decrease', 'fatigue', 'mood_swings'],
+    recommendedActions: [
+      'Забор гормонов по дням цикла (2–5 день; прогестерон — за 7 дней до менструации)',
+      'Пролактин >800 — макропролактин, при подтверждении МРТ гипофиза',
+      'ТТГ + FT4 при усталости и снижении либидо',
+      'Ферритин при обильных менструациях',
+      'Разобрать КОК/антидепрессанты/сон: они меняют либидо не меньше гормонов',
+    ],
+  },
+
+  {
+    id: 'female_fertility_workup',
+    title: 'Планирование беременности: резерв и овуляция (женский сценарий)',
+    sex: 'female', // вместо мужской «спермограмма 0»
+    phase: 'baseline',
+    urgency: 'routine',
+    problem: 'Планирование беременности: овариальный резерв, подтверждение овуляции, щитовидная и пролактин. На курсе ААС цикл часто без овуляции — это первое, что нужно понять.',
+    markers: [
+      { code: 'AMH', label: 'АМГ', importance: 'critical', lowMeaning: '↓ <1.0 нг/мл — снижение овариального резерва: не откладывать', highMeaning: '↑ >4.0 — СПКЯ? (резерв есть, овуляции может не быть)', target: '1.0-4.0 нг/мл (от дня цикла не зависит)' },
+      { code: 'FSH', label: 'ФСГ (2–5 день)', importance: 'critical', lowMeaning: '↓ <2 — подавление оси (курс)', highMeaning: '↑ >10 на 2–5 день — резерв снижается', target: '3-10 МЕ/л (фолликулярная)' },
+      { code: 'E2', label: 'Эстрадиол (2–5 день)', importance: 'important', highMeaning: '↑ >80 пг/мл на 2–5 день — раннее созревание фолликула, ФСГ «занижен»', target: `базовая: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл` },
+      { code: 'PROG', label: 'Прогестерон (лютеиновая)', importance: 'critical', lowMeaning: '↓ <5 нг/мл за 7 дней до менструации — овуляции, вероятно, не было', target: `${PROG_PHASES.luteal.low}–${PROG_PHASES.luteal.high} нг/мл` },
+      { code: 'LH', label: 'ЛГ', importance: 'important', highMeaning: '↑ ЛГ/ФСГ >2 — СПКЯ?', target: `фолликулярная: ${FEMALE_HORMONE_BANDS.LH.normal} МЕ/л` },
+      { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '↑ >800 мМЕ/л — гасит овуляцию', target: `${FEMALE_HORMONE_BANDS.PRL.normal} мМЕ/л` },
+      { code: 'TSH', label: 'ТТГ', importance: 'critical', highMeaning: '>2.5 при планировании — обсудить коррекцию', target: '0.5-2.5 мМЕ/л' },
+      { code: 'TT', label: 'Тестостерон общий', importance: 'optional', highMeaning: '↑ >6 нмоль/л — вирилизация / СПКЯ', target: `${FEMALE_HORMONE_BANDS.TT.range.low}–${FEMALE_HORMONE_BANDS.TT.range.high} нмоль/л` },
+      { code: 'VITAMIN_D', label: '25(OH)D', importance: 'optional', lowMeaning: '↓ <30 нг/мл — дефицит', target: '30-50 нг/мл' },
+    ],
+    clinicalNotes: 'Порядок: АМГ в любой день, ФСГ и E2 на 2–5 день цикла, прогестерон за 7 дней до менструации — иначе об овуляции судить нельзя. На курсе ААС овуляции часто нет (ЛГ/ФСГ подавлены), восстановление занимает месяцы после отмены: планировать беременность на курсе нельзя. Партнёру нужна спермограмма — это часть пары, а не «его провал»: половина причин бесплодия мужские.',
+    triggerSymptoms: ['libido_decrease', 'fatigue', 'mood_swings'],
+    recommendedActions: [
+      'АМГ + ФСГ + E2 на 2–5 день цикла',
+      'Прогестерон за 7 дней до менструации (подтверждение овуляции)',
+      'УЗИ малого таза с фолликулометрией при нерегулярном цикле',
+      'ТТГ и пролактин — до попыток, а не после',
+      'Спермограмма партнёра — в тот же месяц, не «потом»',
+    ],
+  },
+
+  {
     id: 'nutritional_passport',
     title: 'Нутритивно-минеральный паспорт',
     problem: 'Дефициты микронутриентов на старте усугубляются на курсе ААС: магний, цинк, D3, железо.',

@@ -31,12 +31,12 @@ const ids = (sex?: 'male' | 'female') => panelsForSex(sex).map((p) => p.id);
 const malePanel = () => PROBLEM_PANELS.find((p) => p.sex === 'male')!;
 
 /** Женские сценарии — тоже закрытый список. */
-const FEMALE_ONLY = ['female_hormone_passport'];
+const FEMALE_ONLY = ['female_fertility_workup', 'female_hormone_passport', 'female_libido_workup'];
 
 describe('панели «По проблеме» и пол', () => {
   it('сценарии одного пола размечены ровно эти', () => {
     expect(PROBLEM_PANELS.filter((p) => p.sex === 'male').map((p) => p.id).sort()).toEqual(MALE_ONLY);
-    expect(PROBLEM_PANELS.filter((p) => p.sex === 'female').map((p) => p.id)).toEqual(FEMALE_ONLY);
+    expect(PROBLEM_PANELS.filter((p) => p.sex === 'female').map((p) => p.id).sort()).toEqual(FEMALE_ONLY);
   });
 
   it('женщина не видит мужских сценариев, но видит нейтральные и свой паспорт', () => {
@@ -93,6 +93,37 @@ describe('женский гормональный паспорт', () => {
   it('фаза замера названа: 2–5 день цикла и середина лютеиновой', () => {
     expect(panel().clinicalNotes).toContain('2–5 день цикла');
     expect(panel().clinicalNotes).toContain('за 7 дней до');
+  });
+});
+
+describe('женские сценарии либидо и фертильности', () => {
+  const panel = (id: string) => PROBLEM_PANELS.find((x) => x.id === id)!;
+  const target = (id: string, code: string) => panel(id).markers.find((m) => m.code === code)?.target || '';
+
+  it('либидо: тестостерон женский, мужских 400 нг/дл нет', () => {
+    expect(panel('female_libido_workup').sex).toBe('female');
+    expect(target('female_libido_workup', 'TT')).toContain('0.3');
+    expect(target('female_libido_workup', 'TT')).not.toContain('400');
+  });
+
+  it('либидо не сводится к тестостерону: пролактин, ТТГ, ферритин, прогестерон', () => {
+    const codes = panel('female_libido_workup').markers.map((m) => m.code);
+    for (const c of ['PRL', 'TSH', 'FT4', 'FERRITIN', 'PROG', 'SHBG']) expect(codes).toContain(c);
+    expect(panel('female_libido_workup').clinicalNotes).toContain('КОК');
+  });
+
+  it('фертильность: овуляцию подтверждает прогестерон лютеиновой, день цикла назван', () => {
+    expect(panel('female_fertility_workup').sex).toBe('female');
+    expect(target('female_fertility_workup', 'PROG')).toContain('5');
+    expect(target('female_fertility_workup', 'PROG')).toContain('20');
+    expect(panel('female_fertility_workup').clinicalNotes).toContain('2–5 день');
+    expect(panel('female_fertility_workup').clinicalNotes).toContain('за 7 дней до');
+  });
+
+  it('фертильность: спермограмма — про пару, а не мужская цель женщине', () => {
+    const notes = panel('female_fertility_workup').clinicalNotes;
+    expect(notes).toContain('спермограмма');
+    expect(notes).toContain('Партнёру');
   });
 });
 
