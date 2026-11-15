@@ -8,7 +8,7 @@ import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '
 import { normalizeLabValue } from '../core/constants';
 import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
-import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU, HDL_LOW, TG_FLAG_STEPS } from './lab-norms.engine';
+import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU, HDL_LOW, TG_FLAG_STEPS, SCREEN_TARGETS, BILIRUBIN_FLAG_STEPS, getLabNorm } from './lab-norms.engine';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -134,6 +134,9 @@ export function isMaleOnlyScreenMarker(marker: string): boolean {
 export function evaluateRecommendations(state: CalculatorState, result: CalculatorResult, courseWeek?: number): Recommendation[] {
   const fp = state.labs?.fullPanel;
   const sex = state.profile.sex;
+  // Проход 104: ключ половых таблиц (`SCREEN_TARGETS`, `HDL_LOW`) — «всё, что не
+  // female, идёт мужским путём», как и везде в приложении.
+  const sexT: 'male' | 'female' = sex === 'female' ? 'female' : 'male';
   const drugs = state.pharma.aas;
   const recs: Recommendation[] = [];
   const blockedIds = state.journal.negative.map(n => n.substanceId);
@@ -282,7 +285,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── Hepatotoxicity → query hepatoprotectors (priority: ALT) ──
   const altVal = getV(fp, 'panelBiochem', 'ALT');
-  if (maxHep > 0 || hasOral || state.hepatobiliary.altAstElevation !== 'none' || (altVal !== null && altVal > (sex === 'male' ? 30 : 25))) {
+  if (maxHep > 0 || hasOral || state.hepatobiliary.altAstElevation !== 'none' || (altVal !== null && altVal > SCREEN_TARGETS.ALT[sexT])) {
     const severe = maxHep >= 2.5 || hasOral || (altVal !== null && altVal > 100);
     const hepSev: SeverityLevel = severe ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('ALT', hepSev).map(e => e.substanceId);
@@ -522,15 +525,21 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── High Ferritin → iron chelation + antioxidant (priority: FERRITIN) ──
   const ferVal = getV(fp, 'panelIron', 'Ferritin');
-  const ferThreshold = sex === 'female' ? 150 : 300;
+  const ferThreshold = SCREEN_TARGETS.FERRITIN[sexT];
   if (ferVal !== null && ferVal > ferThreshold) {
     const ferSev: SeverityLevel = ferVal > 500 ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('FERRITIN', ferSev).map(e => e.substanceId);
     const ids = priorityIds.length >= 2 ? priorityIds : ['curcumin_sup', 'aspirin', 'vitamin_e'];
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('FERRITIN', id) || 'Хелатация железа, антиоксидант'; });
+    // Проход 104: раньше здесь всегда печаталось «> 300», хотя порог для женщины 150 —
+    // то есть ей показывалось число, которое её значение не превышает. ВГН и цель
+    // разведены словами: «избыток железа» — только выше ВГН (♂300 / ♀200).
+    const ferUln = getLabNorm('FERRITIN', sexT)?.uln ?? 300;
     addRec('lab_ferritin', 'medium', 'hematologic', 'Железо',
-      `Ферритин: ${ferVal} > 300 — избыток железа`,
+      ferVal > ferUln
+        ? `Ферритин: ${ferVal} > ${ferUln} (ВГН) — избыток железа`
+        : `Ферритин: ${ferVal} > ${ferThreshold} (цель курса) — железо под контролем`,
       ids, reasoning,
       'Кровопускание при ферритине >500. Контроль ферритина, Fe, ТФК.',
       'Ферритин, железо, ТФК, % насыщения трансферрина каждые 8 нед',
@@ -548,7 +557,9 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('DHEA_S', id) || 'Поддержка надпочечников'; });
     addRec('lab_dheas', 'low', 'endocrine', 'Надпочечники',
-      `DHEA-S: ${dheaVal} < 100 мкг/дл — надпочечниковая недостаточность`,
+      // Проход 104: порог возрастной (200/150/100/50), а печаталось «< 100» — мужчина
+      // 30 лет с ДГЕА-С 180 читал число, которое его значение не превышает.
+      `DHEA-S: ${dheaVal} < ${dheaThreshold} мкг/дл (цель для ${age} лет) — поддержка надпочечников`,
       ids, reasoning,
       'Контроль DHEA-S, кортизол через 8 нед.',
       'DHEA-S, кортизол утром каждые 8 нед',
@@ -587,23 +598,26 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       'CRP');
   }
 
-  const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string }[] = [
-    { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 30 : 25 }, system:'hepatic', label:'Печень' },
-    { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 30 : 25 }, system:'hepatic', label:'Печень' },
-    { marker:'GGT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 40 : 30 }, system:'hepatic', label:'Печень' },
-    { marker:'Bilirubin', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:21 }, system:'hepatic', label:'Печень' },
-    { marker:'Creatinine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: sex === 'male' ? 106 : 97 }, system:'renal', label:'Почки' },
+  // Проход 104: числа-цели (ниже ВГН) собраны в `SCREEN_TARGETS`, и рекомендация по
+  // ним печатается как «выше цели курса», а не как отклонение от границы. Билирубин
+  // идёт от ВГН (`BILIRUBIN_FLAG_STEPS.mild` = 17.1), как флаг на обоих экранах.
+  const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string; goal?: boolean }[] = [
+    { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.ALT[sexT] }, system:'hepatic', label:'Печень', goal: true },
+    { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.AST[sexT] }, system:'hepatic', label:'Печень', goal: true },
+    { marker:'GGT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.GGT[sexT] }, system:'hepatic', label:'Печень', goal: true },
+    { marker:'Bilirubin', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: BILIRUBIN_FLAG_STEPS.mild }, system:'hepatic', label:'Печень' },
+    { marker:'Creatinine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.CREATININE[sexT] }, system:'renal', label:'Почки', goal: true },
     { marker:'Urea', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:8 }, system:'renal', label:'Почки' },
     { marker:'Glucose', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5.6 }, system:'metabolic', label:'Метаболизм' },
     { marker:'Homocysteine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:15 }, system:'', label:'Метилирование' },
-    { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:2.6 }, system:'cardio', label:'Липиды' },
+    { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:2.6 }, system:'cardio', label:'Липиды', goal: true },
     { marker:'Triglycerides', panels:['panelLipid'], threshold:{ higherIsWorse:true, value: TG_FLAG_STEPS.elevated }, system:'cardio', label:'Липиды' },
-    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: HDL_LOW[sex === 'female' ? 'female' : 'male'] }, system:'cardio', label:'Липиды' },
+    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: HDL_LOW[sexT] }, system:'cardio', label:'Липиды', goal: true },
     { marker:'CRP', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5 }, system:'', label:'Воспаление' },
     { marker:'Cortisol', panels:['panelSex'], threshold:{ higherIsWorse:true, value:550 }, system:'neuro', label:'Стресс' },
     { marker:'D-dimer', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value: age > 50 ? age * 0.01 : 0.5 }, system:'hematologic', label:'Гемостаз' },
     { marker:'Fibrinogen', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value:4 }, system:'hematologic', label:'Гемостаз' },
-    { marker:'Ferritin', panels:['panelIron'], threshold:{ higherIsWorse:true, value: sex === 'female' ? 150 : 300 }, system:'', label:'Железо' },
+    { marker:'Ferritin', panels:['panelIron'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.FERRITIN[sexT] }, system:'', label:'Железо', goal: true },
     { marker:'Vitamin D (25-OH)', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:30 }, system:'endocrine', label:'Витамины' },
     { marker:'B12', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:200 }, system:'', label:'Витамины' },
     { marker:'TSH', panels:['panelThyroid'], threshold:{ higherIsWorse:true, value:4.5 }, system:'endocrine', label:'Щитовидная' },
@@ -647,7 +661,9 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     ids.forEach(id => { reasoning[id] = getPriorityReason(rule.marker, id) || 'По результатам анализов'; });
 
     addRec(recId, 'medium', rule.system, rule.label,
-      `${rule.marker}: ${val} ${rule.threshold.higherIsWorse ? '>' : '<'} ${rule.threshold.value}`,
+      // Проход 104: «цель курса» печатается словом — иначе «АЛТ 32 > 30» читается как
+      // отклонение, хотя ВГН 40 и значение в норме.
+      `${rule.marker}: ${val} ${rule.threshold.higherIsWorse ? '>' : '<'} ${rule.threshold.value}${rule.goal ? ' (цель курса)' : ''}`,
       ids, reasoning,
       `Повторный контроль ${rule.marker} через 2-4 нед. Коррекция дозы по динамике.`,
       `${rule.marker} каждые 2-4 нед`,

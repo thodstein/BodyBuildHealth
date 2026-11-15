@@ -102,7 +102,7 @@ describe('проход 102: источник липидных порогов', (
 
   it('recommendation-engine берёт ту же пару ЛПВП и тот же порог ТГ', () => {
     const rec = readFileSync(resolve(process.cwd(), 'src/engines/recommendation-engine.ts'), 'utf8');
-    expect(rec).toContain("value: HDL_LOW[sex === 'female' ? 'female' : 'male']");
+    expect(rec).toContain('value: HDL_LOW[sexT]');
     expect(rec).toContain('value: TG_FLAG_STEPS.elevated');
     expect(rec).not.toContain("sex === 'female' ? 1.2 : 1.0");
   });
