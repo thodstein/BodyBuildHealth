@@ -126,6 +126,38 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   },
 
   {
+    id: 'female_hormone_passport',
+    title: 'Женский гормональный паспорт (фазовые цели)',
+    sex: 'female', // своя панель вместо мужской: цели по фазе цикла, а не TT >400 нг/дл
+    phase: 'baseline',
+    urgency: 'routine',
+    problem: 'Исходный гормональный фон женщины: ось ГГЯ по фазе цикла, андрогены, пролактин, щитовидная, овариальный резерв. Доказательная база до курса.',
+    markers: [
+      { code: 'E2', label: 'Эстрадиол', importance: 'critical', lowMeaning: '↓ <30 пг/мл — дефицит эстрогенов (либидо, кости)', highMeaning: '↑ выше коридора фазы — сначала проверить день замера, не «подавлять»', target: `по фазе: ${FEMALE_HORMONE_BANDS.E2.normal} пг/мл` },
+      { code: 'PROG', label: 'Прогестерон', importance: 'important', lowMeaning: '↓ <10 в середине лютеиновой — недостаточность лютеиновой фазы', highMeaning: '↑ >30 нг/мл — проверить 19-нор и беременность', target: `по фазе: ${PROG_PHASES.follicular.low}–${PROG_PHASES.follicular.high} фолл. / ${PROG_PHASES.luteal.low}–${PROG_PHASES.luteal.high} лют. нг/мл` },
+      { code: 'LH', label: 'ЛГ', importance: 'critical', lowMeaning: '↓ <2 МЕ/л — подавление оси (курс), риск аменореи', highMeaning: '↑ >8 вне овуляции — СПКЯ? Проверить день цикла', target: `по фазе: ${FEMALE_HORMONE_BANDS.LH.normal} МЕ/л` },
+      { code: 'FSH', label: 'ФСГ', importance: 'critical', lowMeaning: '↓ <2 — подавление оси', highMeaning: '↑ >10 на 2–5 день — снижение овариального резерва', target: `по фазе: ${FEMALE_HORMONE_BANDS.FSH.normal} МЕ/л` },
+      { code: 'TT', label: 'Тестостерон общий', importance: 'important', highMeaning: '↑ >6 нмоль/л — вирилизация (голос, клитор, акне)', target: `${FEMALE_HORMONE_BANDS.TT.range.low}–${FEMALE_HORMONE_BANDS.TT.range.high} нмоль/л` },
+      { code: 'PRL', label: 'Пролактин', importance: 'important', highMeaning: '↑ >800 мМЕ/л — пролактинома? Макропролактин?', target: `${FEMALE_HORMONE_BANDS.PRL.normal} мМЕ/л` },
+      { code: 'AMH', label: 'АМГ', importance: 'important', lowMeaning: '↓ <1.0 нг/мл — снижение овариального резерва', highMeaning: '↑ >4.0 — СПКЯ?', target: '1.0-4.0 нг/мл' },
+      { code: 'TSH', label: 'ТТГ', importance: 'critical', highMeaning: '>3.0 — субклинический гипотиреоз', target: '0.5-2.5 мМЕ/л' },
+      { code: 'FT4', label: 'Т4 свободный', importance: 'important', lowMeaning: '↓ гипотиреоз', target: '12-18 пмоль/л' },
+      { code: 'SHBG', label: 'ГСПГ', importance: 'optional', highMeaning: '↑ на эстрогенах/оральных', lowMeaning: '↓ при инсулинорезистентности', target: '20-45 нмоль/л' },
+      { code: 'DHEA_S', label: 'ДГЭА-С', importance: 'optional', highMeaning: '↑ надпочечниковый источник андрогенов', target: 'до 300 мкг/дл' },
+      { code: 'FERRITIN', label: 'Ферритин', importance: 'optional', lowMeaning: '↓ <30 — запас железа (менструальные потери)', target: '>50 мкг/л' },
+    ],
+    clinicalNotes: 'Забор: базовые гормоны на 2–5 день цикла (фолликулярная), прогестерон — за 7 дней до ожидаемой менструации (лютеиновая), иначе вывод об овуляции неверен. АМГ от дня цикла не зависит. На курсе ААС ось подавлена: LH/FSH <2 — ожидаемо, «повышать» их гормонами не нужно, восстанавливаются отменой и временем. Длительная аменорея на курсе — потеря костной массы: E2 не подавлять, при <30 длительно обсудить остановку курса.',
+    triggerSymptoms: ['libido_decrease', 'mood_swings', 'fatigue'],
+    recommendedActions: [
+      'Забор 2–5 день цикла, натощак, утром 8:00–10:00',
+      'Прогестерон — за 7 дней до менструации (середина лютеиновой)',
+      'АМГ + ФСГ на 2–5 день — оценка овариального резерва',
+      'При E2 <30 длительно — обсудить ЗГТ/остановку курса (кости)',
+      'УЗИ малого таза при АМГ <1.0 или нерегулярном цикле',
+    ],
+  },
+
+  {
     id: 'nutritional_passport',
     title: 'Нутритивно-минеральный паспорт',
     problem: 'Дефициты микронутриентов на старте усугубляются на курсе ААС: магний, цинк, D3, железо.',

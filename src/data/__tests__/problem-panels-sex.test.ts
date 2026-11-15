@@ -30,23 +30,29 @@ const MALE_ONLY = [
 const ids = (sex?: 'male' | 'female') => panelsForSex(sex).map((p) => p.id);
 const malePanel = () => PROBLEM_PANELS.find((p) => p.sex === 'male')!;
 
+/** Женские сценарии — тоже закрытый список. */
+const FEMALE_ONLY = ['female_hormone_passport'];
+
 describe('панели «По проблеме» и пол', () => {
-  it('мужские сценарии размечены ровно эти', () => {
+  it('сценарии одного пола размечены ровно эти', () => {
     expect(PROBLEM_PANELS.filter((p) => p.sex === 'male').map((p) => p.id).sort()).toEqual(MALE_ONLY);
-    expect(PROBLEM_PANELS.filter((p) => p.sex === 'female')).toHaveLength(0);
+    expect(PROBLEM_PANELS.filter((p) => p.sex === 'female').map((p) => p.id)).toEqual(FEMALE_ONLY);
   });
 
-  it('женщина не видит мужских сценариев, но видит нейтральные', () => {
+  it('женщина не видит мужских сценариев, но видит нейтральные и свой паспорт', () => {
     const fem = ids('female');
     for (const id of MALE_ONLY) expect(fem).not.toContain(id);
     for (const id of ['cardio_full', 'hepatotoxicity_workup', 'polycythemia_workup', 'renal_workup', 'nutritional_passport']) {
       expect(fem).toContain(id);
     }
+    expect(fem).toContain('female_hormone_passport');
   });
 
-  it('мужчина видит все сценарии', () => {
-    expect(ids('male')).toHaveLength(PROBLEM_PANELS.length);
-    for (const id of MALE_ONLY) expect(ids('male')).toContain(id);
+  it('мужчина видит все сценарии, кроме женского паспорта', () => {
+    const male = ids('male');
+    expect(male).toHaveLength(PROBLEM_PANELS.length - FEMALE_ONLY.length);
+    for (const id of MALE_ONLY) expect(male).toContain(id);
+    for (const id of FEMALE_ONLY) expect(male).not.toContain(id);
   });
 
   it('пол неизвестен — показываем всё, а не гадаем', () => {
@@ -60,6 +66,33 @@ describe('панели «По проблеме» и пол', () => {
     const p = PROBLEM_PANELS.find((x) => x.id === 'polycythemia_workup')!;
     expect(p.sex).toBeUndefined();
     expect(p.title).toContain('♀');
+  });
+});
+
+describe('женский гормональный паспорт', () => {
+  const panel = () => PROBLEM_PANELS.find((x) => x.id === 'female_hormone_passport')!;
+  const target = (code: string) => panel().markers.find((m) => m.code === code)?.target || '';
+
+  it('цели фазовые: E2, ЛГ, ФСГ и прогестерон — коридорами, а не одним числом', () => {
+    expect(panel().sex).toBe('female');
+    expect(target('E2')).toContain('по фазе');
+    expect(target('E2')).toContain('200');
+    expect(target('E2')).toContain('500');
+    expect(target('PROG')).toContain('0.1');
+    expect(target('PROG')).toContain('5–20');
+    expect(target('LH')).toContain('по фазе');
+    expect(target('FSH')).toContain('по фазе');
+  });
+
+  it('тестостерон — женский 0.3–2.5, без мужских 400 нг/дл', () => {
+    expect(target('TT')).toContain('0.3');
+    expect(target('TT')).toContain('2.5');
+    expect(target('TT')).not.toContain('400');
+  });
+
+  it('фаза замера названа: 2–5 день цикла и середина лютеиновой', () => {
+    expect(panel().clinicalNotes).toContain('2–5 день цикла');
+    expect(panel().clinicalNotes).toContain('за 7 дней до');
   });
 });
 
