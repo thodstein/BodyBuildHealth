@@ -193,6 +193,22 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     window.addEventListener('training-open-tab', h);
     return () => window.removeEventListener('training-open-tab', h);
   }, [goTab]);
+  // Выход из окна конструктора в плеер (ББ-авто → «Отправить в выполнение»).
+  // Конструктор живёт в fixed-окне page='constructor', поэтому переключить одну
+  // вкладку мало — нужен и page='tabs'. Раньше это делалось подделкой
+  // storage-события he_training_tab: окно «само» закрывалось задним числом.
+  useEffect(() => {
+    const h = (e: Event) => {
+      const d = (e as CustomEvent).detail as { tab?: string } | undefined;
+      const t = (d?.tab || 'runtime') as TrainingTab;
+      if (!(TAB_LABELS as Record<string, string>)[t]) return;
+      setZone(zoneForTab(t));
+      setTab(t);
+      setPage('tabs');
+    };
+    window.addEventListener('training-exit-constructor', h);
+    return () => window.removeEventListener('training-exit-constructor', h);
+  }, []);
   // маршрутизация «Применить» для интеллектуальных тренировок (source = intellectual)
   useEffect(() => {
     if (zone === 'calculators') {

@@ -2552,6 +2552,11 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                                   peakWeek: !!b.config.peakWeek,
                                   peakConfig: b.config.peakConfig ?? null,
                                   taper: b.config.taper ?? null,
+                                  // Аудит навигации 2026-11: метка времени передачи.
+                                  // ББ-авто предзаполняет «🏁 Contest prep» только по
+                                  // свежему контексту (иначе старый хвост в хранилище
+                                  // выглядел как самопроизвольный переход в тапер).
+                                  ts: Date.now(),
                                 }));
                                 window.dispatchEvent(new CustomEvent('he-bb-plan-saved'));
                                 setAnnualStatusNote('🚀 Блок передан в ББ-авто — откройте шаг «План»' + (b.config.peakWeek ? ' (пик-неделя предзаполнена в «🏁 Contest prep»)' : ''));

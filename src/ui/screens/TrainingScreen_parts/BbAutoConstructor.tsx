@@ -103,6 +103,7 @@ import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
 import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { resolveBbAutoOpenStep, shouldFollowExternalPlan, annualBlockCtxIsFresh, clampBbWeek } from './bb-auto-nav';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
 import { BbWeightsStep } from './bb-step-weights';
@@ -1213,6 +1214,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   }, []);
 
   // Автосохранение выбранного сплита и последнего собранного плана.
+  /**
+   * Снимок нельзя писать на самом первом проходе: эффект восстановления объявлен
+   * НИЖЕ (FIX-19) и читает `he_bb_auto_state_v1` — запись дефолтов при монтировании
+   * затирала сохранённое раньше, чем его успевали прочитать (поэтому и позиция
+   * «шаг/неделя» не восстанавливалась бы никогда).
+   */
+  const persistReadyRef = useRef(false);
   useEffect(() => {
     const persist = () => {
       try {
@@ -1230,6 +1238,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           avoidAxialLoadUi, fewerCompound, allowStrengthLifts, abRotation, packingV2,
           usePreviousPlan, platePreset, targetBodyFat,
           injuries, mobilityRestrictions,
+          // Аудит навигации 2026-11: позиция в конструкторе. Без неё любой
+          // ремаунт (тап по нижнему меню, возврат из плеера, F5) открывал
+          // «Параметры» и через кадр сам перескакивал на «План».
+          step, bbWeekSel,
         }));
         // BUG-FIX (выбор сплита): НЕ пишем he_bb_plan_saved отсюда — эффект срабатывает
         // на КАЖДУЮ смену параметров (в т.ч. selectedSplitId) и сохранял СТАРЫЙ builtPlan,
@@ -1237,7 +1249,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         // План сохраняется явно при сборке/сохранении/экспорте.
       } catch { /* storage may be unavailable */ }
     };
-    persist();
+    // Первый проход — ДО восстановления из хранилища: не затираем сохранённое.
+    if (persistReadyRef.current) persist();
+    else persistReadyRef.current = true;
     const onHidden = () => { if (document.visibilityState === 'hidden') persist(); };
     window.addEventListener('beforeunload', persist);
     document.addEventListener('visibilitychange', onHidden);
@@ -1251,7 +1265,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     bbVolumeRamp, bbVolumeWave, bfrMode, blastCruiseEnabled, blastWeeks, cruiseWeeks,
     calorieSurplus, eccentricMult, rotationMode, intensityLevel, labMultOverride, recoveryOverride,
     rehabMuscles, avoidAxialLoadUi, fewerCompound, allowStrengthLifts, abRotation, packingV2,
-    usePreviousPlan, platePreset, targetBodyFat, injuries, mobilityRestrictions]);
+    usePreviousPlan, platePreset, targetBodyFat, injuries, mobilityRestrictions, step, bbWeekSel]);
   // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
   useEffect(() => {
     const handler = () => {
@@ -1948,23 +1962,39 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     } catch { /* профиль недоступен — не роняем визард */ }
   }, [bbWorkMax, weakPoints, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, courseIntensity, loadStrategy, planMode, selectedCycleId, bbTrainingFocus]);
 
-  // FIX-19: Авто-загрузка сохранённого плана при монтировании
+  // FIX-19: Авто-загрузка сохранённого плана при монтировании.
+  // Аудит навигации 2026-11: раньше здесь стоял безусловный `setStep('plan')` —
+  // «Параметры» успевали мелькнуть, и экран САМ перескакивал на «План» при
+  // каждом входе (а после любого ремаунта терялось место пользователя). Теперь
+  // план восстанавливается молча, а шаг берётся из сохранённой позиции.
   useEffect(() => {
+    let hasPlan = false;
+    let planWeeks = 0;
+    let planDate: string | null = null;
+    let persistedStep: unknown = null;
+    let persistedWeek: unknown = null;
     try {
       const saved = localStorage.getItem('he_bb_plan_saved');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.plan && parsed.date) {
           setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
-          setBbWeekSel(1);
-          setStep('plan');
-          applyAnnualBlockCtx(consumeAnnualBlockCtx());
+          hasPlan = true;
+          planDate = typeof parsed.date === 'string' ? parsed.date : null;
+          planWeeks = Array.isArray(parsed.plan.weeks) ? parsed.plan.weeks.length : 0;
         }
       }
+      // Контекст переданного блока читаем всегда: без плана он бесполезен, а
+      // оставленный в хранилище «выстрелит» через неделю (см. annualBlockCtxIsFresh).
+      const handoffCtx = consumeAnnualBlockCtx();
+      const handoff = hasPlan && annualBlockCtxIsFresh(handoffCtx, planDate);
       const savedAutoState = localStorage.getItem('he_bb_auto_state_v1');
       if (savedAutoState) {
         const state = JSON.parse(savedAutoState);
         if (state && typeof state === 'object') {
+          // Позиция в конструкторе (пишется персистом ниже) — не состояние сборки.
+          persistedStep = state.step;
+          persistedWeek = state.bbWeekSel;
           if (typeof state.selectedSplitId === 'string') setSelectedSplitId(state.selectedSplitId);
           if (Number.isFinite(state.bbDays)) setBbDays(Math.max(2, Math.min(7, Math.round(state.bbDays))));
           if (Number.isFinite(state.bbWeeks)) setBbWeeks(Math.max(1, Math.min(52, Math.round(state.bbWeeks))));
@@ -2026,13 +2056,28 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           if (Array.isArray(state.mobilityRestrictions)) setMobilityRestrictions(state.mobilityRestrictions.map((x: any) => String(x)));
         }
       }
+      // Позиция: hand-off годового плана открывает «План» переданного цикла
+      // (пик-неделя предзаполняется в «🏁 Contest prep», но в форму без действия
+      // пользователя не уводим), иначе — его собственный шаг.
+      if (handoff) {
+        applyAnnualBlockCtx(handoffCtx);
+        setBbWeekSel(1);
+        setStep('plan');
+      } else {
+        setStep(resolveBbAutoOpenStep(persistedStep, { hasPlan, programMode: planMode === 'programs' }));
+        if (hasPlan) setBbWeekSel(clampBbWeek(persistedWeek, planWeeks));
+      }
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ⚙️ Живой приём плана из «Сборки цикла» Годового планировщика (he-bb-plan-saved)
   /** Актуальная сборка для внешних событий (замыкание эффекта не видит свежий state). */
   const builtPlanRef = useRef<BBPlan | null>(builtPlan);
   useEffect(() => { builtPlanRef.current = builtPlan; }, [builtPlan]);
+  /** Текущий шаг для обработчиков, подписанных один раз (иначе замыкание «залипает»). */
+  const stepRef = useRef<Step>(step);
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   // Сборка плана считается в воркере (see engines/bb/bb-build-async.ts) — греем
   // его при открытии конструктора, чтобы первое «Собрать» не платило за загрузку.
@@ -2064,9 +2109,30 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         }
         if (parsed.plan) {
           setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
+          // Новая структура плана: правки/веса прежней к ней не относятся.
+          // Раньше `weightEntries`/`exerciseEdits` (ключи `${week}-${si}-${ei}`)
+          // переживали подмену — вес чужого упражнения приклеивался к новому.
+          setExerciseEdits({});
+          setEditsHistory([]);
+          setRedosHistory([]);
+          setWeightEntries([]);
+          setWeightsApplied(0);
           setBbWeekSel(1);
-          setStep('plan');
-          applyAnnualBlockCtx(consumeAnnualBlockCtx());
+          const ctx = consumeAnnualBlockCtx();
+          const handoff = annualBlockCtxIsFresh(ctx, typeof parsed.date === 'string' ? parsed.date : null);
+          const prefilled = handoff ? applyAnnualBlockCtx(ctx) : false;
+          // Аудит навигации 2026-11: уводим на «План» только если пользователь не
+          // занят настройкой. В шаге «Годовой план» живёт встроенный
+          // `MacrocyclePanel`, который сам шлёт это событие — прыжок оттуда и был
+          // «экраном, который сам перескочил».
+          if (shouldFollowExternalPlan(stepRef.current)) {
+            setStep('plan');
+          } else {
+            setBridgeMsg(prefilled
+              ? '🏁 План блока загружен — пик-неделя предзаполнена в «🏁 Contest prep»'
+              : '🔄 План обновлён извне — шаг «4 План» покажет новую версию');
+            setTimeout(() => setBridgeMsg(''), 6000);
+          }
         }
       } catch { /* ignore */ }
     };
@@ -2076,7 +2142,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /* ─── Годовой план → ББ-авто: контекст блока (he_bb_plan_saved_ctx) ─── */
 
-  const consumeAnnualBlockCtx = (): { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null } | null => {
+  /** Контекст передачи блока года. `ts` — когда передали (старые записи без него). */
+  type AnnualBlockCtx = {
+    peakWeek?: boolean;
+    weeks?: number;
+    peakConfig?: Record<string, unknown> | null;
+    ts?: number;
+  };
+
+  const consumeAnnualBlockCtx = (): AnnualBlockCtx | null => {
     try {
       const raw = localStorage.getItem('he_bb_plan_saved_ctx');
       if (!raw) return null;
@@ -2086,9 +2160,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     } catch { return null; }
   };
 
-  const applyAnnualBlockCtx = (ctx: { peakWeek?: boolean; weeks?: number; peakConfig?: Record<string, unknown> | null } | null) => {
+  /**
+   * Предзаполнение шага «🏁 Contest prep» из контекста блока года.
+   * Шаг НЕ меняет: раньше здесь было безусловное `setStep('contest')`, и передача
+   * блока выбрасывала пользователя из шага «Годовой план» в форму тапера
+   * (жалоба «экран перескакивает»). Куда идти — решает вызывающий код.
+   * @returns предзаполнение применено (в контексте есть пик-неделя с конфигом).
+   */
+  const applyAnnualBlockCtx = (ctx: AnnualBlockCtx | null): boolean => {
     const patch = ctx ? annualBlockCtxToPrepPatch(ctx) : null;
-    if (!patch) return;
+    if (!patch) return false;
     setPeakWeekCategory(patch.peakWeekCategory);
     setPeakSpec(patch.peakSpec);
     setPrepShowDate(patch.prepShowDate);
@@ -2098,8 +2179,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setPrepSodiumMode(patch.prepSodiumMode as SodiumStrategy);
     setPrepCarbMode(patch.prepCarbMode as CarbLoadStrategy);
     setPrepConfirmedManip(patch.prepConfirmedManip);
-    setStep('contest');
-    flash('🏁 Блок годового плана: пик-неделя предзаполнена — проверьте и соберите Contest prep');
+    flash('🏁 Блок годового плана: пик-неделя предзаполнена в шаге «🏁 Contest prep»');
+    return true;
   };
 
   const revalidateEditedPlan = (plan: BBPlan): BBPlan => {
@@ -3708,9 +3789,20 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         }),
       })));
        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
-      // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор)
-      localStorage.setItem('he_training_tab', 'runtime');
-      window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_tab' }));
+      // План, ушедший в плеер, должен пережить закрытие/ремаунт конструктора:
+      // раньше этот путь НЕ писал he_bb_plan_saved (в отличие от «Сохранить»), и
+      // при следующем открытии восстанавливался прежний план из хранилища.
+      try {
+        localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: executionPlan, date: new Date().toISOString() }));
+        localStorage.removeItem('he_bb_plan_saved_prev');
+        localStorage.removeItem('he_bb_plan_history');
+      } catch { /* storage недоступен — плеер уже получил план */ }
+      // FIX-12: Авто-переход на вкладку «Тренировка» (как ручной конструктор).
+      // Аудит навигации 2026-11: раньше здесь писали he_training_tab и вручную
+      // «изображали» storage-событие — TrainingScreen понимал это как переход из
+      // другого окна и закрывал окно конструктора побочным эффектом. Теперь это
+      // явное намерение, которое обрабатывает сам TrainingScreen.
+      window.dispatchEvent(new CustomEvent('training-exit-constructor', { detail: { tab: 'runtime' } }));
     } catch { flash('Ошибка при отправке плана на выполнение'); }
   };
 
