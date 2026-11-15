@@ -69,6 +69,9 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, rebalance: b
   vegTopUp88: false,
   autoMealRebalance: rebalance,
   fruitPortionFloor: fruitFloor,
+  // §8.111: измерительный A/B одной стадии — последняя миля выключена в обоих вариантах
+  // (иначе оба дня сходятся к канону и разница стадии съедается).
+  noLastMile111: true,
 } as unknown as MealPlanInput);
 
 const SOLID_SKIP = new Set(['liquid', 'supplement']);

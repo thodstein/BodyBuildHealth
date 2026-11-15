@@ -42,6 +42,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
   vegDensity78: false,
   eggSwap71: on,
+  // §8.111: измерительный флаг — последняя миля выключена, иначе A/B сравнивает два уже
+  // сведённых дня и разница стадии съедается (см. §8.111 в аудите).
+  noLastMile111: true,
 } as any) as any;
 
 const solidG = (m: any) => ((m.items || []) as any[])

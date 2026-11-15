@@ -575,17 +575,30 @@ export function starchDoubleStats(meals: any[], opts?: { smallG?: number; smallC
  *   • клетчатка дня ≤ кап (85), орехи/семена ≤ дневной катчелл-кап, яйца ≤ кап,
  *     масла ≤ 30 г на позицию, крахмал ≤ зерновой кап;
  *   • авторские порции (`_fixedGrams`), ингредиенты рецептов, добавки, жидкости и
- *     овощи (пол 200 г) не трогаются.
+ *     овощи (пол 200 г) не трогаются;
+ *   • §8.111 (охраны качества дня, которые доводчик мог бы сломать своими граммами):
+ *     окна тренировки и pre-sleep вне ходов (prew≤60, postw≤75, intra 40 г/ч, pre-sleep
+ *     без углей); цельный белок основного приёма не режется ниже 40 г; белок приёма
+ *     ≤ цели приёма ×1.35; доля жира основного приёма ≤35% дня (кроме дня с дефицитом
+ *     жира >2%); Na дня ≤ цели соли; Ca и витамин E дня не проваливаются (70%-пол, если
+ *     день его уже держал; 50%/60% на предельных профилях, где 70% недостижим).
  *
  * Ходы: одиночные (1 г) и парные (жир↔углевод, белок↔углевод — иначе день, где надо
  * «+8 г жира и −18 г углеводов» при том же ккал, не сдвигается ни одним одиночным ходом:
  * каждая половина обмена по отдельности ухудшает ось ккал).
  */
-// §8.108/§8.110 работают ТОЛЬКО на ручных целях с согласованным ккал (см. `__manualDay`
-// в `buildDayPlan`): замер набора 2046 тестов показал, что в авто-режиме пересборка
-// тарелки после нот и капов ломает выверенные замки (яйца ≤100 г, джем ≤35 г,
-// ведро ≤900 г, шаг белка 5 г), а ручной режим — ровно тот вход, где владелец требует
-// «введённые граммы, а не почти».
+// §8.108/§8.110/§8.111: стадия последней мили.
+// Ручной день — свёртка → доводчик (тол 2%: ветка «🎯 Точность рациона … (отклонение ≤2%)»
+// уже обещает 2%), и корректор только как СТРАХОВКА, если день всё ещё вне 3% (замер:
+// доводчик первым сходится там, где корректор первым набирал углеводы белковыми носителями
+// — 85 кг/5 приёмов/mass застревал на У 3.8%).
+// Авто/профиль — свёртка → доводчик (тол 3%), корректор если доводчика не хватило.
+// Владелец: «≤3% по ккал и отдельно по Б/Ж/У на ЛЮБОМ пути», поэтому гейт «только ручные
+// цели» снят; дни, уже укладывающиеся в 3%, остаются байт-в-байт (ранний выход по devBefore).
+// Замер (80 авто-дней + 80 ручных, 55–120 кг × 3–6 приёмов × тренировка/отдых × cut/mass):
+// авто 78/80 (медиана 2.0%, p90 2.8%), ручной 79/80 (1.2%, 2.3%), «вторых гарниров в малом
+// виде» 22 → 0. Два дня вне канона одинаковы до и после правок — это долг ПОДБОРА продуктов
+// (100 кг/3 приёма/cut: жирный белок; 55 кг/5 приёмов/mass: нет жирового ножа).
 export function microTuneDay(
   meals: any[],
   goal: { kcal: number; p: number; f: number; c: number },
@@ -595,6 +608,8 @@ export function microTuneDay(
     budget?: string;
     fiberCapG?: number;
     maxRounds?: number;
+    /** §8.111: потолок натрия дня (мг). Доводчик не имеет права вывести день за него. */
+    maxNaMg?: number;
   },
 ): { devBefore: number; devAfter: number; rounds: number; applied: boolean } {
   const ms = Array.isArray(meals) ? meals.filter(Boolean) : [];
@@ -640,6 +655,16 @@ export function microTuneDay(
   type Knob = {
     mi: number; it: any; role: string; fam: string; axis: 'p' | 'f' | 'c';
     per: { p: number; f: number; c: number; kcal: number; fiber: number }; maxG: number;
+    // §8.111: охраны качества, которые день уже соблюдает, а доводчик мог бы сломать:
+    // плотность витамина E (нельзя резать E-богатый жир), натрий на грамм (нельзя
+    // вывести день за Na-цель), «основной приём» (доля жира ≤35%) и цель приёма по белку.
+    ePer100: number; naPer: number; main: boolean; tP: number; caPer100: number;
+    // §8.111: порошок/добавка (в т.ч. пришедшая без role='supplement', как whey в перекусе):
+    // её можно двигать, но не ниже 20 г — «пустая ложка» не порция (QG34, hv-snack-protein).
+    isPowder: boolean;
+    // §8.111: пол цельного белка в ОСНОВНОМ приёме (F1: «не треска 40 г»): 75 г у атлетов
+    // ≥80 кг, иначе 40 г. 0 — позиция не цельный белок.
+    wholeFloor: number;
   };
   const knobs: Knob[] = [];
   ms.forEach((m, mi) => {
@@ -648,14 +673,22 @@ export function microTuneDay(
       if (!it || it._fixedGrams) continue;
       const amount = Number(it.amount) || 0;
       if (amount < 5) continue;
+      // §8.111: окна тренировки и pre-sleep — НЕ «свободные граммы». У них собственные
+      // капы (prew≤60, postw≤75, intra 40 г/ч, pre-sleep без углей), и доводчик туда не
+      // ходит: иначе пост-воркаут 75 → 83 г (замок planner-high-volume «peri-капы целы»).
+      if ((m as any)._insulinWindow || ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type))) continue;
       const role = String(it.role || '');
       // Замер по набору (40 красных, §8.110 v1): доводчик НЕ трогает «витрину» —
       // фрукты/овощи/яйца/джемы-кетчупы/добавки/жидкости и авторские позиции. У них своя
       // выверенная арифметика (пол порции фрукта, ≤100 г яиц в дне, ≤35 г джема, пол 200 г
       // овощей, жёсткие граммы в микро-нотах), и любой сдвиг на грамм ломает инвариант.
       // Работают только макро-рабочие: белок, крахмал, жир.
-      if (role === 'supplement' || role === 'liquid' || role === 'veg' || role === 'fruit' || role === 'catchup') continue;
-      if (String(it.id) === 'egg_whole' || /(^|_)egg/.test(String(it.id))) continue;
+      // Работают только макро-рабочие: белок, крахмал, жир. Исключение — яичный белок
+      // (см. ниже): это макро-белок, а не «витрина».
+      const _idKnob = String(it.id || '');
+      const _isEggWhite = _idKnob === 'egg_white' || _idKnob === 'egg_white_liquid';
+      if (role === 'supplement' || (role === 'liquid' && !_isEggWhite) || role === 'veg' || role === 'fruit' || role === 'catchup') continue;
+      if (/(^|_)egg/.test(_idKnob) && !_isEggWhite) continue;
       if (core.includes(it.id)) continue;
       const per = {
         p: (Number(it.p) || 0) / amount, f: (Number(it.f) || 0) / amount,
@@ -668,7 +701,27 @@ export function microTuneDay(
       // Окно ±25% от плановой порции (и не ниже 5 г): день доводится, а не пересобирается.
       let maxG = Math.round(amount * 1.25);
       try { maxG = Math.max(amount, Math.min(maxG, edibilityCapFor(String(it.id || ''), 400))); } catch { /* db-капризы — не блокируем */ }
-      knobs.push({ mi, it, role, fam, axis, per, maxG });
+      const _fd371: any = (() => { try { return FOOD_DB.find((f) => f.id === it.id); } catch { return undefined; } })();
+      // §8.111: порошок/добавка — не витрина, а макро-рабочий белок, но со своим полом
+      // (≥10 г, «пустая ложка» не порция). Раньше такие позиции просто выкидывались из
+      // доводчика, и предельный день (55 кг / 6 приёмов / 275 У) не мог снять лишний белок:
+      // сыворотка была единственным белковым ножом в перекусах.
+      const _isPowder371 = String(_fd371?.category || '').toLowerCase() === 'supplement'
+        || String(_fd371?.foodState || '').toLowerCase() === 'powder';
+      // Пол цельного белка: F1-гарантия «цельный белок основного приёма ≥75 г у атлетов
+      // ≥80 кг» (замок planner-realism-guarantees: луциан 40 г в ужине на 90 кг).
+      const _wholeFloor371 = axis === 'p' && !_isPowder371
+        ? (['breakfast', 'lunch', 'dinner'].includes(String(m.type || ''))
+          && (Number(opts?.weightKg) || 0) >= 80 ? 75 : 40)
+        : 0;
+      knobs.push({
+        mi, it, role, fam, axis, per, maxG, isPowder: _isPowder371, wholeFloor: _wholeFloor371,
+        ePer100: _fd371 ? Number(getMicroFromFood(_fd371, 'VitE')) || 0 : 0,
+        naPer: _fd371 ? (Number(getMicroFromFood(_fd371, 'Na')) || 0) / 100 : 0,
+        caPer100: _fd371 ? Number(getMicroFromFood(_fd371, 'Ca')) || 0 : 0,
+        main: !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type || '')) && !(m as any)._insulinWindow,
+        tP: Number((m as any).target?.p) || 0,
+      });
     }
   });
   if (!knobs.length) return { devBefore, devAfter: devBefore, rounds: 0, applied: false };
@@ -678,6 +731,21 @@ export function microTuneDay(
   const baseSolid = ms.map(solidOf);
   const baseKcal = ms.map((m: any) => sumOf(m, 'kcal'));
   const baseP = ms.map((m: any) => sumOf(m, 'p'));
+  const baseFM = ms.map((m: any) => sumOf(m, 'f'));
+  const isMainMeal = ms.map((m: any) =>
+    !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m?.type || '')) && !(m as any)?._insulinWindow);
+  // Натрий и кальций дня считаются по тарелке: доводчик добавляет граммы реальных
+  // продуктов, и «Na ≤ цели» / «Ca не ниже 70% RDA» — такие же замки, как клетчатка
+  // (замер: 1 день из 30 уходил за 125% Na и 1 — на 67% Ca).
+  let baseNa = 0;
+  let baseCa = 0;
+  let baseE = 0;
+  try {
+    const _bm: any = sumMicros(ms.flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+    baseNa = Number(_bm?.Na || 0);
+    baseCa = Number(_bm?.Ca || 0);
+    baseE = Number(_bm?.VitE || 0);
+  } catch { baseNa = 0; baseCa = 0; baseE = 0; }
   let baseFiber = 0; let baseNut = 0; let baseEgg = 0;
   for (const m of ms) for (const x of (m.items || [])) {
     baseFiber += Number(x.fiber) || 0;
@@ -687,6 +755,14 @@ export function microTuneDay(
   }
 
   const STARCH_FAMS = STARCH_FAMILY_SET;
+  // §8.111: пол витамина E — ЯРУСНЫЙ, как у кальция.
+  // День, который держал 70% RDA (10.5 мг), не падает ниже 70% — это инвариант QG35
+  // («дней с витамином E < 70% RDA нет»); прежний пол 60% (9 мг) пропускал «минус грамм
+  // масла» и выводил день на 68%. День, пришедший НИЖЕ пола (замер B19: 1 мг на
+  // 55 кг / 6 приёмов), защищён «не хуже −10%»: абсолютный пол делал недопустимым ЛЮБОЙ
+  // ход с минусом — даже −2 г мяса, — и день навсегда застревал на 6.0%.
+  const MICRO_FLOOR_E_MG = 10.5; // 70% RDA 15 мг
+  const _eFloor111 = baseE >= MICRO_FLOOR_E_MG ? MICRO_FLOOR_E_MG : baseE * 0.9;
   // Оценка хода: (худшая ось, сумма отклонений) — лексикографически. Одной худшей оси
   // мало: когда белок +17.6% и углеводы −17.6%, ход «убрать 5 г белка» не двигает
   // максимум и отвергается, хотя он — половина обмена; с суммой он проходит, и день
@@ -694,10 +770,11 @@ export function microTuneDay(
   let _em = Infinity;
   let _es = Infinity;
   const evalMoves = (moves: { k: Knob; na: number }[]): boolean => {
-    let dK = 0; let dP = 0; let dF = 0; let dC = 0; let dFib = 0; let dNut = 0; let dEgg = 0;
+    let dK = 0; let dP = 0; let dF = 0; let dC = 0; let dFib = 0; let dNut = 0; let dEgg = 0; let dNa = 0; let dCa = 0; let dE = 0;
     const solid = baseSolid.slice();
     const kcal = baseKcal.slice();
     const pM = baseP.slice();
+    const fM = baseFM.slice();
     for (const mv of moves) {
       const curA = Number(mv.k.it.amount) || 0;
       const na = Math.round(mv.na);
@@ -705,10 +782,28 @@ export function microTuneDay(
       if (na < 5) { _em = Infinity; _es = Infinity; return false; }
       const dg = na - curA;
       const k = mv.k;
+      // §8.111: порошок не опускается ниже 20 г — «пустая ложка» не порция (QG34:
+      // «порошок ≥20 г», а planner-hv-snack-protein ловит и 10 → 5 г).
+      if (k.isPowder && dg < 0 && na < Math.min(20, curA)) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: цельный белок не режется ниже своего пола: 75 г у атлетов ≥80 кг (F1:
+      // «луциан 40 г в ужине»), 40 г в остальных случаях (QG5/QG6: «40 г рыбы» — не порция,
+      // а обрезок). Пол сторожит ПЕРЕХОД через порог: полноценная порция не превращается в
+      // обрезок. Позицию, которую движок сам собрал меньше пола (в предельном дне B19 —
+      // индейка 20 г в перекусе), доводчик может дожать: замеры двух более жёстких форм —
+      // «меньше пола не трогать вовсе» → 8.98%, «абсолютный пол 10 г» → Б 3.64% — обе выводят
+      // день из канона, поэтому остаётся переход через порог (B19 сходится в 1.49%). Сам «20 г белка
+      // в перекусе» — дефект подбора, а не граммов; чинится в отборе продуктов.
+      if (dg < 0 && k.wholeFloor > 0 && curA >= k.wholeFloor && na < k.wholeFloor) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: кальций дня не проваливается от действий доводчика ниже пола
+      // (замер: S1/6/отд 67% — Ca-богатый кунжут/сыр урезали ради калорий).
+      dCa += (k.caPer100 / 100) * dg;
+      dE += (k.ePer100 / 100) * dg;
       dK += k.per.kcal * dg; dP += k.per.p * dg; dF += k.per.f * dg; dC += k.per.c * dg; dFib += k.per.fiber * dg;
+      dNa += k.naPer * dg;
       if (mv.k.it.role !== 'liquid') solid[k.mi] += dg;
       kcal[k.mi] += k.per.kcal * dg;
       pM[k.mi] += k.per.p * dg;
+      fM[k.mi] += k.per.f * dg;
       if (k.fam === 'nuts' || k.fam === 'seeds') dNut += dg;
       if (String(k.it.id) === 'egg_whole') dEgg += dg;
       if (na > k.maxG) { _em = Infinity; _es = Infinity; return false; }
@@ -716,15 +811,64 @@ export function microTuneDay(
       if (k.fam === 'oils' && na > 30) { _em = Infinity; _es = Infinity; return false; }
     }
     for (let i = 0; i < ms.length; i++) {
-      if (solid[i] > Math.max(plateCap, baseSolid[i])) { _em = Infinity; _es = Infinity; return false; }
+      if (solid[i] > Math.max(plateCap, baseSolid[i]) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: тарелка не переходит абсолютный предел 900 г и НЕ создаёт новое «ведро»
+      // (>500 г твёрдого). Замки planner-meal-buckets / planner-hv-meal-count: доводчик
+      // набирал канон граммами и делал на c1500 шесть вёдер вместо трёх — «ведро еды на
+      // один приём» это ровно то, на что жаловался владелец. Пока день далеко от канона
+      // (худшая ось > 5%), ведро — единственный способ добрать физику (c1500 = 1500 г У),
+      // поэтому запрет действует в последней миле канона, а не на предельных профилях.
+      if (solid[i] > Math.max(900, baseSolid[i]) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      if (curM <= 5 && baseSolid[i] <= 500 && solid[i] > 500 + 1e-9) { _em = Infinity; _es = Infinity; return false; }
       if (kcal[i] < Math.min(180, baseKcal[i]) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
-      // Пол белка приёма: честная доля цели, но с допуском 30%. Жёсткая доля (goal/приёмов)
-      // запирала день: 6 приёмов при 88 г Б — это 14.7 г на приём, и ни один приём не мог
-      // отдать белок (замер: 55 кг/6 приёмов застревал на Б +5.8%), хотя день-то сходится
-      // ОБМЕНОМ «мясо → крупа» внутри приёма. Абсолютный минимум 8 г и MPS-полы остаются.
-      if (pM[i] < Math.min(baseP[i], Math.max(8, pShare * 0.7)) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: пол белка приёма — ЯРУСНЫЙ. Доля цели с допуском 30% держит «честную долю»
+      // на днях, где белок в норме; на дне, который ПЕРЕБИРАЕТ белок (замер: 85 кг /
+      // 5 приёмов / mass — Б +3.7%), этот пол запирал единственный доступный нож (яичный
+      // белок завтрака 160 г) и день застревал на Б +3.7% / У −3.8%. Тогда работает только
+      // абсолютный минимум 8 г: цель дня уже нарушена, «недокормить один приём» дешевле,
+      // чем оставить перебор по всему дню.
+      const _pFloorM = dayP > goal.p ? 8 : Math.max(8, pShare * 0.7);
+      if (pM[i] < Math.min(baseP[i], _pFloorM) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: белок не сваливается в приём сверх цели приёма ×1.35 (замок
+      // planner-recipe-high-volume: «Обед 97 г при цели 68»). Уменьшать можно всегда.
+      const _tp = Number(ms[i]?.target?.p) || 0;
+      if (_tp > 0 && pM[i] > Math.max(baseP[i], _tp * 1.35) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      // §8.111: жир не сваливается в один основной приём — доля ≤35% дня (или не хуже
+      // прежней, если день уже был выше; замер QG15: 4 дня из 30 уходили на 36–37%).
+      if (isMainMeal[i]) {
+        const _fDayAfter = dayF + dF;
+        const _shareAfter = _fDayAfter > 0 ? fM[i] / _fDayAfter : 0;
+        const _shareBefore = dayF > 0 ? baseFM[i] / dayF : 0;
+        // §8.111: пока жир дня не добрал цель, «доля в одном приёме» — вторична: день с
+        // дефицитом жира иначе не сходится (замер: 55 кг/6 приёмов/33 г жира застревал на
+        // 9.0%, потому что разложить 33 г по шести приёмам под 35% физически нельзя).
+        // Замок держит только день, который по жиру уже на цели (там перевес — реальный риск).
+        const _fatScarce = _fDayAfter <= goal.f * 0.98;
+        if (!_fatScarce && _shareAfter > Math.max(_shareBefore, 0.35) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      }
+    }
+    // §8.111: белок дня не перебирает цель сверх 16% (замок planner-meal-target-scale:
+    // «3 болюса» уходил на 270/220 = +22.7%, потому что углеводный нож — овсянка/рис с
+    // 10–13% белка — тихо добивал белок при доводке углеводов). Если день УЖЕ выше полосы,
+    // расти ему нельзя, но и «срезать до нормы» здесь не наша задача.
+    if (dayP + dP > Math.max(dayP, goal.p * 1.16) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+    // §8.111: натрий дня не растёт за свой потолок (когда он уже у потолка — только вниз).
+    if (dNa > 0 && Number.isFinite(opts?.maxNaMg ?? Infinity)
+      && baseNa + dNa > Math.max(baseNa, Number(opts?.maxNaMg)) + 1e-9) {
+      _em = Infinity; _es = Infinity; return false;
     }
     if (baseFiber + dFib > fiberCap + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+    if (dCa < 0 && baseCa > 0) {
+      // День уже держит 70% RDA — доводчик не имеет права уронить его ниже (QG18/QG19/QG20:
+      // «ни одного дня с Ca < 70%»). День, дошедший до нас ниже (предельные профили),
+      // защищён полом 50%: там приоритет — канон 3% по макросам.
+      const _caFloor = baseCa >= 700 ? 700 : 500;
+      if (baseCa + dCa < _caFloor) { _em = Infinity; _es = Infinity; return false; }
+    }
+    // §8.111: E-богатый жир не режем — иначе день теряет витамин E ниже 70% RDA
+    // (замер: 1 день из 30 садился до 57% на подсолнечном масле; прежний пол 60% пропускал
+    // «минус грамм масла» и выводил день на 68%, что валило QG35).
+    if (dE < 0 && baseE > 0 && baseE + dE < _eFloor111 - 1e-9) { _em = Infinity; _es = Infinity; return false; }
     if (baseNut + dNut > nutCap + 1e-9) { _em = Infinity; _es = Infinity; return false; }
     if (baseEgg + dEgg > eggCap + 1e-9) { _em = Infinity; _es = Infinity; return false; }
     const rK = rel(dayK + dK, goal.kcal); const rP = rel(dayP + dP, goal.p);
@@ -780,8 +924,24 @@ export function microTuneDay(
     if (!(per > 1e-9)) return 0;
     return clampDelta(k, (axisGoal(ax) - axisVal(ax)) / per);
   };
-  const candsFor = (ax: 'p' | 'f' | 'c'): Knob[] =>
-    knobs.filter((k) => k.axis === ax).sort((a, b) => b.per[ax] - a.per[ax]).slice(0, 4);
+  let allowP = true;
+  const candsFor = (ax: 'p' | 'f' | 'c'): Knob[] => {
+    // §8.111: раскладка белка по приёмам — «витрина»: она попадает в ноту «Белок по приёмам»
+    // и в замки порций (planner-powder-portion «меняются только граммы порошка»,
+    // planner-seed-swap «тронут не тот пункт», planner-fruit-crumb). Доводчик двигает
+    // белковые позиции только когда белок — виновная ось; иначе он чинит жир/углеводы и
+    // мяса не переставляет (замер: курица 90 → 75 г на дне с каноном по жиру).
+    if (ax === 'p' && !allowP) return [];
+    // §8.111: на белковой оси сортируем не по плотности, а по АБСОЛЮТНОМУ вкладу
+    // (граммы × % белка). Плотные позиции (курица 23%, рыба 22%) уже стоят на полах
+    // порций, и «нож» белка физически лежит не в них, а в больших рыхлых позициях —
+    // замер: 85 кг/5 приёмов/mass стоял на Б +3.7% при яичном белке 160 г (17.6 г Б),
+    // который даже не попадал в топ-4 по плотности, так что день не мог сбросить 5.7 г.
+    const mass = (k: Knob) => Math.max(0, Number(k.it?.amount) || 0) * k.per[ax];
+    return knobs.filter((k) => k.axis === ax)
+      .sort((a, b) => (ax === 'p' ? mass(b) - mass(a) : b.per[ax] - a.per[ax]))
+      .slice(0, 4);
+  };
   const OFFS = [-2, -1, 0, 1, 2];
   /**
    * Контракт порций продукта: белок — шаг 5 г (QG19/§8.89: «порция рыбы/мяса 40–200 г,
@@ -800,6 +960,9 @@ export function microTuneDay(
   };
 
   while (rounds < maxRounds && curM > tol + 1e-9) {
+    // §8.111: белок «трогаем» только когда он виновная ось (см. `candsFor`).
+    const _pDevNow = goal.p > 0 ? ((Math.abs(dayP - goal.p) / goal.p) * 100) : 0;
+    allowP = _pDevNow >= curM - 0.5;
     let best: { moves: { k: Knob; na: number }[]; m: number; s: number } | null = null;
     const consider = (moves: { k: Knob; na: number }[]) => {
       const snapped = moves.map((mv) => ({ k: mv.k, na: snapNa(mv.k, mv.na) }));
@@ -855,6 +1018,7 @@ export function microTuneDay(
     // 4) страховка: слепой 1-граммовый скан ±20 (случаи, где аналитика упирается в замок)
     if (!best) {
       for (const k of knobs) {
+        if (!allowP && k.axis === 'p') continue;
         const a0 = Number(k.it.amount) || 0;
         for (let d = 1; d <= 20; d++) {
           consider([{ k, na: a0 + d }]);
@@ -862,8 +1026,12 @@ export function microTuneDay(
         }
       }
     }
-    if (!best) break;
-    for (const mv of best.moves) applyMove(mv.k, mv.na);
+    // TS-фокус: `best` присваивается ТОЛЬКО внутри замыкания `consider`, поэтому
+    // анализатор потока считает его `null` и выводит `never`; каст возвращает
+    // объявленный тип (значение на этом шаге гарантированно не null — см. `if`).
+    const _pick = best as { moves: { k: Knob; na: number }[]; m: number; s: number } | null;
+    if (!_pick) break;
+    for (const mv of _pick.moves) applyMove(mv.k, mv.na);
     day = dayOf();
     dayK = day.kcal; dayP = day.p; dayF = day.f; dayC = day.c;
     curM = score(day);
@@ -17650,6 +17818,237 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         recalcDayTotals(meals as any[], totals);
       }
     }
+    // ─── §8.110: последняя миля — ПОСЛЕДНЯЯ точка, где меняются тарелки ───
+    // Замер §8.107/§8.108: все «финальные» стадии (окна белка, ночной приём, микро-добивки,
+    // гигиена) идут ПОСЛЕ корректора и после свёртки гарнира, поэтому день, сошедшийся на
+    // 2%, к возврату снова уходил на 5–9%: ночной белок добивал пре-слип, «добрана до еды»
+    // переставляла носитель во второй гарнир. Стадий больше не добавляем — здесь
+    // пересобирается ТОЛЬКО то, что они оставили: свёртка гарнира, (при необходимости) один
+    // проход корректора и однограммовая доводка по существующим позициям.
+    // §8.111: стадия работает на ВСЕХ путях. Требование владельца — ≤3% отдельно по ккал и
+    // по Б/Ж/У на ЛЮБОМ входе (ручные цели, профиль, авто), а не только там, где цели
+    // вводил человек. Отличие путей ровно одно: в ручном режиме допуск доводчика 2%
+    // (нота обещает «≤2%»), в авто — 3% (канон), чтобы день, уже сошедшийся, не двигался
+    // ни на грамм.
+    //
+    // Флаг `noLastMile111` — ТОЛЬКО измерительный, как `vegDensity78` / `fatCanonTrim` /
+    // `hvMealCap79`: A/B-замки отдельных стадий сравнивают «со стадией / без неё» на
+    // НЕсведённых днях, а включённая последняя миля выравнивает оба варианта до канона и
+    // делает такое сравнение бессмысленным (оба дня 1.9% — разница стадии съедена).
+    // В UI и профиле флаг не выставляется: по умолчанию стадия ВКЛючена на всех путях.
+    if (!(input as any).noLastMile111) {
+      const _lmN = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+      const _lmGoal = { kcal: _lmN.kcal, p: _lmN.p, f: _lmN.f, c: _lmN.c };
+      // «Ведро» (§8.53) и предел тарелки по факту: ни свёртка, ни корректор не создают
+      // новое ведро (>500 г твёрдого) и не выводят тарелку за 900 г — иначе добор канона
+      // граммами превращает день в «ведро еды на приём» (замер: c1500 вёдер 3 → 6).
+      const _plateStats = (ms: any[]): { buckets: number; maxSolid: number } => {
+        let buckets = 0;
+        let maxSolid = 0;
+        for (const m of ms) {
+          if (!m || !(m.items || []).length) continue;
+          let g = 0;
+          for (const it of m.items) {
+            const r = String(it?.role || '');
+            if (r === 'liquid' || r === 'supplement') continue;
+            g += Number(it?.amount) || 0;
+          }
+          if (g > 500) buckets++;
+          if (g > maxSolid) maxSolid = g;
+        }
+        return { buckets, maxSolid };
+      };
+      const _lmDev = (): number => {
+        const t = { kcal: 0, p: 0, f: 0, c: 0 } as any;
+        for (const m of meals) for (const it of (m.items || [])) {
+          t.kcal += it.kcal || 0; t.p += it.p || 0; t.f += it.f || 0; t.c += it.c || 0;
+        }
+        const rel = (v: number, g: number) => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
+        return Math.max(rel(t.kcal, _lmGoal.kcal), rel(t.p, _lmGoal.p), rel(t.f, _lmGoal.f), rel(t.c, _lmGoal.c));
+      };
+      const _consolidateGuarded = (): void => {
+        // Свёртка меняет граммы: перенос 1:1 по У идёт с округлением до 5 г, а мелкий
+        // носитель снимается целиком вместе со своим белком/жиром/клетчаткой. Поэтому она
+        // принимается только если не ухудшает точность дня и не растит «малый второй
+        // гарнир» — иначе откат к снимку (замер: 55 кг/6 приёмов после свёртки без замка
+        // уходил на ккал −3.3%).
+        const _devC = _lmDev();
+        const _smallC = starchDoubleStats(meals).small;
+        const _snapC = JSON.parse(JSON.stringify(meals)) as any[];
+        const _st = consolidateStarchCarrier(meals, { budget: input.budget, weightKg: input.weightKg });
+        if (_st.removedItems === 0) return;
+        recalcMealTotals(meals); recalcDayTotals(meals, totals);
+        const _smallAfter = starchDoubleStats(meals).small;
+        // Приоритет владельца: сначала «ни одного малого второго гарнира», затем точность.
+        // Свёртка, которая сняла малый носитель, принимается даже с просадкой точности
+        // (её догоняет однограммовый проход), а если малых не убавилось — только без порчи дня.
+        const _worseSmall = _smallAfter > _smallC;
+        const _worseDev = _smallAfter === _smallC && _lmDev() > _devC + 0.05;
+        // Свёртка переносит углеводы в главный носитель — тарелка растёт, и это цена
+        // приоритета владельца «нет второго гарнира в малом виде»: держим только
+        // «малых не убавилось» + «день не испорчен» (замер: с жёстким замком тарелки
+        // свёртка откатывалась и малый гарнир оставался на 3 авто-днях из 80).
+        if (_worseSmall || _worseDev) {
+          meals.splice(0, meals.length, ..._snapC);
+          recalcMealTotals(meals); recalcDayTotals(meals, totals);
+        }
+      };
+      _consolidateGuarded();
+      // Доводчик вызывается до корректора (дешёвый путь: только существующие позиции,
+      // капы яиц/масел/орехов/крупы/тарелки — внутри) и ещё раз после него.
+      const _tuneOnce = (tolPct: number) => {
+        const r = microTuneDay(meals as any, _lmGoal, {
+          // Ручной день: тол 2%, а не 3% — ветка «🎯 Точность рациона … (отклонение ≤2%)»
+          // уже обещает пользователю 2%, и такой день обязан доходить до обещанного, а 3% —
+          // это внешний канон-предел. Авто/профиль: тол 3% — день, уже сошедшийся в канон,
+          // не двигается ни на грамм (иначе ломаются выверенные раскладки).
+          tolPct, weightKg: input.weightKg, budget: input.budget,
+          fiberCapG: input.fiberCapG, maxRounds: 24,
+          // Натрий: та же цель, что у витрины соли (`🧂 Натрий`), — доводчик не выводит день за неё.
+          maxNaMg: input.isTrainingDay
+            ? Math.max(3000, Math.round(3000 + (Number(input.weightKg) || 0) * 5))
+            : 2300,
+        });
+        if (r.applied) {
+          recalcMealTotals(meals);
+          recalcDayTotals(meals, totals);
+          if (r.devAfter < r.devBefore - 0.05
+            && !notes.some((n) => typeof n === 'string' && n.startsWith('📏 Последняя точность'))) {
+            notes.push(`📏 Последняя точность: порции выровнены однограммовыми шагами (худшая ось ${r.devBefore.toFixed(1)}% → ${r.devAfter.toFixed(1)}%) — состав блюд не менялся`);
+          }
+        }
+        return r;
+      };
+      const _correctorPass = (): void => {
+        const _lmCorr = _correctDayToTargets(meals as any, _lmGoal as any, {
+          excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40,
+          weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay,
+          anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay,
+          budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0,
+          hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7),
+          fiberCapG: input.fiberCapG, lowFiberComposition: input.lowFiberComposition,
+        } as any);
+        if (_lmCorr && _lmCorr.meals && _lmCorr.meals.length > 0) {
+          const _before = _lmDev();
+          const _beforeSmall = starchDoubleStats(meals).small;
+          const _platesBefore = _plateStats(meals);
+          const _fixedN = (ms: any[]) => ms.reduce((s: number, m: any) =>
+            s + (m.items || []).filter((x: any) => x && x._fixedGrams).length, 0);
+          const _fixedBefore = _fixedN(meals);
+          const _pBeforeCorr = Number(totals?.p) || 0;
+          const _snap = JSON.parse(JSON.stringify(meals)) as any[];
+          const _cand = JSON.parse(JSON.stringify(_lmCorr.meals)) as any[];
+          meals.splice(0, meals.length, ..._cand);
+          recalcMealTotals(meals);
+          recalcDayTotals(meals, totals);
+          const _after = _lmDev();
+          const _pAfterCorr = Number(totals?.p) || 0;
+          const _afterSmall = starchDoubleStats(meals).small;
+          const _platesAfter = _plateStats(meals);
+          // Принимаем только если не хуже по приоритету владельца (сначала «нет малого
+          // второго гарнира», затем точность) — иначе откат к снимку «до». Защищённые
+          // пункты (`_fixedGrams`: микро-добивка/авторская порция) не теряются.
+          // Тарелки: корректор не создаёт новых вёдер и не выходит за 900 г — добор канона
+          // граммами на экстремальных днях иначе превращал день в «ведро еды на приём».
+          // §8.111: и белок дня не перебирает цель сверх +16% (замок
+          // planner-meal-target-scale: на «3 болюсах» углеводная доводка шла картофелем и
+          // овсянкой, и белок 251.9 → 270 при цели 220 = +22.7%). Белок — не валюта
+          // углеводной доводки: лучше оставить день на У, чем отдать перебор по Б.
+          const _pCapCorr = Math.max(_pBeforeCorr, _lmGoal.p * 1.16);
+          if (_afterSmall > _beforeSmall || _after > _before + 0.05 || _fixedN(meals) < _fixedBefore
+            || _pAfterCorr > _pCapCorr + 1e-9
+            || _platesAfter.maxSolid > Math.max(900, _platesBefore.maxSolid) + 1e-9
+            || (_before <= 5 && _platesAfter.buckets > _platesBefore.buckets)) {
+            meals.splice(0, meals.length, ..._snap);
+            recalcMealTotals(meals);
+            recalcDayTotals(meals, totals);
+          }
+        }
+      };
+      if (__manualDay) {
+        // Ручная цель: сначала свёртка гарнира (приоритет владельца «нет малого второго
+        // гарнира») и бесплатная доводка до обещанных 2% — она не пересобирает приёмы.
+        // И только если день ВСЁ ЕЩЁ вне канона 3%, разрешён один проход корректора
+        // (он перекладывает квоты приёмов) с повторной доводкой. Замер: 85 кг / 5 приёмов
+        // / 275 У сходился только так (без страховки застревал на У 3.8% — корректор,
+        // отработавший ПЕРВЫМ, набирал углеводы картофелем и крупой, то есть белковыми
+        // носителями, и доводчику не оставалось хода).
+        _consolidateGuarded();
+        _tuneOnce(2);
+        if (_lmDev() > PLANNER_CONVERGENCE_PCT) {
+          _correctorPass();
+          _consolidateGuarded();
+          _tuneOnce(2);
+        }
+      } else {
+        // Авто/профиль: день уже собран движком под свои цели — сначала бесплатная доводка
+        // по существующим позициям (капы внутри), и только если её не хватило — один проход
+        // корректора с тем же замком приёмки (свёртка гарнира не растёт, `_fixedGrams` не
+        // теряются). Доводчик повторяется, потому что корректор меняет и структуру приёмов.
+        _tuneOnce(PLANNER_CONVERGENCE_PCT);
+        if (_lmDev() > PLANNER_CONVERGENCE_PCT) {
+          _correctorPass();
+          _consolidateGuarded();
+          _tuneOnce(PLANNER_CONVERGENCE_PCT);
+        }
+      }
+      // ─── витрина не врёт: «Точность рациона» и отклонение дня — по ФАКТУ после стадии ───
+      // Стадия меняет граммы последней, а нота §8.91 написана раньше; без пересчёта
+      // пользователь видит «Б 2%» при факте 3% (замок QG34).
+      {
+        // §8.111: последняя миля меняет белок приёмов (обмен внутри приёма, шаг 5 г), поэтому
+        // строка «Белок по приёмам/равномерно» пересобирается по факту ПОСЛЕ неё — иначе она
+        // показывает раскладку «до» (замок planner-protein-note: приём «Полдник» 37 г
+        // отсутствовал в списке 47/48/40/51/39).
+        _refreshProteinNote();
+        const _gPx = Number(input.goalProteinG) || Number(adjustedProteinG) || 0;
+        const _gFx = Number(input.goalFatG) || 0;
+        const _gCx = Number(input.goalCarbsG) || 0;
+        const _dPx = Math.abs(Number(totals.p) - _gPx) / Math.max(1, _gPx);
+        const _dFx = Math.abs(Number(totals.f) - _gFx) / Math.max(1, _gFx);
+        const _dCx = Math.abs(Number(totals.c) - _gCx) / Math.max(1, _gCx);
+        // §8.91: перебор белка — «пол», а не нарушение: в вердикт идёт только недобор.
+        const _dPxUnder = Math.max(0, _gPx - Number(totals.p)) / Math.max(1, _gPx);
+        const _mxX = Math.max(_dPxUnder, _dFx, _dCx);
+        const _plX = Number(totals.p) > _gPx * 1.0005
+          ? `Б ${Math.round(Number(totals.p))}/${_gPx}г (пол, +${Math.round(_dPx * 100)}%)`
+          : `Б ${Math.round(_dPx * 100)}%`;
+        const _pctAll = `Б ${Math.round(_dPx * 100)}%, Ж ${Math.round(_dFx * 100)}%, У ${Math.round(_dCx * 100)}%`;
+        const _iTx = notes.findIndex((n) => typeof n === 'string' && /Точность рациона:/.test(String(n)));
+        if (_iTx >= 0) {
+          notes[_iTx] = _mxX <= 0.02
+            ? `🎯 Точность рациона: ${_plX}, Ж ${Math.round(Number(totals.f))}/${_gFx}г, У ${Math.round(Number(totals.c))}/${_gCx}г (отклонение ≤2%)`
+            : _mxX <= 0.03
+              // §8.111: канон владельца — ≤3% по каждой оси. Ветка «≤5%» больше не
+              // описывает сошедшийся день: между 2% и 3% стоит честное «≤3%», и все три
+              // оси печатаются ОДНИМ форматом (проценты отклонения), чтобы строка была
+              // сравнима с целью владельца, а не с внутренним «полом» белка.
+              ? `✓ Точность рациона: отклонение ≤3% (${_pctAll})`
+              : _mxX <= 0.05
+                ? `✓ Точность рациона: отклонение ≤5% (${_pctAll})`
+                : `⚠ Точность рациона: отклонение >5% (${_plX}, Ж ${Math.round(_dFx * 100)}%, У ${Math.round(_dCx * 100)}%) — проверьте пулы продуктов`;
+        }
+        _dayDevPctP4 = Math.round(Math.max(
+          (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+          _dPxUnder, _dFx, _dCx,
+        ) * 1000) / 10;
+      }
+    }
+    // ─── §8.110: витрина идёт за последней милей ──────────────────────────────
+    // Стадия выше — ПОСЛЕДНЯЯ, где меняются граммы (свёртка снимает мелкий носитель,
+    // доводчик ходит по существующим позициям). Всё, что читает тарелку — уникальные
+    // продукты, категории, микро-покрытие, — обязано быть снимком ПОСЛЕ неё: иначе день
+    // сошёлся, а витрина показывает состав «до» (замок §8.74/QG21: «нота = тарелка»).
+    _finalFoodIds.clear();
+    for (const m of meals) for (const it of (m.items || [])) _finalFoodIds.add(it.id);
+    for (const _k of Object.keys(_finalCategories)) delete _finalCategories[_k];
+    _finalFoodIds.forEach((id) => {
+      const f = FOOD_DB.find((x) => x.id === id);
+      const cat = f?.category || 'other';
+      _finalCategories[cat] = (_finalCategories[cat] || 0) + 1;
+    });
+    _finalMicroTotals = sumMicros(meals.flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
+    { const _mFresh = _microNow(); if (_mFresh) _finalMicro = _mFresh as any; }
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
     // Здесь собираем «съедобность» из фактических тарелок: овощи, распределение жира,
@@ -17674,7 +18073,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _mb = microBoost.micro;
       // Ищем пункт по payload-маркеру (spread-клоны корректора его сохраняют),
       // а НЕ по ссылке на исходный объект — reconciliation клонирует meals.
-      const _mbFound = meals.flatMap(m => (m.items || [])).find((x: any) => (x as any)._microClosure === _mb) as any;
+      // §8.111: сравнение по СОДЕРЖИМОМУ маркера, а не по ссылке: JSON-снимки
+      // (`JSON.parse(JSON.stringify(...))` в свёртке/корректоре) сохраняют поля, но не
+      // идентичность объекта — на ссылке нота превращалась в ложное «не влез» (замок
+      // planner-micro-closure §4.1: «на дне с ккал-комнатой closure работает»).
+      const _sameMicro = (a: any, b: any): boolean => !!a && !!b
+        && String(a.foodId) === String(b.foodId)
+        && String(a.key) === String(b.key)
+        && Number(a.grams) === Number(b.grams);
+      const _mbFound = meals.flatMap(m => (m.items || [])).find((x: any) => _sameMicro((x as any)._microClosure, _mb)) as any;
       const _mbFood = _mbFound ? FOOD_DB.find(f => f.id === _mbFound.id) : undefined;
       if (_mbFound && _mbFood && _mbFood.id === _mb.foodId) {
         const _actualG = Math.round(_mbFound.amount || 0);
@@ -17765,7 +18172,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const _dGoal37 = Number(_tg37.get('VitD') || 15);
       const _o337 = Number((_finalMicroTotals as any)?.['Omega3'] || 0);
       const _b1237 = Number((_finalMicroTotals as any)?.['VitB12'] || 0);
-      const _mains37 = (meals as any[]).filter((m) => ['breakfast', 'lunch', 'dinner'].includes(String(m.type)));
+      const _mains37 = (meals as any[]).filter((m) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'].includes(String(m.type)));
       const _maxF37 = Math.max(0, ..._mains37.map((m) => Number(m.totals?.f) || 0));
       const _share37 = Math.round((_maxF37 / Math.max(1, Number(totals.f) || 1)) * 100);
       for (let i = 0; i < notes.length; i++) {
@@ -17777,7 +18184,24 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
         if (t.includes('🧈 Жир по приёмам:')) {
           t = t.replace(/максимум жира в основном приёме \d+%/, `максимум жира в основном приёме ${_share37}%`);
+          // §8.111: вторая форма ноты — «снижена с X% до Y%». Y — тот же факт; X остаётся
+          // историческим «до», иначе теряется смысл строки.
+          t = t.replace(/снижена с (\d+)% до \d+%/, `снижена с $1% до ${_share37}%`);
         }
+        // §8.111: белок основного приёма мог измениться в последней миле — «минимум по
+        // основным приёмам N г» пересчитывается по факту (QG14: нота = тарелка).
+        if (t.includes('🥩 Белок по приёмам:')) {
+          // Набор приёмов — как у витрины QG14: пять «основных» (завтрак/обед/ужин/два
+          // перекуса); окна тренировки и pre-sleep в минимум не входят.
+          const _mainsP37 = (meals as any[]).filter((m) => ['breakfast', 'lunch', 'dinner', 'snack', 'snack2'].includes(String(m.type)));
+          if (_mainsP37.length > 0) {
+            const _minMain37 = Math.round(Math.min(..._mainsP37.map((m) => Number(m.totals?.p) || 0)));
+            t = t.replace(/минимум по основным приёмам \d+ г/, `минимум по основным приёмам ${_minMain37} г`);
+          }
+        }
+        // §8.111: молочная нота QG18 печатает «Ca A → B мг (P% цели)» — «после» обязано
+        // быть фактом тарелки: доводчик/свёртка ходят после этой ноты.
+        t = t.replace(/Ca (\d+) → \d+ мг \(\d+% цели\)/, `Ca $1 → ${Math.round(_ca37)} мг (${_pct(_ca37, _caGoal37)}% цели)`);
         if (t.includes('🐟 Кальций:')) {
           t = t.replace(/Ca [\d.,]+ мг \(\d+% цели\)/, `Ca ${Math.round(_ca37)} мг (${_pct(_ca37, _caGoal37)}% цели)`);
           t = t.replace(/B12 [\d.,]+ мкг/, `B12 ${_r1(_b1237)} мкг`);
@@ -17947,125 +18371,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
     mergeDuplicateItems(meals);
-    // ─── §8.110: последняя миля — ПОСЛЕДНЯЯ точка, где меняются тарелки ───
-    // Замер §8.107/§8.108: все «финальные» стадии (окна белка, ночной приём, микро-добивки,
-    // гигиена) идут ПОСЛЕ корректора и после свёртки гарнира, поэтому день, сошедшийся на
-    // 2%, к возврату снова уходил на 5–9%: ночной белок добивал пре-слип, «добрана до еды»
-    // переставляла носитель во второй гарнир. Стадий больше не добавляем — здесь
-    // пересобирается ТОЛЬКО то, что они оставили: свёртка гарнира, (при необходимости) один
-    // проход корректора и однограммовая доводка по существующим позициям.
-    if (__manualDay) {
-      const _lmN = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
-      const _lmGoal = { kcal: _lmN.kcal, p: _lmN.p, f: _lmN.f, c: _lmN.c };
-      const _lmDev = (): number => {
-        const t = { kcal: 0, p: 0, f: 0, c: 0 } as any;
-        for (const m of meals) for (const it of (m.items || [])) {
-          t.kcal += it.kcal || 0; t.p += it.p || 0; t.f += it.f || 0; t.c += it.c || 0;
-        }
-        const rel = (v: number, g: number) => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
-        return Math.max(rel(t.kcal, _lmGoal.kcal), rel(t.p, _lmGoal.p), rel(t.f, _lmGoal.f), rel(t.c, _lmGoal.c));
-      };
-      const _consolidateGuarded = (): void => {
-        // Свёртка меняет граммы: перенос 1:1 по У идёт с округлением до 5 г, а мелкий
-        // носитель снимается целиком вместе со своим белком/жиром/клетчаткой. Поэтому она
-        // принимается только если не ухудшает точность дня и не растит «малый второй
-        // гарнир» — иначе откат к снимку (замер: 55 кг/6 приёмов после свёртки без замка
-        // уходил на ккал −3.3%).
-        const _devC = _lmDev();
-        const _smallC = starchDoubleStats(meals).small;
-        const _snapC = JSON.parse(JSON.stringify(meals)) as any[];
-        const _st = consolidateStarchCarrier(meals, { budget: input.budget, weightKg: input.weightKg });
-        if (_st.removedItems === 0) return;
-        recalcMealTotals(meals); recalcDayTotals(meals, totals);
-        const _smallAfter = starchDoubleStats(meals).small;
-        // Приоритет владельца: сначала «ни одного малого второго гарнира», затем точность.
-        // Свёртка, которая сняла малый носитель, принимается даже с просадкой точности
-        // (её догоняет однограммовый проход), а если малых не убавилось — только без порчи дня.
-        const _worseSmall = _smallAfter > _smallC;
-        const _worseDev = _smallAfter === _smallC && _lmDev() > _devC + 0.05;
-        if (_worseSmall || _worseDev) {
-          meals.splice(0, meals.length, ..._snapC);
-          recalcMealTotals(meals); recalcDayTotals(meals, totals);
-        }
-      };
-      _consolidateGuarded();
-      if (_lmDev() > PLANNER_CONVERGENCE_PCT) {
-        const _lmCorr = _correctDayToTargets(meals as any, _lmGoal as any, {
-          excludedIds: combinedExcluded, allowCoreScale: false, maxIter: _pickCtx.highVolumeDay ? 64 : 40,
-          weightKg: input.weightKg, convenientCarbs: _pickCtx.highVolumeDay, highCarb: _pickCtx.highVolumeDay,
-          anchorCarbIds: _pickCtx.dayCarbAnchors, lbmKg: input.lbmKg, refeedDay: !!(input as any).refeedDay,
-          budget: input.budget, allergenTags: input.allergenTags, daySalt: input.dayOffset ?? 0,
-          hvStyle: input.hvStyle, weekIndex: Math.floor((input.dayOffset || 0) / 7),
-          fiberCapG: input.fiberCapG, lowFiberComposition: input.lowFiberComposition,
-        } as any);
-        if (_lmCorr && _lmCorr.meals && _lmCorr.meals.length > 0) {
-          const _before = _lmDev();
-          const _beforeSmall = starchDoubleStats(meals).small;
-          const _fixedN = (ms: any[]) => ms.reduce((s: number, m: any) =>
-            s + (m.items || []).filter((x: any) => x && x._fixedGrams).length, 0);
-          const _fixedBefore = _fixedN(meals);
-          const _snap = JSON.parse(JSON.stringify(meals)) as any[];
-          const _cand = JSON.parse(JSON.stringify(_lmCorr.meals)) as any[];
-          meals.splice(0, meals.length, ..._cand);
-          recalcMealTotals(meals);
-          recalcDayTotals(meals, totals);
-          const _after = _lmDev();
-          const _afterSmall = starchDoubleStats(meals).small;
-          // Принимаем только если не хуже по приоритету владельца (сначала «нет малого
-          // второго гарнира», затем точность) — иначе откат к снимку «до». Защищённые
-          // пункты (`_fixedGrams`: микро-добивка/авторская порция) не теряются.
-          if (_afterSmall > _beforeSmall || _after > _before + 0.05 || _fixedN(meals) < _fixedBefore) {
-            meals.splice(0, meals.length, ..._snap);
-            recalcMealTotals(meals);
-            recalcDayTotals(meals, totals);
-          }
-        }
-      }
-      _consolidateGuarded();
-      const _mt = microTuneDay(meals as any, _lmGoal, {
-        // Тол 2%, а не 3%: ветка «🎯 Точность рациона … (отклонение ≤2%)» уже обещает
-        // пользователю 2%, и ручной день обязан доходить до обещанного, а 3% — это
-        // внешний канон-предел, а не цель стадии.
-        tolPct: 2, weightKg: input.weightKg, budget: input.budget,
-        fiberCapG: input.fiberCapG, maxRounds: 24,
-      });
-      if (_mt.applied) {
-        recalcMealTotals(meals);
-        recalcDayTotals(meals, totals);
-        if (_mt.devAfter < _mt.devBefore - 0.05) {
-          notes.push(`📏 Последняя точность: порции выровнены однограммовыми шагами (худшая ось ${_mt.devBefore.toFixed(1)}% → ${_mt.devAfter.toFixed(1)}%) — состав блюд не менялся`);
-        }
-      }
-      // ─── витрина не врёт: «Точность рациона» и отклонение дня — по ФАКТУ после стадии ───
-      // Стадия меняет граммы последней, а нота §8.91 написана раньше; без пересчёта
-      // пользователь видит «Б 2%» при факте 3% (замок QG34).
-      {
-        const _gPx = Number(input.goalProteinG) || Number(adjustedProteinG) || 0;
-        const _gFx = Number(input.goalFatG) || 0;
-        const _gCx = Number(input.goalCarbsG) || 0;
-        const _dPx = Math.abs(Number(totals.p) - _gPx) / Math.max(1, _gPx);
-        const _dFx = Math.abs(Number(totals.f) - _gFx) / Math.max(1, _gFx);
-        const _dCx = Math.abs(Number(totals.c) - _gCx) / Math.max(1, _gCx);
-        // §8.91: перебор белка — «пол», а не нарушение: в вердикт идёт только недобор.
-        const _dPxUnder = Math.max(0, _gPx - Number(totals.p)) / Math.max(1, _gPx);
-        const _mxX = Math.max(_dPxUnder, _dFx, _dCx);
-        const _plX = Number(totals.p) > _gPx * 1.0005
-          ? `Б ${Math.round(Number(totals.p))}/${_gPx}г (пол, +${Math.round(_dPx * 100)}%)`
-          : `Б ${Math.round(_dPx * 100)}%`;
-        const _iTx = notes.findIndex((n) => typeof n === 'string' && /Точность рациона:/.test(String(n)));
-        if (_iTx >= 0) {
-          notes[_iTx] = _mxX <= 0.02
-            ? `🎯 Точность рациона: ${_plX}, Ж ${Math.round(Number(totals.f))}/${_gFx}г, У ${Math.round(Number(totals.c))}/${_gCx}г (отклонение ≤2%)`
-            : _mxX <= 0.05
-              ? `✓ Точность рациона: отклонение ≤5% (${_plX}, Ж ${Math.round(_dFx * 100)}%, У ${Math.round(_dCx * 100)}%)`
-              : `⚠ Точность рациона: отклонение >5% (${_plX}, Ж ${Math.round(_dFx * 100)}%, У ${Math.round(_dCx * 100)}%) — проверьте пулы продуктов`;
-        }
-        _dayDevPctP4 = Math.round(Math.max(
-          (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
-          _dPxUnder, _dFx, _dCx,
-        ) * 1000) / 10;
-      }
-    }
     // §8.107d (витрина не врёт): финальная сверка «Сводки MPS» и клетчатки с ФАКТОМ
     // тарелки. Пересборка раньше шла только в отдельных ветках финальных стадий; если
     // день заканчивался в другой ветке (замер: salt 5, C5-fix), витрина отставала на
@@ -19108,9 +19413,13 @@ function reconcileFishSwapNotes(
       const fid = cand ? String(cand.id) : null;
       if (!fid) {
         // Имя в ноте не сверилось с БД (у QG13 короткие имена: «сардины»): решаем по
-        // граммам — если такой порции рыбы в дне нет, обмен отменён поздними проходами.
-        const amts = meals.flatMap((mm: any) => (mm.items || []).map((x: any) => Math.round(Number(x.amount) || 0)));
-        if (!amts.includes(claimed)) { changed = true; continue; }
+        // граммам — если такой порции РЫБЫ в дне нет, обмен отменён поздними проходами.
+        // §8.111: сверяем именно рыбу, а не любую позицию: «50 г» риса делало сегмент
+        // «сардины 50 г» формально «существующим» (QG22: нота = тарелка).
+        const fishAmts = meals.flatMap((mm: any) => (mm.items || [])
+          .filter((x: any) => /^(trout|fish_snapper_red|sardines|salmon|mackerel|herring|pollock|cod|tuna|sprat|hake|perch)/.test(String(x.id)))
+          .map((x: any) => Math.round(Number(x.amount) || 0)));
+        if (!fishAmts.includes(claimed)) { changed = true; continue; }
         kept.push(seg);
         continue;
       }

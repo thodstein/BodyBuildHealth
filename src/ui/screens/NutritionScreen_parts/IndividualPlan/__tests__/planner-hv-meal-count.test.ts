@@ -42,6 +42,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
   ...(on ? {} : { hvMealCap79: false }),
+  // §8.111: измерительный A/B одной стадии (§8.79) — последняя миля выключена в обоих
+  // вариантах, иначе оба дня сходятся к канону и «вёдра/канон» сравнивать не с чем.
+  noLastMile111: true,
 } as any) as any;
 
 const FIXED_TYPES = new Set(['preworkout', 'postworkout', 'intra', 'presleep']);

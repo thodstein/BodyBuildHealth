@@ -48,6 +48,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   // §8.74 (огрызок — не порция) выключается в обоих вариантах: она меняет состав блюд
   // и мешала бы проверять «состав тот же». Её собственный замок — planner-fruit-crumb.test.ts.
   fruitCrumb74: false,
+  // §8.111: измерительный A/B одной стадии — последняя миля выключена в обоих вариантах
+  // (иначе оба дня сходятся к канону и разница стадии съедается).
+  noLastMile111: true,
 } as any) as any;
 
 const solidG = (m: any) => ((m.items || []) as any[])

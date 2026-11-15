@@ -49,6 +49,10 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   // свою стадию, иначе чужой ход уезжает в его off-базу.
   vegDensity78: on,
   vegDenseDiet83: false,
+  // §8.111: измерительный A/B одной стадии (§8.78) — последняя миля выключена в обоих
+  // вариантах: с ней оба дня сходятся к канону, и «меняется только овощ» (граммы прочих
+  // позиций) перестаёт быть проверяемым.
+  noLastMile111: true,
 } as any) as any;
 
 const DENSE = new Set(['spinach', 'kale', 'veg_kale', 'broccoli']);

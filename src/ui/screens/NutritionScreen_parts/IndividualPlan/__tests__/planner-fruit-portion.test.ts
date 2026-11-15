@@ -57,6 +57,10 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean, on: boolean)
   // (`planner-fruit-crumb.test.ts`): в «без стадии» варианте §8.59 крошка остаётся —
   // иначе §8.74 её уберёт, и A/B перестанет быть сравнением одной стадии.
   fruitCrumb74: false,
+  // §8.111: последняя миля выключена в обоих вариантах — это измерительный A/B одной
+  // стадии (§8.59). С включённой милей оба дня сходятся к канону и разница стадии
+  // съедается. Пользовательский путь всегда идёт с последней милей.
+  noLastMile111: true,
 } as unknown as MealPlanInput);
 
 const crumbs = (pl: any) => (pl.meals || []).flatMap((m: any) => ((m.items || []) as any[])

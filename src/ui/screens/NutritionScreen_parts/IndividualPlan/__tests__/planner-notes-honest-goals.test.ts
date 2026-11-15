@@ -56,14 +56,32 @@ describe('B38: примечания о сходимости честны к це
       const t = sum(plan.meals as any[]);
       const note = (plan.notes || []).find((n: string) => n.includes('Точность рациона'));
       expect(note, `нет примечания для ${c.weightKg}кг/${c.goalCarbsG}У`).toBeTruthy();
-      const m = /Б (\d+)%, Ж (\d+)%, У (\d+)%/.exec(String(note));
-      if (!m) continue; // ветка «отклонение ≤2%» печатает граммы, а не проценты
+      const s = String(note);
+      // Три формы строки: проценты («Б 2%, Ж 1%, У 0%»), перебор белка-пола
+      // («Б 186/180г (пол, +3%)») и граммы («Б 179/180г, Ж 79/79г, У 340/340г»).
+      const pB = /Б (\d+)%/.exec(s) || /Б \d+\/\d+г \(пол, \+(\d+)%\)/.exec(s);
+      const pF = /Ж (\d+)%/.exec(s);
+      const pC = /У (\d+)%/.exec(s);
+      if (pB || pF || pC) {
+        checked++;
+        if (pB) expect(Math.abs(Number(pB[1]) - Math.round(pct(t.p, c.goalProteinG))), `Б: ${s}`).toBeLessThanOrEqual(1);
+        if (pF) expect(Math.abs(Number(pF[1]) - Math.round(pct(t.f, c.goalFatG))), `Ж: ${s}`).toBeLessThanOrEqual(1);
+        if (pC) expect(Math.abs(Number(pC[1]) - Math.round(pct(t.c, c.goalCarbsG))), `У: ${s}`).toBeLessThanOrEqual(1);
+        continue;
+      }
+      // §8.111: после последней мили день сходится ≤2% и нота печатает ГРАММЫ
+      // («Б 180/180г, Ж 80/80г, У 340/340г») — граммы тоже обязаны быть фактом тарелки
+      // и целью пользователя, иначе «почти сошлось» врёт в другую сторону.
+      const g = /Ж (\d+)\/(\d+)г.*?У (\d+)\/(\d+)г/.exec(s);
+      expect(g, `не разобрать ноту: ${s}`).toBeTruthy();
+      if (!g) continue;
       checked++;
-      expect(Math.abs(Number(m[1]) - Math.round(pct(t.p, c.goalProteinG))), `Б: ${note}`).toBeLessThanOrEqual(1);
-      expect(Math.abs(Number(m[2]) - Math.round(pct(t.f, c.goalFatG))), `Ж: ${note}`).toBeLessThanOrEqual(1);
-      expect(Math.abs(Number(m[3]) - Math.round(pct(t.c, c.goalCarbsG))), `У: ${note}`).toBeLessThanOrEqual(1);
+      expect(Number(g[1]), `Ж-факт: ${s}`).toBe(Math.round(Number(t.f)));
+      expect(Number(g[2]), `Ж-цель: ${s}`).toBe(c.goalFatG);
+      expect(Number(g[3]), `У-факт: ${s}`).toBe(Math.round(Number(t.c)));
+      expect(Number(g[4]), `У-цель: ${s}`).toBe(c.goalCarbsG);
     }
-    // тест должен реально попасть в ветку с процентами
+    // тест должен реально попасть в ветку с числами
     expect(checked).toBeGreaterThan(0);
   });
 

@@ -42,6 +42,9 @@ const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
   // §8.84 (перенос белка между приёмами) изолирован: замок мерит только свою стадию.
   proteinSmooth84: false,
   seedSwap75: on,
+  // §8.111: измерительный A/B одной стадии — последняя миля выключена в обоих вариантах
+  // (иначе оба дня сходятся к канону и разница стадии съедается).
+  noLastMile111: true,
 } as any) as any;
 
 const solidG = (m: any) => ((m.items || []) as any[])

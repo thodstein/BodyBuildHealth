@@ -39,6 +39,10 @@ const build = (p: (typeof PROFILES)[number], mc: number, tr: boolean, on: boolea
   // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
   vegDensity78: false,
   fatCanonTrim: on,
+  // §8.111: последняя миля тоже выключена в ОБОИХ вариантах — это измерительный A/B одной
+  // стадии (§8.68). С включённой последней милей оба дня сходятся к канону и разница
+  // стадии съедается. Пользовательский путь всегда идёт с последней милей.
+  noLastMile111: true,
 } as any) as any;
 
 const devOf = (plan: any, p: (typeof PROFILES)[number]) => {
