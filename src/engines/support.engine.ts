@@ -40,12 +40,15 @@ export interface SupportInput {
   userId?: string;
   substances: string[];
   goals?: string[];
-  labs?: { code: string; value: number }[];
-  demographics?: {
-    age: number;
-    weight: number;
-    sex: 'male' | 'female';
-  };
+  /**
+   * Проход 95: `labs` и `demographics` удалены из контракта — движок их никогда
+   * не читал, хотя `data-link` честно передавал последние 10 анализов и
+   * `{age, weight, sex}`. Совокупный риск поддержки считается от базы, генетики,
+   * питания, тренировок и доз препаратов; лабораторные и половые поправки живут в
+   * своих движках (`lab-analysis`, `risk-calculator-v2`, `risk-engine-v7-matrix`)
+   * и сливаются на экранах. Поле, которое передаётся и молча отбрасывается, —
+   * худший вид контракта: читатель кода верит, что анализы учтены.
+   */
   genetics?: Record<string, string>;
   nutritionFactor?: number;
   trainingFactor?: number;

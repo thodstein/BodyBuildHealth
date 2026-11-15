@@ -304,8 +304,6 @@ export function useDataLink(): LinkedData {
       try {
         const supportResult = calculateSupport({
           substances: supportIds,
-          labs: labs.slice(-10).map(l => ({ code: l.code, value: l.value })),
-          demographics: { age: _p.age ?? 30, weight: _p.weight ?? 80, sex: _p.sex ?? 'male' },
           genetics,
           nutritionFactor: _sys.nutritionFactor ?? 0.8,
           trainingFactor: _sys.trainingFactor ?? 0.7,
