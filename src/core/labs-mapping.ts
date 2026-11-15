@@ -451,6 +451,40 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
   return { value: round(value * factor), unit: info.prefUnit };
 }
 
+/**
+ * Пересчёт значения из единицы бланка в единицу приложения (проход 86).
+ *
+ * `interpretLabs` сравнивает число с `REFERENCE_RANGES[code].unit`, а `LabPoint`
+ * хранит то, что ввёл пользователь: поле единицы в форме — свободный текст.
+ * Поэтому тестостерон «600 нг/дл» без пересчёта читался как 600 нмоль/л, а
+ * пролактин «15 нг/мл» — как 15 мЕд/л. Правило: обе единицы обязаны разбираться
+ * как концентрации; иначе `null` и вызывающий оставляет значение как есть —
+ * гадать вслепую хуже, чем не пересчитывать.
+ */
+export function convertToUnit(code: string, value: number, fromUnit: string, toUnit: string): number | null {
+  if (!Number.isFinite(value)) return null;
+  const from = unitKey(fromUnit || '');
+  const to = unitKey(toUnit || '');
+  if (!from || !to) return null;
+  if (from === to) return value;
+  const sourceDim = parseConcentrationUnit(from);
+  const targetDim = parseConcentrationUnit(to);
+  if (!sourceDim || !targetDim) return null;
+  if (sourceDim.kind === targetDim.kind) {
+    return round((value * sourceDim.perBase) / targetDim.perBase);
+  }
+  // Массовая ↔ молярная — только при известной молярной массе; активность (МЕ)
+  // в концентрацию не переводим без коэффициента вещества.
+  if (sourceDim.kind === 'activity' || targetDim.kind === 'activity') return null;
+  const canonical = mapToUcumCode(code);
+  const molarMass = MOLAR_MASS[canonical] ?? MOLAR_MASS[canonical.toUpperCase()];
+  if (!molarMass) return null;
+  const factor = sourceDim.kind === 'mass'
+    ? sourceDim.perBase / (molarMass * targetDim.perBase)
+    : (sourceDim.perBase * molarMass) / targetDim.perBase;
+  return round(value * factor);
+}
+
 function round(value: number): number {
   return Number(value.toFixed(Math.abs(value) >= 100 ? 1 : 3));
 }

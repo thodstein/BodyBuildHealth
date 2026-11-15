@@ -1,5 +1,6 @@
 // Lab Analysis Engine — interprets lab values into mechanisms, organs, systems, risks
 import type { LabPoint } from '../core/types';
+import { convertToUnit } from '../core/labs-mapping';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl,
@@ -174,10 +175,13 @@ function findLab(labs: LabPoint[], code: string): number | null {
     return false;
   });
   if (!lab) return null;
-  // Проход 84: E2 читается по единице бланка. Женщина, внёсшая 900 пмоль/л
-  // (245 пг/мл — нормальная лютеиновая), без этого сравнялась бы с порогом в
-  // пг/мл и получила «высоко»; мужчина, внёсший 200 пг/мл, не должен делиться
-  // на 3.671. Остальные маркеры — значение как есть.
+  // Проход 86: значение приводится из единицы бланка к единице приложения
+  // (`REFERENCE_RANGES[code].unit`). Поле единицы в форме — свободный текст,
+  // поэтому без пересчёта «600 нг/дл» тестостерона читалось как 600 нмоль/л, а
+  // пролактин «15 нг/мл» — как 15 мЕд/л. Проход 84: если единицу разобрать не
+  // удалось, у E2 остаётся честный перевод пмоль/л.
+  const converted = convertToUnit(code, lab.value, lab.unit || '', REFERENCE_RANGES[code]?.unit || '');
+  if (converted !== null) return converted;
   if (upper === 'ESTRADIOL') return e2PgPerMl(lab.value, lab.unit);
   return lab.value;
 }
