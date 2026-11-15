@@ -21,7 +21,7 @@ import { decomposeRecipe, pickRecipesForMeal, scaleComponentAmount, recipeViolat
 import { optimizeRecipePortionScales, maxRelativeDeviation } from './planner-recipe-optimizer';
 import { isHighCarbDay, extremeCapacityProfile } from './planner-carb-density';
 import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf, isPortableFood, isWorkWindowMeal, isBreakfastBannedCarb, isBreakfastBannedProtein, hvStyleWidensTopups, HV_PRACTICAL_CARB_IDS, scaleQuotasForExtreme } from './food-availability';
-import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness, applyPlateOverflowRelief, mergeDuplicateItems } from './meal-plan-engine';
+import { applyRealisticFloors, closeExtremeMicroGaps, applyMealFairness, applyPlateOverflowRelief, mergeDuplicateItems, RICE_BUCKET_IDS } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -803,6 +803,10 @@ export function closeRecipeDayToCanon(
             if (!editable(m, it, ['carb_slow', 'carb_fast'])) continue;
             if (!isStarchCarrier(it)) continue;
             if ((it.c || 0) <= 0 || (it.amount || 0) < 20 || (it.amount || 0) > 400) continue;
+            // §8.112: закрыватель тоже уважает «сайд не превращается в ведро» (§8.96):
+            // рис/рисовая каша/кукурузные хлопья не растут сверх 450 г (замер: 140 кг
+            // mass/6/отд — закрыватель доводил рис до 530 г при лимите замка 450).
+            if (RICE_BUCKET_IDS.has(String(it.id)) && (Number(it.amount) || 0) >= 445) continue;
             const dens = (it.c || 0) / Math.max(1, it.amount || 1);
             // §8.97b: приём с комнатой тарелки — приоритет; переполненный — только аварийный
             // вариант (иначе канон дня не закрывается: 100 кг mass/4/отд P1.8, У −7.6%).
@@ -812,14 +816,28 @@ export function closeRecipeDayToCanon(
         }
         const growPick = grow || growFull;
         if (growPick) {
-          const add = Math.max(5, Math.min(300, growPick.room >= 5 ? growPick.room : 300, Math.round(gap / growPick.dens / 5) * 5));
+          const add = Math.max(5, Math.min(
+            300,
+            growPick.room >= 5 ? growPick.room : 300,
+            RICE_BUCKET_IDS.has(String(growPick.it.id))
+              ? Math.max(5, 450 - (Number(growPick.it.amount) || 0))
+              : 300,
+            Math.round(gap / growPick.dens / 5) * 5,
+          ));
           move = { meal: growPick.meal, why: `Добор углеводов дня: ${growPick.it.name} ${growPick.it.amount} → ${(growPick.it.amount || 0) + add} г (тарелка ${solidOf(growPick.meal)} из ${plateCap} г)`, apply: () => resize(growPick!.meal, growPick!.it, (growPick!.it.amount || 0) + add) };
         } else {
-          const denseId = ['rice_white', 'bulgur', 'potato_boiled', 'buckwheat'].find(avail);
-          const fd = denseId ? FOOD_DB.find((f: any) => f.id === denseId) : null;
-          const host = [...poolG].sort((x: any, y: any) =>
+          // §8.112: новый углеводный пункт ставим в приём БЕЗ гарнира. Иначе на одной
+          // тарелке оказываются два starch-носителя (рис 450 + рис 80 = «ведро» 530 г
+          // после склейки дублей) — ровно то, что запрещает §8.96.
+          const noStarch = (m: any) => !(((m.items || []) as any[])
+            .some((it: any) => isStarchCarrier(it) && (Number(it.c) || 0) > 0));
+          const hostPool = [...poolG].filter(noStarch);
+          const host = [...(hostPool.length ? hostPool : poolG)].sort((x: any, y: any) =>
             (Math.max(0, plateRoom(y)) - Math.max(0, plateRoom(x)))
             || (((y.target?.c ?? 0) - (y.totals?.c || 0)) - ((x.target?.c ?? 0) - (x.totals?.c || 0))))[0];
+          const denseId = ['rice_white', 'bulgur', 'potato_boiled', 'buckwheat']
+            .find((id) => avail(id) && !(((host?.items || []) as any[]).some((it: any) => String(it.id) === id)));
+          const fd = denseId ? FOOD_DB.find((f: any) => f.id === denseId) : null;
           if (host && fd) {
             const room = Math.max(30, Math.min(300, plateRoom(host)));
             const g = Math.max(30, Math.min(room, Math.round((gap / Math.max(1, fd.carbs || 25)) * 100 / 10) * 10));
@@ -3013,7 +3031,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         _host.totals = _snapTot;
         break;
       }
-      notes.push(`➕ Жир дня: ${_oil.name} ${_g} г → «${String(_host.label)}» (худшая ось дня ${_d0.toFixed(1)} % → ${_d1.toFixed(1)} %)`);
+      notes.push(`➕ Жир дня: ${_oil.name} ${_g} г → «${String(_host.label)}» (худшая ось дня ${_d0.toFixed(1)} % → ${_d1.toFixed(1)} %; последняя миля рецептурного дня)`);
     }
   }
   const needCorr0 = !rb.withinTolerance || rb.deviationPct > 3;

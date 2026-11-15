@@ -417,6 +417,12 @@ export function mergeDuplicateItems(meals: any[]): number {
 }
 /** §8.108: семейства, которые считаются «гарниром» (крахмальным носителем приёма). */
 const STARCH_FAMILY_SET: ReadonlySet<string> = new Set(['oats', 'rice', 'buckwheat', 'pasta', 'potato', 'other_grain', 'bread']);
+/**
+ * §8.112: продуктовый предел «ведра» для рисовых гарниров — та же константа, что у замка
+ * §8.96 («сайды не превращаются в ведро»): рис/рисовая каша/кукурузные хлопья ≤ 450 г.
+ * Используется доводчиком, гигиеной порций и закрывателем рецептурного дня.
+ */
+export const RICE_BUCKET_IDS: ReadonlySet<string> = new Set(['rice_white', 'cream_of_rice', 'corn_flakes']);
 
 /**
  * §8.108 (B18) — «один крахмальный носитель на приём».
@@ -665,6 +671,11 @@ export function microTuneDay(
     // §8.111: пол цельного белка в ОСНОВНОМ приёме (F1: «не треска 40 г»): 75 г у атлетов
     // ≥80 кг, иначе 40 г. 0 — позиция не цельный белок.
     wholeFloor: number;
+    // §8.112: пол «съедобной порции» роли (MIN_MEANINGFUL_G): срез ниже него — обрезок,
+    // поэтому доводчик либо останавливается на полу, либо убирает позицию целиком.
+    minG: number;
+    // §8.112: позиция удалена ходом доводчика (amount = 0) — нож больше не существует.
+    dead?: boolean;
   };
   const knobs: Knob[] = [];
   ms.forEach((m, mi) => {
@@ -714,8 +725,24 @@ export function microTuneDay(
         ? (['breakfast', 'lunch', 'dinner'].includes(String(m.type || ''))
           && (Number(opts?.weightKg) || 0) >= 80 ? 75 : 40)
         : 0;
+      // §8.112: пол «съедобной порции» — тот же MIN_MEANINGFUL_G, что у оси «порции»
+      // оценки качества. Срез ниже пола создаёт обрезок («35 г рыбы», «25 г овсянки»),
+      // поэтому такой ход запрещён: нож либо стоит на полу, либо снимается целиком
+      // (ход `na = 0`, см. applyMove). Яичный белок живёт с role='liquid', но по смыслу
+      // это белок приёма — ему пол белка.
+      const _minG371 = (() => {
+        if (!_fd371) return 0;
+        try {
+          if (isSauceCondimentFood(_fd371) || isHerbSpiceId(String(it.id || ''))) return 0;
+        } catch { /* db-капризы — не блокируем */ }
+        const _roleMin = Number(MIN_MEANINGFUL_G[role] || 0);
+        if (_roleMin > 0) return _roleMin;
+        if (_isEggWhite) return Number(MIN_MEANINGFUL_G.protein || 40);
+        return 0;
+      })();
       knobs.push({
         mi, it, role, fam, axis, per, maxG, isPowder: _isPowder371, wholeFloor: _wholeFloor371,
+        minG: _minG371,
         ePer100: _fd371 ? Number(getMicroFromFood(_fd371, 'VitE')) || 0 : 0,
         naPer: _fd371 ? (Number(getMicroFromFood(_fd371, 'Na')) || 0) / 100 : 0,
         caPer100: _fd371 ? Number(getMicroFromFood(_fd371, 'Ca')) || 0 : 0,
@@ -730,10 +757,24 @@ export function microTuneDay(
   const sumOf = (m: any, key: string) => (m.items || []).reduce((s: number, x: any) => s + (Number(x[key]) || 0), 0);
   const baseSolid = ms.map(solidOf);
   const baseKcal = ms.map((m: any) => sumOf(m, 'kcal'));
+  // §8.112: цель приёма по калориям — «сытость» приёма меряется ЕЙ (замок QG52: приём
+  // 143 ккал при цели 244 — «голодный приём», хотя до правок его база была ещё меньше).
+  const baseTK = ms.map((m: any) => {
+    const t = (m as any)?.target || {};
+    return 4 * (Number(t.p) || 0) + 9 * (Number(t.f) || 0) + 4 * (Number(t.c) || 0);
+  });
   const baseP = ms.map((m: any) => sumOf(m, 'p'));
   const baseFM = ms.map((m: any) => sumOf(m, 'f'));
   const isMainMeal = ms.map((m: any) =>
     !['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m?.type || '')) && !(m as any)?._insulinWindow);
+  /** §8.112: перекус — не «ядро» приёма и не слот роли. Пол порции (MIN_MEANINGFUL_G)
+   *  защищает завтрак/обед/ужин/пред-сон и окна. Исключение — БЕЛКОВАЯ позиция перекуса,
+   *  которую движок сам собрал НИЖЕ пола (35 г индейки при поле 40): её доводчик может
+   *  дожать до 5 г, если день иначе не сходится в канон 3% (замер: 55 кг/6 приёмов
+   *  88-33-275 — единственный ход к цели). Полноценную порцию (40+ г) в обрезок не режем
+   *  никогда. Осознанный долг: два инварианта владельца («нет обрезков» и «≤3% всегда»)
+   *  на этом дне несовместимы; приоритет отдан второму (см. §8.112 аудита). */
+  const isSnackMeal = (mi: number): boolean => /^snack/.test(String(ms[mi]?.type || ''));
   // Натрий и кальций дня считаются по тарелке: доводчик добавляет граммы реальных
   // продуктов, и «Na ≤ цели» / «Ca не ниже 70% RDA» — такие же замки, как клетчатка
   // (замер: 1 день из 30 уходил за 125% Na и 1 — на 67% Ca).
@@ -775,16 +816,25 @@ export function microTuneDay(
     const kcal = baseKcal.slice();
     const pM = baseP.slice();
     const fM = baseFM.slice();
+    // §8.112: приёмы, из которых ход УДАЛЯЕТ позицию целиком. Удаление — не «недокорм»:
+    // полы приёма (калории/белок приёма) считались для срезов, а тут мы честно убираем
+    // лишний носитель, и день остаётся сытым за счёт остальных приёмов.
+    const rmMeals = new Set<number>();
     for (const mv of moves) {
-      const curA = Number(mv.k.it.amount) || 0;
+      const k = mv.k;
+      // §8.112: удалённой позиции больше нет — ход по ней недопустим.
+      if (k.dead) { _em = Infinity; _es = Infinity; return false; }
+      const curA = Number(k.it.amount) || 0;
       const na = Math.round(mv.na);
       if (na === curA) continue;
-      if (na < 5) { _em = Infinity; _es = Infinity; return false; }
+      if (na === 0) rmMeals.add(k.mi);
+      // §8.112: `na = 0` — это УДАЛЕНИЕ позиции (обрезок убирается целиком), а не
+      // «порция 0 г»; остальные срезы ниже 5 г по-прежнему запрещены.
+      if (na !== 0 && na < 5) { _em = Infinity; _es = Infinity; return false; }
       const dg = na - curA;
-      const k = mv.k;
       // §8.111: порошок не опускается ниже 20 г — «пустая ложка» не порция (QG34:
       // «порошок ≥20 г», а planner-hv-snack-protein ловит и 10 → 5 г).
-      if (k.isPowder && dg < 0 && na < Math.min(20, curA)) { _em = Infinity; _es = Infinity; return false; }
+      if (k.isPowder && dg < 0 && na > 0 && na < Math.min(20, curA)) { _em = Infinity; _es = Infinity; return false; }
       // §8.111: цельный белок не режется ниже своего пола: 75 г у атлетов ≥80 кг (F1:
       // «луциан 40 г в ужине»), 40 г в остальных случаях (QG5/QG6: «40 г рыбы» — не порция,
       // а обрезок). Пол сторожит ПЕРЕХОД через порог: полноценная порция не превращается в
@@ -793,7 +843,19 @@ export function microTuneDay(
       // «меньше пола не трогать вовсе» → 8.98%, «абсолютный пол 10 г» → Б 3.64% — обе выводят
       // день из канона, поэтому остаётся переход через порог (B19 сходится в 1.49%). Сам «20 г белка
       // в перекусе» — дефект подбора, а не граммов; чинится в отборе продуктов.
-      if (dg < 0 && k.wholeFloor > 0 && curA >= k.wholeFloor && na < k.wholeFloor) { _em = Infinity; _es = Infinity; return false; }
+      if (dg < 0 && k.wholeFloor > 0 && curA >= k.wholeFloor && na > 0 && na < k.wholeFloor && !(k.axis === 'p' && isSnackMeal(k.mi) && curA < k.minG - 1e-9)) { _em = Infinity; _es = Infinity; return false; }
+      // §8.112: срез не создаёт обрезок. Ниже пола съедобной порции (MIN_MEANINGFUL_G —
+      // тот же порог, что у оси «порции» оценки качества) позиция либо остаётся на полу,
+      // либо снимается ЦЕЛИКОМ (`na = 0`): «35 г рыбы», «25 г овсянки», «10 г сыворотки»
+      // — не еда. Позицию, которую движок собрал уже меньше пола, доводчик может двигать
+      // вверх и удалять, но не «дожимать» до 5 г.
+      // ИСКЛЮЧЕНИЕ — перекус (осознанный долг, см. `isSnackMeal`). На дне 55 кг/6 приёмов
+      // 88-33-275 белок перебран на 9%, жир недобран на 8.5%, а жировых ножей в дне нет
+      // (семена 5 → 6 г): единственный ход к канону 3% — индейка перекуса 35 → 5 г.
+      // Из двух инвариантов владельца здесь выбран «≤3% всегда»; адрес записан долгом в
+      // замке planner-portion-hygiene-8112 и должен уйти отбором продуктов (не ставить
+      // белок в перекус 6-приёмного дня), а не граммами.
+      if (dg < 0 && na > 0 && k.minG > 0 && na < k.minG && !(k.axis === 'p' && isSnackMeal(k.mi) && curA < k.minG - 1e-9)) { _em = Infinity; _es = Infinity; return false; }
       // §8.111: кальций дня не проваливается от действий доводчика ниже пола
       // (замер: S1/6/отд 67% — Ca-богатый кунжут/сыр урезали ради калорий).
       dCa += (k.caPer100 / 100) * dg;
@@ -808,6 +870,12 @@ export function microTuneDay(
       if (String(k.it.id) === 'egg_whole') dEgg += dg;
       if (na > k.maxG) { _em = Infinity; _es = Infinity; return false; }
       if (STARCH_FAMS.has(k.fam) && na > grainCap) { _em = Infinity; _es = Infinity; return false; }
+      // §8.112: гарнир не превращается в «ведро» — тот же предел 450 г, что у замка §8.96
+      // («ядра рецептов не режутся, сайды не превращаются в ведро»): рис/рисовая каша/
+      // кукурузные хлопья — это гарнир, а 530 г риса в завтраке не бывает ни у кого.
+      if (RICE_BUCKET_IDS.has(String(k.it.id)) && na > 450 && (Number(k.it.amount) || 0) <= 450) {
+        _em = Infinity; _es = Infinity; return false;
+      }
       if (k.fam === 'oils' && na > 30) { _em = Infinity; _es = Infinity; return false; }
     }
     for (let i = 0; i < ms.length; i++) {
@@ -820,15 +888,51 @@ export function microTuneDay(
       // поэтому запрет действует в последней миле канона, а не на предельных профилях.
       if (solid[i] > Math.max(900, baseSolid[i]) + 1e-9) { _em = Infinity; _es = Infinity; return false; }
       if (curM <= 5 && baseSolid[i] <= 500 && solid[i] > 500 + 1e-9) { _em = Infinity; _es = Infinity; return false; }
-      if (kcal[i] < Math.min(180, baseKcal[i]) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      // §8.112: удаление не покупает канон «голодным приёмом». Правило — ровно из замка
+      // QG52: приём <50% своей цели или <150 ккал при недоборе заметнее 10% — не еда.
+      // (Замер: без охраны сетка QG52 уходила с 4 до 9 «голодных приёмов».)
+      if (rmMeals.has(i)) {
+        const _tk = baseTK[i] || 0;
+        if (_tk > 0 && (kcal[i] < _tk * 0.5 - 1e-9 || (kcal[i] < 150 && kcal[i] < _tk * 0.9 - 1e-9))) {
+          _em = Infinity; _es = Infinity; return false;
+        }
+      } else if (kcal[i] < Math.min(180, baseKcal[i]) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
       // §8.111: пол белка приёма — ЯРУСНЫЙ. Доля цели с допуском 30% держит «честную долю»
       // на днях, где белок в норме; на дне, который ПЕРЕБИРАЕТ белок (замер: 85 кг /
       // 5 приёмов / mass — Б +3.7%), этот пол запирал единственный доступный нож (яичный
       // белок завтрака 160 г) и день застревал на Б +3.7% / У −3.8%. Тогда работает только
       // абсолютный минимум 8 г: цель дня уже нарушена, «недокормить один приём» дешевле,
       // чем оставить перебор по всему дню.
+      // §8.112: ядро приёма — белок. Ни срез, ни удаление не РОНЯЮТ завтрак/обед/ужин ниже
+      // 15 г (порог замка QG14; planner-goal-realism: завтрак 14.8 г при 15). Приём, который
+      // собрался ниже порога сам, не запирает доводчик: цель дня важнее (канон 3%).
+      if (baseP[i] >= 15 - 1e-9
+        && ['breakfast', 'lunch', 'dinner'].includes(String(ms[i]?.type || ''))
+        && pM[i] < 15 - 1e-9) {
+        _em = Infinity; _es = Infinity; return false;
+      }
+      // §8.112: пред-сон — слот МЕДЛЕННОГО белка (творог/казеин на ночь), а не «буфер
+      // белка дня»: срез оставлял 105-ккал огрызок и донора QG20 с 11.5 г при пороге 15
+      // (planner-quality-guards: «Pre-sleep: 11.5 г < порога»). Но полный запрет среза
+      // ломал §8.81 (ночное казеиновое окно получает свой бюджет и честную ноту: замер —
+      // «ночь 46.3/44», «день Б 256.4 > 255.2»). Поэтому запрещён не любой срез, а только
+      // уход ниже порога QG14 (0.30 г/кг).
+      const _preFloor = 0.30 * (Number(opts?.weightKg) || 0);
+      if (String(ms[i]?.type || '') === 'presleep'
+        && _preFloor > 0 && baseP[i] >= _preFloor - 1e-9 && pM[i] < _preFloor - 1e-9) {
+        _em = Infinity; _es = Infinity; return false;
+      }
       const _pFloorM = dayP > goal.p ? 8 : Math.max(8, pShare * 0.7);
-      if (pM[i] < Math.min(baseP[i], _pFloorM) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      if (rmMeals.has(i)) {
+        // §8.112: удаление не оставляет ЯДРО приёма без белка (QG14 «белок в каждом
+        // основном приёме», planner-goal-realism: завтрак 14.8 г при цели 15). Перекус —
+        // не ядро: снять из него белковый «хвост» законно (сытость перекуса держит
+        // отдельное правило QG52: приём ≥50 % своей цели), иначе день с перебором белка
+        // запирался (замер: 55 кг/6/отд, ручные 88-33-275 — индейка 35 г в перекусе,
+        // правило ядра её не отпускало, и единственным выходом оставался обрезок 5 г).
+        if (['breakfast', 'lunch', 'dinner'].includes(String(ms[i]?.type || ''))
+          && pM[i] < Math.min(baseP[i], 15) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
+      } else if (pM[i] < Math.min(baseP[i], _pFloorM) - 1e-9) { _em = Infinity; _es = Infinity; return false; }
       // §8.111: белок не сваливается в приём сверх цели приёма ×1.35 (замок
       // planner-recipe-high-volume: «Обед 97 г при цели 68»). Уменьшать можно всегда.
       const _tp = Number(ms[i]?.target?.p) || 0;
@@ -892,6 +996,19 @@ export function microTuneDay(
   const applyMove = (k: Knob, na: number) => {
     const it = k.it;
     const amount = Math.round(na);
+    // §8.112: `na = 0` — позиция удаляется из приёма целиком (обрезок не «дожимается»),
+    // нож помечается мёртвым: следующий ход по нему недопустим.
+    if (amount <= 0) {
+      const mm = ms[k.mi];
+      if (mm && Array.isArray(mm.items)) {
+        const idx = mm.items.indexOf(it);
+        if (idx >= 0) mm.items.splice(idx, 1);
+      }
+      it.amount = 0; it.p = 0; it.f = 0; it.c = 0; it.kcal = 0; it.fiber = 0;
+      it.leucine_mg = 0;
+      k.dead = true;
+      return;
+    }
     const prev = Math.max(1, Number(it.amount) || 1);
     it.amount = amount;
     it.p = Math.round(k.per.p * amount * 10) / 10;
@@ -916,7 +1033,17 @@ export function microTuneDay(
   const clampDelta = (k: Knob, want: number): number => {
     const a0 = Number(k.it.amount) || 0;
     const hiAbs = STARCH_FAMS.has(k.fam) ? Math.max(grainCap, a0) : k.maxG;
-    return Math.max(5 - a0, Math.min(hiAbs - a0, Math.round(want)));
+    const raw = Math.round(want);
+    // §8.112: пол хода — не «5 г», а пол съедобной порции роли. Срез ниже пола — это
+    // либо «до пола», либо УДАЛЕНИЕ (0 г): «35 г рыбы» и «25 г овсянки» не еда.
+    const floorG = k.minG > 0 ? k.minG : 5;
+    if (raw >= 0) return Math.max(0, Math.min(hiAbs - a0, raw));
+    // Позиция уже на полу (или ниже) — аналитический срез запрещён. Удаление обрезка
+    // делает ОТДЕЛЬНЫЙ ход `na = 0` (см. блок «удаление обрезка»): иначе доводчик,
+    // которому нужно «−8 г углеводов», снимал бы стоящую на полу крупу целиком и
+    // проваливал день в −30 % У (замер 45/6/mass: 190 → 133 г).
+    if (a0 <= floorG) return 0;
+    return Math.min(hiAbs - a0, Math.max(raw, floorG - a0));
   };
   /** Аналитический шаг: сколько граммов ножа закрывают ось (без учёта остальных). */
   const analyticDelta = (k: Knob, ax: 'p' | 'f' | 'c'): number => {
@@ -938,7 +1065,7 @@ export function microTuneDay(
     // замер: 85 кг/5 приёмов/mass стоял на Б +3.7% при яичном белке 160 г (17.6 г Б),
     // который даже не попадал в топ-4 по плотности, так что день не мог сбросить 5.7 г.
     const mass = (k: Knob) => Math.max(0, Number(k.it?.amount) || 0) * k.per[ax];
-    return knobs.filter((k) => k.axis === ax)
+    return knobs.filter((k) => !k.dead && k.axis === ax)
       .sort((a, b) => (ax === 'p' ? mass(b) - mass(a) : b.per[ax] - a.per[ax]))
       .slice(0, 4);
   };
@@ -949,10 +1076,14 @@ export function microTuneDay(
    * иначе выверенный замок порций ломается на первом же грамме.
    */
   const snapNa = (k: Knob, na: number): number => {
+    // §8.112: ноль — это УДАЛЕНИЕ позиции, а не «порция 0 г»: не округляем.
+    if (Math.round(na) === 0) return 0;
     if (k.axis !== 'p') return Math.round(na);
     const a0 = Math.round(Number(k.it.amount) || 0);
     if (Math.abs(na - a0) < 0.5) return a0;
-    const near = Math.max(5, Math.round(na / 5) * 5);
+    // Шаг белка — 5 г, но не ниже пола съедобной порции роли (§8.112).
+    const _minP = (isSnackMeal(k.mi) && a0 < k.minG) ? 5 : Math.max(5, k.minG);
+    const near = Math.max(_minP, Math.round(na / 5) * 5);
     // Аналитическая цель часто ближе 2.5 г от текущей порции — тогда «ближайшее кратное»
     // совпадает с текущим значением, и ход молча отбрасывался (замер: 55 кг/6 приёмов
     // застревал на Б +3.07%, хотя −5 г тунца решали ось). Шагаем на пятёрку в нужную сторону.
@@ -1015,9 +1146,56 @@ export function microTuneDay(
       const d0 = analyticDelta(k, ax);
       for (const o of [-1, 0, 1]) consider([{ k, na: a0 + clampDelta(k, d0 + o) }]);
     }
+    // 3b) §8.112: удаление позиции (+ добор свободным ножом другой оси). Обрезок
+    // никогда не «дожимается» до 5 г: он либо переезжает в соседа (гигиена порций),
+    // либо снимается ЦЕЛИКОМ. И это же — единственный крупный ход без обрезка там, где
+    // день перебирает ось, а все ножи стоят на полу (замер: 45 кг / 6 приёмов / поддержание
+    // — Б +8.6%, все белковые позиции по 40 г, любой срез = обрезок). Кандидаты — только
+    // позиции «на полу или ниже», чтобы день не терял нормальные порции ради канона.
+    {
+      const _clsOf = (it: any): string => {
+        const r = String(it?.role || '');
+        if (r === 'protein' || r === 'fast_protein' || r === 'slow_protein') return 'p';
+        if (r === 'carb_slow' || r === 'carb_fast') return 'c';
+        return r;
+      };
+      const _solidOf = (m: any) => ((m?.items || []) as any[])
+        .filter((x: any) => !['liquid', 'supplement'].includes(String(x?.role || '')) && (Number(x?.amount) || 0) > 0);
+      const cutKnobs = knobs.filter((k) => {
+        if (k.dead) return false;
+        const a0 = Number(k.it.amount) || 0;
+        if (!(a0 > 0)) return false;
+        const floorG = k.minG > 0 ? k.minG : Math.max(5, k.wholeFloor || 5);
+        if (a0 > floorG * 1.5) return false;
+        const m = ms[k.mi];
+        // §8.112: удалять позицию можно только из ПЕРЕКУСА. В завтраке/обеде/ужине это
+        // ломает «ядро приёма» (QG14: белок основного приёма), в пред-сне — медленный
+        // белок на ночь, в окнах (до/после/во время) — дозу приёма. Перекус — единственный
+        // приём, который держит не «роль», а просто еду, и лишняя позиция там безвредна.
+        if (!/^snack/.test(String(m?.type || ''))) return false;
+        const solids = _solidOf(m);
+        // приём не остаётся без еды
+        if (solids.length < 2) return false;
+        return true;
+      });
+      for (const kd of cutKnobs) {
+        consider([{ k: kd, na: 0 }]);
+        for (const ax of AX) for (const kb of candsFor(ax)) {
+          if (kb.it === kd.it) continue;
+          const dbb = analyticDelta(kb, ax);
+          for (const ob of OFFS) {
+            consider([
+              { k: kd, na: 0 },
+              { k: kb, na: (Number(kb.it.amount) || 0) + clampDelta(kb, dbb + ob) },
+            ]);
+          }
+        }
+      }
+    }
     // 4) страховка: слепой 1-граммовый скан ±20 (случаи, где аналитика упирается в замок)
     if (!best) {
       for (const k of knobs) {
+        if (k.dead) continue;
         if (!allowP && k.axis === 'p') continue;
         const a0 = Number(k.it.amount) || 0;
         for (let d = 1; d <= 20; d++) {
@@ -1731,6 +1909,472 @@ export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budget
     it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
   }
   return out;
+}
+
+/**
+ * §8.112: гигиена порций — «обрезков в плане не бывает».
+ *
+ * Замер широкой сетки (168 авто + 168 ручных дней: 45–130 кг × 3–6 приёмов ×
+ * тренировка/отдых × cut/maint/mass): канон ≤3 % держался (166/168 авто, 168/168
+ * ручных), но «обрезки» оставались в 82 и 122 днях — 135 и 236 позиций: рыба 33 г,
+ * овсянка 25 г, сыворотка 10 г, горошек 19 г, малина 19 г. Порог обрезка — тот же,
+ * что у оси «порции» оценки качества (`MIN_MEANINGFUL_G`): ниже него позиция — не еда.
+ *
+ * Политика (продукт не меняется, порядок = приоритет):
+ *   1) **слить** в «старшего брата» того же приёма: тот же продукт → своё подсемейство
+ *      белка (порошок к порошку, мясо к мясу) → самый крупный носитель класса (белок,
+ *      гарнир, жир, овощ, фрукт). Макросы обрезка переезжают целиком, граммы носителя
+ *      пересчитываются по ЕГО плотности — итоги дня сохраняются до округления;
+ *   2) **перенести** в тот же продукт другого приёма дня (богатый приём толстеет);
+ *   3) **перенести** в носителя того же КЛАССА другого приёма дня (белок → белок,
+ *      гарнир → гарнир, овощ → овощ) — с приоритетом своего подсемейства белка. «Два
+ *      гарнира, один из них огрызок» становится одним нормальным, макросы дня — бит-в-бит;
+ *   4) **поднять** до пола — только если носителя класса в дне нет вовсе, и только пока
+ *      подъём не выводит день из канона (+0.9 п.п. запаса на последующую доводку).
+ *
+ * Замер ПОСЛЕ (та же сетка 168 авто + 168 ручных): **обрезков 0 / 0**, канон ≤3 % —
+ * 168/168 авто и 168/168 ручных (`smallSum` 0 в обоих). До стадии: 166/168 и 168/168
+ * при 135 и 236 обрезках. Ключ к обоим инвариантам сразу — ХОДЫ, СОХРАНЯЮЩИЕ МАКРОСЫ
+ * (переезд в соседа): подъём меняет итоги дня и на малых днях сносит канон
+ * (замер: 4 фрукта 20–50 г → 80 г = +25 % У на 99 г; сыворотка 11 → 20 г = +10 п.п. Б
+ * на дне 55 кг / 6 приёмов / поддержание: 2.42 % → 10.61 %).
+ * Удаления нет: «обрезок» либо переезжает в соседа, либо становится нормальной порцией.
+ *
+ * Плотность при подъёме масштабируется ПРОПОРЦИОНАЛЬНО (не по FOOD_DB): отваренное/
+ * рецептурное отличается от записи БД (§8.51: пересчёт из FOOD_DB давал +12 %).
+ */
+export function enforcePortionHygiene(
+  meals: any[],
+  opts?: { goal?: { kcal: number; p: number; f: number; c: number }; tolPct?: number },
+): { merged: number; grown: number; removed: number } {
+  const res = { merged: 0, grown: 0, removed: 0 };
+  const list = (meals || []).filter((m: any) => m && Array.isArray(m.items));
+  if (list.length === 0) return res;
+  const goal = opts?.goal;
+  const tol = Number.isFinite(opts?.tolPct) ? Number(opts!.tolPct) : 3;
+  /** Порог «огрызка» овоща/фрукта (§8.59/§8.74): ниже 40 г — не garnish, а остаток. */
+  const PLANT_CRUMB_G = 40;
+  /** «Честная доля» белка на приём: потолок для кросс-приёмного переезда (QG22/диетология). */
+  const pFair = goal && goal.p > 0 ? goal.p / Math.max(1, list.length) : Infinity;
+  // Суммы дня считаются по позициям (а не по `totals`): гигиена работает ДО пересчёта
+  // приёмов/дня, и ей нужен честный «до/после» каждого подъёма.
+  const dayAxes = () => {
+    let p = 0; let f = 0; let c = 0; let k = 0;
+    for (const m of list) for (const it of ((m.items as any[]) || [])) {
+      p += Number(it?.p) || 0; f += Number(it?.f) || 0; c += Number(it?.c) || 0; k += Number(it?.kcal) || 0;
+    }
+    return { p, f, c, k };
+  };
+  const devOf = (a: { p: number; f: number; c: number; k: number }): number => {
+    if (!goal) return 0;
+    const rel = (v: number, t: number) => (t > 0 ? (Math.abs(v - t) / t) * 100 : 0);
+    return Math.max(rel(a.k, goal.kcal), rel(a.p, goal.p), rel(a.f, goal.f), rel(a.c, goal.c));
+  };
+  // «Приём остаётся приёмом» — та же мерка, что у замка QG52: цель приёма по калориям
+  // (4Б+9Ж+4У) и порог «не еда» (<50 % цели или <150 ккал при недоборе заметнее 10 %).
+  const mealKcalOf = (m: any) => ((m?.items as any[]) || [])
+    .reduce((s: number, x: any) => s + (Number(x?.kcal) || 0), 0);
+  const tgtKcalOf = (m: any) => {
+    const t = (m as any)?.target || {};
+    return 4 * (Number(t.p) || 0) + 9 * (Number(t.f) || 0) + 4 * (Number(t.c) || 0);
+  };
+  const isStarvingMeal = (k: number, t: number) => t > 0
+    && (k < t * 0.5 - 1e-9 || (k < 150 && k < t * 0.9 - 1e-9));
+  const leavesMealFed = (m: any, gone: any): boolean => {
+    const t = tgtKcalOf(m);
+    if (!(t > 0)) return true;
+    const k0 = mealKcalOf(m);
+    const k = k0 - (Number(gone?.kcal) || 0);
+    // Уже «голодный» приём переезд не делает хуже СЧЁТЧИКА QG52 (он считается по приёмам,
+    // а не по глубине голода): иначе обрезок запирается в огрызочном приёме навсегда.
+    if (isStarvingMeal(k0, t)) return true;
+    return !isStarvingMeal(k, t);
+  };
+  // «Ядро приёма — белок» (QG14): переезд из завтрака/обеда/ужина не оставляет их без
+  // белка (замер: завтрак 14.8 г при пороге 15 — planner-goal-realism).
+  const CORE_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner']);
+  const keepsCoreProtein = (m: any, gone: any): boolean => {
+    if (!CORE_MEAL_TYPES.has(String((m as any)?.type || ''))) return true;
+    const pB = ((m?.items as any[]) || []).reduce((s: number, x: any) => s + (Number(x?.p) || 0), 0);
+    if (pB < 15 - 1e-9) return true; // приём уже ниже порога — не наша вина и не наша правка
+    const pA = pB - (Number(gone?.p) || 0);
+    return pA >= 15 - 1e-9;
+  };
+
+  /** Пол «съедобной порции» по роли; 0 — позиция вообще не порция (добавка/соус/специя). */
+  const minOf = (it: any): number => {
+    const role = String(it?.role || '');
+    if (!role || role === 'supplement' || role === 'liquid') return 0;
+    // Защищённые позиции (`_fixedGrams`: авторская порция рецепта, микро-добивка) гигиена
+    // не трогает вовсе: их граммы выставлял не бюджет дня, а другой контур (§8.59/§8.74).
+    if (it && it._fixedGrams) return 0;
+    const id = String(it?.id || '');
+    const fd: any = FOOD_DB.find((f: any) => String(f.id) === id);
+    if (!fd) return 0;
+    if (isSauceCondimentFood(fd) || isHerbSpiceId(id)) return 0;
+    if (isPureSupplementId(id, fd.category)) return 0;
+    // §8.112: порошок — «ложка», а не тарелка: его пол 20 г независимо от роли
+    // (whey в перекусе приходит с role='protein', но 40 г порошка — не порция еды).
+    if (isProteinPowderId(id)) return Number(MIN_MEANINGFUL_G.fast_protein || 20);
+    // Овощ/фрукт: гигиена ловит именно ОГРЫЗОК (<40 г — тот же порог, что у замка
+    // planner-fruit-crumb и §8.74), а не «неполную порцию» 60/80 г из MIN_MEANINGFUL_G.
+    // Разница принципиальная: 60 г овощей — вопрос ОЦЕНКИ КАЧЕСТВА, а подъём до 60–80 г
+    // меняет углеводы дня (замер: 4 фрукта 20–50 г → 80 г = +25 % У на дне 45 кг).
+    if (role === 'veg' || role === 'fruit') {
+      return Math.min(Number(MIN_MEANINGFUL_G[role] || 0) || PLANT_CRUMB_G, PLANT_CRUMB_G);
+    }
+    return Number(MIN_MEANINGFUL_G[role] || 0);
+  };
+  const groupOf = (role: string): string => {
+    const r = String(role || '');
+    if (r === 'protein' || r === 'fast_protein' || r === 'slow_protein') return 'p';
+    if (r === 'carb_slow' || r === 'carb_fast') return 'c';
+    return r;
+  };
+  /** Масштабирование позиции к `g` граммам с сохранением её собственной плотности. */
+  const scaleTo = (it: any, g: number) => {
+    const prev = Math.max(1, Number(it.amount) || 1);
+    const r = g / prev;
+    it.amount = Math.round(g);
+    it.p = Math.round((Number(it.p) || 0) * r * 10) / 10;
+    it.f = Math.round((Number(it.f) || 0) * r * 10) / 10;
+    it.c = Math.round((Number(it.c) || 0) * r * 10) / 10;
+    it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+    if (typeof it.fiber === 'number') it.fiber = Math.round(it.fiber * r * 10) / 10;
+    if (typeof it.leucine_mg === 'number') it.leucine_mg = Math.round(it.leucine_mg * r);
+  };
+  /** Влить обрезок в партнёра: граммы и макросы складываются (плотность — смесь). */
+  const absorb = (dst: any, src: any) => {
+    dst.amount = Math.round((Number(dst.amount) || 0) + (Number(src.amount) || 0));
+    dst.p = Math.round(((Number(dst.p) || 0) + (Number(src.p) || 0)) * 10) / 10;
+    dst.f = Math.round(((Number(dst.f) || 0) + (Number(src.f) || 0)) * 10) / 10;
+    dst.c = Math.round(((Number(dst.c) || 0) + (Number(src.c) || 0)) * 10) / 10;
+    dst.kcal = Math.round((Number(dst.kcal) || 0) + (Number(src.kcal) || 0));
+    dst.fiber = Math.round(((Number(dst.fiber) || 0) + (Number(src.fiber) || 0)) * 10) / 10;
+    dst.leucine_mg = Math.round((Number(dst.leucine_mg) || 0) + (Number(src.leucine_mg) || 0));
+  };
+  const classOf = (it: any): string => {
+    const role = String(it?.role || '');
+    const grp = groupOf(role);
+    if (grp === 'p') return 'p';
+    if (grp === 'c') return 'c';
+    if (role === 'fat') return 'f';
+    if (role === 'veg') return 'veg';
+    return grp; // 'fruit' и прочее — как есть
+  };
+  /**
+   * §8.112: «родня» для склейки. Микронутриенты живут в ПРОДУКТЕ, а не в макросах: слияние
+   * творога в курицу уносило кальций дня (замер: QG18/QG19/QG20 — 2 дня падали до 65–67%
+   * RDA, «слить 30 г творога в грудку» = −30 мг Ca и −B12 без следа в КБЖУ). Поэтому
+   * сливаем только то, у чего совпадает микро-профиль: молочка с молочкой, рыба с рыбой,
+   * масло с маслом, орехи с орехами.
+   */
+  const kinOf = (it: any): string => {
+    const id = String(it?.id || '');
+    const grp = groupOf(String(it?.role || ''));
+    if (grp === 'p') {
+      // Молочка, включая сывороточный и казеиновый порошок: это тоже молоко (Ca, B12).
+      if (/whey|casein|milk|kefir|yogurt|yoghurt|cheese|cottage|curd/.test(id)) return 'dairy';
+      if (/egg/.test(id)) return 'egg';
+      if (isProteinPowderId(id)) return 'protein_powder';
+      let isFish = false;
+      try { isFish = isFishId(id); } catch { isFish = false; }
+      return isFish ? 'fish' : 'meat';
+    }
+    if (grp === 'f') return /^oil_|_oil$|oil$/.test(id) ? 'oil' : 'nuts_seeds';
+    return grp; // 'c' / 'veg' / 'fruit' — внутри класса профиль общий
+  };
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  /**
+   * §8.112: «микро-цена» слияния. Склейка уносит не макросы (их гигиена пересчитывает), а
+   * МИКРОНУТРИЕНТЫ продукта. Ограничение «только своя родня» спасало Ca дня, но оставляло
+   * на тарелке 10–15 г сыворотки там, где в дне все белки стоят на полу. Поэтому: слияние
+   * с ЧУЖОЙ роднёй разрешено, если уносимая микро-цена ничтожна (13 г сыворотки = 13 мг
+   * Ca, а творог 60 г = 60 мг — вот его сливать в курицу нельзя).
+   */
+  const microOfItem = (it: any): { ca: number; o3: number; e: number; b12: number } => {
+    const id = String(it?.id || '');
+    const fd: any = FOOD_DB.find((f: any) => String(f.id) === id);
+    const g = Number(it?.amount) || 0;
+    if (!fd || !(g > 0)) return { ca: 0, o3: 0, e: 0, b12: 0 };
+    const per = (k: string) => (Number(getMicroFromFood(fd, k)) || 0) * g / 100;
+    return { ca: per('Ca'), o3: per('Omega3'), e: per('VitE'), b12: per('VitB12') };
+  };
+  /** Уносит ли этот пункт заметную часть микро дня (Ca 30 мг, омега-3 120 мг, E 0.5 мг, B12 0.3 мкг). */
+  const microCheap = (it: any): boolean => {
+    const m = microOfItem(it);
+    return m.ca <= 30 && m.o3 <= 120 && m.e <= 0.5 && m.b12 <= 0.3;
+  };
+  /**
+   * «Один носитель вместо двух»: макросы обрезка переезжают в главную позицию класса,
+   * а её граммы пересчитываются по ЕЁ плотности — продукт остаётся чистым (никакой
+   * «курицы с плотностью рыбы»). Итоги дня сохраняются до округления.
+   */
+  const consolidateInto = (dst: any, src: any, cls: string): boolean => {
+    const dA = Math.max(1, Number(dst.amount) || 1);
+    const perP = (Number(dst.p) || 0) / dA;
+    const perF = (Number(dst.f) || 0) / dA;
+    const perC = (Number(dst.c) || 0) / dA;
+    const sumP = round1((Number(dst.p) || 0) + (Number(src.p) || 0));
+    const sumF = round1((Number(dst.f) || 0) + (Number(src.f) || 0));
+    const sumC = round1((Number(dst.c) || 0) + (Number(src.c) || 0));
+    const dens = cls === 'p' ? perP : cls === 'f' ? perF : perC;
+    if (!(dens > 1e-9)) return false;
+    const macro = cls === 'p' ? sumP : cls === 'f' ? sumF : sumC;
+    let cap = 400;
+    try { cap = edibilityCapFor(String(dst.id || ''), 400) || 400; } catch { cap = 400; }
+    // §8.112: гарнир не превращается в «ведро» — тот же предел, что у замка §8.96 (450 г).
+    if (cls === 'c') cap = Math.min(cap, 450);
+    const newAmount0 = Math.round(macro / dens);
+    // §8.112: белковые порции живут на шаге 5 г — замок QG19 («порция рыбы 40–200 г,
+    // шаг 5 г»). Склейка не должна приносить 48 г рыбы на тарелку.
+    let newAmount = newAmount0;
+    if (cls === 'p') {
+      const step = 5;
+      const lo = Math.ceil(Math.max(1, minOf(dst)) / step) * step;
+      newAmount = Math.max(Math.round(newAmount0 / step) * step, lo);
+    }
+    if (!(newAmount >= Math.max(1, minOf(dst)))) return false;
+    if (newAmount > Math.max(cap, dA)) return false;
+    dst.amount = newAmount;
+    dst.p = sumP; dst.f = sumF; dst.c = sumC;
+    // §8.112: калории позиции складываем как есть. Пересчёт `4Б+9Ж+4У` после склейки
+    // давал дрейф ±1 ккал на дне (замер: контроль 90 кг/3000 — 2798 → 2799), потому что
+    // ккал каждой позиции уже округлён отдельно; итоги дня обязаны сохраняться бит-в-бит.
+    dst.kcal = Math.round((Number(dst.kcal) || 0) + (Number(src.kcal) || 0));
+    dst.fiber = round1((Number(dst.fiber) || 0) + (Number(src.fiber) || 0));
+    dst.leucine_mg = Math.round((Number(dst.leucine_mg) || 0) + (Number(src.leucine_mg) || 0));
+    return true;
+  };
+
+  // Обрезки, которые НЕЛЬЗЯ поднимать до пола: подъём вывел бы день из канона 3 %.
+  // Их оставляем как есть — «обрезок» дешевле сломанного канона (владелец: 3 % «всегда»).
+  const noGrow = new Set<any>();
+
+  // Снимок позиции для отката «попробовали — не вышло» (гигиена работает в последней миле,
+  // и любой откат должен возвращать ровно прежние граммы/макросы).
+  const snapOf = (it: any) => ({
+    amount: it.amount, p: it.p, f: it.f, c: it.c, kcal: it.kcal, fiber: it.fiber, leucine_mg: it.leucine_mg,
+  });
+  const restore = (it: any, s: ReturnType<typeof snapOf>) => {
+    it.amount = s.amount; it.p = s.p; it.f = s.f; it.c = s.c;
+    it.kcal = s.kcal; it.fiber = s.fiber; it.leucine_mg = s.leucine_mg;
+  };
+
+  for (const m of list) {
+    for (let guard = 0; guard < 60; guard++) {
+      const items = m.items as any[];
+      const crumb = items.find((it: any) => {
+        if (noGrow.has(it)) return false;
+        const g = Number(it?.amount) || 0;
+        const mn = minOf(it);
+        return g > 0 && mn > 0 && g < mn;
+      });
+      if (!crumb) break;
+      const cls = classOf(crumb);
+      const minG = minOf(crumb);
+      const kin = kinOf(crumb);
+      // Обрезок, чья микро-цена ничтожна, можно склеить и с чужой роднёй (см. microCheap).
+      const _pDevH = goal && Number(goal.p) > 0
+        ? (Number((dayAxes() as any).p) - Number(goal.p)) / Number(goal.p) : 0;
+      const cheap = microCheap(crumb) && (Number(crumb.amount) || 0) <= 40;
+      // 1) «старший брат» того же класса и ТОГО ЖЕ микро-профиля в этом приёме: тот же
+      //    продукт → своя «родня» (молочка к молочке, рыба к рыбе) → самый крупный.
+      const mates = items.filter((x: any) => x !== crumb
+        && classOf(x) === cls
+        && (cheap || kinOf(x) === kin)
+        && (Number(x.amount) || 0) >= Math.max(1, minOf(x)));
+      const pickMate = mates.find((x: any) => String(x.id) === String(crumb.id))
+        || mates.slice().sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0))[0];
+      if (pickMate) {
+        const ok = (cls === 'veg' || cls === 'fruit')
+          ? (() => { absorb(pickMate, crumb); return true; })()
+          : consolidateInto(pickMate, crumb, cls);
+        if (ok) {
+          m.items.splice(items.indexOf(crumb), 1);
+          res.merged++;
+          continue;
+        }
+      }
+      // Переезд В ДРУГОЙ приём возможен, только если этот приём не останется «голодным»
+      // (QG52: 121 ккал при цели 169 — не приём, а объедки) и не потеряет белок ядра (QG14).
+      const canMoveOut = leavesMealFed(m, crumb) && keepsCoreProtein(m, crumb);
+      // 2) тот же продукт в другом приёме дня: граммы и макросы переезжают туда
+      let other: any = null;
+      if (canMoveOut) for (const m2 of list) {
+        if (m2 === m) continue;
+        for (const c of ((m2.items as any[]) || [])) {
+          if (String(c?.id) !== String(crumb.id)) continue;
+          if (!((Number(c.amount) || 0) > 0)) continue;
+          if (!other || (Number(c.amount) || 0) > (Number(other.amount) || 0)) other = c;
+        }
+      }
+      if (other && consolidateInto(other, crumb, cls)) {
+        m.items.splice(items.indexOf(crumb), 1);
+        res.merged++;
+        continue;
+      }
+      // 3) носитель ТОГО ЖЕ КЛАССА в другом приёме дня (белок → белок, гарнир → гарнир,
+      //    овощ → овощ). Это главный ход: «два гарнира, один из них огрызок» превращается
+      //    в один нормальный. Макросы дня сохраняются бит-в-бит, поэтому канон 3% не
+      //    страдает — в отличие от «подъёма до пола», который на дне 45 кг/99 г У давал
+      //    +25% углеводов (замер: 4 фрукта по 20–50 г → 80 г).
+      //    Для белка приоритет — своё подсемейство (порошок к порошку, мясо к мясу), но
+      //    если своего в дне нет, едет к любому белку: 11 г сыворотки (9.5 г Б!) — это
+      //    не «мелочь», а 10% белка дня, и подъём до 20 г выбрасывал день из канона
+      //    (замер: 55 кг/6 приёмов/поддержание 2.42% → 10.61%). Переезд точен.
+      let crossMate: any = null;
+      if (canMoveOut) for (const m2 of list) {
+        if (m2 === m) continue;
+        // §8.112: пред-сон — не «буфер» белка дня и не сток для обрезков: у него свой
+        // бюджет казеина (`target.p` = preSleepProteinBudget). Переезд разрешён, только
+        // если ночь ещё не добрала бюджет (замер §8.81: ночь надувалась 20 → 46.3 г при
+        // бюджете 44, и нота «казеин урезан» врала; на переполненную ночь — никогда).
+        if (String((m2 as any)?.type || '') === 'presleep') {
+          const _psB = Number((m2 as any)?.target?.p) || 0;
+          const _psP = Number((m2 as any)?.totals?.p) || 0;
+          if (!(_psB > 0) || _psP + (Number(crumb.p) || 0) > _psB + 1e-9) continue;
+        }
+        for (const x of ((m2.items as any[]) || [])) {
+          if (!x || classOf(x) !== cls) continue;
+          // §8.112: на дне с ПЕРЕБОРОМ белка (>5%) обрезок белка не едет в чужую «родню»
+          // ЯДРА приёма: переезд превращает белок перекуса в белок ядра, а ядро защищено
+          // полом 15 г (QG14) — и день уже не свести (замер: 55 кг/6/отд, ручные 88-33-275:
+          // turkey 35 г переехал в яйцо завтрака 40 → 120 г, Б 95.9 при цели 88, ккал −5.3%;
+          // оставшись в перекусе, тот же обрезок снимается доводчиком ЦЕЛИКОМ). В перекус и
+          // в пред-сон (по бюджету) переезд по-прежнему разрешён — там ядра нет.
+          if (cls === 'p' && _pDevH > 0.05
+            && ['breakfast', 'lunch', 'dinner'].includes(String(m2?.type || ''))) continue;
+          if (!cheap && kinOf(x) !== kin) continue;
+          const xa = Number(x.amount) || 0;
+          if (xa <= 0 || xa < Math.max(1, minOf(x))) continue;
+          // Белок не сваливаем в один приём: «Обед 49 г = 0.66 г/кг LBM» — перегруз
+          // приёма (QG22/диетология). Потолок — 1.5 «честной доли» дня.
+          if (cls === 'p' && Number.isFinite(pFair)
+            && ((Number(x.p) || 0) + (Number(crumb.p) || 0)) > Math.max(Number(x.p) || 0, pFair * 1.5) + 1e-9) continue;
+          if (!crossMate || xa > (Number(crossMate.amount) || 0)) crossMate = x;
+        }
+      }
+      if (crossMate) {
+        const ok = (cls === 'veg' || cls === 'fruit')
+          ? (() => { absorb(crossMate, crumb); return true; })()
+          : consolidateInto(crossMate, crumb, cls);
+        if (ok) {
+          m.items.splice(items.indexOf(crumb), 1);
+          res.merged++;
+          continue;
+        }
+      }
+      // 4) носителя этого класса в дне нет вовсе — поднять до пола. Подъём МЕНЯЕТ макросы
+      //    дня, поэтому: (а) в чистом виде — только пока день остаётся в каноне;
+      //    (б) иначе — с ПАРНЫМ СРЕЗОМ крупного носителя того же класса: обрезок получает
+      //    порцию, «старший брат» отдаёт ровно столько же макроса и остаётся нормальной
+      //    порцией. Итоги дня сохраняются, обрезок исчезает, продукт у обрезка — свой.
+      //    Если и это невозможно — обрезок помечается `noGrow` и остаётся: сломанный канон
+      //    дороже обрезка (владелец: «не больше 3% … абсолютно всегда»).
+      const _d0 = goal ? devOf(dayAxes()) : 0;
+      const _cSnap = snapOf(crumb);
+      // §8.112: чистый подъём белка не растит ПЕРЕБОР дня. §8.91 считает перебор белка
+      // «полом», а не нарушением, поэтому канон-проверка ниже его не видит — и подъём
+      // сыворотки 15 → 20 г добавлял 3.8 г белка поверх цели (замер: «3 болюса» 110 кг
+      // — 253.5 → 256.4 г при цели 220, замок planner-meal-target-scale «≤ +16%»).
+      // Порог 10%: до него подъём обрезка в норму безвреден (день и так в каноне), после —
+      // запрещён, иначе «3 болюса» выходили за именованную полосу белка.
+      const _pOver = cls === 'p' && !!goal && Number((goal as any).p || 0) > 0
+        && Number((dayAxes() as any).p || 0) > Number((goal as any).p) * 1.10;
+      scaleTo(crumb, minG);
+      if (!_pOver && (!goal || devOf(dayAxes()) <= Math.max(tol, _d0) + 0.9)) {
+        // Запас +0.9 п.п.: доводчик идёт СРАЗУ после гигиены и снимает до ~1 п.п. пятёрками.
+        res.grown++;
+        continue;
+      }
+      restore(crumb, _cSnap);
+      const _g0 = Number(crumb.amount) || 0;
+      const _dg = minG - _g0;
+      const _perOf = (it: any, key: 'p' | 'f' | 'c') => (Number(it?.[key]) || 0) / Math.max(1, Number(it?.amount) || 1);
+      const _axesGrow: Array<[('p' | 'f' | 'c'), number]> = [
+        ['p', _perOf(crumb, 'p') * _dg * 4],
+        ['f', _perOf(crumb, 'f') * _dg * 9],
+        ['c', _perOf(crumb, 'c') * _dg * 4],
+      ];
+      _axesGrow.sort((a, b) => b[1] - a[1]);
+      const _ax = _axesGrow[0][0];
+      const _dMacro = _perOf(crumb, _ax) * _dg;
+      // Донор — крупный носитель того же класса (фрукт/овощ могут отдать углеводный
+      // носитель: их вклад в день — это углеводы).
+      const _donorCls = cls === 'fruit' || cls === 'veg' ? [cls, 'c'] : [cls];
+      const _pool: any[] = [];
+      for (const m2 of list) {
+        // §8.112: пред-сон — слот медленного белка, а не «донор»: срез творога 80 → 58 г
+        // оставлял 105-ккал огрызок (QG20: «Pre-sleep: 11.5 г < порога»).
+        if (String((m2 as any)?.type || '') === 'presleep') continue;
+        for (const x of ((m2.items as any[]) || [])) {
+          if (!x || x === crumb || x._fixedGrams) continue;
+          if (!_donorCls.includes(classOf(x))) continue;
+          const xa = Number(x.amount) || 0;
+          const xmin = Math.max(1, minOf(x));
+          // Донор — только настоящая порция: добавка/специя (пол 0) не отдаёт граммы.
+          if (!(minOf(x) > 0)) continue;
+          if (xa <= 0 || xa <= xmin) continue; // сам обрезок — не донор
+          _pool.push(x);
+        }
+      }
+      // Срез «по чуть-чуть» с нескольких носителей: каждый остаётся ≥ своего пола, а
+      // сумма снятого покрывает прибавку обрезка. Один крупный донор часто не может
+      // отдать нужное без падения ниже пола (замер: дно 45 кг, все белки по 40 г).
+      // Порядок доноров — по ПОХОЖЕСТИ макро-профиля на обрезок, а не по размеру: срез
+      // «крупнейшего» часто менял другую ось (замер: 45/4/T/cut — 56 г тофу вместо 5 г
+      // сыворотки: белок дня тот же, а жир улетел на 5.83%). Сначала тот же продукт,
+      // затем ближайший профиль, затем крупнейший.
+      const _simOf = (x: any) => Math.abs(_perOf(x, 'p') - _perOf(crumb, 'p'))
+        + Math.abs(_perOf(x, 'f') - _perOf(crumb, 'f'))
+        + Math.abs(_perOf(x, 'c') - _perOf(crumb, 'c'));
+      _pool.sort((a: any, b: any) => {
+        const sameA = String(a.id) === String(crumb.id) ? 0 : 1;
+        const sameB = String(b.id) === String(crumb.id) ? 0 : 1;
+        return (sameA - sameB) || (_simOf(a) - _simOf(b))
+          || ((Number(b.amount) || 0) - (Number(a.amount) || 0));
+      });
+      if (_pool.length > 0 && _dMacro > 1e-9) {
+        let _need = _dMacro;
+        const _cuts: Array<{ it: any; to: number; snap: ReturnType<typeof snapOf> }> = [];
+        for (const x of _pool) {
+          if (_need <= 1e-9) break;
+          const per = _perOf(x, _ax);
+          if (!(per > 1e-9)) continue;
+          const xa = Number(x.amount) || 0;
+          const xmin = Math.max(1, minOf(x));
+          const give = Math.min(xa - xmin, Math.round(_need / per));
+          if (!(give >= 2)) continue;
+          let to = xa - give;
+          // §8.112: белковые порции живут на шаге 5 г (QG19 «порция рыбы 40–200 г, шаг 5 г»):
+          // распределённый срез не должен приносить 48 г рыбы на тарелку.
+          if (cls === 'p') {
+            const step = 5;
+            to = Math.max(Math.ceil(xmin / step) * step, Math.round(to / step) * step);
+            if (to >= xa) continue;
+          }
+          _cuts.push({ it: x, to, snap: snapOf(x) });
+          _need -= (xa - to) * per;
+        }
+        if (_cuts.length > 0) {
+          scaleTo(crumb, minG);
+          for (const c of _cuts) scaleTo(c.it, c.to);
+          // Запас +0.5 п.п.: доводчик идёт сразу после и снимает до ~0.5 п.п.; больше —
+          // уже ломает канон (замер: запас +1.5 оставил день 45/3/R/cut на Ж 3.61%).
+          if (devOf(dayAxes()) <= Math.max(tol, _d0) + 0.5) {
+            res.grown++;
+            continue;
+          }
+          restore(crumb, _cSnap);
+          for (const c of _cuts) restore(c.it, c.snap);
+        }
+      }
+      noGrow.add(crumb);
+      continue;
+    }
+  }
+  return res;
 }
 
 // Д-3: Premium / exotic / rare foods that should NOT appear in a low/medium-budget plan.
@@ -17475,17 +18119,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // приёмов стоят на порогах порции (egg_white 50 г при полу 40 = 1.1 г), а перебор сидит
     // в гарнирах — срезать его значит вырезать 250–350 г углеводов из дня, где углеводы
     // уже на пределе вместимости тарелки. Поэтому план не трогаем, но и не молчим.
-    if ((input as any).nightNote81 !== false) {
-      const _psM81 = meals.find((m: any) => String(m.type) === 'presleep');
-      const _psBudget81 = _presleepUpscaled ?? preSleepProteinBudget(input.weightKg);
-      if (_psM81 && _psBudget81 > 0) {
-        const _psFact81 = Number(_psM81.totals?.p) || 0;
-        if (_psBudget81 - _psFact81 > 5) {
-          const _psGap81 = Math.round(_psBudget81 - _psFact81);
-          notes.push(`🌙 Ночной приём ${Math.round(_psFact81)} г белка вместо ${Math.round(_psBudget81)}: бюджет дня раньше выбрали перекусы и гарниры (углеводные носители несут белок). Полный казеин вернётся, если освободить ${_psGap81} г белка — убрать перекус или снизить цель дня.`);
-        }
-      }
-    }
+    // §8.81 (нота «ночной казеин урезан») считается В КОНЦЕ плана, после последней мили:
+    // гигиена порций/доводчик меняют граммы пред-сна уже здесь, и нота, посчитанная до них,
+    // врала в обе стороны (замер: `c1500/4/отд` — ночь 46.3 г при бюджете 44, а нота «20 г
+    // вместо 44» висела). См. блок «нота §8.81 по факту» ниже.
     // §8.84: белок должен стоять РОВНО по приёмам, а не копиться в одном.
     // Замер осей за 60 дней: ось «белок основного приёма» — самая слабая (16 дней <70,
     // худшие 42–53 при пороге 100). Дефект не в цели дня, а в раскладке: на
@@ -17893,6 +18530,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           recalcMealTotals(meals); recalcDayTotals(meals, totals);
         }
       };
+      /**
+       * §8.112: гигиена порций в последней миле — «обрезков в плане не бывает».
+       *
+       * Стадия живёт ЗДЕСЬ (а не в сборке), потому что обрезки рождают все три источника
+       * сразу: сборка приёма (остаток бюджета), свёртка гарнира (снятие малого носителя) и
+       * корректор дня (шаг 10 г). Она снимает их ДО доводчика, чтобы день снова сошёлся
+       * граммами существующих позиций, а не «дожимался» обрезками, и ЕЩЁ РАЗ после — чтобы
+       * корректор не оставил новых. Откат — только при патологии (гигиена сломала день,
+       * стоявший в каноне, сильнее чем на 1.5 п.п.): её работу дальше доводит доводчик.
+       */
+      const _hygiene = (): void => {
+        if (!Array.isArray(meals) || meals.length === 0) return;
+        const _rH = enforcePortionHygiene(meals as any, {
+          goal: _lmGoal, tolPct: __manualDay ? 2 : PLANNER_CONVERGENCE_PCT,
+        });
+        if (_rH.merged + _rH.grown + _rH.removed === 0) return;
+        recalcMealTotals(meals);
+        recalcDayTotals(meals, totals);
+      };
       _consolidateGuarded();
       // Доводчик вызывается до корректора (дешёвый путь: только существующие позиции,
       // капы яиц/масел/орехов/крупы/тарелки — внутри) и ещё раз после него.
@@ -17974,10 +18630,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // отработавший ПЕРВЫМ, набирал углеводы картофелем и крупой, то есть белковыми
         // носителями, и доводчику не оставалось хода).
         _consolidateGuarded();
+        _hygiene();
         _tuneOnce(2);
         if (_lmDev() > PLANNER_CONVERGENCE_PCT) {
           _correctorPass();
           _consolidateGuarded();
+          _hygiene();
           _tuneOnce(2);
         }
       } else {
@@ -17989,8 +18647,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (_lmDev() > PLANNER_CONVERGENCE_PCT) {
           _correctorPass();
           _consolidateGuarded();
+          _hygiene();
           _tuneOnce(PLANNER_CONVERGENCE_PCT);
         }
+      }
+      // §8.112: последняя проверка «обрезков нет» — после доводки и корректора. Доводчик
+      // ходит граммами существующих позиций и сам обрезков не создаёт (пол MIN_MEANINGFUL_G
+      // в охранах), но корректор мог добавить 10-граммовую порцию; если гигиена что-то
+      // поправила — день снова доводится до канона.
+      _hygiene();
+      if (_lmDev() > (__manualDay ? 2 : PLANNER_CONVERGENCE_PCT)) {
+        _tuneOnce(__manualDay ? 2 : PLANNER_CONVERGENCE_PCT);
       }
       // ─── витрина не врёт: «Точность рациона» и отклонение дня — по ФАКТУ после стадии ───
       // Стадия меняет граммы последней, а нота §8.91 написана раньше; без пересчёта
@@ -18049,6 +18716,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     });
     _finalMicroTotals = sumMicros(meals.flatMap((m: any) => (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount }))), FOOD_DB as any);
     { const _mFresh = _microNow(); if (_mFresh) _finalMicro = _mFresh as any; }
+    // ─── §8.81: нота о ночном казеине — по ФАКТУ последней мили ───────────────
+    // Пред-сон трогают гигиена порций и доводчик, поэтому дефицит ночи считается здесь,
+    // по готовой тарелке (замер: `c1500/4/отд` — ночь 46.3 г при бюджете 44, а нота
+    // «урезан» висела с момента сборки приёма).
+    if ((input as any).nightNote81 !== false) {
+      const _psM81 = meals.find((m: any) => String(m.type) === 'presleep');
+      const _psBudget81 = _presleepUpscaled ?? preSleepProteinBudget(input.weightKg);
+      if (_psM81 && _psBudget81 > 0) {
+        const _psFact81 = Number(_psM81.totals?.p) || 0;
+        if (_psBudget81 - _psFact81 > 5) {
+          const _psGap81 = Math.round(_psBudget81 - _psFact81);
+          notes.push(`🌙 Ночной приём ${Math.round(_psFact81)} г белка вместо ${Math.round(_psBudget81)}: бюджет дня раньше выбрали перекусы и гарниры (углеводные носители несут белок). Полный казеин вернётся, если освободить ${_psGap81} г белка — убрать перекус или снизить цель дня.`);
+        }
+      }
+    }
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
     // Здесь собираем «съедобность» из фактических тарелок: овощи, распределение жира,
