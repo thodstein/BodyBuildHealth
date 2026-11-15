@@ -9,6 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { deriveTier, getTierLabel, LAB_TIERS, type Tier } from './lab-tier-ranges';
+import { FEMALE_HORMONE_ULN } from '../engines/lab-norms.engine';
 
 export interface TierAddSub {
   id: string;
@@ -257,6 +258,50 @@ const TIER_RULES: TierRule[] = [
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
+//  femaleHormoneAlert — тревожные бэнды женских гормонов (проход 83)
+// ════════════════════════════════════════════════════════════════════════════
+/**
+ * Женские гормоны не проходят мужскую лестницу действий (`MALE_ONLY_TIER` в
+ * `lab-tier-ranges`), но и молчать о по-настоящему высоких значениях нельзя.
+ * Здесь только те пороги, где действие очевидно и не зависит от фазы:
+ * E2 >800 и <30, прогестерон >30, пролактин >1500, тестостерон >6.
+ * Фазовые коридоры (ЛГ, ФСГ, лютеиновая E2 450) — не повод для алерта: их
+ * показывает строка результата своей фазовой нормой.
+ */
+function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
+  const out = (tier: Tier, message: string): TierAlert => ({ marker, value, tier, message });
+  switch (marker.toUpperCase()) {
+    case 'E2':
+    case 'ESTRADIOL':
+      if (value > FEMALE_HORMONE_ULN.E2.criticalHigh) {
+        return out(3, `⛔ Эстрадиол = ${value} пг/мл — очень высоко для женщины. Не подавлять ИА «на всякий случай»: гинеколог/эндокринолог, проверить фазу и УЗИ яичников.`);
+      }
+      if (value < FEMALE_HORMONE_ULN.E2.low) {
+        return out(2, `Эстрадиол = ${value} пг/мл — ниже 30: дефицит эстрогенов (кости, либидо). Проверить день цикла и обсудить с гинекологом.`);
+      }
+      return null;
+    case 'PROG':
+    case 'PROGESTERONE':
+      if (value > FEMALE_HORMONE_ULN.PROG.criticalHigh) {
+        return out(2, `Прогестерон = ${value} нг/мл — выше лютеинового коридора (5–20): 19-нор, беременность или киста жёлтого тела — гинеколог.`);
+      }
+      return null;
+    case 'PRL':
+      if (value > FEMALE_HORMONE_ULN.PRL.criticalHigh) {
+        return out(3, `Пролактин = ${value} мМЕ/л — очень высоко для женщины: исключить пролактиному (макропролактин, МРТ) — эндокринолог.`);
+      }
+      return null;
+    case 'TESTOSTERONE':
+      if (value > FEMALE_HORMONE_ULN.TT.criticalHigh) {
+        return out(2, `Тестостерон = ${value} нмоль/л — выше женской нормы 0.3–2.5: вирилизация (голос, клитор, акне). Гинеколог-эндокринолог.`);
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  computeTierAdjustments — главная функция
 // ════════════════════════════════════════════════════════════════════════════
 export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male' | 'female'): TierAdjustmentResult {
@@ -269,6 +314,18 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
 
   for (const [marker, value] of Object.entries(labs)) {
     if (typeof value !== 'number' || isNaN(value)) continue;
+
+    // Проход 83: женские гормоны идут своим путём. `deriveTier` для них вернёт 0
+    // (мужская лестница не применяется), поэтому тревожные бэнды женской модели
+    // печатаем здесь — своей формулировкой, без анастрозола и кломифена.
+    if (sex === 'female') {
+      const femAlert = femaleHormoneAlert(marker, value);
+      if (femAlert) {
+        alerts.push(femAlert);
+        tierSummary.push({ marker, value, tier: femAlert.tier, label: '', unit: '' });
+      }
+    }
+
     const tier = deriveTier(marker, value, sex);
     if (tier === 0) continue;
 

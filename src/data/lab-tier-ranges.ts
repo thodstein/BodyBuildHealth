@@ -204,10 +204,27 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
 // ════════════════════════════════════════════════════════════════════════════
 //  deriveTier — определение уровня по значению маркёра
 // ════════════════════════════════════════════════════════════════════════════
+/**
+ * Гормоны, чья ступенчатая шкала и действия написаны мужчине (проход 83).
+ *
+ * `LAB_TIERS` для них — «норма на курсе» мужчины: E2 20–40 пг/мл, прогестерон
+ * 0.3–1.5 нг/мл, ЛГ 1.7–9, тестостерон 15–50, пролактин 2–15 нг/мл. Ступени
+ * ведут в `TIER_RULES` к действиям, которые женщине вредны: «титровать
+ * анастрозол» на её лютеиновую E2 450, «кломифен» на подавленный ЛГ 0.5,
+ * «каберголин» на нормальный пролактин 300 мМЕ/л. Поэтому у женщины эти
+ * маркеры ступень не получают вовсе: её оценка живёт в фазовой строке
+ * результата и женском паспорте, а тревожные бэнды печатаются своей
+ * формулировкой в `computeTierAdjustments` (`femaleHormoneAlert`).
+ */
+const MALE_ONLY_TIER = new Set([
+  'E2', 'ESTRADIOL', 'PROG', 'PROGESTERONE', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT',
+]);
+
 export function deriveTier(marker: string, value: number, sex?: 'male' | 'female'): Tier {
   const key = marker.toUpperCase().replace('-', '');
   const base = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
   if (!base) return 0;
+  if (sex === 'female' && MALE_ONLY_TIER.has(key)) return 0;
   // ♀ — женский ряд той же шкалы (ВГН и ступени от неё); мужской ряд не меняем.
   const override = sex === 'female' ? FEMALE_TIER_OVERRIDES[key] : undefined;
   const t = override ? { ...base, ...override } : base;
