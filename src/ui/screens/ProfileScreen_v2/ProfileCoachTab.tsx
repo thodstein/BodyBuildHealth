@@ -90,6 +90,7 @@ import { CoachWeekView } from './CoachWeekView';
 import { CoachReportSheet } from './CoachReportSheet';
 import { CoachLockSettingsCard } from './CoachLockSettingsCard';
 import { CoachDeviceInviteCard } from './CoachDeviceInviteCard';
+import { CoachAssignmentsCard } from './CoachAssignmentsCard';
 import { isJoinedSpace } from '../../../core/space-invite';
 import { CoachPinDialog } from '../../CoachPinDialog';
 import {
@@ -1831,6 +1832,14 @@ export const ProfileCoachTab: React.FC<{
               </>
             )}
           </div>
+
+          {/* Назначения: рацион, БАДы, анализы и лист назначения. Выдача — как
+              у тренировки: объект + библиотека, а не «зайди в его профиль». */}
+          <CoachAssignmentsCard
+            athletes={state.athletes}
+            activeAthleteId={active?.id ?? null}
+            onAudit={auditEvent}
+          />
 
           <CoachLockSettingsCard
             settings={lock}

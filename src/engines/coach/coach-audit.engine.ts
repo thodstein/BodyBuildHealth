@@ -35,6 +35,12 @@ export type CoachAuditKind =
   | 'program-issued'
   | 'program-imported'
   | 'program-exported'
+  | 'assignment-saved'
+  | 'nutrition-issued'
+  | 'supplements-issued'
+  | 'course-issued'
+  | 'lab-order-created'
+  | 'sheet-printed'
   | 'copy-exported'
   | 'copy-imported'
   | 'reminders-enabled'
@@ -73,6 +79,12 @@ const KINDS: readonly CoachAuditKind[] = [
   'program-issued',
   'program-imported',
   'program-exported',
+  'assignment-saved',
+  'nutrition-issued',
+  'supplements-issued',
+  'course-issued',
+  'lab-order-created',
+  'sheet-printed',
   'copy-exported',
   'copy-imported',
   'reminders-enabled',
@@ -226,6 +238,18 @@ export function auditLabel(kind: CoachAuditKind): string {
       return 'программа импортирована из файла';
     case 'program-exported':
       return 'программа выгружена файлом';
+    case 'assignment-saved':
+      return 'назначение снято в библиотеку';
+    case 'nutrition-issued':
+      return 'рацион выдан';
+    case 'supplements-issued':
+      return 'протокол БАДов выдан';
+    case 'course-issued':
+      return 'курс выдан';
+    case 'lab-order-created':
+      return 'назначены анализы';
+    case 'sheet-printed':
+      return 'лист назначения распечатан';
     case 'copy-exported':
       return 'копия атлета выгружена';
     case 'copy-imported':

@@ -3,6 +3,35 @@ import { UCUM_MAP, REQUIRED_LABS_PER_PHASE } from '../../core/constants';
 import type { LabPoint } from '../../core/types';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
+import { activeSpaceRecord } from '../../core/data-space';
+import {
+  autoCloseLabOrdersFromImport,
+  readCoachLabOrders,
+  writeCoachLabOrders,
+} from '../../engines/coach/coach-lab-order.engine';
+
+/**
+ * Назначение анализов тренера закрывается само, когда результат сдан.
+ *
+ * Проверяем по фактическим записям `labs_log` этого пространства (не по тому,
+ * что набрано в форме сейчас): частичный результат оставляет назначение
+ * открытым, и тренер видит, чего ещё ждёт. Сбои здесь не должны ломать ввод.
+ */
+async function closeAssignedLabOrders(): Promise<void> {
+  try {
+    const space = activeSpaceRecord();
+    if (!space || !space.athleteId) return; // свои данные — назначений тренера нет
+    const storage = typeof localStorage === 'undefined' ? null : localStorage;
+    if (!storage) return;
+    const rows = await db.getAll<{ code?: string }>('labs_log');
+    const codes = rows.map(r => (typeof r?.code === 'string' ? r.code : ''));
+    const store = readCoachLabOrders(storage);
+    const next = autoCloseLabOrdersFromImport(store, space.athleteId, codes);
+    if (next !== store) writeCoachLabOrders(storage, next);
+  } catch {
+    /* назначения не должны блокировать ввод результата */
+  }
+}
 
 const PHASES = [
   { id: 'baseline', label: 'Базовый', icon: '📋', color: '#8b5cf6' },
@@ -132,6 +161,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
           patientId: profile.id || 'current-user',
         } as LabPoint);
         setSaveStatus('saved');
+        void closeAssignedLabOrders();
         setTimeout(() => setSaveStatus('idle'), 1500);
       } catch { setSaveStatus('idle'); }
     }, 800);
