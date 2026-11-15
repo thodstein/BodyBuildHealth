@@ -1,6 +1,6 @@
 import synonyms from '../data/labs-synonyms.json';
 import { UCUM_MAP, DYNAMIC_REFS } from './constants';
-import { getLabNorm } from '../engines/lab-norms.engine';
+import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
@@ -377,12 +377,12 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     case 'BIL': case 'DBIL': if (from.includes('mg/dl')) { factor = 17.104; converted = true; } break;
     // Глюкоза: клинический коэффициент 18.018 (100 mg/dL = 5.55 ммоль/л).
     case 'GLU': if (from.includes('mg/dl')) { factor = 1 / 18.018; converted = true; } break;
-    case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) { factor = 1 / 3.671; converted = true; } break;
+    case 'E2': if (from.includes('pmol') || /пмоль|pmol/i.test(unit)) { factor = 1 / E2_PG_TO_PMOL; converted = true; } break;
     // Пролактин: 1 ng/mL = 21.2 mIU/L. mIU/mL — это 1000 mIU/L, раньше
     // делитель применялся так же, как к mIU/L, и результат был занижен в 1000 раз.
     case 'PRL':
-      if (from === 'miu/ml') { factor = 1000 / 21.2; converted = true; }
-      else if (from.includes('miu') || from.includes('uiu')) { factor = 1 / 21.2; converted = true; }
+      if (from === 'miu/ml') { factor = 1000 / PRL_NG_TO_MIU; converted = true; }
+      else if (from.includes('miu') || from.includes('uiu')) { factor = 1 / PRL_NG_TO_MIU; converted = true; }
       break;
     case 'TT':
       if (from.includes('nmol')) { factor = 28.84; converted = true; }

@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  FEMALE_HORMONE_BANDS, FEMALE_LAB_BOUNDS, labUlnText,
+  FEMALE_HORMONE_BANDS, FEMALE_LAB_BOUNDS, labUlnText, E2_PG_TO_PMOL,
 } from '../../../../engines/lab-norms.engine';
 import { LAB_MONITOR_DB } from '../../SupportScreen_parts/UnifiedSynergyCalculator';
 import { FEMALE_LAB_GROUPS } from '../../SupportScreen_parts/supportProtocolWomenData';
@@ -47,6 +47,35 @@ describe('FEMALE_HORMONE_BANDS — одна запись на женские г�
     expect(FEMALE_HORMONE_BANDS.PRL.green).toBe('<800');
     expect(FEMALE_HORMONE_BANDS.PRL.red).toBe('>1500');
   });
+
+  // Проход 76: у бэндов появились числовые поля — их читают отчёт и сравнения,
+  // а строки печатают UI. Разъехаться они не должны: правка одного без другого
+  // раньше уже случалась (E2 40–200 в строке и 40–400 в «зелёном»).
+  it('числовые поля совпадают со строками (E2 фазы, PRL норма)', () => {
+    const p = FEMALE_HORMONE_BANDS.E2.phases;
+    expect(FEMALE_HORMONE_BANDS.E2.normal).toContain(`${p.follicular.low}–${p.follicular.high}`);
+    expect(FEMALE_HORMONE_BANDS.E2.normal).toContain(`${p.luteal.low}–${p.luteal.high}`);
+    expect(FEMALE_HORMONE_BANDS.PRL.normal).toBe(
+      `${FEMALE_HORMONE_BANDS.PRL.range.low}–${FEMALE_HORMONE_BANDS.PRL.range.high}`);
+  });
+
+  it('Е2 в пмоль/л пересчитывается множителем приложения (1 пг/мл = 3.671)', () => {
+    expect(E2_PG_TO_PMOL).toBe(3.671);
+    expect(Math.round(FEMALE_HORMONE_BANDS.E2.phases.luteal.high * E2_PG_TO_PMOL)).toBe(1836);
+  });
+
+  // Проход 76: TT/LH/FSH добавлены как числа — их читает сводный отчёт, чтобы
+  // женский тестостерон 3 нмоль/л не считался нормой по мужским 10–35.
+  it('числовые поля TT/LH/FSH совпадают со строками', () => {
+    const tt = FEMALE_HORMONE_BANDS.TT;
+    expect(tt.normal).toBe(`${tt.range.low}–${tt.range.high}`);
+    const lh = FEMALE_HORMONE_BANDS.LH.phases;
+    expect(FEMALE_HORMONE_BANDS.LH.normal).toContain(`${lh.follicular.low}–${lh.follicular.high}`);
+    expect(FEMALE_HORMONE_BANDS.LH.normal).toContain(`${lh.luteal.low}–${lh.luteal.high}`);
+    const fsh = FEMALE_HORMONE_BANDS.FSH.phases;
+    expect(FEMALE_HORMONE_BANDS.FSH.normal).toContain(`${fsh.follicular.low}–${fsh.follicular.high}`);
+    expect(FEMALE_HORMONE_BANDS.FSH.normal).toContain(`${fsh.luteal.low}–${fsh.luteal.high}`);
+  });
 });
 
 describe('женский таб «Лабы» читает те же числа (кросс-лок)', () => {
@@ -62,6 +91,20 @@ describe('женский таб «Лабы» читает те же числа (
     expect(prl.red).toBe(FEMALE_HORMONE_BANDS.PRL.red);
     expect(prl.green).toBe(FEMALE_HORMONE_BANDS.PRL.green);
     expect(prl.normal).toContain(FEMALE_HORMONE_BANDS.PRL.normal);
+  });
+
+  it('TT/LH/FSH — те же числа, что в бэндах (кросс-лок против дрейфа)', () => {
+    const tt = byMarker('Тестостерон общий')!;
+    expect(tt.normal).toContain(`${FEMALE_HORMONE_BANDS.TT.range.low}–${FEMALE_HORMONE_BANDS.TT.range.high}`);
+    expect(tt.red).toBe(FEMALE_HORMONE_BANDS.TT.red);
+    const lh = byMarker('ЛГ')!;
+    const lhp = FEMALE_HORMONE_BANDS.LH.phases;
+    expect(lh.normal).toContain(`${lhp.follicular.low}–${lhp.follicular.high}`);
+    expect(lh.normal).toContain(`${lhp.luteal.low}–${lhp.luteal.high}`);
+    const fsh = byMarker('ФСГ')!;
+    const fp = FEMALE_HORMONE_BANDS.FSH.phases;
+    expect(fsh.normal).toContain(`${fp.follicular.low}–${fp.follicular.high}`);
+    expect(fsh.normal).toContain(`${fp.luteal.low}–${fp.luteal.high}`);
   });
 
   it('АЛТ/АСТ/ГГТ — от ВГН резолвера (31), зоны 1.5×/3× посчитаны', () => {

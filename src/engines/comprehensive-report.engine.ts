@@ -13,6 +13,10 @@ import { getScoreHistory } from './score-history';
 import { analyzeMeasurements, loadMeasurements } from './log-analytics-progression.engine';
 import { getExerciseById } from '../core/exercise-catalog';
 import { readRiskBridge } from './risk-bridge';
+import {
+  getLabNorm, LFT_ULN, GGT_ULN, CREATININE_ULN, FEMALE_HORMONE_ULN, FEMALE_HORMONE_BANDS,
+  HCT_THRESHOLDS, LFT_STAGE_ULN, E2_PG_TO_PMOL, PRL_NG_TO_MIU,
+} from './lab-norms.engine';
 import { DEFAULT_DOSAGES } from '../data/support-database';
 import { defaultDoseUnit } from '../data/dose-units';
 import { supportNameRu } from '../data/support-names';
@@ -236,7 +240,100 @@ function gatherAnthropometry(dateFrom: string, dateTo: string): ReportSection {
     id: 'anthropometry', title: 'Антропометрия', icon: '📐', metrics };
 }
 
-function gatherLabs(dateFrom: string, dateTo: string): ReportSection {
+type ReportSex = 'male' | 'female';
+
+/**
+ * Объединение фазовых коридоров женского гормона: одного числа у неё нет, но
+ * мужское не годится. Так отчёт не «изобретает» фазу (её знает только женский
+ * таб) и не будит тревогу в лютеиновую половину цикла.
+ */
+function phaseUnion(phases: { follicular: { low: number; high: number }; luteal: { low: number; high: number } }): { low: number; high: number } {
+  return {
+    low: Math.min(phases.follicular.low, phases.luteal.low),
+    high: Math.max(phases.follicular.high, phases.luteal.high),
+  };
+}
+
+/**
+ * Референсы отчёта по полу (проход 76) — из единственного резолвера норм.
+ *
+ * До него `gatherLabs` держала собственную таблицу (АЛТ/АСТ 40, ГГТ 60,
+ * креатинин 110, HGB 160, HCT 50, PRL 400): четвёртая шкала рядом с резолвером,
+ * карточками K0–K10 и панелями, и вся мужская. Женщина читала в отчёте
+ * «Референс: 0 – 40» у АЛТ (её ВГН 31), «120 – 160 г/л» у HGB (её 120–150),
+ * «36 – 50 %» у HCT (её верх 48) — и получала статус «норма» на отклонении.
+ *
+ * `null` — маркера нет в резолвере (электролиты, липиды, СРБ, Д-димер):
+ * у них остаются прежние числа из таблицы.
+ */
+function sexRefs(code: string, sex: ReportSex): { refLow?: number; refHigh?: number } | null {
+  switch (code) {
+    case 'АЛТ':
+      return { refLow: 0, refHigh: LFT_ULN.ALT[sex] };
+    case 'АСТ':
+      return { refLow: 0, refHigh: LFT_ULN.AST[sex] };
+    case 'ГГТ':
+      return { refLow: 0, refHigh: GGT_ULN[sex] };
+    case 'Креатинин': {
+      const n = getLabNorm('CREATININE', sex);
+      return { refLow: n?.lln, refHigh: CREATININE_ULN[sex] };
+    }
+    case 'Гемоглобин': {
+      const n = getLabNorm('HGB', sex);
+      return { refLow: n?.lln, refHigh: n?.uln };
+    }
+    case 'Гематокрит': {
+      const n = getLabNorm('HCT', sex);
+      return { refLow: n?.lln, refHigh: n?.uln };
+    }
+    case 'Пролактин': {
+      // В резолвере PRL — в нг/мл (2–15), отчёт — в мМЕ/л: единицы разные.
+      // Женская норма — из бэндов приложения (они уже в мМЕ/л), мужская — из
+      // резолвера через общий множитель 21.2. Прежние 80–400 брались «на глаз»:
+      // верх 400 мМЕ/л ≈ 18.9 нг/мл — выше резолверной ВГН 15 нг/мл.
+      if (sex === 'female') {
+        return {
+          refLow: FEMALE_HORMONE_BANDS.PRL.range.low,
+          refHigh: FEMALE_HORMONE_BANDS.PRL.range.high,
+        };
+      }
+      const n = getLabNorm('PRL', 'male');
+      return {
+        refLow: n ? Math.round(n.lln * PRL_NG_TO_MIU) : 80,
+        refHigh: n ? Math.round(n.uln * PRL_NG_TO_MIU) : 400,
+      };
+    }
+    case 'Эстрадиол': {
+      if (sex !== 'female') return null; // мужская строка (40–160 пмоль/л) не меняется
+      // У женщины норма фазовая — одного числа нет. Показываем объединение
+      // фазовых коридоров (40–500 пг/мл → пмоль/л): фаза печатается в женском
+      // табе, а отчёт не должен выдавать мужскую норму за её.
+      const u = phaseUnion(FEMALE_HORMONE_BANDS.E2.phases);
+      return { refLow: Math.round(u.low * E2_PG_TO_PMOL), refHigh: Math.round(u.high * E2_PG_TO_PMOL) };
+    }
+    // Женские половины гормонов, которых в резолвере нет. Мужские числа таблицы
+    // (TT 10–35 нмоль/л, ЛГ 1.5–9.3, ФСГ 1.4–18.1) у женщины означали бы, что
+    // вирилизация (TT 5) — «норма», а подавление оси (ЛГ 0.5) — тем более.
+    case 'Тестостерон':
+      return sex === 'female'
+        ? { refLow: FEMALE_HORMONE_BANDS.TT.range.low, refHigh: FEMALE_HORMONE_BANDS.TT.range.high }
+        : null;
+    case 'ЛГ': {
+      if (sex !== 'female') return null;
+      const u = phaseUnion(FEMALE_HORMONE_BANDS.LH.phases);
+      return { refLow: u.low, refHigh: u.high };
+    }
+    case 'ФСГ': {
+      if (sex !== 'female') return null;
+      const u = phaseUnion(FEMALE_HORMONE_BANDS.FSH.phases);
+      return { refLow: u.low, refHigh: u.high };
+    }
+    default:
+      return null;
+  }
+}
+
+function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male'): ReportSection {
   const diary = getLabDiary();
 
   const groups: Array<{ title: string; markers: Array<{ code: string; name: string; refLow?: number; refHigh?: number; unit: string }> }> = [
@@ -303,10 +400,12 @@ function gatherLabs(dateFrom: string, dateTo: string): ReportSection {
       const current = recent.length > 0 ? recent[recent.length - 1].value : null;
       const prevVal = prev.length > 0 ? prev[0].value : null;
       const { delta, deltaPct, trend } = computeDelta(prevVal, current);
+      // Проход 76: числа референса — из резолвера по полу (там, где он есть).
+      const refs = sexRefs(marker.code, sex);
 
       const m: ReportMetric = {
         label: marker.name, unit: marker.unit, prev: prevVal, current: current ?? 'Нет данных',
-        refLow: marker.refLow, refHigh: marker.refHigh, delta, deltaPct, trend,
+        refLow: refs?.refLow ?? marker.refLow, refHigh: refs?.refHigh ?? marker.refHigh, delta, deltaPct, trend,
         sparkline: computeSparkline(hist, 'value', dateFrom, dateTo),
       };
       assignStatus(m);
@@ -716,7 +815,7 @@ function gatherPedRisk(): ReportSection | null {
   return { id: 'ped_risk', title: 'Риск-оценка PED', icon: '🛡️', metrics };
 }
 
-function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeData | null): ReportRecommendation[] {
+function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeData | null, sex: ReportSex = 'male'): ReportRecommendation[] {
   const recs: ReportRecommendation[] = [];
   const findMetric = (label: string): ReportMetric | undefined => {
     for (const s of sections) { const m = s.metrics.find(m => m.label === label); if (m) return m; }
@@ -729,8 +828,13 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
   };
 
   const hct = numVal(findMetric('Гематокрит'));
-  if (hct != null && hct > 54) recs.push({ section: 'Кровь', priority: 'critical', text: `Гематокрит ${hct}% — полицитемия. Кровопускание (флеботомия 450-500мл). Увеличить потребление воды до 3-4 л/день.` });
-  else if (hct != null && hct > 50) recs.push({ section: 'Кровь', priority: 'warning', text: `Гематокрит ${hct}% — приближается к границе. Контроль каждые 2 недели. Донаторы оксида азота (L-аргинин, чеснок).` });
+  // Проход 76: пороги — из `HCT_THRESHOLDS` с полом пациента. Было `>54`/`>50`
+  // для всех: женщина с HCT 53 % получала только предупреждение, хотя её порог
+  // флеботомии — 52, а 50 % (выше её эритроцитоза 48) вообще не считалось.
+  const hctBlock = HCT_THRESHOLDS[sex].block;
+  const hctWarn = HCT_THRESHOLDS[sex].erythrocytosis;
+  if (hct != null && hct >= hctBlock) recs.push({ section: 'Кровь', priority: 'critical', text: `Гематокрит ${hct}% — полицитемия (порог ${hctBlock}%). Кровопускание (флеботомия 450-500мл). Увеличить потребление воды до 3-4 л/день.` });
+  else if (hct != null && hct >= hctWarn) recs.push({ section: 'Кровь', priority: 'warning', text: `Гематокрит ${hct}% — приближается к границе (эритроцитоз от ${hctWarn}%). Контроль каждые 2 недели. Донаторы оксида азота (L-аргинин, чеснок).` });
 
   const ldl = numVal(findMetric('ЛПНП'));
   if (ldl != null && ldl > 4.9) recs.push({ section: 'Липиды', priority: 'critical', text: `ЛПНП ${ldl} ммоль/л —极高 риск. Статин (аторвастатин 20-40мг). Рассмотреть отмену 17α-алкилированных ААС.` });
@@ -743,13 +847,23 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
   if (tg != null && tg > 2.3) recs.push({ section: 'Липиды', priority: 'warning', text: `Триглицериды ${tg} ммоль/л. Ограничение простых углеводов, омега-3 2-4г/день, контроль алкоголя.` });
 
   const prolactin = numVal(findMetric('Пролактин'));
-  if (prolactin != null && prolactin > 600) recs.push({ section: 'Гормоны', priority: 'critical', text: `Пролактин ${prolactin} mIU/L — значительно выше нормы. Каберголин 0.5мг 2×/нед + МРТ гипофиза.` });
-  else if (prolactin != null && prolactin > 400) recs.push({ section: 'Гормоны', priority: 'warning', text: `Пролактин ${prolactin} mIU/L. Каберголин 0.25мг 2×/нед. Исключить пролактиному.` });
+  // Проход 76: у женщины норма до 500 мМЕ/л, зелёный бэнд до 800, красный >1500.
+  // Прежние 400/600 были мужскими: её нормальный 650 мМЕ/л получал «значительно
+  // выше нормы → каберголин + МРТ гипофиза».
+  const prlWarn = sex === 'female' ? FEMALE_HORMONE_ULN.PRL.high : 400;
+  const prlCritical = sex === 'female' ? FEMALE_HORMONE_ULN.PRL.criticalHigh : 600;
+  if (prolactin != null && prolactin > prlCritical) recs.push({ section: 'Гормоны', priority: 'critical', text: `Пролактин ${prolactin} mIU/L — значительно выше нормы. Каберголин 0.5мг 2×/нед + МРТ гипофиза.` });
+  else if (prolactin != null && prolactin > prlWarn) recs.push({ section: 'Гормоны', priority: 'warning', text: `Пролактин ${prolactin} mIU/L. Каберголин 0.25мг 2×/нед. Исключить пролактиному.` });
 
   const alt = numVal(findMetric('АЛТ'));
   const ast = numVal(findMetric('АСТ'));
-  if (alt != null && alt > 80) recs.push({ section: 'Печень', priority: 'critical', text: `АЛТ ${alt} U/L — гепатотоксичность. Отмена оральных ААС и гепатотоксичных препаратов. УДХК 300-600мг/день.` });
-  else if (alt != null && alt > 40) recs.push({ section: 'Печень', priority: 'warning', text: `АЛТ ${alt} U/L — выше нормы. ТUDCA 250-500мг/день, NAC 600-1200мг/день. Контроль через 4 нед.` });
+  // Проход 76: ВГН и 2×ВГН — из резолвера с полом (♂ 40/80, ♀ 31/62). Женщина
+  // с АЛТ 70 читала «выше нормы» вместо «гепатотоксичность»: до 80 у неё ещё
+  // две ВГН, а порог отмены оралов — 62.
+  const altWarn = LFT_ULN.ALT[sex];
+  const altCritical = LFT_STAGE_ULN.reduce[sex];
+  if (alt != null && alt >= altCritical) recs.push({ section: 'Печень', priority: 'critical', text: `АЛТ ${alt} U/L — гепатотоксичность (≥2×ВГН ${altCritical}). Отмена оральных ААС и гепатотоксичных препаратов. УДХК 300-600мг/день.` });
+  else if (alt != null && alt > altWarn) recs.push({ section: 'Печень', priority: 'warning', text: `АЛТ ${alt} U/L — выше нормы (ВГН ${altWarn}). ТUDCA 250-500мг/день, NAC 600-1200мг/день. Контроль через 4 нед.` });
   if (ast != null && alt != null && alt > 0 && ast / alt > 2) recs.push({ section: 'Печень', priority: 'warning', text: `АСТ/АЛТ > 2 — мышечное повреждение или алкоголь. Дифференциальная диагностика.` });
 
   const gfr = numVal(findMetric('СКФ (GFR)'));
@@ -758,6 +872,8 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
   else if (gfr != null && gfr < 90) recs.push({ section: 'Почки', priority: 'info', text: `СКФ ${gfr} — нижняя граница нормы. Поддерживать гидратацию 2.5-3 л/день.` });
 
   const creatinine = numVal(findMetric('Креатинин'));
+  // 130 — порог ДЕЙСТВИЯ («значимое повышение»), а не ВГН: норма по полу уже
+  // печатается в референсе карточки (♂ ≤110 / ♀ ≤97, проход 76).
   if (creatinine != null && creatinine > 130) recs.push({ section: 'Почки', priority: 'warning', text: `Креатинин ${creatinine} µmol/L — повышен. Может быть следствием креатина/белка. Оценить СКФ.` });
 
   const glucose = numVal(findMetric('Глюкоза'));
@@ -896,6 +1012,9 @@ export async function generateComprehensiveReport(input: {
   const pharma = settings.pharma || {};
   const goals = settings.goals || {};
   const personal = settings.personal || {};
+  // Проход 76: пол пациента для референсов и порогов отчёта (женский слой
+  // резолвера включается только явно, как и во всех остальных вызовах).
+  const sex: ReportSex = (personal as any).sex === 'female' ? 'female' : 'male';
 
   const courseWeek = pharma.courseStartDate ? Math.floor(Math.max(1, daysBetween(pharma.courseStartDate, dateTo)) / 7) + 1 : undefined;
 
@@ -911,7 +1030,7 @@ export async function generateComprehensiveReport(input: {
 
   const sections = await Promise.all([
     gatherAnthropometry(dateFrom, dateTo),
-    gatherLabs(dateFrom, dateTo),
+    gatherLabs(dateFrom, dateTo, sex),
     gatherRisks(dateFrom, dateTo),
     gatherCourse(dateFrom, dateTo),
     gatherTraining(dateFrom, dateTo),
@@ -928,7 +1047,7 @@ export async function generateComprehensiveReport(input: {
   if (pedRiskSection) sections.push(pedRiskSection);
 
   const trends = input.type === 'monthly' ? await gatherMonthlyTrends(dateFrom, dateTo) : undefined;
-  const recommendations = generateRecommendations(sections, pedRisk);
+  const recommendations = generateRecommendations(sections, pedRisk, sex);
 
   return {
     trends,
