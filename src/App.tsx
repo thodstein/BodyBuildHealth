@@ -517,6 +517,21 @@ export default function App() {
           }, 700);
           return;
         }
+        if (target === 'nutrition_scan' || target === 'nutrition_photo') {
+          // Скан штрихкода и фото этикетки живут в WebView-движках: ведём в
+          // «Питание» и просим экран сразу открыть нужный сценарий. Флаг в
+          // sessionStorage переживает поздний монтаж ленивого экрана.
+          try {
+            sessionStorage.setItem('he:nut-open', target === 'nutrition_photo' ? 'photo' : 'scan');
+          } catch {
+            /* приватный режим */
+          }
+          handleNavigate('nutrition');
+          window.setTimeout(() => {
+            if (alive) window.dispatchEvent(new Event('he-nutrition-open'));
+          }, 400);
+          return;
+        }
         if (
           target === 'training' ||
           target === 'nutrition' ||

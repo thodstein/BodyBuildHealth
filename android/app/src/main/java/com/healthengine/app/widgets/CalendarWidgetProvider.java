@@ -324,7 +324,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                         + (overdue > 0 ? (", просрочено " + overdue) : ""))
                 : ("Календарь, " + period + ": задач нет");
         v.setContentDescription(R.id.w_cal_root, a11y);
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_cal_root);
     }
 
     private static void styleModeChip(RemoteViews v, int id, boolean on, String label) {

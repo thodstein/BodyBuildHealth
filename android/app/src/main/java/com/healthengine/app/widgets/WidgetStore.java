@@ -25,6 +25,8 @@ public final class WidgetStore {
     public static final String KEY_QUEUE = "nutrition_queue";
     public static final String KEY_TIMER = "timer_json";
     public static final String KEY_LAUNCH_TARGET = "launch_target";
+    /** Прозрачность фона виджетов в процентах: 100 / 85 / 70 / 50. */
+    public static final String KEY_OPACITY = "widget_opacity";
 
     /** Per-widget состояние календаря: режим день/неделя/месяц и опорная дата. */
     public static final String KEY_CAL_MODE_PREFIX = "calendar_mode_";
@@ -41,6 +43,10 @@ public final class WidgetStore {
     /** Открыть проведение и записать следующий подход (быстрый сет с рабочего стола). */
     public static final String TARGET_TRAINING_QUICK = "training_quick";
     public static final String TARGET_NUTRITION = "nutrition";
+    /** Питание + сразу открыть сканер штрихкода. */
+    public static final String TARGET_NUTRITION_SCAN = "nutrition_scan";
+    /** Питание + сразу открыть камеру для распознавания этикетки/блюда. */
+    public static final String TARGET_NUTRITION_PHOTO = "nutrition_photo";
     public static final String TARGET_SUPPORT = "support";
     public static final String TARGET_CALENDAR = "calendar";
     public static final String TARGET_NOTES = "notes";
@@ -137,6 +143,27 @@ public final class WidgetStore {
                 .remove(KEY_CAL_MODE_PREFIX + widgetId)
                 .remove(KEY_CAL_ANCHOR_PREFIX + widgetId)
                 .apply();
+    }
+
+    // ---- Прозрачность фона виджетов ----
+
+    /** Текущая прозрачность в процентах (100 — плотный фон). */
+    public static int getWidgetOpacity(Context ctx) {
+        int v = prefs(ctx).getInt(KEY_OPACITY, 100);
+        return normalizeOpacity(v);
+    }
+
+    public static void setWidgetOpacity(Context ctx, int value) {
+        prefs(ctx).edit().putInt(KEY_OPACITY, normalizeOpacity(value)).apply();
+    }
+
+    /** Разрешены четыре ступени: 100 / 85 / 70 / 50. */
+    public static int normalizeOpacity(int value) {
+        if (value >= 100) return 100;
+        if (value >= 85) return 85;
+        if (value >= 70) return 70;
+        if (value >= 50) return 50;
+        return 50;
     }
 
     // ---- Timer state ----

@@ -94,7 +94,7 @@ public class WaterQuickWidgetProvider extends AppWidgetProvider {
                 target > 0
                         ? ("Вода: " + water + " из " + target + " мл")
                         : ("Вода: " + water + " мл"));
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_waterquick_root);
     }
 
     static PendingIntent openApp(Context context, String target, int code) {

@@ -17,6 +17,8 @@ export type WidgetTarget =
   | 'training_run'
   | 'training_quick'
   | 'nutrition'
+  | 'nutrition_scan'
+  | 'nutrition_photo'
   | 'support'
   | 'calendar'
   | 'notes'
@@ -143,6 +145,8 @@ interface WidgetBridgeNative {
   getTimerState(): Promise<TimerState>;
   getLaunchTarget(): Promise<{ target: string | null }>;
   requestPinWidget(o: { kind: string }): Promise<{ requested: boolean; reason?: string }>;
+  getWidgetOpacity(): Promise<{ opacity: number }>;
+  setWidgetOpacity(o: { opacity: number }): Promise<{ ok: boolean; opacity: number }>;
   refreshAll(): Promise<{ ok: boolean }>;
 }
 
@@ -548,6 +552,8 @@ export async function consumeWidgetLaunchTarget(): Promise<WidgetTarget | null> 
         t === 'training_run' ||
         t === 'training_quick' ||
         t === 'nutrition' ||
+        t === 'nutrition_scan' ||
+        t === 'nutrition_photo' ||
         t === 'support' ||
         t === 'calendar' ||
         t === 'notes' ||
@@ -588,5 +594,43 @@ export async function refreshAllWidgets(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/* ---------------- прозрачность фона ---------------- */
+
+/** Разрешённые ступени прозрачности фона виджетов (100 — плотный фон). */
+export const WIDGET_OPACITIES = [100, 85, 70, 50] as const;
+
+export function normalizeWidgetOpacity(value: number): number {
+  if (!Number.isFinite(value)) return 100;
+  if (value >= 100) return 100;
+  if (value >= 85) return 85;
+  if (value >= 70) return 70;
+  return 50;
+}
+
+/** Текущая прозрачность фона виджетов (вне APK — всегда 100). */
+export async function widgetOpacity(): Promise<number> {
+  const p = plugin();
+  if (!p) return 100;
+  try {
+    const r = await p.getWidgetOpacity();
+    return normalizeWidgetOpacity(Number(r.opacity));
+  } catch {
+    return 100;
+  }
+}
+
+/** Сохранить прозрачность и сразу перерисовать все виджеты. */
+export async function setWidgetOpacity(opacity: number): Promise<number> {
+  const next = normalizeWidgetOpacity(opacity);
+  const p = plugin();
+  if (!p) return next;
+  try {
+    const r = await p.setWidgetOpacity({ opacity: next });
+    return normalizeWidgetOpacity(Number(r.opacity));
+  } catch {
+    return next;
   }
 }

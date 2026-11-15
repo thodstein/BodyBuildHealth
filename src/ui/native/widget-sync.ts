@@ -362,6 +362,21 @@ function addRank(item: { type?: string } | null | undefined): number {
 }
 
 /**
+ * Приёмы пищи в дневнике — русские подписи («Завтрак», «Обед»…), а нативные
+ * виджеты и старые очереди присылают английские ключи. Приводим к дневнику,
+ * иначе блюдо падает в невидимую секцию.
+ */
+export function normalizeMealKey(raw?: string | null): string {
+  const v = String(raw ?? '').trim();
+  const lower = v.toLowerCase();
+  if (lower === 'breakfast' || v === 'Завтрак') return 'Завтрак';
+  if (lower === 'lunch' || v === 'Обед') return 'Обед';
+  if (lower === 'dinner' || v === 'Ужин') return 'Ужин';
+  if (lower === 'snack' || v === 'Перекус') return 'Перекус';
+  return v ? v.slice(0, 32) : 'Перекус';
+}
+
+/**
  * Применить очередь виджета к журналам: вода -> he_water_log,
  * еда -> nutrition_diary_v2 в день из метки времени,
  * задача -> статус «сделано» в планшете (he_coach_planner).
@@ -394,7 +409,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         const date = isoFromTs(it.ts || Date.now());
         const diary = readDiaryV2();
         const day = diary[date] ?? { meals: {} };
-        const meal = (it.meal || 'snack').slice(0, 32);
+        const meal = normalizeMealKey(it.meal);
         const list = [...(day.meals[meal] ?? [])];
         list.push({
           name: String(it.name).slice(0, 120),

@@ -195,6 +195,18 @@ export const DashboardNative: React.FC<Props> = ({ onNavigate }) => {
           }, 700);
           return;
         }
+        if (target === 'nutrition_scan' || target === 'nutrition_photo') {
+          try {
+            sessionStorage.setItem('he:nut-open', target === 'nutrition_photo' ? 'photo' : 'scan');
+          } catch {
+            /* ignore */
+          }
+          onNavigate?.('nutrition');
+          window.setTimeout(() => {
+            if (alive) window.dispatchEvent(new Event('he-nutrition-open'));
+          }, 400);
+          return;
+        }
         if (target === 'training' || target === 'nutrition' || target === 'support' || target === 'calendar' || target === 'notes') {
           onNavigate?.(target);
         }

@@ -44,6 +44,6 @@ public class ComplianceWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {}
         v.setOnClickPendingIntent(R.id.w_comp_root,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_SUPPORT, 31));
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_comp_root);
     }
 }

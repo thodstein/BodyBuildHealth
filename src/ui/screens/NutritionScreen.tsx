@@ -1356,6 +1356,36 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
 
+  // Виджет «Питание»: «Скан»/«Фото» открывают Питание и сразу нужный сценарий.
+  // Флаг в sessionStorage переживает поздний монтаж ленивого экрана.
+  useEffect(() => {
+    const openFromWidget = () => {
+      let want: string | null = null;
+      try {
+        want = sessionStorage.getItem('he:nut-open');
+        if (want) sessionStorage.removeItem('he:nut-open');
+      } catch {
+        return;
+      }
+      if (!want) return;
+      setPage('tabs');
+      setNutritionSection('diary');
+      setTab('diary');
+      if (want === 'photo') {
+        // Камеру открывает дневник (useLabelScan) — флаг переживает его монтаж.
+        try { sessionStorage.setItem('he:nut-label-cam', '1'); } catch { /* ignore */ }
+        window.setTimeout(() => {
+          window.dispatchEvent(new Event('he-nutrition-label-camera'));
+        }, 500);
+      } else {
+        setScanOpen(true);
+      }
+    };
+    openFromWidget();
+    window.addEventListener('he-nutrition-open', openFromWidget);
+    return () => window.removeEventListener('he-nutrition-open', openFromWidget);
+  }, []);
+
   useEffect(() => {
     try {
       const diary = readDiaryV2();

@@ -53,6 +53,10 @@ public class WidgetBridgePlugin extends Plugin {
         try {
             WaterQuickWidgetProvider.updateAll(ctx);
         } catch (Exception ignored) {}
+        // «Быстрый сет» тоже подхватывает настройку прозрачности.
+        try {
+            QuickSetWidgetProvider.updateAll(ctx);
+        } catch (Exception ignored) {}
     }
 
     @PluginMethod
@@ -278,6 +282,31 @@ public class WidgetBridgePlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("queueSize failed");
+        }
+    }
+
+    // ---- Прозрачность фона виджетов ----
+
+    @PluginMethod
+    public void getWidgetOpacity(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("opacity", WidgetStore.getWidgetOpacity(getContext()));
+        call.resolve(ret);
+    }
+
+    /** 100 / 85 / 70 / 50 — фон всех виджетов перерисовывается сразу. */
+    @PluginMethod
+    public void setWidgetOpacity(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            WidgetStore.setWidgetOpacity(ctx, call.getInt("opacity", 100));
+            updateAll(ctx);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            ret.put("opacity", WidgetStore.getWidgetOpacity(ctx));
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("setWidgetOpacity failed");
         }
     }
 

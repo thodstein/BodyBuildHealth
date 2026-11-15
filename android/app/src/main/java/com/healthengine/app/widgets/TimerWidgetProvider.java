@@ -200,6 +200,6 @@ public class TimerWidgetProvider extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.w_timer_reset, cmdIntent(context, CMD_RESET, 0, 96));
         v.setOnClickPendingIntent(R.id.w_timer_open,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_TRAINING, 97));
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_timer_root);
     }
 }

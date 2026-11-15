@@ -37,8 +37,13 @@ public class WidgetQuickAddActivity extends Activity {
 
     public static final String EXTRA_KIND = "quick_kind";
     public static final String EXTRA_DATE = "quick_date";
+    /** Подсказка приёма пищи для еды: Завтрак / Обед / Ужин / Перекус. */
+    public static final String EXTRA_MEAL = "quick_meal";
     public static final String KIND_TASK = "task";
     public static final String KIND_NOTE = "note";
+    public static final String KIND_FOOD = "food";
+
+    private static final String[] MEALS = {"Завтрак", "Обед", "Ужин", "Перекус"};
 
     private static final Pattern TIME_RE = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
     private static final String[] MONTHS_GEN = {
@@ -53,16 +58,25 @@ public class WidgetQuickAddActivity extends Activity {
     private String kind = KIND_TASK;
     private String selectedDate = "";
     private String priority = "none";
+    private String meal = "Перекус";
 
     private EditText titleEt;
     private EditText timeEt;
     private EditText checklistEt;
+    private EditText kcalEt;
+    private EditText proteinEt;
+    private EditText fatEt;
+    private EditText carbsEt;
     private TextView dateLabel;
     private TextView dateToday;
     private TextView dateTomorrow;
     private TextView prioNone;
     private TextView prioMedium;
     private TextView prioHigh;
+    private TextView mealBf;
+    private TextView mealLunch;
+    private TextView mealDinner;
+    private TextView mealSnack;
     private TextView msg;
 
     @Override
@@ -80,19 +94,31 @@ public class WidgetQuickAddActivity extends Activity {
 
         Intent intent = getIntent();
         String k = intent == null ? null : intent.getStringExtra(EXTRA_KIND);
-        kind = KIND_NOTE.equals(k) ? KIND_NOTE : KIND_TASK;
+        if (KIND_NOTE.equals(k)) kind = KIND_NOTE;
+        else if (KIND_FOOD.equals(k)) kind = KIND_FOOD;
+        else kind = KIND_TASK;
         String d = intent == null ? null : intent.getStringExtra(EXTRA_DATE);
         selectedDate = isIso(d) ? d : todayIso();
+        String m = intent == null ? null : intent.getStringExtra(EXTRA_MEAL);
+        meal = normalizeMeal(m);
 
         titleEt = findViewById(R.id.qa_title);
         timeEt = findViewById(R.id.qa_time);
         checklistEt = findViewById(R.id.qa_checklist);
+        kcalEt = findViewById(R.id.qa_kcal);
+        proteinEt = findViewById(R.id.qa_p);
+        fatEt = findViewById(R.id.qa_f);
+        carbsEt = findViewById(R.id.qa_c);
         dateLabel = findViewById(R.id.qa_date_label);
         dateToday = findViewById(R.id.qa_date_today);
         dateTomorrow = findViewById(R.id.qa_date_tomorrow);
         prioNone = findViewById(R.id.qa_prio_none);
         prioMedium = findViewById(R.id.qa_prio_medium);
         prioHigh = findViewById(R.id.qa_prio_high);
+        mealBf = findViewById(R.id.qa_meal_bf);
+        mealLunch = findViewById(R.id.qa_meal_lunch);
+        mealDinner = findViewById(R.id.qa_meal_dinner);
+        mealSnack = findViewById(R.id.qa_meal_snack);
         msg = findViewById(R.id.qa_msg);
 
         TextView titleLabel = findViewById(R.id.qa_title_label);
@@ -100,6 +126,9 @@ public class WidgetQuickAddActivity extends Activity {
         View timeView = findViewById(R.id.qa_time);
         View priorityRow = findViewById(R.id.qa_priority_row);
         View checklistLabel = findViewById(R.id.qa_checklist_label);
+        View foodRow = findViewById(R.id.qa_food_row);
+        View mealLabel = findViewById(R.id.qa_meal_label);
+        View mealRow = findViewById(R.id.qa_meal_row);
 
         if (KIND_NOTE.equals(kind)) {
             titleLabel.setText("Новая заметка");
@@ -110,6 +139,16 @@ public class WidgetQuickAddActivity extends Activity {
             timeView.setVisibility(View.GONE);
             priorityRow.setVisibility(View.GONE);
             dateLabel.setText("Заметка появится в «Заметках» и на виджете");
+        } else if (KIND_FOOD.equals(kind)) {
+            titleLabel.setText("Новая еда");
+            titleEt.setHint("Что съели? (например, куриная грудка)");
+            dateRow.setVisibility(View.GONE);
+            timeView.setVisibility(View.GONE);
+            priorityRow.setVisibility(View.GONE);
+            foodRow.setVisibility(View.VISIBLE);
+            mealLabel.setVisibility(View.VISIBLE);
+            mealRow.setVisibility(View.VISIBLE);
+            dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
         } else {
             titleLabel.setText("Новая задача");
             titleEt.setHint("Что сделать?");
@@ -123,12 +162,42 @@ public class WidgetQuickAddActivity extends Activity {
         prioNone.setOnClickListener(v -> selectPriority("none"));
         prioMedium.setOnClickListener(v -> selectPriority("medium"));
         prioHigh.setOnClickListener(v -> selectPriority("high"));
+        mealBf.setOnClickListener(v -> selectMeal("Завтрак"));
+        mealLunch.setOnClickListener(v -> selectMeal("Обед"));
+        mealDinner.setOnClickListener(v -> selectMeal("Ужин"));
+        mealSnack.setOnClickListener(v -> selectMeal("Перекус"));
         findViewById(R.id.qa_cancel).setOnClickListener(v -> finish());
         findViewById(R.id.qa_save).setOnClickListener(v -> save());
 
         updateDateUi();
         updatePriorityUi();
+        updateMealUi();
         titleEt.requestFocus();
+    }
+
+    private void selectMeal(String value) {
+        meal = normalizeMeal(value);
+        updateMealUi();
+    }
+
+    private void updateMealUi() {
+        styleChip(mealBf, "Завтрак".equals(meal));
+        styleChip(mealLunch, "Обед".equals(meal));
+        styleChip(mealDinner, "Ужин".equals(meal));
+        styleChip(mealSnack, "Перекус".equals(meal));
+    }
+
+    /** Английские ключи (breakfast/lunch/dinner/snack) из старых вызовов тоже понимаем. */
+    static String normalizeMeal(String value) {
+        if (value == null) return "Перекус";
+        String v = value.trim();
+        if ("breakfast".equalsIgnoreCase(v)) return "Завтрак";
+        if ("lunch".equalsIgnoreCase(v)) return "Обед";
+        if ("dinner".equalsIgnoreCase(v)) return "Ужин";
+        for (String m : MEALS) {
+            if (m.equalsIgnoreCase(v)) return m;
+        }
+        return "Перекус";
     }
 
     private void selectDate(String iso) {
@@ -141,8 +210,8 @@ public class WidgetQuickAddActivity extends Activity {
         String tomorrow = addDays(today, 1);
         styleChip(dateToday, selectedDate.equals(today));
         styleChip(dateTomorrow, selectedDate.equals(tomorrow));
-        // У заметки даты нет — подпись «Дата: …» не должна перебивать подсказку.
-        if (!KIND_NOTE.equals(kind)) {
+        // У заметки и еды даты нет — подпись «Дата: …» их подсказку не перебивает.
+        if (KIND_TASK.equals(kind)) {
             dateLabel.setText("Дата: " + formatDayLabel(selectedDate));
         }
     }
@@ -167,18 +236,21 @@ public class WidgetQuickAddActivity extends Activity {
     private void save() {
         String title = titleEt.getText() == null ? "" : titleEt.getText().toString().trim();
         if (TextUtils.isEmpty(title)) {
-            showError(KIND_NOTE.equals(kind) ? "Введите заголовок заметки" : "Введите задачу");
+            showError(KIND_NOTE.equals(kind) ? "Введите заголовок заметки"
+                    : (KIND_FOOD.equals(kind) ? "Введите, что съели" : "Введите задачу"));
             return;
         }
-        // Лимиты совпадают с движком (140 у задачи, 120 у заметки).
-        int maxTitle = KIND_NOTE.equals(kind) ? 120 : 140;
+        // Лимиты совпадают с движком (140 у задачи, 120 у заметки и еды).
+        int maxTitle = KIND_TASK.equals(kind) ? 140 : 120;
         if (title.length() > maxTitle) title = title.substring(0, maxTitle);
         long now = System.currentTimeMillis();
         String id = "w_" + (KIND_NOTE.equals(kind) ? "n_" : "t_") + now + "_" + (int) (Math.random() * 1000);
 
         try {
             boolean ok;
-            if (KIND_NOTE.equals(kind)) {
+            if (KIND_FOOD.equals(kind)) {
+                ok = saveFood(title, now);
+            } else if (KIND_NOTE.equals(kind)) {
                 ok = saveNote(id, title, now);
             } else {
                 ok = saveTask(id, title, now);
@@ -186,6 +258,44 @@ public class WidgetQuickAddActivity extends Activity {
             if (ok) finish();
         } catch (Exception e) {
             showError("Не удалось сохранить — попробуйте ещё раз");
+        }
+    }
+
+    /** Еда из виджета «Питание»: запись в очередь `type=food` + оптимистичные круги. */
+    private boolean saveFood(String name, long now) throws Exception {
+        int kcal = parseQty(kcalEt, 5000);
+        if (kcal <= 0) {
+            showError("Укажите калорийность порции");
+            return false;
+        }
+        int p = parseQty(proteinEt, 500);
+        int f = parseQty(fatEt, 500);
+        int c = parseQty(carbsEt, 500);
+        JSONObject item = new JSONObject();
+        item.put("type", "food");
+        item.put("name", name);
+        item.put("kcal", kcal);
+        item.put("p", p);
+        item.put("f", f);
+        item.put("c", c);
+        item.put("meal", meal);
+        item.put("ts", now);
+        WidgetStore.enqueue(this, item);
+        NutritionWidgetProvider.optimisticFood(this, kcal, p, f, c);
+        NutritionWidgetProvider.updateAll(this);
+        Toast.makeText(this, "Добавлено: " + name, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    private static int parseQty(EditText et, int max) {
+        try {
+            String raw = et == null || et.getText() == null ? "" : et.getText().toString().trim();
+            if (raw.isEmpty()) return 0;
+            double val = Double.parseDouble(raw.replace(',', '.'));
+            if (Double.isNaN(val) || val <= 0) return 0;
+            return (int) Math.min(max, Math.round(val));
+        } catch (Exception e) {
+            return 0;
         }
     }
 

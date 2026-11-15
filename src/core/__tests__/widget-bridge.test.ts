@@ -24,8 +24,12 @@ import {
   getWidgetTimerState,
   readFallbackSnapshot,
   resetWidgetBridgeCache,
+  normalizeWidgetOpacity,
+  widgetOpacity,
+  setWidgetOpacity,
+  WIDGET_OPACITIES,
 } from '../widget-bridge';
-import { applyWidgetQueue } from '../../ui/native/widget-sync';
+import { applyWidgetQueue, normalizeMealKey } from '../../ui/native/widget-sync';
 import { localIsoDate } from '../local-date';
 
 beforeEach(async () => {
@@ -171,15 +175,17 @@ describe('очередь -> дневники', () => {
     expect(row.amountMl).toBe(750);
   });
 
-  it('10. еда из виджета падает в nutrition_diary_v2', async () => {
+  it('10. еда из виджета падает в nutrition_diary_v2 (секция дневника)', async () => {
     await queueFood({ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 55, meal: 'breakfast' });
     const applied = applyWidgetQueue(await drainWidgetQueue());
     expect(applied).toEqual({ waterMl: 0, foods: 1, tasks: 0, tasksAdded: 0, notesAdded: 0 });
     const diary = JSON.parse(localStorage.getItem('nutrition_diary_v2') || '{}');
     const dates = Object.keys(diary).filter((k) => k !== '__version');
     expect(dates.length).toBe(1);
-    expect(diary[dates[0]].meals.breakfast[0].name).toBe('Овсянка');
-    expect(diary[dates[0]].meals.breakfast[0].kcal).toBe(300);
+    // Английский ключ виджета приводим к подписи дневника, иначе блюдо
+    // оказывается в невидимой секции «breakfast».
+    expect(diary[dates[0]].meals['Завтрак'][0].name).toBe('Овсянка');
+    expect(diary[dates[0]].meals['Завтрак'][0].kcal).toBe(300);
   });
 
   it('11. битый элемент не роняет остальные', async () => {
@@ -266,5 +272,33 @@ describe('очередь -> дневники', () => {
     const task = stored.items.find(t => t.id === 'w_task_2');
     expect(task?.title).toBe('Выпить креатин');
     expect(task?.done).toBe(true);
+  });
+});
+
+describe('прозрачность фона виджетов', () => {
+  it('16. ступени 100 / 85 / 70 / 50', () => {
+    expect(WIDGET_OPACITIES).toEqual([100, 85, 70, 50]);
+    expect(normalizeWidgetOpacity(100)).toBe(100);
+    expect(normalizeWidgetOpacity(92)).toBe(85);
+    expect(normalizeWidgetOpacity(80)).toBe(70);
+    expect(normalizeWidgetOpacity(60)).toBe(50);
+    expect(normalizeWidgetOpacity(0)).toBe(50);
+    expect(normalizeWidgetOpacity(Number.NaN)).toBe(100);
+  });
+
+  it('17. вне APK прозрачность 100 и вызовы не бросают', async () => {
+    expect(await widgetOpacity()).toBe(100);
+    expect(await setWidgetOpacity(80)).toBe(70);
+  });
+});
+
+describe('приёмы пищи из виджета', () => {
+  it('18. английские ключи приводятся к подписям дневника', () => {
+    expect(normalizeMealKey('breakfast')).toBe('Завтрак');
+    expect(normalizeMealKey('lunch')).toBe('Обед');
+    expect(normalizeMealKey('dinner')).toBe('Ужин');
+    expect(normalizeMealKey('snack')).toBe('Перекус');
+    expect(normalizeMealKey('Ужин')).toBe('Ужин');
+    expect(normalizeMealKey('')).toBe('Перекус');
   });
 });

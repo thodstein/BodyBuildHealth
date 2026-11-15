@@ -36,7 +36,7 @@ public class QuickSetWidgetProvider extends AppWidgetProvider {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_quickset);
         v.setOnClickPendingIntent(R.id.w_quickset_root, openApp(context, WidgetStore.TARGET_TRAINING_QUICK, 21));
         v.setOnClickPendingIntent(R.id.w_quickset_act, openApp(context, WidgetStore.TARGET_TRAINING_QUICK, 22));
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_quickset_root);
     }
 
     static PendingIntent openApp(Context context, String target, int code) {

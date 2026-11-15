@@ -88,7 +88,7 @@ public class TrainingWidgetProvider extends AppWidgetProvider {
                 ? (live ? WidgetStore.TARGET_TRAINING_QUICK : WidgetStore.TARGET_TRAINING_RUN)
                 : actionTarget;
         v.setOnClickPendingIntent(R.id.w_training_act, openApp(context, act, 13));
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_training_root);
     }
 
     static PendingIntent openApp(Context context, String target, int code) {

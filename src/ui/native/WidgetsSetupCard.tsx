@@ -3,10 +3,13 @@
  * Telegram/web этот компонент не импортируют.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NativeIcon, type NativeIconName } from './NativeIcons';
 import {
   requestPinWidget,
+  setWidgetOpacity,
+  widgetOpacity,
+  WIDGET_OPACITIES,
   type WidgetKind,
 } from '../../core/widget-bridge';
 import { getLocale } from '../../data/interactions-labels';
@@ -16,7 +19,7 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'training', icon: 'dumbbell', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
   { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Остаток ккал, БЖУ, вода +250/+500 в один тап' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Аналитика КБЖУ кругами: ＋ Еда, скан и фото с рабочего стола' },
   { kind: 'water', icon: 'droplet', name: 'Вода', desc: 'Прогресс воды дня и +250 мл в один тап' },
   { kind: 'calendar', icon: 'clock', name: 'Календарь', desc: 'День / неделя / месяц и новая задача прямо с рабочего стола' },
   { kind: 'notes', icon: 'notebook', name: 'Заметки', desc: 'Закреплённые и свежие заметки; новая заметка — без открытия приложения' },
@@ -26,7 +29,7 @@ const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'training', icon: 'dumbbell', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
   { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'Kcal left, macros, water +250/+500 in one tap' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'KBJU rings analytics: + Food, scan and photo from the home screen' },
   { kind: 'water', icon: 'droplet', name: 'Water', desc: 'Daily water progress and +250 ml in one tap' },
   { kind: 'calendar', icon: 'clock', name: 'Calendar', desc: 'Day / week / month and a new task right from the home screen' },
   { kind: 'notes', icon: 'notebook', name: 'Notes', desc: 'Pinned and recent notes; add a note without opening the app' },
@@ -66,6 +69,9 @@ function strings() {
       refreshTasks: (n: number) => `widget tasks: ${n}`,
       refreshTasksAdded: (n: number) => `new tasks: ${n}`,
       refreshNotesAdded: (n: number) => `new notes: ${n}`,
+      opacityTitle: 'Widget background opacity',
+      opacityHint: 'One setting for every widget — applied immediately, no app restart.',
+      opacityApplied: (n: number) => `widget background: ${n}%`,
       refreshFail: 'Could not refresh widgets',
       manualTitle: 'How to add manually',
       manual: (
@@ -100,6 +106,9 @@ function strings() {
     refreshTasks: (n: number) => `задач с виджета: ${n}`,
     refreshTasksAdded: (n: number) => `новых задач: ${n}`,
     refreshNotesAdded: (n: number) => `новых заметок: ${n}`,
+    opacityTitle: 'Прозрачность фона виджетов',
+    opacityHint: 'Одна настройка на все виджеты — применяется сразу, без перезапуска.',
+    opacityApplied: (n: number) => `фон виджетов: ${n}%`,
     refreshFail: 'Не удалось обновить виджеты',
     manualTitle: 'Как добавить вручную',
     manual: (
@@ -123,8 +132,35 @@ export const WidgetsSetupCard: React.FC = () => {
   const [busy, setBusy] = useState<WidgetKind | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [opacity, setOpacity] = useState(100);
+  const [opacityBusy, setOpacityBusy] = useState(false);
   const T = strings();
   const reasons = T.reasons;
+
+  useEffect(() => {
+    let alive = true;
+    void widgetOpacity().then((v) => {
+      if (alive) setOpacity(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const applyOpacity = async (value: number) => {
+    setOpacityBusy(true);
+    setOpacity(value);
+    setMsg(null);
+    try {
+      const applied = await setWidgetOpacity(value);
+      setOpacity(applied);
+      setMsg(T.opacityApplied(applied));
+    } catch {
+      setMsg(T.refreshFail);
+    } finally {
+      setOpacityBusy(false);
+    }
+  };
 
   const pin = async (kind: WidgetKind) => {
     setBusy(kind);
@@ -186,6 +222,31 @@ export const WidgetsSetupCard: React.FC = () => {
             </button>
           </div>
         ))}
+      </div>
+      {/* Иконка без класса строк виджетов: тест фиксирует ровно 7 видов. */}
+      <div className="native-feature-row" style={{ marginTop: 10 }} role="group" aria-label={T.opacityTitle}>
+        <span style={{ display: 'inline-flex', flexShrink: 0, color: 'var(--accent)' }}>
+          <NativeIcon name="grid" size={15} />
+        </span>
+        <div className="native-feature-row-body">
+          <div className="native-feature-row-name">{T.opacityTitle}</div>
+          <div className="native-feature-row-desc">{T.opacityHint}</div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {WIDGET_OPACITIES.map((o) => (
+              <button
+                key={o}
+                className="native-feature-btn"
+                disabled={opacityBusy}
+                aria-pressed={opacity === o}
+                data-active={opacity === o}
+                onClick={() => applyOpacity(o)}
+                style={{ flex: 1 }}
+              >
+                {o}%
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       <button className="native-feature-wide" disabled={syncing} onClick={refresh}>
         {syncing ? T.refreshBusy : T.refreshCta}

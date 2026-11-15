@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Виджет «Питание» — сводка дня в духе FatSecret:
-    остаток калорий крупно, съедено/цель, полоса калорий,
-    Б/Ж/У с процентами от цели, вода и быстрые действия.
+    Виджет «Питание» — аналитика КБЖУ кругами.
+    Слева крупный круг калорий, справа три круга Б/Ж/У, ниже сводка дня,
+    вода и быстрые действия: своя еда (нативный диалог), скан штрихкода,
+    фото этикетки. Всё, кроме скана/фото, работает без открытия приложения.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_nut_root"
@@ -12,11 +13,11 @@
     android:orientation="vertical"
     android:paddingLeft="12dp"
     android:paddingRight="12dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
     android:contentDescription="@string/widget_nutrition_desc">
 
-    <!-- Шапка: название + очередь быстрых записей -->
+    <!-- Шапка: название + дата + очередь быстрых записей -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,123 +64,122 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Главный блок: остаток калорий + съедено -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
-        android:baselineAligned="false"
-        android:gravity="bottom"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/w_nut_left_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:letterSpacing="0.08"
-                android:text="ОСТАЛОСЬ"
-                android:textColor="#8FA3C4"
-                android:textSize="9sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/w_nut_left_value"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="—"
-                android:textColor="#FFFFFF"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/w_nut_left_sub"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text="ккал"
-                android:textColor="#8FA3C4"
-                android:textSize="9sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="end"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:letterSpacing="0.08"
-                android:text="СЪЕДЕНО"
-                android:textColor="#8FA3C4"
-                android:textSize="9sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/w_nut_eaten"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="0"
-                android:textColor="#C9F73A"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/w_nut_pct"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="0% цели"
-                android:textColor="#8FA3C4"
-                android:textSize="9sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <ProgressBar
-        android:id="@+id/w_nut_kcal_bar"
-        style="@android:style/Widget.ProgressBar.Horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="5dp"
-        android:layout_marginTop="5dp"
-        android:max="100"
-        android:progress="0"
-        android:progressDrawable="@drawable/widget_bar_kcal" />
-
-    <!-- Макросы: Б / Ж / У -->
+    <!-- Круги: калории крупно + Б / Ж / У -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:baselineAligned="false"
+        android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <!-- Калории -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_weight="1"
+            android:layout_weight="1.15"
+            android:gravity="center_horizontal"
             android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="74dp"
+                android:layout_height="74dp">
+
+                <ProgressBar
+                    style="@style/WidgetRing"
+                    android:id="@+id/w_nut_kcal_ring"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_ring_kcal" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/w_nut_kcal_pct"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="0%"
+                        android:textColor="#FFFFFF"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.06"
+                        android:text="ККАЛ"
+                        android:textColor="#8FA3C4"
+                        android:textSize="8sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/w_nut_kcal_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="0 / 0"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Белки -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="56dp">
+
+                <ProgressBar
+                    style="@style/WidgetRing"
+                    android:id="@+id/w_nut_p_ring"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_ring_protein" />
+
+                <TextView
+                    android:id="@+id/w_nut_p_pct"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="0%"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
                 android:text="Белки"
                 android:textColor="#60A5FA"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -187,38 +187,57 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
+                android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="0 / 0 г"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
+                android:text="0 / 0"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
                 android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/w_nut_p_bar"
-                style="@android:style/Widget.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginTop="3dp"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/widget_bar_protein" />
         </LinearLayout>
 
+        <!-- Жиры -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
             android:layout_weight="1"
+            android:gravity="center_horizontal"
             android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="56dp">
+
+                <ProgressBar
+                    style="@style/WidgetRing"
+                    android:id="@+id/w_nut_f_ring"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_ring_fat" />
+
+                <TextView
+                    android:id="@+id/w_nut_f_pct"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="0%"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
                 android:text="Жиры"
                 android:textColor="#F59E0B"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -226,37 +245,57 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
+                android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="0 / 0 г"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
+                android:text="0 / 0"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
                 android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/w_nut_f_bar"
-                style="@android:style/Widget.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginTop="3dp"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/widget_bar_fat" />
         </LinearLayout>
 
+        <!-- Углеводы -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:gravity="center_horizontal"
             android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="56dp"
+                android:layout_height="56dp">
+
+                <ProgressBar
+                    style="@style/WidgetRing"
+                    android:id="@+id/w_nut_c_ring"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressDrawable="@drawable/widget_ring_carbs" />
+
+                <TextView
+                    android:id="@+id/w_nut_c_pct"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="0%"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
-                android:text="Углеводы"
+                android:text="Углев."
                 android:textColor="#F97316"
-                android:textSize="9sp"
+                android:textSize="8sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -264,30 +303,34 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
+                android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:text="0 / 0 г"
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
+                android:text="0 / 0"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
                 android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/w_nut_c_bar"
-                style="@android:style/Widget.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="4dp"
-                android:layout_marginTop="3dp"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/widget_bar_carbs" />
         </LinearLayout>
     </LinearLayout>
+
+    <!-- Сводка: съедено / цель / остаток -->
+    <TextView
+        android:id="@+id/w_nut_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="Данных за сегодня пока нет"
+        android:textColor="#8FA3C4"
+        android:textSize="9sp" />
 
     <!-- Вода -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="5dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -324,11 +367,60 @@
         android:progress="0"
         android:progressDrawable="@drawable/widget_bar_water" />
 
-    <!-- Быстрые действия -->
+    <!-- Быстрые действия: еда / скан / фото -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="7dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_nut_food"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip_on"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="＋ Еда"
+            android:textColor="#07111F"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_nut_scan"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Скан"
+            android:textColor="#E2ECFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_nut_photo"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Фото"
+            android:textColor="#E2ECFF"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Вода в один тап + дневник -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:orientation="horizontal">
 
         <TextView
@@ -367,7 +459,7 @@
             android:background="@drawable/widget_action"
             android:gravity="center"
             android:includeFontPadding="false"
-            android:text="＋ Еда"
+            android:text="Дневник"
             android:textColor="#C9F73A"
             android:textSize="11sp"
             android:textStyle="bold" />

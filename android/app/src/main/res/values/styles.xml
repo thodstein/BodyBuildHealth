@@ -69,6 +69,14 @@
         <item name="android:textSize">11sp</item>
     </style>
 
+    <!-- Кольцевой прогресс виджета: level-режим вместо «крутилки» по умолчанию -->
+    <style name="WidgetRing">
+        <item name="android:indeterminateOnly">false</item>
+        <item name="android:indeterminate">false</item>
+        <item name="android:mirrorForRtl">false</item>
+        <item name="android:max">100</item>
+    </style>
+
     <!-- Компактный редактор задачи/заметки с рабочего стола -->
     <style name="WidgetQuickAddTheme" parent="@android:style/Theme.Material.Dialog">
         <item name="android:windowNoTitle">true</item>

@@ -102,7 +102,7 @@ public class NotesWidgetProvider extends AppWidgetProvider {
                 ? ("Заметки: " + total + (pinned > 0 ? (", закреплено " + pinned) : ""))
                 : "Заметки: пока пусто";
         v.setContentDescription(R.id.w_notes_root, a11y);
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_notes_root);
     }
 
     private static PendingIntent quickAddNote(Context context) {

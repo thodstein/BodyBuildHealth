@@ -18,18 +18,21 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Homescreen-виджет «Питание» в духе FatSecret: остаток калорий крупно,
- * съедено/цель, полосы Б/Ж/У, вода и быстрые действия.
+ * Homescreen-виджет «Питание» — аналитика КБЖУ кругами.
  *
- * Кнопки воды работают БЕЗ открытия приложения (пишут в очередь, приложение
- * забирает её при старте), еда — через открытие дневника.
+ * Слева крупный круг калорий, справа Б/Ж/У; ниже сводка дня, вода и кнопки.
+ * «＋ Еда» открывает компактный нативный редактор (WidgetQuickAddActivity)
+ * без запуска приложения и сразу пишет запись в очередь `type=food`.
+ * «Скан» и «Фото» уводят в приложение прямо в нужный сценарий: распознавание
+ * штрихкода / этикетки требует WebView-движков, нативно их не продублировать.
  */
 public class NutritionWidgetProvider extends AppWidgetProvider {
 
     public static final String ACTION_WATER = "com.healthengine.app.action.WIDGET_WATER";
+    public static final String ACTION_FOOD = "com.healthengine.app.action.WIDGET_NUT_FOOD";
     public static final String EXTRA_ML = "ml";
 
-    private static final int C_TEXT = 0xFFFFFFFF;
+    private static final int C_TEXT = 0xFFE2ECFF;
     private static final int C_MUTED = 0xFF8FA3C4;
     private static final int C_ACCENT = 0xFFC9F73A;
     private static final int C_DANGER = 0xFFFF6B6B;
@@ -86,6 +89,18 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {}
     }
 
+    /** Еда из нативного редактора: круги обновляются сразу, без входа в приложение. */
+    static void optimisticFood(Context context, int kcal, int p, int f, int c) {
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            d.put("kcal", Math.max(0, d.optInt("kcal", 0)) + Math.max(0, kcal));
+            d.put("protein", Math.max(0, d.optInt("protein", 0)) + Math.max(0, p));
+            d.put("fat", Math.max(0, d.optInt("fat", 0)) + Math.max(0, f));
+            d.put("carbs", Math.max(0, d.optInt("carbs", 0)) + Math.max(0, c));
+            WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
+        } catch (Exception ignored) {}
+    }
+
     static RemoteViews build(Context context) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_nutrition);
         JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
@@ -121,35 +136,39 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             v.setViewVisibility(R.id.w_nut_queue, View.GONE);
         }
 
+        // ---- Круги КБЖУ ----
         int kcalPct = target > 0 ? Math.min(100, Math.round(kcal * 100f / target)) : 0;
+        v.setProgressBar(R.id.w_nut_kcal_ring, 100, kcalPct, false);
+        v.setTextViewText(R.id.w_nut_kcal_pct, target > 0 ? (kcalPct + "%") : "—");
+        v.setTextColor(R.id.w_nut_kcal_pct,
+                target > 0 && kcal > target ? C_DANGER : (kcalPct >= 100 ? C_ACCENT : 0xFFFFFFFF));
+        v.setTextViewText(R.id.w_nut_kcal_value,
+                target > 0 ? (formatNum(kcal) + " / " + formatNum(target)) : formatNum(kcal));
+
+        setRing(v, R.id.w_nut_p_ring, R.id.w_nut_p_pct, R.id.w_nut_p_value, protein, tProtein);
+        setRing(v, R.id.w_nut_f_ring, R.id.w_nut_f_pct, R.id.w_nut_f_value, fat, tFat);
+        setRing(v, R.id.w_nut_c_ring, R.id.w_nut_c_pct, R.id.w_nut_c_value, carbs, tCarbs);
+
+        // ---- Сводка ----
+        String summary;
         if (!has) {
-            v.setTextViewText(R.id.w_nut_left_label, "ОСТАЛОСЬ");
-            v.setTextColor(R.id.w_nut_left_label, C_MUTED);
-            v.setTextViewText(R.id.w_nut_left_value, "—");
-            v.setTextColor(R.id.w_nut_left_value, C_TEXT);
-            v.setTextViewText(R.id.w_nut_left_sub, "добавь еду");
-            v.setTextViewText(R.id.w_nut_eaten, "0");
-            v.setTextViewText(R.id.w_nut_pct, "нет цели");
+            summary = "Данных за сегодня пока нет — добавьте еду";
+        } else if (target > 0) {
+            int left = target - kcal;
+            if (left > 0) {
+                summary = "Осталось " + formatNum(left) + " ккал из " + formatNum(target);
+            } else if (left == 0) {
+                summary = "Цель дня закрыта: " + formatNum(target) + " ккал";
+            } else {
+                summary = "Перебор " + formatNum(-left) + " ккал из " + formatNum(target);
+            }
         } else {
-            int left = target > 0 ? target - kcal : 0;
-            boolean over = target > 0 && left < 0;
-            boolean reached = target > 0 && left == 0;
-            v.setTextViewText(R.id.w_nut_left_label, over ? "ПЕРЕБОР" : (reached ? "ЦЕЛЬ" : "ОСТАЛОСЬ"));
-            v.setTextColor(R.id.w_nut_left_label, over ? C_DANGER : (reached ? C_ACCENT : C_MUTED));
-            v.setTextViewText(R.id.w_nut_left_value, formatNum(Math.abs(left)));
-            v.setTextColor(R.id.w_nut_left_value, over ? C_DANGER : C_TEXT);
-            v.setTextViewText(
-                    R.id.w_nut_left_sub,
-                    target > 0 ? ("из " + formatNum(target) + " ккал") : "ккал");
-            v.setTextViewText(R.id.w_nut_eaten, formatNum(kcal));
-            v.setTextViewText(R.id.w_nut_pct, target > 0 ? (kcalPct + "% цели") : "без цели");
+            summary = "Съедено " + formatNum(kcal) + " ккал · цель не задана";
         }
-        v.setProgressBar(R.id.w_nut_kcal_bar, 100, kcalPct, false);
+        v.setTextViewText(R.id.w_nut_summary, summary);
+        v.setTextColor(R.id.w_nut_summary, target > 0 && kcal > target ? C_DANGER : C_MUTED);
 
-        setMacro(v, R.id.w_nut_p_value, R.id.w_nut_p_bar, protein, tProtein);
-        setMacro(v, R.id.w_nut_f_value, R.id.w_nut_f_bar, fat, tFat);
-        setMacro(v, R.id.w_nut_c_value, R.id.w_nut_c_bar, carbs, tCarbs);
-
+        // ---- Вода ----
         int waterPct = tWater > 0 ? Math.min(100, Math.round(water * 100f / tWater)) : 0;
         boolean waterDone = tWater > 0 && water >= tWater;
         String waterLine = tWater > 0
@@ -160,10 +179,17 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         v.setTextColor(R.id.w_nut_water_pct, waterDone ? C_ACCENT : C_MUTED);
         v.setProgressBar(R.id.w_nut_water_bar, 100, waterPct, false);
 
+        // ---- Действия ----
         v.setOnClickPendingIntent(R.id.w_nut_water,
                 waterAction(context, 250, 41));
         v.setOnClickPendingIntent(R.id.w_nut_water500,
                 waterAction(context, 500, 42));
+        v.setOnClickPendingIntent(R.id.w_nut_food,
+                foodAction(context, mealForNow()));
+        v.setOnClickPendingIntent(R.id.w_nut_scan,
+                TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION_SCAN, 46));
+        v.setOnClickPendingIntent(R.id.w_nut_photo,
+                TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION_PHOTO, 47));
         v.setOnClickPendingIntent(R.id.w_nut_open,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION, 43));
         v.setOnClickPendingIntent(R.id.w_nut_root,
@@ -177,16 +203,18 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                         + ", углеводы " + carbs + " из " + tCarbs + " грамм")
                 : "Питание: данных за сегодня пока нет";
         v.setContentDescription(R.id.w_nut_root, a11y);
-        return v;
+        return WidgetStyle.apply(context, v, R.id.w_nut_root);
     }
 
-    private static void setMacro(RemoteViews v, int valueId, int barId, int value, int target) {
-        String line = target > 0
-                ? (formatNum(value) + " / " + formatNum(target) + " г")
-                : (formatNum(value) + " г");
-        v.setTextViewText(valueId, line);
+    /** Круг макроса: процент внутри, «факт / цель» под ним. */
+    private static void setRing(RemoteViews v, int ringId, int pctId, int valueId, int value, int target) {
         int pct = target > 0 ? Math.min(100, Math.round(value * 100f / target)) : 0;
-        v.setProgressBar(barId, 100, pct, false);
+        v.setProgressBar(ringId, 100, pct, false);
+        v.setTextViewText(pctId, target > 0 ? (pct + "%") : "—");
+        v.setTextColor(pctId, target > 0 && value > target ? C_DANGER : 0xFFFFFFFF);
+        v.setTextViewText(valueId,
+                target > 0 ? (value + " / " + target) : String.valueOf(value));
+        v.setTextColor(valueId, target > 0 && value >= target ? C_ACCENT : C_TEXT);
     }
 
     /** 1380 -> «1 380»: тысячи читаются как в дневнике. */
@@ -198,11 +226,36 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    /** Подсказка приёма пищи по времени суток — как в дневнике. */
+    static String mealForNow() {
+        try {
+            int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+            if (h < 11) return "Завтрак";
+            if (h < 15) return "Обед";
+            if (h < 18) return "Перекус";
+            if (h < 23) return "Ужин";
+            return "Перекус";
+        } catch (Exception e) {
+            return "Перекус";
+        }
+    }
+
     static PendingIntent waterAction(Context context, int ml, int code) {
         Intent i = new Intent(context, NutritionWidgetProvider.class);
         i.setAction(ACTION_WATER);
         i.putExtra(EXTRA_ML, ml);
         return PendingIntent.getBroadcast(context, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** «＋ Еда»: компактный нативный редактор еды поверх лаунчера. */
+    static PendingIntent foodAction(Context context, String meal) {
+        Intent i = new Intent(context, WidgetQuickAddActivity.class);
+        i.setAction(ACTION_FOOD);
+        i.putExtra(WidgetQuickAddActivity.EXTRA_KIND, WidgetQuickAddActivity.KIND_FOOD);
+        i.putExtra(WidgetQuickAddActivity.EXTRA_MEAL, meal);
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(context, 45, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 }

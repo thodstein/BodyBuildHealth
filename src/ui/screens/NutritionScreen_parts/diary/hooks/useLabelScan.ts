@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { processUploadedFile } from '../../../../../core/ocr-engine';
 import { isCapacitorNative } from '../../../../../core/app-platform';
 import { parseNutritionLabel, labelToCustomFood, type ParsedNutritionLabel } from '../../../../../engines/nutrition-label-parser';
@@ -220,6 +220,27 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
       setBarcodeLoading(false);
     }
   }, [barcodeLoading, showToast]);
+
+  // Виджет «Питание» → «Фото»: сразу открываем камеру и панель распознавания.
+  // Экран ставит флаг в sessionStorage — он переживает монтаж этого хука.
+  useEffect(() => {
+    const openCamera = () => {
+      let pending: string | null = null;
+      try {
+        pending = sessionStorage.getItem('he:nut-label-cam');
+        if (pending) sessionStorage.removeItem('he:nut-label-cam');
+      } catch {
+        return;
+      }
+      if (!pending) return;
+      setOpen(true);
+      setError('');
+      void handlePick('camera');
+    };
+    openCamera();
+    window.addEventListener('he-nutrition-label-camera', openCamera);
+    return () => window.removeEventListener('he-nutrition-label-camera', openCamera);
+  }, [handlePick]);
 
   const handleClose = useCallback(() => {
     requestRef.current += 1;
