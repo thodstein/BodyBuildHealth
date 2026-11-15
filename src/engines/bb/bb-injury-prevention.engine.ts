@@ -70,7 +70,11 @@ export function calculateSessionStress(session: BBSession): JointStressReport {
   const byJoint: Record<string, number> = {};
   let total = 0;
 
-  for (const ex of session.exercises) {
+  // P2-6 (аудит 2026-11): сессия без `exercises` — не повод падать всему отчёту
+  // качества (импорт/частичный снапшот плана).
+  const exercises: any[] = Array.isArray((session as any)?.exercises) ? (session as any).exercises : [];
+
+  for (const ex of exercises) {
     const stress = getJointStress(ex);
     total += stress;
     const trueMuscle = trueMuscleOf({ name: ex.name, group: ex.muscle, movementPattern: ex.exerciseName }) || ex.muscle;
@@ -104,7 +108,11 @@ export function calculateWeeklyStress(week: { sessions: BBSession[] }): JointStr
   let total = 0;
   const allIssues: string[] = [];
 
-  for (const session of week.sessions) {
+  // P2-6 (аудит 2026-11): неделя/сессия без массивов не должна ронять отчёт
+  // качества — планы приходят из импорта и из ручных правок.
+  const sessions: any[] = Array.isArray((week as any)?.sessions) ? (week as any).sessions : [];
+
+  for (const session of sessions) {
     const sessionReport = calculateSessionStress(session);
     total += sessionReport.sessionStress;
     for (const [joint, stress] of Object.entries(sessionReport.byJoint)) {
@@ -116,11 +124,11 @@ export function calculateWeeklyStress(week: { sessions: BBSession[] }): JointStr
   // Проверка конфликтов: плечи + жим лёжа + жим стоя в одну неделю
   const shoulderStress = byJoint['shoulder'] || 0;
   if (shoulderStress > STRESS_THRESHOLDS.high) {
-    const hasBenchPress = week.sessions.some(s =>
-      s.exercises.some(ex => /жим.*лёж|bench.*press/i.test(ex.name))
+    const hasBenchPress = sessions.some((s: any) =>
+      (Array.isArray(s?.exercises) ? s.exercises : []).some((ex: any) => /жим.*лёж|bench.*press/i.test(ex.name))
     );
-    const hasOverheadPress = week.sessions.some(s =>
-      s.exercises.some(ex => /жим.*стоя|жим.*сидя|overhead|ohp|армей/i.test(ex.name))
+    const hasOverheadPress = sessions.some((s: any) =>
+      (Array.isArray(s?.exercises) ? s.exercises : []).some((ex: any) => /жим.*стоя|жим.*сидя|overhead|ohp|армей/i.test(ex.name))
     );
     if (hasBenchPress && hasOverheadPress) {
       allIssues.push('⚠ Конфликт плечевого сустава: жим лёжа + жим стоя в одну неделю — высокий риск травмы плеча.');
@@ -156,8 +164,15 @@ export function analyzePlanStress(plan: BBPlan): {
   let peakStress = 0;
   let peakWeek = 0;
 
-  for (const w of plan.weeks) {
-    if (w.phase === 'deload') continue; // skip deload weeks
+  // P2-6 (аудит 2026-11): план без `weeks` (импорт/частичный снапшот) не должен
+  // ронять отчёт качества TypeError'ом — раньше `for (const w of plan.weeks)`
+  // бросал исключение и весь экран «Качество» падал вместо честной оценки
+  // «нет данных». Недели без массива сессий тоже пропускаются.
+  const planWeeks = (Array.isArray((plan as any)?.weeks) ? plan.weeks : [])
+    .filter((w: any) => w && Array.isArray(w.sessions));
+
+  for (const w of planWeeks) {
+    if ((w as any).phase === 'deload') continue; // skip deload weeks
     const report = calculateWeeklyStress(w);
     weeklyReports.push(report);
     totalStress += report.weeklyStress;

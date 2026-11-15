@@ -500,8 +500,12 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
   }
   if (plan.volumeTargets) {
     for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
-      const peakVolume = plan.weeklyVolume
-        ? Math.max(...Object.values(plan.weeklyVolume).map(week => week[muscle]?.effectiveSets || 0))
+      // P2-5 (аудит 2026-11): `Math.max(...[])` = -Infinity, и это попадало в
+      // пользовательский текст («эффективных сетов -Infinity ниже минимума MEV 8
+      // (-Infinity%)»), когда `weeklyVolume` есть, но пуст.
+      const weeklyVolumeRows = plan.weeklyVolume ? Object.values(plan.weeklyVolume) : [];
+      const peakVolume = weeklyVolumeRows.length
+        ? Math.max(...weeklyVolumeRows.map(week => (week as any)?.[muscle]?.effectiveSets || 0))
         : 0;
       // Порог 70% MEV: дефициты 70-100% — пограничная точность распределения
       // (шум в rationale для лимитированных natural-сплитов); значимые <70%.

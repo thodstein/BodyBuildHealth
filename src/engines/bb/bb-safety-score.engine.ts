@@ -148,6 +148,10 @@ export function calculatePlanSafetyScore(
 ): PlanSafetyScore {
   const issues: string[] = [];
   const recommendations: string[] = [];
+  // P2-6 (аудит 2026-11): план без `weeks` (импорт/частичный снапшот) не должен
+  // ронять отчёт качества TypeError'ом — раньше каждый проход ниже падал на
+  // `plan.weeks`.
+  const planWeeks: any[] = Array.isArray((plan as any)?.weeks) ? (plan as any).weeks.filter(Boolean) : [];
 
   // 1. Joint Stress Score — reuse if passed (убираем дубль analyzePlanStress)
   const stressAnalysis = options.stressAnalysis ?? analyzePlanStress(plan);
@@ -231,9 +235,9 @@ export function calculatePlanSafetyScore(
   // 5. Volume Compliance (MRV) — единый источник: aggregateBBVolume(effective) + BB_MRV_TOLERANCE 1.15
   const volumeDetails: SafetyDetails['volumeDetails'] = [];
   const violatingMuscles = new Set<string>();
-  for (const w of plan.weeks) {
+  for (const w of planWeeks) {
     if ((w as any).phase === 'deload') continue;
-    const volume = aggregateBBVolume(w.sessions);
+    const volume = aggregateBBVolume(Array.isArray(w.sessions) ? w.sessions : []);
     for (const [muscle, values] of Object.entries(volume)) {
       const cap = (plan as any).mrvByMuscle?.[muscle] ?? plan.volumeLandmarks?.find(l => l.group === muscle)?.mrv;
       const allowed = cap ? cap * BB_MRV_TOLERANCE : Infinity;
@@ -256,9 +260,10 @@ export function calculatePlanSafetyScore(
 
   // Frequency
   const frequencyCounts: Record<string, Set<number>> = {};
-  for (const week of plan.weeks) {
-    for (const session of week.sessions) {
-      for (const muscle of new Set(session.exercises.map(exercise => exercise.muscle))) {
+  for (const week of planWeeks) {
+    for (const session of (Array.isArray(week?.sessions) ? week.sessions : [])) {
+      const sessionExercises = Array.isArray(session?.exercises) ? session.exercises : [];
+      for (const muscle of new Set<string>(sessionExercises.map((exercise: any) => String(exercise?.muscle || '')).filter(Boolean))) {
         (frequencyCounts[muscle] ||= new Set()).add(session.day);
       }
     }
@@ -341,7 +346,7 @@ export function calculatePlanSafetyScore(
     // Load distribution
     let loadDistribution: LoadDistributionOutput | null = null;
     try {
-      const weeklySessions = options.weeklySessions ?? (plan.weeks[0]?.sessions.length || 4);
+      const weeklySessions = options.weeklySessions ?? ((Array.isArray(planWeeks[0]?.sessions) ? planWeeks[0].sessions.length : 0) || 4);
       const goal = options.goal || (plan as any).goal || 'hypertrophy';
       const riskLevelForLoad = orthopedic?.phase === 'acute' ? 'high' : stressAnalysis.overallRisk === 'high' ? 'high' : stressAnalysis.overallRisk === 'moderate' ? 'medium' : 'low';
       loadDistribution = distributeWeeklyLoad({

@@ -2,6 +2,9 @@
 
 **Дата:** 2026-11-15 · **Область:** `src/engines/bb/*` (сборка, валидация, финализация, качество).
 
+Проход 1 — все P1 (§1). Проход 2 — два P2 из того же списка (§3): падение отчёта качества
+на плане без `weeks` и `-Infinity` в тексте валидатора.
+
 Документ заменяет три рабочих отчёта аудита (они удалены, суть сохранена здесь):
 `BB-CORE-BUILD-AUDIT-2026-11.md`, `BB-FINALIZE-VALIDATION-AUDIT-2026-11.md`,
 `bb-auto-constructor-audit-2026-11-15.md`.
@@ -58,21 +61,37 @@ P1 из аудита UI-конструктора (настройки шагов 
 node --max-old-space-size=3200 ./node_modules/typescript/bin/tsc --noEmit
 # exit 0
 
-# весь движок BB (311 файлов)
+# весь движок BB (312 файлов — с учётом bb-audit-p2-fixes.test.ts)
 node --max-old-space-size=3600 ./node_modules/vitest/vitest.mjs run "src/engines/bb/__tests__" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
-# 311 файлов: 310 passed + 4 skipped-файла (внутри) · 3593 теста: 3592 passed, 20 skipped
+# Test Files: 308 passed | 4 skipped (312)
+# Tests:      3577 passed | 20 skipped (3597)   exit 0
 ```
 
 Единственное падение первого прогона — `bb-controlled-rotation.test.ts > does not rotate
 into an excluded injury muscle`: тест утверждал, что упражнение исключённой мышцы остаётся в
 плане (то есть фиксировал именно тот дефект, который чинит P1-2). Тест переписан на новый
 инвариант: после `finalizeBBPlan(..., { excludedMuscles: ['chest'] })` в плане нет ни одного
-упражнения грудной мышцы, а `excluded_muscle_present` в `validation` отсутствует.
+упражнения грудной мышцы, а `excluded_muscle_present` в `validation` отсутствует. Повторный
+полный прогон после правки — зелёный (числа выше).
 
 Кроме этого, профильный набор из 25 файлов (валидатор/качество/финализация/селекция) —
 passed, exit 0.
 
-## 3. Осталось (P2/P3 — зафиксировано, не в этом проходе)
+## 3. P2 — сделано следом (отдельный коммит)
+
+| № | Находка | Файл | Правка |
+|---|---|---|---|
+| P2-6 | `buildBBQualityReport` падал `TypeError` на плане без `weeks` (импорт/частичный снапшот) — весь экран «Качество» вместо оценки | `bb-safety-score.engine.ts`, `bb-injury-prevention.engine.ts` | Общий нормализатор `planWeeks` (массив или пусто), проходы по частоте/объёму/MRV и `weeklySessions` больше не трогают `plan.weeks` напрямую; `calculateWeeklyStress`/`calculateSessionStress` терпят неделю без `sessions` и сессию без `exercises` |
+| P2-5 | `-Infinity` в пользовательском тексте `target_volume_deficit` | `bb-validator.engine.ts` | `Math.max(...[])` заменён на «есть строки объёма? max : 0» — при пустом (но существующем) `weeklyVolume` сообщение остаётся читаемым |
+
+Тесты: `src/engines/bb/__tests__/bb-audit-p2-fixes.test.ts` (4 теста) — `{}` и
+`{ weeks: [{ week: 1 }] }` не роняют отчёт/safety-скор/анализ стресса; сообщение дефицита
+не содержит `Infinity`/`NaN`.
+
+Кроме этого исправлено в том же проходе, но вне исходного списка аудита: пустые
+`weeklyVolume`-строки в валидаторе больше не дают `-Infinity` в проценте выполнения MEV.
+
+## 4. Осталось (P2/P3 — зафиксировано, не в этом проходе)
 
 ### Ядро сборки (`bb-builder.engine.ts`)
 
@@ -98,8 +117,6 @@ passed, exit 0.
 - P2-3. Единственный ремонт safety-ограничений включён флагом `reorder` — в `faithful`-режиме
   error-коды валидатора остаются. (Исключённые мышцы из этого пункта уже выведены — см. §1.)
 - P2-4. Гейт «существенный объём» в `scoreProWeek` — тавтология (`>= 0 ||`).
-- P2-5. `-Infinity` попадает в пользовательский текст `target_volume_deficit`.
-- P2-6. `buildBBQualityReport` падает `TypeError` на плане без `weeks`.
 - P2-7. Финальный кап/порядок упражнений — только для сессий с `warmupActivator`.
 - P3-1. Финальный снимок не пересобирает строки `⚠/🚫 Валидация:` → устаревшие строки в
   rationale.
