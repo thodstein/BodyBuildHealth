@@ -1857,7 +1857,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           )}
 
           {catalogView === 'problems' && (
-            <LabsProblemPanelsTab />
+            <LabsProblemPanelsTab sex={profileSex === 'male' || profileSex === 'female' ? profileSex : undefined} />
           )}
 
           {catalogView !== 'catalog' && catalogView !== 'schedule' && catalogView !== 'problems' && (

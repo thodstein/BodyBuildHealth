@@ -38,6 +38,12 @@ export interface ProblemPanel {
   problem: string;                 // описание проблемы (1 предложение)
   phase: string;                    // baseline | on_cycle | pct | any
   urgency: 'routine' | 'urgent' | 'emergency';
+  /**
+   * Сценарий адресован одному полу. У такого пола цели и пороги чужие
+   * (гинекомастия, спермограмма, ПКТ, мужской гормональный паспорт), поэтому
+   * другому полу панель не показывается вовсе — см. `panelsForSex`.
+   */
+  sex?: 'male' | 'female';
   markers: ProblemMarker[];
   clinicalNotes: string;            // врачебная заметка: что искать, дифдиагноз
   triggerSymptoms: string[];        // symptomId из symptom-solver.engine
@@ -86,6 +92,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   {
     id: 'hormone_passport',
     title: 'Гормональный паспорт (полный эндокринный профиль)',
+    sex: 'male', // мужской набор целей: TT >400 нг/дл, ингибин Б, АМГ по клеткам Сертоли
     problem: 'Исходный гормональный фон: тестостерон, эстрадиол, надпочечники, щитовидная. Доказательная база для ПКТ.',
     phase: 'baseline',
     urgency: 'routine',
@@ -212,6 +219,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   {
     id: 'gynecomastia_workup',
     title: 'Грудь болит / гинекомастия (эстрогенный сценарий)',
+    sex: 'male', // гинекомастия и прогестиновая грудь — мужской сценарий
     problem: 'Боль/уплотнение в груди на курсе. Дифференциал: эстрогенная vs прогестиновая гинекомастия.',
     phase: 'on_cycle',
     urgency: 'urgent',
@@ -237,6 +245,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   {
     id: 'ed_libido_workup',
     title: 'Нет либидо / эректильная дисфункция (андрогенный сценарий)',
+    sex: 'male', // эректильная дисфункция и андрогенный дефицит — мужской сценарий
     problem: 'Снижение либидо или ЭД на курсе/после курса. Множественные причины: гормоны, нейростероиды, психогенно.',
     phase: 'any',
     urgency: 'routine',
@@ -357,6 +366,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   {
     id: 'hpta_recovery_fail',
     title: 'Не восстанавливается ось ГГЯ после 4 нед ПКТ',
+    sex: 'male', // ПКТ и восстановление оси после курса — мужской сценарий
     problem: 'ЛГ/ФСГ остаются подавлены, тестостерон <300 нг/дл после стандартного протокола ПКТ.',
     phase: 'pct',
     urgency: 'urgent',
@@ -387,6 +397,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
   {
     id: 'fertility_extended',
     title: 'Не могу зачать / спермограмма 0 (фертильность — расширенный)',
+    sex: 'male', // спермограмма и мужская фертильность — женская панель другая
     problem: 'Азооспермия или тяжёлая олигоспермия после курса ААС. Полный поиск причин и протокол восстановления.',
     phase: 'fertility',
     urgency: 'urgent',
@@ -471,6 +482,20 @@ export function getProblemPanelsForPhase(phase: string): ProblemPanel[] {
  */
 export function getAllProblemPanels(): ProblemPanel[] {
   return PROBLEM_PANELS;
+}
+
+/**
+ * Сценарий можно показывать этому полу. Нейтральная панель видна всем; пол
+ * неизвестен (не заполнен в профиле) — тоже показываем всё: скрыть полезное
+ * хуже, чем показать лишнее, а вот чужие цели печатать нельзя.
+ */
+export function isPanelForSex(panel: ProblemPanel, sex?: 'male' | 'female'): boolean {
+  return !panel.sex || !sex || panel.sex === sex;
+}
+
+/** Панели для пола: чужой сценарий отсекается целиком, а не переписывается. */
+export function panelsForSex(sex?: 'male' | 'female'): ProblemPanel[] {
+  return PROBLEM_PANELS.filter(p => isPanelForSex(p, sex));
 }
 
 /**

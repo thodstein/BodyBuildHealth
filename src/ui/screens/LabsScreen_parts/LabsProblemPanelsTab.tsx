@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ruCount, RU_SYMPTOMS } from '../../../engines/ru-plural';
-import { PROBLEM_PANELS, formatPanelAsReferral, type ProblemPanel } from '../../../data/labs-problem-panels';
+import { panelsForSex, formatPanelAsReferral, type ProblemPanel } from '../../../data/labs-problem-panels';
 import { getProblemPanelsForSymptoms } from '../../../engines/symptom-lab-link';
 import { SYMPTOM_DB, findSymptomById, type SymptomEntry } from '../../../engines/symptom-solver.engine';
 import { copyOrShareText } from '../../../core/apk-share';
@@ -33,7 +33,7 @@ const IMPORTANCE_LABELS: Record<string, string> = {
   optional: 'Опционально',
 };
 
-const LabsProblemPanelsTab: React.FC = () => {
+const LabsProblemPanelsTab: React.FC<{ sex?: 'male' | 'female' }> = ({ sex }) => {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [filterPhase, setFilterPhase] = useState<string>('all');
   const [filterUrgency, setFilterUrgency] = useState<string>('all');
@@ -46,7 +46,9 @@ const LabsProblemPanelsTab: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const allPanels = useMemo(() => PROBLEM_PANELS, []);
+  // Сценарии одного пола (гинекомастия, спермограмма, ПКТ, мужской гормональный
+  // паспорт) женщине не показываем: цели в них мужские, не «общие».
+  const allPanels = useMemo(() => panelsForSex(sex), [sex]);
 
   const allSymptoms = useMemo(() => SYMPTOM_DB, []);
 
@@ -89,9 +91,12 @@ const LabsProblemPanelsTab: React.FC = () => {
   // Auto-search when selection changes
   const handleSymptomSearch = useCallback(() => {
     if (selectedSymptomIds.length === 0) { setSymptomLinkedPanels([]); return; }
-    const panels = getProblemPanelsForSymptoms(selectedSymptomIds);
+    // Симптом может вести в чужой сценарий (гинекомастия у женщины) — такой id
+    // отбрасываем здесь, чтобы в состоянии не жила невидимая панель.
+    const visible = new Set(allPanels.map(p => p.id));
+    const panels = getProblemPanelsForSymptoms(selectedSymptomIds).filter(id => visible.has(id));
     setSymptomLinkedPanels(panels);
-  }, [selectedSymptomIds]);
+  }, [selectedSymptomIds, allPanels]);
 
   useEffect(() => {
     if (showSymptomLink && selectedSymptomIds.length > 0) {
