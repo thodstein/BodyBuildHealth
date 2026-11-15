@@ -389,11 +389,14 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
       else if (from.includes('ng/ml')) { factor = 100; converted = true; }
       break;
     case 'FT':
-      // Canonical free-testosterone unit is pg/mL. 1 pg/mL = 3.467 pmol/L.
-      if (from.includes('pmol')) { factor = 1 / 3.467; converted = true; }
-      else if (from.includes('nmol')) { factor = 288.4; converted = true; }
+      // Канон приложения — pg/mL. Оба пересчёта выводятся из молярной массы
+      // тестостерона (`MOLAR_MASS.FT` = 288.42): 1 pg/mL = 1000/MW pmol/L (≈3.4672),
+      // 1 nmol/L = MW pg/mL. Литералы 3.467 и 288.4 были её округлениями — проход 101.
+      if (from.includes('pmol')) { factor = MOLAR_MASS.FT / 1000; converted = true; }
+      else if (from.includes('nmol')) { factor = MOLAR_MASS.FT; converted = true; }
       break;
-    case 'VITD': if (from.includes('nmol')) { factor = 1 / 2.496; converted = true; } break;
+    // Витамин D: молярная масса 400.64 → 1 ng/mL = 2.496 nmol/L (1000/MW).
+    case 'VITD': if (from.includes('nmol')) { factor = MOLAR_MASS.VITD / 1000; converted = true; } break;
     case 'HGB': if (from.includes('g/dl') && !from.includes('mg/dl')) { factor = 10; converted = true; } break;
     case 'CHOL': case 'HDL': case 'LDL': if (from.includes('mg/dl')) { factor = 1 / 38.67; converted = true; } break;
     case 'TG': if (from.includes('mg/dl')) { factor = 1 / 88.57; converted = true; } break;
