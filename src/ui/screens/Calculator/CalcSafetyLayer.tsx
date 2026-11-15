@@ -32,7 +32,7 @@ const ORGAN_ORDER = ['cardio', 'hepatic', 'renal', 'neuro', 'reproductive', 'hem
 //  guardrails/алерты/педа-эскалация → «Предупреждения курса»;
 //  конфликты/gaps → «Синергии и взаимодействия»;
 //  labFindings/assayWarnings → «Мониторинг и анализы»;
-//  вымывание → «Питание по анализам»; UL-нагрузка → «Контроль дозировок»;
+//  вымывание → «Действия по анализам»; UL-нагрузка → «Контроль дозировок»;
 //  ПКТ-тайминг → «Ребаунд»; pillBurden → «План поддержки»;
 //  процедуры и инъекции — отдельные карточки.
 // ════════════════════════════════════════════════════════════════════
@@ -217,7 +217,7 @@ export const SafetyLabFindings: React.FC<{ planResult?: PlanResult }> = ({ planR
   );
 };
 
-/** 💊 Вымывание нутриентов — в «Питание по анализам» */
+/** 💊 Вымывание нутриентов — в «Действия по анализам» */
 export const SafetyDepletion: React.FC<{ planResult?: PlanResult }> = ({ planResult }) => {
   const items = planResult?.depletionWarnings || [];
   if (items.length === 0) return null;

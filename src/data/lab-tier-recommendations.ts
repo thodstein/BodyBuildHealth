@@ -302,6 +302,64 @@ function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  femaleHormoneSteps — женская лестница действий (проход 97)
+// ════════════════════════════════════════════════════════════════════════════
+/**
+ * Мужская лестница (`TIER_RULES`) женщине не применяется: `MALE_ONLY_TIER` даёт
+ * ступень 0, и без этого блока она на «пограничном» гормоне не получала ничего —
+ * алерт есть только у крайних бэндов (>800 E2, >1500 PRL, >30 PROG, >6 TT).
+ * Пограничная полоса (выше коридора, но не тревожно) оставалась пустой, хотя
+ * именно там и нужен следующий шаг — и он диагностический, а не лечебный: одно
+ * значение гормона без дня цикла не лечат, его перепроверяют.
+ *
+ * Пороги — `FEMALE_HORMONE_ULN` (те же числа, что у бэндов и у `interpretLabs`):
+ * E2 «>400» и «<30», прогестерон «>20», пролактин «>800», тестостерон «>2.5».
+ * Шаги — 1 = пересдать в правильную фазу, 2 = визуализация/смежный анализ.
+ */
+function femaleHormoneSteps(marker: string, value: number): TierNutritionTip[] {
+  const out: TierNutritionTip[] = [];
+  const tip = (tier: Tier, action: string, target: string) => out.push({ action, target, marker, tier });
+  switch (marker.toUpperCase()) {
+    case 'E2':
+    case 'ESTRADIOL': {
+      const u = FEMALE_HORMONE_ULN.E2;
+      if (value < u.low) {
+        tip(1, 'Пересдать E2', 'в фолликулярную фазу, вместе с ФСГ и АМГ');
+      } else if (value > u.high) {
+        tip(1, 'Пересдать E2', '2–5 день цикла, без стимуляции овуляции');
+        tip(2, 'УЗИ', 'яичники и фолликулогенез — исключить кисту и гиперстимуляцию');
+      }
+      break;
+    }
+    case 'PROG':
+    case 'PROGESTERONE': {
+      if (value > FEMALE_HORMONE_ULN.PROG.high) {
+        tip(1, 'Пересдать прогестерон', 'за 7 дней до менструации (лютеиновая фаза)');
+        tip(2, 'УЗИ', 'жёлтое тело и кисты — гинеколог');
+      }
+      break;
+    }
+    case 'PRL': {
+      if (value > FEMALE_HORMONE_ULN.PRL.high) {
+        tip(1, 'Повторить пролактин', 'утром натощак, без физнагрузки и стресса за сутки');
+        tip(2, 'ТТГ и макропролактин', 'исключить гипотиреоз и макропролактин');
+      }
+      break;
+    }
+    case 'TESTOSTERONE': {
+      if (value > FEMALE_HORMONE_ULN.TT.high) {
+        tip(1, 'Повторить тестостерон', 'утро, 8–10 день цикла, вместе с ГСПГ');
+        tip(2, 'Гинеколог-эндокринолог', 'оценка вирилизации: голос, кожа, цикл');
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return out;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  computeTierAdjustments — главная функция
 // ════════════════════════════════════════════════════════════════════════════
 export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male' | 'female'): TierAdjustmentResult {
@@ -318,11 +376,22 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
     // Проход 83: женские гормоны идут своим путём. `deriveTier` для них вернёт 0
     // (мужская лестница не применяется), поэтому тревожные бэнды женской модели
     // печатаем здесь — своей формулировкой, без анастрозола и кломифена.
+    // Проход 97: плюс своя лестница шагов (`femaleHormoneSteps`) — диагностика
+    // вместо мужских действий, чтобы пограничный гормон не оставался без
+    // следующего шага.
     if (sex === 'female') {
       const femAlert = femaleHormoneAlert(marker, value);
-      if (femAlert) {
-        alerts.push(femAlert);
-        tierSummary.push({ marker, value, tier: femAlert.tier, label: '', unit: '' });
+      const femSteps = femaleHormoneSteps(marker, value);
+      if (femAlert) alerts.push(femAlert);
+      for (const s of femSteps) nutrition.push(s);
+      if (femAlert || femSteps.length > 0) {
+        tierSummary.push({
+          marker,
+          value,
+          tier: femAlert ? femAlert.tier : (Math.max(...femSteps.map(s => s.tier)) as Tier),
+          label: '',
+          unit: '',
+        });
       }
     }
 

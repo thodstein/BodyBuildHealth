@@ -3683,7 +3683,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         <div style={{ marginTop:6 }}>
           <div onClick={() => setShowNutrition(!showNutrition)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', padding:'7px 9px', borderRadius: showNutrition ? '8px 8px 0 0' : 8, background: hasHigh ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.04)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.15)' : 'rgba(0,230,138,0.12)') }}>
             <span style={{ fontSize:10, fontWeight:700, color: hasHigh ? '#f59e0b' : '#22c55e', display:'flex', alignItems:'center', gap:5 }}>
-              🥗 Питание по анализам ({total})
+              🧪 Действия по анализам ({total})
               {hasHigh && <span style={{ fontSize:7, fontWeight:600, color:'#f59e0b', padding:'1px 5px', borderRadius:4, background:'rgba(245,158,11,0.12)' }}>требует коррекции</span>}
             </span>
             <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{showNutrition ? '▲ скрыть' : '▼ показать'}</span>
@@ -3691,7 +3691,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           {showNutrition && (
             <div style={{ padding:'6px 9px', background:'rgba(0,0,0,0.15)', border:'1px solid ' + (hasHigh ? 'rgba(245,158,11,0.1)' : 'rgba(0,230,138,0.08)'), borderTop:'none', borderRadius:'0 0 8px 8px' }}>
               <div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', marginBottom:5, lineHeight:1.4 }}>
-                Рекомендации по питанию на основе отклонений лабораторных маркеров. Сгруппированы по показателю.
+                Что сделать по отклонённым маркерам: питание, контроль, дообследование. Сгруппировано по показателю.
               </div>
               {markers.map(marker => {
                 const tips = tipsByMarker[marker];
