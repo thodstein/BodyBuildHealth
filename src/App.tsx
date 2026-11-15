@@ -7,6 +7,7 @@ import { ToastContainer } from './ui/ToastContainer';
 import { KvUpdateBanner } from './ui/KvUpdateBanner';
 import { KvErrorBanner } from './ui/KvErrorBanner';
 import { DataSpaceBanner } from './ui/DataSpaceBanner';
+import { CoachCornerButton } from './ui/CoachCornerButton';
 import { rememberScreen, restoreScreen } from './core/space-return';
 import { KvSyncButton } from './ui/KvSyncButton';
 import { setLocale, getLocale } from './data/interactions-labels';
@@ -667,6 +668,17 @@ export default function App() {
       )}
       {/* Офлайн-пилюля — ТОЛЬКО APK (в TG/web ветка не монтируется). */}
       {isNativeApp() && !appLocked && initialized && <NativeOfflinePill />}
+      {/* Режим тренера: угловая кнопка «в свой профиль» — пока режим включён.
+          На самой вкладке тренера (и на hero профиля) она не нужна. */}
+      {!appLocked && initialized && (
+        <CoachCornerButton
+          hidden={
+            tab === 'profile' &&
+            (subTab == null || ['coach', 'log', 'notes', 'planner'].includes(subTab))
+          }
+          onOpenCoach={() => go('profile', 'coach')}
+        />
+      )}
       <nav className="tabs" aria-label="Основная навигация">
         {PRIMARY_NAV.map(item => (
           <button

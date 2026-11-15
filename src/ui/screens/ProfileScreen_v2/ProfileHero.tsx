@@ -13,9 +13,6 @@ import { colors, withAlpha } from './ui';
 import { coachSummary, readCoachState } from '../../../engines/coach/coach-mode.engine';
 
 const COACH_COLOR = '#22d3ee';
-const NOTES_COLOR = '#f59e0b';
-const PLANNER_COLOR = '#60a5fa';
-const LOG_COLOR = '#a78bfa';
 
 const coachDescForHero = (): string => {
   try {
@@ -26,6 +23,8 @@ const coachDescForHero = (): string => {
 };
 
 interface TabDef {
+  /** Инструменты тренера (log/notes/planner) живут ВНУТРИ «Режима тренера»,
+   *  поэтому в hero их отдельных карточек нет — id остаются для переходов. */
   id: 'user' | 'diaries' | 'reports' | 'settings' | 'coach' | 'notes' | 'planner' | 'log';
   icon: NativeIconName;
   label: string;
@@ -33,14 +32,16 @@ interface TabDef {
   color: string;
 }
 
+/**
+ * Hero-карточки профиля. Режим тренера — ОДНА карточка: журнал, заметки и
+ * планер — его внутренние разделы, а не отдельные пункты профиля. Иначе у
+ * обычного пользователя профиль выглядел бы набором тренерских инструментов.
+ */
 const TABS: TabDef[] = [
   { id: 'user', icon: 'user', label: 'Пользователь', desc: 'Имя, параметры, образ жизни, курс, цели', color: colors.primary },
   { id: 'diaries', icon: 'notebook', label: 'Дневники', desc: 'Сон, давление, вес, замеры', color: colors.orange },
   { id: 'reports', icon: 'chart', label: 'Отчёты', desc: 'Комплексный отчёт для врача/тренера', color: colors.blue },
-  { id: 'coach', icon: 'award', label: 'Тренер', desc: 'Атлеты, разделы, активный атлет', color: COACH_COLOR },
-  { id: 'log', icon: 'activity', label: 'Журнал', desc: 'Подходы и вес тела по атлетам', color: LOG_COLOR },
-  { id: 'notes', icon: 'file', label: 'Заметки', desc: 'Контекст, ограничения, договорённости', color: NOTES_COLOR },
-  { id: 'planner', icon: 'clock', label: 'Планер', desc: 'Календарь задач по дням', color: PLANNER_COLOR },
+  { id: 'coach', icon: 'award', label: 'Режим тренера', desc: 'Атлеты, разделы, журнал, заметки и планер', color: COACH_COLOR },
   { id: 'settings', icon: 'sliders', label: 'Настройки', desc: 'Единицы, уведомления, экспорт данных', color: colors.purple },
 ];
 
@@ -73,6 +74,18 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
 
   const [completeness, setCompleteness] = useState(0);
   const [undoAvailable, setUndoAvailable] = useState(false);
+  // Подпись карточки тренера должна меняться сразу после включения режима:
+  // иначе человек включает его на вкладке, возвращается в hero и видит «Выключен».
+  const [coachDesc, setCoachDesc] = useState<string>(coachDescForHero);
+  useEffect(() => {
+    const refresh = () => setCoachDesc(coachDescForHero());
+    window.addEventListener('he-coach-mode', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('he-coach-mode', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     setCompleteness(calcCompleteness(settings));
@@ -100,7 +113,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
   const bmi = p.weight && p.height && p.height > 0
     ? (p.weight / Math.pow(p.height / 100, 2)).toFixed(1) : null;
   const barColor = completeness < 50 ? colors.danger : completeness < 80 ? colors.warning : 'var(--profile-accent, #34d399)';
-  const tabs: TabDef[] = TABS.map(t => (t.id === 'coach' ? { ...t, desc: coachDescForHero() } : t));
+  const tabs: TabDef[] = TABS.map(t => (t.id === 'coach' ? { ...t, desc: coachDesc } : t));
 
   return (
     <div className="profile-hero pf-hero" data-complete={filled} style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>

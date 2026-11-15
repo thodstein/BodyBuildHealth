@@ -3927,6 +3927,19 @@ html.app-native .native-fab-mini:disabled {
   opacity: 0.55;
 }
 
+/* Угловая кнопка «Режим тренера» уступает место экранам с собственной нижней
+ * панелью: там она накрыла бы кнопки сохранения/генерации. Это не «пропала
+ * навигация»: вернуться к своим данным всё равно можно из полосы «Данные атлета»
+ * и через нижнее меню → Профиль. */
+html.app-native:has(.plan-generate-fab) [data-coach="corner"],
+html.app-native:has(.support-subbar) [data-coach="corner"],
+html.app-native:has(.editor-bottomnav) [data-coach="corner"],
+html.app-native:has(.train-quickentry) [data-coach="corner"],
+html.app-native:has(.train-recordform) [data-coach="corner"],
+html.app-native:has(.train-checkin) [data-coach="corner"] {
+  display: none !important;
+}
+
 /* Раскрыт: плюс поворачивается в крестик. */
 html.app-native .native-fab-wrap.open .native-fab-plus {
   display: inline-block;

@@ -47,22 +47,40 @@ afterEach(() => {
 });
 
 describe('проводка вкладок профиля', () => {
-  it('hero-карточка «Тренер» открывает режим тренера', async () => {
+  it('hero-карточка «Режим тренера» открывает режим тренера', async () => {
     const { container } = render(<ProfileScreen_v2 />);
     fireEvent.click(container.querySelector('.pf-hero-card[data-id="coach"]') as HTMLElement);
     await waitForSel(container, '[data-coach="root"]');
-    expect(container.querySelector('[aria-label="Раздел Тренер"]')?.getAttribute('aria-current')).toBe('page');
+    expect(container.querySelector('[aria-label="Раздел Режим тренера"]')?.getAttribute('aria-current')).toBe('page');
+    // Инструменты тренера — внутренняя навигация, а не отдельные пункты профиля.
+    expect(container.querySelector('[data-coach-nav="notes"]')).not.toBeNull();
+    expect(container.querySelector('[data-coach-nav="planner"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Раздел Заметки"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Раздел Планер"]')).toBeNull();
   });
 
-  it('hero-карточки «Заметки» и «Планер» открывают свои вкладки', async () => {
+  it('внутренние вкладки «Журнал», «Заметки» и «Планер» открываются из режима тренера', async () => {
+    // Журнал показывает записи по атлетам: пустой режим открыл бы пустое состояние
+    // без корня вкладки, и тест проверял бы не то.
+    let coach = setCoachEnabled(emptyCoachState(), true);
+    coach = addCoachAthlete(coach, { name: 'Иван' }, { id: 'a1' }).state;
+    writeCoachState(localStorage, coach);
     const { container } = render(<ProfileScreen_v2 />);
-    fireEvent.click(container.querySelector('.pf-hero-card[data-id="notes"]') as HTMLElement);
-    await waitForSel(container, '[data-notes="root"]');
+    fireEvent.click(container.querySelector('.pf-hero-card[data-id="coach"]') as HTMLElement);
+    await waitForSel(container, '[data-coach="root"]');
 
-    fireEvent.click(container.querySelector('[aria-label="Назад к hero"]') as HTMLElement);
-    fireEvent.click(container.querySelector('.pf-hero-card[data-id="planner"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-coach-nav="notes"]') as HTMLElement);
+    await waitForSel(container, '[data-notes="root"]');
+    expect(container.querySelector('[data-coach-nav="notes"]')?.getAttribute('aria-current')).toBe('page');
+
+    fireEvent.click(container.querySelector('[data-coach-nav="planner"]') as HTMLElement);
     await waitForSel(container, '[data-planner="root"]');
-  });
+
+    fireEvent.click(container.querySelector('[data-coach-nav="log"]') as HTMLElement);
+    await waitForSel(container, '[data-log="root"]');
+    // Поднавигация профиля по-прежнему отмечает «Режим тренера».
+    expect(container.querySelector('[aria-label="Раздел Режим тренера"]')?.getAttribute('aria-current')).toBe('page');
+  }, 30000);
 
   it('диплинк initialSubTab открывает вкладку сразу, без hero', async () => {
     const { container: coach } = render(<ProfileScreen_v2 initialSubTab="coach" />);
@@ -70,6 +88,8 @@ describe('проводка вкладок профиля', () => {
     cleanup();
     const { container: notes } = render(<ProfileScreen_v2 initialSubTab="notes" />);
     await waitForSel(notes, '[data-notes="root"]');
+    // Инструмент открылся внутри «Режима тренера», а не как отдельный раздел.
+    expect(notes.querySelector('[data-coach-nav="notes"]')?.getAttribute('aria-current')).toBe('page');
     cleanup();
     const { container: planner } = render(<ProfileScreen_v2 initialSubTab="planner" />);
     await waitForSel(planner, '[data-planner="root"]');

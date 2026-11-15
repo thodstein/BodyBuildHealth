@@ -38,12 +38,13 @@ afterEach(async () => {
 });
 
 describe('ProfileHero', () => {
-  // 8 карточек: 4 базовых (Пользователь/Дневники/Отчёты/Настройки) + инструменты
-  // тренера (Тренер, Журнал, Заметки, Планер). Число держим явным, чтобы случайное
-  // «добавлю ещё одну карточку» не проходило молча, и одинаковым на обеих платформах.
-  const HERO_CARDS = 8;
+  // 5 карточек: Пользователь / Дневники / Отчёты / Режим тренера / Настройки.
+  // Инструменты тренера (журнал, заметки, планер) — ВНУТРИ «Режима тренера»,
+  // отдельными карточками профиля они больше не показываются. Число держим
+  // явным, чтобы случайное «добавлю ещё одну карточку» не проходило молча.
+  const HERO_CARDS = 5;
 
-  it('1. native → hero + имя + прогресс + 8 разделов', async () => {
+  it('1. native → hero + имя + прогресс + 5 разделов', async () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
@@ -61,19 +62,23 @@ describe('ProfileHero', () => {
     ).not.toBeNull();
     expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
     expect(container.querySelector('.profile-hero-card[data-id="coach"]')).not.toBeNull();
-    expect(container.querySelector('.profile-hero-card[data-id="log"]')).not.toBeNull();
-    expect(container.querySelector('.profile-hero-card[data-id="notes"]')).not.toBeNull();
-    expect(container.querySelector('.profile-hero-card[data-id="planner"]')).not.toBeNull();
+    // Инструменты тренера живут внутри «Режима тренера», не в hero.
+    expect(container.querySelector('.profile-hero-card[data-id="log"]')).toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="notes"]')).toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="planner"]')).toBeNull();
+    expect(container.querySelector('.profile-hero-card[data-id="coach"]')?.textContent).toContain(
+      'Режим тренера',
+    );
   });
 
-  it('2. web → та же классика (hero, 8 разделов)', async () => {
+  it('2. web → та же классика (hero, 5 разделов)', async () => {
     await resetPlatform();
     const { container } = render(<ProfileHero onSelectTab={() => {}} />);
     expect(container.querySelector('.profile-hero')).not.toBeNull();
     expect(container.querySelectorAll('.profile-hero-card').length).toBe(HERO_CARDS);
     // Одинаковый набор карточек на обеих платформах — без «web-урезанной» версии.
     const ids = Array.from(container.querySelectorAll('.profile-hero-card')).map(el => el.getAttribute('data-id'));
-    expect(ids).toEqual(['user', 'diaries', 'reports', 'coach', 'log', 'notes', 'planner', 'settings']);
+    expect(ids).toEqual(['user', 'diaries', 'reports', 'coach', 'settings']);
   });
 
   it('3. клик по разделу открывает вкладку', async () => {

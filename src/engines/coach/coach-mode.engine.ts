@@ -264,6 +264,15 @@ export function writeCoachState(
       /* ignore quota */
     }
   }
+  // Угловая кнопка и hero профиля живут вне вкладки тренера: без события они
+  // узнали бы о включении режима только после перемонтирования экрана.
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('he-coach-mode', { detail: { enabled: state.enabled } }));
+    }
+  } catch {
+    /* среда без CustomEvent (редкие WebView) — событие необязательно */
+  }
   return state;
 }
 

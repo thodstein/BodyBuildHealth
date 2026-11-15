@@ -311,7 +311,9 @@ export const ProfileCoachTab: React.FC<{
   onNavigate?: (screen: string) => void;
   /** Открыть заметки/задачи конкретного атлета (переход на вкладку с фильтром). */
   onOpenAthlete?: (athleteId: string, target: 'notes' | 'planner' | 'log') => void;
-}> = ({ onNavigate, onOpenAthlete }) => {
+  /** Открыть инструмент тренера: журнал, заметки или планер. */
+  onOpenTool?: (tool: 'log' | 'notes' | 'planner') => void;
+}> = ({ onNavigate, onOpenAthlete, onOpenTool }) => {
   const [state, setState] = useState<CoachState>(() => readCoachState(ls()));
   const [form, setForm] = useState<AthleteForm>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1679,14 +1681,50 @@ export const ProfileCoachTab: React.FC<{
             )}
           </div>
         )}
+        {state.enabled && onOpenTool && (
+          <div
+            data-coach="tool-links"
+            style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+          >
+            {(
+              [
+                ['log', 'Журнал', log.items.length],
+                ['notes', 'Заметки', notes.items.length],
+                ['planner', 'Планер', planner.items.filter(t => !t.done).length],
+              ] as const
+            ).map(([id, label, count]) => (
+              <button
+                key={id}
+                type="button"
+                data-coach="open-tool"
+                data-tool={id}
+                onClick={() => onOpenTool(id)}
+                style={{ ...btn('ghost'), fontSize: 11.5, padding: '7px 11px' }}
+                title={`Открыть: ${label}`}
+              >
+                {label}
+                {count > 0 ? ` · ${count}` : ''} →
+              </button>
+            ))}
+          </div>
+        )}
+        {state.enabled && (
+          <div
+            data-coach="corner-hint"
+            style={{ marginTop: 10, fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
+          >
+            Журнал, заметки и планер — внутри этого раздела. Кнопка «Мой профиль» в углу
+            экрана вернёт сюда из любого раздела приложения.
+          </div>
+        )}
       </div>
 
       {!state.enabled ? (
         <>
           <div style={{ ...cardStyle, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.55 }}>
-            Включите режим, чтобы вести карточки атлетов и выбрать разделы, которые вы у них
-            контролируете. Заметки и календарь-планер доступны отдельными вкладками профиля
-            и работают независимо от режима.
+            Включите режим, чтобы вести карточки атлетов, выбрать разделы, которые вы у них
+            контролируете, и открыть инструменты тренера: журнал, заметки и планер. Они входят
+            в «Режим тренера» и не смешиваются с вашими дневниками.
           </div>
           {/* Режим выключен, но телефон подключён к тренеру: без этой карточки
               отключиться было бы негде — режим тренера выключен, а данные чужие. */}
@@ -2220,7 +2258,7 @@ export const ProfileCoachTab: React.FC<{
               {visibleAthletes.length === 0 && (
                 <div data-coach="athletes-empty" style={{ fontSize: 12, color: colors.textMuted }}>
                   {state.athletes.length === 0
-                    ? 'Пока ни одного атлета — добавьте первого.'
+                    ? 'Пока ни одного атлета. Заполните карточку выше — имя обязательно, остальное можно позже.'
                     : statusFilter === 'live' && statusCounts.archived > 0
                       ? `В работе никого нет — ${statusCounts.archived} в архиве. Откройте «Архив»: данные и программы на месте.`
                       : 'По фильтру никого не найдено.'}

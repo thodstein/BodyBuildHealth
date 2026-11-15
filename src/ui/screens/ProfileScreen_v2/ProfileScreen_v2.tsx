@@ -59,12 +59,31 @@ const TAB_META: Record<Tab, { icon: NativeIconName; title: string; color: string
   user: { icon: 'user', title: 'Пользователь', color: colors.primary },
   diaries: { icon: 'notebook', title: 'Дневники', color: colors.orange },
   reports: { icon: 'chart', title: 'Отчёты', color: colors.blue },
-  coach: { icon: 'award', title: 'Тренер', color: '#22d3ee' },
+  coach: { icon: 'award', title: 'Режим тренера', color: '#22d3ee' },
   log: { icon: 'activity', title: 'Журнал', color: '#a78bfa' },
   notes: { icon: 'file', title: 'Заметки', color: '#f59e0b' },
   planner: { icon: 'clock', title: 'Планер', color: '#60a5fa' },
   settings: { icon: 'sliders', title: 'Настройки', color: colors.purple },
 };
+
+/**
+ * Вкладки в поднавигации профиля. Инструменты тренера (журнал, заметки,
+ * планер) сюда НЕ попадают: у обычного пользователя они не должны выглядеть
+ * разделами профиля, а у тренера живут внутри «Режима тренера».
+ */
+const PROFILE_NAV_TABS: Tab[] = ['user', 'diaries', 'reports', 'coach', 'settings'];
+
+type CoachToolTab = 'coach' | 'log' | 'notes' | 'planner';
+
+const COACH_TOOLS: { id: CoachToolTab; label: string; icon: NativeIconName }[] = [
+  { id: 'coach', label: 'Атлеты', icon: 'award' },
+  { id: 'log', label: 'Журнал', icon: 'activity' },
+  { id: 'notes', label: 'Заметки', icon: 'file' },
+  { id: 'planner', label: 'Планер', icon: 'clock' },
+];
+
+const isCoachToolTab = (t: Tab): t is CoachToolTab =>
+  t === 'coach' || t === 'log' || t === 'notes' || t === 'planner';
 
 export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void; initialSubTab?: string }> = ({ onNavigate, initialSubTab }) => {
   useProfileRefresh();
@@ -123,8 +142,10 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
     return <ProfileHero onSelectTab={setTab} />;
   }
 
-  const meta = TAB_META[tab];
-  const tabs = (Object.keys(TAB_META) as Tab[]);
+  const coachToolsOpen = isCoachToolTab(tab);
+  const meta = coachToolsOpen ? TAB_META.coach : TAB_META[tab];
+  const tabs = PROFILE_NAV_TABS;
+  const activeTool = coachToolsOpen ? COACH_TOOLS.find(t => t.id === tab) ?? null : null;
 
   return (
     <div className="profile-inner pf-inner" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 120px)', minHeight: 0 }}>
@@ -152,7 +173,11 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
           <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: -0.3, lineHeight:1.15 }}>
             {meta.title}
           </div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:600, letterSpacing:'0.4px', marginTop:1 }}>АВТО-СОХРАНЕНИЕ ВКЛЮЧЕНО</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:600, letterSpacing:'0.4px', marginTop:1 }}>
+            {activeTool && activeTool.id !== 'coach'
+              ? `${activeTool.label.toUpperCase()} · АВТО-СОХРАНЕНИЕ`
+              : 'АВТО-СОХРАНЕНИЕ ВКЛЮЧЕНО'}
+          </div>
         </div>
         <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
       </div>
@@ -164,7 +189,8 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
       }}>
         {tabs.map(t => {
           const m = TAB_META[t];
-          const active = t === tab;
+          // «Режим тренера» подсвечен и на своих внутренних инструментах.
+          const active = t === tab || (t === 'coach' && coachToolsOpen);
           return (
             <button
               key={t}
@@ -193,7 +219,47 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         })}
       </div>
 
-      {/* Содержимое вкладки с прокруткой */}
+      {/* Внутренняя навигация «Режима тренера»: Атлеты / Журнал / Заметки / Планер.
+          Отдельных пунктов профиля у этих инструментов больше нет. */}
+      {coachToolsOpen && (
+        <div
+          className="pf-coach-nav"
+          role="navigation"
+          aria-label="Инструменты режима тренера"
+          style={{
+            display: 'flex', gap: 6, padding: '8px 12px', flexShrink: 0,
+            overflowX: 'auto', scrollbarWidth: 'none',
+            background: 'rgba(16,16,18,0.85)', borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          {COACH_TOOLS.map(tool => {
+            const on = tool.id === tab;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                data-coach-nav={tool.id}
+                onClick={() => setTab(tool.id)}
+                aria-label={`Инструмент ${tool.label}`}
+                aria-current={on ? 'page' : undefined}
+                style={{
+                  flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 12px', borderRadius: 10, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700, minHeight: 40, whiteSpace: 'nowrap',
+                  border: `1px solid ${on ? 'rgba(34,211,238,0.55)' : 'rgba(255,255,255,0.10)'}`,
+                  background: on ? 'rgba(34,211,238,0.16)' : 'rgba(255,255,255,0.04)',
+                  color: on ? '#fff' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                <span aria-hidden="true" style={{ display: 'inline-flex', color: on ? '#22d3ee' : 'rgba(255,255,255,0.55)' }}>
+                  <NativeIcon name={tool.icon} size={13} />
+                </span>
+                {tool.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="profile-body" style={{
         flex: '1 1 0',
         height: 0,
@@ -208,7 +274,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
       }}>
          <Suspense fallback={<div style={{ padding: '24px 16px', color: 'var(--text-dim)', fontSize: 12, textAlign: 'center' }}>Загрузка…</div>}>
          {tab === 'user' && <ProfileErrorBoundary tabName="Пользователь"><ProfileUserTab /></ProfileErrorBoundary>}
-          {tab === 'coach' && <ProfileErrorBoundary tabName="Тренер"><ProfileCoachTab onNavigate={onNavigate} onOpenAthlete={openAthleteSection} /></ProfileErrorBoundary>}
+          {tab === 'coach' && <ProfileErrorBoundary tabName="Режим тренера"><ProfileCoachTab onNavigate={onNavigate} onOpenAthlete={openAthleteSection} onOpenTool={setTab} /></ProfileErrorBoundary>}
           {tab === 'log' && <ProfileErrorBoundary tabName="Журнал"><ProfileAthleteLogTab initialAthleteId={athleteFocus?.target === 'log' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'notes' && <ProfileErrorBoundary tabName="Заметки"><ProfileNotesTab initialAthleteId={athleteFocus?.target === 'notes' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}
           {tab === 'planner' && <ProfileErrorBoundary tabName="Планер"><ProfilePlannerTab initialAthleteId={athleteFocus?.target === 'planner' ? athleteFocus.id : undefined} /></ProfileErrorBoundary>}

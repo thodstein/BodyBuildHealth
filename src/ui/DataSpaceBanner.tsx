@@ -135,7 +135,7 @@ export const DataSpaceBanner: React.FC = () => {
             Данные атлета: {active.label}
           </div>
           <div style={{ opacity: 0.72, fontSize: 11 }}>
-            Профиль, дневники и планы сейчас — этого атлета. Заметки и планер тренера общие.
+            Профиль, дневники и планы сейчас — этого атлета. Заметки и планер тренера общие — в «Режиме тренера».
           </div>
           {exitMinutes > 0 && (
             <div data-space="auto-exit" style={{ opacity: 0.62, fontSize: 10.5, marginTop: 2 }}>
