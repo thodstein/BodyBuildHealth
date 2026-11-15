@@ -24,6 +24,7 @@ import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
+import { convertToUnit } from '../../core/labs-mapping';
 import { e2PgPerMl } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
@@ -1304,15 +1305,35 @@ export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[
   };
 }
 
+/**
+ * Единицы «плоского» мира (риск-модель, тиры) — те же, к которым приводит
+ * `normalizeLabValue`: E2 пг/мл, пролактин нг/мл, тестостерон нмоль/л, кортизол
+ * нмоль/л, ДГЭА-С мкг/дл, прогестерон нг/мл.
+ */
+const FLAT_TARGET_UNIT: Record<string, string> = {
+  E2: 'pg/mL', ESTRADIOL: 'pg/mL', 'ЭСТРАДИОЛ': 'pg/mL',
+  PRL: 'ng/mL', PROLACTIN: 'ng/mL',
+  TT: 'nmol/L', 'TOTAL T': 'nmol/L', TESTOSTERONE: 'nmol/L', TESTOSTERONE_TOTAL: 'nmol/L',
+  CORTISOL: 'nmol/L',
+  'DHEA-S': 'μg/dL', 'DHEA_S': 'μg/dL', DHEAS: 'μg/dL',
+  PROG: 'ng/mL', PROGESTERONE: 'ng/mL', OH17_PROGESTERONE: 'nmol/L',
+};
+
 /** Нормализация плоского списка анализов (linked.labs) — та же логика, что extractLabValues. */
 export function normalizeFlatLabs(labs: Array<{ code?: string; name?: string; value?: number; unit?: string }>): Record<string, number> {
   const m: Record<string, number> = {};
   for (const l of labs) {
     const code = (l.code || l.name || '').toUpperCase();
     if (!code || l.value == null || isNaN(l.value)) continue;
-    // Проход 84: единица бланка главнее эвристики. У E2 `normalizeLabValue`
-    // угадывает по величине («>300 — значит пмоль/л») и на женской лютеиновой
-    // E2 450 пг/мл режет значение втрое; здесь единица известна — переводим по ней.
+    // Проходы 84 и 88: единица бланка главнее эвристики. `normalizeLabValue`
+    // угадывает по величине («у E2 >300 — значит пмоль/л», «у пролактина >100 —
+    // значит мЕд/л») и на реальных крайностях врёт: лютеиновая E2 450 пг/мл
+    // режется втрое, а пролактинома 120 нг/мл превращается в 5.7. Здесь единица
+    // известна из точки анализа — переводим по ней; эвристика остаётся только
+    // для ввода без единицы.
+    const target = FLAT_TARGET_UNIT[code];
+    const byUnit = target && l.unit ? convertToUnit(code, l.value, l.unit, target) : null;
+    if (byUnit !== null) { m[code] = byUnit; continue; }
     m[code] = (code === 'E2' || code === 'ESTRADIOL') && l.unit
       ? e2PgPerMl(l.value, l.unit)
       : normalizeLabValue(code, l.value);

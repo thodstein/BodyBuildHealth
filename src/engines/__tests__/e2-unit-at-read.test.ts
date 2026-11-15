@@ -76,8 +76,8 @@ describe('normalizeFlatLabs: единица есть — эвристика не
     expect(normalizeFlatLabs([{ code: 'E2', value: 450, unit: 'пг/мл' }]).E2).toBe(450);
   });
 
-  it('900 пмоль/л даёт 245.2 пг/мл', () => {
-    expect(normalizeFlatLabs([{ code: 'ESTRADIOL', value: 900, unit: 'пмоль/л' }]).ESTRADIOL).toBe(245.2);
+  it('900 пмоль/л даёт ~245 пг/мл', () => {
+    expect(normalizeFlatLabs([{ code: 'ESTRADIOL', value: 900, unit: 'пмоль/л' }]).ESTRADIOL).toBeCloseTo(245.1, 1);
   });
 
   it('единицы нет (быстрый ввод настроек) — прежняя эвристика', () => {
@@ -86,6 +86,22 @@ describe('normalizeFlatLabs: единица есть — эвристика не
 
   it('другие маркеры не тронуты: пролактин 300 без единицы — прежний пересчёт', () => {
     expect(normalizeFlatLabs([{ code: 'PRL', value: 300 }]).PRL).toBe(14.2);
+  });
+
+  it('пролактинома 120 нг/мл остаётся 120 (эвристика срезала бы до 5.7)', () => {
+    expect(normalizeFlatLabs([{ code: 'PRL', value: 120, unit: 'нг/мл' }]).PRL).toBe(120);
+  });
+
+  it('пролактин 318 мЕд/л даёт 15 нг/мл', () => {
+    expect(normalizeFlatLabs([{ code: 'PRL', value: 318, unit: 'мЕд/л' }]).PRL).toBe(15);
+  });
+
+  it('тестостерон 600 нг/дл даёт ~20.8 нмоль/л', () => {
+    expect(normalizeFlatLabs([{ code: 'TT', value: 600, unit: 'нг/дл' }]).TT).toBeCloseTo(20.8, 1);
+  });
+
+  it('кортизол 15 мкг/дл даёт ~414 нмоль/л', () => {
+    expect(normalizeFlatLabs([{ code: 'CORTISOL', value: 15, unit: 'мкг/дл' }]).CORTISOL).toBeCloseTo(413.8, 0);
   });
 });
 
