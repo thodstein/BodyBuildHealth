@@ -18,6 +18,7 @@ const PHASE_MARKER: Record<string, PhaseHormone> = {
   E2: 'E2', ESTRADIOL: 'E2', 'ЭСТРАДИОЛ': 'E2',
   LH: 'LH', 'ЛГ': 'LH',
   FSH: 'FSH', 'ФСГ': 'FSH',
+  PROG: 'PROG', PROGESTERONE: 'PROG', 'ПРОГЕСТЕРОН': 'PROG',
 };
 
 /**
@@ -53,9 +54,10 @@ function getLabStatus(lab: LabPoint, sex?: 'male' | 'female', cycle?: CycleState
     if (lab.value < lab.refLow) return 'low';
     return 'normal';
   }
-  // ♀ E2/ЛГ/ФСГ: одной нормы на весь цикл не бывает — сравниваем с коридором ЕЁ
-  // фазы, а не с мужской строкой (E2 10–40 пг/мл, ЛГ 1–12), которую резолвер
-  // отдаёт женщине, потому что половой нормы у этих гормонов нет вовсе.
+  // ♀ E2/ЛГ/ФСГ/прогестерон: одной нормы на весь цикл не бывает — сравниваем с
+  // коридором ЕЁ фазы, а не с мужской строкой (E2 10–40 пг/мл, ЛГ 1–12,
+  // прогестерон 0.1–1.2), которую резолвер отдаёт женщине, потому что половой
+  // нормы у этих гормонов нет вовсе.
   const ph = phaseRef(lab.code, sex, cycle);
   if (ph) {
     // Низ E2 — красная граница 30, а не низ коридора: в менструальную фазу он
@@ -104,7 +106,7 @@ export const LabsResults: React.FC<{
       {sex === 'female' && (
         <div data-female-labs-note style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(244,114,182,0.06)', border:'1px solid rgba(244,114,182,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
           {FEMALE_LABS_TAB_NOTE}
-          {cycle && ` Сейчас: ${cycle.label.toLowerCase()} фаза, ${cycle.cycleDay}-й день из ${cycle.cycleLength} — E2/ЛГ/ФСГ сравниваются с коридором этой фазы.`}
+          {cycle && ` Сейчас: ${cycle.label.toLowerCase()} фаза, ${cycle.cycleDay}-й день из ${cycle.cycleLength} — E2/ЛГ/ФСГ/прогестерон сравниваются с коридором этой фазы.`}
         </div>
       )}
       {/* Filters — TOP APK pills 44px, скролл-лента */}

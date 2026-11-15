@@ -1,6 +1,6 @@
 import synonyms from '../data/labs-synonyms.json';
 import { UCUM_MAP, DYNAMIC_REFS } from './constants';
-import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU } from '../engines/lab-norms.engine';
+import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
 
@@ -404,7 +404,7 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     case 'B12': if (from.includes('pmol')) { factor = 1 / 0.738; converted = true; } break;
     case 'FOL': if (from.includes('nmol')) { factor = 1 / 2.266; converted = true; } break;
     case 'INS': if (from.includes('pmol')) { factor = 1 / 6.0; converted = true; } break;
-    case 'PROG': if (from.includes('nmol')) { factor = 1 / 3.18; converted = true; } break;
+    case 'PROG': if (from.includes('nmol')) { factor = 1 / PROG_NG_TO_NMOL; converted = true; } break;
     case 'DHEA_S': if (from.includes('umol')) { factor = 36.84; converted = true; } break;
     case 'IRON': if (from.includes('ug/dl')) { factor = 0.1791; converted = true; } break;
     default: break;

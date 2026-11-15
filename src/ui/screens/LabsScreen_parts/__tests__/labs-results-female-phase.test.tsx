@@ -96,6 +96,43 @@ describe('♀ E2 в строке результата — коридор её ф
   });
 });
 
+describe('♀ прогестерон в строке результата (проход 79)', () => {
+  it('лютеиновая: 12 нг/мл — норма, а не «выше» мужских 1.2', () => {
+    const h = html([lab('PROG', 12, 'нг/мл')], 'female', LUTEAL);
+    expect(h).toContain('5–20 нг/мл (лютеиновая)');
+    expect(h).toContain('норма');
+    expect(h).not.toContain('выше');
+  });
+
+  it('фолликулярная: 3.0 — выше её коридора 0.1–1.5', () => {
+    const h = html([lab('PROG', 3.0, 'нг/мл')], 'female', FOLLICULAR);
+    expect(h).toContain('0.1–1.5 нг/мл (фолликулярная)');
+    expect(h).toContain('выше');
+  });
+
+  it('лютеиновая 0.5 — «ниже»: овуляции не было', () => {
+    const h = html([lab('PROG', 0.5, 'нг/мл')], 'female', LUTEAL);
+    expect(h).toContain('ниже');
+  });
+
+  it('без даты цикла — объединение 0.1–20 и подпись «по фазе»', () => {
+    const h = html([lab('PROG', 12, 'нг/мл')], 'female');
+    expect(h).toContain('0.1–20 нг/мл (по фазе)');
+    expect(h).toContain('норма');
+  });
+
+  it('алиас PROGESTERONE получает тот же коридор', () => {
+    const h = html([lab('PROGESTERONE', 12, 'нг/мл')], 'female', LUTEAL);
+    expect(h).toContain('5–20 нг/мл (лютеиновая)');
+  });
+
+  it('мужчине фаза не подставляется: 12 нг/мл — «выше»', () => {
+    const h = html([lab('PROG', 12, 'нг/мл')], 'male', LUTEAL);
+    expect(h).not.toContain('data-phase-ref');
+    expect(h).toContain('выше');
+  });
+});
+
 describe('источник фазы в экране «Лаборатории»', () => {
   const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen.tsx'), 'utf8');
 

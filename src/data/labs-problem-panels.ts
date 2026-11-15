@@ -10,7 +10,15 @@
  *   - support-calculator: приоритетная коррекция по сценарию
  */
 
+import { FEMALE_HORMONE_BANDS } from '../engines/lab-norms.engine';
+
 export type MarkerImportance = 'critical' | 'important' | 'optional';
+
+/**
+ * Фазовые коридоры прогестерона — женская половина строки панели. Числа берутся
+ * из резолвера (`FEMALE_HORMONE_BANDS`), чтобы не завести второй источник.
+ */
+const PROG_PHASES = FEMALE_HORMONE_BANDS.PROG.phases;
 
 export interface ProblemMarker {
   code: string;          // код из UCUM_MAP
@@ -211,7 +219,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '>40 пг/мл — эстрогенная гинекомастия (ароматизация)', target: '20-35 пг/мл' },
       { code: 'ESTRADIOL_SENS', label: 'Эстрадиол (чувств. метод)', importance: 'critical', highMeaning: '>120 пмоль/л — точный метод для низких уровней', target: '50-110 пмоль/л' },
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>15 нг/мл — лактационная гинекомастия', target: '<12 нг/мл' },
-      { code: 'PROG', label: 'Прогестерон', importance: 'important', highMeaning: '>1.2 нг/мл — прогестиновая гинекомастия (дека/трен)', target: '<0.8 нг/мл' },
+      { code: 'PROG', label: 'Прогестерон', importance: 'important', highMeaning: '>1.2 нг/мл — прогестиновая гинекомастия (дека/трен); ♀ — это норма по фазе, а не отклонение', target: `<0.8 нг/мл (♂); ♀ ${PROG_PHASES.follicular.low}–${PROG_PHASES.follicular.high} фолл. / ${PROG_PHASES.luteal.low}–${PROG_PHASES.luteal.high} лют.` },
       { code: 'SHBG', label: 'ГСПГ', importance: 'important', lowMeaning: '↓ → ↑ свободный Т → ↑ ароматизация', target: '20-45 нмоль/л' },
       { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: '↓ на финастериде → ↑ E2/T-баланс', target: '200-600 пг/мл' },
       { code: 'ANDROSTENEDIONE', label: 'Андростендион', importance: 'optional', highMeaning: '↑ >6 нмоль/л — дополнительный источник E2', target: '<5 нмоль/л' },

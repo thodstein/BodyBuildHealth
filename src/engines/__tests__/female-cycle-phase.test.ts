@@ -8,10 +8,13 @@
  * понимала, какая норма у неё сегодня.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   cycleState, cycleStateFromProfile, clampCycleLength,
   phaseHormoneBand, phaseUnionBand, phaseHormoneText,
 } from '../female-cycle-phase.engine';
+import { PROG_NG_TO_NMOL } from '../lab-norms.engine';
 
 /** Дата на `daysAgo` дней раньше 2026-11-14 (локальный календарь). */
 function startDaysAgo(daysAgo: number): string {
@@ -116,5 +119,34 @@ describe('фазовые коридоры гормонов', () => {
     expect(phaseHormoneText('E2', 'luteal')).toBe('70–500 пг/мл (лютеиновая)');
     expect(phaseHormoneText('LH', 'luteal')).toBe('5–25 МЕ/л (лютеиновая)');
     expect(phaseHormoneText('E2', 'ovulatory')).toBeNull();
+  });
+});
+
+describe('прогестерон: фазовые коридоры (проход 79)', () => {
+  it('фолликулярная 0.1–1.5, лютеиновая 5–20 нг/мл', () => {
+    expect(phaseHormoneBand('PROG', 'follicular')).toEqual({ low: 0.1, high: 1.5 });
+    expect(phaseHormoneBand('PROG', 'luteal')).toEqual({ low: 5, high: 20 });
+  });
+
+  it('менструальная идёт по фолликулярному ориентиру — прогестерон там тоже низкий', () => {
+    expect(phaseHormoneBand('PROG', 'menstrual')).toEqual({ low: 0.1, high: 1.5 });
+  });
+
+  it('овуляторная — числа нет; без фазы — объединение коридоров', () => {
+    expect(phaseHormoneBand('PROG', 'ovulatory')).toBeNull();
+    expect(phaseHormoneBand('PROG', null)).toBeNull();
+    expect(phaseUnionBand('PROG')).toEqual({ low: 0.1, high: 20 });
+  });
+
+  it('подпись коридора — в нг/мл, как в бланке женщины', () => {
+    expect(phaseHormoneText('PROG', 'luteal')).toBe('5–20 нг/мл (лютеиновая)');
+    expect(phaseHormoneText('PROG', 'follicular')).toBe('0.1–1.5 нг/мл (фолликулярная)');
+  });
+
+  it('нг/мл → нмоль/л — одна константа, без литерала в labs-mapping', () => {
+    expect(PROG_NG_TO_NMOL).toBe(3.18);
+    const src = readFileSync(resolve(process.cwd(), 'src/core/labs-mapping.ts'), 'utf8');
+    expect(src).toContain('1 / PROG_NG_TO_NMOL');
+    expect(src).not.toContain('1 / 3.18');
   });
 });

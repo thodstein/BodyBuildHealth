@@ -94,10 +94,10 @@ export function cycleStateFromProfile(profile: ProfileLike | null | undefined, o
 }
 
 /** Гормоны, у которых есть фазовые коридоры (PRL — намеренно нет). */
-export type PhaseHormone = 'E2' | 'LH' | 'FSH';
+export type PhaseHormone = 'E2' | 'LH' | 'FSH' | 'PROG';
 
-/** Единица фазового коридора: бэнды хранятся в пг/мл и МЕ/л. */
-const PHASE_UNIT: Record<PhaseHormone, string> = { E2: 'пг/мл', LH: 'МЕ/л', FSH: 'МЕ/л' };
+/** Единица фазового коридора: бэнды хранятся в пг/мл, МЕ/л и нг/мл. */
+const PHASE_UNIT: Record<PhaseHormone, string> = { E2: 'пг/мл', LH: 'МЕ/л', FSH: 'МЕ/л', PROG: 'нг/мл' };
 
 /** Единица фазового коридора — для пересчёта в единицы отчёта/бланка. */
 export function phaseHormoneUnit(marker: PhaseHormone): string {
