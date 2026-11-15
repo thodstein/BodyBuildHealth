@@ -610,7 +610,7 @@ export interface UnifiedSettings {
     hdlLow: boolean;
     previousCVD: boolean;
     familyCVD: boolean;
-    triglycerides: 'normal' | 'high';
+    triglycerides: 'normal' | 'elevated' | 'high';
     // ЖКТ
     bloating: boolean; heartburn: boolean; constipation: boolean;
     diarrhea: boolean; diagnosedIBS: boolean;

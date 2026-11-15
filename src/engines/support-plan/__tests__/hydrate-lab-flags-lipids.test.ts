@@ -11,8 +11,8 @@
  * рекомендаций говорила «низко», а карточка анализов — «норма».
  *
  * Стало: ряд живёт в резолвере — `LDL_FLAG_STEPS` (3.0/4.0/5.0),
- * `TG_FLAG_STEPS` (1.7/2.3), `BILIRUBIN_FLAG_STEPS` (21/40/60) и
- * `HDL_LOW = { male: 1.0, female: 1.2 }`; им пользуются и `hydrateState`, и
+ * `TG_FLAG_STEPS` (1.7/2.3), `BILIRUBIN_FLAG_STEPS` (от ВГН 17.1: 17.1/39.3/59.9)
+ * и `HDL_LOW = { male: 1.0, female: 1.2 }`; им пользуются и `hydrateState`, и
  * `recommendation-engine`. Мужские цифры не изменились.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -44,7 +44,8 @@ describe('проход 102: липидные флаги из анализов �
   it('ряд объявлен в резолвере и не сдвинут', () => {
     expect(LDL_FLAG_STEPS).toEqual({ mild: 3.0, moderate: 4.0, severe: 5.0 });
     expect(TG_FLAG_STEPS).toEqual({ elevated: 1.7, high: 2.3 });
-    expect(BILIRUBIN_FLAG_STEPS).toEqual({ mild: 21, moderate: 40, severe: 60 });
+    // Билирубин собран от ВГН 17.1: mild = ВГН, moderate ×2.3, severe ×3.5.
+    expect(BILIRUBIN_FLAG_STEPS).toEqual({ mild: 17.1, moderate: 39.3, severe: 59.9 });
     expect(HDL_LOW).toEqual({ male: 1.0, female: 1.2 });
   });
 
@@ -75,11 +76,13 @@ describe('проход 102: липидные флаги из анализов �
     expect(tg('2.3')).toBe('high');
   });
 
-  it('билирубин: 20 «none», 21 «mild», 40 «moderate», 60 «severe»', () => {
+  it('билирубин: 17 «none», 18 «mild», 39 «mild», 40 «moderate», 60 «severe»', () => {
     const bil = (v: string) => flags('male', { panelBiochem: { Bilirubin: v } }).hep.bilirubinElevation;
-    expect(bil('20')).toBe('none');
-    expect(bil('21')).toBe('mild');
+    expect(bil('17')).toBe('none');
+    expect(bil('18')).toBe('mild');
+    expect(bil('39')).toBe('mild');
     expect(bil('40')).toBe('moderate');
+    expect(bil('59')).toBe('moderate');
     expect(bil('60')).toBe('severe');
   });
 });

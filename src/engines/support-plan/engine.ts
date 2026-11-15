@@ -26,6 +26,7 @@ import type { SupportLevel } from '../tz-bridge-mechanism';
 import { buildMapperCtx } from './mapper-ctx';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, HCT_STEPS,
+  CREATININE_FLAG_STEP,
   LDL_FLAG_STEPS, TG_FLAG_STEPS, BILIRUBIN_FLAG_STEPS, HDL_LOW,
 } from '../lab-norms.engine';
 
@@ -1113,7 +1114,7 @@ export function hydrateState(): Partial<CalculatorState> {
       if (bilirubin !== null) hep.bilirubinElevation = bilirubin < BILIRUBIN_FLAG_STEPS.mild ? 'none' : bilirubin < BILIRUBIN_FLAG_STEPS.moderate ? 'mild' : bilirubin < BILIRUBIN_FLAG_STEPS.severe ? 'moderate' : 'severe';
 
       if (!result.urinary) result.urinary = { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' } as any;
-      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + 20 ? 'mild' : creatinine < crUln + 40 ? 'moderate' : 'severe';
+      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + CREATININE_FLAG_STEP ? 'mild' : creatinine < crUln + 2 * CREATININE_FLAG_STEP ? 'moderate' : 'severe';
 
       if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
       const card = result.cardio!;

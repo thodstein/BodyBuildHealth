@@ -1,5 +1,10 @@
 import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
-import { getLabNorm, HCT_THRESHOLDS, HGB_THRESHOLDS, HCT_CORRECTION_MARGIN } from '../../../engines/lab-norms.engine';
+import {
+  getLabNorm, HCT_THRESHOLDS, HGB_THRESHOLDS, HCT_CORRECTION_MARGIN,
+  LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
+  BILIRUBIN_FLAG_STEPS, LDL_FLAG_STEPS, TG_FLAG_STEPS, HDL_LOW,
+  CREATININE_ULN, CREATININE_FLAG_STEP,
+} from '../../../engines/lab-norms.engine';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -246,31 +251,37 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   // учитывается. Раньше здесь жили мужские литералы (40/80/120, 55/100/200,
   // 21/40/60, 110/130/150): у женщины АЛТ 35 одновременно была «нормой» и
   // «отклонением» на разных экранах.
-  const altUln = getLabNorm('ALT', sex)?.uln ?? 40;
-  const ggtUln = getLabNorm('GGT', sex)?.uln ?? 55;
-  const biliUln = getLabNorm('BIL', sex)?.uln ?? 21;
+  // Проход 103: ступени тоже из таблиц резолвера (`LFT_STAGE_ULN`, `GGT_STAGE_ULN`,
+  // `BILIRUBIN_FLAG_STEPS`), а не множителями «×2 / ×4 / ×3.5». Пока множители жили
+  // здесь, ГГТ 200 у мужчины на этом экране был «moderate», а в «Поддержке» — уже
+  // «severe» (там шкала ×3 = 165); билирубин 35 — «moderate» здесь и «mild» там,
+  // а 18–21 — «mild» здесь и «норма» там.
+  const sexKey: 'male' | 'female' = sex === 'female' ? 'female' : 'male';
+  const lftUln = LFT_ULN.ALT[sexKey];
+  const lftReduce = LFT_STAGE_ULN.reduce[sexKey];
+  const lftStopOral = LFT_STAGE_ULN.stopOral[sexKey];
 
   if (alt !== null || ast !== null) {
     const maxTransam = Math.max(alt ?? 0, ast ?? 0);
-    if (maxTransam < altUln) hep.altAstElevation = 'none';
-    else if (maxTransam < altUln * 2) hep.altAstElevation = 'mild';
-    else if (maxTransam < altUln * 3) hep.altAstElevation = 'moderate';
+    if (maxTransam < lftUln) hep.altAstElevation = 'none';
+    else if (maxTransam < lftReduce) hep.altAstElevation = 'mild';
+    else if (maxTransam < lftStopOral) hep.altAstElevation = 'moderate';
     else hep.altAstElevation = 'severe';
     derived.push('hepatobiliary.altAstElevation');
   }
 
   if (ggt !== null) {
-    if (ggt < ggtUln) hep.ggtElevation = 'none';
-    else if (ggt < ggtUln * 2) hep.ggtElevation = 'mild';
-    else if (ggt < ggtUln * 4) hep.ggtElevation = 'moderate';
+    if (ggt < GGT_ULN[sexKey]) hep.ggtElevation = 'none';
+    else if (ggt < GGT_STAGE_ULN.double[sexKey]) hep.ggtElevation = 'mild';
+    else if (ggt < GGT_STAGE_ULN.triple[sexKey]) hep.ggtElevation = 'moderate';
     else hep.ggtElevation = 'severe';
     derived.push('hepatobiliary.ggtElevation');
   }
 
   if (bilirubin !== null) {
-    if (bilirubin < biliUln) hep.bilirubinElevation = 'none';
-    else if (bilirubin < biliUln * 2) hep.bilirubinElevation = 'mild';
-    else if (bilirubin < biliUln * 3.5) hep.bilirubinElevation = 'moderate';
+    if (bilirubin < BILIRUBIN_FLAG_STEPS.mild) hep.bilirubinElevation = 'none';
+    else if (bilirubin < BILIRUBIN_FLAG_STEPS.moderate) hep.bilirubinElevation = 'mild';
+    else if (bilirubin < BILIRUBIN_FLAG_STEPS.severe) hep.bilirubinElevation = 'moderate';
     else hep.bilirubinElevation = 'severe';
     derived.push('hepatobiliary.bilirubinElevation');
   }
@@ -292,21 +303,25 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   const hb = getV('panelHematology', 'Hemoglobin');
 
   if (ldl !== null) {
-    if (ldl < 3.0) card.ldlElevation = 'none';
-    else if (ldl < 4.0) card.ldlElevation = 'mild';
-    else if (ldl < 5.0) card.ldlElevation = 'moderate';
+    if (ldl < LDL_FLAG_STEPS.mild) card.ldlElevation = 'none';
+    else if (ldl < LDL_FLAG_STEPS.moderate) card.ldlElevation = 'mild';
+    else if (ldl < LDL_FLAG_STEPS.severe) card.ldlElevation = 'moderate';
     else card.ldlElevation = 'severe';
     derived.push('cardio.ldlElevation');
   }
 
   if (hdl !== null) {
-    card.hdlLow = hdl < 1.0;
+    // Проход 103: женская цель ЛПВП выше (1.2), как в «Поддержке» и в таблице
+    // рекомендаций. Общий порог 1.0 давал женщине «норму» на двух экранах из трёх.
+    card.hdlLow = hdl < HDL_LOW[sexKey];
     derived.push('cardio.hdlLow');
   }
 
   if (tg !== null) {
-    if (tg < 1.7) card.triglycerides = 'normal';
-    else if (tg < 2.3) card.triglycerides = 'mild';
+    // 'elevated' — то же значение, что пишет «Поддержка»: `engine-helpers` считает
+    // +10 к кардио-риску только за него, а 'mild' не понимал ни один потребитель.
+    if (tg < TG_FLAG_STEPS.elevated) card.triglycerides = 'normal';
+    else if (tg < TG_FLAG_STEPS.high) card.triglycerides = 'elevated';
     else card.triglycerides = 'high';
     derived.push('cardio.triglycerides');
   }
@@ -341,11 +356,11 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
   const protein = getS('panelUrinalysis', 'Protein');
 
   if (creatinine !== null) {
-    // §6.2 (P2): ULN по полу (♂ 110, ♀ 97), шаг +20/+40 как был.
-    const crUln = getLabNorm('CREATININE', sex)?.uln ?? 110;
+    // §6.2 (P2): ULN по полу (♂ 110, ♀ 97), шаг +20/+40 — одна пара на приложение.
+    const crUln = CREATININE_ULN[sexKey];
     if (creatinine < crUln) urin.creatinineElevation = 'none';
-    else if (creatinine < crUln + 20) urin.creatinineElevation = 'mild';
-    else if (creatinine < crUln + 40) urin.creatinineElevation = 'moderate';
+    else if (creatinine < crUln + CREATININE_FLAG_STEP) urin.creatinineElevation = 'mild';
+    else if (creatinine < crUln + 2 * CREATININE_FLAG_STEP) urin.creatinineElevation = 'moderate';
     else urin.creatinineElevation = 'severe';
     derived.push('urinary.creatinineElevation');
   }
