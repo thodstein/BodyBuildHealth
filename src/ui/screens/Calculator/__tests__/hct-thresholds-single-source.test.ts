@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { hctCuts, hctGradationLabel, deriveStateFromLabs } from '../Calc.labs-derived';
+import { hctCuts, hctGradationLabel, deriveStateFromLabs, HCT_CORRECTION_MARGIN } from '../Calc.labs-derived';
 import { clinicalFloorsForLabs, HCT_THRESHOLDS } from '../../../../engines/risk-engine-tz-spec';
 import { HCT_THRESHOLDS as HCT_THRESHOLDS_FROM_LAB_NORMS, getLabNorm } from '../../../../engines/lab-norms.engine';
 import { STOP_COURSE_TABLE } from '../../SupportScreen_parts/supportProtocolsShared';
@@ -192,5 +192,20 @@ describe('два числа HCT — намеренно (норма лабора�
   it('порог действия ниже нормы только у мужчин — так и задумано', () => {
     expect(HCT_THRESHOLDS_FROM_LAB_NORMS.male.erythrocytosis).toBeLessThan(getLabNorm('HCT', 'male')!.uln);
     expect(HCT_THRESHOLDS_FROM_LAB_NORMS.female.erythrocytosis).toBe(getLabNorm('HCT', 'female')!.uln);
+  });
+
+  // Проход 75: «коррекция» (♂ 48 / ♀ 44) — не норма из литературы, а продуктовый
+  // запас в 4 п.п. ниже верхней нормы. Женские 44 выводятся из 48, поэтому
+  // отдельного женского источника чисел здесь быть не должно.
+  it('«коррекция» = норма − продуктовый маржin, а не отдельная норма', () => {
+    expect(HCT_CORRECTION_MARGIN).toBe(4);
+    for (const s of ['male', 'female'] as const) {
+      const c = hctCuts(s);
+      expect(c.correction).toBe(c.therapy - HCT_CORRECTION_MARGIN);
+      expect(c.correction).toBeGreaterThan(0);
+      expect(c.correction).toBeLessThan(c.therapy);
+    }
+    expect(hctCuts('male').correction).toBe(48);
+    expect(hctCuts('female').correction).toBe(44);
   });
 });

@@ -154,9 +154,19 @@ export function labPointsToSlice(input: any): LabSlice | null {
 }
 
 /**
+ * Маржинальная зона гематокрита — ПРОДУКТОВОЕ правило приложения, не клиническая
+ * норма (проход 75). «Коррекция» начинается на 4 п.п. ниже верхней нормы: это
+ * запас, в котором уже пора снижать нагрузку/добавлять гидратацию, но порог
+ * терапии ещё не достигнут. Женские 44 — следствие (48 − 4), отдельного
+ * источника чисел нет; поэтому константа стоит рядом с `hctCuts`, а не в
+ * `lab-norms.engine` (там живут только нормы и пороги из литературы).
+ */
+export const HCT_CORRECTION_MARGIN = 4;
+
+/**
  * §6.2 (P2, проход 39): ЕДИНАЯ шкала гематокрита для подписи, баннера и
  * состояния лабораторий. Границы:
- *   коррекция = ULN − 4 (♂ 48, ♀ 44)
+ *   коррекция = ULN − `HCT_CORRECTION_MARGIN` (♂ 48, ♀ 44)
  *   терапия   = ULN     (♂ 52, ♀ 48)
  *   ургент    = порог блока первичной модели (`HCT_THRESHOLDS`: ♂ 54, ♀ 52)
  * До 39-го прохода на одном экране жили три шкалы: подпись 48/52/57, состояние
@@ -166,7 +176,7 @@ export function labPointsToSlice(input: any): LabSlice | null {
 export function hctCuts(sex?: 'male' | 'female'): { correction: number; therapy: number; urgent: number } {
   const s = sex === 'female' ? 'female' : 'male';
   const therapy = getLabNorm('HCT', s)?.uln ?? (s === 'female' ? 48 : 52);
-  return { correction: therapy - 4, therapy, urgent: HCT_THRESHOLDS[s].block };
+  return { correction: therapy - HCT_CORRECTION_MARGIN, therapy, urgent: HCT_THRESHOLDS[s].block };
 }
 
 /** UI-градация гематокрита — по `hctCuts` (мужские 48/52/54, женские 44/48/52). */
