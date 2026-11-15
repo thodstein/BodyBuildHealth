@@ -75,6 +75,7 @@ import { getSubstanceMonitoring } from '../data/substance-monitoring-db';
 import { addonsFor, isInjectableCourse, isLongEsterHalfLife } from './support-phase-labs.engine';
 import {
   HCT_THRESHOLDS, HGB_THRESHOLDS, LFT_STAGE_ULN, lftUlnText, FEMALE_HORMONE_BANDS,
+  getLabNorm,
 } from './lab-norms.engine';
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS } from '../data/support-db';
 import { canonId, sameClassIds } from './support-plan/shared-constants';
@@ -1625,6 +1626,36 @@ function computeSymptomDrugs(ctx: MapperCtx): PhaseAssignedDrug[] {
   return result;
 }
 
+// ── Пороги серьёзности по анализам (проход 96) ──────────────────────────────
+/**
+ * Маркеры, у которых порог — ссылочная граница пола, а не «цель приложения».
+ * Числа берутся из единого резолвера (`getLabNorm`): АЛТ/АСТ ♂ 40 / ♀ 31, ГГТ
+ * ♂ 55 / ♀ 31, гематокрит ♂ 52 / ♀ 48, гемоглобин ♂ 170 / ♀ 150, креатинин
+ * ♂ 110 / ♀ 97, мочевая кислота ♂ 420 / ♀ 350. До прохода 96 здесь стояли
+ * литералы 40/40/55/50/165/105/420: женщина получала мужской порог, а половина
+ * чисел ещё и расходилась с резолвером (50 вместо 52, 165 вместо 170, 105 вместо
+ * 110) — то есть рекомендации по анализам жили на своей четвёртой копии норм.
+ */
+const LAB_REF_UPPER: Record<string, string> = {
+  ALT: 'ALT', AST: 'AST', GGT: 'GGT',
+  HCT: 'HCT', HEMATOCRIT: 'HCT',
+  HGB: 'HGB', HEMOGLOBIN: 'HGB',
+  CREATININE: 'CREATININE',
+  URIC_ACID: 'UA',
+};
+
+/**
+ * Порог «выше — хуже» для маркера: ВГН его пола. `null` — резолвер маркер не
+ * знает, и вызывающий берёт функциональную цель из `LAB_TARGETS` (это не нормы,
+ * у них нет пола). Без `sex` резолвер отдаёт мужской ряд — прежний путь.
+ */
+export function labSeverityCut(marker: string, sex?: 'male' | 'female'): number | null {
+  const code = LAB_REF_UPPER[String(marker || '').toUpperCase()];
+  if (!code) return null;
+  const norm = getLabNorm(code, sex);
+  return norm ? norm.uln : null;
+}
+
 function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
   // ── 1. активировать мехи ─
   const activated = getActivatedTzMechs(ctx.labs);
@@ -1712,10 +1743,11 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     subs.push({ substanceId: bv.id, category: bv.category, k: 0.5, q: 'B', reason: bv.reason, mechsCovered: [], priority: 2 });
   }
   // ── 6. привязка к анализам (lab→substance priority map) ─
-  const LAB_NORMALS: Record<string, { default: number; higherIsWorse: boolean }> = {
-    ALT: { default: 40, higherIsWorse: true },
-    AST: { default: 40, higherIsWorse: true },
-    GGT: { default: 55, higherIsWorse: true },
+  // Функциональные цели приложения, а не нормы: пола у них нет, и верхней границы
+  // из литературы тоже (ферритин 100, витамин D 30, ТТГ 2.5, тестостерон 20, СРБ 3).
+  // Ссылочные границы (АЛТ/АСТ/ГГТ/HCT/HGB/креатинин/мочевая кислота) живут в
+  // резолвере — см. `labSeverityCut` выше, проход 96.
+  const LAB_TARGETS: Record<string, { default: number; higherIsWorse: boolean }> = {
     BILIRUBIN: { default: 21, higherIsWorse: true },
     BILIRUBIN_TOTAL: { default: 21, higherIsWorse: true },
     TOTAL_BILIRUBIN: { default: 21, higherIsWorse: true },
@@ -1723,13 +1755,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     CHOLESTEROL_LDL: { default: 3.0, higherIsWorse: true },
     HDL: { default: 1.0, higherIsWorse: false },
     TRIGLYCERIDES: { default: 1.7, higherIsWorse: true },
-    HCT: { default: 50, higherIsWorse: true },
-    HEMATOCRIT: { default: 50, higherIsWorse: true },
-    HEMOGLOBIN: { default: 165, higherIsWorse: true },
-    HGB: { default: 165, higherIsWorse: true },
-    CREATININE: { default: 105, higherIsWorse: true },
     EGFR: { default: 90, higherIsWorse: false },
-    URIC_ACID: { default: 420, higherIsWorse: true },
     TSH: { default: 2.5, higherIsWorse: true },
     E2: { default: 30, higherIsWorse: true },
     ESTRADIOL: { default: 30, higherIsWorse: true },
@@ -1774,9 +1800,15 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     const labSubs: Array<{ id: string; reason: string; marker: string; severity: SeverityLevel }> = [];
     for (const [marker, value] of Object.entries(ctx.labs)) {
       if (typeof value !== 'number' || isNaN(value)) continue;
-      const norm = LAB_NORMALS[marker.toUpperCase()];
-      if (!norm) continue;
-      const sev = deriveSeverity(value, norm.default, norm.higherIsWorse);
+      const label = String(marker).toUpperCase();
+      // Проход 96: ссылочная граница — из резолвера с полом (`labSeverityCut`),
+      // функциональная цель — из `LAB_TARGETS`. Все границы здесь «выше — хуже».
+      const refCut = labSeverityCut(label, ctx.sex);
+      const target = LAB_TARGETS[label];
+      if (refCut === null && !target) continue;
+      const sev = refCut !== null
+        ? deriveSeverity(value, refCut, true)
+        : deriveSeverity(value, target!.default, target!.higherIsWorse);
       const entries = getPrioritySubstances(marker, sev);
       for (const e of entries) {
         labSubs.push({ id: e.substanceId, reason: e.reason, marker, severity: sev });
