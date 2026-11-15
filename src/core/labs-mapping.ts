@@ -452,12 +452,26 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
 }
 
 /**
+ * Коэффициенты «масса ↔ активность» (проход 87): мМЕ/л на 1 нг/мл.
+ *
+ * Пролактин — единственный гормон разбора, где бланк даёт нг/мл (и `ng/mL` —
+ * единица приложения по умолчанию в `UCUM_MAP`), а шкала `REFERENCE_RANGES`
+ * задана в мЕд/л. Без пересчёта нормальные 12 нг/мл читались как 12 мЕд/л и
+ * получали «низко». Коэффициент — один на приложение (`PRL_NG_TO_MIU`).
+ */
+const MASS_ACTIVITY_FACTOR: Record<string, number> = {
+  PRL: PRL_NG_TO_MIU,
+  PROLACTIN: PRL_NG_TO_MIU,
+};
+
+/**
  * Пересчёт значения из единицы бланка в единицу приложения (проход 86).
  *
  * `interpretLabs` сравнивает число с `REFERENCE_RANGES[code].unit`, а `LabPoint`
  * хранит то, что ввёл пользователь: поле единицы в форме — свободный текст.
  * Поэтому тестостерон «600 нг/дл» без пересчёта читался как 600 нмоль/л, а
- * пролактин «15 нг/мл» — как 15 мЕд/л. Правило: обе единицы обязаны разбираться
+ * пролактин «15 нг/мл» — как 15 мЕд/л (у него есть коэффициент вещества,
+ * `MASS_ACTIVITY_FACTOR`). Правило: обе единицы обязаны разбираться
  * как концентрации; иначе `null` и вызывающий оставляет значение как есть —
  * гадать вслепую хуже, чем не пересчитывать.
  */
@@ -473,9 +487,18 @@ export function convertToUnit(code: string, value: number, fromUnit: string, toU
   if (sourceDim.kind === targetDim.kind) {
     return round((value * sourceDim.perBase) / targetDim.perBase);
   }
-  // Массовая ↔ молярная — только при известной молярной массе; активность (МЕ)
-  // в концентрацию не переводим без коэффициента вещества.
-  if (sourceDim.kind === 'activity' || targetDim.kind === 'activity') return null;
+  // Активность ↔ масса — только там, где коэффициент вещества известен
+  // (пролактин: 1 нг/мл = 21.2 мМЕ/л). Иначе `null`: выдумывать фактор нельзя.
+  if (sourceDim.kind === 'activity' || targetDim.kind === 'activity') {
+    const perNgPerMl = MASS_ACTIVITY_FACTOR[mapToUcumCode(code).toUpperCase()];
+    if (!perNgPerMl) return null;
+    if (sourceDim.kind === 'mass') {
+      const ngPerMl = (value * sourceDim.perBase) / 1e-9 / 1000;
+      return round((ngPerMl * perNgPerMl * 1e-3) / targetDim.perBase);
+    }
+    const miuPerL = (value * sourceDim.perBase) / 1e-3;
+    return round(((miuPerL / perNgPerMl) * 1e-9 * 1000) / targetDim.perBase);
+  }
   const canonical = mapToUcumCode(code);
   const molarMass = MOLAR_MASS[canonical] ?? MOLAR_MASS[canonical.toUpperCase()];
   if (!molarMass) return null;
