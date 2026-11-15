@@ -2,7 +2,7 @@
 import type { LabPoint } from '../core/types';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl,
 } from './lab-norms.engine';
 import { phaseHormoneBand, phaseUnionBand, type CycleState } from './female-cycle-phase.engine';
 
@@ -173,7 +173,13 @@ function findLab(labs: LabPoint[], code: string): number | null {
     if (aliases && aliases.includes(upper)) return true;
     return false;
   });
-  return lab?.value ?? null;
+  if (!lab) return null;
+  // Проход 84: E2 читается по единице бланка. Женщина, внёсшая 900 пмоль/л
+  // (245 пг/мл — нормальная лютеиновая), без этого сравнялась бы с порогом в
+  // пг/мл и получила «высоко»; мужчина, внёсший 200 пг/мл, не должен делиться
+  // на 3.671. Остальные маркеры — значение как есть.
+  if (upper === 'ESTRADIOL') return e2PgPerMl(lab.value, lab.unit);
+  return lab.value;
 }
 
 export function computeHOMA_IR(glucose: number, insulin: number): number {

@@ -24,6 +24,7 @@ import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue } from '../../core/constants';
+import { e2PgPerMl } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
@@ -1304,12 +1305,17 @@ export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[
 }
 
 /** Нормализация плоского списка анализов (linked.labs) — та же логика, что extractLabValues. */
-export function normalizeFlatLabs(labs: Array<{ code?: string; name?: string; value?: number }>): Record<string, number> {
+export function normalizeFlatLabs(labs: Array<{ code?: string; name?: string; value?: number; unit?: string }>): Record<string, number> {
   const m: Record<string, number> = {};
   for (const l of labs) {
     const code = (l.code || l.name || '').toUpperCase();
     if (!code || l.value == null || isNaN(l.value)) continue;
-    m[code] = normalizeLabValue(code, l.value);
+    // Проход 84: единица бланка главнее эвристики. У E2 `normalizeLabValue`
+    // угадывает по величине («>300 — значит пмоль/л») и на женской лютеиновой
+    // E2 450 пг/мл режет значение втрое; здесь единица известна — переводим по ней.
+    m[code] = (code === 'E2' || code === 'ESTRADIOL') && l.unit
+      ? e2PgPerMl(l.value, l.unit)
+      : normalizeLabValue(code, l.value);
   }
   return m;
 }
