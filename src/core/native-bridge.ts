@@ -715,24 +715,33 @@ export async function getDeviceInfo(): Promise<DeviceInfo> {
     appVersion: '',
   };
   if (!isCapacitorNative()) return fallback;
+  // Версия APK критична для авто-обновления (сравнивается с тегом релиза),
+  // поэтому читается отдельно: сбой Device.getId()/getInfo() не должен её терять.
+  let appVersion = '';
+  try {
+    const { App } = await import('@capacitor/app');
+    appVersion = (await App.getInfo()).version ?? '';
+  } catch {
+    /* версия приложения опциональна */
+  }
   try {
     const { Device } = await import('@capacitor/device');
-    const [id, info] = await Promise.all([Device.getId(), Device.getInfo()]);
-    let appVersion = '';
+    const info = await Device.getInfo();
+    let idText = '';
     try {
-      const { App } = await import('@capacitor/app');
-      appVersion = (await App.getInfo()).version ?? '';
+      const id = await Device.getId();
+      idText = id.identifier ?? '';
     } catch {
-      /* версия приложения опциональна */
+      /* id — не критичен */
     }
     return {
-      platform: info.platform ?? id.identifier ?? 'android',
+      platform: info.platform || idText || 'android',
       model: info.model ?? fallback.model,
       osVersion: info.osVersion ?? '',
       appVersion,
     };
   } catch {
-    return fallback;
+    return { ...fallback, appVersion };
   }
 }
 

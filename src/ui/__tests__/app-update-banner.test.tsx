@@ -91,6 +91,25 @@ describe('AppUpdateBanner (волна 20)', () => {
 
     expect(await screen.findByText(/9\.9\.9/)).not.toBeNull();
   });
+
+  it('6. неудачная авто-проверка не съедает суточное окно', async () => {
+    (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('native');
+    const upd = await import('../../core/app-updater');
+    const writeState = upd.writeUpdateState as unknown as {
+      mockClear: () => void;
+      mock: { calls: unknown[][] };
+    };
+    writeState.mockClear();
+    // фид недоступен (нет сети/лимит GitHub) — lastCheck писать нельзя,
+    // иначе авто-обновление отложится на сутки вперёд.
+    (upd.fetchLatestRelease as unknown as { mockResolvedValueOnce: (v: null) => void }).mockResolvedValueOnce(null);
+    const { container } = render(<AppUpdateBanner />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.querySelector('[aria-label="app-update"]')).toBeNull();
+    expect(writeState.mock.calls).toHaveLength(0);
+  });
 });
 
 describe('волна 32: PWA-баннер не лезет поверх hero в APK', () => {

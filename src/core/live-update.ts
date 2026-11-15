@@ -11,6 +11,8 @@
  * - ready() вызывать один раз после успешного старта (main.tsx, native).
  */
 
+import { isNewerVersion } from './app-updater';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LiveUpdatePlugin = any;
 
@@ -138,55 +140,83 @@ export async function resetToBuiltInBundle(): Promise<boolean> {
   }
 }
 
-const BUILD_MARKER_KEY = 'he_app_build_marker_v1';
+const RESET_GUARD_KEY = 'he_ota_reset_guard_v1';
+
+/** Версия установленного APK (versionName) или '' вне native/при сбое. */
+async function installedApkVersion(): Promise<string> {
+  try {
+    const { isCapacitorNative } = await import('./app-platform');
+    if (!isCapacitorNative()) return '';
+    const { App } = await import('@capacitor/app');
+    const info = await App.getInfo();
+    return String(info?.version ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+/** Похоже на версию (иначе сравнивать нечего). */
+function isVersionLike(v: string): boolean {
+  return /^\d+(\.\d+)+$/.test((v || '').trim().replace(/^[vV]/, ''));
+}
+
+/**
+ * Нужно ли сбросить активный OTA-бандл на встроенный dist.
+ *
+ * - бандл НОВЕЕ установленного APK → это и есть обновление, не трогаем;
+ * - бандл не новее APK (равен или старше) → устарел: APK уже содержит эти файлы.
+ *
+ * Пустые/нечисловые версии = не трогаем (сравнивать нечего, риск откатить
+ * живое обновление выше пользы).
+ */
+export function shouldResetOtaBundle(bundleId: string, apkVersion: string): boolean {
+  const b = (bundleId || '').trim();
+  const a = (apkVersion || '').trim();
+  if (!b || !a) return false;
+  if (!isVersionLike(b) || !isVersionLike(a)) return false;
+  return !isNewerVersion(b, a);
+}
+
+function readResetGuard(): string {
+  try {
+    return localStorage.getItem(RESET_GUARD_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function writeResetGuard(apkVersion: string): void {
+  try {
+    localStorage.setItem(RESET_GUARD_KEY, apkVersion);
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * OTA-бандл живёт в данных приложения и переживает установку нового APK:
  * скачанный однажды бандл молча перекрывает свежий встроенный dist, и правки
  * из новой сборки «не приезжают» — приложение выглядит так же, как до фикса.
  *
- * Здесь: при запуске сборки с новой меткой (__APP_BUILD__ меняется на каждом
- * `npm run build`) активный OTA-бандл сбрасывается на встроенный. Возвращает
- * true, если нужен reload (вызывающий делает reloadToLiveBundle()).
- * Идемпотентно: после сброса метка совпадает → повторных сбросов нет.
+ * Решение — по версиям (см. shouldResetOtaBundle), а НЕ по метке сборки
+ * `__APP_BUILD__`: метка меняется на каждой сборке, включая сам OTA-бандл,
+ * поэтому по ней каждый только что применённый бандл сбрасывался при первом
+ * же перезапуске — «быстрое обновление» откатывалось само, и перезапуск
+ * возвращал старую версию.
+ *
+ * Возвращает true, если нужен reload (вызывающий делает reloadToLiveBundle()).
  */
-export async function ensureBuiltInBundleForThisBuild(): Promise<boolean> {
+export async function resetStaleOtaBundle(): Promise<boolean> {
   try {
-    const buildMarker =
-      typeof __APP_BUILD__ !== 'undefined' ? String(__APP_BUILD__) : '';
-    if (!buildMarker) return false;
-    let stored = '';
-    try {
-      stored = localStorage.getItem(BUILD_MARKER_KEY) || '';
-    } catch {
-      return false;
-    }
-    if (!stored) {
-      // Первый запуск после появления метки — запоминаем и ничего не трогаем.
-      try {
-        localStorage.setItem(BUILD_MARKER_KEY, buildMarker);
-      } catch {
-        /* ignore */
-      }
-      return false;
-    }
-    if (stored === buildMarker) return false;
-    // Новая встроенная сборка: старый OTA-бандл сбросить, иначе правки
-    // в APK останутся невидимыми до ручного вмешательства.
-    let hasBundle = false;
-    try {
-      const id = await getLiveBundleId();
-      hasBundle = Boolean(id);
-      if (hasBundle) await resetToBuiltInBundle();
-    } catch {
-      /* ignore */
-    }
-    try {
-      localStorage.setItem(BUILD_MARKER_KEY, buildMarker);
-    } catch {
-      /* ignore */
-    }
-    return hasBundle;
+    const bundleId = (await getLiveBundleId()) || '';
+    if (!bundleId) return false; // встроенный dist — сбрасывать нечего
+    const apkVersion = await installedApkVersion();
+    if (!shouldResetOtaBundle(bundleId, apkVersion)) return false;
+    // Один сброс на версию APK: если reset() почему-то не сработал, цикла
+    // «сброс → reload → сброс» не будет.
+    if (readResetGuard() === apkVersion) return false;
+    writeResetGuard(apkVersion);
+    return await resetToBuiltInBundle();
   } catch {
     return false;
   }

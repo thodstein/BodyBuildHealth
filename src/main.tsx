@@ -287,12 +287,13 @@ async function bootstrap() {
     // зависший вызов плагина = вечный спиннер только в APK.
     try { await withTimeout(initNativeChrome(), 8000, 'native-chrome'); } catch (e) { console.warn('initNativeChrome failed:', e); }
     // Новая встроенная сборка APK важнее ранее скачанного OTA-бандла:
-    // без сброса старый бандл перекрывает свежий dist и правки не видны.
+    // без сброса устаревший бандл перекрывает свежий dist и правки не видны.
+    // Свежий OTA (новее APK) не трогаем — иначе «быстрое обновление» откатывалось.
     try {
-      const { ensureBuiltInBundleForThisBuild, reloadToLiveBundle } = await import('./core/live-update');
-      const reset = await withTimeout(ensureBuiltInBundleForThisBuild(), 5000, 'ota-reset');
+      const { resetStaleOtaBundle, reloadToLiveBundle } = await import('./core/live-update');
+      const reset = await withTimeout(resetStaleOtaBundle(), 5000, 'ota-reset');
       if (reset) {
-        console.warn('[bootstrap] OTA-бандл сброшен на встроенный — перезагрузка');
+        console.warn('[bootstrap] устаревший OTA-бандл сброшен на встроенный — перезагрузка');
         const reloaded = await reloadToLiveBundle();
         if (reloaded) return;
       }

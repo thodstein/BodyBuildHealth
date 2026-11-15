@@ -129,38 +129,44 @@ export const AppUpdateBanner: React.FC = () => {
       if (!manual && !shouldCheckNow()) return;
       const info = await getDeviceInfo();
       const installed = (info.appVersion || '').trim();
-      // Без версии сборки сравнивать не с чем — тихо выходим.
+      // Без версии сборки сравнивать не с чем — тихо выходим (и не съедаем
+      // суточное окно: следующий запуск попробует снова).
       if (!installed) {
-        writeUpdateState({ lastCheck: Date.now() });
         if (manual) toastStore.error('Не удалось узнать версию приложения');
         return;
       }
+      // Действующая версия = max(APK, применённый OTA): иначе после «быстрого
+      // обновления» баннер продолжал бы звать на полный APK каждый день.
+      let liveId: string | null = null;
+      try {
+        liveId = await getLiveBundleId();
+      } catch {
+        /* без OTA — остаётся версия APK */
+      }
+      const effective = liveId && isNewerVersion(liveId, installed) ? liveId : installed;
       const latest = await fetchLatestRelease();
-      writeUpdateState({ lastCheck: Date.now() });
       if (!latest) {
+        // Неудачная проверка НЕ съедает суточное окно: иначе один запуск без
+        // сети откладывал бы авто-обновление на сутки вперёд.
         if (manual) toastStore.error('Не удалось проверить обновления — нет связи');
         return;
       }
-      if (!isNewerVersion(latest.version, installed)) {
-        if (manual) toastStore.success(`✅ У вас последняя версия ${installed}`);
+      writeUpdateState({ lastCheck: Date.now() });
+      if (!isNewerVersion(latest.version, effective)) {
+        if (manual) toastStore.success(`✅ У вас последняя версия ${effective}`);
         return;
       }
       // Пропущенную версию не навязываем при фоновой проверке, но ручная
       // проверка — это явная просьба показать, что есть.
       if (!manual && readUpdateState().skippedVersion === latest.version) return;
-      // Быстрый путь — только при совместимом мажоре и не установленном бандле.
-      try {
-        const liveId = await getLiveBundleId();
-        if (
+      // Быстрый путь — только при совместимом мажоре и ещё не применённом бандле.
+      setOta(
+        Boolean(
           latest.bundleUrl &&
-          isBundleCompatible(latest.version, installed) &&
-          liveId !== latest.version
-        ) {
-          setOta(true);
-        }
-      } catch {
-        /* без OTA — остаётся полный APK */
-      }
+            isBundleCompatible(latest.version, installed) &&
+            liveId !== latest.version,
+        ),
+      );
       setRelease(latest);
       setPhase('available');
       if (manual) toastStore.success(`⬆️ Доступна версия ${latest.version}`);
@@ -176,8 +182,29 @@ export const AppUpdateBanner: React.FC = () => {
       void runCheck(true);
     };
     window.addEventListener(UPDATE_CHECK_EVENT, onManual);
+    // Приложение может жить в памяти сутками: без проверки при возврате в
+    // foreground «авто-обновление» ждало бы следующего холодного старта.
+    // Суточное окно (shouldCheckNow) остаётся — лишних запросов нет.
+    let removeResume: (() => void) | null = null;
+    let disposed = false;
+    void (async () => {
+      try {
+        const { App } = await import('@capacitor/app');
+        const handle = await App.addListener('resume', () => {
+          if (!disposed) void runCheck(false);
+        });
+        removeResume = () => {
+          void handle?.remove?.();
+        };
+        if (disposed) removeResume();
+      } catch {
+        /* resume-триггер опционален */
+      }
+    })();
     return () => {
+      disposed = true;
       window.removeEventListener(UPDATE_CHECK_EVENT, onManual);
+      if (removeResume) removeResume();
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [runCheck]);

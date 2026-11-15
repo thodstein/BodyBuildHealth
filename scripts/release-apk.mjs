@@ -4,7 +4,8 @@
  *
  * Что делает:
  *   1) поднимает версию (patch по умолчанию) в package.json и
- *      android/app/build.gradle (versionCode +1, versionName = новая версия);
+ *      android/app/build.gradle (versionName = новая версия, versionCode =
+ *      major*1e6 + minor*1e3 + patch — та же формула, что в CI);
  *   2) коммитит ТОЛЬКО эти два файла (чужой WIP в дереве не попадает);
  *   3) ставит аннотированный тег vX.Y.Z;
  *   4) пушит ветку и тег.
@@ -60,6 +61,18 @@ function nextVersion(current) {
   const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(current);
   if (!m) die(`версия в package.json не похожа на x.y.z: "${current}"`);
   return `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
+}
+
+/**
+ * x.y.z → versionCode (3.0.15 → 3000015) — та же формула, что в
+ * scripts/apk-version.mjs. «versionCode + 1» давал одинаковые номера всем
+ * ручным релизам (CI не коммитит build.gradle), а Android отклоняет установку
+ * APK с versionCode ниже уже установленного.
+ */
+function versionCodeFor(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!m) die(`версия не похожа на x.y.z: "${version}"`);
+  return Number(m[1]) * 1000000 + Number(m[2]) * 1000 + Number(m[3]);
 }
 
 /** Числовое сравнение версий (3.0.10 > 3.0.9). */
@@ -134,7 +147,7 @@ if (remoteTags.includes(version) || git(['tag', '-l', `v${version}`])) {
   die(`тег v${version} уже существует`);
 }
 
-const nextCode = Number(codeMatch[2]) + 1;
+const nextCode = versionCodeFor(version);
 const tag = `v${version}`;
 
 log(`версия: ${pkgVersion} → ${version}   versionCode: ${codeMatch[2]} → ${nextCode}   тег: ${tag}`);

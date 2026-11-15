@@ -9,9 +9,12 @@
  * Две команды:
  *
  *   resolve — посчитать version/tag/versionCode для текущего запуска:
- *     • push тега vX.Y.Z  → version = X.Y.Z (из тега), code = из build.gradle;
+ *     • push тега vX.Y.Z  → version = X.Y.Z (из тега);
  *     • workflow_dispatch → version = --input-version или патч +1 от максимума
- *       (package.json / последний GitHub Release), code = текущий + 1.
+ *       (package.json / последний GitHub Release).
+ *     versionCode в обоих случаях считается из версии (major*1e6 + minor*1e3 +
+ *     patch): он обязан расти вместе с versionName, иначе Android отклоняет
+ *     установку поверх как downgrade.
  *     Ручной запуск обязан давать версию СТРОГО выше последнего релиза —
  *     иначе телефон не покажет баннер обновления. Печатает key=value для
  *     $GITHUB_OUTPUT, человекочитаемый итог — в stderr.
@@ -86,6 +89,22 @@ function bumpPatch(v) {
   return `${m[1]}.${m[2]}.${Number(m[3]) + 1}`;
 }
 
+/**
+ * x.y.z → versionCode, строго монотонный по версии: 3.0.15 → 3000015.
+ *
+ * Раньше code брался из build.gradle (+1 для ручного запуска), но `apply`
+ * пишет его только в рабочую копию CI и никогда не коммитит → в репозитории
+ * code вечно 7, а ВСЕ ручные релизы получали code 8. Тег-пуш при этом собирал
+ * code 7 — то есть ниже уже установленного, и Android отклонял установку
+ * (INSTALL_FAILED_VERSION_DOWNGRADE). Считаем code из версии: он всегда растёт
+ * вместе с versionName и не зависит от состояния файла.
+ */
+function versionCodeFor(version) {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(stripV(version));
+  if (!m) die(`версия не похожа на x.y.z: "${version}"`);
+  return Number(m[1]) * 1000000 + Number(m[2]) * 1000 + Number(m[3]);
+}
+
 /** Тег последнего опубликованного релиза (gh api; нет сети/gh → пусто). */
 function latestReleaseVersion() {
   const repo = process.env.GH_REPO || DEFAULT_REPO;
@@ -144,14 +163,14 @@ function resolve() {
   let publish;
 
   if (tagPush) {
-    // Тег-пуш: версию диктует тег, versionCode — из build.gradle (его поднял
-    // scripts/release-apk.mjs в том же коммите). Нестандартный тег (rc/beta)
-    // лучше уронить, чем молча опубликовать другую версию.
+    // Тег-пуш: версию диктует тег; versionCode считается из неё (см.
+    // versionCodeFor) — он обязан быть выше уже установленного. Нестандартный
+    // тег (rc/beta) лучше уронить, чем молча опубликовать другую версию.
     version = stripV(ref.split('/').pop());
     if (!isSemver(version)) {
       die(`тег ${ref} не в формате vX.Y.Z — APK/релиз требуют числовую версию`);
     }
-    code = gradle.code;
+    code = versionCodeFor(version);
     publish = true;
   } else {
     // Ручной запуск: новая версия обязана быть выше последнего релиза,
@@ -168,7 +187,10 @@ function resolve() {
           'Укажите version выше или оставьте поле пустым (авто +1 патч).',
       );
     }
-    code = gradle.code + 1;
+    // code из версии, а не «gradle.code + 1»: apply пишет его только в
+    // рабочую копию CI (не коммитится), из-за чего все ручные релизы
+    // получали одинаковый code и ломали установку поверх.
+    code = versionCodeFor(version);
     publish = String(inputPublish || 'true').toLowerCase() !== 'false';
     // Ручная публикация с ветки выпустила бы WIP-код «последним релизом»
     // всем установленным приложениям. Сборка с ветки — только артефакт.
