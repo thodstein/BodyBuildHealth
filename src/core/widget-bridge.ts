@@ -11,7 +11,7 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
-export type WidgetKind = 'training' | 'timer' | 'compliance' | 'nutrition' | 'water' | 'calendar' | 'notes';
+export type WidgetKind = 'training' | 'workout' | 'timer' | 'compliance' | 'nutrition' | 'water' | 'calendar' | 'notes';
 export type WidgetTarget =
   | 'training'
   | 'training_run'
@@ -26,7 +26,7 @@ export type WidgetTarget =
 export type TimerAction = 'preset' | 'start' | 'pause' | 'toggle' | 'reset';
 
 export interface QueuedItem {
-  type: 'water' | 'food' | 'task' | 'task_add' | 'note_add';
+  type: 'water' | 'food' | 'task' | 'task_add' | 'note_add' | 'set_add' | 'workout_start' | 'workout_finish';
   ml?: number;
   name?: string;
   kcal?: number;
@@ -34,6 +34,18 @@ export interface QueuedItem {
   f?: number;
   c?: number;
   meal?: string;
+  /* --- Подход из виджета «Проведение» (type='set_add') --- */
+  /** Упражнение, к которому относится подход (имя из плана/живой сессии). */
+  exerciseName?: string;
+  weight?: number;
+  reps?: number;
+  rpe?: number;
+  rir?: number;
+  /** Оценка техники 3/4/5 (как в проведении тренировки). */
+  technique?: number;
+  /** Пауза на груди (жим, IPF-стиль). */
+  pause?: boolean;
+  notes?: string;
   /** Для type='task': id задачи и её новое состояние «сделано». */
   id?: string;
   done?: boolean;
@@ -82,6 +94,11 @@ export interface CalendarWidgetTask {
   done: boolean;
   /** none|low|medium|high — для точки приоритета. */
   priority: string;
+  /**
+   * Тип события: task (личное дело), training (тренировка по графику),
+   * supp (приём БАД), pharma (фарма/инъекция). Неизвестное → task.
+   */
+  kind?: string;
 }
 
 /**
@@ -127,6 +144,44 @@ export interface NotesWidgetSnapshot {
   pinned: number;
 }
 
+/** Упражнение дня для виджета «Проведение тренировки». */
+export interface WorkoutWidgetExercise {
+  name: string;
+  /** План строкой: «4×8 · 80 кг · RIR 2». */
+  plan: string;
+  /** Сколько подходов уже записано. */
+  done: number;
+  /** Сколько подходов в плане. */
+  planned: number;
+  /** Вес/повторы/RIR для подстановки в диалог (последний сет или план). */
+  weight: number;
+  reps: number;
+  rir: number;
+  /** Отдых между подходами, сек. */
+  restSec: number;
+}
+
+/**
+ * Снапшот «проведения тренировки»: упражнения назначенной на сегодня сессии
+ * и прогресс подходов. Заполняется из живой сессии, а если её нет — из плана
+ * дня (`he_pl_runtime`) по графику тренировок профиля.
+ */
+export interface WorkoutWidgetSnapshot {
+  title: string;
+  subtitle: string;
+  /** Живая сессия: кнопка меняется на «Завершить». */
+  live: boolean;
+  /** Время начала живой сессии, HH:MM. */
+  startedAt: string;
+  setsDone: number;
+  setsPlanned: number;
+  volumeKg: number;
+  progress: number;
+  /** Индекс дня плана: по нему JS восстанавливает упражнения при записи сета. */
+  dayIndex: number;
+  exercises: WorkoutWidgetExercise[];
+}
+
 interface WidgetBridgeNative {
   syncTraining(o: {
     title: string; subtitle: string; meta: string;
@@ -136,6 +191,7 @@ interface WidgetBridgeNative {
   syncNutrition(o: NutritionWidgetSnapshot): Promise<{ ok: boolean }>;
   syncCalendar(o: CalendarWidgetSnapshot): Promise<{ ok: boolean }>;
   syncNotes(o: NotesWidgetSnapshot): Promise<{ ok: boolean }>;
+  syncWorkout(o: WorkoutWidgetSnapshot): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
   queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string }): Promise<{ ok: boolean; queue: number }>;
   queueTaskToggle(o: { id: string; done: boolean }): Promise<{ ok: boolean; queue: number }>;
@@ -237,7 +293,10 @@ export function parseQueueItems(raw: string): QueuedItem[] {
           it.type === 'food' ||
           it.type === 'task' ||
           it.type === 'task_add' ||
-          it.type === 'note_add'),
+          it.type === 'note_add' ||
+          it.type === 'set_add' ||
+          it.type === 'workout_start' ||
+          it.type === 'workout_finish'),
     );
   } catch {
     return [];
@@ -382,6 +441,39 @@ export async function syncNotesWidget(input: NotesWidgetSnapshot): Promise<boole
     }
   }
   fbSnapshot('notes', { ...input, updatedAt: Date.now() });
+  return false;
+}
+
+export async function syncWorkoutWidget(input: WorkoutWidgetSnapshot): Promise<boolean> {
+  const payload: WorkoutWidgetSnapshot = {
+    ...input,
+    title: (input.title ?? '').slice(0, 80),
+    subtitle: (input.subtitle ?? '').slice(0, 120),
+    progress: clampPct(input.progress ?? 0),
+    setsDone: Math.max(0, Math.round(input.setsDone || 0)),
+    setsPlanned: Math.max(0, Math.round(input.setsPlanned || 0)),
+    volumeKg: Math.max(0, Math.round(input.volumeKg || 0)),
+    exercises: (input.exercises ?? []).slice(0, 6).map((ex) => ({
+      name: String(ex.name ?? '').slice(0, 60),
+      plan: String(ex.plan ?? '').slice(0, 48),
+      done: Math.max(0, Math.round(ex.done || 0)),
+      planned: Math.max(0, Math.round(ex.planned || 0)),
+      weight: Math.max(0, Number(ex.weight) || 0),
+      reps: Math.max(0, Math.round(ex.reps || 0)),
+      rir: Math.max(0, Math.round(ex.rir || 0)),
+      restSec: Math.max(0, Math.round(ex.restSec || 0)),
+    })),
+  };
+  const p = plugin();
+  if (p) {
+    try {
+      await p.syncWorkout(payload);
+      return true;
+    } catch {
+      /* fallback ниже */
+    }
+  }
+  fbSnapshot('workout', { ...payload, updatedAt: Date.now() });
   return false;
 }
 

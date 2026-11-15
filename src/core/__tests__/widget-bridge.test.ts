@@ -29,7 +29,15 @@ import {
   setWidgetOpacity,
   WIDGET_OPACITIES,
 } from '../widget-bridge';
-import { applyWidgetQueue, normalizeMealKey } from '../../ui/native/widget-sync';
+import {
+  applyWidgetQueue,
+  normalizeMealKey,
+  collectWorkout,
+  resolveWorkoutPlan,
+  formatPlanLine,
+  trainingWeekdays,
+  collectCalendar,
+} from '../../ui/native/widget-sync';
 import { localIsoDate } from '../local-date';
 
 beforeEach(async () => {
@@ -166,7 +174,16 @@ describe('очередь -> дневники', () => {
     await queueWaterMl(250);
     await queueWaterMl(500);
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 750, foods: 0, tasks: 0, tasksAdded: 0, notesAdded: 0 });
+    expect(applied).toEqual({
+      waterMl: 750,
+      foods: 0,
+      tasks: 0,
+      tasksAdded: 0,
+      notesAdded: 0,
+      setsAdded: 0,
+      workoutsStarted: 0,
+      workoutsFinished: 0,
+    });
     const log = JSON.parse(localStorage.getItem('he_water_log') || '[]');
     // Канон даты — локальный календарь (`local-date`), а не UTC: `toISOString()`
     // в UTC+10 до 10:00 утра отдаёт «вчера», и тест падал только по утрам.
@@ -178,7 +195,16 @@ describe('очередь -> дневники', () => {
   it('10. еда из виджета падает в nutrition_diary_v2 (секция дневника)', async () => {
     await queueFood({ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 55, meal: 'breakfast' });
     const applied = applyWidgetQueue(await drainWidgetQueue());
-    expect(applied).toEqual({ waterMl: 0, foods: 1, tasks: 0, tasksAdded: 0, notesAdded: 0 });
+    expect(applied).toEqual({
+      waterMl: 0,
+      foods: 1,
+      tasks: 0,
+      tasksAdded: 0,
+      notesAdded: 0,
+      setsAdded: 0,
+      workoutsStarted: 0,
+      workoutsFinished: 0,
+    });
     const diary = JSON.parse(localStorage.getItem('nutrition_diary_v2') || '{}');
     const dates = Object.keys(diary).filter((k) => k !== '__version');
     expect(dates.length).toBe(1);
@@ -300,5 +326,221 @@ describe('приёмы пищи из виджета', () => {
     expect(normalizeMealKey('snack')).toBe('Перекус');
     expect(normalizeMealKey('Ужин')).toBe('Ужин');
     expect(normalizeMealKey('')).toBe('Перекус');
+  });
+});
+
+describe('виджет «Проведение тренировки»', () => {
+  const ACTIVE_KEY = 'he_workout_active_v1';
+  const LOG_KEY = 'he_workout_log_v2';
+
+  const PLAN = {
+    days: [
+      {
+        label: 'Верх A',
+        exercises: [
+          {
+            name: 'Жим лёжа',
+            muscleGroup: 'chest',
+            restSec: 120,
+            targetSets: [
+              { weight: 80, reps: 8, rir: 2 },
+              { weight: 80, reps: 8, rir: 1 },
+            ],
+          },
+          {
+            name: 'Тяга блока',
+            muscleGroup: 'back',
+            targetSets: [{ weight: 60, reps: 12, rir: 3 }],
+          },
+        ],
+      },
+      {
+        label: 'Низ A',
+        exercises: [{ name: 'Присед', muscleGroup: 'legs', targetSets: [{ weight: 100, reps: 5, rir: 2 }] }],
+      },
+    ],
+    focus: 'upper_lower',
+    week: 3,
+    track: 'bb',
+  };
+
+  const seedPlan = () => localStorage.setItem('he_pl_runtime', JSON.stringify(PLAN));
+
+  it('19. план дня: упражнения, подходы и строка плана', () => {
+    seedPlan();
+    const plan = resolveWorkoutPlan(localIsoDate());
+    expect(plan).not.toBeNull();
+    expect(plan!.exercises.length).toBe(2);
+    expect(plan!.plannedSets).toBe(3);
+    expect(formatPlanLine(plan!.exercises[0])).toBe('2×8 · 80 кг');
+    // Один подход в плане — RIR выводится, диапазоны не выдумываются.
+    expect(formatPlanLine(plan!.exercises[1])).toBe('1×12 · 60 кг · RIR 3');
+  });
+
+  it('20. без живой сессии снапшот показывает план с нулевым прогрессом', () => {
+    seedPlan();
+    const snap = collectWorkout();
+    expect(snap.live).toBe(false);
+    expect(snap.title).not.toMatch(/●/);
+    expect(snap.exercises[0].name).toBe('Жим лёжа');
+    expect(snap.exercises[0].done).toBe(0);
+    expect(snap.exercises[0].planned).toBe(2);
+    expect(snap.exercises[0].weight).toBe(80);
+    expect(snap.setsPlanned).toBe(3);
+    expect(snap.progress).toBe(0);
+  });
+
+  it('21. подход с виджета запускает сессию из плана и пишется в live-сессию', () => {
+    seedPlan();
+    const applied = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 82.5, reps: 7, rir: 2, ts: Date.now() },
+    ]);
+    expect(applied.setsAdded).toBe(1);
+    expect(applied.workoutsStarted).toBe(1);
+
+    const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null');
+    expect(active).not.toBeNull();
+    expect(active.exercises.length).toBe(2);
+    const set = active.exercises[0].sets[0];
+    expect(set.weightKg).toBe(82.5);
+    expect(set.reps).toBe(7);
+    expect(set.rir).toBe(2);
+    // RPE выводится как 10 − RIR, если не задан явно.
+    expect(set.rpe).toBe(8);
+    expect(active.plannedSetsTotal).toBe(3);
+
+    // Снапшот после записи: живая сессия, прогресс 1 из 3.
+    const snap = collectWorkout();
+    expect(snap.live).toBe(true);
+    expect(snap.setsDone).toBe(1);
+    expect(snap.exercises[0].done).toBe(1);
+    expect(snap.progress).toBe(33);
+  });
+
+  it('22. техника и пауза сохраняются в подходе', () => {
+    seedPlan();
+    applyWidgetQueue([
+      {
+        type: 'set_add',
+        exerciseName: 'Жим лёжа',
+        weight: 100,
+        reps: 3,
+        rir: 1,
+        rpe: 9.5,
+        technique: 5,
+        pause: true,
+        notes: 'локти ближе',
+        ts: Date.now(),
+      },
+    ]);
+    const active = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null');
+    const set = active.exercises[0].sets[0];
+    expect(set.rpe).toBe(9.5);
+    expect(set.techniqueScore).toBe(5);
+    expect(set.pause).toBe(true);
+    expect(set.notes).toBe('локти ближе');
+  });
+
+  it('23. «Завершить» сохраняет сессию в журнал и очищает живую', () => {
+    seedPlan();
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+    const res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
+    expect(res.workoutsFinished).toBe(1);
+    expect(localStorage.getItem(ACTIVE_KEY)).toBeNull();
+
+    const log = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    expect(log.length).toBe(1);
+    expect(log[0].totalSets).toBe(1);
+    expect(log[0].exercises[0].exerciseName).toBe('Жим лёжа');
+    // После завершения виджет снова показывает план, а не «идёт».
+    expect(collectWorkout().live).toBe(false);
+  });
+
+  it('24. вес 0 отклоняется: ни подхода, ни сессии', () => {
+    seedPlan();
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 0, reps: 8, ts: Date.now() },
+    ]);
+    expect(res.setsAdded).toBe(0);
+    expect(res.workoutsStarted).toBe(0);
+    expect(localStorage.getItem(ACTIVE_KEY)).toBeNull();
+  });
+
+  it('25. без плана снапшот честно пуст и не выдумывает упражнения', () => {
+    const snap = collectWorkout();
+    expect(snap.exercises).toEqual([]);
+    expect(snap.subtitle).toContain('План не найден');
+  });
+
+  it('26. график тренировок дня: настройка профиля и раскладка daysPerWeek', () => {
+    expect(trainingWeekdays({ daysPerWeek: 3 })).toEqual([
+      true, false, true, false, true, false, false,
+    ]);
+    expect(
+      trainingWeekdays({
+        daysPerWeek: 3,
+        schedule: { enabled: true, scheduleType: 'weekly', weeklyDays: [true, false, false, true, false, false, false] },
+      }),
+    ).toEqual([true, false, false, true, false, false, false]);
+  });
+});
+
+describe('календарь: тренировки, БАДы, фарма и дела', () => {
+  it('27. график тренировок попадает в события календаря', () => {
+    const cal = collectCalendar();
+    const training = cal.items.filter(i => i.kind === 'training');
+    expect(training.length).toBeGreaterThan(30);
+    // Дни недели тренировок повторяются по графику, а не «каждый день».
+    const dows = new Set(training.map(t => new Date(`${t.date}T00:00:00`).getDay()));
+    expect(dows.size).toBeGreaterThan(0);
+    expect(dows.size).toBeLessThan(7);
+    expect(training[0].title).toContain('Тренировка');
+  });
+
+  it('28. БАДы и инъекции видны, «сделано» берётся из дневников', () => {
+    const today = localIsoDate();
+    localStorage.setItem('he_support_plan_result', JSON.stringify(['mag', 'd3']));
+    localStorage.setItem(
+      'he_support_diary',
+      JSON.stringify([{ date: today, substances: { mag: { taken: true }, d3: { taken: true } } }]),
+    );
+    const dow = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
+    localStorage.setItem(
+      'he_injection_schedule',
+      JSON.stringify([
+        { id: 'inj1', substance: 'Тестостерон энантат', dose: '250 мг', daysOfWeek: [dow], active: true },
+      ]),
+    );
+    localStorage.setItem(
+      'he_injection_diary',
+      JSON.stringify([{ date: today, substance: 'Тестостерон энантат', dose: '250 мг' }]),
+    );
+
+    const cal = collectCalendar();
+    const supp = cal.items.find(i => i.kind === 'supp' && i.date === today);
+    expect(supp).toBeTruthy();
+    expect(supp!.done).toBe(true);
+    expect(supp!.title).toContain('БАДы');
+
+    const pharma = cal.items.find(i => i.kind === 'pharma' && i.date === today);
+    expect(pharma).toBeTruthy();
+    expect(pharma!.done).toBe(true);
+    expect(pharma!.title).toContain('Тестостерон');
+  });
+
+  it('29. личные дела остаются в календаре с kind=task', async () => {
+    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } = await import(
+      '../../engines/coach/coach-planner.engine'
+    );
+    const added = addCoachTask(emptyCoachPlanner(), { title: 'Позвонить врачу', date: localIsoDate() });
+    writeCoachPlanner(localStorage, added.store);
+
+    const cal = collectCalendar();
+    const task = cal.items.find(i => i.id === added.task!.id);
+    expect(task).toBeTruthy();
+    expect(task!.kind).toBe('task');
+    expect(task!.title).toBe('Позвонить врачу');
   });
 });

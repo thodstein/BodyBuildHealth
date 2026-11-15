@@ -48,11 +48,20 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_TODAY = "com.healthengine.app.action.WIDGET_CAL_TODAY";
     public static final String ACTION_PICK_DAY = "com.healthengine.app.action.WIDGET_CAL_DAY";
     public static final String ACTION_ADD = "com.healthengine.app.action.WIDGET_CAL_ADD";
+    /** Фильтр типов событий (всё / дела / тренировки / БАДы / фарма). */
+    public static final String ACTION_FILTER = "com.healthengine.app.action.WIDGET_CAL_FILTER";
 
     public static final String EXTRA_WIDGET_ID = "widget_id";
     public static final String EXTRA_MODE = "mode";
     public static final String EXTRA_DIR = "dir";
     public static final String EXTRA_DATE = "date";
+    public static final String EXTRA_FILTER = "filter";
+
+    /** Типы событий агенды: личное дело, тренировка, приём БАД, фарма/инъекция. */
+    public static final String KIND_TASK = "task";
+    public static final String KIND_TRAINING = "training";
+    public static final String KIND_SUPP = "supp";
+    public static final String KIND_PHARMA = "pharma";
 
     public static final String MODE_DAY = "day";
     public static final String MODE_WEEK = "week";
@@ -173,6 +182,11 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                 updateWidget(context, widgetId, null);
                 return;
             }
+            if (ACTION_FILTER.equals(action)) {
+                WidgetStore.setCalendarFilter(context, widgetId, intent.getStringExtra(EXTRA_FILTER));
+                updateWidget(context, widgetId, null);
+                return;
+            }
             if (ACTION_PICK_DAY.equals(action)) {
                 String date = intent.getStringExtra(EXTRA_DATE);
                 if (isIso(date)) {
@@ -221,7 +235,11 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
     public static RemoteViews buildFor(Context context, int widgetId, String forcedMode) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_calendar);
         JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_CALENDAR);
-        List<Task> tasks = readTasks(d);
+        List<Task> allTasks = readTasks(d);
+        // Фильтр по типу события — per-widget, чтобы на одном экземпляре видеть
+        // только тренировки, на другом — только дела.
+        String filter = forcedMode == null ? WidgetStore.getCalendarFilter(context, widgetId) : "all";
+        List<Task> tasks = filterTasks(allTasks, filter);
 
         String today = iso(today());
         String anchor = forcedMode == null ? defaultAnchor(context, widgetId) : today;
@@ -256,6 +274,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         boolean showChrome = forcedMode == null;
         v.setViewVisibility(R.id.w_cal_modes, showChrome ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.w_cal_nav_row, showChrome ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.w_cal_filters, showChrome ? View.VISIBLE : View.GONE);
         if (showChrome) {
             styleModeChip(v, R.id.w_cal_chip_day, MODE_DAY.equals(mode), "День");
             styleModeChip(v, R.id.w_cal_chip_week, MODE_WEEK.equals(mode), "Неделя");
@@ -269,6 +288,18 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             v.setOnClickPendingIntent(R.id.w_cal_nav_prev, navAction(context, widgetId, -1));
             v.setOnClickPendingIntent(R.id.w_cal_nav_next, navAction(context, widgetId, 1));
             v.setOnClickPendingIntent(R.id.w_cal_nav_today, todayAction(context, widgetId));
+
+            // Фильтры: «Всё» и по одному типу события.
+            styleModeChip(v, R.id.w_cal_f_all, "all".equals(filter), "Всё");
+            styleModeChip(v, R.id.w_cal_f_task, KIND_TASK.equals(filter), "Дела");
+            styleModeChip(v, R.id.w_cal_f_train, KIND_TRAINING.equals(filter), "Трени");
+            styleModeChip(v, R.id.w_cal_f_supp, KIND_SUPP.equals(filter), "БАДы");
+            styleModeChip(v, R.id.w_cal_f_pharma, KIND_PHARMA.equals(filter), "Фарма");
+            v.setOnClickPendingIntent(R.id.w_cal_f_all, filterAction(context, widgetId, "all", 0));
+            v.setOnClickPendingIntent(R.id.w_cal_f_task, filterAction(context, widgetId, KIND_TASK, 1));
+            v.setOnClickPendingIntent(R.id.w_cal_f_train, filterAction(context, widgetId, KIND_TRAINING, 2));
+            v.setOnClickPendingIntent(R.id.w_cal_f_supp, filterAction(context, widgetId, KIND_SUPP, 3));
+            v.setOnClickPendingIntent(R.id.w_cal_f_pharma, filterAction(context, widgetId, KIND_PHARMA, 4));
         }
 
         // ---- Сетка месяца ----
@@ -292,18 +323,32 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         } else {
             renderDayRows(v, context, widgetId, anchor, today, tasks, month ? MONTH_AGENDA_ROWS : DAY_ROWS);
             if (tasksOn(tasks, anchor).isEmpty()) {
-                emptyText = month
-                        ? (total > 0 ? "В этом месяце есть задачи — выберите день с точкой" : "В этом месяце задач нет")
-                        : "На этот день задач нет";
+                String prefix = "all".equals(filter) ? "" : ("Фильтр «" + filterLabel(filter) + "»: ");
+                if (month) {
+                    emptyText = prefix + (total > 0
+                            ? "в этом месяце есть события — выберите день с точкой"
+                            : "в этом месяце событий нет");
+                } else {
+                    emptyText = prefix + "на этот день пусто";
+                }
             }
         }
         v.setViewVisibility(R.id.w_cal_empty, emptyText.isEmpty() ? View.GONE : View.VISIBLE);
         if (!emptyText.isEmpty()) v.setTextViewText(R.id.w_cal_empty, emptyText);
 
         // ---- Просрочено ----
+        // Счётчик только по личным делам: тренировки/БАДы/инъекции не «горят»,
+        // как задачи, и не должны накручивать тревожный бейдж.
         int overdue = d.optInt("overdue", 0);
         int computedOverdue = 0;
-        for (Task t : tasks) if (!t.done && t.date.compareTo(today) < 0) computedOverdue++;
+        boolean tasksVisible = "all".equals(filter) || KIND_TASK.equals(filter);
+        if (tasksVisible) {
+            for (Task t : allTasks) {
+                if (KIND_TASK.equals(t.kind) && !t.done && t.date.compareTo(today) < 0) computedOverdue++;
+            }
+        } else {
+            overdue = 0;
+        }
         if (computedOverdue > overdue) overdue = computedOverdue;
         if (overdue > 0) {
             v.setTextViewText(R.id.w_cal_overdue, "⚠ " + overdue);
@@ -350,14 +395,15 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             List<Task> day = tasksOn(tasks, date);
             String label;
             if (day.isEmpty()) {
-                label = c.get(Calendar.DAY_OF_MONTH) + " · нет задач";
+                label = c.get(Calendar.DAY_OF_MONTH) + " · нет событий";
                 v.setTextColor(TITLE_IDS[i], C_MUTED);
             } else {
                 int done = 0;
                 for (Task t : day) if (t.done) done++;
                 Task first = firstUndone(day);
                 label = c.get(Calendar.DAY_OF_MONTH) + " · " + done + "/" + day.size() + " · "
-                        + (first.time.isEmpty() ? first.title : first.time + " " + first.title);
+                        + (first.time.isEmpty() ? "" : first.time + " ")
+                        + kindGlyph(first) + " " + first.title;
                 v.setTextColor(TITLE_IDS[i], date.equals(today) ? C_ACCENT : C_TEXT);
             }
             v.setTextViewText(TITLE_IDS[i], label);
@@ -376,11 +422,15 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             }
             Task t = day.get(i);
             v.setViewVisibility(ROW_IDS[i], View.VISIBLE);
-            v.setTextViewText(CHECK_IDS[i], t.done ? "✓" : "○");
-            v.setTextColor(CHECK_IDS[i], t.done ? C_ACCENT : priorityColor(t.priority));
+            v.setTextViewText(CHECK_IDS[i], kindGlyph(t));
+            v.setTextColor(CHECK_IDS[i], t.done ? C_MUTED : kindColor(t.kind, t.priority));
             v.setTextViewText(TITLE_IDS[i], t.time.isEmpty() ? t.title : (t.time + "  " + t.title));
             v.setTextColor(TITLE_IDS[i], t.done ? C_MUTED : C_TEXT);
-            v.setOnClickPendingIntent(ROW_IDS[i], toggleAction(context, widgetId, t.id, !t.done, i));
+            // Личное дело отмечается на месте; тренировка/БАД/фарма открывают
+            // свой раздел приложения — «сделано» там ставит сам журнал.
+            v.setOnClickPendingIntent(ROW_IDS[i], KIND_TASK.equals(t.kind)
+                    ? toggleAction(context, widgetId, t.id, !t.done, i)
+                    : openKindAction(context, widgetId, t, i));
         }
         // Строки сверх maxRows прячем (в месячном режиме их 2).
         for (int i = maxRows; i < AGENDA_ROWS; i++) {
@@ -409,11 +459,14 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                 Calendar cell = (Calendar) first.clone();
                 cell.set(Calendar.DAY_OF_MONTH, dayNum);
                 String date = iso(cell);
-                int count = tasksOn(tasks, date).size();
+                List<Task> dayTasks = tasksOn(tasks, date);
+                int count = dayTasks.size();
                 v.setTextViewText(cellId, String.valueOf(dayNum) + (count > 0 ? "•" : ""));
                 boolean on = date.equals(anchor) || date.equals(today);
                 v.setInt(cellId, "setBackgroundResource", on ? R.drawable.widget_chip_on : 0);
-                v.setTextColor(cellId, on ? C_ON_ACCENT : (count > 0 ? C_TEXT : C_MUTED));
+                // Цвет дня подсказывает главное событие: фарма > тренировка > БАД > дела.
+                v.setTextColor(cellId, on ? C_ON_ACCENT
+                        : (count > 0 ? kindColor(dominantKind(dayTasks), "none") : C_MUTED));
                 v.setOnClickPendingIntent(cellId, pickDayAction(context, widgetId, date, r * 7 + c));
             }
             v.setViewVisibility(GRID_ROW_IDS[r], used ? View.VISIBLE : View.GONE);
@@ -481,6 +534,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             task.put("time", time == null ? "" : time);
             task.put("done", false);
             task.put("priority", priority == null ? "none" : priority);
+            task.put("kind", KIND_TASK);
             items.put(task);
             d.put("items", items);
             String today = iso(today());
@@ -507,14 +561,17 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         final String time;
         final String priority;
         final boolean done;
+        /** task | training | supp | pharma — тип события агенды. */
+        final String kind;
 
-        Task(String id, String date, String title, String time, String priority, boolean done) {
+        Task(String id, String date, String title, String time, String priority, boolean done, String kind) {
             this.id = id;
             this.date = date;
             this.title = title;
             this.time = time == null ? "" : time;
             this.priority = priority == null ? "none" : priority;
             this.done = done;
+            this.kind = normalizeKind(kind);
         }
     }
 
@@ -533,7 +590,8 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                         t.optString("title", ""),
                         t.optString("time", ""),
                         t.optString("priority", "none"),
-                        t.optBoolean("done", false)));
+                        t.optBoolean("done", false),
+                        t.optString("kind", KIND_TASK)));
             }
         }
         if (out.isEmpty()) {
@@ -550,7 +608,8 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                             t.optString("title", ""),
                             t.optString("time", ""),
                             t.optString("priority", "none"),
-                            t.optBoolean("done", false)));
+                            t.optBoolean("done", false),
+                            t.optString("kind", KIND_TASK)));
                 }
             }
         }
@@ -596,6 +655,76 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         if ("medium".equals(priority)) return C_WARN;
         if ("low".equals(priority)) return 0xFF38BDF8;
         return C_MUTED;
+    }
+
+    // ------------------------------------------------------------------
+    // Типы событий: значок, цвет, переход и фильтр
+    // ------------------------------------------------------------------
+
+    private static String normalizeKind(String kind) {
+        if (KIND_TRAINING.equals(kind) || KIND_SUPP.equals(kind) || KIND_PHARMA.equals(kind)) {
+            return kind;
+        }
+        return KIND_TASK;
+    }
+
+    /** Значок строки: дело — галочка/кружок, остальное — свой символ. */
+    private static String kindGlyph(Task t) {
+        if (KIND_TRAINING.equals(t.kind)) return "🏋";
+        if (KIND_SUPP.equals(t.kind)) return "💊";
+        if (KIND_PHARMA.equals(t.kind)) return "💉";
+        return t.done ? "✓" : "○";
+    }
+
+    private static int kindColor(String kind, String priority) {
+        if (KIND_TRAINING.equals(kind)) return C_ACCENT;
+        if (KIND_SUPP.equals(kind)) return 0xFF60A5FA;
+        if (KIND_PHARMA.equals(kind)) return 0xFFF472B6;
+        return priorityColor(priority);
+    }
+
+    /** Главный тип дня для цвета числа в сетке месяца. */
+    private static String dominantKind(List<Task> day) {
+        boolean training = false;
+        boolean supp = false;
+        for (Task t : day) {
+            if (KIND_PHARMA.equals(t.kind)) return KIND_PHARMA;
+            if (KIND_TRAINING.equals(t.kind)) training = true;
+            else if (KIND_SUPP.equals(t.kind)) supp = true;
+        }
+        if (training) return KIND_TRAINING;
+        if (supp) return KIND_SUPP;
+        return KIND_TASK;
+    }
+
+    private static String kindTarget(String kind) {
+        if (KIND_TRAINING.equals(kind)) return WidgetStore.TARGET_TRAINING;
+        if (KIND_SUPP.equals(kind) || KIND_PHARMA.equals(kind)) return WidgetStore.TARGET_SUPPORT;
+        return WidgetStore.TARGET_CALENDAR;
+    }
+
+    private static int kindSlot(String kind) {
+        if (KIND_TRAINING.equals(kind)) return 0;
+        if (KIND_SUPP.equals(kind)) return 1;
+        if (KIND_PHARMA.equals(kind)) return 2;
+        return 3;
+    }
+
+    private static List<Task> filterTasks(List<Task> tasks, String filter) {
+        if (filter == null || "all".equals(filter)) return tasks;
+        List<Task> out = new ArrayList<>();
+        for (Task t : tasks) {
+            if (filter.equals(t.kind)) out.add(t);
+        }
+        return out;
+    }
+
+    private static String filterLabel(String filter) {
+        if (KIND_TASK.equals(filter)) return "дела";
+        if (KIND_TRAINING.equals(filter)) return "тренировки";
+        if (KIND_SUPP.equals(filter)) return "БАДы";
+        if (KIND_PHARMA.equals(filter)) return "фарма";
+        return "все события";
     }
 
     // ------------------------------------------------------------------
@@ -741,6 +870,21 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         i.putExtra(EXTRA_DATE, date);
         return PendingIntent.getBroadcast(context, requestCode(widgetId, 8, cell), i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    private static PendingIntent filterAction(Context context, int widgetId, String filter, int slot) {
+        Intent i = new Intent(context, CalendarWidgetProvider.class);
+        i.setAction(ACTION_FILTER);
+        i.putExtra(EXTRA_WIDGET_ID, widgetId);
+        i.putExtra(EXTRA_FILTER, filter);
+        return PendingIntent.getBroadcast(context, requestCode(widgetId, 9, slot), i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Тап по событию не-делу: открыть профильный раздел приложения. */
+    private static PendingIntent openKindAction(Context context, int widgetId, Task t, int row) {
+        return TrainingWidgetProvider.openApp(context, kindTarget(t.kind),
+                requestCode(widgetId, 30 + kindSlot(t.kind), row));
     }
 
     static PendingIntent toggleAction(Context context, int widgetId, String taskId,

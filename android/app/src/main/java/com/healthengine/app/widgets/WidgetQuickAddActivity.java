@@ -26,6 +26,9 @@ import java.util.regex.Pattern;
  * WidgetQuickAddActivity — компактный нативный редактор задачи/заметки,
  * который открывается кнопкой «＋» прямо с рабочего стола.
  *
+ * Кроме задач и заметок умеет еду (виджет «Питание») и подход (виджет
+ * «Проведение тренировки»): вес, повторы, RIR/RPE, техника, пауза, заметка.
+ *
  * Почему отдельная Activity, а не поле в виджете: RemoteViews не поддерживает
  * EditText и ввод с клавиатуры. Эта Activity не запускает WebView и не
  * открывает основной интерфейс — только диалог поверх лаунчера. Сохранение
@@ -42,6 +45,15 @@ public class WidgetQuickAddActivity extends Activity {
     public static final String KIND_TASK = "task";
     public static final String KIND_NOTE = "note";
     public static final String KIND_FOOD = "food";
+    /** Подход из виджета «Проведение тренировки»: вес, повторы, RIR/RPE, техника. */
+    public static final String KIND_SET = "set";
+    public static final String ACTION_SET = "com.healthengine.app.action.WIDGET_SET";
+    public static final String EXTRA_EXERCISE = "quick_exercise";
+    public static final String EXTRA_WEIGHT = "quick_weight";
+    public static final String EXTRA_REPS = "quick_reps";
+    public static final String EXTRA_RIR = "quick_rir";
+    public static final String EXTRA_SET_NUM = "quick_set_num";
+    public static final String EXTRA_REST_SEC = "quick_rest_sec";
 
     private static final String[] MEALS = {"Завтрак", "Обед", "Ужин", "Перекус"};
 
@@ -59,6 +71,12 @@ public class WidgetQuickAddActivity extends Activity {
     private String selectedDate = "";
     private String priority = "none";
     private String meal = "Перекус";
+    private String exerciseName = "";
+    private int setNumber = 0;
+    private int restSec = 0;
+    /** Оценка техники 3/4/5 (0 — не указана) и пауза на груди. */
+    private int technique = 0;
+    private boolean pause = false;
 
     private EditText titleEt;
     private EditText timeEt;
@@ -67,6 +85,11 @@ public class WidgetQuickAddActivity extends Activity {
     private EditText proteinEt;
     private EditText fatEt;
     private EditText carbsEt;
+    private EditText weightEt;
+    private EditText repsEt;
+    private EditText rirEt;
+    private EditText rpeEt;
+    private EditText setNoteEt;
     private TextView dateLabel;
     private TextView dateToday;
     private TextView dateTomorrow;
@@ -77,6 +100,10 @@ public class WidgetQuickAddActivity extends Activity {
     private TextView mealLunch;
     private TextView mealDinner;
     private TextView mealSnack;
+    private TextView tech3;
+    private TextView tech4;
+    private TextView tech5;
+    private TextView pauseChip;
     private TextView msg;
 
     @Override
@@ -96,11 +123,18 @@ public class WidgetQuickAddActivity extends Activity {
         String k = intent == null ? null : intent.getStringExtra(EXTRA_KIND);
         if (KIND_NOTE.equals(k)) kind = KIND_NOTE;
         else if (KIND_FOOD.equals(k)) kind = KIND_FOOD;
+        else if (KIND_SET.equals(k)) kind = KIND_SET;
         else kind = KIND_TASK;
         String d = intent == null ? null : intent.getStringExtra(EXTRA_DATE);
         selectedDate = isIso(d) ? d : todayIso();
         String m = intent == null ? null : intent.getStringExtra(EXTRA_MEAL);
         meal = normalizeMeal(m);
+        if (intent != null) {
+            String ex = intent.getStringExtra(EXTRA_EXERCISE);
+            exerciseName = ex == null ? "" : ex.trim();
+            setNumber = Math.max(0, intent.getIntExtra(EXTRA_SET_NUM, 0));
+            restSec = Math.max(0, intent.getIntExtra(EXTRA_REST_SEC, 0));
+        }
 
         titleEt = findViewById(R.id.qa_title);
         timeEt = findViewById(R.id.qa_time);
@@ -120,6 +154,15 @@ public class WidgetQuickAddActivity extends Activity {
         mealDinner = findViewById(R.id.qa_meal_dinner);
         mealSnack = findViewById(R.id.qa_meal_snack);
         msg = findViewById(R.id.qa_msg);
+        weightEt = findViewById(R.id.qa_weight);
+        repsEt = findViewById(R.id.qa_reps);
+        rirEt = findViewById(R.id.qa_rir);
+        rpeEt = findViewById(R.id.qa_rpe);
+        setNoteEt = findViewById(R.id.qa_set_note);
+        tech3 = findViewById(R.id.qa_tech3);
+        tech4 = findViewById(R.id.qa_tech4);
+        tech5 = findViewById(R.id.qa_tech5);
+        pauseChip = findViewById(R.id.qa_pause);
 
         TextView titleLabel = findViewById(R.id.qa_title_label);
         View dateRow = findViewById(R.id.qa_date_row);
@@ -129,6 +172,9 @@ public class WidgetQuickAddActivity extends Activity {
         View foodRow = findViewById(R.id.qa_food_row);
         View mealLabel = findViewById(R.id.qa_meal_label);
         View mealRow = findViewById(R.id.qa_meal_row);
+        View setRow = findViewById(R.id.qa_set_row);
+        View setLabel = findViewById(R.id.qa_set_label);
+        View techRow = findViewById(R.id.qa_tech_row);
 
         if (KIND_NOTE.equals(kind)) {
             titleLabel.setText("Новая заметка");
@@ -149,6 +195,32 @@ public class WidgetQuickAddActivity extends Activity {
             mealLabel.setVisibility(View.VISIBLE);
             mealRow.setVisibility(View.VISIBLE);
             dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
+        } else if (KIND_SET.equals(kind)) {
+            titleLabel.setText(exerciseName.isEmpty() ? "Новый подход" : exerciseName);
+            titleEt.setHint("Упражнение");
+            if (!exerciseName.isEmpty()) titleEt.setText(exerciseName);
+            dateRow.setVisibility(View.GONE);
+            timeView.setVisibility(View.GONE);
+            priorityRow.setVisibility(View.GONE);
+            checklistLabel.setVisibility(View.GONE);
+            checklistEt.setVisibility(View.GONE);
+            setRow.setVisibility(View.VISIBLE);
+            setLabel.setVisibility(View.VISIBLE);
+            techRow.setVisibility(View.VISIBLE);
+            setNoteEt.setVisibility(View.VISIBLE);
+            if (intent != null) {
+                weightEt.setText(safeExtra(intent, EXTRA_WEIGHT));
+                repsEt.setText(safeExtra(intent, EXTRA_REPS));
+                String rirText = safeExtra(intent, EXTRA_RIR);
+                rirEt.setText(rirText);
+                // RPE по умолчанию = 10 − RIR: в проведении тренировки он выводится так же.
+                int rir0 = (int) Math.max(0, Math.min(20, parseDecimal(rirEt)));
+                if (!rirText.isEmpty()) rpeEt.setText(String.valueOf(Math.max(0, 10 - rir0)));
+            }
+            String head = "Подход";
+            if (setNumber > 0) head = head + " #" + setNumber;
+            if (restSec > 0) head = head + " · отдых " + restSec + " с";
+            dateLabel.setText(head + ": вес, повторы, RIR/RPE, техника");
         } else {
             titleLabel.setText("Новая задача");
             titleEt.setHint("Что сделать?");
@@ -166,13 +238,39 @@ public class WidgetQuickAddActivity extends Activity {
         mealLunch.setOnClickListener(v -> selectMeal("Обед"));
         mealDinner.setOnClickListener(v -> selectMeal("Ужин"));
         mealSnack.setOnClickListener(v -> selectMeal("Перекус"));
+        tech3.setOnClickListener(v -> selectTechnique(technique == 3 ? 0 : 3));
+        tech4.setOnClickListener(v -> selectTechnique(technique == 4 ? 0 : 4));
+        tech5.setOnClickListener(v -> selectTechnique(technique == 5 ? 0 : 5));
+        pauseChip.setOnClickListener(v -> {
+            pause = !pause;
+            updateTechniqueUi();
+        });
         findViewById(R.id.qa_cancel).setOnClickListener(v -> finish());
         findViewById(R.id.qa_save).setOnClickListener(v -> save());
 
         updateDateUi();
         updatePriorityUi();
         updateMealUi();
-        titleEt.requestFocus();
+        updateTechniqueUi();
+        if (KIND_SET.equals(kind)) weightEt.requestFocus();
+        else titleEt.requestFocus();
+    }
+
+    private static String safeExtra(Intent intent, String key) {
+        String v = intent.getStringExtra(key);
+        return v == null ? "" : v.trim();
+    }
+
+    private void selectTechnique(int value) {
+        technique = value;
+        updateTechniqueUi();
+    }
+
+    private void updateTechniqueUi() {
+        styleChip(tech3, technique == 3);
+        styleChip(tech4, technique == 4);
+        styleChip(tech5, technique == 5);
+        styleChip(pauseChip, pause);
     }
 
     private void selectMeal(String value) {
@@ -237,7 +335,8 @@ public class WidgetQuickAddActivity extends Activity {
         String title = titleEt.getText() == null ? "" : titleEt.getText().toString().trim();
         if (TextUtils.isEmpty(title)) {
             showError(KIND_NOTE.equals(kind) ? "Введите заголовок заметки"
-                    : (KIND_FOOD.equals(kind) ? "Введите, что съели" : "Введите задачу"));
+                    : (KIND_FOOD.equals(kind) ? "Введите, что съели"
+                    : (KIND_SET.equals(kind) ? "Введите упражнение" : "Введите задачу")));
             return;
         }
         // Лимиты совпадают с движком (140 у задачи, 120 у заметки и еды).
@@ -248,7 +347,9 @@ public class WidgetQuickAddActivity extends Activity {
 
         try {
             boolean ok;
-            if (KIND_FOOD.equals(kind)) {
+            if (KIND_SET.equals(kind)) {
+                ok = saveSet(title, now);
+            } else if (KIND_FOOD.equals(kind)) {
                 ok = saveFood(title, now);
             } else if (KIND_NOTE.equals(kind)) {
                 ok = saveNote(id, title, now);
@@ -262,8 +363,7 @@ public class WidgetQuickAddActivity extends Activity {
     }
 
     /** Еда из виджета «Питание»: запись в очередь `type=food` + оптимистичные круги. */
-    private boolean saveFood(String name, long now) throws Exception {
-        int kcal = parseQty(kcalEt, 5000);
+    private boolean saveFood(String name, long now) throws Exception {        int kcal = parseQty(kcalEt, 5000);
         if (kcal <= 0) {
             showError("Укажите калорийность порции");
             return false;
@@ -285,6 +385,56 @@ public class WidgetQuickAddActivity extends Activity {
         NutritionWidgetProvider.updateAll(this);
         Toast.makeText(this, "Добавлено: " + name, Toast.LENGTH_SHORT).show();
         return true;
+    }
+
+    /**
+     * Подход из виджета «Проведение тренировки»: очередь `set_add` + оптимистичный
+     * прогресс. JS запишет подход в живую сессию (или создаст её из плана дня).
+     */
+    private boolean saveSet(String name, long now) throws Exception {
+        double weight = Math.max(0, Math.min(500, parseDecimal(weightEt)));
+        if (weight <= 0) {
+            showError("Укажите вес снаряда (для собственного веса — вес тела)");
+            return false;
+        }
+        int reps = parseQty(repsEt, 100);
+        if (reps <= 0) {
+            showError("Укажите число повторений");
+            return false;
+        }
+        int rir = parseQty(rirEt, 20);
+        double rpeRaw = parseDecimal(rpeEt);
+        double rpe = rpeRaw > 0 ? Math.min(10, rpeRaw) : Math.max(0, 10 - rir);
+
+        JSONObject item = new JSONObject();
+        item.put("type", "set_add");
+        item.put("exerciseName", name);
+        item.put("weight", weight);
+        item.put("reps", reps);
+        item.put("rpe", rpe);
+        item.put("rir", rir);
+        if (technique > 0) item.put("technique", technique);
+        if (pause) item.put("pause", true);
+        String note = setNoteEt.getText() == null ? "" : setNoteEt.getText().toString().trim();
+        if (!note.isEmpty()) item.put("notes", note);
+        item.put("ts", now);
+        WidgetStore.enqueue(this, item);
+        WorkoutWidgetProvider.optimisticSet(this, name, (int) Math.round(weight), reps);
+        WorkoutWidgetProvider.updateAll(this);
+        String w = weight == Math.floor(weight) ? String.valueOf((int) weight) : String.valueOf(weight);
+        Toast.makeText(this, "Подход: " + w + " кг × " + reps, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    private static double parseDecimal(EditText et) {
+        try {
+            String raw = et == null || et.getText() == null ? "" : et.getText().toString().trim();
+            if (raw.isEmpty()) return 0;
+            double v = Double.parseDouble(raw.replace(',', '.'));
+            return Double.isFinite(v) ? v : 0;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private static int parseQty(EditText et, int max) {

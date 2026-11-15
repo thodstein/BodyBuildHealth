@@ -86,6 +86,19 @@
                 android:resource="@xml/widget_training_info" />
         </receiver>
         <receiver
+            android:name=".widgets.WorkoutWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_workout_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.healthengine.app.action.WIDGET_WORKOUT_START" />
+                <action android:name="com.healthengine.app.action.WIDGET_WORKOUT_FINISH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_workout_info" />
+        </receiver>
+        <receiver
             android:name=".widgets.TimerWidgetProvider"
             android:exported="false"
             android:label="@string/widget_timer_label">
@@ -155,6 +168,7 @@
                 <action android:name="com.healthengine.app.action.WIDGET_CAL_NAV" />
                 <action android:name="com.healthengine.app.action.WIDGET_CAL_TODAY" />
                 <action android:name="com.healthengine.app.action.WIDGET_CAL_DAY" />
+                <action android:name="com.healthengine.app.action.WIDGET_CAL_FILTER" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

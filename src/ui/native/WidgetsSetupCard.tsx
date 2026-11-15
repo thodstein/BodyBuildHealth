@@ -16,6 +16,7 @@ import { getLocale } from '../../data/interactions-labels';
 import { syncAllWidgets } from './widget-sync';
 
 const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
+  { kind: 'workout', icon: 'dumbbell', name: 'Проведение', desc: 'Упражнения назначенной тренировки: подход со всеми параметрами, старт и завершение' },
   { kind: 'training', icon: 'dumbbell', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
   { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
@@ -26,6 +27,7 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
 ];
 
 const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: string }[] = [
+  { kind: 'workout', icon: 'dumbbell', name: 'Workout run', desc: 'Assigned exercises: log a set with all parameters, start and finish from the home screen' },
   { kind: 'training', icon: 'dumbbell', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
   { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
@@ -58,7 +60,7 @@ function strings() {
       reasons: PIN_REASON_EN,
       cardLabel: 'Home screen widgets',
       title: 'Home screen widgets',
-      sub: 'APK only · 7 widgets · work without opening the app',
+      sub: 'APK only · 8 widgets · work without opening the app',
       pin: (name: string) => `Pin the ${name} widget`,
       pinCta: '📌 To home',
       refreshBusy: 'Updating…',
@@ -69,6 +71,9 @@ function strings() {
       refreshTasks: (n: number) => `widget tasks: ${n}`,
       refreshTasksAdded: (n: number) => `new tasks: ${n}`,
       refreshNotesAdded: (n: number) => `new notes: ${n}`,
+      refreshSets: (n: number) => `widget sets: ${n}`,
+      refreshWorkouts: (started: number, finished: number) =>
+        `workouts: start ${started}, finish ${finished}`,
       opacityTitle: 'Widget background opacity',
       opacityHint: 'One setting for every widget — applied immediately, no app restart.',
       opacityApplied: (n: number) => `widget background: ${n}%`,
@@ -80,7 +85,7 @@ function strings() {
           <br />
           2. Choose “Widgets”
           <br />
-          3. Find “Health Engine” (HE · Workout / Timer / Compliance / Nutrition / Water / Calendar / Notes)
+          3. Find “Health Engine” (HE · Workout run / Workout / Timer / Compliance / Nutrition / Water / Calendar / Notes)
           <br />
           4. Drag the widget onto the screen
           <br />
@@ -95,7 +100,7 @@ function strings() {
     reasons: PIN_REASON_RU,
     cardLabel: 'Виджеты рабочего стола',
     title: 'Виджеты на рабочий стол',
-    sub: 'Только APK · 7 виджетов · работают без открытия приложения',
+    sub: 'Только APK · 8 виджетов · работают без открытия приложения',
     pin: (name: string) => `Закрепить виджет ${name}`,
     pinCta: '📌 На стол',
     refreshBusy: 'Обновление…',
@@ -106,6 +111,9 @@ function strings() {
     refreshTasks: (n: number) => `задач с виджета: ${n}`,
     refreshTasksAdded: (n: number) => `новых задач: ${n}`,
     refreshNotesAdded: (n: number) => `новых заметок: ${n}`,
+    refreshSets: (n: number) => `подходов с виджета: ${n}`,
+    refreshWorkouts: (started: number, finished: number) =>
+      `тренировок: начато ${started}, завершено ${finished}`,
     opacityTitle: 'Прозрачность фона виджетов',
     opacityHint: 'Одна настройка на все виджеты — применяется сразу, без перезапуска.',
     opacityApplied: (n: number) => `фон виджетов: ${n}%`,
@@ -117,7 +125,7 @@ function strings() {
         <br />
         2. Выберите «Виджеты»
         <br />
-        3. Найдите «Health Engine» (HE · Тренировка / Таймер / Комплаенс / Питание / Вода / Календарь / Заметки)
+        3. Найдите «Health Engine» (HE · Проведение / Тренировка / Таймер / Комплаенс / Питание / Вода / Календарь / Заметки)
         <br />
         4. Перетащите виджет на стол
         <br />
@@ -187,6 +195,10 @@ export const WidgetsSetupCard: React.FC = () => {
       if (r.tasksToggled > 0) parts.push(T.refreshTasks(r.tasksToggled));
       if (r.tasksAdded > 0) parts.push(T.refreshTasksAdded(r.tasksAdded));
       if (r.notesAdded > 0) parts.push(T.refreshNotesAdded(r.notesAdded));
+      if (r.setsAdded > 0) parts.push(T.refreshSets(r.setsAdded));
+      if (r.workoutsStarted > 0 || r.workoutsFinished > 0) {
+        parts.push(T.refreshWorkouts(r.workoutsStarted, r.workoutsFinished));
+      }
       setMsg(parts.join(' · '));
     } catch {
       setMsg(T.refreshFail);

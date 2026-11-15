@@ -13,6 +13,14 @@ import {
   getISOWeekNumber,
   loadActiveSession,
   summarizeActiveSession,
+  loadSessions,
+  startSession,
+  addExerciseToSession,
+  logSet,
+  saveActiveSession,
+  finishSession,
+  clearActiveSession,
+  type WorkoutSession,
 } from '../../engines/workout-logger.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
@@ -28,8 +36,11 @@ import {
   syncNutritionWidget,
   syncCalendarWidget,
   syncNotesWidget,
+  syncWorkoutWidget,
   drainWidgetQueue,
   type QueuedItem,
+  type WorkoutWidgetExercise,
+  type WorkoutWidgetSnapshot,
 } from '../../core/widget-bridge';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
 import {
@@ -96,7 +107,12 @@ export interface WidgetSyncResult {
   tasksAdded: number;
   /** Новые заметки, добавленные из быстрого редактора виджета. */
   notesAdded: number;
+  /** Подходы, записанные с виджета «Проведение тренировки». */
+  setsAdded: number;
+  workoutsStarted: number;
+  workoutsFinished: number;
   trainingOk: boolean;
+  workoutOk: boolean;
   complianceOk: boolean;
   nutritionOk: boolean;
   calendarOk: boolean;
@@ -272,15 +288,183 @@ function collectNutrition(): {
  * Календарь для виджета: задачи «сегодня» + просрочено. Как агенда TickTick:
  * чужие дневники не трогает, задачи берёт из того же хранилища, что и вкладка
  * «Планер» (he_coach_planner).
+ *
+ * Кроме личных дел календарь подхватывает график тренировок (план `he_pl_runtime`
+ * + расписание из профиля), приём БАД (`he_support_plan_result` + дневник
+ * `he_support_diary`) и фарму/инъекции (`he_injection_schedule` + `he_injection_diary`).
+ * Нативный виджет фильтрует события по типу (чипы «Всё / Дела / Трени / БАДы / Фарма»).
  */
-function collectCalendar(): {
+export type CalendarEventKind = 'task' | 'training' | 'supp' | 'pharma';
+
+export interface CalendarEventItem {
+  id: string;
+  date: string;
+  title: string;
+  time: string;
+  done: boolean;
+  priority: string;
+  kind: CalendarEventKind;
+}
+
+function readJsonArray(key: string): any[] {
+  try {
+    const raw = localStorageRef()?.getItem(key);
+    const v = raw ? JSON.parse(raw) : [];
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Подпись дня плана для конкретной даты (или общая «Тренировка»). */
+function planLabelForDate(
+  days: any[],
+  training: any,
+  isoDate: string,
+): { label: string; exerciseCount: number; plannedSets: number } | null {
+  if (!days.length) return { label: 'Тренировка', exerciseCount: 0, plannedSets: 0 };
+  const index = pickPlanDayIndex(isoDate, training, days.length);
+  const day = days[index % days.length];
+  if (!day) return null;
+  const exercises = Array.isArray(day.exercises) ? day.exercises : [];
+  const plannedSets = exercises.reduce(
+    (sum: number, e: any) => sum + (Array.isArray(e?.targetSets) ? e.targetSets.length : 0),
+    0,
+  );
+  return {
+    label: String(day.label || 'Тренировка').slice(0, 40),
+    exerciseCount: exercises.length,
+    plannedSets,
+  };
+}
+
+/** Тренировки по графику: какие дни назначены и что в них делать. */
+function trainingCalendarItems(
+  from: string,
+  to: string,
+  playedDates: Set<string>,
+): CalendarEventItem[] {
+  const out: CalendarEventItem[] = [];
+  const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
+  const weekly = trainingWeekdays(training);
+  if (!weekly.some(Boolean)) return out;
+  const days = safe(() => {
+    const runtime = JSON.parse(localStorageRef()?.getItem('he_pl_runtime') ?? 'null');
+    return Array.isArray(runtime?.days) ? runtime.days.filter((d: any) => Array.isArray(d?.exercises)) : [];
+  }, [] as any[]);
+  const startTime =
+    training?.schedule?.enabled && typeof training.schedule.startTime === 'string'
+      ? String(training.schedule.startTime).slice(0, 5)
+      : '';
+
+  let iso = from;
+  for (let guard = 0; guard < 400 && iso <= to; guard++) {
+    if (weekly[mondayIndex(iso)]) {
+      const plan = planLabelForDate(days, training, iso);
+      if (plan) {
+        const parts = [plan.label];
+        if (plan.exerciseCount > 0) parts.push(`${plan.exerciseCount} упр.`);
+        if (plan.plannedSets > 0) parts.push(`${plan.plannedSets} подх.`);
+        out.push({
+          id: `tr:${iso}`,
+          date: iso,
+          kind: 'training',
+          title: parts.join(' · ').slice(0, 120),
+          time: startTime,
+          done: playedDates.has(iso),
+          priority: 'none',
+        });
+      }
+    }
+    iso = addDaysIso(iso, 1);
+  }
+  return out;
+}
+
+/** Приём БАД: план из профиля + фактический дневник за прошлые дни. */
+function supplementCalendarItems(today: string): CalendarEventItem[] {
+  const plan = safe(() => {
+    const v = JSON.parse(localStorageRef()?.getItem('he_support_plan_result') ?? '[]');
+    return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : [];
+  }, [] as string[]);
+  if (!plan.length) return [];
+  const diary = readJsonArray('he_support_diary');
+  const byDate = new Map<string, { taken: number; total: number }>();
+  for (const entry of diary) {
+    const date = String(entry?.date ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const subs = entry?.substances && typeof entry.substances === 'object' ? entry.substances : {};
+    const keys = Object.keys(subs);
+    const taken = keys.filter(k => subs[k]?.taken).length;
+    byDate.set(date, { taken, total: keys.length });
+  }
+  const out: CalendarEventItem[] = [];
+  // Прошлое — чтобы видеть пропуски; вперёд — только неделя, иначе виджет
+  // утонет в ежедневных строках «БАДы».
+  for (let offset = -30; offset <= 7; offset++) {
+    const date = addDaysIso(today, offset);
+    const rec = byDate.get(date);
+    const total = Math.max(plan.length, rec?.total ?? 0);
+    const taken = rec?.taken ?? 0;
+    const title =
+      taken > 0
+        ? `БАДы · принято ${taken}/${total}`
+        : `БАДы · ${plan.length} шт по плану`;
+    out.push({
+      id: `supp:${date}`,
+      date,
+      kind: 'supp',
+      title: title.slice(0, 120),
+      time: '',
+      done: !!rec && rec.total > 0 && taken >= rec.total,
+      priority: 'none',
+    });
+  }
+  return out;
+}
+
+/** Фарма: инъекции по недельному расписанию + отметки из дневника инъекций. */
+function pharmaCalendarItems(from: string, to: string): CalendarEventItem[] {
+  const schedule = readJsonArray('he_injection_schedule');
+  if (!schedule.length) return [];
+  const diary = readJsonArray('he_injection_diary');
+  const doneKeys = new Set(
+    diary.map(e => `${String(e?.date ?? '').slice(0, 10)}|${String(e?.substance ?? '')}`),
+  );
+  const out: CalendarEventItem[] = [];
+  for (const item of schedule) {
+    if (!item || item.active === false) continue;
+    const days = Array.isArray(item.daysOfWeek) ? item.daysOfWeek.map(Number) : [];
+    if (!days.length) continue;
+    const substance = String(item.substance ?? 'Инъекция').slice(0, 60);
+    const dose = String(item.dose ?? '').slice(0, 20);
+    let iso = from;
+    for (let guard = 0; guard < 400 && iso <= to; guard++) {
+      if (days.includes(mondayIndex(iso))) {
+        out.push({
+          id: `inj:${String(item.id ?? substance)}:${iso}`,
+          date: iso,
+          kind: 'pharma',
+          title: `Инъекция · ${substance}${dose ? ` ${dose}` : ''}`.slice(0, 120),
+          time: '',
+          done: doneKeys.has(`${iso}|${substance}`),
+          priority: 'high',
+        });
+      }
+      iso = addDaysIso(iso, 1);
+    }
+  }
+  return out;
+}
+
+export function collectCalendar(): {
   date: string;
   dateLabel: string;
-  tasks: { id: string; title: string; time: string; done: boolean; priority: string }[];
+  tasks: { id: string; title: string; time: string; done: boolean; priority: string; kind: string }[];
   total: number;
   done: number;
   overdue: number;
-  items: { id: string; date: string; title: string; time: string; done: boolean; priority: string }[];
+  items: CalendarEventItem[];
 } {
   const today = todayLocalISO();
   let dateLabel = today;
@@ -300,6 +484,46 @@ function collectCalendar(): {
   // сегодняшнего дня, чтобы листать календарь без WebView. Кап — 800 строк,
   // SharedPreferences не резиновые.
   const rangeTasks = safe(() => tasksInRange(store, addDaysIso(today, -90), addDaysIso(today, 365)), []);
+  const playedDates = safe(
+    () => new Set(loadSessions().map(s => String(s.date ?? ''))),
+    new Set<string>(),
+  );
+
+  const merged: CalendarEventItem[] = [];
+  for (const t of rangeTasks.slice(0, 560)) {
+    merged.push({
+      id: t.id,
+      date: t.date,
+      title: String(t.title).slice(0, 120),
+      time: t.time ?? '',
+      done: !!t.done,
+      priority: coachTaskPriority(t),
+      kind: 'task',
+    });
+  }
+  try {
+    merged.push(...trainingCalendarItems(addDaysIso(today, -90), addDaysIso(today, 365), playedDates));
+  } catch {
+    /* график тренировок — дополнительный слой */
+  }
+  try {
+    merged.push(...supplementCalendarItems(today));
+  } catch {
+    /* БАДы — дополнительный слой */
+  }
+  try {
+    merged.push(...pharmaCalendarItems(addDaysIso(today, -90), addDaysIso(today, 365)));
+  } catch {
+    /* фарма — дополнительный слой */
+  }
+  merged.sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    const at = a.time || '99:99';
+    const bt = b.time || '99:99';
+    if (at !== bt) return at < bt ? -1 : 1;
+    return a.title.localeCompare(b.title, 'ru');
+  });
+
   return {
     date: today,
     dateLabel,
@@ -309,18 +533,12 @@ function collectCalendar(): {
       time: t.time ?? '',
       done: !!t.done,
       priority: coachTaskPriority(t),
+      kind: 'task',
     })),
     total: dayTasks.length,
     done: dayTasks.filter(t => t.done).length,
     overdue,
-    items: rangeTasks.slice(0, 800).map(t => ({
-      id: t.id,
-      date: t.date,
-      title: String(t.title).slice(0, 120),
-      time: t.time ?? '',
-      done: !!t.done,
-      priority: coachTaskPriority(t),
-    })),
+    items: merged.slice(0, 900),
   };
 }
 
@@ -352,6 +570,296 @@ function localStorageRef(): Storage | null {
     return typeof localStorage !== 'undefined' ? localStorage : null;
   } catch {
     return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// План тренировки дня (виджет «Проведение»)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Один подход плана: вес/повторы/RIR из `targetSets` движка PL. */
+interface PlanSetTarget {
+  weight: number;
+  reps: number;
+  rir: number;
+}
+
+interface PlanExercise {
+  name: string;
+  muscleGroup: string;
+  /** Дыхание: пустой массив — «по самочувствию». */
+  sets: PlanSetTarget[];
+  restSec: number;
+}
+
+/**
+ * Разрешённый план дня: что делать сегодня.
+ *
+ * `he_pl_runtime` не хранит дат — только массив дней. День выбирается по
+ * графику тренировок профиля (какой по счёту тренировочный день недели),
+ * а если графика нет — ротацией по числу сессий на этой неделе.
+ */
+export interface ResolvedWorkoutPlan {
+  dayIndex: number;
+  label: string;
+  focus: string;
+  week: number;
+  exercises: PlanExercise[];
+  plannedSets: number;
+}
+
+const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/** Индекс дня недели 0=Пн..6=Вс для локальной даты YYYY-MM-DD. */
+function mondayIndex(iso: string): number {
+  try {
+    const [y, m, d] = iso.split('-').map(Number);
+    if (!y || !m || !d) return 0;
+    return (new Date(y, m - 1, d).getDay() + 6) % 7;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Тренировочные дни недели (Пн..Вс) — из профиля, если график включён,
+ * иначе раскладка `daysPerWeek` по общепринятому шаблону.
+ */
+export function trainingWeekdays(training: any): boolean[] {
+  const sched = training?.schedule;
+  const fromList = (list: number[]) => WEEKDAY_LABELS.map((_, i) => list.includes(i));
+
+  if (sched && sched.enabled) {
+    if (
+      sched.scheduleType === 'weekly' &&
+      Array.isArray(sched.weeklyDays) &&
+      sched.weeklyDays.length === 7
+    ) {
+      return sched.weeklyDays.map((v: any) => v === true);
+    }
+    if (sched.scheduleType === 'eod') return fromList([0, 2, 4, 6]);
+  }
+
+  const perWeek = Math.max(1, Math.min(7, Number(training?.daysPerWeek) || 3));
+  const pattern: Record<number, number[]> = {
+    1: [2],
+    2: [0, 3],
+    3: [0, 2, 4],
+    4: [0, 1, 3, 4],
+    5: [0, 1, 2, 3, 4],
+    6: [0, 1, 2, 3, 4, 5],
+    7: [0, 1, 2, 3, 4, 5, 6],
+  };
+  return fromList(pattern[perWeek] || pattern[3]);
+}
+
+/** Цикл «работа/отдых» (scheduleType='pattern'): сегодня тренировочный? */
+function patternTrainingToday(sched: any, iso: string): boolean {
+  const work = Math.max(1, Math.min(14, Number(sched?.pattern?.work) || 2));
+  const off = Math.max(0, Math.min(14, Number(sched?.pattern?.off) || 1));
+  if (off === 0) return true;
+  try {
+    const [y, m, d] = iso.split('-').map(Number);
+    const epoch = Date.UTC(2024, 0, 1);
+    const dayMs = Date.UTC(y, m - 1, d) - epoch;
+    const pos = ((Math.floor(dayMs / 86400000) % (work + off)) + (work + off)) % (work + off);
+    return pos < work;
+  } catch {
+    return true;
+  }
+}
+
+function rotationPlanIndex(planDays: number, iso: string): number {
+  const done = safe(() => getSessionsByWeek(getISOWeekNumber(iso)).length, 0);
+  return planDays > 0 ? done % planDays : 0;
+}
+
+function pickPlanDayIndex(iso: string, training: any, planDays: number): number {
+  if (planDays <= 0) return 0;
+  const sched = training?.schedule;
+  if (sched?.enabled && sched.scheduleType === 'pattern') {
+    return rotationPlanIndex(planDays, iso);
+  }
+  const weekly = trainingWeekdays(training);
+  const positions = weekly.map((v, i) => (v ? i : -1)).filter(i => i >= 0);
+  if (positions.length === 0) return rotationPlanIndex(planDays, iso);
+  const dow = mondayIndex(iso);
+  const exact = positions.indexOf(dow);
+  if (exact >= 0) return exact % planDays;
+  // Сегодня отдых — показываем ближайшую тренировку вперёд (по кругу).
+  const next = positions.find(p => p > dow) ?? positions[0];
+  return positions.indexOf(next) % planDays;
+}
+
+/** Строка плана для одного упражнения: «4×8 · 80 кг · RIR 2». */
+export function formatPlanLine(ex: PlanExercise): string {
+  if (!ex.sets.length) return 'по самочувствию';
+  const reps = [...new Set(ex.sets.map(s => s.reps))].filter(r => r > 0);
+  const weights = [...new Set(ex.sets.map(s => s.weight))].filter(w => w > 0);
+  const rirs = [...new Set(ex.sets.map(s => s.rir))];
+  const parts = [`${ex.sets.length}×${reps.length ? reps.join('/') : '—'}`];
+  if (weights.length === 1) parts.push(`${weights[0]} кг`);
+  else if (weights.length > 1) parts.push(`${Math.min(...weights)}–${Math.max(...weights)} кг`);
+  if (rirs.length === 1) parts.push(`RIR ${rirs[0]}`);
+  return parts.join(' · ');
+}
+
+function planExerciseFromRuntime(raw: any): PlanExercise {
+  const sets = Array.isArray(raw?.targetSets) ? raw.targetSets : [];
+  return {
+    name: String(raw?.name ?? raw?.exerciseName ?? 'Упражнение').slice(0, 60),
+    muscleGroup: String(raw?.muscleGroup ?? raw?.pattern ?? ''),
+    sets: sets.slice(0, 12).map((s: any) => {
+      const rirRaw = Number(s?.rir);
+      return {
+        weight: Math.max(0, Number(s?.weight) || 0),
+        reps: Math.max(0, Math.min(100, Math.round(Number(s?.reps) || 0))),
+        rir: Number.isFinite(rirRaw) ? Math.max(0, Math.min(20, Math.round(rirRaw))) : 2,
+      };
+    }),
+    restSec:
+      Math.max(0, Math.min(600, Math.round(Number(raw?.restSec ?? raw?.rest) || 0))) || 90,
+  };
+}
+
+/** Прочитать `he_pl_runtime` и разрешить план на дату. */
+export function resolveWorkoutPlan(dateIso = todayLocalISO()): ResolvedWorkoutPlan | null {
+  const runtime = safe<{ days?: any[]; focus?: string; week?: number } | null>(
+    () => JSON.parse(localStorageRef()?.getItem('he_pl_runtime') ?? 'null'),
+    null,
+  );
+  const days = Array.isArray(runtime?.days)
+    ? runtime!.days.filter((d: any) => Array.isArray(d?.exercises) && d.exercises.length > 0)
+    : [];
+  if (!days.length) return null;
+
+  const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
+  const dayIndex = pickPlanDayIndex(dateIso, training, days.length);
+  const day = days[dayIndex % days.length];
+  const exercises: PlanExercise[] = (day.exercises as any[])
+    .slice(0, 12)
+    .map(planExerciseFromRuntime);
+  return {
+    dayIndex,
+    label: String(day.label || runtime?.focus || 'Тренировка').slice(0, 60),
+    focus: String(runtime?.focus || day.label || 'Тренировка'),
+    week: Math.max(1, Math.round(Number(runtime?.week) || 1)),
+    exercises,
+    plannedSets: exercises.reduce((s, e) => s + e.sets.length, 0),
+  };
+}
+
+function planExerciseToSessionExercise(ex: PlanExercise) {
+  return {
+    id: ex.name,
+    name: ex.name,
+    pattern: ex.muscleGroup,
+    muscleGroup: ex.muscleGroup,
+  };
+}
+
+/** Живая сессия из плана: все упражнения дня уже внутри (подходов ещё нет). */
+function sessionFromPlan(plan: ResolvedWorkoutPlan | null): WorkoutSession {
+  const today = todayLocalISO();
+  let session = startSession(plan?.label || 'Тренировка', plan?.week || getISOWeekNumber(today));
+  for (const ex of plan?.exercises ?? []) {
+    session = addExerciseToSession(session, planExerciseToSessionExercise(ex));
+  }
+  return session;
+}
+
+/** Дополнить сессию упражнениями плана, которых в ней ещё нет. */
+function ensurePlanExercises(session: WorkoutSession, plan: ResolvedWorkoutPlan | null): WorkoutSession {
+  if (!plan) return session;
+  let next = session;
+  for (const ex of plan.exercises) {
+    if (!next.exercises.some(e => e.exerciseName === ex.name)) {
+      next = addExerciseToSession(next, planExerciseToSessionExercise(ex));
+    }
+  }
+  return next;
+}
+
+/**
+ * Снапшот виджета «Проведение тренировки»: упражнения назначенной сессии.
+ * Приоритет — живая сессия; иначе план дня с нулевым прогрессом.
+ */
+export function collectWorkout(): WorkoutWidgetSnapshot {
+  const today = todayLocalISO();
+  const plan = safe(() => resolveWorkoutPlan(today), null);
+  const active = safe(() => loadActiveSession(), null);
+  const exercises: WorkoutWidgetExercise[] = [];
+  const seen = new Set<string>();
+
+  const pushExercise = (planEx: PlanExercise | null, sessionEx: WorkoutSession['exercises'][number] | null) => {
+    const name = String(planEx?.name ?? sessionEx?.exerciseName ?? 'Упражнение').slice(0, 60);
+    if (seen.has(name)) return;
+    seen.add(name);
+    const sets = sessionEx?.sets ?? [];
+    const last = sets.length ? sets[sets.length - 1] : null;
+    const firstTarget = planEx?.sets[0] ?? null;
+    exercises.push({
+      name,
+      plan: planEx ? formatPlanLine(planEx) : 'вне плана',
+      done: sets.length,
+      planned: planEx?.sets.length ?? sets.length,
+      weight: Math.max(0, Math.round(Number(last?.weightKg ?? firstTarget?.weight ?? 0))),
+      reps: Math.max(0, Math.round(Number(last?.reps ?? firstTarget?.reps ?? 0))),
+      rir: Math.max(0, Math.round(Number(last?.rir ?? firstTarget?.rir ?? 0))),
+      restSec: planEx?.restSec ?? 90,
+    });
+  };
+
+  for (const planEx of plan?.exercises ?? []) {
+    const sessionEx = active?.exercises.find(e => e.exerciseName === planEx.name) ?? null;
+    pushExercise(planEx, sessionEx);
+  }
+  for (const sessionEx of active?.exercises ?? []) {
+    pushExercise(null, sessionEx);
+  }
+
+  const setsDone = Math.max(0, Number(active?.totalSets) || 0);
+  const setsPlanned = Math.max(
+    plan?.plannedSets ?? 0,
+    Number(active?.plannedSetsTotal) || 0,
+    setsDone,
+  );
+  const volumeKg = Math.max(0, Math.round(Number(active?.totalVolume) || 0));
+  const progress = setsPlanned > 0
+    ? Math.max(0, Math.min(100, Math.round((setsDone / setsPlanned) * 100)))
+    : setsDone > 0
+      ? 100
+      : 0;
+
+  const live = !!active;
+  const titleBase = plan?.label || active?.focus || 'Тренировка';
+  const title = live ? `● ${titleBase}` : titleBase;
+  const subtitle = !plan && !active
+    ? 'План не найден — откройте Тренировку'
+    : live
+      ? `${setsDone}/${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)} · ${volumeKg} кг`
+      : `${exercises.length} упр. · ${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)}`;
+
+  return {
+    title,
+    subtitle,
+    live,
+    startedAt: active?.startTime ?? '',
+    setsDone,
+    setsPlanned,
+    volumeKg,
+    progress,
+    dayIndex: plan?.dayIndex ?? 0,
+    exercises: exercises.slice(0, 6),
+  };
+}
+
+/** Только виджет «Проведение» — обновить после записи подхода (APK). */
+export async function pushWorkoutWidget(): Promise<boolean> {
+  try {
+    return await syncWorkoutWidget(collectWorkout());
+  } catch {
+    return false;
   }
 }
 
@@ -387,12 +895,19 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   tasks: number;
   tasksAdded: number;
   notesAdded: number;
+  /** Подходы, записанные из виджета «Проведение». */
+  setsAdded: number;
+  workoutsStarted: number;
+  workoutsFinished: number;
 } {
   let waterMl = 0;
   let foods = 0;
   let tasks = 0;
   let tasksAdded = 0;
   let notesAdded = 0;
+  let setsAdded = 0;
+  let workoutsStarted = 0;
+  let workoutsFinished = 0;
   // Сначала создаём быстрые задачи/заметки, потом применяем остальное:
   // иначе отметка «сделано» у только что добавленной с виджета задачи
   // пришла бы раньше создания и потерялась бы.
@@ -475,12 +990,75 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           writeCoachNotes(storage, res.store);
           notesAdded += 1;
         }
+      } else if (it.type === 'workout_start') {
+        const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
+        const current = loadActiveSession();
+        if (!current) {
+          if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets)) workoutsStarted += 1;
+        } else {
+          // Сессия уже идёт: ничего не начинаем, только дополняем планом дня.
+          saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets);
+        }
+      } else if (it.type === 'workout_finish') {
+        const active = loadActiveSession();
+        if (active) {
+          finishSession(active);
+          clearActiveSession();
+          workoutsFinished += 1;
+        }
+      } else if (it.type === 'set_add' && it.exerciseName) {
+        const name = String(it.exerciseName).slice(0, 60);
+        const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
+        const base = loadActiveSession();
+        let session = base ? ensurePlanExercises(base, plan) : sessionFromPlan(plan);
+        const index = session.exercises.findIndex(e => e.exerciseName === name);
+        if (index >= 0) {
+          const weight = Math.max(0, Math.min(500, Number(it.weight) || 0));
+          const reps = Math.max(0, Math.min(100, Math.round(Number(it.reps) || 0)));
+          const rir = Math.max(0, Math.min(20, Math.round(Number(it.rir) || 0)));
+          const rpeRaw = Number(it.rpe);
+          const rpe =
+            Number.isFinite(rpeRaw) && rpeRaw > 0
+              ? Math.max(0, Math.min(10, Math.round(rpeRaw * 10) / 10))
+              : Math.max(0, 10 - rir);
+          const techniqueRaw = Number(it.technique);
+          const techniqueScore =
+            Number.isFinite(techniqueRaw) && techniqueRaw >= 3 && techniqueRaw <= 5
+              ? Math.round(techniqueRaw)
+              : undefined;
+          const res = logSet(session, index, {
+            setNumber: (session.exercises[index].sets.length || 0) + 1,
+            weightKg: weight,
+            reps,
+            rpe,
+            rir,
+            notes: String(it.notes ?? '').slice(0, 200),
+            techniqueScore,
+            pause: it.pause === true,
+            plannedWeight: Number(it.weight) || undefined,
+          });
+          if (res.success) {
+            saveActiveSession(res.session, plan?.plannedSets);
+            setsAdded += 1;
+            // Первый подход с рабочего стола сам запускает сессию.
+            if (!base) workoutsStarted += 1;
+          }
+        }
       }
     } catch {
       /* один битый элемент не роняет остальные */
     }
   }
-  return { waterMl, foods, tasks, tasksAdded, notesAdded };
+  return {
+    waterMl,
+    foods,
+    tasks,
+    tasksAdded,
+    notesAdded,
+    setsAdded,
+    workoutsStarted,
+    workoutsFinished,
+  };
 }
 
 /** Только виджет тренировки — живой прогресс во время проведения (APK). */
@@ -502,6 +1080,9 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   let tasksToggled = 0;
   let tasksAdded = 0;
   let notesAdded = 0;
+  let setsAdded = 0;
+  let workoutsStarted = 0;
+  let workoutsFinished = 0;
   try {
     const items = await drainWidgetQueue();
     if (items.length > 0) {
@@ -511,17 +1092,22 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       tasksToggled = applied.tasks;
       tasksAdded = applied.tasksAdded;
       notesAdded = applied.notesAdded;
+      setsAdded = applied.setsAdded;
+      workoutsStarted = applied.workoutsStarted;
+      workoutsFinished = applied.workoutsFinished;
     }
   } catch {
     /* очередь недоступна */
   }
   const t = collectTraining();
+  const wo = collectWorkout();
   const c = collectCompliance();
   const n = collectNutrition();
   const cal = collectCalendar();
   const nt = collectNotes();
-  const [trainingOk, complianceOk, nutritionOk, calendarOk, notesOk] = await Promise.all([
+  const [trainingOk, workoutOk, complianceOk, nutritionOk, calendarOk, notesOk] = await Promise.all([
     syncTrainingWidget(t).catch(() => false),
+    syncWorkoutWidget(wo).catch(() => false),
     syncComplianceWidget(c).catch(() => false),
     syncNutritionWidget({
       kcal: n.kcal,
@@ -544,7 +1130,11 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     tasksToggled,
     tasksAdded,
     notesAdded,
+    setsAdded,
+    workoutsStarted,
+    workoutsFinished,
     trainingOk,
+    workoutOk,
     complianceOk,
     nutritionOk,
     calendarOk,

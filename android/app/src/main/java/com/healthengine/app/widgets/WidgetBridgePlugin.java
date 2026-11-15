@@ -36,6 +36,9 @@ public class WidgetBridgePlugin extends Plugin {
             TrainingWidgetProvider.updateAll(ctx);
         } catch (Exception ignored) {}
         try {
+            WorkoutWidgetProvider.updateAll(ctx);
+        } catch (Exception ignored) {}
+        try {
             ComplianceWidgetProvider.updateAll(ctx);
         } catch (Exception ignored) {}
         try {
@@ -202,6 +205,33 @@ public class WidgetBridgePlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("syncNotes failed");
+        }
+    }
+
+    @PluginMethod
+    public void syncWorkout(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            JSONObject obj = new JSONObject();
+            obj.put("title", call.getString("title", ""));
+            obj.put("subtitle", call.getString("subtitle", ""));
+            obj.put("live", call.getBoolean("live", false));
+            obj.put("startedAt", call.getString("startedAt", ""));
+            obj.put("setsDone", Math.max(0, call.getInt("setsDone", 0)));
+            obj.put("setsPlanned", Math.max(0, call.getInt("setsPlanned", 0)));
+            obj.put("volumeKg", Math.max(0, call.getInt("volumeKg", 0)));
+            obj.put("progress", Math.max(0, Math.min(100, call.getInt("progress", 0))));
+            obj.put("dayIndex", Math.max(0, call.getInt("dayIndex", 0)));
+            JSArray list = call.getArray("exercises");
+            obj.put("exercises", list == null ? new JSONArray() : list);
+            obj.put("updatedAt", System.currentTimeMillis());
+            WidgetStore.putJson(ctx, WidgetStore.KEY_WORKOUT, obj);
+            WorkoutWidgetProvider.updateAll(ctx);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("syncWorkout failed");
         }
     }
 
@@ -479,6 +509,7 @@ public class WidgetBridgePlugin extends Plugin {
 
     private Class<?> providerFor(String kind) {
         if ("training".equals(kind)) return TrainingWidgetProvider.class;
+        if ("workout".equals(kind)) return WorkoutWidgetProvider.class;
         if ("timer".equals(kind)) return TimerWidgetProvider.class;
         if ("compliance".equals(kind)) return ComplianceWidgetProvider.class;
         if ("nutrition".equals(kind)) return NutritionWidgetProvider.class;
@@ -490,6 +521,7 @@ public class WidgetBridgePlugin extends Plugin {
 
     private String kindToTarget(String kind) {
         if ("training".equals(kind) || "timer".equals(kind)) return WidgetStore.TARGET_TRAINING;
+        if ("workout".equals(kind)) return WidgetStore.TARGET_TRAINING_RUN;
         if ("nutrition".equals(kind)) return WidgetStore.TARGET_NUTRITION;
         if ("water".equals(kind)) return WidgetStore.TARGET_NUTRITION;
         if ("compliance".equals(kind)) return WidgetStore.TARGET_SUPPORT;

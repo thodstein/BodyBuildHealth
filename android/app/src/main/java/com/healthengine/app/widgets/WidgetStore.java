@@ -22,6 +22,8 @@ public final class WidgetStore {
     public static final String KEY_NUTRITION = "nutrition_json";
     public static final String KEY_CALENDAR = "calendar_json";
     public static final String KEY_NOTES = "notes_json";
+    /** Снапшот «проведения тренировки»: упражнения дня и прогресс. */
+    public static final String KEY_WORKOUT = "workout_json";
     public static final String KEY_QUEUE = "nutrition_queue";
     public static final String KEY_TIMER = "timer_json";
     public static final String KEY_LAUNCH_TARGET = "launch_target";
@@ -31,6 +33,8 @@ public final class WidgetStore {
     /** Per-widget состояние календаря: режим день/неделя/месяц и опорная дата. */
     public static final String KEY_CAL_MODE_PREFIX = "calendar_mode_";
     public static final String KEY_CAL_ANCHOR_PREFIX = "calendar_anchor_";
+    /** Per-widget фильтр типов событий: all / task / training / supp / pharma. */
+    public static final String KEY_CAL_FILTER_PREFIX = "calendar_filter_";
 
     /** Intent action: открыть приложение из виджета. */
     public static final String ACTION_OPEN = "com.healthengine.app.action.WIDGET_OPEN";
@@ -138,10 +142,28 @@ public final class WidgetStore {
         prefs(ctx).edit().putString(KEY_CAL_ANCHOR_PREFIX + widgetId, isoDate).apply();
     }
 
+    /** Фильтр событий календаря: all показывает всё, остальное — один тип. */
+    public static String getCalendarFilter(Context ctx, int widgetId) {
+        return normalizeFilter(prefs(ctx).getString(KEY_CAL_FILTER_PREFIX + widgetId, "all"));
+    }
+
+    public static void setCalendarFilter(Context ctx, int widgetId, String filter) {
+        prefs(ctx).edit().putString(KEY_CAL_FILTER_PREFIX + widgetId, normalizeFilter(filter)).apply();
+    }
+
+    public static String normalizeFilter(String value) {
+        if ("task".equals(value) || "training".equals(value)
+                || "supp".equals(value) || "pharma".equals(value)) {
+            return value;
+        }
+        return "all";
+    }
+
     public static void clearCalendarState(Context ctx, int widgetId) {
         prefs(ctx).edit()
                 .remove(KEY_CAL_MODE_PREFIX + widgetId)
                 .remove(KEY_CAL_ANCHOR_PREFIX + widgetId)
+                .remove(KEY_CAL_FILTER_PREFIX + widgetId)
                 .apply();
     }
 
