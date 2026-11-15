@@ -69,6 +69,7 @@ import {
   type ProfessionKind,
 } from '../core/activity-catalog';
 import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
+import { HCT_STEPS, HCT_CORRECTION_MARGIN, getLabNorm } from './lab-norms.engine';
 
 export type WeightPoint = WeightPointBase;
 // Доменные типы — декомпозиция монстра MetabolicInput (backward compat: MetabolicInput = пересечение всех)
@@ -717,35 +718,45 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   const ferritin = input.ferritin;
   // hgb estimate: HCT*3.4 (если нет лаба)
   const hgbEstimated = hgb ?? (hct != null ? Math.round(hct * 3.4) : null);
+  // Проход 94: шкала HCT половая. `HematologyInput.sex` был объявлен с самого начала
+  // и пробрасывался из `MetabolicHub.tsx`, но движок его не читал — женщина видела
+  // мужскую лестницу: флеботомия с 52% вместо 49%, стоп с 55% вместо 53%.
+  // Числа — из резолвера: `HCT_STEPS` = [эритроцитоз, блок, гипервязкость]
+  // (♂ 51/54/58, ♀ 48/52/56), «зона внимания» — на `HCT_CORRECTION_MARGIN` ниже
+  // верхней нормы (♂ 48, ♀ 44). Без sex — прежний мужской ряд байт-в-байт.
+  const sex: 'male' | 'female' = input.sex === 'female' ? 'female' : 'male';
+  const [hctErythrocytosis, hctBlock, hctCritical] = HCT_STEPS[sex];
+  const hctAttention = (getLabNorm('HCT', sex)?.uln ?? hctBlock) - HCT_CORRECTION_MARGIN;
+
   // zone по ESC/ASA + clinicalFloorsForLabs (risk-engine:200)
   let zone: HematologyResult['zone'] = 'unknown';
   let zoneLabel = 'Нет данных HCT — сдайте ОАК';
   let color = 'rgba(255,255,255,0.35)';
   if (hct != null) {
-    if (hct > 60) { zone = 'critical'; zoneLabel = 'Критический — госпитализация, СТОП ААС'; color = '#7f1d1d'; }
-    else if (hct > 54) { zone = 'stop'; zoneLabel = 'СТОП ААС — флеботомия 450мл обязательна'; color = '#ef4444'; }
-    else if (hct > 51) { zone = 'phlebotomy'; zoneLabel = 'Порог флеботомии — донация 300-450мл'; color = '#f59e0b'; }
-    else if (hct >= 48) { zone = 'attention'; zoneLabel = 'Внимание — контроль, +вода, стоп железо'; color = '#eab308'; }
+    if (hct > hctCritical) { zone = 'critical'; zoneLabel = 'Критический — госпитализация, СТОП ААС'; color = '#7f1d1d'; }
+    else if (hct > hctBlock) { zone = 'stop'; zoneLabel = 'СТОП ААС — флеботомия 450мл обязательна'; color = '#ef4444'; }
+    else if (hct > hctErythrocytosis) { zone = 'phlebotomy'; zoneLabel = 'Порог флеботомии — донация 300-450мл'; color = '#f59e0b'; }
+    else if (hct >= hctAttention) { zone = 'attention'; zoneLabel = 'Внимание — контроль, +вода, стоп железо'; color = '#eab308'; }
     else { zone = 'normal'; zoneLabel = 'Норма'; color = '#22c55e'; }
   }
   // waterAdj + target (lab-tier-recommendations:266)
   let waterAdj = 0;
   if (hct != null) {
-    if (hct > 54) waterAdj = 750;
-    else if (hct > 51) waterAdj = 500;
-    else if (hct >= 48) waterAdj = 300;
+    if (hct > hctBlock) waterAdj = 750;
+    else if (hct > hctErythrocytosis) waterAdj = 500;
+    else if (hct >= hctAttention) waterAdj = 300;
   }
-  // target 35мл/кг база + adj, но при HCT>51 цель 40-45мл/кг
+  // target 35мл/кг база + adj, но выше порога эритроцитоза цель 40-45мл/кг
   const baseNeed = Math.round(weight * 35);
-  const hctTargetPerKg = hct != null && hct > 51 ? 42 : hct != null && hct >= 48 ? 40 : 35;
+  const hctTargetPerKg = hct != null && hct > hctErythrocytosis ? 42 : hct != null && hct >= hctAttention ? 40 : 35;
   const waterTargetMl = Math.round(Math.max(baseNeed + waterAdj, weight * hctTargetPerKg));
   const mlPerKg = Math.round((waterTargetMl / weight) * 10) / 10;
   // iron
   let ironRec: HematologyResult['ironRec'] = 'normal';
   let ironRecLabel = 'Железо — норма (15-18мг/сут)';
   if (hct != null) {
-    if (hct > 51) { ironRec = 'zero'; ironRecLabel = '⛔ Стоп железо — ZERO (печень/говядина), HCT>51'; }
-    else if (hct >= 48) { ironRec = 'cap_15'; ironRecLabel = '⚠ Кап железо ≤15мг/сут (HCT 48-51)'; }
+    if (hct > hctErythrocytosis) { ironRec = 'zero'; ironRecLabel = `⛔ Стоп железо — ZERO (печень/говядина), HCT>${hctErythrocytosis}`; }
+    else if (hct >= hctAttention) { ironRec = 'cap_15'; ironRecLabel = `⚠ Кап железо ≤15мг/сут (HCT ${hctAttention}-${hctErythrocytosis})`; }
   }
   if (ferritin != null && ferritin < 30 && ironRec === 'zero') {
     ironRecLabel += ' · ферритин <30 — дефицит, но HCT приоритет (консультация гематолога)';
@@ -757,7 +768,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
     ? Math.round(input.ironIntakeMg * 10) / 10
     : null;
   if (ironMg != null) {
-    if (ironRec === 'zero' && ironMg > 0) ironRecLabel += ` · сейчас ${ironMg}мг/сут — отменить (HCT>51)`;
+    if (ironRec === 'zero' && ironMg > 0) ironRecLabel += ` · сейчас ${ironMg}мг/сут — отменить (HCT>${hctErythrocytosis})`;
     else if (ironRec === 'cap_15' && ironMg > 15) ironRecLabel += ` · сейчас ${ironMg}мг/сут — выше капа 15`;
     else if (ironRec === 'normal' && ironMg > 18 && !(ferritin != null && ferritin < 30)) ironRecLabel += ` · сейчас ${ironMg}мг/сут — больше RDA 15-18, пользы нет без дефицита`;
     else if (ironRec === 'normal' && ferritin != null && ferritin < 30 && ironMg < 15) ironRecLabel += ` · сейчас ${ironMg}мг/сут — ниже RDA 15-18 при ферритине <30`;
@@ -765,12 +776,12 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   // donation
   let donation: HematologyResult['donation'] = { needed: false, urgency: 'none', text: 'Донация не требуется', k: 0 };
   if (hct != null) {
-    if (hct > 54) donation = { needed: true, urgency: 'urgent', text: 'Срочная флеботомия 450мл / эритроцитаферез k0.45 (1-я линия)', k: 0.45 };
-    else if (hct > 52) donation = { needed: true, urgency: 'soon', text: 'Флеботомия 300-450мл в ближайшие дни', k: 0.30 };
-    else if (hct > 51) donation = { needed: true, urgency: 'elective', text: 'Плановая донация 300-450мл', k: 0.30 };
+    if (hct > hctBlock) donation = { needed: true, urgency: 'urgent', text: 'Срочная флеботомия 450мл / эритроцитаферез k0.45 (1-я линия)', k: 0.45 };
+    else if (hct > hctBlock - 2) donation = { needed: true, urgency: 'soon', text: 'Флеботомия 300-450мл в ближайшие дни', k: 0.30 };
+    else if (hct > hctErythrocytosis) donation = { needed: true, urgency: 'elective', text: 'Плановая донация 300-450мл', k: 0.30 };
   }
-  // viscosity: HCT>51 && water<1.5 или HCT>54
-  const viscosityFlag = hct != null && ((hct > 51 && waterL != null && waterL < 1.8) || hct > 53);
+  // viscosity: выше порога эритроцитоза при суточной воде <1.8 л или почти блок
+  const viscosityFlag = hct != null && ((hct > hctErythrocytosis && waterL != null && waterL < 1.8) || hct > hctBlock - 1);
   const gfrFlag = typeof gfr === 'number' && gfr < 60;
   const ferritinFlag = typeof ferritin === 'number' && ferritin < 30;
   // nutritionMult как в risk-engine:663-672 (1.0-1.25) — синхронизировано с TZ-spec
@@ -783,7 +794,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   if (waterL != null && waterL < 1.5) nutritionMult += 0.04;
   nutritionMult = Math.min(1.25, Math.round(nutritionMult * 100) / 100);
   // якорные floors из риск-движка (единый источник порогов)
-  const floors = hct != null ? clinicalFloorsForLabs({ HCT: hct, HGB: hgb ?? undefined } as any).filter(f=> f.organId==='hematologic') : [];
+  const floors = hct != null ? clinicalFloorsForLabs({ HCT: hct, HGB: hgb ?? undefined } as any, sex).filter(f=> f.organId==='hematologic') : [];
   const recommendations: string[] = [];
   if (floors.length>0) {
     // floors уже содержат текст порога — добавим для прозрачности
@@ -796,7 +807,7 @@ export function calcHematology(input: HematologyInput): HematologyResult {
     if (zone === 'normal') recommendations.push('Гидратация 35мл/кг + кардио 3×/нед достаточно');
     if (zone === 'attention') recommendations.push('Вода 40мл/кг, стоп железо 15мг, омега-3 2г, контроль HCT через 2-4 нед');
     if (zone === 'phlebotomy') recommendations.push('Донация 300-450мл, вода 42мл/кг, ZERO железо, омега-3 + аспирин только при ≥2 факторов риска');
-    if (zone === 'stop' || zone === 'critical') recommendations.push('СТОП ААС, эритроцитаферез k0.45 — 1-я линия, госпитализация при HCT>60');
+    if (zone === 'stop' || zone === 'critical') recommendations.push(`СТОП ААС, эритроцитаферез k0.45 — 1-я линия, госпитализация при HCT>${hctCritical}`);
     if (viscosityFlag) recommendations.push('Гипервязкость: увеличьте воду до ' + waterTargetMl + 'мл (' + mlPerKg + 'мл/кг)');
     if (gfrFlag) recommendations.push('GFR <60 — белок и PRAL под контролем (почки)');
     if (ferritinFlag && ironRec !== 'zero') recommendations.push('Ферритин <30 — гемовое железо (говядина/печень) + vit C');

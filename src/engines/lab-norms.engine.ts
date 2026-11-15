@@ -117,6 +117,24 @@ export const HCT_THRESHOLDS = {
 } as const;
 
 /**
+ * Трёхступенчатый ряд HCT для поверхностей, которые печатают сами ступени
+ * (проверочные маркеры, метаболический хаб): [эритроцитоз, блок, гипервязкость].
+ * Третья ступень — `block + 4 п.п.` (то же правило, что «ургент» у женщины выше),
+ * то есть ♂ 51/54/58, ♀ 48/52/56. Отдельных литералов 58/56 в приложении нет.
+ */
+export const HCT_STEPS: Record<'male' | 'female', [number, number, number]> = {
+  male: [HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 4],
+  female: [HCT_THRESHOLDS.female.erythrocytosis, HCT_THRESHOLDS.female.block, HCT_THRESHOLDS.female.block + 4],
+};
+
+/**
+ * Шаг «зоны внимания» HCT: 4 п.п. ниже верхней нормы (♂ 48, ♀ 44). Тот же шаг,
+ * что в `hctCuts` калькулятора; вынесен сюда, чтобы метаболический хаб не заводил
+ * пятую копию числа.
+ */
+export const HCT_CORRECTION_MARGIN = 4;
+
+/**
  * Пороги гемоглобина (г/л) — пара к `HCT_THRESHOLDS`: тот же эритроцитоз, та же
  * шкала «верх нормы → флеботомия/отмена».
  *  - `upper` — верх нормы: из резолвера (♂ 170, ♀ 150), а не литерал;
