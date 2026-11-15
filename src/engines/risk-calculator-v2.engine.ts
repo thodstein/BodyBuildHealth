@@ -1,6 +1,7 @@
 import { UCUM_MAP } from '../core/constants';
 import type { LabPoint, RiskResult } from '../core/types';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../core/constants';
+import { getLabNorm } from './lab-norms.engine';
 
 interface RiskSystemContribution {
   [key: string]: number;
@@ -18,17 +19,20 @@ interface RiskCalculationResult {
  * OVERLOAD 1: When called with labs only, return RiskCalculationResult
  * OVERLOAD 2: When called with RiskResult and labs, return RiskResult
  */
-export function calculateRiskFromAnalyses(labs: LabPoint[]): RiskCalculationResult;
-export function calculateRiskFromAnalyses(riskResult: RiskResult, labs: LabPoint[]): RiskResult;
-export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: LabPoint[]): RiskResult | RiskCalculationResult {
+export function calculateRiskFromAnalyses(labs: LabPoint[], sex?: 'male' | 'female'): RiskCalculationResult;
+export function calculateRiskFromAnalyses(riskResult: RiskResult, labs: LabPoint[], sex?: 'male' | 'female'): RiskResult;
+export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrSex?: LabPoint[] | 'male' | 'female', sexArg?: 'male' | 'female'): RiskResult | RiskCalculationResult {
   let labsArray: LabPoint[];
   let riskResult: RiskResult | null = null;
+  let sex: 'male' | 'female' | undefined;
 
   if (Array.isArray(arg1)) {
     labsArray = arg1;
+    sex = labsOrSex as 'male' | 'female' | undefined;
   } else {
     riskResult = arg1;
-    labsArray = labs || [];
+    labsArray = (labsOrSex as LabPoint[]) || [];
+    sex = sexArg;
   }
 
   // Initialize contributions for all risk systems
@@ -192,8 +196,14 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labs?: 
       return;
     }
 
-    const uln = reference.uln; // Upper limit of normal (in prefUnit)
-    const lln = reference.lln; // Lower limit of normal (in prefUnit)
+    // ВГН пола из единого резолвера (`getLabNorm`): у женщины гематокрит держится
+    // 36–48, АЛТ/АСТ/ГГТ 31, креатинин 97, ферритин 200, мочевая кислота 350.
+    // Раньше здесь читался только мужской ряд `UCUM_MAP`, хотя отклонение ниже
+    // считалось «в долях ВГН своего пола» — комментарий обещал больше, чем было.
+    // Без sex резолвер возвращает ровно пару `UCUM_MAP` (мужской путь байт-в-байт).
+    const normPair = getLabNorm(code, sex);
+    const uln = normPair ? normPair.uln : reference.uln; // Upper limit of normal (in prefUnit)
+    const lln = normPair ? normPair.lln : reference.lln; // Lower limit of normal (in prefUnit)
     const coeff = reference.coeff || 1; // Unit conversion coefficient
 
     // Normalize value to the same units as ULN/LLN

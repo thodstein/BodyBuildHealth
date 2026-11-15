@@ -441,10 +441,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       }));
   }, [labs]);
 
+  // Проход 92: риски по системам считаются с полом пациента — тем же резолвером
+  // норм, что и список отклонений ниже. Зависимости `currentLabs`/`profileSex`
+  // добавлены осознанно: без них после правки пола или выбора другого анализа
+  // мемо оставалось со старыми (мужскими) границами.
   const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
     if (!hasLabs) return null;
     const labData = currentLabs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
-    const contribs = calculateRiskFromAnalyses(labData) as any;
+    const contribs = calculateRiskFromAnalyses(labData, profileSex as 'male' | 'female') as any;
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     let maxNet = 0;
     for (const sys of ALL_RISK_SYSTEMS) {
@@ -486,7 +490,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     }
     markerDeviations.sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
     return { overallNet, systemBreakdown, markerDeviations };
-  }, [hasLabs, labs]);
+  }, [hasLabs, labs, currentLabs, profileSex]);
 
   const labIndexDetails = useMemo(() => {
     if (!hasLabs) return {} as Record<string, LabIndexDetail>;

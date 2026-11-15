@@ -29,6 +29,7 @@ import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } fro
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { getLabNorm } from '../../engines/lab-norms.engine';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
@@ -296,8 +297,8 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   const labRiskContributions = useMemo(() => {
     if (!hasLabs) return null;
     const labData = (linked?.labs || []).map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
-    return calculateRiskFromAnalyses(labData);
-  }, [hasLabs, linked.labs]);
+    return calculateRiskFromAnalyses(labData, profileSex);
+  }, [hasLabs, linked.labs, profileSex]);
 
   // Training risk (from workouts per week)
   const trainingRisk = useMemo(() => {
@@ -399,7 +400,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     if (!pharmaRisk) return null;
     let result = pharmaRisk;
     if (hasLabs) {
-      result = calculateRiskFromAnalyses(result, linked.labs);
+      result = calculateRiskFromAnalyses(result, linked.labs, profileSex);
     }
     // Merge training risk
     result = mergeRiskSource(result, trainingRisk);
@@ -429,7 +430,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
     // пуст и секция «Покрытие поддержкой» показывала нули при любой поддержке.
     result = { ...result, coverageMap: (linked.supportCoverage || {}) as Record<string, number> };
     return result;
-  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk, linked.supportCoverage]);
+  }, [pharmaRisk, hasLabs, shouldApplyPenalty, noLabsSystems, trainingRisk, nutritionRisk, linked.supportCoverage, linked.labs, profileSex]);
 
   // Build synthetic lab risk contribution from penalty when no labs exist
   const syntheticLabContrib = useMemo(() => {
@@ -1851,7 +1852,7 @@ export const LabsRisksTab: React.FC = () => {
   const labRisks = useMemo(() => {
     if (!hasLabs) return null;
     try {
-    const contribs = calculateRiskFromAnalyses(labs) as any;
+    const contribs = calculateRiskFromAnalyses(labs, profileSex) as any;
     const sb: Record<string,{raw:number;net:number}> = {};
     for (const sys of ALL_RISK_SYSTEMS) {
       const c = contribs.systemContributions?.[sys] || 0;
@@ -1863,9 +1864,11 @@ export const LabsRisksTab: React.FC = () => {
       if (!ref?.uln || !ref?.lln) continue;
       const coeff = ref.coeff || 1;
       const norm = lab.value * coeff;
-      // Prefer stored reference ranges from parsed lab forms
-      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : ref.uln;
-      const lln = lab.refLow !== undefined ? lab.refLow * coeff : ref.lln;
+      // Проход 92: бланк главнее, затем ВГН пола (♀ HCT 48, АЛТ/АСТ/ГГТ 31,
+      // креатинин 97, мочевая кислота 350), и только потом общий ряд UCUM.
+      const normPair = getLabNorm(lab.code, profileSex);
+      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : (normPair?.uln ?? ref.uln);
+      const lln = lab.refLow !== undefined ? lab.refLow * coeff : (normPair?.lln ?? ref.lln);
       let deviation = 0;
       if (norm > uln) deviation = (norm - uln) / uln;
       else if (norm < lln) deviation = -((lln - norm) / lln);
@@ -1880,7 +1883,7 @@ export const LabsRisksTab: React.FC = () => {
     devs.sort((a,b) => Math.abs(b.deviation)-Math.abs(a.deviation));
     return { systemBreakdown: sb, markerDeviations: devs, deviationCount: devs.length };
     } catch { return null; }
-  }, [hasLabs, labs]);
+  }, [hasLabs, labs, profileSex]);
 
   const sysColors: Record<string,string> = {
     hepatic:'#22c55e', renal:'#3b82f6', endocrine:'#a855f7', hematologic:'#ef4444',
