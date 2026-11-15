@@ -102,10 +102,24 @@ function exTonnage(ex: FactLikeExercise): number {
   return t;
 }
 
-function exAvgRir(ex: FactLikeExercise): number {
-  const sets = ex.workSets ?? ex.sets ?? [];
-  const vals = sets.map(s => Number(s.rir)).filter(v => Number.isFinite(v) && v > 0);
-  if (!vals.length) return 0;
+/**
+ * Средний RIR упражнения плана; `null` — данных нет.
+ *
+ * P3-2 (аудит 2026-11): RIR 0 — это работа в отказ, то есть валидное значение.
+ * Прежний фильтр `v > 0` выбрасывал его, а `0` служил заодно сигналом «нет данных»,
+ * поэтому план «в отказ» попадал в факт как план без запланированного RIR.
+ */
+function exAvgRir(ex: FactLikeExercise): number | null {
+  const raw: unknown = ex.workSets ?? ex.sets ?? [];
+  // Защита от импортированных/деривативных планов, где sets — число, а не массив.
+  const sets = Array.isArray(raw) ? raw : [];
+  const vals = sets
+    // Пустой/отсутствующий RIR — не «ноль»: Number(null) === 0, поэтому явная проверка.
+    .map(s => (s as { rir?: unknown } | null | undefined)?.rir)
+    .filter(v => v !== null && v !== undefined && v !== '')
+    .map(v => Number(v))
+    .filter(v => Number.isFinite(v) && v >= 0);
+  if (!vals.length) return null;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
@@ -253,7 +267,8 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
       pSets += sc;
       pTonn += exTonnage(ex);
       const ar = exAvgRir(ex);
-      if (ar > 0) { pRirSum += ar * sc; pRirN += sc; }
+      // P3-2: `null` — RIR в плане не задан; RIR 0 учитывается как обычное значение.
+      if (ar != null && sc > 0) { pRirSum += ar * sc; pRirN += sc; }
     }
     let aSets = 0, aTonn = 0, aRirSum = 0, aRirN = 0, aSessions = 0;
   for (const sess of (sessions || []).filter(Boolean)) {
@@ -267,8 +282,11 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
         for (const st of sets) {
           const w = Number(st.weightKg ?? 0), r = Number(st.reps ?? 0);
           if (w > 0 && r > 0) sTonn += w * r;
-          const rir = Number(st.rir);
-          if (Number.isFinite(rir) && rir > 0) { sRirSum += rir; sRirN += 1; }
+          // P3-2: RIR 0 (отказ) — валидное значение; пустой RIR не считается нулём.
+          const rawRir: unknown = st?.rir;
+          const hasRir = rawRir !== null && rawRir !== undefined && rawRir !== '';
+          const rir = hasRir ? Number(rawRir) : NaN;
+          if (Number.isFinite(rir) && rir >= 0) { sRirSum += rir; sRirN += 1; }
         }
       }
       if (Number.isFinite(sess.totalSets) && (sess.totalSets as number) > 0) sSets = sess.totalSets as number;

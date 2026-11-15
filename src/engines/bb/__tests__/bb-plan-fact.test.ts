@@ -85,3 +85,46 @@ describe('bb-plan-fact', () => {
     expect(bbAdherenceBadge(0).label).toBe('· нет данных');
   });
 });
+
+// P3-2 (аудит 2026-11): RIR 0 — работа в отказ, то есть валидное значение.
+// Раньше `exAvgRir` фильтровал `v > 0`, а 0 служил сигналом «нет данных»:
+// план «в отказ» попадал в факт как план без запланированного RIR.
+describe('RIR 0 учитывается как значение (P3-2)', () => {
+  it('плановый RIR 0 входит в средневзвешенный avgRir', () => {
+    const p = {
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [
+        { muscle: 'chest', sets: [{ weight: 100, reps: 8, rir: 2 }, { weight: 100, reps: 8, rir: 2 }] },
+        { muscle: 'triceps', sets: [{ weight: 40, reps: 12, rir: 0 }] },
+      ] }] }],
+    };
+    const f = buildBBPlanFact(p, [], '2026-09-01');
+    // (2*2 + 0*1) / 3 = 1.333…; до правки отказной сет выбрасывался → 2.0
+    expect(f.weeks[0].planned.avgRir).toBeCloseTo(4 / 3, 5);
+  });
+
+  it('фактический RIR 0 входит в средневзвешенный avgRir', () => {
+    const p = {
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [
+        { muscle: 'chest', sets: [{ weight: 100, reps: 8, rir: 2 }] },
+      ] }] }],
+    };
+    const sess = [{ date: '2026-09-02', exercises: [{ muscleGroup: 'chest', sets: [
+      { weightKg: 100, reps: 8, rir: 2 }, { weightKg: 100, reps: 8, rir: 0 },
+    ] }] }];
+    const f = buildBBPlanFact(p, sess as any, '2026-09-01');
+    // (2 + 0) / 2 = 1; до правки → 2
+    expect(f.weeks[0].actual.avgRir).toBeCloseTo(1);
+  });
+
+  it('отсутствующий RIR (null/undefined) не считается нулём', () => {
+    const p = {
+      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [
+        { muscle: 'chest', sets: [{ weight: 100, reps: 8, rir: null }, { weight: 100, reps: 8 }] },
+        { muscle: 'back', sets: [{ weight: 80, reps: 10, rir: 4 }] },
+      ] }] }],
+    };
+    const f = buildBBPlanFact(p as any, [], '2026-09-01');
+    // Только back даёт данные: avgRir = 4, а не (0+0+4)/3
+    expect(f.weeks[0].planned.avgRir).toBeCloseTo(4);
+  });
+});

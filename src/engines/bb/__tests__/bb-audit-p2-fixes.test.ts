@@ -10,6 +10,8 @@
  * - P2-2 (финализация): добивка дельт в финализаторе расходует место и по УПРАЖНЕНИЯМ,
  *   а не только по сетам (иначе `session_exercise_cap`).
  * - P2-1 (ядро): auto-MEV-feeder не добавляет упражнения в делод/тапер-недели.
+ * - P2-2 (ядро): `schemeActive` считается по `effVolumeScheme` — понижение схемы
+ *   объёма до 'standard' не выключает добивку мышц дня.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -117,5 +119,21 @@ describe('P2-1 (ядро): auto-MEV-feeder не добивает разгруз�
     // Гейт не отключил проход целиком: в рабочих неделях фидер остаётся.
     expect(feedersOf(working).length).toBeGreaterThan(0);
     expect(feedersOf(deload)).toHaveLength(0);
+  });
+});
+
+// P2-2 (ядро): `schemeActive` должен читать ЭФФЕКТИВНУЮ схему объёма. FST-7 при
+// не-enhanced уровне понижается до 'standard' — значит и добивка мышц дня
+// (гарантия рук по дню) должна работать, как в обычном плане.
+describe('P2-2 (ядро): понижённая схема объёма не выключает добивку мышц дня', () => {
+  const shape = (plan: any) => (plan.weeks || []).map((w: any) => (w.sessions || []).map((s: any) =>
+    (s.exercises || []).map((e: any) => `${e.muscle}|${e.name}|${e.sets}`)));
+
+  it('fst7 при intermediate понижается до standard и даёт тот же состав, что явный standard', () => {
+    const downgraded = buildBBPlan(makeInput({ volumeScheme: 'fst7', weeks: 4 })) as any;
+    const plain = buildBBPlan(makeInput({ volumeScheme: 'standard', weeks: 4 })) as any;
+    // Понижение действительно произошло — иначе тест проверял бы не то.
+    expect(downgraded.volumeScheme).toBe('standard');
+    expect(shape(downgraded)).toEqual(shape(plain));
   });
 });

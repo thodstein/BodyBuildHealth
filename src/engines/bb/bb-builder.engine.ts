@@ -4836,7 +4836,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // концентрированный объём (GVT-10), а лишние guarantee-изоляты раздувают
       // direct за кап — cap-adjust потом срезает GVT-пятёрки (pro-methods-levels).
       // PPL-минимумы при схемах держат отдельные топ-апы финализатора.
-      const schemeActive = (input.volumeScheme || 'standard') !== 'standard';
+      // P2-2 (аудит 2026-11): активность схемы объёма определяется ЭФФЕКТИВНОЙ схемой.
+      // `effVolumeScheme` (объявлена выше, ~4614) понижается до 'standard', когда схема
+      // недоступна (fst7 — только enhanced; гейты jointGuard/соло-инсулин). Раньше здесь
+      // читался сырой `input.volumeScheme`, и при таком понижении добивка мышц дня
+      // выключалась на пустом месте.
+      const schemeActive = (effVolumeScheme || 'standard') !== 'standard';
       const dayMusclePlans = schemeActive ? [] : dedupeMuscles(s.sessionTag, new Set());
       const dayArmMuscles = new Set(dayMusclePlans.filter(mp => ARM_MUSCLES_SET.has(mp.group)).map(mp => mp.group));
       if (dayArmMuscles.size > 0) {
