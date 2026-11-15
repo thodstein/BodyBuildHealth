@@ -8,6 +8,7 @@ import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '
 import { normalizeLabValue } from '../core/constants';
 import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
+import { HCT_STEPS } from './lab-norms.engine';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -237,8 +238,12 @@ function orderByPriority(ids: string[], marker?: string): string[] {
 
   // ── HCT impact → query support by mechanism + priority ──
   const hctVal = getV(fp, 'panelHematology', 'HCT');
-  if (maxHct >= 3 || state.cardio.hctElevation !== 'none' || (hctVal !== null && hctVal > (sex === 'male' ? 50 : 46))) {
-    const severe = maxHct >= 5 || (hctVal !== null && hctVal > 54) || state.cardio.hctElevation === 'severe';
+  // Проход 98: шкала HCT — из резолвера (`HCT_STEPS`: ♂ 51/54/58, ♀ 48/52/56), а не
+  // пара литералов 50/46 и «>54»: у женщины порог вмешательства — 52, а не 54, и до
+  // него она получала «нет риска» при HCT 53.
+  const [hctErythrocytosis, hctBlock] = HCT_STEPS[sex === 'female' ? 'female' : 'male'];
+  if (maxHct >= 3 || state.cardio.hctElevation !== 'none' || (hctVal !== null && hctVal >= hctErythrocytosis)) {
+    const severe = maxHct >= 5 || (hctVal !== null && hctVal >= hctBlock) || state.cardio.hctElevation === 'severe';
     const hctSev: SeverityLevel = severe ? 'severe' : 'moderate';
     const priorityIds = getPrioritySubstances('HCT', hctSev).map(e => e.substanceId);
     let hctIds: string[] = priorityIds.length >= 2 ? [...priorityIds] : findSupportByMechanisms(['PLATELET_AGGREGATION_INHIBITION', 'FIBRINOLYSIS']);

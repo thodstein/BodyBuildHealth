@@ -109,6 +109,13 @@
 - `Calc.labs-derived` — `hctCuts` (норма/терапия/ургент) и `hgbSymptomCut`
   (♂ 170 / ♀ 150 = `HGB_THRESHOLDS.upper`); `HCT_CORRECTION_MARGIN`
   ре-экспортируется из резолвера.
+- `support-plan/engine` (`hydrateState`) и `recommendation-engine` — производные
+  клинические флаги и HCT-триггер: `altAstElevation` от
+  `LFT_ULN`/`LFT_STAGE_ULN`, `ggtElevation` от `GGT_ULN`/`GGT_STAGE_ULN`
+  (♂ 55/110/165, ♀ 31/62/93), `creatinineElevation` от `CREATININE_ULN`
+  (ВГН, +20, +40), `hctElevation` от `HCT_STEPS` (♂ 51/54/58, ♀ 48/52/56). До
+  прохода 98 здесь стояли литералы 40/55/110 и ряд 52/56/60: женщина с АЛТ 35 или
+  креатинином 100 получала «none», а флаг HCT жил на пятой копии ряда.
 - `LabsScreen_parts/LabsResults` — строка результата: у женщины E2/ЛГ/ФСГ/
   прогестерон сравниваются с коридором её фазы (`phaseHormoneBand`) и
   подписываются ею («70–500 пг/мл (лютеиновая)», «5–20 нг/мл (лютеиновая)»);

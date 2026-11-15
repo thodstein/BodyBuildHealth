@@ -24,6 +24,9 @@ import { resolvePlanDose } from './substances';
 import { resolvePlan } from '../tz-mapper-engine';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import { buildMapperCtx } from './mapper-ctx';
+import {
+  LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, HCT_STEPS,
+} from '../lab-norms.engine';
 
 const AUTO_DOCTOR_ONLY = new Set([
   'warfarin', 'enoxaparin', 'sulodexide', 'lumbrokinase',
@@ -1085,24 +1088,38 @@ export function hydrateState(): Partial<CalculatorState> {
       const tg = getV('panelLipid', 'Triglycerides');
       const hct = getV('panelHematology', 'HCT');
 
+      // Проход 98: клинические флаги ниже считаются от норм ПОЛА, а не от литералов
+      // 40/55/110/52. Раньше женщина с АЛТ 35, ГГТ 40 или креатинином 100 получала
+      // «none» по мужской границе, хотя её ВГН — 31/31/97, а HCT-флаг жил на
+      // четвёртой копии ряда (52/56/60), которой нет ни в одном источнике.
+      const sexKey: 'male' | 'female' = result.profile?.sex === 'female' ? 'female' : 'male';
+      const lftUln = LFT_ULN.ALT[sexKey];
+      const lftReduce = LFT_STAGE_ULN.reduce[sexKey];
+      const lftStopOral = LFT_STAGE_ULN.stopOral[sexKey];
+      const ggtUln = GGT_ULN[sexKey];
+      const ggtDouble = GGT_STAGE_ULN.double[sexKey];
+      const ggtTriple = GGT_STAGE_ULN.triple[sexKey];
+      const crUln = CREATININE_ULN[sexKey];
+      const [hctErythrocytosis, hctBlock, hctHyperviscosity] = HCT_STEPS[sexKey];
+
       if (!result.hepatobiliary) result.hepatobiliary = { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' } as any;
       const hep = result.hepatobiliary!;
       if (alt !== null || ast !== null) {
         const maxTransam = Math.max(alt ?? 0, ast ?? 0);
-        hep.altAstElevation = maxTransam < 40 ? 'none' : maxTransam < 80 ? 'mild' : maxTransam < 120 ? 'moderate' : 'severe';
+        hep.altAstElevation = maxTransam < lftUln ? 'none' : maxTransam < lftReduce ? 'mild' : maxTransam < lftStopOral ? 'moderate' : 'severe';
       }
-      if (ggt !== null) hep.ggtElevation = ggt < 55 ? 'none' : ggt < 100 ? 'mild' : ggt < 200 ? 'moderate' : 'severe';
+      if (ggt !== null) hep.ggtElevation = ggt < ggtUln ? 'none' : ggt < ggtDouble ? 'mild' : ggt < ggtTriple ? 'moderate' : 'severe';
       if (bilirubin !== null) hep.bilirubinElevation = bilirubin < 21 ? 'none' : bilirubin < 40 ? 'mild' : bilirubin < 60 ? 'moderate' : 'severe';
 
       if (!result.urinary) result.urinary = { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' } as any;
-      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < 110 ? 'none' : creatinine < 130 ? 'mild' : creatinine < 150 ? 'moderate' : 'severe';
+      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + 20 ? 'mild' : creatinine < crUln + 40 ? 'moderate' : 'severe';
 
       if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
       const card = result.cardio!;
       if (ldl !== null) card.ldlElevation = ldl < 3.0 ? 'none' : ldl < 4.0 ? 'mild' : ldl < 5.0 ? 'moderate' : 'severe';
       if (hdl !== null) card.hdlLow = hdl < 1.0;
       if (tg !== null) card.triglycerides = tg < 1.7 ? 'normal' : tg < 2.3 ? 'elevated' : 'high';
-      if (hct !== null) card.hctElevation = hct < 52 ? 'none' : hct < 56 ? 'mild' : hct < 60 ? 'moderate' : 'severe';
+      if (hct !== null) card.hctElevation = hct < hctErythrocytosis ? 'none' : hct < hctBlock ? 'mild' : hct < hctHyperviscosity ? 'moderate' : 'severe';
     } catch {}
   }
 
