@@ -8,7 +8,7 @@ import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '
 import { normalizeLabValue } from '../core/constants';
 import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
-import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU } from './lab-norms.engine';
+import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU, HDL_LOW, TG_FLAG_STEPS } from './lab-norms.engine';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -597,8 +597,8 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     { marker:'Glucose', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5.6 }, system:'metabolic', label:'Метаболизм' },
     { marker:'Homocysteine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:15 }, system:'', label:'Метилирование' },
     { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:2.6 }, system:'cardio', label:'Липиды' },
-    { marker:'Triglycerides', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:1.7 }, system:'cardio', label:'Липиды' },
-    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: sex === 'female' ? 1.2 : 1.0 }, system:'cardio', label:'Липиды' },
+    { marker:'Triglycerides', panels:['panelLipid'], threshold:{ higherIsWorse:true, value: TG_FLAG_STEPS.elevated }, system:'cardio', label:'Липиды' },
+    { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: HDL_LOW[sex === 'female' ? 'female' : 'male'] }, system:'cardio', label:'Липиды' },
     { marker:'CRP', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5 }, system:'', label:'Воспаление' },
     { marker:'Cortisol', panels:['panelSex'], threshold:{ higherIsWorse:true, value:550 }, system:'neuro', label:'Стресс' },
     { marker:'D-dimer', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value: age > 50 ? age * 0.01 : 0.5 }, system:'hematologic', label:'Гемостаз' },

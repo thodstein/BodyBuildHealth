@@ -26,6 +26,7 @@ import type { SupportLevel } from '../tz-bridge-mechanism';
 import { buildMapperCtx } from './mapper-ctx';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, HCT_STEPS,
+  LDL_FLAG_STEPS, TG_FLAG_STEPS, BILIRUBIN_FLAG_STEPS, HDL_LOW,
 } from '../lab-norms.engine';
 
 const AUTO_DOCTOR_ONLY = new Set([
@@ -1109,16 +1110,16 @@ export function hydrateState(): Partial<CalculatorState> {
         hep.altAstElevation = maxTransam < lftUln ? 'none' : maxTransam < lftReduce ? 'mild' : maxTransam < lftStopOral ? 'moderate' : 'severe';
       }
       if (ggt !== null) hep.ggtElevation = ggt < ggtUln ? 'none' : ggt < ggtDouble ? 'mild' : ggt < ggtTriple ? 'moderate' : 'severe';
-      if (bilirubin !== null) hep.bilirubinElevation = bilirubin < 21 ? 'none' : bilirubin < 40 ? 'mild' : bilirubin < 60 ? 'moderate' : 'severe';
+      if (bilirubin !== null) hep.bilirubinElevation = bilirubin < BILIRUBIN_FLAG_STEPS.mild ? 'none' : bilirubin < BILIRUBIN_FLAG_STEPS.moderate ? 'mild' : bilirubin < BILIRUBIN_FLAG_STEPS.severe ? 'moderate' : 'severe';
 
       if (!result.urinary) result.urinary = { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' } as any;
       if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + 20 ? 'mild' : creatinine < crUln + 40 ? 'moderate' : 'severe';
 
       if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
       const card = result.cardio!;
-      if (ldl !== null) card.ldlElevation = ldl < 3.0 ? 'none' : ldl < 4.0 ? 'mild' : ldl < 5.0 ? 'moderate' : 'severe';
-      if (hdl !== null) card.hdlLow = hdl < 1.0;
-      if (tg !== null) card.triglycerides = tg < 1.7 ? 'normal' : tg < 2.3 ? 'elevated' : 'high';
+      if (ldl !== null) card.ldlElevation = ldl < LDL_FLAG_STEPS.mild ? 'none' : ldl < LDL_FLAG_STEPS.moderate ? 'mild' : ldl < LDL_FLAG_STEPS.severe ? 'moderate' : 'severe';
+      if (hdl !== null) card.hdlLow = hdl < HDL_LOW[sexKey];
+      if (tg !== null) card.triglycerides = tg < TG_FLAG_STEPS.elevated ? 'normal' : tg < TG_FLAG_STEPS.high ? 'elevated' : 'high';
       if (hct !== null) card.hctElevation = hct < hctErythrocytosis ? 'none' : hct < hctBlock ? 'mild' : hct < hctHyperviscosity ? 'moderate' : 'severe';
     } catch {}
   }
