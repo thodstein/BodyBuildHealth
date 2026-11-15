@@ -6,6 +6,7 @@
  * 2. Source-guard'ы на три файла: монтирование больше не ставит шаг, hand-off
  *    годового плана не уводит в «Contest prep», выход в плеер — событием, а не
  *    подделкой storage.
+ * 3. P2: кросс-оконные storage-события и скролл наверх при смене шага.
  *
  * jsdom-рендер god-компонента BbAutoConstructor виснет (пред-существующее), поэтому
  * UI-часть проверяется по исходнику — как в bb-wave-p0-fixes.test.ts.
@@ -23,12 +24,14 @@ import {
   shouldFollowExternalPlan,
   annualBlockCtxIsFresh,
   clampBbWeek,
+  shouldNavigateOnStorageEvent,
 } from '../bb-auto-nav';
 
 const DIR = resolve(__dirname, '..');
 const SRC = readFileSync(resolve(DIR, 'BbAutoConstructor.tsx'), 'utf8');
 const TRAINING = readFileSync(resolve(DIR, '..', 'TrainingScreen.tsx'), 'utf8');
 const MACRO = readFileSync(resolve(DIR, '..', 'SRCBBScreen_parts', 'MacrocyclePanel.tsx'), 'utf8');
+const TRAINING_UI = readFileSync(resolve(DIR, 'training-ui.tsx'), 'utf8');
 
 describe('resolveBbAutoOpenStep — вход в конструктор не прыгает на «План»', () => {
   it('нет сохранённой позиции → «1 Параметры» (раньше был безусловный «План»)', () => {
@@ -190,5 +193,42 @@ describe('source-guard: TrainingScreen и MacrocyclePanel', () => {
 
   it('контекст передачи блока несёт метку времени', () => {
     expect(MACRO).toContain('ts: Date.now(),');
+  });
+});
+
+describe('P2: кросс-оконные storage-события не уводят экран', () => {
+  it('событие своего документа (isTrusted=false) — по-прежнему навигация', () => {
+    for (const page of ['hero', 'planning', 'tabs', 'constructor']) {
+      expect(shouldNavigateOnStorageEvent({ isTrusted: false, page })).toBe(true);
+    }
+  });
+
+  it('чужое окно не выдёргивает пользователя из открытого конструктора', () => {
+    expect(shouldNavigateOnStorageEvent({ isTrusted: true, page: 'constructor' })).toBe(false);
+  });
+
+  it('чужое окно вне конструктора навигацию не ломает (как было)', () => {
+    expect(shouldNavigateOnStorageEvent({ isTrusted: true, page: 'tabs' })).toBe(true);
+    expect(shouldNavigateOnStorageEvent({ isTrusted: true, page: 'hero' })).toBe(true);
+  });
+
+  it('TrainingScreen гейтит storage-обработчик этой политикой и знает текущую страницу', () => {
+    expect(TRAINING).toContain('shouldNavigateOnStorageEvent({ isTrusted: e.isTrusted, page: pageRef.current })');
+    expect(TRAINING).toContain('pageRef.current = page;');
+    // Трек 'arm' раньше выпадал из белого списка и превращался в 'pl'.
+    expect(TRAINING).toMatch(/const allowed: PlanningTrack\[\] = \[[^\]]*'arm'/);
+  });
+});
+
+describe('P2: смена шага скроллит реальный скроллер конструктора', () => {
+  it('usePlannerStepScroll берёт тело окна конструктора (.tp-cbody), а не экран под оверлеем', () => {
+    const at = TRAINING_UI.indexOf('export function usePlannerStepScroll');
+    expect(at).toBeGreaterThan(0);
+    const body = TRAINING_UI.slice(at, TRAINING_UI.indexOf('\n}', at));
+    expect(body).toContain("nav?.closest('.tp-cbody')");
+    // Фолбэк на старый контейнер остаётся только как страховка.
+    expect(body).toContain(".screen.training-screen");
+    // Скроллер ищем ПОСЛЕ навигации (нужен её предок), а не из документа целиком.
+    expect(body.indexOf("data-planner-step-nav")).toBeLessThan(body.indexOf("closest('.tp-cbody')"));
   });
 });

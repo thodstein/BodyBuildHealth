@@ -109,3 +109,19 @@ export function clampBbWeek(v: unknown, totalWeeks: number): number {
   const week = Math.round(n);
   return total > 0 ? Math.min(week, total) : week;
 }
+
+/**
+ * Реагировать ли навигацией на `storage`-событие (смена трека планировщика /
+ * вкладки тренировок).
+ *
+ * Событие, отправленное в СВОЁМ документе (`window.dispatchEvent(new StorageEvent(…))`),
+ * имеет `isTrusted === false` — это осознанный клик по кнопке, его отрабатываем.
+ * Настоящее кросс-оконное событие — чужое действие в другой вкладке/окне: пока у
+ * нас открыто окно конструктора, оно не имеет права ни подменить трек, ни
+ * закрыть окно (это и читалось как «экран сам перескакивает»). Выбор всё равно
+ * лежит в localStorage и применится при следующем открытии конструктора.
+ */
+export function shouldNavigateOnStorageEvent(opts: { isTrusted?: boolean; page: string }): boolean {
+  if (!opts.isTrusted) return true;
+  return opts.page !== 'constructor';
+}

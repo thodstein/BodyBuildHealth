@@ -23,6 +23,10 @@
 внешнее событие не уводит со шага, где пользователь работает; выход в плеер — явное
 событие `training-exit-constructor` вместо подделки `storage`.
 
+Дополнительно (P2, §5): настоящее storage-событие из другого окна больше не уводит это окно
+в конструктор, а смена шага скроллит реальный скроллер конструктора (`.tp-cbody`), а не
+экран под оверлеем.
+
 ---
 
 ## 1. Факты кода (до правок)
@@ -133,22 +137,71 @@ node --max-old-space-size=3200 ./node_modules/typescript/bin/tsc --noEmit
 - `cardio-user-flow.test.tsx > «протокол сессии открывается по клику…»` падает **до и после**
   правки (кардио, к конструктору ББ отношения не имеет) — пред-существующее, не трогал.
 
-## 5. Не входит в эту правку (P2, зафиксировано)
+## 5. P2 — сделано (отдельный коммит)
 
-- Кросс-оконная синхронизация `he_training_planning_track`: реальное storage-событие из
-  другого окна всё ещё переводит **это** окно в «Планировщик → Конструктор»
-  (`TrainingScreen.tsx:543-565`). В APK одно окно, риск нулевой; для web/Telegram-мультитаба
-  стоит ограничить навигацию только событиями `isTrusted === false` (same-document),
-  оставив кросс-окну лишь синхронизацию выбранного трека.
-- `usePlannerStepScroll` скроллит `.screen.training-screen`, а реальный скроллер конструктора —
-  `.tp-cbody`; это не «перескок шага», но исправить стоит отдельной задачей.
+Оба хвоста из первой волны закрыты.
+
+### P2.1 Кросс-оконные `storage`-события
+
+`TrainingScreen.tsx` пропускает навигацию через чистую политику
+`shouldNavigateOnStorageEvent({ isTrusted, page })` (`bb-auto-nav.ts`):
+
+| Событие | `isTrusted` | Поведение |
+|---|---|---|
+| Своё окно (`window.dispatchEvent(new StorageEvent(...))` — осознанный клик, напр. «Тренировка → ББ-авто» из дневника) | `false` | как раньше: зона «Планировщик» + окно конструктора нужного трека |
+| Чужое окно/вкладка, у нас открыт конструктор | `true` | **игнор** — окно не подменяется и не закрывается |
+| Чужое окно/вкладка, конструктор не открыт | `true` | как раньше (кросс-табовая синхронизация вкладки сохранилась) |
+
+Трек/вкладка всё равно лежат в `localStorage` и применятся при следующем открытии
+(`getPlanningTrack`), так что «дочернее окно → родитель» не ломается.
+Заодно в белый список треков добавлен `arm`: раньше `'arm'` из другого окна
+превращался в `'pl'` (в белом списке не было значения, хотя `getPlanningTrack` его знает).
+Текущая страница читается через `pageRef` (у эффекта пустые зависимости).
+
+### P2.2 Скролл при смене шага
+
+`usePlannerStepScroll` (`training-ui.tsx`) целился в `.screen.training-screen`, но тот
+лежит **под** fixed-оверлеем окна конструктора (`zIndex:102`), поэтому «наверх» визуально
+не происходило: после смены шага оставался скролл предыдущего шага — читалось как «экран
+перескочил на другой». Теперь скроллер — тело окна конструктора (`.tp-cbody`,
+`overflow:auto`), найденное как предок навигации: `nav.closest('.tp-cbody')`; старый
+контейнер оставлен фолбэком. Правило действует для всех конструкторов, использующих хук
+(ББ-авто, ПЛ-авто, ручной сбор, кардио, ТА, единоборства, арм).
+
+### Проверка P2
+
+```powershell
+node --max-old-space-size=3200 ./node_modules/typescript/bin/tsc --noEmit
+# exit 0
+
+node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run "src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-nav.test.ts" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
+# 1 файл, 28 тестов — passed (было 23, +5 на P2)
+
+node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run "src/ui/screens/TrainingScreen_parts/__tests__/bb-" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
+# 42 файла, 374 теста — passed, exit 0
+
+node --max-old-space-size=4096 ./node_modules/vitest/vitest.mjs run "src/ui/screens/ProfileScreen_v2/__tests__/profile-deep-links.test.tsx" "src/ui/screens/TrainingScreen_parts/__tests__/arm-lifting-nav.test.tsx" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
+# 2 файла, 12 тестов — passed (рендерят TrainingScreen целиком)
+
+npm run verify:apk-design
+# OK: all APK design markers in place
+```
+
+## 5.1 Что осталось за рамками (не дефекты «перескоков»)
+
+- Чистка `he_bb_plan_saved_ctx` после применения (сейчас живёт до TTL 24 ч — не вредит,
+  т.к. читается только как hand-off по `ts`).
+- Папка `docs/` содержит неотслеживаемые аудит-артефакты прошлой сессии
+  (`BB-CORE-BUILD-AUDIT-2026-11.md`, `BB-FINALIZE-VALIDATION-AUDIT-2026-11.md`,
+  `bb-auto-constructor-audit-2026-11-15.md`) — решение об их судьбе отдельное.
 
 ## 6. Файлы
 
 | Файл | Что |
 |---|---|
-| `src/ui/screens/TrainingScreen_parts/bb-auto-nav.ts` | **новый**: политика навигации (чистые функции) |
-| `src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-nav.test.ts` | **новый**: 23 теста (логика + source-guard'ы) |
+| `src/ui/screens/TrainingScreen_parts/bb-auto-nav.ts` | **новый**: политика навигации (чистые функции) + `shouldNavigateOnStorageEvent` (P2) |
+| `src/ui/screens/TrainingScreen_parts/__tests__/bb-auto-nav.test.ts` | **новый**: 28 тестов (логика + source-guard'ы; 23 в первой волне, +5 на P2) |
 | `src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx` | персист позиции, монтирование без прыжка, `applyAnnualBlockCtx` без смены шага, `stepRef`, гейт внешнего события, `persistReadyRef`, `training-exit-constructor`, сохранение плана при отправке в плеер |
-| `src/ui/screens/TrainingScreen.tsx` | обработчик `training-exit-constructor` |
+| `src/ui/screens/TrainingScreen_parts/training-ui.tsx` | `usePlannerStepScroll` скроллит `.tp-cbody` (реальный скроллер конструктора) |
+| `src/ui/screens/TrainingScreen.tsx` | обработчик `training-exit-constructor`; гейт storage-навигации + `pageRef` (P2) |
 | `src/ui/screens/SRCBBScreen_parts/MacrocyclePanel.tsx` | `ts` в контексте передачи блока |

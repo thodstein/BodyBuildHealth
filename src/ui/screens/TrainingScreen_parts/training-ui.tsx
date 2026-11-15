@@ -372,12 +372,18 @@ export function usePlannerStepScroll(navKey: string, deps: React.DependencyList)
     try {
       const animate = Date.now() - mountedAt.current > 800;
       const behavior: ScrollBehavior = animate ? 'smooth' : 'auto';
-      const scroller = document.querySelector('.screen.training-screen') as HTMLElement | null;
+      const nav = document.querySelector(`[data-planner-step-nav="${navKey}"]`) as HTMLElement | null;
+      // Реальный скроллер — тело окна конструктора (`.tp-cbody`, overflow:auto),
+      // а не `.screen.training-screen`: тот лежит ПОД fixed-оверлеем конструктора,
+      // поэтому раньше «наверх» визуально не срабатывало и после смены шага
+      // пользователь оставался в середине предыдущего (выглядело как «экран
+      // перескочил»). Фолбэк оставлен для экранов без окна конструктора.
+      const scroller = (nav?.closest('.tp-cbody') as HTMLElement | null)
+        ?? (document.querySelector('.screen.training-screen') as HTMLElement | null);
       // Скролл «наверх» вызываем только если реально прокручено: пустой
       // scrollTo всё равно заставляет браузер пересчитать раскладку (~780 мс
       // на 4× CPU на тяжёлом конструкторе).
       if (scroller && typeof scroller.scrollTo === 'function' && scroller.scrollTop > 0) scroller.scrollTo({ top: 0, behavior });
-      const nav = document.querySelector(`[data-planner-step-nav="${navKey}"]`) as HTMLElement | null;
       const activeBtn = nav?.querySelector('button[aria-current="step"]') as HTMLElement | null;
       if (activeBtn && nav && typeof activeBtn.scrollIntoView === 'function') {
         // Пилюля уже в видимой зоне навигации — центрировать нечего.

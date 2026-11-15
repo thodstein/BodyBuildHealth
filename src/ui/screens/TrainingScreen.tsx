@@ -72,6 +72,7 @@ import {
 } from '../../engines/workout-logger.engine';
 import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
+import { shouldNavigateOnStorageEvent } from './TrainingScreen_parts/bb-auto-nav';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
@@ -144,6 +145,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   const [planningTrack, setPlanningTrackState] = useState<PlanningTrack>(getPlanningTrack());
   const [tab, setTab] = useState<TrainingTab>('runtime');
   const [page, setPage] = useState<TrainingPage>('hero');
+  // Свежая страница для обработчиков с пустыми зависимостями (storage-события
+  // из других окон): им нужно знать, открыто ли сейчас окно конструктора.
+  const pageRef = useRef<TrainingPage>('hero');
+  pageRef.current = page;
   const [zone, setZone] = useState<TrainingZone | null>(null);
   const switchPlanningTrack = (t: PlanningTrack | PlannerMode) => {
     setPlanningTrack(t as PlanningTrack);
@@ -555,12 +560,20 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   useEffect(() => { if (prevDays.current !== daysPerWeek) { prevDays.current = daysPerWeek; generatePlan(); } }, [daysPerWeek]);
   useEffect(() => { localStorage.setItem('myTrainingExercises', JSON.stringify(customExercises)); }, [customExercises]);
 
-  // Sync tab/planningTrack with 'storage' events (cross-tab + child-tab navigation via localStorage)
+  // Sync tab/planningTrack with 'storage' events (cross-tab + child-tab navigation via localStorage).
+  // Аудит навигации 2026-11 (P2): событие может прийти из ДРУГОГО окна/вкладки.
+  // Синтетические события этого документа (`new StorageEvent(...)` + dispatchEvent)
+  // имеют isTrusted === false — это осознанная навигация по клику, их отрабатываем
+  // как раньше. Настоящее кросс-оконное событие — чужое действие: оно не должно
+  // выдёргивать пользователя из открытого конструктора (окно «само перескакивало»).
+  // Выбранный трек/вкладка всё равно остаются в localStorage и применятся при
+  // следующем монтировании экрана (getPlanningTrack).
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
+      if (!shouldNavigateOnStorageEvent({ isTrusted: e.isTrusted, page: pageRef.current })) return;
       if (e.key === 'he_training_planning_track') {
         const val = localStorage.getItem('he_training_planning_track');
-        const allowed: PlanningTrack[] = ['pl','bb','manual','cardio','strength','combat'];
+        const allowed: PlanningTrack[] = ['pl','bb','manual','cardio','strength','combat','arm'];
         const parsed = (allowed as string[]).includes(val || '') ? (val as PlanningTrack) : 'pl';
         setPlanningTrack(parsed);
         setPlanningTrackState(parsed);
