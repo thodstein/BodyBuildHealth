@@ -31,6 +31,7 @@ import { readDiaryV2, onDiaryChangeV2, addMealEntryV2 } from './NutritionScreen_
 import { BarcodeScanner } from '../components/BarcodeScanner';
 import { NativeIcon } from '../native/NativeIcons';
 import { MetabolicHub } from './Shared/MetabolicHub';
+import { ProteinKidneyPanel } from './NutritionScreen_parts/ProteinKidneyPanel';
 import { RecipesTabModern } from './NutritionScreen_parts/RecipesTabModern';
 import { ModernHero, ModernPill, ModernSearch, modernCardBg } from './NutritionScreen_parts/nutrition-modern-kit';
 
@@ -46,7 +47,7 @@ import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'ration' | 'kitchen' | 'analysis' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'planreport' | 'organload' | 'peak' | 'periodization';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'proteinkidney' | 'planreport' | 'organload' | 'peak' | 'periodization';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
@@ -57,8 +58,8 @@ const SECTION_TABS: Record<NutritionSection, string[]> = {
   // planning оставлен legacy-алиасом (диплинки/тесты), в UI-переключателе не показывается.
   ration: ['mealplan', 'favorites', 'cart', 'peak'],
   kitchen: ['catalog', 'recipes', 'restaurant', 'customfood'],
-  analysis: ['reference', 'info', 'usefulness', 'metabolic', 'planreport', 'organload', 'periodization'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
+  analysis: ['reference', 'info', 'usefulness', 'metabolic', 'proteinkidney', 'planreport', 'organload', 'periodization'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic', 'proteinkidney'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ const TAB_LABELS: Record<string, string> = {
   quests: '🎯 Квесты',
   peri: '🥤 Пери-воркаут',
   metabolic: '⚖️ Метаболика',
+  proteinkidney: '🧪 Белок/почки',
   planreport: '📊 Отчёт',
   organload: '🧬 Нагрузка',
   peak: '🏁 Тапер',
@@ -1464,7 +1466,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         setTab(tab);
         setPage('tabs');
         if (tab === 'peak') setNutritionSection('ration');
-        else if (tab === 'planreport' || tab === 'organload' || tab === 'periodization') setNutritionSection('analysis');
+        else if (tab === 'planreport' || tab === 'organload' || tab === 'periodization' || tab === 'proteinkidney') setNutritionSection('analysis');
       } catch {}
     };
     window.addEventListener('nutrition-open-tab', handler as EventListener);
@@ -1601,6 +1603,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       case 'peri': return <InfoErrorBoundary label="Пери-воркаут"><PeriWorkoutCard /></InfoErrorBoundary>;
       case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
       case 'metabolic': return <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>;
+      case 'proteinkidney': return <InfoErrorBoundary label="Белок и почки"><ProteinKidneyPanel /></InfoErrorBoundary>;
       case 'planreport': return <InfoErrorBoundary label="Отчёт плана"><PlanReportTab /></InfoErrorBoundary>;
       case 'organload': return <InfoErrorBoundary label="Нагрузка БЖУ"><OrganLoadCalculator /></InfoErrorBoundary>;
       case 'periodization': return <InfoErrorBoundary label="Периодизация питания"><NutritionPeriodizationTab /></InfoErrorBoundary>;
@@ -1635,7 +1638,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
               { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: 'notebook' as const, title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
               { section: 'ration' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: 'bowl' as const, title: 'Мой рацион', desc: 'План, избранное, корзина', color: '#f97316' },
               { section: 'kitchen' as NutritionSection, tab: 'catalog' as ActiveTab, icon: 'bag' as const, title: 'Кухня', desc: 'Каталог, рецепты, рестораны', color: '#eab308' },
-              { section: 'analysis' as NutritionSection, tab: 'reference' as ActiveTab, icon: 'bookOpen' as const, title: 'Знания и анализ', desc: 'Справочник, полезность, метаболика', color: '#38bdf8' },
+              { section: 'analysis' as NutritionSection, tab: 'reference' as ActiveTab, icon: 'bookOpen' as const, title: 'Знания и анализ', desc: 'Справочник, метаболика, белок/почки', color: '#38bdf8' },
             ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} className="nutrition-hero-card" data-section={card.section} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
