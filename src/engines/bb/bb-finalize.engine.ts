@@ -1297,8 +1297,15 @@ function ensureDeltCoverageForUpperWeeks(plan: any, options: BBFinalizeOptions):
       const sideSets = rearCand ? Math.min(2, roomSets) : Math.min(3, roomSets);
       (session.exercises as any[]).push(mkDelt(useSide, sideSets, useSide === rearCand));
       roomSets -= sideSets;
-      if (rearCand && useSide !== rearCand && roomSets >= 2 && !usedNames.has(rearCand.name)) {
+      roomEx -= 1;
+      // P2-2 (аудит 2026-11): второе упражнение (задняя дельта) раньше добавлялось
+      // только по остатку СЕТОВ — при `roomEx === 1` день получал maxExercises+1 и
+      // валидатор ловил `session_exercise_cap`. Теперь место по упражнениям
+      // проверяется и расходуется для каждого добавления.
+      if (rearCand && useSide !== rearCand && roomEx >= 1 && roomSets >= 2 && !usedNames.has(rearCand.name)) {
         (session.exercises as any[]).push(mkDelt(rearCand, 2, true));
+        roomEx -= 1;
+        roomSets -= 2;
       }
       break;
     }

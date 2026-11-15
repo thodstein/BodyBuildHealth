@@ -2,8 +2,9 @@
 
 **Дата:** 2026-11-15 · **Область:** `src/engines/bb/*` (сборка, валидация, финализация, качество).
 
-Проход 1 — все P1 (§1). Проход 2 — два P2 из того же списка (§3): падение отчёта качества
-на плане без `weeks` и `-Infinity` в тексте валидатора.
+Проход 1 — все P1 (§1). Проход 2 — четыре P2 из того же списка (§3): падение отчёта
+качества на плане без `weeks`, `-Infinity` в тексте валидатора, кап упражнений на головки
+дельт и переполнение сессии при добивке дельт.
 
 Документ заменяет три рабочих отчёта аудита (они удалены, суть сохранена здесь):
 `BB-CORE-BUILD-AUDIT-2026-11.md`, `BB-FINALIZE-VALIDATION-AUDIT-2026-11.md`,
@@ -64,7 +65,7 @@ node --max-old-space-size=3200 ./node_modules/typescript/bin/tsc --noEmit
 # весь движок BB (312 файлов — с учётом bb-audit-p2-fixes.test.ts)
 node --max-old-space-size=3600 ./node_modules/vitest/vitest.mjs run "src/engines/bb/__tests__" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
 # Test Files: 308 passed | 4 skipped (312)
-# Tests:      3577 passed | 20 skipped (3597)   exit 0
+# Tests:      3580 passed | 20 skipped (3600)   exit 0
 ```
 
 Единственное падение первого прогона — `bb-controlled-rotation.test.ts > does not rotate
@@ -83,10 +84,13 @@ passed, exit 0.
 |---|---|---|---|
 | P2-6 | `buildBBQualityReport` падал `TypeError` на плане без `weeks` (импорт/частичный снапшот) — весь экран «Качество» вместо оценки | `bb-safety-score.engine.ts`, `bb-injury-prevention.engine.ts` | Общий нормализатор `planWeeks` (массив или пусто), проходы по частоте/объёму/MRV и `weeklySessions` больше не трогают `plan.weeks` напрямую; `calculateWeeklyStress`/`calculateSessionStress` терпят неделю без `sessions` и сессию без `exercises` |
 | P2-5 | `-Infinity` в пользовательском тексте `target_volume_deficit` | `bb-validator.engine.ts` | `Math.max(...[])` заменён на «есть строки объёма? max : 0» — при пустом (но существующем) `weeklyVolume` сообщение остаётся читаемым |
+| P2-1 | Кап упражнений на мышцу не канонизировал головки дельт: `delt_front`/`delt_mid`/`delt_rear` по 2 каждая + 4 «плечи» = до 10 упражнений на плечи в дне | `bb-session-order.engine.ts` | `MUSCLE_EX_CAP_GROUP` (`delt_*` → `shoulders`): общий лимит «плечи» 4 на день, свой лимит 2 на головку сохранён |
+| P2-2 | Добивка дельт добавляла второе упражнение только по остатку СЕТОВ → день получал `maxExercises + 1`, валидатор ловил `session_exercise_cap` уже после финализации | `bb-finalize.engine.ts` (`ensureDeltCoverageForUpperWeeks`) | `roomEx` проверяется и расходуется на каждое добавление (`roomEx >= 1`, `roomEx -= 1`), сеты тоже учитываются |
 
-Тесты: `src/engines/bb/__tests__/bb-audit-p2-fixes.test.ts` (4 теста) — `{}` и
+Тесты: `src/engines/bb/__tests__/bb-audit-p2-fixes.test.ts` (7 тестов) — `{}` и
 `{ weeks: [{ week: 1 }] }` не роняют отчёт/safety-скор/анализ стресса; сообщение дефицита
-не содержит `Infinity`/`NaN`.
+не содержит `Infinity`/`NaN`; шесть упражнений на дельты срезаются до общего лимита, а
+лимит на головку (2) сохранён; добивка дельт проверяет `roomEx` (source-guard).
 
 Кроме этого исправлено в том же проходе, но вне исходного списка аудита: пустые
 `weeklyVolume`-строки в валидаторе больше не дают `-Infinity` в проценте выполнения MEV.
@@ -111,9 +115,6 @@ passed, exit 0.
 
 ### Валидация/финализация/качество
 
-- P2-1. Кап упражнений на мышцу не канонизирует мышцу (`delt_*` обходят кап «плечи»).
-- P2-2. Добивка дельт добавляет второе упражнение без повторной проверки `roomEx`
-  (`session_exercise_cap`).
 - P2-3. Единственный ремонт safety-ограничений включён флагом `reorder` — в `faithful`-режиме
   error-коды валидатора остаются. (Исключённые мышцы из этого пункта уже выведены — см. §1.)
 - P2-4. Гейт «существенный объём» в `scoreProWeek` — тавтология (`>= 0 ||`).

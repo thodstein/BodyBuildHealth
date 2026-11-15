@@ -457,6 +457,14 @@ const MUSCLE_EX_CAP: Record<string, number> = {
   shoulders: 4, chest: 4, back: 4, quads: 4, hamstrings: 4, glutes: 4, legs: 4,
 };
 
+// P2-1 (аудит 2026-11): головки дельт — одна группа для ОБЩЕГО лимита. Без этого
+// `delt_front`/`delt_mid`/`delt_rear` считались независимо (по 2 каждая, итого 6)
+// плюс 4 «shoulders», и день набирал 7–10 упражнений на плечи — валидатор ловил
+// `session_exercise_cap` уже после капа. Свой лимит на головку (2) сохраняется.
+const MUSCLE_EX_CAP_GROUP: Record<string, string> = {
+  delt_front: 'shoulders', delt_mid: 'shoulders', delt_rear: 'shoulders',
+};
+
 // Keep at most N exercises per muscle in a session (anti-spam: 4 shrugs -> 2).
 // Ranks by primary role then heavier load; preserves original input order in output.
 // backCap: опытный enhanced (6+ лет) с про-объёмом спины получает до 6 паттернов —
@@ -476,12 +484,17 @@ export function capExercisesPerMuscle(exercises: BBExercise[], backCap = 4): BBE
     return a.i - b.i;
   });
   const counts: Record<string, number> = {};
+  const groupCounts: Record<string, number> = {};
   const keep = new Set<BBExercise>();
   for (const { ex } of ranked) {
     const m = ex.muscle || "";
-    const cap = m === 'back' ? backCap : (MUSCLE_EX_CAP[m] ?? 4);
-    if ((counts[m] || 0) >= cap) continue;
+    const group = MUSCLE_EX_CAP_GROUP[m] || m;
+    const groupCap = group === 'back' ? backCap : (MUSCLE_EX_CAP[group] ?? 4);
+    const perKeyCap = m === 'back' ? backCap : (MUSCLE_EX_CAP[m] ?? groupCap);
+    if ((counts[m] || 0) >= perKeyCap) continue;
+    if (group !== m && (groupCounts[group] || 0) >= groupCap) continue;
     counts[m] = (counts[m] || 0) + 1;
+    groupCounts[group] = (groupCounts[group] || 0) + 1;
     keep.add(ex);
   }
   const keptRest = rest.filter((e) => keep.has(e as any));
