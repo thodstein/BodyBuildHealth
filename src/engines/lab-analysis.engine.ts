@@ -362,6 +362,21 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
   }
   const prlCut = fem ? FEMALE_HORMONE_ULN.PRL.high : 350;
   if (prolactin !== null && prolactin > prlCut) hormoneScore += 20;
+
+  // Проход 91: женские механизмы (ановуляция, снижение овариального резерва,
+  // СПКЯ-подозрение) входят в гормональный балл — только женщине и ровно по тем
+  // условиям, что уже дали интерпретацию. Второго набора порогов нет: балл читает
+  // то же, что видит человек в разборе, поэтому они не могут разойтись.
+  // Ановуляция весит больше остальных: без овуляции нет ни лютеиновой фазы, ни
+  // беременности, и это единственный из трёх механизмов, который виден по числу
+  // без УЗИ и анамнеза.
+  if (fem) {
+    for (const interp of interpretations) {
+      if (interp.mechanism === 'ANOVULATION') hormoneScore += 20;
+      else if (interp.mechanism === 'OVARIAN_RESERVE_LOW' || interp.mechanism === 'PCOS_SUSPECT') hormoneScore += 15;
+    }
+  }
+
   hormoneScore = Math.min(100, hormoneScore);
 
   return { homaIR, liverStress, cardioRisk, inflammation, kidneyStress, hormoneScore, interpretations };

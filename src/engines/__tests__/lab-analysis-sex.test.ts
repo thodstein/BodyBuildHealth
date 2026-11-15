@@ -17,6 +17,8 @@
  * получает мужской механизм «подавление оси» (это не подавление).
  * Проход 89: прогестерон у женщины — лютеиновый сигнал ановуляции; мужской шкалы
  * у него нет вовсе, а без дня цикла он не судится.
+ * Проход 90: высокие ЛГ/ФСГ у женщины — своя линия (резерв / СПКЯ) в базовой фазе.
+ * Проход 91: те же механизмы входят в гормональный балл по тем же условиям.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -277,5 +279,43 @@ describe('проход 90: высокие гонадотропины у женщ
     const src = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
     expect(src).toContain("cycle?.phase === 'follicular' || cycle?.phase === 'menstrual'");
     expect(src).toContain('PCOS_SUSPECT');
+  });
+});
+
+describe('проход 91: женские механизмы входят в гормональный балл', () => {
+  const luteal = cycleState({ sex: 'female', lastPeriodStart: '2026-10-30', cycleLengthDays: 28 }, '2026-11-14');
+  const follicular = cycleState({ sex: 'female', lastPeriodStart: '2026-11-05', cycleLengthDays: 28 }, '2026-11-14');
+  const score = (
+    labs: Array<{ code: string; value: number }>,
+    sex?: 'male' | 'female',
+    cycle: ReturnType<typeof cycleState> | null = null,
+  ) => interpretLabs(labs as any, sex, cycle).hormoneScore;
+
+  it('ановуляция (лютеиновая PROG 2) добавляет 20, лютеиновая 12 — ничего', () => {
+    expect(score([{ code: 'PROG', value: 2 }], 'female', luteal)).toBe(20);
+    expect(score([{ code: 'PROG', value: 12 }], 'female', luteal)).toBe(0);
+  });
+
+  it('базовый ФСГ 14 добавляет 15, ФСГ 7 — ничего', () => {
+    expect(score([{ code: 'FSH', value: 14 }], 'female', follicular)).toBe(15);
+    expect(score([{ code: 'FSH', value: 7 }], 'female', follicular)).toBe(0);
+  });
+
+  it('СПКЯ-подозрение (ЛГ 18 / ФСГ 7) добавляет 15', () => {
+    expect(score([{ code: 'LH', value: 18 }, { code: 'FSH', value: 7 }], 'female', follicular)).toBe(15);
+  });
+
+  it('лютеиновая ЛГ 20 в балл не идёт — это физиология', () => {
+    expect(score([{ code: 'LH', value: 20 }], 'female', luteal)).toBe(0);
+  });
+
+  it('мужчине женские механизмы балл не поднимают', () => {
+    expect(score([{ code: 'PROG', value: 2 }], 'male')).toBe(0);
+  });
+
+  it('источник: балл читает интерпретации, а не второй набор порогов', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
+    expect(src).toContain("interp.mechanism === 'ANOVULATION'");
+    expect(src).toContain("interp.mechanism === 'OVARIAN_RESERVE_LOW' || interp.mechanism === 'PCOS_SUSPECT'");
   });
 });
