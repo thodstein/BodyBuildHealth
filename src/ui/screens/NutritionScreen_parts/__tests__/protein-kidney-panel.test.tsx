@@ -5,10 +5,11 @@
  * поле рисуется, а значение не доходит до расчёта. Здесь дёргаем UI как пользователь.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
-import { ProteinKidneyPanel, buildRetestIcs } from '../ProteinKidneyPanel';
+import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { ProteinKidneyPanel, buildRetestIcs, mergeLatestLabs } from '../ProteinKidneyPanel';
 import { NutritionScreen } from '../../NutritionScreen';
 import { PROTEIN_KIDNEY_INPUT_KEY } from '../../../../engines/protein-kidney-tolerance.engine';
+import { db } from '../../../../core/db';
 
 /** Выбрать вариант в ScorePicker по подписи поля (например, «Белок в тест-полоске» → «отр»). */
 function pickScore(label: string, option: string) {
@@ -193,5 +194,42 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     expect(ics).toContain('SUMMARY:Пересдать: белок\\, почки');
     expect(ics).toContain('DESCRIPTION:Сдать ОАМ\\; urea');
     expect(ics).toContain('END:VCALENDAR');
+  });
+
+  it('14. mergeLatestLabs: свежая дата побеждает, чужой patientId не смешивается', () => {
+    const merged = mergeLatestLabs(
+      {
+        UREA: { value: 9, unit: 'ммоль/л', date: '2026-10-01' },
+        CREATININE: { value: 80, unit: 'мкмоль/л', date: '2026-11-01' },
+      },
+      [
+        { code: 'UREA', value: 6.5, unit: 'ммоль/л', date: '2026-11-05', patientId: 'current-user' },
+        { code: 'CREATININE', value: 70, unit: 'мкмоль/л', date: '2026-10-01', patientId: 'current-user' },
+        { code: 'CYSTATIN_C', value: 0.8, unit: 'мг/л', date: '2026-11-06', patientId: 'other' },
+        { code: 'EGFR', value: 101, date: '2026-11-06' },
+      ],
+      'current-user',
+    );
+    expect(merged.UREA.value).toBe(6.5);
+    expect(merged.CREATININE.value).toBe(80); // старая дата не перетирает свежую
+    expect(merged.CYSTATIN_C).toBeUndefined(); // чужой пациент
+    expect(merged.EGFR.value).toBe(101); // запись без patientId — своя
+  });
+
+  it('15. кнопка «Из анализов» тянет labs_log, а не только профиль', async () => {
+    await db.clear('labs_log');
+    await db.put('labs_log', {
+      id: 'pk-urea', code: 'UREA', value: 7.4, unit: 'ммоль/л', date: '2026-11-10', patientId: 'current-user',
+    });
+    await db.put('labs_log', {
+      id: 'pk-creat', code: 'CREATININE', value: 92, unit: 'мкмоль/л', date: '2026-11-10', patientId: 'current-user',
+    });
+    render(<ProteinKidneyPanel />);
+    const btn = document.querySelector('button[aria-label="Подтянуть анализы из раздела Анализы"]') as HTMLElement | null;
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn as HTMLElement);
+    await waitFor(() => expect(bodyText()).toContain('Подтянуто из анализов: 2'));
+    // Поля реально заполнены: значение ушло в расчёт, а не только в сообщение.
+    expect(bodyText()).toContain('мочевина 7.4');
   });
 });

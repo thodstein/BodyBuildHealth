@@ -23,6 +23,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlanCtx } from './IndividualPlan/IndividualPlanContext';
 import { readPlanTargets } from './IndividualPlan/plan-targets-bridge';
 import { getProfile } from '../../../core/profile-manager';
+import { db } from '../../../core/db';
 import {
   ALBUMINURIA_LABEL,
   GFR_CATEGORY_LABEL,
@@ -227,6 +228,58 @@ function safeRead<T>(key: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** Строка из `labs_log` (IndexedDB): результат из раздела «Анализы». */
+export interface LabDbRow {
+  code?: string;
+  value?: unknown;
+  unit?: unknown;
+  date?: string;
+  patientId?: string;
+}
+
+/**
+ * Свежие значения по коду из двух источников: сводка профиля и `labs_log`.
+ *
+ * Зачем: профиль обновляется не мгновенно, а раздел «Анализы» пишет напрямую
+ * в IndexedDB. Кнопка «Из анализов» должна видеть только что сданный результат,
+ * не дожидаясь фоновой синхронизации. Побеждает более свежая дата; записи без
+ * `patientId` считаем своими (старый формат), чужих не смешиваем.
+ */
+export function mergeLatestLabs(
+  profileSummary: Record<string, { value?: unknown; unit?: unknown; date?: string }> | null | undefined,
+  entries: LabDbRow[],
+  patientId: string,
+): Record<string, { value: number; unit?: string }> {
+  const out: Record<string, { value: number; unit?: string; date: string }> = {};
+  for (const [rawKey, entry] of Object.entries(profileSummary || {})) {
+    const key = String(rawKey || '').trim().toUpperCase();
+    const value = Number(entry?.value);
+    if (!key || !Number.isFinite(value)) continue;
+    out[key] = {
+      value,
+      unit: entry?.unit == null ? undefined : String(entry.unit),
+      date: typeof entry?.date === 'string' ? entry.date : '',
+    };
+  }
+  for (const row of entries) {
+    const key = String(row?.code ?? '').trim().toUpperCase();
+    const value = Number(row?.value);
+    if (!key || !Number.isFinite(value)) continue;
+    if (row.patientId && row.patientId !== patientId) continue;
+    const date = typeof row.date === 'string' ? row.date : '';
+    const prev = out[key];
+    // Если у старой записи есть дата, а у новой нет — не можем доказать, что
+    // она свежее; оставляем проверенное значение.
+    if (prev?.date && (!date || date < prev.date)) continue;
+    out[key] = {
+      value,
+      unit: row.unit == null ? undefined : String(row.unit),
+      date,
+    };
+  }
+  return out;
 }
 
 /** Достаём значение из settings.labs.summary по списку алиасов. */
@@ -459,6 +512,9 @@ export const ProteinKidneyPanel: React.FC = () => {
   const [history, setHistory] = useState<ProteinKidneySnapshot[]>(() => loadProteinKidneyHistory());
   const [showMethod, setShowMethod] = useState(false);
   const [savedMsg, setSavedMsg] = useState('');
+  const [labsBusy, setLabsBusy] = useState(false);
+  const [labsNotice, setLabsNotice] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
+  const labsNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setOptional = useCallback((key: OptionalNumKey, v: number | undefined) => {
     manualRef.current[key] = true;
@@ -474,17 +530,13 @@ export const ProteinKidneyPanel: React.FC = () => {
   const valuesRef = useRef(state);
   useEffect(() => { valuesRef.current = state; }, [state]);
 
-  /** Подтягиваем лабы из профиля: ручной ввод и уже показанное не затираем. */
-  const pullLabs = useCallback((force = false) => {
-    let labs: Record<string, { value?: unknown; unit?: unknown }> = {};
-    try {
-      labs = ((getProfile()?.settings as any)?.labs?.summary) || {};
-    } catch {
-      labs = {};
-    }
-    if (!labs || typeof labs !== 'object') return;
-
+  /** Раскладываем сводку анализов по полям. Возвращает число применённых. */
+  const applyLabSummary = useCallback((
+    labs: Record<string, { value?: unknown; unit?: unknown }>,
+    force: boolean,
+  ): number => {
     const cur = valuesRef.current;
+    let applied = 0;
     const apply = (key: OptionalNumKey, raw: { key: string; value: number; unit: string } | null, convert?: (v: number, u: string, labKey: string) => number) => {
       if (!raw) return;
       if (!force && manualRef.current[key]) return;
@@ -493,18 +545,11 @@ export const ProteinKidneyPanel: React.FC = () => {
       const value = convert ? convert(raw.value, raw.unit, raw.key) : raw.value;
       if (!Number.isFinite(value)) return;
       pulledRef.current[key] = true;
+      // Явное «подтянуть» снимает ручную блокировку: значение снова из анализов.
+      if (force) delete manualRef.current[key];
+      applied += 1;
       setState((s) => ({ ...s, [key]: value }));
     };
-
-    // «Белок сейчас» следует за планом, пока пользователь не поправил его вручную.
-    if (!manualRef.current.proteinGPerDay) {
-      const planProtein = (() => {
-        try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
-      })();
-      if (planProtein > 0 && Math.abs(cur.proteinGPerDay - planProtein) > 1) {
-        setState((s) => ({ ...s, proteinGPerDay: Math.round(planProtein) }));
-      }
-    }
 
     apply('ureaMmolL', pickLab(labs, ['UREA', 'Urea', 'urea', 'Мочевина', 'BUN']), ureaMmol);
     apply('creatinineUmolL', pickLab(labs, ['CREATININE', 'Creatinine', 'creatinine', 'Креатинин']), creatinineUmol);
@@ -524,7 +569,69 @@ export const ProteinKidneyPanel: React.FC = () => {
     apply('urineGlucoseScore', pickLab(labs, ['URINE_GLUCOSE_QR', 'urine_glucose_qr']), (v) => Math.max(0, Math.min(4, v)));
     apply('urineKetonesScore', pickLab(labs, ['URINE_KETONES_QR', 'urine_ketones_qr']), (v) => Math.max(0, Math.min(4, v)));
     apply('urineCastsPerUl', pickLab(labs, ['URINE_CYLINDERS', 'urine_cylinders', 'Цилиндры мочи']));
+    return applied;
   }, []);
+
+  const notifyLabs = useCallback((text: string, tone: 'ok' | 'warn') => {
+    setLabsNotice({ text, tone });
+    if (labsNoticeTimer.current) clearTimeout(labsNoticeTimer.current);
+    labsNoticeTimer.current = setTimeout(() => setLabsNotice(null), 4200);
+  }, []);
+
+  useEffect(() => () => {
+    if (labsNoticeTimer.current) clearTimeout(labsNoticeTimer.current);
+  }, []);
+
+  /** Подтягиваем лабы из профиля: ручной ввод и уже показанное не затираем. */
+  const pullLabs = useCallback((force = false) => {
+    let labs: Record<string, { value?: unknown; unit?: unknown }> = {};
+    try {
+      labs = ((getProfile()?.settings as any)?.labs?.summary) || {};
+    } catch {
+      labs = {};
+    }
+    if (!labs || typeof labs !== 'object') return;
+
+    const cur = valuesRef.current;
+    // «Белок сейчас» следует за планом, пока пользователь не поправил его вручную.
+    if (!manualRef.current.proteinGPerDay) {
+      const planProtein = (() => {
+        try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
+      })();
+      if (planProtein > 0 && Math.abs(cur.proteinGPerDay - planProtein) > 1) {
+        setState((s) => ({ ...s, proteinGPerDay: Math.round(planProtein) }));
+      }
+    }
+    applyLabSummary(labs, force);
+  }, [applyLabSummary]);
+
+  /**
+   * Кнопка «Из анализов»: читает `labs_log` напрямую (IndexedDB), не дожидаясь
+   * фоновой синхронизации профиля. Свежесть — по дате бланка, чужие patientId
+   * отбрасываются.
+   */
+  const pullLabsFromDb = useCallback(async () => {
+    if (labsBusy) return;
+    setLabsBusy(true);
+    try {
+      const entries = await db.getAll<LabDbRow>('labs_log');
+      const profile = (() => {
+        try { return getProfile(); } catch { return null; }
+      })();
+      const patientId = profile?.id || 'current-user';
+      const profileSummary = (() => {
+        try { return (profile?.settings as any)?.labs?.summary || {}; } catch { return {}; }
+      })();
+      const merged = mergeLatestLabs(profileSummary, Array.isArray(entries) ? entries : [], patientId);
+      const applied = applyLabSummary(merged, true);
+      if (applied > 0) notifyLabs(`Подтянуто из анализов: ${applied}`, 'ok');
+      else notifyLabs('В анализах нет нужных маркеров — заполните вручную', 'warn');
+    } catch {
+      notifyLabs('Не удалось прочитать раздел «Анализы»', 'warn');
+    } finally {
+      setLabsBusy(false);
+    }
+  }, [applyLabSummary, labsBusy, notifyLabs]);
 
   useEffect(() => {
     pullLabs();
@@ -681,16 +788,41 @@ export const ProteinKidneyPanel: React.FC = () => {
             ОАМ + мочевина + креатинин → сколько белка ещё можно добавить
           </div>
         </div>
+      </div>
+
+      {/* Два источника: профиль (план, вес, вода) и раздел «Анализы» (labs_log). */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         <button
           type="button"
           onClick={resetFromProfile}
-          aria-label="Подтянуть анализы из профиля заново"
+          aria-label="Подтянуть данные из профиля заново"
           style={{
-            minHeight: 44, padding: '0 12px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff',
+            flex: 1, minHeight: 44, padding: '0 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff',
           }}
-        >↻ Профиль</button>
+        >↻ Из профиля</button>
+        <button
+          type="button"
+          onClick={() => void pullLabsFromDb()}
+          disabled={labsBusy}
+          aria-label="Подтянуть анализы из раздела Анализы"
+          style={{
+            flex: 1, minHeight: 44, padding: '0 10px', borderRadius: 10, fontSize: 10, fontWeight: 800,
+            cursor: labsBusy ? 'progress' : 'pointer', opacity: labsBusy ? 0.65 : 1,
+            background: 'rgba(56,189,248,0.14)', border: '1px solid rgba(56,189,248,0.32)', color: '#7dd3fc',
+          }}
+        >{labsBusy ? 'Читаю анализы…' : '↻ Из анализов'}</button>
       </div>
+      {labsNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            marginTop: -2, marginBottom: 8, padding: '0 2px', fontSize: 9, lineHeight: 1.4,
+            color: labsNotice.tone === 'ok' ? '#22c55e' : '#f59e0b',
+          }}
+        >{labsNotice.text}</div>
+      )}
 
       {result.dataIssues.length > 0 && (
         <div role="alert" style={{
