@@ -30,6 +30,7 @@ import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-
 import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { getLabNorm } from '../../engines/lab-norms.engine';
+import { normalizeLabMeasurement } from '../../core/labs-mapping';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
@@ -1863,12 +1864,17 @@ export const LabsRisksTab: React.FC = () => {
       const ref = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
       if (!ref?.uln || !ref?.lln) continue;
       const coeff = ref.coeff || 1;
-      const norm = lab.value * coeff;
+      // Проход 93: единица бланка главнее коэффициента (HGB 150 г/л не становится
+      // 1500); без единицы — прежний `coeff`.
+      const hasUnit = !!String(lab.unit || '').trim();
+      const normalized = hasUnit ? normalizeLabMeasurement(lab.code, lab.value, String(lab.unit)) : null;
+      const factor = normalized && lab.value ? normalized.value / lab.value : coeff;
+      const norm = lab.value * factor;
       // Проход 92: бланк главнее, затем ВГН пола (♀ HCT 48, АЛТ/АСТ/ГГТ 31,
       // креатинин 97, мочевая кислота 350), и только потом общий ряд UCUM.
       const normPair = getLabNorm(lab.code, profileSex);
-      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : (normPair?.uln ?? ref.uln);
-      const lln = lab.refLow !== undefined ? lab.refLow * coeff : (normPair?.lln ?? ref.lln);
+      const uln = lab.refHigh !== undefined ? lab.refHigh * factor : (normPair?.uln ?? ref.uln);
+      const lln = lab.refLow !== undefined ? lab.refLow * factor : (normPair?.lln ?? ref.lln);
       let deviation = 0;
       if (norm > uln) deviation = (norm - uln) / uln;
       else if (norm < lln) deviation = -((lln - norm) / lln);

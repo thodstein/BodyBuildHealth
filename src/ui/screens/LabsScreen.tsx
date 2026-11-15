@@ -32,7 +32,7 @@ import { describeOcrFailure, processUploadedFile, saveParsedLabs, type ParsedLab
 import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
-import { normalizedRatio } from '../../core/labs-mapping';
+import { normalizedRatio, normalizeLabMeasurement } from '../../core/labs-mapping';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
@@ -466,12 +466,19 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       const ref = (UCUM_MAP as any)[lab.code] || (UCUM_MAP as any)[lab.code.toUpperCase()] || (UCUM_MAP as any)[lab.code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === String(lab.code).toLowerCase())?.[1] as any);
       if (!ref) continue;
       const coeff = ref.coeff || 1;
-      const norm = lab.value * coeff;
+      // Проход 93: если единица бланка известна, число и диапазон бланка приводятся
+      // к единице приложения одним множителем (`normalizeLabMeasurement`): HGB
+      // 150 г/л больше не становится 1500 и не даёт 782% отклонения. Единицы нет —
+      // прежний `coeff`.
+      const hasUnit = !!String(lab.unit || '').trim();
+      const normalized = hasUnit ? normalizeLabMeasurement(lab.code, lab.value, String(lab.unit)) : null;
+      const factor = normalized && lab.value ? normalized.value / lab.value : coeff;
+      const norm = lab.value * factor;
       // Prefer stored reference ranges from parsed lab forms;
       // fall back to UCUM_MAP defaults (Л8: женские границы при sex=female) when not available.
       const fallbackNorm = getLabNorm(lab.code, profileSex as 'male' | 'female');
-      const uln = lab.refHigh !== undefined ? lab.refHigh * coeff : (fallbackNorm?.uln ?? ref.uln);
-      const lln = lab.refLow !== undefined ? lab.refLow * coeff : (fallbackNorm?.lln ?? ref.lln);
+      const uln = lab.refHigh !== undefined ? lab.refHigh * factor : (fallbackNorm?.uln ?? ref.uln);
+      const lln = lab.refLow !== undefined ? lab.refLow * factor : (fallbackNorm?.lln ?? ref.lln);
       let deviation = 0;
       if (norm > uln) deviation = (norm - uln) / uln;
       else if (norm < lln) deviation = -((lln - norm) / lln);

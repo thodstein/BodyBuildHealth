@@ -2,6 +2,7 @@ import { UCUM_MAP } from '../core/constants';
 import type { LabPoint, RiskResult } from '../core/types';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../core/constants';
 import { getLabNorm } from './lab-norms.engine';
+import { normalizeLabMeasurement } from '../core/labs-mapping';
 
 interface RiskSystemContribution {
   [key: string]: number;
@@ -206,8 +207,15 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
     const lln = normPair ? normPair.lln : reference.lln; // Lower limit of normal (in prefUnit)
     const coeff = reference.coeff || 1; // Unit conversion coefficient
 
-    // Normalize value to the same units as ULN/LLN
-    const norm = value * coeff;
+    // Проход 93: единица бланка главнее коэффициента. `coeff` в UCUM описан как
+    // «гемоглобин в г/дл» (×10), поэтому HGB 150 г/л превращался в 1500 и давал
+    // 782% отклонения при норме. Пересчёт — тем же `normalizeLabMeasurement`, что
+    // и в остальных потребителях (г/л, мг/дл, мккат/л, пмоль/л). Единицы нет —
+    // остаётся прежний `coeff`: старые записи читаются байт-в-байт.
+    const hasUnit = !!String(unit || '').trim();
+    const norm = hasUnit
+      ? normalizeLabMeasurement(code, value, String(unit)).value
+      : value * coeff;
 
     // Get the system mappings for this lab code
     const systemMapEntry = CODE_TO_SYSTEM_MAP[code];
