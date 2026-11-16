@@ -1659,7 +1659,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   }
 
   return (
-    <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
+    <div className="screen nutrition nutrition-screen nutrition-tabs" style={{ position:'relative', flex:1, minHeight:0, display:'flex', flexDirection:'column', overflow:'hidden', padding:0 }}>
       <div className="nutrition-tabs-head" style={{
         display:'flex', flexDirection:'column', alignItems:'stretch', gap:0, padding:'8px 12px 8px', flexShrink:0,
         background:'#18181b',
@@ -1706,58 +1706,62 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           </button>
         )}
         </div>
-        {navOpen && (
-          <div role="dialog" aria-label="Меню питания" style={{ position:'fixed', inset:0, zIndex:1000 }} onClick={e => { if (e.target === e.currentTarget) setNavOpen(false); }}>
-            <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} onClick={() => setNavOpen(false)} />
-            <div className="nutrition-nav-drawer" style={{
-              position:'absolute', top:0, bottom:0, left:0, width:'min(84vw,320px)',
-              background:'#18181b', borderRight:'1px solid rgba(255,255,255,0.08)',
-              boxShadow:'8px 0 32px rgba(0,0,0,0.5)', overflowY:'auto',
-              padding:'12px 12px calc(16px + max(env(safe-area-inset-bottom,0px),0px))',
-            }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                <div style={{ flex:1, fontSize:14, fontWeight:800, color:'#fff' }}>Питание</div>
-                <button onClick={() => setNavOpen(false)} aria-label="Закрыть меню" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16 }}>✕</button>
-              </div>
-              {([
-                { id: 'diary' as NutritionSection, label: '📓 Дневник' },
-                { id: 'ration' as NutritionSection, label: '🥗 Рацион' },
-                { id: 'kitchen' as NutritionSection, label: '🍳 Кухня' },
-                { id: 'analysis' as NutritionSection, label: '📊 Анализ' },
-              ]).map(s => (
-                <div key={s.id} style={{ marginBottom:10 }}>
-                  <button onClick={() => { setNutritionSection(s.id); const first = (SECTION_TABS[s.id] || [])[0]; if (first) setTab(first as ActiveTab); }} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
-                    width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
-                    fontSize:12, fontWeight:800,
-                    border: nutritionSection === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-                    background: nutritionSection === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
-                    color: nutritionSection === s.id ? '#00e68a' : '#fff',
-                  }}>{s.label}</button>
-                  <div className="nutrition-chips" style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
-                    {(SECTION_TABS[s.id] || []).map(t => {
-                      const isActive = tab === t;
-                      return (
-                        <button key={t} onClick={() => { setTab(t as ActiveTab); setNutritionSection(s.id); setNavOpen(false); }} className="nutrition-chip" data-active={isActive} style={{
-                          width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
-                          fontSize:12, fontWeight: isActive ? 800 : 600,
-                          border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
-                          background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                          color: isActive ? '#000' : '#fff',
-                        }}>
-                          {TAB_LABELS[t] || t}
-                          {t === 'cart' && cartCount > 0 && (
-                            <span style={{ marginLeft:6, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a' }}>{cartCount}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+      {/* Меню питания — ВНЕ .nutrition-tabs-head: backdrop-filter шапки
+          превращал position:fixed в containing block, и выдвижная панель
+          обрезалась высотой шапки (подвкладки были недоступны). Теперь это
+          absolute-оверлей всего экрана Питания. */}
+      {navOpen && (
+        <div role="dialog" aria-label="Меню питания" style={{ position:'absolute', inset:0, zIndex:1000 }} onClick={e => { if (e.target === e.currentTarget) setNavOpen(false); }}>
+          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.6)' }} onClick={() => setNavOpen(false)} />
+          <div className="nutrition-nav-drawer" style={{
+            position:'absolute', top:0, bottom:0, left:0, width:'min(84vw,320px)',
+            background:'#18181b', borderRight:'1px solid rgba(255,255,255,0.08)',
+            boxShadow:'8px 0 32px rgba(0,0,0,0.5)', overflowY:'auto',
+            padding:'12px 12px calc(16px + max(env(safe-area-inset-bottom,0px),0px))',
+          }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <div style={{ flex:1, fontSize:14, fontWeight:800, color:'#fff' }}>Питание</div>
+              <button onClick={() => setNavOpen(false)} aria-label="Закрыть меню" style={{ width:44, height:44, borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:16 }}>✕</button>
+            </div>
+            {([
+              { id: 'diary' as NutritionSection, label: '📓 Дневник' },
+              { id: 'ration' as NutritionSection, label: '🥗 Рацион' },
+              { id: 'kitchen' as NutritionSection, label: '🍳 Кухня' },
+              { id: 'analysis' as NutritionSection, label: '📊 Анализ' },
+            ]).map(s => (
+              <div key={s.id} style={{ marginBottom:10 }}>
+                <button onClick={() => { setNutritionSection(s.id); const first = (SECTION_TABS[s.id] || [])[0]; if (first) setTab(first as ActiveTab); }} className="nutrition-section" data-active={nutritionSection === s.id} aria-pressed={nutritionSection === s.id} style={{
+                  width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
+                  fontSize:12, fontWeight:800,
+                  border: nutritionSection === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                  background: nutritionSection === s.id ? 'rgba(0,230,138,0.12)' : 'transparent',
+                  color: nutritionSection === s.id ? '#00e68a' : '#fff',
+                }}>{s.label}</button>
+                <div className="nutrition-chips" style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4 }}>
+                  {(SECTION_TABS[s.id] || []).map(t => {
+                    const isActive = tab === t;
+                    return (
+                      <button key={t} onClick={() => { setTab(t as ActiveTab); setNutritionSection(s.id); setNavOpen(false); }} className="nutrition-chip" data-active={isActive} style={{
+                        width:'100%', padding:'10px 12px', borderRadius:10, cursor:'pointer', minHeight:44, textAlign:'left',
+                        fontSize:12, fontWeight: isActive ? 800 : 600,
+                        border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+                        background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                        color: isActive ? '#000' : '#fff',
+                      }}>
+                        {TAB_LABELS[t] || t}
+                        {t === 'cart' && cartCount > 0 && (
+                          <span style={{ marginLeft:6, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a' }}>{cartCount}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {isNativeApp() && scanOpen && (
         <BarcodeScanner onProductFound={(p) => onScanProduct(p)} onClose={() => setScanOpen(false)} />
       )}

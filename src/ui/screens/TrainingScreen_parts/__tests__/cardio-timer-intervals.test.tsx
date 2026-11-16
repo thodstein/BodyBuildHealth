@@ -185,9 +185,16 @@ describe('CardioDiaryPanel: факт по подходам виден в жур�
   });
 
   it('сводка за 14 дней: подходы и недобор по сессиям', () => {
+    // Даты считаем от «сегодня»: жёсткие 2026-11-01/03 выпадали из 14-дневного
+    // окна, и тест падал просто от смены календарной даты.
+    const daysAgoIso = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
     const log: CardioLogEntry[] = [
-      { id: 'iv-2', date: '2026-11-01', type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 8 },
-      { id: 'iv-3', date: '2026-11-03', type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 6 },
+      { id: 'iv-2', date: daysAgoIso(6), type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 8 },
+      { id: 'iv-3', date: daysAgoIso(2), type: 'hiit', durationMin: 40, completed: true, intervalsPlanned: 8, intervalsDone: 6 },
     ];
     const { container } = render(<CardioDiaryPanel cycle={null} log={log} />);
     const block = container.querySelector('[data-cardio="interval-adherence"]');

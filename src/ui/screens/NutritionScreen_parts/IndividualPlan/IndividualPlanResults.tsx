@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, findFoodByIdOrName } from '../../../../core/nutrition-database';
 import { pickReplaceIdxForIssue } from "./planner-issue-replace";
@@ -37,6 +37,10 @@ import {
   loadAbSnapshots, saveAbSnapshot, removeAbSnapshot, snapshotFromDayPlan, diffAbSnapshots,
   AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
 } from "./planner-ab-compare";
+import {
+  readActivePlan, readPlanArchive, restorePlanFromArchive, removeArchivedPlan,
+  PLAN_ARCHIVE_EVENT, publishPlanTargetsFor,
+} from "./planner-plan-archive";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -277,6 +281,21 @@ export const IndividualPlanResults: React.FC = () => {
   const [abSnaps, setAbSnaps] = useState<Partial<Record<AbSlot, AbPlanSnapshot>>>(() => loadAbSnapshots());
   const [abDiff, setAbDiff] = useState<AbDiffResult | null>(null);
   const [abShowDiff, setAbShowDiff] = useState(false);
+  // Активный план + архив: читаем сами (а не из контекста), чтобы карточка
+  // «Сохранённые планы» переживала перезагрузку и обновлялась по событию.
+  const [activePlan, setActivePlan] = useState(() => readActivePlan());
+  const [planArchive, setPlanArchive] = useState(() => readPlanArchive());
+  useEffect(() => {
+    const sync = () => { setActivePlan(readActivePlan()); setPlanArchive(readPlanArchive()); };
+    sync();
+    window.addEventListener(PLAN_ARCHIVE_EVENT, sync);
+    return () => window.removeEventListener(PLAN_ARCHIVE_EVENT, sync);
+  }, [savedPlans.length]);
+  // Планы, уехавшие в архив, не показываем в «Сохранённых планах» — иначе
+  // одна и та же запись висела бы в двух списках. В localStorage список
+  // остаётся полным: он уходит в coach-бандлы (передача рационов клиенту).
+  const archivedPlanIds = new Set(planArchive.map((p: any) => p.id));
+  const visibleSavedPlans = savedPlans.filter((p: any) => !archivedPlanIds.has(p.id));
 
 /**
  * B5: выбор «жертвы» для замены вынесен в отдельный модуль
@@ -2657,20 +2676,23 @@ const doImportPlan = (raw: string): boolean => {
         </GlassCard>
       )}
 
-      {savedPlans.length > 0 && (
+      {visibleSavedPlans.length > 0 && (
         <GlassCard title="Сохранённые планы" icon="📂" color="#8b5cf6">
-          {savedPlans.slice(0, 10).map((p: any, pi: number) => {
+          {visibleSavedPlans.slice(0, 10).map((p: any) => {
             const isExpanded = p.id === (expandedSavedId as any);
             return (
               <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
+                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 6, padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
                   onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{p.name || p.date}</span>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {activePlan?.id === p.id && (
+                    <span aria-label="Активный план" style={{ fontSize: 8, fontWeight: 800, color: '#00e68a', padding: '2px 7px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.28)', whiteSpace: 'nowrap' }}>● активный</span>
+                  )}
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 'auto' }}>
                      <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}</span>
                      <button aria-label="Загрузить сохранённый план" onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
                      <button aria-label="Поделиться сохранённым планом" onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; void shareOrCopyText('Сохранённый план', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать сохранённый план.'); }); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
-                     <button aria-label="Удалить сохранённый план" onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((_: any, j: number) => j !== pi); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
+                     <button aria-label="Удалить сохранённый план" onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((x: any) => x.id !== p.id); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
                   </div>
                 </div>
                 {isExpanded && (
@@ -2698,6 +2720,50 @@ const doImportPlan = (raw: string): boolean => {
               </div>
             );
           })}
+        </GlassCard>
+      )}
+
+      {/* Архив планов: сюда уезжает предыдущий активный план при сохранении
+          нового. Можно вернуть в работу или удалить. */}
+      {planArchive.length > 0 && (
+        <GlassCard title="Архив планов" icon="🗄" color="#94a3b8">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>
+            Здесь лежат предыдущие планы. При сохранении нового активный план автоматически уходит сюда.
+          </div>
+          {planArchive.slice(0, 10).map((p: any) => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', marginBottom: 6, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{p.name || p.date}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
+                  {p.date}{p.dayPlan ? ` · ${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}
+                </div>
+              </div>
+              <button
+                aria-label="Вернуть план из архива"
+                title="Вернуть план в работу"
+                onClick={() => {
+                  const restored = restorePlanFromArchive(p.id);
+                  if (!restored) return;
+                  publishPlanTargetsFor(restored);
+                  loadSavedPlan(restored);
+                  const updated = [restored, ...savedPlans.filter((x: any) => x.id !== restored.id)].slice(0, 10);
+                  setSavedPlans(updated);
+                  try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {}
+                }}
+                className="plan-mini"
+                style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 700 }}>
+                ↩
+              </button>
+              <button
+                aria-label="Удалить план из архива"
+                title="Удалить из архива"
+                onClick={() => { removeArchivedPlan(p.id); }}
+                className="plan-mini"
+                style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 700 }}>
+                ✕
+              </button>
+            </div>
+          ))}
         </GlassCard>
       )}
 

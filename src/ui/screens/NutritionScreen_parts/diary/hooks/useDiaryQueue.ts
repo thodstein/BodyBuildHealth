@@ -34,8 +34,9 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   const [customFoodF, setCustomFoodF] = useState('5');
   const [customFoodC, setCustomFoodC] = useState('10');
 
-  const addFoodFromDB = useCallback((food: FoodItemLike) => {
-    setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: 100, category: food.category || 'other' }]);
+  const addFoodFromDB = useCallback((food: FoodItemLike, qty = 100) => {
+    const grams = Math.max(10, Math.min(2000, Math.round(Number(qty) || 100)));
+    setParsedItems(prev => [...prev, { name: food.name, kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, qty: grams, category: food.category || 'other' }]);
     // Поиск НЕ сбрасываем: иначе после каждого «＋» список результатов
     // схлопывается и приходится искать заново — добавить несколько
     // продуктов подряд становится невозможно.
@@ -88,17 +89,26 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
 
   const labelScan = useLabelScan({ showToast, onAddToQueue: addCustomEntryToQueue });
 
-  const handleDirectAdd = useCallback((food: FoodItemLike) => {
+  const handleDirectAdd = useCallback((food: FoodItemLike, qty = 100) => {
+    const grams = Math.max(10, Math.min(2000, Math.round(Number(qty) || 100)));
+    const factor = grams / 100;
     const data = { ...diaryData };
     if (!data[selectedDate]) data[selectedDate] = { meals: {} };
     const mt = mealType || 'Перекус';
     if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
-    (data[selectedDate].meals[mt] as any).push({ name: food.name, qty: '100 г', kcal: food.kcal, p: food.protein, f: food.fat, c: food.carbs, category: food.category, foodId: (food as any).id });
+    (data[selectedDate].meals[mt] as any).push({
+      name: food.name, qty: `${grams} г`,
+      kcal: Math.round((food.kcal || 0) * factor),
+      p: Math.round((food.protein || 0) * factor * 10) / 10,
+      f: Math.round((food.fat || 0) * factor * 10) / 10,
+      c: Math.round((food.carbs || 0) * factor * 10) / 10,
+      category: food.category, foodId: (food as any).id,
+    });
     saveDiary(data);
     // Сверка с действующими ограничениями программы: дневник — факт, поэтому
     // предупреждаем, а не отказываем (тихий отказ съел бы реальную еду).
     const summary = summarizeImportChecks([{ name: food.name, foodId: (food as any).id, category: food.category }], readProgramRestrictions());
-    showToast(summary.text || `⚡ ${food.name} → ${mt} 100г`);
+    showToast(summary.text || `⚡ ${food.name} → ${mt} ${grams}г`);
   }, [diaryData, selectedDate, mealType, saveDiary, showToast]);
 
   const handleBarcodeProduct = useCallback((product: OFFProduct) => {

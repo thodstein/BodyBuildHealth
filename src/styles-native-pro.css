@@ -17,10 +17,19 @@ html.app-native body {
 }
 
 html.app-native #app {
+  height: var(--app-height, 100dvh);
   min-height: var(--app-height, 100dvh);
-  /* max(): если WebView не отдаёт env (старый Android), всё равно даём
-   * минимум высоты статус-бара — иначе верхи прячутся под шторкой. */
-  padding-top: max(env(safe-area-inset-top, 0px), 24px);
+  /* Единственный владелец верхнего отступа. --app-safe-top = max(env, tg, 32px):
+   * WebView на Android часто отдаёт env(top)=0, и 24px не хватало —
+   * шапка Питания и заголовки экранов прятались под статус-баром. */
+  padding-top: var(--app-safe-top, max(env(safe-area-inset-top, 0px), 32px));
+}
+
+/* .app раньше имел height:100vh (= высота вьюпорта) и с padding-top у #app
+ * вылезал за контейнер: низ экрана обрезался. В APK .app = ровно #app. */
+html.app-native .app {
+  height: 100%;
+  max-height: 100%;
 }
 
 /* Нижний отступ под плавающий навбар уже есть в shell; здесь — страховка

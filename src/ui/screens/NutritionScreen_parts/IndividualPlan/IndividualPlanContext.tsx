@@ -24,6 +24,7 @@ import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { publishPlanTargets } from "./plan-targets-bridge";
+import { readActivePlan, rotateActivePlan, publishPlanTargetsFor } from "./planner-plan-archive";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { readPlannerPrefs, writePlannerPrefsPatch } from "./planner-prefs";
@@ -4333,6 +4334,14 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
       setErrorMsg('⚠️ Не удалось сохранить план: превышен лимит localStorage. Удалите старые планы или отчёты.');
     } else {
       setErrorMsg(null);
+      // Активный план + архив предыдущего: новый план становится главным,
+      // старый не теряется в общем списке, а уезжает в «Архив планов».
+      // Фолбэк на savedPlans[0] — для сохранений, сделанных до появления
+      // активного плана: первый повторный сейв не оставит два «главных».
+      try { rotateActivePlan(plan, readActivePlan() || savedPlans[0] || null); } catch {}
+      // Сохранение плана подставляет ЕГО фактические КБЖУ в шапку Питания
+      // и дневник (а не только effective-цели из настроек).
+      publishPlanTargetsFor(plan);
       if (typeof (window as any).showToast === 'function') (window as any).showToast(`💾 План «${name}» сохранён`, 'success');
     }
   };

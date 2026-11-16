@@ -83,6 +83,27 @@ describe('NutritionScreen native hero', () => {
     expect(container.querySelector('.nutrition-hero')).not.toBeNull();
   });
 
+  it('3b. меню питания — оверлей экрана, а не обрезок высоты шапки', async () => {
+    await resetPlatform();
+    const { container } = render(<NutritionScreen />);
+    fireEvent.click(
+      container.querySelector('.nutrition-hero-card[data-section="diary"]') as HTMLElement,
+    );
+    fireEvent.click(container.querySelector('.nutrition-burger') as HTMLElement);
+
+    const drawer = container.querySelector('.nutrition-nav-drawer') as HTMLElement | null;
+    const head = container.querySelector('.nutrition-tabs-head') as HTMLElement | null;
+    expect(drawer).not.toBeNull();
+    expect(head).not.toBeNull();
+    // drawer вне шапки: backdrop-filter шапки обрезал position:fixed до её высоты.
+    expect(head!.contains(drawer!)).toBe(false);
+    expect(drawer!.parentElement?.parentElement).toBe(
+      container.querySelector('.nutrition-screen'),
+    );
+    // Все подразделы доступны внутри панели.
+    expect(drawer!.querySelectorAll('.nutrition-chip').length).toBeGreaterThan(0);
+  });
+
   it('4. навигация hero → вкладки работает в web', async () => {
     await resetPlatform();
     const { container } = render(<NutritionScreen />);

@@ -47,6 +47,13 @@ afterEach(() => {
 });
 
 describe('Дневник: полноэкранный лист добавления еды', () => {
+  // «＋» теперь сначала спрашивает порцию (окно «Сколько грамм?»), поэтому
+  // добавление из поиска = выбрать продукт → подтвердить 100 г в шторке.
+  const addFirstFromSearch = () => {
+    fireEvent.click(screen.getAllByLabelText('Указать порцию')[0]);
+    fireEvent.click(screen.getByLabelText('Добавить в очередь'));
+  };
+
   it('открывается как диалог на весь экран с поиском и кнопкой закрытия', () => {
     const { container } = render(<NutritionDiary foodEntries={[]} />);
     const sheet = container.querySelector('.nd-addsheet') as HTMLElement;
@@ -64,18 +71,18 @@ describe('Дневник: полноэкранный лист добавлени
     const input = screen.getByLabelText('Поиск продуктов') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'творог' } });
 
-    await waitFor(() => expect(screen.getAllByLabelText(/^Добавить /).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByLabelText('Указать порцию').length).toBeGreaterThan(0));
     const resultRows = () => document.querySelectorAll('.nd-result').length;
     const resultsBefore = resultRows();
 
-    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    addFirstFromSearch();
 
     await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
     // Главное: выдача на месте, искать заново не нужно.
     expect(input.value).toBe('творог');
     expect(resultRows()).toBe(resultsBefore);
 
-    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    addFirstFromSearch();
     await waitFor(() => expect(screen.getByText(/На очереди \(2\)/)).toBeTruthy());
   });
 
@@ -83,8 +90,8 @@ describe('Дневник: полноэкранный лист добавлени
     render(<NutritionDiary foodEntries={[]} />);
     const input = screen.getByLabelText('Поиск продуктов') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'творог' } });
-    await waitFor(() => expect(screen.getAllByLabelText('В очередь').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    await waitFor(() => expect(screen.getAllByLabelText('Указать порцию').length).toBeGreaterThan(0));
+    addFirstFromSearch();
     await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
 
     fireEvent.click(screen.getByLabelText('Очистить очередь'));
@@ -122,8 +129,20 @@ describe('Дневник: полноэкранный лист добавлени
     render(<NutritionDiary foodEntries={[]} />);
     fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: '4600000000001' } });
     await waitFor(() => expect(document.querySelector('.nd-barcode-result')?.textContent).toContain('Простоквашино'));
-    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    addFirstFromSearch();
     await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
+  });
+
+  it('из пустой выдачи можно сразу добавить продукт в базу', async () => {
+    render(<NutritionDiary foodEntries={[]} />);
+    fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'щщщнесуществующий' } });
+
+    await waitFor(() => expect(screen.getByText(/Ничего не найдено/)).toBeTruthy());
+    fireEvent.click(screen.getByLabelText('Добавить найденное название в базу'));
+
+    // Открывается форма своей базы с уже введённым запросом.
+    expect(await screen.findByLabelText('Добавить продукт в базу')).toBeTruthy();
+    expect((screen.getByLabelText('Название продукта') as HTMLInputElement).value).toBe('щщщнесуществующий');
   });
 
   it('честно сообщает, когда каталоги сетей недоступны', async () => {
@@ -154,8 +173,8 @@ describe('Дневник: полноэкранный лист добавлени
     render(<NutritionDiary foodEntries={[]} />);
     fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
 
-    await waitFor(() => expect(screen.getAllByLabelText('В очередь').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+    await waitFor(() => expect(screen.getAllByLabelText('Указать порцию').length).toBeGreaterThan(0));
+    addFirstFromSearch();
     await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
 
     fireEvent.click(screen.getByLabelText('Отменить добавление'));
@@ -170,8 +189,8 @@ describe('Дневник: полноэкранный лист добавлени
     try {
       render(<NutritionDiary foodEntries={[]} />);
       fireEvent.change(screen.getByLabelText('Поиск продуктов'), { target: { value: 'творог' } });
-      await waitFor(() => expect(screen.getAllByLabelText('В очередь').length).toBeGreaterThan(0));
-      fireEvent.click(screen.getAllByLabelText('В очередь')[0]);
+      await waitFor(() => expect(screen.getAllByLabelText('Указать порцию').length).toBeGreaterThan(0));
+      addFirstFromSearch();
       await waitFor(() => expect(screen.getByText(/На очереди \(1\)/)).toBeTruthy());
 
       fireEvent.click(screen.getByLabelText('Сохранить'));

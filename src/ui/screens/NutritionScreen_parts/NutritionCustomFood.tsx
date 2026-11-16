@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { saveCustomFood, loadCustomFoods, deleteCustomFood, saveCustomTargets, loadCustomTargets, type CustomFoodEntry } from '../../../engines/meal-custom-food';
+import { saveOrUpdateCustomFood, loadCustomFoods, deleteCustomFood, saveCustomTargets, loadCustomTargets, type CustomFoodEntry } from '../../../engines/meal-custom-food';
 import type { FoodItem } from '../../../core/nutrition-database';
 
 const CATEGORIES: { value: string; label: string }[] = [
@@ -13,7 +13,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: 'other', label: 'Другое' },
 ];
 
-const EMPTY_FOOD: Partial<CustomFoodEntry> = { name: '', kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, category: 'protein', servingSize: '100 г' };
+const EMPTY_FOOD: Partial<CustomFoodEntry> = { name: '', brand: '', barcode: '', kcal: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, category: 'protein', servingSize: '100 г' };
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' };
 const labelStyle: React.CSSProperties = { fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 };
@@ -37,6 +37,10 @@ export const NutritionCustomFood: React.FC = () => {
     const food: CustomFoodEntry = {
       id: 'custom_' + Date.now(),
       name: newFood.name || '',
+      brand: newFood.brand?.trim() || undefined,
+      barcode: String(newFood.barcode || '').replace(/\D/g, '') || undefined,
+      description: newFood.description?.trim() || 'Свой продукт',
+      source: 'manual',
       kcal: newFood.kcal || 0,
       protein: newFood.protein || 0,
       fat: newFood.fat || 0,
@@ -86,7 +90,7 @@ export const NutritionCustomFood: React.FC = () => {
       polyphenols_mg: newFood.polyphenols_mg,
       flavonoids_mg: newFood.flavonoids_mg,
     };
-    saveCustomFood(food);
+    saveOrUpdateCustomFood(food);
     setCustomFoods([...loadCustomFoods()]);
     setNewFood({ ...EMPTY_FOOD });
     setShowAddFood(false);
@@ -137,6 +141,14 @@ export const NutritionCustomFood: React.FC = () => {
         {showAddFood && (
           <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
             <div><label style={labelStyle}>Название</label><input type="text" value={newFood.name || ''} onChange={e => setNewFood({...newFood, name: e.target.value})} placeholder="Мой продукт" style={inputStyle} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div><label style={labelStyle}>Марка</label><input type="text" value={newFood.brand || ''} onChange={e => setNewFood({...newFood, brand: e.target.value})} placeholder="Простоквашино" style={inputStyle} /></div>
+              <div><label style={labelStyle}>Штрихкод</label><input type="text" inputMode="numeric" value={newFood.barcode || ''} onChange={e => setNewFood({...newFood, barcode: e.target.value})} placeholder="4600000000000" style={inputStyle} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 6 }}>
+              <div><label style={labelStyle}>Порция</label><input type="text" value={newFood.servingSize || ''} onChange={e => setNewFood({...newFood, servingSize: e.target.value})} placeholder="100 г" style={inputStyle} /></div>
+              <div><label style={labelStyle}>Описание</label><input type="text" value={newFood.description || ''} onChange={e => setNewFood({...newFood, description: e.target.value})} placeholder="Состав, особенности" style={inputStyle} /></div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
               <div><label style={labelStyle}>Ккал</label><input type="number" value={newFood.kcal || ''} onChange={e => setNewFood({...newFood, kcal: parseFloat(e.target.value) || 0})} style={inputStyle} /></div>
               <div><label style={labelStyle}>Белки</label><input type="number" value={newFood.protein || ''} onChange={e => setNewFood({...newFood, protein: parseFloat(e.target.value) || 0})} style={inputStyle} /></div>
@@ -187,7 +199,7 @@ export const NutritionCustomFood: React.FC = () => {
               </div>
             )}
 
-            <button onClick={handleAddFood} style={{ width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 13 }}>Добавить продукт</button>
+            <button onClick={handleAddFood} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00c8a0)', color: '#000', fontWeight: 800, fontSize: 14, minHeight: 48 }}>＋ Добавить продукт в базу</button>
           </div>
         )}
         {customFoods.length === 0 ? (
@@ -197,7 +209,7 @@ export const NutritionCustomFood: React.FC = () => {
             {customFoods.map(f => (
               <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '8px 12px', borderRadius: 8 }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{f.name}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{f.name}{f.brand ? <span style={{ fontWeight: 400, color: 'var(--text-dim)' }}> · {f.brand}</span> : null}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
                     {f.kcal} ккал | Б:{f.protein}г Ж:{f.fat}г У:{f.carbs}г
                     {f.source === 'label_photo' ? ' · 🏷 с упаковки' : ''}

@@ -9,6 +9,8 @@ import { isCapacitorNative } from '../../../../core/app-platform';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 import { readDiaryV2 } from '../diary-storage-v2';
 import { LabelNutritionPanel, type LabelDraftView } from './LabelNutritionPanel';
+import { PortionSheet } from './PortionSheet';
+import { AddToBaseModal, type BaseFoodInitial } from './AddToBaseModal';
 import { customFoodToFoodItem } from '../../../../engines/meal-custom-food';
 import { useCustomFoods } from './hooks/useCustomFoods';
 import { readFavIds, toggleFavorite } from './food-favorites';
@@ -21,8 +23,8 @@ interface AddFoodPanelProps {
   mealType: string;
   onMealTypeChange: (v: string) => void;
   allMealTypes: string[];
-  onAddFoodFromDB: (food: FoodItemLike) => void;
-  onDirectAdd?: (food: FoodItemLike) => void;
+  onAddFoodFromDB: (food: FoodItemLike, qty?: number) => void;
+  onDirectAdd?: (food: FoodItemLike, qty?: number) => void;
   customMealInput: string;
   onCustomMealInputChange: (value: string) => void;
   onAddCustomMeal: () => void;
@@ -145,12 +147,42 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   useEffect(() => () => { if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current); }, []);
   /** Что именно добавили — чтобы «Отменить» снимало нужную позицию. */
   const lastQueuedRef = useRef<{ name: string; idx: number } | null>(null);
-  const queueFood = (food: any) => {
+  const queueFood = (food: any, qty = 100) => {
     lastQueuedRef.current = { name: String(food?.name || ''), idx: parsedItems.length };
-    onAddFoodFromDB(food);
+    onAddFoodFromDB(food, qty);
     setLastQueued(String(food?.name || ''));
     if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current);
     lastQueuedTimer.current = setTimeout(() => setLastQueued(''), 3500);
+  };
+
+  // ── «Сколько грамм?» ─────────────────────────────────────────────────────
+  // Из поиска продукт больше не падает в очередь молча на 100 г: сначала
+  // спрашиваем порцию, показываем пересчитанное КБЖУ и только потом добавляем.
+  const [portionFood, setPortionFood] = useState<any | null>(null);
+  const openPortion = (food: any) => setPortionFood(food);
+
+  // ── «Добавить в базу» ────────────────────────────────────────────────────
+  const [baseOpen, setBaseOpen] = useState(false);
+  const [baseInitial, setBaseInitial] = useState<BaseFoodInitial | null>(null);
+  const openBase = (food?: any) => {
+    if (food) {
+      setBaseInitial({
+        name: String(food.name || ''),
+        brand: food.brand ? String(food.brand) : undefined,
+        barcode: food.barcode ? String(food.barcode) : undefined,
+        kcal: Number(food.kcal) || 0,
+        protein: Number(food.protein) || 0,
+        fat: Number(food.fat) || 0,
+        carbs: Number(food.carbs) || 0,
+        fiber: Number(food.fiber) || 0,
+        servingSize: food.servingSize ? String(food.servingSize) : '100 г',
+        category: food.category,
+        description: food.description ? String(food.description) : undefined,
+      });
+    } else {
+      setBaseInitial(null);
+    }
+    setBaseOpen(true);
   };
   /** «＋» нажали случайно — один тап возвращает как было. */
   const undoLastQueued = () => {
@@ -435,8 +467,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   // ── Общие стили строк результата ─────────────────────────────────────────
   const rowStyle: React.CSSProperties = {
-    padding: '10px 12px', borderRadius: 12, color: '#fff', display: 'flex',
-    alignItems: 'center', gap: 8, minHeight: 56, background: 'rgba(255,255,255,0.02)',
+    padding: '12px 12px', borderRadius: 12, color: '#fff', display: 'flex',
+    alignItems: 'center', gap: 8, minHeight: 64, background: 'rgba(255,255,255,0.02)',
     border: '1px solid rgba(255,255,255,0.04)',
   };
   const nameStyle: React.CSSProperties = {
@@ -448,14 +480,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     color: 'rgba(255,255,255,0.65)', marginTop: 3, fontVariantNumeric: 'tabular-nums',
   };
   const addBtnStyle: React.CSSProperties = {
-    padding: '5px 8px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.10)',
-    background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13,
-    cursor: 'pointer', minHeight: 44, minWidth: 44, flexShrink: 0,
+    padding: '8px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: 18,
+    cursor: 'pointer', minHeight: 48, minWidth: 52, flexShrink: 0,
   };
   const nowBtnStyle: React.CSSProperties = {
-    padding: '5px 9px', borderRadius: 9, border: 'none',
+    padding: '8px 10px', borderRadius: 12, border: 'none',
     background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000',
-    fontSize: 11, fontWeight: 800, cursor: 'pointer', minHeight: 44, flexShrink: 0,
+    fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 48, flexShrink: 0,
   };
   const sectionHead = (color: string): React.CSSProperties => ({
     fontSize: 11, fontWeight: 800, color, marginBottom: 6, display: 'flex',
@@ -796,7 +828,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       <div style={{ ...metaStyle, color: 'rgba(96,165,250,0.85)' }}>штрихкод {barcodeQuery}</div>
                       {macros(barcodeFood.kcal, barcodeFood.protein, barcodeFood.fat, barcodeFood.carbs)}
                     </div>
-                    <button onClick={() => queueFood(barcodeFood)} aria-label="В очередь" className="nd-addq"
+                    <button onClick={() => openPortion(barcodeFood)} aria-label="Указать порцию" className="nd-addq"
                       style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
                     {onDirectAdd && <button onClick={() => onDirectAdd(barcodeFood)} aria-label="Сразу в дневник" className="nd-addnow"
                       style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
@@ -820,13 +852,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                   {foodSearchResults.map(f => (
                     <div key={f.id} className="nd-result" style={rowStyle}>
                       <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
-                      <button onClick={() => queueFood(f)} role="button" aria-label={`Добавить ${f.name}`}
+                      <button onClick={() => openPortion(f)} role="button" aria-label={`Добавить ${f.name}`}
                         style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
                         <div style={nameStyle}>{f.name}</div>
                         {macros(f.kcal, f.protein, f.fat, f.carbs)}
                         {f.description ? <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 2, overflowWrap: 'anywhere' }}>{f.description}</div> : null}
                       </button>
-                      <button onClick={() => queueFood(f)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={addBtnStyle}>＋</button>
+                      <button onClick={() => openPortion(f)} title="Указать граммы и добавить" aria-label="Указать порцию" className="nd-addq" style={addBtnStyle}>＋</button>
                       {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
                       {favButton(f)}
                     </div>
@@ -859,7 +891,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       if (!meta) return null;
                       return (
                         <div key={`${p.source}-${p.id}`} className="nd-netrow" style={{ ...rowStyle, background: 'rgba(0,230,138,0.03)', border: '1px solid rgba(0,230,138,0.10)' }}>
-                          <button onClick={() => queueFood(retailToFoodItem(p) as any)} role="button" aria-label={`Добавить ${p.name} из ${meta.label}`}
+                          <button onClick={() => openPortion(retailToFoodItem(p) as any)} role="button" aria-label={`Добавить ${p.name} из ${meta.label}`}
                             style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: `${meta.color}1c`, color: meta.color, border: `1px solid ${meta.color}35`, whiteSpace: 'nowrap' }}>{meta.emoji} {meta.label}</span>
@@ -874,7 +906,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                               <span style={{ color: '#fb923c' }}>У {p.carbs}</span>
                             </div>
                           </button>
-                          <button onClick={() => queueFood(retailToFoodItem(p) as any)} title="В очередь (потом Сохранить)" aria-label="В очередь" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>＋</button>
+                          <button onClick={() => openPortion(retailToFoodItem(p) as any)} title="Указать граммы и добавить" aria-label="Указать порцию" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>＋</button>
                           {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
                           {favButton(retailToFoodItem(p) as any)}
                         </div>
@@ -912,13 +944,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                     {internetUnique.map(f => (
                       <div key={f.id} className="nd-netrow" style={{ ...rowStyle, background: 'rgba(59,130,246,0.03)', border: '1px solid rgba(59,130,246,0.10)' }}>
                         <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>🌐</span>
-                        <button onClick={() => queueFood(f)} role="button" aria-label={`Добавить ${f.name}`}
+                        <button onClick={() => openPortion(f)} role="button" aria-label={`Добавить ${f.name}`}
                           style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
                           <div style={nameStyle}>{f.name}</div>
                           {f.brand ? <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, overflowWrap: 'anywhere' }}>🏷 {f.brand}</div> : null}
                           {macros(f.kcal, f.protein, f.fat, f.carbs)}
                         </button>
-                        <button onClick={() => queueFood(f)} aria-label="В очередь" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
+                        <button onClick={() => openPortion(f)} aria-label="Указать порцию" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
                         {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-addnow" style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
                         {favButton(f)}
                       </div>
@@ -931,9 +963,23 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             {showEmpty && (
               <div className="nd-noresult" style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', textAlign: 'center', padding: '16px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
                 <div>Ничего не найдено по «{query}».</div>
-                <div style={{ fontSize: 10, marginTop: 4, color: 'rgba(255,255,255,0.45)' }}>Попробуйте другое написание или создайте продукт вручную.</div>
-                <button onClick={() => { if (query && !customFoodName) onCustomFoodNameChange(query); onToggleCustomFood(); }} style={{ marginTop: 10, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.10)', color: '#a78bfa', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>🍎 Своя еда</button>
+                <div style={{ fontSize: 10, marginTop: 4, color: 'rgba(255,255,255,0.45)' }}>Добавьте продукт один раз — дальше он находится поиском и сканером.</div>
+                <button onClick={() => openBase({ name: query })} aria-label="Добавить найденное название в базу" className="nd-base-empty"
+                  style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', color: '#fff', fontWeight: 800, fontSize: 12, minHeight: 48 }}>
+                  ＋ Добавить «{query}» в базу
+                </button>
+                <button onClick={() => { if (query && !customFoodName) onCustomFoodNameChange(query); onToggleCustomFood(); }} className="nd-base-quick"
+                  style={{ marginTop: 8, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.10)', color: '#a78bfa', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>🍎 Быстро: только КБЖУ</button>
               </div>
+            )}
+
+            {/* Как в MyFitnessPal/FatSecret: из выдачи всегда можно уйти в свою базу. */}
+            {!showEmpty && (
+              <button type="button" onClick={() => openBase({ name: query })} aria-label="Добавить свой продукт в базу" className="nd-base-link"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', minHeight: 50,
+                  background: 'rgba(139,92,246,0.07)', border: '1px dashed rgba(139,92,246,0.35)', color: '#c4b5fd', fontSize: 12, fontWeight: 700 }}>
+                ➕ Не нашли нужное? Добавить продукт в базу
+              </button>
             )}
           </div>
         )}
@@ -941,42 +987,55 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         {/* ── Инструменты и быстрые действия (когда поиск пуст) ── */}
         {!hasQuery && (
           <>
-            <div className="nd-tools" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            <div className="nd-tools" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
               <button type="button" onClick={onShowBarcode} aria-label="Штрих-код"
-                style={{ padding: '10px 4px', borderRadius: 12, fontSize: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                   background: showBarcode ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${showBarcode ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: showBarcode ? '#00e68a' : 'rgba(255,255,255,0.85)', minHeight: 58, fontWeight: 700 }}>
-                <span style={{ fontSize: 18 }}>📱</span>
+                  color: showBarcode ? '#00e68a' : 'rgba(255,255,255,0.85)', minHeight: 84, fontWeight: 700 }}>
+                <span style={{ fontSize: 24 }}>📱</span>
                 <span>Штрих-код</span>
               </button>
-              <label onClick={handlePhotoTile} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 10, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              <label onClick={handlePhotoTile} style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                 background: ocrFileLoading ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(139,92,246,0.06)',
                 border: `1px solid ${ocrFileLoading ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.14)'}`,
-                color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 58, fontWeight: 700, justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
+                color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 84, fontWeight: 700, pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
                 <input ref={ocrFileRef} type="file" accept="image/*" style={{ display: 'none' }}
                   onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
-                <span style={{ fontSize: 18 }}>{ocrFileLoading ? '⏳' : '📸'}</span>
+                <span style={{ fontSize: 24 }}>{ocrFileLoading ? '⏳' : '📸'}</span>
                 <span>{ocrFileLoading ? 'Сканируем…' : 'Фото'}</span>
               </label>
               <button onClick={onShowOCR} aria-label="Текст"
-                style={{ padding: '10px 4px', borderRadius: 12, fontSize: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                   background: showOCR ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(59,130,246,0.08))' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${showOCR ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: showOCR ? '#60a5fa' : 'rgba(255,255,255,0.85)', minHeight: 58, fontWeight: 700 }}>
-                <span style={{ fontSize: 18 }}>📋</span>
+                  color: showOCR ? '#60a5fa' : 'rgba(255,255,255,0.85)', minHeight: 84, fontWeight: 700 }}>
+                <span style={{ fontSize: 24 }}>📋</span>
                 <span>Текст</span>
               </button>
               <button type="button" onClick={labelOpen ? onCloseLabelScan : onOpenLabelScan} aria-label="КБЖУ с упаковки камерой"
                 aria-expanded={labelOpen} className="nd-label-open"
-                style={{ padding: '10px 4px', borderRadius: 12, fontSize: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
                   background: labelOpen ? 'rgba(0,230,138,0.16)' : 'rgba(0,230,138,0.05)',
                   border: `1px solid ${labelOpen ? 'rgba(0,230,138,0.35)' : 'rgba(0,230,138,0.16)'}`,
-                  color: labelOpen ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 58, fontWeight: 700 }}>
-                <span style={{ fontSize: 18 }}>🏷</span>
+                  color: labelOpen ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 84, fontWeight: 700 }}>
+                <span style={{ fontSize: 24 }}>🏷</span>
                 <span>С упаковки</span>
               </button>
             </div>
+
+            {/* Главная точка входа в «свою базу»: не спрятана в разделе Кухня. */}
+            <button type="button" onClick={() => openBase()} aria-label="Открыть добавление продукта в базу" className="nd-base-cta"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(109,40,217,0.06))',
+                border: '1px solid rgba(139,92,246,0.3)', color: '#fff', textAlign: 'left', minHeight: 62 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(139,92,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>➕</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#c4b5fd' }}>Добавить продукт в базу</span>
+                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>КБЖУ, марка, штрихкод — найдётся в поиске и сканере</span>
+              </span>
+              <span style={{ color: '#c4b5fd', fontSize: 16, flexShrink: 0 }}>→</span>
+            </button>
 
             <LabelNutritionPanel
               open={labelOpen} loading={labelLoading} progress={labelProgress} hint={labelHint}
@@ -1207,6 +1266,24 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           onLabelScan={() => { onCloseBarcode(); onOpenLabelScan(); }}
         />
       )}
+
+      {/* Порция: продукт из поиска → граммы → очередь/дневник */}
+      <PortionSheet
+        open={!!portionFood}
+        food={portionFood}
+        onClose={() => setPortionFood(null)}
+        onAddToQueue={(food, grams) => queueFood(food, grams)}
+        onAddDirect={onDirectAdd ? (food, grams) => onDirectAdd(food as FoodItemLike, grams) : undefined}
+        onAddToBase={(food) => openBase(food)}
+      />
+
+      {/* Новая запись в собственной базе продуктов */}
+      <AddToBaseModal
+        open={baseOpen}
+        initial={baseInitial}
+        onClose={() => { setBaseOpen(false); setBaseInitial(null); }}
+      />
+
       <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
       {/* ── Нижняя строка добавления: один раз и навсегда внизу листа ── */}
