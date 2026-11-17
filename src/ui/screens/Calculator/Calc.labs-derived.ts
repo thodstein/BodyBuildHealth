@@ -8,6 +8,7 @@ import {
 import { LAB_UNIT_CHOICES, labUnitKey } from '../../../core/constants';
 import { normalizeLabMeasurement, resolveLabMarker } from '../../../core/labs-mapping';
 import { FULL_PANELS } from './Calc.lab';
+import { MARKER_TO_UCUM } from './Calc.lab-units';
 
 // ═══════════════════════════════════════════════════════════════
 //  Маркер → панель: авт-определение панели для code из LabPoint
@@ -186,24 +187,13 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'ALT': 'ALT', 'AST': 'AST', 'GGT': 'GGT', 'RBC': 'RBC', 'WBC': 'WBC',
 };
 
-/**
- * Маркер бланка → код UCUM для пересчёта единиц (проход 112).
- *
- * Пересчёт есть только у тех маркеров, для которых он описан в общем конвертере
- * (`normalizeLabMeasurement`): мг/дл → мкмоль/л, г/дл → г/л, нмоль/л → нг/мл
- * и так далее. Гормонов с выбором единицы тут нет намеренно: у них единица
- * бланка остаётся частью данных (`slice.units`), а пересчёт делает чтение
- * (`readLabValue`), которое знает пол и фазу.
- */
-export const MARKER_TO_UCUM: Record<string, string> = {
-  'Hemoglobin': 'HGB', 'HCT': 'HCT',
-  'Creatinine': 'CREATININE', 'Urea': 'UREA', 'Uric acid': 'UA',
-  'Bilirubin': 'BIL', 'Glucose': 'GLU',
-  'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',
-  'CRP': 'CRP', 'Vitamin D (25-OH)': 'VITD', 'B12': 'B12', 'Folate': 'FOL',
-  'Iron': 'IRON', 'Calcium': 'CA', 'Magnesium': 'MG', 'Phosphorus': 'P',
-  'Fibrinogen': 'FIBRINOGEN', 'D-dimer': 'D_DIMER', 'Ferritin': 'FERRITIN',
-};
+// Проход 114: таблица «маркер бланка → код UCUM» переехала в `Calc.lab-units`,
+// чтобы ею же пользовалась подсказка единицы в форме — и без цикла импортов
+// (`Calc.lab` → `Calc.lab-units`, `Calc.labs-derived` → `Calc.lab-units`).
+// Пересчёт есть только у маркеров, для которых он описан в общем конвертере
+// (`normalizeLabMeasurement`). Гормонов с выбором единицы там нет: их единица
+// остаётся частью данных (`slice.units`), а пересчёт делает `readLabValue`.
+export { MARKER_TO_UCUM, markerReadUnit } from './Calc.lab-units';
 
 /** Имя маркера бланка по коду в любом написании; null — это не наш маркер. */
 export function sliceMarkerFor(code: string): string | null {

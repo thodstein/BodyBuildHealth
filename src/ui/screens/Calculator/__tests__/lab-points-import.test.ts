@@ -9,9 +9,10 @@
  * хотя она была в данных.
  */
 import { describe, it, expect } from 'vitest';
-import { labPointsToSlice, sliceMarkerFor, MARKER_TO_UCUM } from '../Calc.labs-derived';
-import { FULL_PANELS } from '../Calc.lab';
-import { LAB_UNIT_CHOICES } from '../../../../core/constants';
+import { labPointsToSlice, sliceMarkerFor } from '../Calc.labs-derived';
+import { FULL_PANELS, labUnitHint } from '../Calc.lab';
+import { LAB_UNIT_CHOICES, UCUM_MAP } from '../../../../core/constants';
+import { MARKER_TO_UCUM, markerReadUnit } from '../Calc.lab-units';
 
 const point = (code: string, value: number | string, unit?: string) =>
   labPointsToSlice([{ code, value, unit, date: '2026-11-01' }]);
@@ -131,6 +132,31 @@ describe('проход 112: единица импорта приводится �
     for (const marker of Object.keys(MARKER_TO_UCUM)) {
       expect(markers.has(marker), `${marker} нет в форме — опечатка выключит пересчёт`).toBe(true);
       expect(LAB_UNIT_CHOICES[marker], `${marker}: у гормонов с выбором единицы пересчёт делает чтение`).toBeUndefined();
+      expect(UCUM_MAP[MARKER_TO_UCUM[marker]]?.prefUnit, `${marker}: кода ${MARKER_TO_UCUM[marker]} нет в каталоге UCUM`).toBeTruthy();
+      expect(markerReadUnit(marker), `${marker}: нет подсказки единицы`).toBeTruthy();
     }
+  });
+});
+
+/**
+ * Проход 114: форма не говорила, в какой единице ждёт число. Человек вписывал
+ * 15 г/дл гемоглобина в поле, где норма 130–170 г/л, — и получал анемию из
+ * воздуха. Теперь единица стоит подсказкой в самом поле; у гормонов с выбором
+ * единицы подсказки нет — рядом `UnitPicker`.
+ */
+describe('проход 114: подсказка единицы в форме', () => {
+  it('подсказка — та же единица, в которую импорт приводит значение', () => {
+    expect(labUnitHint('Hemoglobin')).toBe('г/л');
+    expect(labUnitHint('Creatinine')).toBe('мкмоль/л');
+    expect(labUnitHint('Glucose')).toBe('ммоль/л');
+    expect(labUnitHint('LDL')).toBe('ммоль/л');
+    expect(labUnitHint('Vitamin D (25-OH)')).toBe('нг/мл');
+    expect(labUnitHint('Platelets')).toBe('10⁹/л');
+  });
+
+  it('у гормонов с выбором единицы подсказки нет — там UnitPicker', () => {
+    expect(labUnitHint('E2')).toBeUndefined();
+    expect(labUnitHint('Total T')).toBeUndefined();
+    expect(labUnitHint('Prolactin')).toBeUndefined();
   });
 });

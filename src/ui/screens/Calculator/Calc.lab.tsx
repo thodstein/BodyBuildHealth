@@ -1,6 +1,8 @@
 import React from 'react';
 import type { LabSlice } from '../../../engines/support-plan';
 import { LAB_UNIT_CHOICES } from '../../../core/constants';
+import { LAB_MARKER_MAP } from '../../../data/lab-marker-map';
+import { markerReadUnit, ruUnit } from './Calc.lab-units';
 import { GLASS, PILL, INPUT } from './Calc.types';
 
 export const FULL_PANELS: { key: keyof LabSlice; label: string; color: string; markers: string[] }[] = [
@@ -41,6 +43,27 @@ export const LAB_MARKER_RU: Record<string, string> = {
   pH:'pH', Protein:'Белок', Ketones:'Кетоны', Leukocytes:'Лейкоциты', Nitrite:'Нитриты',
 };
 export const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
+
+/** Единица, в которой калькулятор ждёт число: общий каталог маркеров — единственный источник. */
+const MARKER_UNIT: Record<string, string> = {};
+for (const e of LAB_MARKER_MAP) {
+  const key = String(e.marker || '').toLowerCase();
+  if (e.unit && key && !MARKER_UNIT[key]) MARKER_UNIT[key] = e.unit;
+}
+
+/**
+ * Подсказка единицы в поле ввода (проход 114). У маркеров с выбором единицы
+ * подсказку не печатаем — рядом стоит `UnitPicker`. Для остальных показываем
+ * единицу, в которой движок сравнивает число: иначе человек вписывает 15 г/дл
+ * гемоглобина в поле, где норма 130–170, и «анемия» берётся из воздуха.
+ */
+export function labUnitHint(marker: string): string | undefined {
+  if (LAB_UNIT_CHOICES[marker]) return undefined;
+  // Сначала каталог UCUM — это та единица, к которой импорт приводит значение;
+  // каталог маркеров (`LAB_MARKER_MAP`) остаётся для маркеров без пересчёта.
+  const hint = markerReadUnit(marker) ?? MARKER_UNIT[marker.toLowerCase()];
+  return hint ? ruUnit(hint) : undefined;
+}
 
 /**
  * Единица бланка (проход 106). Бланки дают E2 и в пг/мл, и в пмоль/л, пролактин — в
@@ -101,7 +124,7 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['LH','FSH','Total T','Free T','E2','Prolactin','SHBG','DHT','Progesterone','Cortisol'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelSex?.[m] || ''} onChange={e => onChange({ ...slice, panelSex: { ...slice.panelSex, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelSex?.[m] || ''} onChange={e => onChange({ ...slice, panelSex: { ...slice.panelSex, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
             <UnitPicker panel="panelSex" marker={m} slice={slice} onChange={onChange} />
           </div>)}
       </div>
@@ -109,21 +132,21 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['ALT','AST','GGT','Bilirubin','Glucose','Creatinine','Urea','Uric acid','CRP','Homocysteine'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelBiochem?.[m] || ''} onChange={e => onChange({ ...slice, panelBiochem: { ...slice.panelBiochem, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelBiochem?.[m] || ''} onChange={e => onChange({ ...slice, panelBiochem: { ...slice.panelBiochem, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#fbbf24', marginBottom: 2 }}>Гематология</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['HCT','Hemoglobin','RBC','WBC','Platelets','Neutrophils','Lymphocytes'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelHematology?.[m] || ''} onChange={e => onChange({ ...slice, panelHematology: { ...slice.panelHematology, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelHematology?.[m] || ''} onChange={e => onChange({ ...slice, panelHematology: { ...slice.panelHematology, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#a855f7', marginBottom: 2 }}>Тиреоидные</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
         {['TSH','T3 free','T4 free','Anti-TPO','Anti-TG'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelThyroid?.[m] || ''} onChange={e => onChange({ ...slice, panelThyroid: { ...slice.panelThyroid, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelThyroid?.[m] || ''} onChange={e => onChange({ ...slice, panelThyroid: { ...slice.panelThyroid, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
     </>}
@@ -141,7 +164,7 @@ export function FullLabInput({ values, onChange }: { values: LabSlice | null; on
       <div style={{ fontSize:8, fontWeight:600, color:pan.color, marginBottom:2 }}>{pan.label}</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
         {pan.markers.map(m => <div key={m}><span style={{ fontSize:7, color:'var(--text-dim)' }}>{ruMarker(m)}</span>
-          <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
+          <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} placeholder={labUnitHint(m)} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
           <UnitPicker panel={String(pan.key)} marker={m} slice={s} onChange={onChange} />
         </div>)}
       </div>
