@@ -43,8 +43,15 @@ describe('качество цикла: мульти-спек источника 
 
   it('cycle-08: рамп-сет легче рабочих (первый < последнего)', () => {
     const plan: any = buildPlan('cycle-08');
-    const bench = plan.weeks[0].sessions.flatMap((s: any) => s.exercises).find((e: any) => /Жим штанги лёжа/i.test(e.name));
-    expect(bench).toBeTruthy();
+    // Тест ищет упражнение ПО СХЕМЕ ИСТОЧНИКА, а не по имени: до аудита P2-3
+    // (финализация) имя «Жим лежа» из шаблона подменялось ремонтом на каталожное,
+    // и совпадение по названию случайно указывало на нужное упражнение. Схема
+    // `40%×12, 60%×10` — устойчивый маркер: она есть только у жима в день 3.
+    const day3 = plan.weeks[0].sessions.find((s: any) => s.day === 3);
+    const withSpec = (day3?.exercises || []).filter((e: any) =>
+      /40%×12/.test(String(e.comment || '')) && /60%×10/.test(String(e.comment || '')));
+    expect(withSpec, 'жим со схемой 40%×12 / 60%×10 в дне 3').toHaveLength(1);
+    const bench = withSpec[0];
     const ws = bench.workSets || [];
     expect(ws.length).toBeGreaterThanOrEqual(2);
     expect(Number(ws[0].weight)).toBeLessThan(Number(ws[ws.length - 1].weight));

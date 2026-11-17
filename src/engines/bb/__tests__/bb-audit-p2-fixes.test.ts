@@ -19,6 +19,8 @@
  *   и без снижения MRV (раньше выводились только при `labMrvMultiplier < 1`).
  * - P2-7 (финализация): финальный кап/порядок упражнений выполняется для всех сессий, а не
  *   только для тех, где есть разминка-активатор (сторож инварианта, см. комментарий у теста).
+ * - P2-3 (валидация): safety-ремонт (замена упражнения + пересчёт веса) работает и при
+ *   `reorder:false` — раньше error-коды валидатора оставались на плане навсегда.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -29,6 +31,7 @@ import { analyzePlanStress } from '../bb-injury-prevention.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { capExercisesPerMuscle } from '../bb-session-order.engine';
 import { buildBBPlan, applyMacrocycleToBBPlan } from '../bb-builder.engine';
+import { finalizeBBPlan } from '../bb-finalize.engine';
 import { makeInput } from './bb-test-helpers';
 
 describe('P2-6: отчёт качества переживает план без weeks', () => {
@@ -320,4 +323,48 @@ describe('P2-7 (финализация): финальный кап/порядо�
       }
     }
   });
+});
+
+// P2-3 (валидация; пункт §4): единственный ремонт safety-ограничений
+// (`repairAdaptiveSafety`) стоял под гейтом `reorder !== false`, хотя он не переставляет
+// упражнения — только подменяет имя и пересчитывает вес. В режиме `reorder:false` план
+// оставался с error-кодами `equipment_restriction_violation` (и по той же причине
+// `axial_restriction_violation`, `excluded_exercise_present`), то есть невалидным навсегда.
+describe('P2-3 (валидация): safety-ремонт не зависит от reorder', () => {
+  const EQ = ['dumbbell', 'machine', 'cable', 'bodyweight'];
+  const planWithBarbell = (): any => ({
+    pattern: {} as any,
+    weeks: [{
+      week: 1,
+      sessions: [{
+        day: 1, weekOffset: 1, character: 'тяж', sessionTag: 'Upper',
+        exercises: [
+          {
+            muscle: 'chest', name: 'Жим штанги лёжа', role: 'primary', character: 'тяж',
+            sets: 4, repsRange: [6, 8], rir: 2,
+            workSets: Array.from({ length: 4 }, () => ({ reps: 8, rir: 2, weight: 80 })),
+          },
+          {
+            muscle: 'back', name: 'Тяга штанги в наклоне', role: 'accessory', character: 'тяж',
+            sets: 3, repsRange: [8, 10], rir: 2,
+            workSets: Array.from({ length: 3 }, () => ({ reps: 10, rir: 2, weight: 60 })),
+          },
+        ],
+      }],
+    }],
+    rotationMuscleVolume: {}, rationale: [],
+  });
+
+  for (const reorder of [true, false]) {
+    it(`штанга без оборудования заменяется доступным вариантом (reorder=${reorder})`, () => {
+      const result: any = finalizeBBPlan(planWithBarbell(), { equipment: EQ, level: 'intermediate', reorder });
+      const exs: any[] = result.weeks[0].sessions[0].exercises;
+      const barbell = exs.filter(e => /штанг|barbell|гриф/i.test(String(e.name || '')));
+      expect(barbell, 'упражнения со штангой остались в плане').toHaveLength(0);
+      // Ремонт прошёл именно штатным проходом, а не побочной заменой.
+      expect(exs.some(e => /Safety repair/.test(String(e.comment || '')))).toBe(true);
+      const errors = (result.validation?.issues || []).filter((i: any) => i.level === 'error').map((i: any) => i.code);
+      expect(errors).not.toContain('equipment_restriction_violation');
+    });
+  }
 });

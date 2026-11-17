@@ -4752,14 +4752,25 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     };
     const catalogExercise = findCatalogExercise(exercise.name) || findCatalogExercise(exercise.exerciseName);
     const unknownWithEquipmentRestriction = equipment.length > 0 && !catalogExercise;
-    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || !equipmentAllowed(catalogExercise as any);
+    // P2-3 (аудит 2026-11): `!equipmentAllowed(catalogExercise)` проверяем только когда
+    // упражнение есть в каталоге. Иначе ЛЮБОЕ кастомное/устаревшее имя (его нет в каталоге)
+    // считалось нарушением оборудования даже при пустом списке оборудования у пользователя —
+    // и в faithful-режиме молча подменялось каталожным (замер: 3 шрага → 2 после склейки).
+    const equipmentViolation = !!catalogExercise && !equipmentAllowed(catalogExercise as any);
+    const unsafe = excludedExercises.has(exercise.name) || excludedExercises.has(exercise.exerciseName || '') || (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) || isMobilityRestricted(exercise, options.mobilityRestrictions) || unknownWithEquipmentRestriction || equipmentViolation;
     // Исключённые мышцы здесь не ремонтируются: замена упражнением той же мышцы
     // снова нарушит ограничение — их удаляет purgeExcludedMuscleExercises.
     if (!unsafe) continue;
+    // Не подменяем на упражнение, которое уже стоит в этой сессии: иначе в дне появляются
+    // два одинаковых упражнения и поздняя склейка дублей уносит слот (замер: 3 шрага → 2,
+    // сеты 2 + 2 склеивались в 4).
+    const sessionNames = new Set((session.exercises || [])
+      .filter((e: any) => e !== exercise)
+      .map((e: any) => String(e.name || '')));
     const replacement = bestReplacementFor(
       catalogByMuscle(exercise.muscle),
       (candidate: any) => -(exercise.role === 'primary' ? bbExerciseTier(candidate) : (candidate.type === 'isolation' ? 0 : 1)),
-      (candidate) => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate),
+      (candidate) => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate) && !sessionNames.has(String(candidate.name || '')),
     );
     if (!replacement) continue;
     const oldName = exercise.name;
@@ -5775,7 +5786,13 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
   if (!options.preserveSource) purgeExcludedMuscleExercises(next, options);
   syncBBPlanSetShape(next);
   if (!options.preserveSource && options.phaseSafety) applyAdaptivePhaseSafety(next);
-  if (!options.preserveSource && options.reorder !== false) repairAdaptiveSafety(next, options);
+  // P2-3 (аудит 2026-11): safety-ремонт — не перестановка: он меняет только имя упражнения
+  // и вес (порядок, число упражнений и сеты сохраняются). Гейт `reorder` (то есть режим
+  // «faithful» с `reorder:false`) держал на таком плане error-коды валидатора
+  // `excluded_exercise_present` / `equipment_restriction_violation` /
+  // `axial_restriction_violation` навсегда — при том что `purgeExcludedMuscleExercises`
+  // от `reorder` уже не зависит. Теперь так же и здесь.
+  if (!options.preserveSource) repairAdaptiveSafety(next, options);
   // 🏁 Prep guard: feeders/ротация добавляют или заменяют упражнения — для taper/пик
   // недель это нарушает «без новых упражнений и без роста объёма».
   if (!options.preserveSource && options.ensureMinimumVolume && !planHasPrep) addAdaptiveMEVFeeders(next, options);

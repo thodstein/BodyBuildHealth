@@ -14,8 +14,13 @@ describe('BB finalizer safety merge', () => {
       rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: false, level: 'intermediate' });
-    expect(result.validation?.valid).toBe(false);
-    expect(result.validation?.issues.some(issue => issue.code === 'equipment_restriction_violation')).toBe(true);
+    // P2-3 (аудит 2026-11): safety-ремонт больше не привязан к `reorder`, поэтому план не
+    // остаётся невалидным — ограничения из `safetyConstraints` реально применяются
+    // (раньше тест проверял обратное: «нарушение осталось в плане», то есть дефект).
+    const exs = result.weeks[0].sessions[0].exercises;
+    expect(exs.filter(e => /штанг|barbell|гриф/i.test(String(e.name)))).toHaveLength(0);
+    expect(exs.some(e => /Safety repair/.test(String(e.comment || '')))).toBe(true);
+    expect(result.validation?.issues.some(issue => issue.code === 'equipment_restriction_violation')).toBe(false);
     expect(result.safetyConstraints).toEqual(plan.safetyConstraints);
   });
 });

@@ -24,9 +24,13 @@ describe('BB runtime snapshot boundary', () => {
     });
 
     expect(result.validation).toBeTruthy();
-    expect(result.validation?.valid).toBe(false);
+    // P2-3 (аудит 2026-11): ограничение оборудования теперь ремонтируется и при
+    // `reorder:false` (штанга заменена), поэтому нарушение в плане не остаётся.
+    // Проверяем именно то, ради чего тест написан: снимок собран по ТЕКУЩЕМУ составу.
+    expect(String(result.weeks[0].sessions[0].exercises[0].name)).not.toMatch(/штанг|barbell|гриф/i);
+    expect(result.validation?.issues.some(issue => issue.code === 'equipment_restriction_violation')).toBe(false);
     expect(result.weeklyVolume?.[1]?.chest.directSets).toBe(2);
     expect(result.fatigueReport?.[0].sessions[0].exerciseCount).toBe(1);
-    expect(result.report?.validationValid).toBe(false);
+    expect(result.report?.validationValid).toBe(result.validation?.valid);
   });
 });
