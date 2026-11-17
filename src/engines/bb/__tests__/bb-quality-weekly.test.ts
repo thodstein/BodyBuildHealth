@@ -188,3 +188,48 @@ describe('bb-quality-weekly: свойства', () => {
     expect(arms!.ok).toBe(true);
   });
 });
+
+// P2-4 (аудит 2026-11): гейт «существенный объём» перед проверкой паттернов был
+// тавтологией для всех групп, кроме ног: `avgDirect(...) >= 0 || pool.length > 0`
+// (среднее всегда ≥ 0). Паттерны «требовались» даже у мышцы с одним-двумя подходами
+// за неделю. Теперь гейт — фактический объём группы против её MEV.
+describe('bb-quality-weekly: гейт «существенный объём» в PRO-паттернах (P2-4)', () => {
+  // Один и тот же паттерн (жим лёжа) двумя слотами — «паттернов 1» при любом объёме.
+  const mkPlan = (chestSets: number): any => {
+    const half = Math.max(1, Math.round(chestSets / 2));
+    return {
+      level: 'intermediate',
+      goal: 'mass',
+      weeks: [{
+        week: 1,
+        sessions: [{
+          sessionTag: 'Chest',
+          exercises: [
+            { muscle: 'chest', name: 'Жим штанги лёжа', sets: half, workSets: [] },
+            { muscle: 'chest', name: 'Жим штанги лёжа', sets: Math.max(1, chestSets - half), workSets: [] },
+          ],
+        }],
+      }],
+    };
+  };
+  const chestRow = (sets: number) => {
+    const pro = scoreProWeek(mkPlan(sets), 1);
+    const row = pro.patterns.find(p => p.muscle === 'chest')!;
+    return { pro, row };
+  };
+
+  it('объём ниже MEV — требование двух паттернов не применяется', () => {
+    const { row } = chestRow(4);
+    expect(row.distinct).toBe(1);
+    expect(row.issue).toBeUndefined();
+    expect(row.ok).toBe(true);
+  });
+
+  it('объём на уровне MEV — тот же один паттерн уже нарушение', () => {
+    const { pro, row } = chestRow(10);
+    expect(row.distinct).toBe(1);
+    expect(row.ok).toBe(false);
+    expect(String(row.issue)).toContain('паттернов 1 < 2');
+    expect((pro.totalRecommendations || []).some(r => /добавьте/.test(String(r)))).toBe(true);
+  });
+});

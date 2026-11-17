@@ -726,10 +726,12 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
   }
   const nW = Math.max(1, scopeWeeks.length);
   const avgDirect = (m: string) => (agg[m] || 0) / nW;
-  const mevOf = (m: string) => {
+  // P2-4 (аудит 2026-11): MEV группы «как есть», без подстановки 0 — 0 у `delt_front`
+  // означает «прямой работы не требуется», а не «объёма нет». null = лендмарка нет.
+  const mevOrNull = (m: string): number | null => {
     const t = ((plan as any).volumeTargets || {})[m];
-    if (t) return t.mev;
-    return getVolumeLandmarks(level, m)?.mev ?? 0;
+    const v = t ? Number(t.mev) : Number(getVolumeLandmarks(level, m)?.mev);
+    return Number.isFinite(v) ? v : null;
   };
 
   // Паттерны — только для существенно нагруженных групп скоупа.
@@ -741,9 +743,29 @@ export function scoreProWeek(plan: PlanLike, weekNo: number | 'meso'): BBProWeek
       .filter(e => (mu === 'arms' ? ['biceps', 'triceps', 'arms'].includes(e.muscle) : e.muscle === mu) && e.pattern);
     const distinct = Array.from(new Set(pool.map(e => e.pattern)));
     const expected = BB_PATTERN_EXPECT[mu] || [];
-    const substantial = mu === 'legs'
-      ? (avgDirect('quads') + avgDirect('hamstrings') + avgDirect('glutes')) >= mevOf('quads')
-      : avgDirect(mu === 'shoulders' ? 'delt_mid' : mu) >= 0 || pool.length > 0;
+    // P2-4 (аудит 2026-11): гейт «существенный объём» был тавтологией для всех групп,
+    // кроме ног: `avgDirect(...) >= 0 || pool.length > 0` — среднее всегда ≥ 0, поэтому
+    // паттерны «требовались» и у группы с одним подходом за неделю (штраф за «паттернов
+    // 1 < 2» при фактически не нагруженной мышце). Теперь гейт честный — объём группы
+    // против её MEV: плечи — сумма головок (иначе объём уходит в `delt_*`), руки — по
+    // каждой головке. Если лендмарки нет или MEV = 0 — прежнее поведение по пулу.
+    const legsTotal = avgDirect('quads') + avgDirect('hamstrings') + avgDirect('glutes');
+    const deltTotal = avgDirect('shoulders') + avgDirect('delt_front') + avgDirect('delt_mid') + avgDirect('delt_rear');
+    const mevQuads = mevOrNull('quads');
+    const mevShoulders = mevOrNull('shoulders');
+    const mevBiceps = mevOrNull('biceps');
+    const mevTriceps = mevOrNull('triceps');
+    let substantial: boolean;
+    if (mu === 'legs' && (mevQuads ?? 0) > 0) {
+      substantial = legsTotal >= (mevQuads as number);
+    } else if (mu === 'shoulders' && (mevShoulders ?? 0) > 0) {
+      substantial = deltTotal >= (mevShoulders as number);
+    } else if (mu === 'arms' && ((mevBiceps ?? 0) > 0 || (mevTriceps ?? 0) > 0)) {
+      substantial = avgDirect('biceps') >= (mevBiceps ?? 0) || avgDirect('triceps') >= (mevTriceps ?? 0);
+    } else {
+      const mev = mevOrNull(mu);
+      substantial = mev != null && mev > 0 ? avgDirect(mu) >= mev : pool.length > 0;
+    }
     const need = mu === 'chest' || mu === 'back' || mu === 'legs' ? 2 : 1;
     const ok = !substantial || distinct.length >= need || (mu === 'shoulders' && distinct.length >= 1);
     let issue: string | undefined;
