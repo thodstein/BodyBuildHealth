@@ -2421,8 +2421,11 @@ function buildSession(
     // это ломало калиброванные веса. Модули (bb-rpe-calibration/bb-mdup/bb-emg-scoring/
     // bb-vl-thresholds/bb-individual-landmarks) удалены как спекулятивный WIP без потребителей.
     // P4: Eccentric overload (Schoenfeld 2021) - advanced/enhanced can handle 110-120% eccentric
+    // P2-3 (аудит 2026-11): надбавка не выводит назначенный вес за рабочий максимум.
+    // На низких повторах (интенсификация: Brzycki ~92% 1ПМ) ×1.2 давало 110% 1ПМ —
+    // такой вес не поднимается концентрически, а прогрессия считает его от workMax.
     if (eccentricMult && eccentricMult > 1.0 && role === 'primary') {
-      weight = Math.round(weight * eccentricMult * 10) / 10;
+      weight = Math.min(wm, Math.round(weight * eccentricMult * 10) / 10);
     }
     // P1-8 (audit 2026-07): pre_exhaust methodology → compound weight ×0.90.
     // После pre-exhaust изоляции целевая мышца уже утомлена → рабочий вес базы
@@ -4942,16 +4945,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
       const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
-  const fTempo = tempoFor('памп', undefined, phaseByWeek.get(wk1.week) || 'accumulation');
-  const need = Math.max(2, targetMEV - weekSets);
+      const fTempo = tempoFor('памп', undefined, phaseByWeek.get(wk1.week) || 'accumulation');
       // P1-5: максимум 5 сетов на одно упражнение (про-объём добивается
       // упражнениями, а не 6-8 подходами в одном движении); остаток — вторым.
       const perExCapM = 5;
-      const useTwoEx = need > perExCapM && feederPool.length >= 2;
-      const setsPerEx = useTwoEx ? Math.ceil(need / 2) : Math.min(need, perExCapM);
       const fData = feederPool[0];
       const fName = fData.name || fData.id;
-      const fData2 = useTwoEx ? feederPool[1] : null;
+      const fData2 = feederPool[1] ?? null;
       const fName2 = fData2 ? (fData2.name || fData2.id) : null;
       // Добавить feeder в каждую неделю
       for (const w of finalPlan.weeks) {
@@ -4961,6 +4961,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // У cross-day аналога (compensateCrossDayWeakPoints) такой гейт был, здесь — нет.
         const wPhase = String((w as any).phase || '').toLowerCase();
         if (wPhase === 'deload' || (w as any).deload || (w as any).taper || (w as any).taperApplied || wPhase === 'peaking') continue;
+        // P2-7 (аудит 2026-11): разрыв до MEV считался ОДИН раз по первой неделе и
+        // затем механически добавлялся в каждую неделю мезо, хотя объём мышцы внутри
+        // мезо растёт (прогрессия) → в поздних неделях фидер перебирал цель. Заодно
+        // `Math.max(2, gap)` превращал разрыв в 1 сет в лишний сет «на всякий случай».
+        // Теперь разрыв считается по КАЖДОЙ неделе, а разрыв < 2 пропускается: это
+        // шум округления лендмарка, а упражнение на один сет ловит `single_work_set`
+        // в валидаторе и MEV осмысленно не покрывает.
+        let wWeekSets = 0;
+        for (const s of w.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) wWeekSets += e.sets;
+        const gap = targetMEV - wWeekSets;
+        if (gap < 2) continue;
+        const useTwoEx = gap > perExCapM && !!fName2;
+        const setsPerEx = useTwoEx ? Math.ceil(gap / 2) : Math.min(gap, perExCapM);
         for (const s of w.sessions) {
           const tag = (s.sessionTag || '').toLowerCase();
           if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
@@ -4970,17 +4983,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
             sets: setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
             workSets: Array.from({ length: setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
             exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${weekSets} < MEV ${targetMEV}).`,
+            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${wWeekSets} < MEV ${targetMEV}).`,
             warmupSets: [], rationale: 'MEV coverage: auto-feeder.',
           });
-          // Второе упражнение (если need > perExCap)
+          // Второе упражнение (если gap > perExCap)
           if (useTwoEx && fName2 && !s.exercises.some(e => e.name === fName2)) {
             s.exercises.push({
               muscle: m, name: fName2, role: 'accessory' as const, character: 'памп' as DayCharacter,
-              sets: need - setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
-              workSets: Array.from({ length: need - setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+              sets: gap - setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
+              workSets: Array.from({ length: gap - setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
               exerciseName: fName2, tempoSpec: fTempo.notation, restSeconds: 30,
-              comment: `Auto-MEV-feeder (2) для ${m}: ${need - setsPerEx}×15-20 RIR 3 @${feederWeight}кг.`,
+              comment: `Auto-MEV-feeder (2) для ${m}: ${gap - setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${wWeekSets} < MEV ${targetMEV}).`,
               warmupSets: [], rationale: 'MEV coverage: auto-feeder (2-е упражнение).',
             });
           }
@@ -6232,6 +6245,16 @@ function applyBbMacroToBBPlan(plan: BBPlan, macro: BBMacrocycle): BBPlan {
     contest_prep: { compound: [0, 1] as [number, number], accessory: [1, 2] as [number, number] },
     transition:   { compound: [3, 4] as [number, number], accessory: [4, 5] as [number, number] },
   };
+  // P2-4 (аудит 2026-11): фаза блока должна доезжать до недели плана. Раньше
+  // менялись только объём/RIR/флаг делода, а `week.phase` оставалась той, что
+  // выдал билдер: план «соревновательная подготовка» был помечен accumulation,
+  // и валидатор/качество/UI считали объём и RIR по чужой фазе.
+  const BB_BLOCK_TO_WEEK_PHASE: Record<string, BBPhase> = {
+    hypertrophy: 'accumulation',
+    strength: 'intensification',
+    contest_prep: 'peaking',
+    transition: 'deload',
+  };
 
   const findBlockForWeek = (weekNum: number) => {
     for (const block of macro.blocks) {
@@ -6247,14 +6270,24 @@ function applyBbMacroToBBPlan(plan: BBPlan, macro: BBMacrocycle): BBPlan {
 
     const volC = BB_VOLUME[block.phase].compound;
     const volA = BB_VOLUME[block.phase].accessory;
-    const [compRirMin] = BB_RIR[block.phase].compound;
-    const [accRirMin] = BB_RIR[block.phase].accessory;
 
     const isDeload = block.phase === 'transition';
     const blockWeek = weekNum - block.weekOffset + 1;
     const periodicDeload = !isDeload
       && (block.phase === 'hypertrophy' || block.phase === 'strength')
       && blockWeek % 4 === 0;
+
+    // P2-4: раньше из диапазона брался ТОЛЬКО минимум, и весь блок шёл на самом
+    // тяжёлом краю (hypertrophy [2,3] → RIR 2 в каждой неделе). Теперь RIR
+    // дрейфует от максимума к минимуму внутри блока (накопление усталости), как
+    // и в PL-ветке макроцикла; делод-неделя внутри блока — на сет легче.
+    const rirInRange = (range: [number, number]): number => {
+      const [min, max] = range;
+      const lastBlockWeek = Math.max(1, block.weeks);
+      const t = lastBlockWeek > 1 ? Math.min(1, (blockWeek - 1) / (lastBlockWeek - 1)) : 1;
+      const v = Math.round(max - (max - min) * t) + (periodicDeload ? 1 : 0);
+      return Math.max(0, Math.min(5, v));
+    };
 
     const sessions = wk.sessions.map((ses) => ({
       ...ses,
@@ -6265,7 +6298,7 @@ function applyBbMacroToBBPlan(plan: BBPlan, macro: BBMacrocycle): BBPlan {
           : (isCompound ? volC : volA);
 
         const targetSets = Math.max(1, Math.round((ex.sets || 0) * effectiveVol));
-        const targetRir = Math.max(0, Math.min(5, isCompound ? compRirMin : accRirMin));
+        const targetRir = rirInRange(isCompound ? BB_RIR[block.phase].compound : BB_RIR[block.phase].accessory);
 
         const workSets = Array.from({ length: targetSets }, (_, i) => {
           const src = ex.workSets[i];
@@ -6285,7 +6318,8 @@ function applyBbMacroToBBPlan(plan: BBPlan, macro: BBMacrocycle): BBPlan {
       }).filter((ex): ex is BBExercise => ex !== null),
     }));
 
-    return { ...wk, deload: isDeload || periodicDeload, sessions };
+    // P2-4: фаза недели приводится к фазе блока макроцикла.
+    return { ...wk, phase: BB_BLOCK_TO_WEEK_PHASE[block.phase] ?? wk.phase, deload: isDeload || periodicDeload, sessions };
   });
 
   const phaseList = macro.blocks.map(b => `${b.phase}×${b.weeks}`).join(' → ');

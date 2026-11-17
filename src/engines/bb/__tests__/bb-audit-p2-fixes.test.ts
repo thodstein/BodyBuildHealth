@@ -12,6 +12,9 @@
  * - P2-1 (ядро): auto-MEV-feeder не добавляет упражнения в делод/тапер-недели.
  * - P2-2 (ядро): `schemeActive` считается по `effVolumeScheme` — понижение схемы
  *   объёма до 'standard' не выключает добивку мышц дня.
+ * - P2-3 (ядро): эксцентрическая надбавка не выводит вес primary за рабочий максимум.
+ * - P2-4 (ядро): макроцикл обновляет фазу недели и ведёт RIR по всему диапазону блока.
+ * - P2-7 (ядро): auto-MEV-feeder считает разрыв до MEV по каждой неделе и не перебирает цель.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -21,7 +24,7 @@ import { calculatePlanSafetyScore } from '../bb-safety-score.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { capExercisesPerMuscle } from '../bb-session-order.engine';
-import { buildBBPlan } from '../bb-builder.engine';
+import { buildBBPlan, applyMacrocycleToBBPlan } from '../bb-builder.engine';
 import { makeInput } from './bb-test-helpers';
 
 describe('P2-6: отчёт качества переживает план без weeks', () => {
@@ -135,5 +138,114 @@ describe('P2-2 (ядро): понижённая схема объёма не в�
     // Понижение действительно произошло — иначе тест проверял бы не то.
     expect(downgraded.volumeScheme).toBe('standard');
     expect(shape(downgraded)).toEqual(shape(plain));
+  });
+});
+
+// P2-3 (ядро): вес primary не должен выходить за рабочий максимум мышцы.
+// На низких повторах Brzycki даёт ~85-92% 1ПМ, и эксцентрическая надбавка ×1.5
+// уводила назначенный вес за 100% — такой вес не поднимается концентрически,
+// а прогрессия/cap-adjust считают его от workMax.
+describe('P2-3 (ядро): эксцентрика не выводит вес за рабочий максимум', () => {
+  const WM: Record<string, number> = {
+    chest: 100, back: 120, quads: 140, hamstrings: 100, glutes: 120, shoulders: 70,
+    biceps: 50, triceps: 60, forearms: 35, calves: 80, abs: 40,
+  };
+
+  for (const patternId of ['bro_5', 'upper_lower_4']) {
+    it(`${patternId}: ни один primary не тяжелее workMax мышцы при eccentricMult 1.5`, () => {
+      const plan = buildBBPlan(makeInput({
+        patternId, weeks: 12, level: 'enhanced', trainingYears: 4, eccentricMult: 1.5,
+      })) as any;
+      const over: string[] = [];
+      let maxRatio = 0;
+      for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+        if (e.role !== 'primary') continue;
+        const wm = WM[e.muscle];
+        if (!wm) continue;
+        const wt = Number(e.workSets?.[0]?.weight ?? 0);
+        maxRatio = Math.max(maxRatio, wt / wm);
+        if (wt > wm + 0.001) over.push(`w${w.week} ${e.muscle} ${e.name}: ${wt} > ${wm}`);
+      }
+      expect(over).toEqual([]);
+      // Надбавка реально применялась: без неё вес держится ~0.6-0.75 от максимума.
+      expect(maxRatio).toBeGreaterThan(0.95);
+    });
+  }
+});
+
+// P2-4 (ядро): макроцикл раньше менял только объём/RIR/флаг делода, а `week.phase`
+// оставалась той, что выдал билдер, и из RIR-диапазона брался только минимум.
+describe('P2-4 (ядро): макроцикл обновляет фазу недели и ведёт RIR по диапазону', () => {
+  const macro = {
+    blocks: [
+      { phase: 'hypertrophy', weeks: 4, weekOffset: 1, description: '' },
+      { phase: 'contest_prep', weeks: 3, weekOffset: 5, description: '' },
+      { phase: 'transition', weeks: 1, weekOffset: 8, description: '' },
+    ],
+    totalWeeks: 8,
+    trainingFocus: 'bodybuilding',
+    rationale: [],
+  } as any;
+
+  const applied = () => applyMacrocycleToBBPlan(buildBBPlan(makeInput({ weeks: 8 })), macro) as any;
+
+  it('фаза каждой недели соответствует своему блоку', () => {
+    const p = applied();
+    expect(p.weeks.map((w: any) => w.phase)).toEqual([
+      'accumulation', 'accumulation', 'accumulation', 'accumulation',
+      'peaking', 'peaking', 'peaking', 'deload',
+    ]);
+    expect(p.weeks[7].deload).toBe(true);
+  });
+
+  it('RIR дрейфует от максимума диапазона к минимуму внутри блока', () => {
+    const p = applied();
+    const rirOf = (w: any): number => {
+      const primary = (w.sessions || []).flatMap((s: any) => s.exercises || []).find((e: any) => e.role === 'primary');
+      return Number(primary?.rir);
+    };
+    // hypertrophy, compound [2,3]: первая неделя — лёгкий край, третья — тяжёлый.
+    expect(rirOf(p.weeks[0])).toBe(3);
+    expect(rirOf(p.weeks[2])).toBe(2);
+    // contest_prep, compound [0,1]: неделя 5 — 1, неделя 7 — 0.
+    expect(rirOf(p.weeks[4])).toBe(1);
+    expect(rirOf(p.weeks[6])).toBe(0);
+  });
+});
+
+// P2-7 (ядро): разрыв до MEV считался по первой неделе и добавлялся в каждую неделю
+// мезо (объём внутри мезо растёт → перебор в поздних неделях), а `Math.max(2, gap)`
+// превращал разрыв в 1 сет в лишний сет.
+describe('P2-7 (ядро): auto-MEV-feeder добивает точно и по своей неделе', () => {
+  it('не перебирает MEV и считает разрыв по каждой неделе', () => {
+    const plan = buildBBPlan(makeInput({ patternId: 'bro_5', weeks: 8 })) as any;
+    const groups = new Map<string, { muscle: string; week: number; before: number; mev: number; sets: number }>();
+    for (const w of plan.weeks) {
+      for (const e of (w.sessions || []).flatMap((s: any) => s.exercises || [])) {
+        if (!/Auto-MEV-feeder/i.test(String(e.comment || ''))) continue;
+        const key = `${w.week}|${e.muscle}`;
+        const g = groups.get(key) || { muscle: String(e.muscle), week: Number(w.week), before: -1, mev: -1, sets: 0 };
+        const mm = /недельный объём (\d+) < MEV (\d+)/.exec(String(e.comment));
+        if (mm) { g.before = Number(mm[1]); g.mev = Number(mm[2]); }
+        g.sets += Number(e.sets) || 0;
+        groups.set(key, g);
+      }
+    }
+    const list = [...groups.values()];
+    expect(list.length).toBeGreaterThan(0);
+    for (const g of list) {
+      expect(g.mev, `MEV в комментарии фидера ${g.muscle}/w${g.week}`).toBeGreaterThan(0);
+      expect(g.before + g.sets, `${g.muscle} w${g.week}: ${g.before}+${g.sets} vs MEV ${g.mev}`)
+        .toBeLessThanOrEqual(g.mev);
+    }
+    // Если бы разрыв брался из первой недели, число фидер-сетов было бы одинаковым
+    // во всех неделях мезо.
+    const byMuscle = new Map<string, Set<number>>();
+    for (const g of list) {
+      const s = byMuscle.get(g.muscle) || new Set<number>();
+      s.add(g.sets);
+      byMuscle.set(g.muscle, s);
+    }
+    expect([...byMuscle.values()].some(s => s.size > 1)).toBe(true);
   });
 });

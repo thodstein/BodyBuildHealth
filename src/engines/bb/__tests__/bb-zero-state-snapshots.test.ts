@@ -105,8 +105,12 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // traps 7→6 (-7…-11%, в рамках документированных ≤15%). Валидатор зелёный,
     // новых дефицитов нет (единственные предупреждения — delt_mid/delt_rear
     // ниже MEV, они были и в прежнем снимке).
+    // Re-baseline 13 (аудит 2026-11, P2-7 auto-MEV-фидер): разрыв до MEV считается
+    // по каждой неделе (раньше брался из недели 1 и добавлялся всем — в поздних
+    // неделях перебор), а разрыв в 1 сет больше не превращается в 2. Сумма по
+    // дельтам не выросла: delt_mid 4 → delt_front 2 + delt_mid 2. Валидатор зелёный.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 31, biceps: 4, calves: 9, chest: 15, delt_mid: 4, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 4,
+      abs: 10, back: 31, biceps: 4, calves: 9, chest: 15, delt_front: 2, delt_mid: 2, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 4,
     });
   });
 
