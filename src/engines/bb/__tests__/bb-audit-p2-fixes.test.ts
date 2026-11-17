@@ -15,6 +15,8 @@
  * - P2-3 (ядро): эксцентрическая надбавка не выводит вес primary за рабочий максимум.
  * - P2-4 (ядро): макроцикл обновляет фазу недели и ведёт RIR по всему диапазону блока.
  * - P2-7 (ядро): auto-MEV-feeder считает разрыв до MEV по каждой неделе и не перебирает цель.
+ * - P2-9 (ядро): лабораторные предупреждения и заметка по интенсивности попадают в rationale
+ *   и без снижения MRV (раньше выводились только при `labMrvMultiplier < 1`).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -247,5 +249,32 @@ describe('P2-7 (ядро): auto-MEV-feeder добивает точно и по �
       byMuscle.set(g.muscle, s);
     }
     expect([...byMuscle.values()].some(s => s.size > 1)).toBe(true);
+  });
+});
+
+// P2-9 (ядро; в плане нумеровалась P2-6 из §4): предупреждения лаборатории и заметка по
+// интенсивности выводились ТОЛЬКО внутри `if (labMrvMultiplier < 1)`. Если лаборатория не
+// снизила допустимый объём (или предупреждение не дошло до снижения MRV), пользователь не
+// видел ни одного своего анализа — а это информация о здоровье, а не часть коррекции MRV.
+describe('P2-9 (ядро): лабораторные предупреждения не зависят от снижения MRV', () => {
+  const LAB = ['АЛТ умеренно выше нормы', 'Ферритин низкий'];
+  const NOTE = 'не повышать интенсивность, держать RIR 3';
+
+  it('при нейтральной лаборатории (MRV не снижен) предупреждения и заметка всё равно в rationale', () => {
+    const plan = buildBBPlan(makeInput({ labWarnings: LAB, labIntensityNote: NOTE })) as any;
+    const text = (plan.rationale || []).join('\n');
+    for (const w of LAB) expect(text, `предупреждение «${w}» потерялось`).toContain(w);
+    expect(text).toContain(`Интенсивность: ${NOTE}`);
+    // Коррекции MRV не было — строки про неё быть не должно.
+    expect(text).not.toContain('Лабораторная коррекция');
+  });
+
+  it('при сниженном MRV и предупреждения, и строка коррекции на месте и не дублируются', () => {
+    const plan = buildBBPlan(makeInput({ labMrvMultiplier: 0.85, labWarnings: LAB, labIntensityNote: NOTE })) as any;
+    const lines = ((plan.rationale || []) as string[]);
+    const text = lines.join('\n');
+    expect(text).toContain('Лабораторная коррекция: MRV ×0.85');
+    expect(lines.filter(l => l.includes(LAB[0])).length).toBe(1);
+    expect(lines.filter(l => l.includes('Интенсивность:')).length).toBe(1);
   });
 });

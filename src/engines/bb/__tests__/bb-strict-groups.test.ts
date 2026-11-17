@@ -164,6 +164,29 @@ describe('ensureStrictGroupCoverage — обязательное присутс�
   });
 });
 
+describe('ensureStrictGroupCoverage — SFR-тай-брейк учитывает фазу (P2-5)', () => {
+  const mkPool = (ids: string[]) => ids.map(id => ({ ...EXERCISE_CATALOG.find(c => c.id === id)!, _score: 0 }));
+  // Группа chest_fly: fly_db (SFR 4, lengthened-профиль) и pec_deck (SFR 5, mid).
+  //   accumulation: бонус только по SFR → pec_deck (4 против 2);
+  //   intensification: lengthened получает +3 → fly_db (5 против 4).
+  const pick = (phase?: string) => {
+    const pool = mkPool(['incline_bar', 'incline_db', 'fly_db', 'pec_deck']);
+    const exDatas: any[] = [pool[0], pool[1]];
+    ensureStrictGroupCoverage(exDatas, pool, 'chest', 4, [], [], { isPrimary: true, phase });
+    return exDatas.map((e: any) => e.id);
+  };
+
+  it('без фазы и в accumulation порядок прежний: по SFR выигрывает pec_deck', () => {
+    expect(pick()).toContain('pec_deck');
+    expect(pick('accumulation')).toContain('pec_deck');
+  });
+
+  it('в intensification бонус lengthened-профиля меняет выбор на fly_db', () => {
+    expect(pick('intensification')).toContain('fly_db');
+    expect(pick('intensification')).not.toContain('pec_deck');
+  });
+});
+
 describe('buildBBPlan — жёсткие группы присутствуют в программе', () => {
   it('upper/lower 8 нед: грудь всегда с разводкой И жимом 30°; спина с верхним блоком/Т-тягой; ноги с приседом/гакк и разгибаниями', () => {
     const plan = buildBBPlan({

@@ -455,7 +455,9 @@ export function ensureStrictGroupCoverage(
   exerciseCount: number,
   sessionSelectedIds: string[],
   sessionSelectedNames: string[],
-  opts?: { isPrimary?: boolean; rotationMode?: string; avoidPatterns?: string[] },
+  // P2-5 (аудит 2026-11): фаза нужна тай-брейку по SFR внутри группы — у
+  // `sfrSelectionBonus` lengthened-упражнение получает +3 только в intensification.
+  opts?: { isPrimary?: boolean; rotationMode?: string; avoidPatterns?: string[]; phase?: string },
 ): void {
   // Аудит Sep 2026: покрытие работало только на primary-сессиях — на upper_lower
   // хамы бывают только accessory, и ham_hack (гакк-бицепс/колодец|колодце) выпадал из
@@ -531,10 +533,15 @@ export function ensureStrictGroupCoverage(
     if (candidates.length === 0) continue;
     // P1: SFR-тай-брейк среди равных по _score (высокий SFR предпочтителен для
     // изоляций/машин — это группы strict-замены: разводки/сгибания и т.п.).
+    // P2-5 (аудит 2026-11): фаза бралась жёстко 'accumulation', поэтому бонус
+    // lengthened-профиля (+3 в intensification) в тай-брейке не срабатывал никогда,
+    // и в тяжёлой фазе группа добиралась коротким/средним амплитудным вариантом.
+    // Без явной фазы поведение остаётся прежним (accumulation) — обратная совместимость.
+    const sfrPhase = opts?.phase || 'accumulation';
     const best = candidates.slice().sort((a, b) => {
       const sa = (a._score ?? 0), sb = (b._score ?? 0);
       if (sa !== sb) return sb - sa;
-      return sfrSelectionBonus(b, 'accumulation') - sfrSelectionBonus(a, 'accumulation');
+      return sfrSelectionBonus(b, sfrPhase) - sfrSelectionBonus(a, sfrPhase);
     })[0];
     if (!best) continue;
     exDatas[idx] = best;

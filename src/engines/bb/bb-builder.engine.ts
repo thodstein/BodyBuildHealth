@@ -2922,7 +2922,8 @@ function buildSession(
       ? (isWeak(muscle, weakPoints) || (focusGroup ? collapseKey(focusGroup) === muscle : false))
       : true;
     if (isSpecTarget && !skipStrictCoverage) {
-      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary', rotationMode, avoidPatterns: abAvoidPatterns });
+      // P2-5 (аудит 2026-11): передаём фазу — она участвует в SFR-тай-брейке группы.
+      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary', rotationMode, avoidPatterns: abAvoidPatterns, phase });
     }
 
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
@@ -4705,12 +4706,17 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const effectiveMrvMult = pedMrvMult * labMult;
   if (labMult < 1) {
     rationale.push(`🧪 Лабораторная коррекция: MRV ×${labMult.toFixed(2)} (печень/почки/воспаление/гормоны) → эффективный MRV-множитель ×${effectiveMrvMult.toFixed(2)}.`);
-    if (input.labWarnings && input.labWarnings.length > 0) {
-      rationale.push(...input.labWarnings.map(w => `⚠ ${w}`));
-    }
-    if (input.labIntensityNote) {
-      rationale.push(`🧪 Интенсивность: ${input.labIntensityNote}`);
-    }
+  }
+  // P2-6 (аудит 2026-11): предупреждения лаборатории и заметка по интенсивности —
+  // это информация о здоровье и о том, как читать план, а не часть коррекции MRV.
+  // Раньше они выводились только внутри `labMult < 1`, поэтому при нейтральной
+  // лаборатории (или при предупреждении, не дошедшем до снижения MRV) пользователь
+  // их вообще не видел.
+  if (input.labWarnings && input.labWarnings.length > 0) {
+    rationale.push(...input.labWarnings.map(w => `⚠ ${w}`));
+  }
+  if (input.labIntensityNote) {
+    rationale.push(`🧪 Интенсивность: ${input.labIntensityNote}`);
   }
   // PRO: cross-mesocycle continuity — отчёт о прогрессии
   if (mesoProgression) {
