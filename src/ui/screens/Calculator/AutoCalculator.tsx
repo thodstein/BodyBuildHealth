@@ -14,6 +14,8 @@ import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
+import { ruMarker } from './Calc.lab';
+import { LAB_UNIT_CHOICES } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult, onResetEdits }) => {
@@ -23,6 +25,27 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   });
   /** Перекрытия ответов анкеты анализами (проход 105) — показываем оба значения. */
   const [labOverrides, setLabOverrides] = useState<LabFlagOverride[]>(() => state.labFlagOverrides ?? []);
+  /**
+   * Маркеры, которые движок читает по величине, потому что единицы нет, а бланки
+   * расходятся (проход 106). Молчать об этом нельзя: E2 500 без единицы — это либо
+   * высокая пг/мл, либо нормальная пмоль/л, и вердикт зависит от выбора.
+   */
+  const unitMissing = useMemo(() => {
+    const slice = state.labs?.fullPanel || state.labs?.midCourse || state.labs?.preCourse;
+    if (!slice) return [] as string[];
+    const out: string[] = [];
+    for (const panel of Object.keys(slice)) {
+      if (panel === 'units' || panel === 'date') continue;
+      const markers = (slice as any)[panel] as Record<string, string> | undefined;
+      if (!markers) continue;
+      for (const marker of Object.keys(markers)) {
+        if (!markers[marker] || !LAB_UNIT_CHOICES[marker]) continue;
+        if (slice.units?.[panel]?.[marker]) continue;
+        out.push(ruMarker(marker));
+      }
+    }
+    return Array.from(new Set(out));
+  }, [state.labs]);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
   const [labSyncFlash, setLabSyncFlash] = useState(false);
@@ -689,6 +712,20 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 • {o.title}: по анализам «{flagLevelRu(o.lab)}» ({o.marker} {o.value}, предел {o.limit}) — в анкете было «{flagLevelRu(o.manual)}»
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Проход 106: единица не указана — значение читается по величине, и об этом
+          надо сказать вслух, потому что бланки расходятся (пг/мл против пмоль/л). */}
+      {unitMissing.length > 0 && (
+        <div data-lab-unit-missing style={{ ...GLASS, padding: '6px 10px', marginBottom: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 2 }}>
+            ⚠ Единица не указана
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
+            {unitMissing.join(', ')} — прочитано по величине. Выберите единицу в бланке анализов,
+            иначе вердикт может быть противоположным (пг/мл против пмоль/л).
           </div>
         </div>
       )}

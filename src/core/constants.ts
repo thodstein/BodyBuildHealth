@@ -784,3 +784,86 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
       return rawValue;
   }
 }
+
+// ── Единица бланка вместо догадки (проход 106) ──
+// Догадка по величине — «>300 значит пмоль/л» — ошибается там, где значение
+// возможно в обеих единицах. Женщина с E2 500 пг/мл (реальная высокая эстрадиоляция)
+// уходила в 136 пг/мл, то есть в норму, и повод для анастрозола исчезал. Поэтому
+// единица стала частью данных: её выбирают в бланке, а чтение идёт по ней.
+// Догадка осталась только для старых записей без единицы — и помечается (`guessed`),
+// чтобы интерфейс сказал «единица не указана, прочитано как …».
+//
+// Канонические единицы чтения — те же, к которым приводил `normalizeLabValue`
+// (и те, что перечислены в комментарии выше). Множители — из общего дома (проход 100).
+export const LAB_READ_UNIT: Record<string, string> = {
+  'E2': 'пг/мл', 'Prolactin': 'нг/мл', 'Total T': 'нмоль/л',
+  'Cortisol': 'нмоль/л', 'DHEA-S': 'мкг/дл',
+};
+
+/** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
+export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
+  'E2': ['пг/мл', 'пмоль/л'],
+  'Prolactin': ['нг/мл', 'мМЕ/л'],
+  'Total T': ['нмоль/л', 'нг/дл'],
+  'Cortisol': ['нмоль/л', 'мкг/дл'],
+  'DHEA-S': ['мкг/дл', 'мкмоль/л'],
+};
+
+/** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
+const UNIT_ALIAS: Record<string, string> = {
+  'пг/мл': 'пг/мл', 'pg/ml': 'пг/мл',
+  'пмоль/л': 'пмоль/л', 'pmol/l': 'пмоль/л',
+  'нг/мл': 'нг/мл', 'ng/ml': 'нг/мл',
+  'мме/л': 'мМЕ/л', 'miu/l': 'мМЕ/л', 'мед/л': 'мМЕ/л', 'ммед/л': 'мМЕ/л',
+  'нмоль/л': 'нмоль/л', 'nmol/l': 'нмоль/л',
+  'нг/дл': 'нг/дл', 'ng/dl': 'нг/дл',
+  'мкг/дл': 'мкг/дл', 'µg/dl': 'мкг/дл', 'μg/dl': 'мкг/дл', 'ug/dl': 'мкг/дл',
+  'мкмоль/л': 'мкмоль/л', 'µmol/l': 'мкмоль/л', 'μmol/l': 'мкмоль/л', 'umol/l': 'мкмоль/л',
+};
+
+/** Каноническое написание единицы (для сверки). Неизвестное — пустая строка. */
+export function labUnitKey(unit?: string): string {
+  if (!unit) return '';
+  return UNIT_ALIAS[unit.trim().toLowerCase().replace(/\s+/g, '')] ?? '';
+}
+
+export interface LabValueRead {
+  /** Значение в канонической единице чтения. */
+  value: number;
+  /** Единицы в бланке не было — прочитано по величине, интерфейс должен это сказать. */
+  guessed: boolean;
+}
+
+/**
+ * Чтение значения маркера из бланка. Единица известна — переводим по ней и ничего не
+ * угадываем; единицы нет — прежняя эвристика `normalizeLabValue`, но с пометкой
+ * `guessed`. Исключение: эстрадиол у женщины без единицы читается как пг/мл — деление
+ * «>300» прятало её реально высокие значения (500 пг/мл → 136), то есть было
+ * ложноотрицательным. Мужской путь и путь без пола не изменены.
+ */
+export function readLabValue(
+  marker: string,
+  rawValue: number,
+  unit?: string,
+  sex?: 'male' | 'female',
+): LabValueRead {
+  if (isNaN(rawValue)) return { value: rawValue, guessed: false };
+  const canon = LAB_READ_UNIT[marker];
+  if (!canon) return { value: rawValue, guessed: false };
+
+  const u = labUnitKey(unit);
+  if (u) {
+    if (u === canon) return { value: rawValue, guessed: false };
+    switch (marker) {
+      case 'E2': return { value: Math.round(rawValue / E2_PG_TO_PMOL * 10) / 10, guessed: false };
+      case 'Prolactin': return { value: Math.round(rawValue / PRL_NG_TO_MIU * 10) / 10, guessed: false };
+      case 'Total T': return { value: Math.round(rawValue / TT_NMOL_TO_NG_DL * 10) / 10, guessed: false };
+      case 'Cortisol': return { value: Math.round(rawValue * CORTISOL_UG_DL_TO_NMOL * 10) / 10, guessed: false };
+      case 'DHEA-S': return { value: Math.round(rawValue * DHEAS_UMOL_TO_UG_DL * 10) / 10, guessed: false };
+    }
+    return { value: rawValue, guessed: false };
+  }
+
+  if (marker === 'E2' && sex === 'female') return { value: rawValue, guessed: true };
+  return { value: normalizeLabValue(marker, rawValue), guessed: true };
+}

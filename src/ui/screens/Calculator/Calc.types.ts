@@ -218,6 +218,21 @@ export function normalizeLabSlice(value: unknown): LabSlice | null {
     const panel = value[key];
     (slice as any)[key] = isRecord(panel) ? panel as Record<string, string> : {};
   }
+  // Проход 106: единицы бланка — часть данных. Без переноса сюда выбор единицы
+  // умирал при сохранении, и значение снова читалось догадкой по величине.
+  if (isRecord(value.units)) {
+    const units: Record<string, Record<string, string>> = {};
+    for (const panelKey of Object.keys(value.units)) {
+      const per = (value.units as Record<string, unknown>)[panelKey];
+      if (!isRecord(per)) continue;
+      const clean: Record<string, string> = {};
+      for (const [marker, unit] of Object.entries(per)) {
+        if (typeof unit === 'string' && unit) clean[marker] = unit;
+      }
+      if (Object.keys(clean).length > 0) units[panelKey] = clean;
+    }
+    if (Object.keys(units).length > 0) slice.units = units;
+  }
   return slice;
 }
 

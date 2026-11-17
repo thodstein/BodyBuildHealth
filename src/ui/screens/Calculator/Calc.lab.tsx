@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LabSlice } from '../../../engines/support-plan';
+import { LAB_UNIT_CHOICES } from '../../../core/constants';
 import { GLASS, PILL, INPUT } from './Calc.types';
 
 export const FULL_PANELS: { key: keyof LabSlice; label: string; color: string; markers: string[] }[] = [
@@ -41,6 +42,37 @@ export const LAB_MARKER_RU: Record<string, string> = {
 };
 export const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
 
+/**
+ * Единица бланка (проход 106). Бланки дают E2 и в пг/мл, и в пмоль/л, пролактин — в
+ * нг/мл и мМЕ/л, и «угадать» по величине можно только там, где значение невозможно в
+ * обеих единицах. Поэтому единица выбирается здесь и едет вместе с числом: чтение
+ * идёт по ней, а не по догадке. Пусто — «не указана», прежняя догадка с пометкой.
+ */
+function UnitPicker({ panel, marker, slice, onChange }: {
+  panel: string; marker: string; slice: LabSlice; onChange: (v: any) => void;
+}) {
+  const choices = LAB_UNIT_CHOICES[marker];
+  if (!choices) return null;
+  const value = slice.units?.[panel]?.[marker] ?? '';
+  return (
+    <select
+      value={value}
+      aria-label={`Единица: ${ruMarker(marker)}`}
+      title="Единица из бланка. Без неё значение читается по величине — и это может соврать."
+      onChange={e => {
+        const unit = e.target.value;
+        const panelUnits = { ...(slice.units?.[panel] || {}) };
+        if (unit) panelUnits[marker] = unit; else delete panelUnits[marker];
+        onChange({ ...slice, units: { ...(slice.units || {}), [panel]: panelUnits } });
+      }}
+      style={{ ...INPUT, padding: '1px 3px', fontSize: 7, height: 17, marginTop: 1 }}
+    >
+      <option value="">ед.?</option>
+      {choices.map(u => <option key={u} value={u}>{u}</option>)}
+    </select>
+  );
+}
+
 export function LabSliceInput({ label, slice, onChange }: { label: string; slice: LabSlice | null; onChange: (v: any) => void; fullSpectrum?: boolean }) {
   return <div className="calc-labslice" style={{ marginBottom: 6 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -54,6 +86,7 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
         {['LH','FSH','Total T','Free T','E2','Prolactin','SHBG','DHT','Progesterone','Cortisol'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
             <input value={slice.panelSex?.[m] || ''} onChange={e => onChange({ ...slice, panelSex: { ...slice.panelSex, [m]: e.target.value } })} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <UnitPicker panel="panelSex" marker={m} slice={slice} onChange={onChange} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#22c55e', marginBottom: 2 }}>Биохимия</div>
@@ -93,6 +126,7 @@ export function FullLabInput({ values, onChange }: { values: LabSlice | null; on
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
         {pan.markers.map(m => <div key={m}><span style={{ fontSize:7, color:'var(--text-dim)' }}>{ruMarker(m)}</span>
           <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
+          <UnitPicker panel={String(pan.key)} marker={m} slice={s} onChange={onChange} />
         </div>)}
       </div>
     </div>)}

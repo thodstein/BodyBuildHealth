@@ -116,6 +116,12 @@ export interface LabSlice {
   panelMineral: Record<string, string>;
   panelTumor: Record<string, string>;
   panelUrinalysis: Record<string, string>;
+  /**
+   * Единицы бланка (проход 106): панель → маркер → единица («пмоль/л», «pg/mL»).
+   * Необязательно: у старых записей единицы нет, и читаются они прежней догадкой
+   * (с пометкой «единица не указана»).
+   */
+  units?: Record<string, Record<string, string>>;
 }
 
 export interface LabPanelData {

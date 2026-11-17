@@ -23,7 +23,7 @@ import { resolvePedAlias } from '../../data/ped-alias-map';
 import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
-import { normalizeLabValue } from '../../core/constants';
+import { normalizeLabValue, readLabValue } from '../../core/constants';
 import { convertToUnit } from '../../core/labs-mapping';
 import { e2PgPerMl } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
@@ -1045,13 +1045,19 @@ function extractLabValues(
 
   // panelSex: LH, FSH, Total T, Free T, E2, Prolactin, SHBG, DHT, Progesterone, Cortisol
   const s = (fp.panelSex || {}) as Record<string, any>;
+  // Проход 106: гормон читается по единице бланка; нет единицы — прежняя догадка
+  // по величине (у женщины E2 без единицы больше не делится).
+  const unitOf = (panel: string, marker: string): string | undefined =>
+    (fp.units?.[panel] as Record<string, string> | undefined)?.[marker];
+  const readHormone = (marker: string, panel: string, raw: number) =>
+    readLabValue(marker, raw, unitOf(panel, marker), sex).value;
   if (num(s.LH) !== undefined) v['LH'] = num(s.LH)!;
   if (num(s.FSH) !== undefined) v['FSH'] = num(s.FSH)!;
-  if (num(s['Total T']) !== undefined) v['TT'] = normalizeLabValue('Total T', num(s['Total T'])!);
-  if (num(s.E2) !== undefined) v['E2'] = normalizeLabValue('E2', num(s.E2)!);
-  if (num(s.Prolactin) !== undefined) v['PRL'] = normalizeLabValue('Prolactin', num(s.Prolactin)!);
+  if (num(s['Total T']) !== undefined) v['TT'] = readHormone('Total T', 'panelSex', num(s['Total T'])!);
+  if (num(s.E2) !== undefined) v['E2'] = readHormone('E2', 'panelSex', num(s.E2)!);
+  if (num(s.Prolactin) !== undefined) v['PRL'] = readHormone('Prolactin', 'panelSex', num(s.Prolactin)!);
   if (num(s.SHBG) !== undefined) v['SHBG'] = num(s.SHBG)!;
-  if (num(s.Cortisol) !== undefined) v['CORTISOL'] = normalizeLabValue('Cortisol', num(s.Cortisol)!);
+  if (num(s.Cortisol) !== undefined) v['CORTISOL'] = readHormone('Cortisol', 'panelSex', num(s.Cortisol)!);
 
   // panelThyroid: TSH, T3 free, T4 free
   const th = (fp.panelThyroid || {}) as Record<string, any>;
@@ -1098,7 +1104,7 @@ function extractLabValues(
 
   // panelAdrenal: DHEA-S, Aldosterone, PTH
   const adr = (fp.panelAdrenal || {}) as Record<string, any>;
-  if (num(adr['DHEA-S']) !== undefined) v['DHEAS'] = num(adr['DHEA-S'])!;
+  if (num(adr['DHEA-S']) !== undefined) v['DHEAS'] = readHormone('DHEA-S', 'panelAdrenal', num(adr['DHEA-S'])!);
   if (num(adr.Aldosterone) !== undefined) v['ALDO'] = num(adr.Aldosterone)!;
   if (num(adr.PTH) !== undefined) v['PTH'] = num(adr.PTH)!;
 
