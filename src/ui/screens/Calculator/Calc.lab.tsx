@@ -77,7 +77,23 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
   return <div className="calc-labslice" style={{ marginBottom: 6 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
       <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text)' }}>{label}</span>
-      <input type="date" value={slice?.date || ''} onChange={e => onChange(e.target.value ? { date: e.target.value, panelSex: {}, panelBiochem: {}, panelHematology: {}, panelThyroid: {} } : null)} style={{ ...INPUT, width: 130, fontSize: 9 }} />
+      <input type="date" value={slice?.date || ''} onChange={e => {
+        // Проход 110: дата — это не новый бланк. Раньше выбор (или исправление) даты
+        // пересоздавал срез с пустыми панелями и стирал уже введённые анализы вместе
+        // с выбранными единицами — молча, без возможности отменить. Теперь меняется
+        // только дата; пустая дата значения не удаляет (для этого есть ✕).
+        const v = e.target.value;
+        if (!v) { onChange(slice ? { ...slice, date: '' } : null); return; }
+        onChange({
+          ...(slice || {}),
+          date: v,
+          panelSex: slice?.panelSex || {},
+          panelBiochem: slice?.panelBiochem || {},
+          panelHematology: slice?.panelHematology || {},
+          panelThyroid: slice?.panelThyroid || {},
+          ...(slice?.units ? { units: slice.units } : {}),
+        });
+      }} style={{ ...INPUT, width: 130, fontSize: 9 }} />
       <button onClick={() => onChange(null)} style={{ ...PILL, fontSize: 8, background: '#ef4444', color: '#fff', padding: '3px 8px' }}>✕</button>
     </div>
     {slice && <>
