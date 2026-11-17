@@ -7760,6 +7760,13 @@ for (const week of next.weeks) {
     specTargets: (options as any).priorityMuscles,
     canonicalMuscle: (m: string) => (WEAK_TO_MUSCLE as Record<string, string>)[m] || m,
     refreshFrequency: true,
+    // P3-1 (аудит 2026-11): строки «⚠/🚫 Валидация» тоже пересобираются о факту.
+    // Финализатор добавлял их из ПРОМЕЖУТОЧНОЙ валидации (до гардов головок рук,
+    // гейта уровней, реализма сессии и пост-финального трима), а снимок в конце
+    // обновлял `plan.validation`, но не rationale — в тексте оставались
+    // предупреждения/ошибки, которых в итоговом плане нет. Все остальные вызовы
+    // снимка (билдер, replan, два cycle-пути, UI) эту опцию уже передавали.
+    refreshValidationRationale: true,
     refreshRotationRationale: true,
   });
   (next as any).buildContext = {

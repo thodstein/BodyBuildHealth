@@ -80,8 +80,13 @@ function patternSummary(weeks: any[], muscles: string[]): string {
   }
   return Object.entries(acc).map(([key, value]) => `${key}=${value}`).join(', ') || 'нет прямой работы';
 }
-/** Коды, которые на промежуточной стадии ожидаемы и снимаются финализатором. */
-const TRANSIENT_VALIDATION_CODES = new Set(['target_volume_deficit', 'effective_mrv_overflow']);
+// P3-3 (аудит 2026-11): здесь был фильтр «промежуточных» кодов
+// (`target_volume_deficit`, `effective_mrv_overflow`) — они не попадали в строки
+// «⚠ Валидация». Но КАЖДЫЙ вызов `refreshBBPlanSnapshots` в проекте — терминальный
+// снимок (билдер, финализатор, replan, оба cycle-пути, UI-перевалидация): снимок
+// зовётся последним, после всех мутирующих проходов. Значит эти коды в нём не
+// промежуточные, а настоящие: дефицит объёма до MEV и перебор MRV — то, что
+// пользователю нужно видеть в плане, а не только в панели валидации. Фильтр убран.
 
 /**
  * Пересчитывает все производные объекты плана по его текущему содержимому.
@@ -171,7 +176,6 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
     const issues = ((plan.validation.issues || []) as any[]);
     const fresh = issues
       .filter((issue) => issue.level === 'warning')
-      .filter((issue) => !TRANSIENT_VALIDATION_CODES.has(String(issue.code)))
       .slice(0, 20)
       .map((issue) => `${VALIDATION_LINE_PREFIX} ${issue.message}`);
     // Ошибки — то же обещание: цикл-путь после трима гасил их в плане, а строки
