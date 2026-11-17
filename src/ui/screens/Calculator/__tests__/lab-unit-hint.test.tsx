@@ -65,5 +65,10 @@ describe('проход 114: единица стоит подсказкой в п
     const vd = container.querySelector('select[aria-label="Единица: Вит. D"]') as HTMLSelectElement;
     expect(vd, 'у витамина D должен быть выбор единицы').toBeTruthy();
     expect(Array.from(vd.options).map(o => o.value)).toEqual(['', 'нг/мл', 'нмоль/л']);
+    // проход 122: фолат — тоже с выбором единицы
+    expect(labUnitHint('Folate')).toBeUndefined();
+    const fol = container.querySelector('select[aria-label="Единица: Фолат"]') as HTMLSelectElement;
+    expect(fol, 'у фолата должен быть выбор единицы').toBeTruthy();
+    expect(Array.from(fol.options).map(o => o.value)).toEqual(['', 'нг/мл', 'нмоль/л']);
   });
 });

@@ -78,8 +78,8 @@ describe('проход 106: readLabValue — единица есть, догад
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
     // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
-    // 121: витамин D — в каждом случае единицы расходятся, и догадка по величине не работает
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)']);
+    // 121: витамин D; 122: фолат — в каждом случае единицы расходятся, и догадка не работает
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -487,5 +487,32 @@ describe('проход 121: витамин D читается по единиц�
   it('движок берёт витамин D через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin'");
+  });
+});
+
+/**
+ * Проход 122: фолат. Норма приложения — 7–50 нг/мл, а бланк может дать нмоль/л
+ * (разница 2.27). 15 нмоль/л — это 6.6 нг/мл, пограничный дефицит; прочитанное
+ * как 15 нг/мл число давало «уверенную норму» и снимало вопрос с B12/гомоцистеином.
+ */
+describe('проход 122: фолат читается по единице бланка', () => {
+  it('нмоль/л приводится к нг/мл, догадки нет', () => {
+    const r = readLabValue('Folate', 15, 'нмоль/л');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(6.6);
+  });
+
+  it('нг/мл остаётся как есть', () => {
+    expect(readLabValue('Folate', 6.6, 'нг/мл')).toEqual({ value: 6.6, guessed: false });
+  });
+
+  it('пересчёт совпадает с конвертером импорта', () => {
+    const fromImport = normalizeLabMeasurement('FOL', 15, 'nmol/L');
+    expect(readLabValue('Folate', 15, 'нмоль/л').value).toBeCloseTo(fromImport.value, 0);
+  });
+
+  it('движок берёт фолат через чтение с единицей', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['FOLATE'] = readHormone('Folate', 'panelVitamin'");
   });
 });

@@ -1101,7 +1101,8 @@ function extractLabValues(
   // Проход 121: витамин D читается по единице бланка (нг/мл против нмоль/л, 2.5).
   if (num(vit['Vitamin D (25-OH)']) !== undefined) v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin', num(vit['Vitamin D (25-OH)'])!);
   if (num(vit.B12) !== undefined) v['B12'] = num(vit.B12)!;
-  if (num(vit.Folate) !== undefined) v['FOLATE'] = num(vit.Folate)!;
+  // Проход 122: фолат тоже читается по единице бланка (нг/мл против нмоль/л).
+  if (num(vit.Folate) !== undefined) v['FOLATE'] = readHormone('Folate', 'panelVitamin', num(vit.Folate)!);
 
   // panelAdrenal: DHEA-S, Aldosterone, PTH
   const adr = (fp.panelAdrenal || {}) as Record<string, any>;

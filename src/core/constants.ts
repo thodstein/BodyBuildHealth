@@ -732,6 +732,9 @@ export const FT4_PG_TO_PMOL = 1.2872;    // 1 pg/mL = 1.2872 pmol/L (M = 776.87)
 // Проход 121: витамин D дают и в нг/мл, и в нмоль/л (разница 2.5). Канон — нг/мл,
 // как в нормах приложения (30–100).
 export const VITD_NG_TO_NMOL = 2.496;    // 1 ng/mL = 2.496 nmol/L (M = 400.64)
+// Проход 122: фолат дают в нг/мл и в нмоль/л (разница 2.27); канон — нг/мл
+// (норма приложения 7–50).
+export const FOLATE_NG_TO_NMOL = 2.2655; // 1 ng/mL = 2.2655 nmol/L (M = 441.4)
 export const TT_NMOL_TO_NG_DL = 28.84;   // 1 nmol/L = 28.84 ng/dL
 export const CORTISOL_UG_DL_TO_NMOL = 27.59;
 export const DHEAS_UMOL_TO_UG_DL = 36.9;
@@ -817,6 +820,8 @@ export const LAB_READ_UNIT: Record<string, string> = {
   'T3 free': 'пмоль/л', 'T4 free': 'пмоль/л',
   // Проход 121: витамин D — канон нг/мл (нормы приложения 30–100).
   'Vitamin D (25-OH)': 'нг/мл',
+  // Проход 122: фолат — канон нг/мл (норма приложения 7–50).
+  'Folate': 'нг/мл',
 };
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
@@ -831,6 +836,7 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'T3 free': ['пмоль/л', 'пг/мл'],
   'T4 free': ['пмоль/л', 'пг/мл'],
   'Vitamin D (25-OH)': ['нг/мл', 'нмоль/л'],
+  'Folate': ['нг/мл', 'нмоль/л'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -894,6 +900,9 @@ export function readLabValue(
       // Проход 121: 62 нмоль/л витамина D — это 24.8 нг/мл, то есть дефицит,
       // а не 62 нг/мл (которое читалось бы как «выше нормы»).
       case 'Vitamin D (25-OH)': return { value: Math.round(rawValue / VITD_NG_TO_NMOL * 10) / 10, guessed: false };
+      // Проход 122: 15 нмоль/л фолата — это 6.6 нг/мл (пограничный дефицит),
+      // а как 15 нг/мл число выглядело бы уверенной нормой.
+      case 'Folate': return { value: Math.round(rawValue / FOLATE_NG_TO_NMOL * 10) / 10, guessed: false };
     }
     return { value: rawValue, guessed: false };
   }
