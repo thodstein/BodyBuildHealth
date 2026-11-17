@@ -78,8 +78,8 @@ describe('проход 106: readLabValue — единица есть, догад
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
     // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
-    // 121: витамин D; 122: фолат — в каждом случае единицы расходятся, и догадка не работает
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate']);
+    // 121–123: витамин D, фолат, B12 — везде единицы расходятся, догадка не работает
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -514,5 +514,32 @@ describe('проход 122: фолат читается по единице бл
   it('движок берёт фолат через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['FOLATE'] = readHormone('Folate', 'panelVitamin'");
+  });
+});
+
+/**
+ * Проход 123: B12. Норма приложения — 200–900 пг/мл, а бланк может дать пмоль/л
+ * (1 пг/мл = 0.738 пмоль/л). 300 пмоль/л — это 406.6 пг/мл (уверенная норма),
+ * а прочитанное как 300 пг/мл число попадало в пограничную зону.
+ */
+describe('проход 123: B12 читается по единице бланка', () => {
+  it('пмоль/л приводится к пг/мл, догадки нет', () => {
+    const r = readLabValue('B12', 300, 'пмоль/л');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(406.6);
+  });
+
+  it('пг/мл остаётся как есть', () => {
+    expect(readLabValue('B12', 406.6, 'пг/мл')).toEqual({ value: 406.6, guessed: false });
+  });
+
+  it('пересчёт совпадает с конвертером импорта', () => {
+    const fromImport = normalizeLabMeasurement('B12', 300, 'pmol/L');
+    expect(readLabValue('B12', 300, 'пмоль/л').value).toBeCloseTo(fromImport.value, 0);
+  });
+
+  it('движок берёт B12 через чтение с единицей', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['B12'] = readHormone('B12', 'panelVitamin'");
   });
 });

@@ -26,9 +26,8 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',
   // ── гормоны без выбора единицы ──
   'TSH': 'TSH', 'Anti-TPO': 'TPO_AB', 'Anti-TG': 'TG_AB',
-  // ── железо, витамины ──
+  // ── железо (витамины D, B12 и фолат переехали в выбор единицы — проходы 121–123) ──
   'Iron': 'IRON', 'TIBC': 'TIBC', 'Transferrin': 'TRANSFERRIN', 'Ferritin': 'FERRITIN',
-  'B12': 'B12',
   // ── электролиты ──
   'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K',
   // ── свёртывание, сердце, опухолевые маркеры ──
