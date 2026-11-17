@@ -315,7 +315,9 @@ export function buildLabFindings(
     const recs = evaluateRecommendations(state, tzRes, state.courseWeek);
     const seen = new Set<string>();
     for (const rec of recs) {
-      if (!rec.substances || rec.substances.length === 0) continue;
+      // Проход 108: находка без веществ — это не мусор, а анализ, по которому поддержка
+      // уже выдана другими блоками (глюкоза, D-димер). Выбрасывать её нельзя: тогда
+      // отклонение исчезает из вердикта, и «нет записи» читается как «всё в норме».
       // курсовая динамика (изменение доз по неделям) — это не лабораторное отклонение
       if ((rec.id || '') === '__week_change') continue;
       const key = `${rec.id || ''}|${rec.title || ''}`;
@@ -328,7 +330,7 @@ export function buildLabFindings(
         systemLabel: rec.systemLabel || rec.system || 'Прочее',
         title: rec.title || '',
         status: rec.status,
-        substances: rec.substances.map((s: any) => ({
+        substances: (rec.substances || []).map((s: any) => ({
           id: s.id,
           name: s.name,
           dose: s.dose || '',

@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES } from '../../core/constants';
 import { evaluateRecommendations } from '../../engines/recommendation-engine';
+import { buildLabFindings } from '../support-plan/display';
 import { normalizeCalculatorState } from '../../ui/screens/Calculator/Calc.types';
 
 describe('проход 106: readLabValue — единица есть, догадки нет', () => {
@@ -228,5 +229,34 @@ describe('проход 107: один анализ — один совет', () =
     for (const marker of ['ALT', 'Ferritin', 'Homocysteine', 'CRP', 'Vitamin D (25-OH)', 'B12', 'E2', 'Prolactin', 'DHEA-S']) {
       expect(src, `в labRules вернулся ${marker}`).not.toContain(`{ marker:'${marker}'`);
     }
+  });
+});
+
+/**
+ * Проход 108: находка не исчезает из-за того, что её вещества уже в плане. Раньше
+ * `addRec` при «все вещества уже выданы» молчал, а `buildLabFindings` выбрасывал
+ * записи без веществ — и повышенная глюкоза 7.0 или D-димер 1.5 не появлялись нигде:
+ * «нет записи» читалось как «всё в норме».
+ */
+describe('проход 108: находка без новых веществ остаётся видимой', () => {
+  const findings = (labs: Record<string, any>) =>
+    buildLabFindings(mkState('male', labs) as any, {} as any);
+
+  it('глюкоза 7: находка есть, веществ нет — и это сказано словами', () => {
+    const f = findings({ panelBiochem: { Glucose: '7' } }).find(x => x.title.includes('Glucose'));
+    expect(f, 'находки по глюкозе нет').toBeDefined();
+    expect(f!.substances).toHaveLength(0);
+    expect(f!.escalation).toContain('Поддержка по этому маркеру уже выдана другими блоками');
+  });
+
+  it('D-димер 1.5: находка есть (свёртываемость — не тишина)', () => {
+    const f = findings({ panelCoagulation: { 'D-dimer': '1.5' } }).find(x => x.title.includes('D-dimer'));
+    expect(f, 'находки по D-димеру нет').toBeDefined();
+  });
+
+  it('АСТ 60: находка с веществами — пустой она не становится', () => {
+    const f = findings({ panelBiochem: { AST: '60' } }).find(x => x.title.includes('AST'));
+    expect(f).toBeDefined();
+    expect(f!.substances.length).toBeGreaterThan(0);
   });
 });

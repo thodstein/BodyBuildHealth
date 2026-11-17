@@ -204,7 +204,14 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   });
 }
 
-  const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string, marker?: string) => {
+  /**
+   * Проход 108: находка не исчезает из-за того, что её вещества уже в плане. Раньше
+   * `addRec` при «все вещества уже выданы» молчал, и анализ пропадал из вердикта
+   * целиком: повышенная глюкоза 7.0 и D-димер 1.5 не появлялись нигде, потому что
+   * их вещества забрали блоки `hct` и `lipid`. С `allowEmpty` запись остаётся как
+   * находка (число, шаг, контроль), но без дублей веществ — и говорит об этом прямо.
+   */
+  const addRec = (id: string, severity: RecSeverity, system: string, systemLabel: string, title: string, substanceIds: string[], reasoningMap: Record<string, string>, escalation: string, monitoring: string, marker?: string, opts?: { allowEmpty?: boolean }) => {
     const orderedIds = orderByPriority(substanceIds, marker);
     const substances = orderedIds.filter(sid =>
       !blockedIds.includes(sid) &&
@@ -216,13 +223,16 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       if (blockedIds.includes(sid)) { s.name += ' [⚠ ЗАБЛОКИРОВАН]'; s.reasoning += ' — замена по механизму'; }
       return s;
     });
-    if (substances.length === 0) return;
+    if (substances.length === 0 && !opts?.allowEmpty) return;
     // Mark added substances (включая их same-class альтернативы) для будущей дедупликации
     for (const s of substances) {
       usedSubstanceIds.add(s.id);
       for (const alt of recSameClassIds(s.id)) usedSubstanceIds.add(alt);
     }
-    recs.push({ id, severity, system, systemLabel, title, status: 'active', substances, escalation, monitoring, conflicts: [] });
+    const escalationText = substances.length === 0
+      ? 'Поддержка по этому маркеру уже выдана другими блоками — дозы не дублируются. ' + escalation
+      : escalation;
+    recs.push({ id, severity, system, systemLabel, title, status: 'active', substances, escalation: escalationText, monitoring, conflicts: [] });
   };
 
   // ════════════════════════════════════════════════════════════════
@@ -661,7 +671,8 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       const labMatches = findByLabMarker(rule.marker).filter(m => !REC_BLACKLIST.has(m.substanceId));
       ids = labMatches.slice(0, 3).map(m => m.substanceId);
     }
-    if (ids.length === 0) continue;
+    // Проход 108: раньше здесь стоял `continue` при пустом списке веществ — и маркер
+    // пропадал из вердикта целиком. Число и шаг контроля полезны и без добавок.
 
     const recId = 'lab_' + rule.marker;
     if (coveredSystems.has(recId)) continue;
@@ -677,7 +688,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       `Повторный контроль ${rule.marker} через 2-4 нед. Коррекция дозы по динамике.`,
       `${rule.marker} каждые 2-4 нед`,
-      rule.marker);
+      rule.marker, { allowEmpty: true });
   }
 
   // ════════════════════════════════════════════════════════════════
