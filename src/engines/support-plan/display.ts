@@ -10,6 +10,22 @@ import type { CalculatorState, CalculatorResult, LabFinding } from './types';
 import { catalogEntry, NUTRIENT_UL, MINERAL_SEPARATION_HOURS, halfLifeMultiplicity } from './types';
 import { NON_PILL_SUPPORT_IDS } from './substances';
 
+/**
+ * Уровни клинических флагов по-русски (проход 105). Флаги живут enum-строками
+ * (`none`/`mild`/`moderate`/`severe`, у триглицеридов — `normal`/`elevated`/`high`),
+ * а в подписи «по анализам … / в анкете было …» нужен человеческий текст.
+ * Держим здесь, чтобы калькулятор и протокол поддержки подписывали одинаково.
+ */
+const FLAG_LEVEL_RU: Record<string, string> = {
+  none: 'норма', mild: 'незначительно', moderate: 'умеренно', severe: 'выраженно',
+  normal: 'норма', elevated: 'повышено', high: 'высоко', низко: 'низко', норма: 'норма',
+};
+
+/** Русская подпись уровня флага; незнакомое значение печатаем как есть. */
+export function flagLevelRu(value: string): string {
+  return FLAG_LEVEL_RU[value] ?? value;
+}
+
 /** Клинические механизмы для распространённых конфликтов (используется
  *  когда ALL_INTERACTIONS не содержит mechanism). */
 const CONFLICT_MECHANISMS: Record<string, string> = {

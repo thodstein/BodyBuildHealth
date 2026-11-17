@@ -1,4 +1,4 @@
-import type { CalculatorState, LabSlice } from '../../../engines/support-plan';
+import type { CalculatorState, LabSlice, LabFlagOverride } from '../../../engines/support-plan';
 import {
   getLabNorm, HCT_THRESHOLDS, HGB_THRESHOLDS, HCT_CORRECTION_MARGIN,
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
@@ -216,13 +216,15 @@ export function hgbSymptomCut(sex?: 'male' | 'female'): number {
   return HGB_THRESHOLDS[s].upper;
 }
 
-export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
+export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female', prev?: Partial<CalculatorState>): {
   hepatobiliary: Partial<CalculatorState['hepatobiliary']>;
   cardio: Partial<CalculatorState['cardio']>;
   urinary: Partial<CalculatorState['urinary']>;
   goals: Partial<CalculatorState['goals']>;
   contraindications: Partial<CalculatorState['contraindications']>;
   derivedFields: string[];
+  /** Перекрытия ответов анкеты (проход 105) — чтобы показать оба значения. */
+  overrides: LabFlagOverride[];
 } {
   const getV = (panel: keyof LabSlice, key: string): number | null => {
     const pv = fp[panel] as Record<string, string> | undefined;
@@ -409,5 +411,41 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female'): {
     derived.push('contraindications.hasThrombophilia');
   }
 
-  return { hepatobiliary: hep, cardio: card, urinary: urin, goals, contraindications: contr, derivedFields: derived };
+  // ── Проход 105: анализы главнее анкеты, но перекрытие не молчит ──
+  // На расчёт `prev` не влияет: флаг берётся из бланка. Если в анкете стоял другой
+  // ответ, оба значения уезжают наверх — экран покажет «по анализам «умеренно»
+  // (АЛТ 85, предел <40), в анкете было «норма»» вместо молчаливой подмены.
+  const overrides: LabFlagOverride[] = [];
+  const noteOverride = (
+    field: string, title: string, manual: string | undefined, lab: string | undefined,
+    marker: string, value: number | null, limit: string,
+  ) => {
+    if (!manual || !lab || manual === lab || value === null) return;
+    overrides.push({ field, title, manual, lab, marker, value, limit });
+  };
+  const transamPeak = alt !== null || ast !== null ? Math.max(alt ?? 0, ast ?? 0) : null;
+  noteOverride('hepatobiliary.altAstElevation', 'АЛТ/АСТ', prev?.hepatobiliary?.altAstElevation, hep.altAstElevation,
+    (alt ?? 0) >= (ast ?? 0) ? 'ALT' : 'AST', transamPeak, `<${lftUln}`);
+  noteOverride('hepatobiliary.ggtElevation', 'ГГТ', prev?.hepatobiliary?.ggtElevation, hep.ggtElevation,
+    'GGT', ggt, `<${GGT_ULN[sexKey]}`);
+  noteOverride('hepatobiliary.bilirubinElevation', 'Билирубин', prev?.hepatobiliary?.bilirubinElevation, hep.bilirubinElevation,
+    'Bilirubin', bilirubin, `<${BILIRUBIN_FLAG_STEPS.mild}`);
+  noteOverride('urinary.creatinineElevation', 'Креатинин', prev?.urinary?.creatinineElevation, urin.creatinineElevation,
+    'Creatinine', creatinine, `<${CREATININE_ULN[sexKey]}`);
+  noteOverride('urinary.ureaElevation', 'Мочевина', prev?.urinary?.ureaElevation, urin.ureaElevation, 'Urea', urea, '<8.3');
+  // Если ЛПНП не сдан, флаг идёт от общего холестерина — и в подписи должно стоять
+  // то же, чем считали.
+  const tcVal = ldl === null ? getV('panelLipid', 'Total Cholesterol') : null;
+  noteOverride('cardio.ldlElevation', 'ЛПНП', prev?.cardio?.ldlElevation, card.ldlElevation,
+    ldl !== null ? 'LDL' : 'Холестерин общий', ldl ?? tcVal, ldl !== null ? `<${LDL_FLAG_STEPS.mild}` : '<5');
+  noteOverride('cardio.hdlLow', 'ЛПВП',
+    prev?.cardio === undefined ? undefined : (prev.cardio.hdlLow ? 'низко' : 'норма'),
+    card.hdlLow === undefined ? undefined : (card.hdlLow ? 'низко' : 'норма'),
+    'HDL', hdl, `≥${HDL_LOW[sexKey]}`);
+  noteOverride('cardio.triglycerides', 'Триглицериды', prev?.cardio?.triglycerides, card.triglycerides,
+    'Triglycerides', tg, `<${TG_FLAG_STEPS.elevated}`);
+  noteOverride('cardio.hctElevation', 'Гематокрит', prev?.cardio?.hctElevation, card.hctElevation,
+    'HCT', hct, `<${hctCuts(sex).correction}`);
+
+  return { hepatobiliary: hep, cardio: card, urinary: urin, goals, contraindications: contr, derivedFields: derived, overrides };
 }

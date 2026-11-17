@@ -16,7 +16,7 @@ function makePlan(over: Partial<PlanResult> = {}): PlanResult {
     substances: [{ id: 'vitamin_d3', name: 'Витамин D3' }],
     dosages: {}, schedule: [], systems: {}, mechanisms: [],
     coveragePercent: 60, synergyComment: '', monitoring: [], specialInstructions: [],
-    riskDynamics: [], overallRiskBefore: 40, overallRiskAfter: 25, labFindings: [],
+    riskDynamics: [], overallRiskBefore: 40, overallRiskAfter: 25, labFindings: [], labFlagOverrides: [],
     uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [],
     conflicts: [], riskBreakdown: {},
     pillBurden: { totalSubstances: 1, estimatedPillsPerDay: 1, morningPills: 1, afternoonPills: 0, eveningPills: 0, feasibility: 'ok', message: '' },

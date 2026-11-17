@@ -208,6 +208,29 @@ export interface InjectionData {
   glutes: string; quads: string; delts: string; localAreas: string;
 }
 
+/**
+ * Перекрытие флага ответом из анализов (проход 105). Анализы главнее анкеты: флаг
+ * берётся из значения, но само перекрытие запоминается, чтобы интерфейс показал оба
+ * числа — «по анализам «умеренно» (АЛТ 85, предел <40), в анкете было «норма»». Без
+ * этой записи ответ пользователя исчезал без следа.
+ */
+export interface LabFlagOverride {
+  /** Путь поля состояния: `hepatobiliary.altAstElevation`, `cardio.hdlLow`, … */
+  field: string;
+  /** Человеческое имя: «АЛТ/АСТ», «ЛПВП», … */
+  title: string;
+  /** Как ответил пользователь (текстом: покрывает и enum-флаги, и булевы). */
+  manual: string;
+  /** Что вышло по анализам. */
+  lab: string;
+  /** Маркер, по которому посчитано. */
+  marker: string;
+  /** Значение из бланка. */
+  value: number;
+  /** Предел, с которым сравнивали: «<40», «≥1» и т. п. */
+  limit: string;
+}
+
 // ─── Complete Calculator State ───
 export interface CalculatorState {
   profile: UserProfileData;
@@ -231,6 +254,14 @@ export interface CalculatorState {
   injection: InjectionData;
   powerLevel: PowerLevel;
   courseWeek?: number;
+  /** Что авто-вывод из анализов перекрыл в анкете (проход 105) — для показа обоих значений. */
+  labFlagOverrides?: LabFlagOverride[];
+  /**
+   * Ответы анкеты до авто-вывода (проход 105): только те блоки, что реально были
+   * сохранены. Нужны, чтобы при смене бланка перекрытие считалось от ответа
+   * пользователя, а не от предыдущего значения из анализов.
+   */
+  labFlagBaseline?: Partial<CalculatorState>;
   boostEnabled?: boolean;
   jointMode?: boolean;
   reproMode?: boolean;
@@ -451,6 +482,8 @@ export interface PlanResult {
   overallRiskBefore: number;
   overallRiskAfter: number;
   labFindings: LabFinding[];
+  /** Флаги, которые авто-вывод перекрыл в анкете (проход 105): показываем оба значения. */
+  labFlagOverrides: LabFlagOverride[];
   uncoveredMechanisms: Array<{ mechKey: string; mechLabel: string; systemLabel: string; risk: number }>;
   coverageGaps: Array<{ system: string; label: string; raw: number; net: number; gapPercent: number }>;
   weekScale: number;

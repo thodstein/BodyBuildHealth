@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback } from 'react';
-import type { CalculatorState, CalculatorResult, LabSlice } from '../../../engines/support-plan';
+import type { CalculatorState, CalculatorResult, LabSlice, LabFlagOverride } from '../../../engines/support-plan';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
-import { calculateSupportTZ, hydrateState } from '../../../engines/support-plan';
+import { calculateSupportTZ, hydrateState, flagLevelRu } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
 import { GLASS, BADGE, DEFAULT_STATE, normalizeCalculatorState } from './Calc.types';
@@ -21,6 +21,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     const h = hydrateState();
     return normalizeCalculatorState({ ...DEFAULT_STATE, ...h });
   });
+  /** Перекрытия ответов анкеты анализами (проход 105) — показываем оба значения. */
+  const [labOverrides, setLabOverrides] = useState<LabFlagOverride[]>(() => state.labFlagOverrides ?? []);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
   const [labSyncFlash, setLabSyncFlash] = useState(false);
@@ -117,12 +119,16 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
 
   React.useEffect(() => {
     const fp = state.labs.fullPanel;
+    // Бланка `fullPanel` нет — выводить нечего. Перекрытия, записанные `hydrateState`,
+    // при этом не стираем: они описывают то, что уже случилось при загрузке профиля.
     if (!fp) { setLabDerivedFields([]); return; }
     const fpStr = JSON.stringify(fp);
     if (fpStr === lastFullPanelRef.current) return;
     lastFullPanelRef.current = fpStr;
-    const derived = deriveStateFromLabs(fp, state.profile?.sex === 'female' ? 'female' : 'male');
-    if (derived.derivedFields.length === 0) { setLabDerivedFields([]); return; }
+    // Проход 105: сравнение идёт с ответом анкеты (`labFlagBaseline`), а не с прошлым
+    // значением из анализов — иначе при смене бланка «в анкете было» врало бы.
+    const derived = deriveStateFromLabs(fp, state.profile?.sex === 'female' ? 'female' : 'male', state.labFlagBaseline);
+    if (derived.derivedFields.length === 0) { setLabDerivedFields([]); setLabOverrides(derived.overrides); return; }
     setState(s => ({
       ...s,
       hepatobiliary: { ...s.hepatobiliary, ...derived.hepatobiliary },
@@ -130,8 +136,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       urinary: { ...s.urinary, ...derived.urinary },
       goals: { ...s.goals, ...derived.goals },
       contraindications: { ...s.contraindications, ...derived.contraindications },
+      labFlagOverrides: derived.overrides,
     }));
     setLabDerivedFields(derived.derivedFields);
+    setLabOverrides(derived.overrides);
     setLabSyncFlash(true);
     setTimeout(() => setLabSyncFlash(false), 1800);
   }, [state.labs.fullPanel]);
@@ -665,6 +673,23 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
               🤖 Авто-вывод: {labDerivedFields.length} полей (печень/ССС/почки/цели/противопоказания)
             </div>
           )}
+        </div>
+      )}
+
+      {/* Проход 105: анализы главнее анкеты, но перекрытие видно и без бланка
+          `fullPanel` — флаги могли прийти из истории анализов при загрузке профиля. */}
+      {labOverrides.length > 0 && (
+        <div style={{ ...GLASS, padding: '6px 10px', marginBottom: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 3 }}>
+            ✍️ Анализы главнее анкеты — перекрыто {labOverrides.length}
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
+            {labOverrides.map(o => (
+              <div key={o.field} data-lab-override={o.field}>
+                • {o.title}: по анализам «{flagLevelRu(o.lab)}» ({o.marker} {o.value}, предел {o.limit}) — в анкете было «{flagLevelRu(o.manual)}»
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

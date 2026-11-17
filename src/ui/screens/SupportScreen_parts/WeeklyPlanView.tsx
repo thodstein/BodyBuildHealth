@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PlanResult } from '../../../engines/support-plan';
+import { flagLevelRu } from '../../../engines/support-plan';
 import { computeWeekScale } from '../../../engines/support-plan/substances';
 import { SUB_NAMES } from '../../../engines/support-plan/engine-helpers';
 import { formatDose } from '../../../data/dose-units';
@@ -155,6 +156,22 @@ export const WeeklyPlanView: React.FC<WeeklyPlanViewProps> = ({ planResult, cour
           );
         })}
       </div>
+
+      {/* Флаги, которые анализы перекрыли в анкете (проход 105): анализы главнее,
+          но оба значения должны быть видны — иначе ответ пользователя исчезает молча. */}
+      {planResult.labFlagOverrides && planResult.labFlagOverrides.length > 0 && (
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.2)' }}>
+          <div style={{ fontSize: 7, color: '#fbbf24', fontWeight: 700, marginBottom: 3 }}>
+            ✍️ Флаги из анализов главнее анкеты ({planResult.labFlagOverrides.length})
+          </div>
+          {planResult.labFlagOverrides.map((o) => (
+            <div key={o.field} data-lab-override={o.field} style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45 }}>
+              <span style={{ color: '#fbbf24', fontWeight: 700 }}>{o.title}</span>: по анализам «{flagLevelRu(o.lab)}»
+              {' '}({o.marker} {o.value}, предел {o.limit}) — в анкете было «{flagLevelRu(o.manual)}»
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* UL по ФАКТИЧЕСКИМ дозам плана (а не по типовой дозе каталога) */}
       {planResult.ulWarnings && planResult.ulWarnings.length > 0 && (

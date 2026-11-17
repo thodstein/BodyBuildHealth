@@ -48,7 +48,7 @@ import { calculateSupportTZ, hydrateState } from '../../engines/support-plan';
 import type { CalculatorState, CalculatorResult, PowerLevel } from '../../engines/support-plan';
 import { getDrugTzMechanisms, getSupportTzDisplay, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../../data/support-db';
 import { getLabEffectsForDrug, getMarkerName } from '../../data/support-lab-effects';
-import { runSupportUnified, runSupportForLevel, canonId } from '../../engines/support-plan';
+import { runSupportUnified, runSupportForLevel, canonId, flagLevelRu } from '../../engines/support-plan';
 import { defaultDoseUnit, formatDefaultDose, formatDoseFromMg, formatDose } from '../../data/dose-units';import type { PlanResult, PlanSubstance } from '../../engines/support-plan';
 import { writeRiskBridge } from '../../engines/risk-bridge';
 import { buildPreApplyCard, evaluateRecommendations, computeCoverageRisk } from '../../engines/recommendation-engine';
@@ -620,7 +620,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       planRes = runSupportUnified(normalizeCalculatorState(state));
     } catch (e) {
       console.error('runSupportUnified in useMemo threw:', e);
-      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
+      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], labFlagOverrides: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
     }
     // subs + dosages из единого результата (с dedup)
     // Минус вещества, УДАЛЁННЫЕ пользователем в менеджере калькулятора:
@@ -2694,6 +2694,12 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
         const label = w.limitKind === 'SafeLevel' ? 'safe level' : 'UL';
         return `${w.substanceId} ${formatDose(w.substanceId, w.currentDoseMg)}${applied} (${label} ${formatDose(w.substanceId, w.ulMg)}, ${w.percentUL}%)`;
       }).join('; ')}`);
+    }
+    if (planResult.labFlagOverrides && planResult.labFlagOverrides.length > 0) {
+      // Проход 105: анализы главнее анкеты, но в протоколе должно быть видно, что
+      // именно перекрыто и с каким значением — иначе ответ пользователя исчезает.
+      riskNotes.push(`✍ Флаги из анализов главнее анкеты: ${planResult.labFlagOverrides.map(o =>
+        `${o.title} — по анализам «${flagLevelRu(o.lab)}» (${o.marker} ${o.value}, предел ${o.limit}), в анкете было «${flagLevelRu(o.manual)}»`).join('; ')}`);
     }
     return `ПЛАН ПОДДЕРЖКИ (${SUPPORT_LEVELS[supportLevel]?.label || supportLevel})
 Уровень: ${supportLevel} | Неделя: ${courseWeekState}

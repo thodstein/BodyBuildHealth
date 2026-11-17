@@ -1,6 +1,6 @@
 import {
   type CalculatorState, type CalculatorResult, type RiskSystemId,
-  type SynergyId, type TimelineWeekData,
+  type SynergyId, type TimelineWeekData, type LabFlagOverride,
   SYNERGY_ID_SUBSTANCES,
 } from './types';
 import {
@@ -1104,24 +1104,78 @@ export function hydrateState(): Partial<CalculatorState> {
       const crUln = CREATININE_ULN[sexKey];
       const [hctErythrocytosis, hctBlock, hctHyperviscosity] = HCT_STEPS[sexKey];
 
+      // Проход 105: анализы главнее анкеты, но перекрытие не должно быть молчаливым.
+      // Запоминаем ответ до перезаписи: `undefined` значит «пользователь не отвечал» —
+      // тогда перекрывать нечего и записи нет. Если ответил «норма», а бланк говорит
+      // иначе, оба значения попадут в `labFlagOverrides`. Копия, а не ссылка: ниже
+      // те же объекты мутируются под значение из бланка.
+      const prevHep = result.hepatobiliary ? { ...result.hepatobiliary } : undefined;
+      const prevUrin = result.urinary ? { ...result.urinary } : undefined;
+      const prevCard = result.cardio ? { ...result.cardio } : undefined;
+      // Базовая линия для пересчёта перекрытий при смене бланка: только то, что реально
+      // было сохранено в анкете (иначе «в анкете было «норма»» — это дефолт, а не ответ).
+      const baseline: Partial<CalculatorState> = {};
+      if (prevHep) baseline.hepatobiliary = prevHep;
+      if (prevUrin) baseline.urinary = prevUrin;
+      if (prevCard) baseline.cardio = prevCard;
+      if (Object.keys(baseline).length > 0) result.labFlagBaseline = baseline;
+      const overrides: LabFlagOverride[] = [];
+      const noteOverride = (
+        field: string, title: string, manual: string | undefined, lab: string | undefined,
+        marker: string, value: number | null, limit: string,
+      ) => {
+        if (!manual || !lab || manual === lab || value === null) return;
+        overrides.push({ field, title, manual, lab, marker, value, limit });
+      };
+
       if (!result.hepatobiliary) result.hepatobiliary = { altAstElevation: 'none', ggtElevation: 'none', bilirubinElevation: 'none', fattyLiver: false, cholecystitis: false, alcoholHistory: 'none' } as any;
       const hep = result.hepatobiliary!;
       if (alt !== null || ast !== null) {
         const maxTransam = Math.max(alt ?? 0, ast ?? 0);
         hep.altAstElevation = maxTransam < lftUln ? 'none' : maxTransam < lftReduce ? 'mild' : maxTransam < lftStopOral ? 'moderate' : 'severe';
+        noteOverride('hepatobiliary.altAstElevation', 'АЛТ/АСТ', prevHep?.altAstElevation, hep.altAstElevation,
+          (alt ?? 0) >= (ast ?? 0) ? 'ALT' : 'AST', maxTransam, `<${lftUln}`);
       }
-      if (ggt !== null) hep.ggtElevation = ggt < ggtUln ? 'none' : ggt < ggtDouble ? 'mild' : ggt < ggtTriple ? 'moderate' : 'severe';
-      if (bilirubin !== null) hep.bilirubinElevation = bilirubin < BILIRUBIN_FLAG_STEPS.mild ? 'none' : bilirubin < BILIRUBIN_FLAG_STEPS.moderate ? 'mild' : bilirubin < BILIRUBIN_FLAG_STEPS.severe ? 'moderate' : 'severe';
+      if (ggt !== null) {
+        hep.ggtElevation = ggt < ggtUln ? 'none' : ggt < ggtDouble ? 'mild' : ggt < ggtTriple ? 'moderate' : 'severe';
+        noteOverride('hepatobiliary.ggtElevation', 'ГГТ', prevHep?.ggtElevation, hep.ggtElevation, 'GGT', ggt, `<${ggtUln}`);
+      }
+      if (bilirubin !== null) {
+        hep.bilirubinElevation = bilirubin < BILIRUBIN_FLAG_STEPS.mild ? 'none' : bilirubin < BILIRUBIN_FLAG_STEPS.moderate ? 'mild' : bilirubin < BILIRUBIN_FLAG_STEPS.severe ? 'moderate' : 'severe';
+        noteOverride('hepatobiliary.bilirubinElevation', 'Билирубин', prevHep?.bilirubinElevation, hep.bilirubinElevation,
+          'Bilirubin', bilirubin, `<${BILIRUBIN_FLAG_STEPS.mild}`);
+      }
 
       if (!result.urinary) result.urinary = { creatinineElevation: 'none', ureaElevation: 'none', proteinuria: false, nephrotoxicDrugs: false, hypertension: false, diabetes: false, urinationPattern: 'normal' } as any;
-      if (creatinine !== null) result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + CREATININE_FLAG_STEP ? 'mild' : creatinine < crUln + 2 * CREATININE_FLAG_STEP ? 'moderate' : 'severe';
+      if (creatinine !== null) {
+        result.urinary!.creatinineElevation = creatinine < crUln ? 'none' : creatinine < crUln + CREATININE_FLAG_STEP ? 'mild' : creatinine < crUln + 2 * CREATININE_FLAG_STEP ? 'moderate' : 'severe';
+        noteOverride('urinary.creatinineElevation', 'Креатинин', prevUrin?.creatinineElevation, result.urinary!.creatinineElevation,
+          'Creatinine', creatinine, `<${crUln}`);
+      }
 
       if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
       const card = result.cardio!;
-      if (ldl !== null) card.ldlElevation = ldl < LDL_FLAG_STEPS.mild ? 'none' : ldl < LDL_FLAG_STEPS.moderate ? 'mild' : ldl < LDL_FLAG_STEPS.severe ? 'moderate' : 'severe';
-      if (hdl !== null) card.hdlLow = hdl < HDL_LOW[sexKey];
-      if (tg !== null) card.triglycerides = tg < TG_FLAG_STEPS.elevated ? 'normal' : tg < TG_FLAG_STEPS.high ? 'elevated' : 'high';
-      if (hct !== null) card.hctElevation = hct < hctErythrocytosis ? 'none' : hct < hctBlock ? 'mild' : hct < hctHyperviscosity ? 'moderate' : 'severe';
+      if (ldl !== null) {
+        card.ldlElevation = ldl < LDL_FLAG_STEPS.mild ? 'none' : ldl < LDL_FLAG_STEPS.moderate ? 'mild' : ldl < LDL_FLAG_STEPS.severe ? 'moderate' : 'severe';
+        noteOverride('cardio.ldlElevation', 'ЛПНП', prevCard?.ldlElevation, card.ldlElevation, 'LDL', ldl, `<${LDL_FLAG_STEPS.mild}`);
+      }
+      if (hdl !== null) {
+        card.hdlLow = hdl < HDL_LOW[sexKey];
+        // У ЛПВП шкала булева: «норма»/«низко» — это и есть оба значения.
+        noteOverride('cardio.hdlLow', 'ЛПВП',
+          prevCard === undefined ? undefined : (prevCard.hdlLow ? 'низко' : 'норма'),
+          card.hdlLow ? 'низко' : 'норма', 'HDL', hdl, `≥${HDL_LOW[sexKey]}`);
+      }
+      if (tg !== null) {
+        card.triglycerides = tg < TG_FLAG_STEPS.elevated ? 'normal' : tg < TG_FLAG_STEPS.high ? 'elevated' : 'high';
+        noteOverride('cardio.triglycerides', 'Триглицериды', prevCard?.triglycerides, card.triglycerides,
+          'Triglycerides', tg, `<${TG_FLAG_STEPS.elevated}`);
+      }
+      if (hct !== null) {
+        card.hctElevation = hct < hctErythrocytosis ? 'none' : hct < hctBlock ? 'mild' : hct < hctHyperviscosity ? 'moderate' : 'severe';
+        noteOverride('cardio.hctElevation', 'Гематокрит', prevCard?.hctElevation, card.hctElevation, 'HCT', hct, `<${hctErythrocytosis}`);
+      }
+      if (overrides.length > 0) result.labFlagOverrides = overrides;
     } catch {}
   }
 

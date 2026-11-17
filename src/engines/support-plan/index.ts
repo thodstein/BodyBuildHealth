@@ -60,7 +60,7 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
       substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [],
       coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [],
       riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50,
-      labFindings: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1,
+      labFindings: [], labFlagOverrides: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1,
       stackRecommendations: [], conflicts: [], riskBreakdown: {},
       pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' },
       error: 'Ошибка расчёта поддержки: ' + (err?.message || 'неизвестная'),
@@ -179,6 +179,9 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     overallRiskBefore: Math.round(tzRes.overallRiskBefore),
     overallRiskAfter: Math.round(tzRes.overallRiskAfter),
     labFindings,
+    // Флаги, перекрытые анализами (проход 105): анализы главнее анкеты, но оба
+    // значения едут в результат, чтобы протокол показал, что именно перекрыто.
+    labFlagOverrides: state.labFlagOverrides ?? [],
     uncoveredMechanisms,
     coverageGaps,
     weekScale,
@@ -220,5 +223,5 @@ export { calculateSupportTZ, hydrateState } from './engine';
 export { generateSynergyRecommendations } from './engine-helpers';
 export { SYNERGY_ID_LABELS, SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYSTEM_LABELS_RU, SYS_ORDER, clamp, sysName, sysEmoji, catalogEntry, defaultDosage } from './types';
 export { canonId, SUB_ALIAS, TZ_AUTO_BLACKLIST, sameClassIds } from './shared-constants';
-export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase, SynergyRecommendation } from './types';
-export { buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildCautions, buildLabFindings, calcStackSynergyScore, suggestSynergyAdditions } from './display';
+export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase, SynergyRecommendation, LabFlagOverride } from './types';
+export { buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildCautions, buildLabFindings, calcStackSynergyScore, suggestSynergyAdditions, flagLevelRu } from './display';

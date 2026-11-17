@@ -20,7 +20,7 @@ function makePlan(over: Partial<PlanResult> = {}): PlanResult {
   return {
     substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [],
     coveragePercent: 60, synergyComment: '', monitoring: [], specialInstructions: [],
-    riskDynamics: [], overallRiskBefore: 40, overallRiskAfter: 25, labFindings: [],
+    riskDynamics: [], overallRiskBefore: 40, overallRiskAfter: 25, labFindings: [], labFlagOverrides: [],
     uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [],
     conflicts: [], riskBreakdown: {},
     pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: '' },
