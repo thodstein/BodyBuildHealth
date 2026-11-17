@@ -295,7 +295,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       hctIds, hctReasoning,
       `HCT > 54: флеботомия 300-400 мл. Контроль D-димера. Гидратация 4+ л/день. ${state.contraindications.hasThrombophilia ? '⚠ ТРОМБОФИЛИЯ — обязательная консультация гематолога, антикоагуляция (LMWH/DOAC).' : ''}`,
       'HCT, Hb, RBC, D-димер, фибриноген каждые 2 нед',
-      'HCT');
+      'HCT', { allowEmpty: true });
   }
 
   // ── Hepatotoxicity → query hepatoprotectors (priority: ALT) ──
@@ -319,7 +319,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       `АЛТ > 100: NAC → 2400 мг. ${hasOral ? 'Курс оральных не более 6 нед.' : ''}Контроль каждые 2 нед. Hy's law: АЛТ >3×ВГН + билирубин >2×ВГН → критично, немедленная отмена препарата.`,
       'АЛТ, АСТ, ГГТ, ЩФ, билирубин каждые 2-4 нед',
-      'ALT');
+      'ALT', { allowEmpty: true });
   }
 
   // ── Neurotoxicity → query neuroprotectors ──
@@ -387,7 +387,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
         ? `${e2UnitMissing ? `Единица E2 не указана: ${e2Val} читается и как пг/мл, и как пмоль/л (${e2Alt} пг/мл) — уточните её в бланке, ступень взята по нижней оценке. ` : ''}E2 > ${e2Trigger} pg/mL: пересдать на 2-5 день цикла (без стимуляции овуляции), УЗИ яичников — исключить кисту и гиперстимуляцию. AI без гинеколога не назначать, дозу тестостерона не повышать.`
         : 'E2 > 55 pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <10 — прекратить AI (краш). Контроль E2 каждые 4 нед.',
       sex === 'female' ? 'E2, прогестерон, ЛГ, ФСГ каждые 4 нед' : 'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
-      'E2');
+      'E2', { allowEmpty: true });
   }
 
   // ── Progestogenic / 19-nor → prolactin control (priority: PRL) — только по лаб. подтверждению ──
@@ -422,7 +422,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
         ? `Пролактин > ${Math.round(prlTriggerNg)} нг/мл: повторить утром натощак, без физнагрузки и стресса, вместе с ТТГ и макропролактином. Каберголин — только по назначению врача.`
         : 'Пролактин > 40: +Каберголин 0.25 мг 2×/нед. Перед назначением — макропролактин (без теста — ложные назначения каждому 4-му). ЭхоКГ при длительности >6 мес. Контроль пролактина каждые 4 нед.',
       'Пролактин, E2, ЛГ, ФСГ каждые 4 нед',
-      'PRL');
+      'PRL', { allowEmpty: true });
   }
 
   // ── hCG auto-assign: any AAS → hCG 500 IU 2×/week, 3 weeks on / 1 week off ──
@@ -527,7 +527,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Контроль 25-OH D через 8 нед. Цель: 40-60 нг/мл.',
       '25-OH витамин D каждые 8 нед',
-      'VITD');
+      'VITD', { allowEmpty: true });
   }
 
   // ── B12 deficiency → methylcobalamin + folate (priority: B12) ──
@@ -543,7 +543,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Контроль B12, гомоцистеин через 4 нед.',
       'B12, гомоцистеин, фолат каждые 4 нед',
-      'B12');
+      'B12', { allowEmpty: true });
   }
 
   // ── High Ferritin → iron chelation + antioxidant (priority: FERRITIN) ──
@@ -566,7 +566,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Кровопускание при ферритине >500. Контроль ферритина, Fe, ТФК.',
       'Ферритин, железо, ТФК, % насыщения трансферрина каждые 8 нед',
-      'FERRITIN');
+      'FERRITIN', { allowEmpty: true });
   }
 
   // ── Low DHEA-S → DHEA support (priority: DHEA_S) ──
@@ -586,7 +586,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Контроль DHEA-S, кортизол через 8 нед.',
       'DHEA-S, кортизол утром каждые 8 нед',
-      'DHEA_S');
+      'DHEA_S', { allowEmpty: true });
   }
 
   // ── High Homocysteine → methylation support (priority: HOMOCYSTEINE) ──
@@ -602,7 +602,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Контроль гомоцистеина через 4 нед. Цель: <10.',
       'Гомоцистеин, B12, фолат каждые 4 нед',
-      'HOMOCYSTEINE');
+      'HOMOCYSTEINE', { allowEmpty: true });
   }
 
   // ── High CRP → anti-inflammatory support (priority: CRP) ──
@@ -618,7 +618,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       'Контроль СРБ, IL-6 через 4 нед.',
       'СРБ, IL-6, ферритин каждые 4 нед',
-      'CRP');
+      'CRP', { allowEmpty: true });
   }
 
     // Проход 104: числа-цели (ниже ВГН) собраны в `SCREEN_TARGETS`, и рекомендация по

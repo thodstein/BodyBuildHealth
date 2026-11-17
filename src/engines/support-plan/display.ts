@@ -345,7 +345,16 @@ export function buildLabFindings(
       });
     }
   } catch {}
-  return out.slice(0, 20);
+  // Проход 109: находок может быть больше двадцати (пустые находки тоже считаются).
+  // Раньше cap отрезал «как пришло», то есть последними в списке, — и критичная
+  // находка могла исчезнуть из-за порядка блоков в движке. Теперь при переполнении
+  // отрезаются самые мягкие, а внутри одной тяжести порядок движка сохранён.
+  const sevWeight: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  return out
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => (sevWeight[a.f.severity] ?? 5) - (sevWeight[b.f.severity] ?? 5) || a.i - b.i)
+    .map(x => x.f)
+    .slice(0, 20);
 }
 
 /**

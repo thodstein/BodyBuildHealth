@@ -260,3 +260,34 @@ describe('проход 108: находка без новых веществ ос
     expect(f!.substances.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Проход 109: тот же режим у блоков, а не только у таблицы. Блоки «Гепатотоксичность»,
+ * гематокрит, эстрадиол, пролактин, витамин D, B12, ферритин, ДГЕА-С, гомоцистеин и СРБ
+ * тоже молчали, если их вещества уже забрали другие блоки. Плюс cap находок: если их
+ * больше двадцати, раньше отрезались последние по порядку движка — теперь самые мягкие.
+ */
+describe('проход 109: находка из блока и порядок тяжести', () => {
+  const SEV_W: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+  const findings = (labs: Record<string, any>) =>
+    buildLabFindings(mkState('male', labs) as any, {} as any);
+
+  it('блоки анализов включают режим «находка без новых веществ»', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/recommendation-engine.ts'), 'utf8');
+    for (const marker of ['HCT', 'ALT', 'E2', 'PRL', 'VITD', 'B12', 'FERRITIN', 'DHEA_S', 'HOMOCYSTEINE', 'CRP']) {
+      expect(src, `${marker}: блок снова молчит при занятых веществах`).toContain(`'${marker}', { allowEmpty: true });`);
+    }
+  });
+
+  it('тяжёлые находки идут первыми: при переполнении отрезаются мягкие', () => {
+    const list = findings({
+      panelBiochem: { ALT: '200' },
+      panelHematology: { HCT: '58' },
+      panelIron: { Ferritin: '500' },
+      panelVitamin: { 'Vitamin D (25-OH)': '12' },
+    });
+    expect(list.length).toBeGreaterThan(3);
+    const w = list.map(f => SEV_W[f.severity] ?? 5);
+    expect([...w].sort((a, b) => a - b)).toEqual(w);
+  });
+});
