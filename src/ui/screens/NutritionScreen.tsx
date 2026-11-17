@@ -7,7 +7,7 @@ import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
-import { localIsoDate } from '../../core/local-date';
+import { localIsoDate, parseLocalIsoDate } from '../../core/local-date';
 import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
 import { addFavorite, removeFavorite, resolveFavorites, type FavFood } from './NutritionScreen_parts/diary/food-favorites';
 import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
@@ -705,7 +705,9 @@ const SleepGuide: React.FC = () => {
 
 const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?: { kcal: number; protein: number; fats: number; carbs: number } }> = ({ foodEntries, profile, targets }) => {
   const [reportMode, setReportMode] = React.useState<'day'|'week'|'month'>('day');
-  const [reportDate, setReportDate] = React.useState(new Date().toISOString().split('T')[0]);
+  // Дата отчёта — локальный календарь: toISOString давал UTC и в UTC+3…+12
+  // «сегодня» превращалось во «вчера» (отчёт открывался на пустой день).
+  const [reportDate, setReportDate] = React.useState(() => localIsoDate());
   const [reportSubTab, setReportSubTab] = React.useState<'overview' | 'full' | 'archive'>('overview');
   const reportSex = profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const reportWeight = Number(profile?.settings?.personal?.weight) > 0 ? Number(profile.settings.personal.weight) : 80;
@@ -723,10 +725,17 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
   }, []);
   const raw = React.useMemo(() => readDiaryV2(), [foodEntries]);
   const dayData = raw[reportDate];
-  const weekStart = React.useMemo(() => { const d = new Date(reportDate); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; }, [reportDate]);
+  // Окно недели — по локальному календарю (понедельник). Раньше здесь смешивались
+  // new Date('YYYY-MM-DD') (полночь UTC) и toISOString: на западных смещениях
+  // неделя начиналась со вторника.
+  const weekStart = React.useMemo(() => {
+    const d = parseLocalIsoDate(reportDate) ?? new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return localIsoDate(d);
+  }, [reportDate]);
   const weekData = React.useMemo(() => {
-    const start = new Date(weekStart); const entries: any[] = [];
-    for (let i=0;i<7;i++) { const d = new Date(start); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; if (raw[ds]) Object.values(raw[ds].meals||{}).forEach((m:any) => m.forEach((e:any) => entries.push({...e, date:ds}))); }
+    const start = parseLocalIsoDate(weekStart) ?? new Date(); const entries: any[] = [];
+    for (let i=0;i<7;i++) { const d = new Date(start); d.setDate(d.getDate()+i); const ds = localIsoDate(d); if (raw[ds]) Object.values(raw[ds].meals||{}).forEach((m:any) => m.forEach((e:any) => entries.push({...e, date:ds}))); }
     return entries;
   }, [raw, weekStart]);
   const monthKey = reportDate.slice(0,7);
@@ -1117,7 +1126,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
         } catch {}
       }} style={{ width:'100%', padding:'12px', borderRadius:12, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.06)', color:'#00e68a', cursor:'pointer', fontSize:12, fontWeight:700, minHeight:48, marginBottom:8 }}>📄 Сгенерировать и сохранить отчёт</button>
       {reportMode === 'week' && <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-        {Array.from({length:7}, (_,i) => { const d = new Date(new Date(weekStart)); d.setDate(d.getDate()+i); const ds = d.toISOString().split('T')[0]; const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'6px 2px', borderRadius:8, background: hasData ? 'rgba(0,230,138,0.12)' : '#202023', fontSize:9, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.8)' }}>
+        {Array.from({length:7}, (_,i) => { const d = parseLocalIsoDate(weekStart) ?? new Date(); d.setDate(d.getDate()+i); const ds = localIsoDate(d); const hasData = !!raw[ds]; return <div key={i} style={{ flex:1, textAlign:'center', padding:'6px 2px', borderRadius:8, background: hasData ? 'rgba(0,230,138,0.12)' : '#202023', fontSize:9, color: hasData ? '#00e68a' : 'rgba(255,255,255,0.8)' }}>
           <div>{dayNames[i]}</div><div style={{ fontWeight:700, fontSize:11 }}>{d.getDate()}</div>
         </div>; })}
       </div>}
@@ -1357,6 +1366,9 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   const [navOpen, setNavOpen] = useState(false);
   const [foodEntries, setFoodEntries] = useState<DiaryEntry[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, DiaryEntry[]>>({});
+  // «Сегодня» для hero: ЛОКАЛЬНЫЙ календарный день (был toISOString → UTC и в
+  // вечерние часы показывал вчерашние итоги) + живое обновление после полуночи.
+  const [todayIso, setTodayIso] = useState(() => localIsoDate());
 
   // Виджет «Питание»: «Скан»/«Фото» открывают Питание и сразу нужный сценарий.
   // Флаг в sessionStorage переживает поздний монтаж ленивого экрана.
@@ -1443,6 +1455,29 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   };
 
   useEffect(() => onDiaryChangeV2(() => reloadDiary()), []);
+
+  // Полночь/возврат в приложение: «сегодня» в hero переключается на новый день
+  // без перезапуска, и итоги перечитываются.
+  useEffect(() => {
+    const syncDay = () => {
+      const now = localIsoDate();
+      setTodayIso(prev => (prev === now ? prev : now));
+      // Дневник мог измениться из виджета/другого экрана — «съедено сегодня»
+      // должно совпадать с тем, что реально в хранилище.
+      reloadDiary();
+    };
+    syncDay();
+    const id = window.setInterval(syncDay, 60_000);
+    document.addEventListener('visibilitychange', syncDay);
+    window.addEventListener('focus', syncDay);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', syncDay);
+      window.removeEventListener('focus', syncDay);
+    };
+  }, []);
+
+  useEffect(() => { reloadDiary(); }, [todayIso]);
 
   // Open diary tab directly when navigated from Profile → diaries → Питание
   useEffect(() => {
@@ -1561,7 +1596,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
     } catch {}
     // Fallback: today's diary entries (estimate weight from kcal using ~2 kcal/g average)
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = localIsoDate();
       const diary = readDiaryV2();
       const todayData = diary[today];
       if (todayData?.meals) {
@@ -1613,8 +1648,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   };
 
   if (page === 'hero') {
-    const todayISO = (() => { try { return new Date().toISOString().split('T')[0]; } catch { return ''; } })();
-    const todayEntries = todayISO ? (dailyLogs[todayISO] || []) : [];
+    const todayEntries = dailyLogs[todayIso] || [];
     const todayKcal = todayEntries.reduce((s, e) => s + (e.kcal || 0), 0);
     const todayProtein = todayEntries.reduce((s, e) => s + (e.p || 0), 0);
     return (

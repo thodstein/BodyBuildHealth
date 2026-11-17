@@ -14,6 +14,18 @@ const LEVEL_RU: Record<string, string> = {
   low: 'Низкая', moderate: 'Умеренная', elevated: 'Повышенная', high: 'Высокая', critical: 'Критическая',
 };
 
+/** Подписи состояний, которые движок понимает в `conditions`. */
+const CONDITION_LABELS: Record<string, string> = {
+  diabetes: 'Диабет',
+  nafld: 'Жировой гепатоз',
+  ckd: 'ХБП',
+  hypertension: 'Гипертония',
+  gallstones: 'ЖКБ',
+  ibs: 'СРК',
+  gout: 'Подагра',
+  kidney_stones: 'Камни в почках',
+};
+
 const barBg: React.CSSProperties = {
   height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', flex: 1,
 };
@@ -101,7 +113,8 @@ const OrganRow: React.FC<{
 // ─── Manual Input Fields ───
 const ManualFields: React.FC<{
   values: Record<string, number>; setters: Record<string, (v: number) => void>;
-}> = ({ values, setters }) => {
+  heightCm?: number; onHeightChange?: (v: number) => void;
+}> = ({ values, setters, heightCm, onHeightChange }) => {
   const fields = [
     { key: 'protein',  label: 'Белки (г)',       color: '#f97316', half: true },
     { key: 'fat',      label: 'Жиры (г)',        color: '#f59e0b', half: true },
@@ -126,6 +139,16 @@ const ManualFields: React.FC<{
             style={{ ...inputStyle, padding: '5px 8px', fontSize: 10 }} />
         </div>
       ))}
+      {/* Рост влияет на ИМТ (множитель для печени/адипоцитов): без него в
+          ручном режиме всем считалось 175 см. */}
+      {heightCm !== undefined && onHeightChange && (
+        <div style={{ gridColumn: '1/-1' }}>
+          <div style={{ fontSize: 7, color: '#fff', marginBottom: 1, fontWeight: 600 }}>Рост (см)</div>
+          <input type="number" min={120} max={230} value={heightCm || ''}
+            onChange={e => onHeightChange(Math.min(230, Math.max(120, Number(e.target.value) || 0)))}
+            style={{ ...inputStyle, padding: '5px 8px', fontSize: 10 }} />
+        </div>
+      )}
     </div>
   );
 };
@@ -195,22 +218,57 @@ export const OrganLoadCalculator: React.FC = () => {
     return Math.round(mg);
   }, [ctx?.dayPlan]);
   const fiber   = useCtx ? (_planFiber ?? 25) : manualFib;
-  const omega3  = useCtx ? (_planOmega3 ?? 500) : manualO3;
-  const chol    = manualChol;
-  const sodium  = manualNa;
-  const potass  = manualK;
-  const water   = manualWater;
-  const height  = manualHeight;
+  const omega3  = useCtx ? (_planOmega3 ?? 0) : manualO3;
+  // Минералы плана (Na/K/холестерин/Ca/Mg/P) — из FOOD_DB по позициям дня.
+  // Раньше в режиме «Данные плана» эти поля брались из констант (300 мг
+  // холестерина, 2 г натрия, 3.5 г калия) и панель показывала не план.
+  const planMicro = useMemo(() => {
+    const p = ctx?.dayPlan;
+    if (!p?.meals) return null;
+    const acc: Record<string, number> = {};
+    let found = false;
+    (p.meals as any[]).forEach(m => (m.items || []).forEach((it: any) => {
+      const micros = (findFoodById(it.id) as any)?.micros;
+      if (!micros) return;
+      const grams = Number(it.amount) || 0;
+      if (grams <= 0) return;
+      (['Na', 'K', 'Cholesterol', 'Ca', 'Mg', 'P'] as const).forEach(key => {
+        const v = micros[key];
+        if (typeof v === 'number' && v > 0) {
+          acc[key] = (acc[key] || 0) + (v * grams) / 100;
+          found = true;
+        }
+      });
+    }));
+    return found ? acc : null;
+  }, [ctx?.dayPlan]);
+  const chol    = useCtx ? Math.round(planMicro?.Cholesterol ?? manualChol) : manualChol;
+  const sodium  = useCtx ? Math.round(planMicro?.Na ?? manualNa) : manualNa;
+  const potass  = useCtx ? Math.round(planMicro?.K ?? manualK) : manualK;
+  // Вода — из водного расчёта плана (в литрах), иначе базовая 30 мл/кг.
+  const planWaterL = Number(ctx?.waterCalc?.total) || 0;
+  const water   = useCtx ? Math.round(planWaterL > 0 ? planWaterL * 1000 : bw * 30) : manualWater;
+  const height  = useCtx ? (ctx?.height || manualHeight) : manualHeight;
   const train   = useCtx ? 0 : manualTrain;
-  const meals   = useCtx ? 4 : manualMeals;
+  const meals   = useCtx ? (ctx?.mealsCount || manualMeals) : manualMeals;
+  // Тощая масса — по проценту жира из профиля, если он есть (раньше всегда 0.75 bw).
+  const bfPct = Number(ctx?.bodyFatPct) || 0;
+  const leanMassKg = bfPct >= 5 && bfPct <= 60 ? bw * (1 - bfPct / 100) : bw * 0.75;
 
   const totalKcal = protein * 4 + fat * 9 + carbs * 4;
 
+  // Только реальные соответствия. Раньше «камни в почках» уезжали в 'ckd'
+  // (белок ×1.8 — при мочекаменной болезни его не ограничивают), а
+  // непереносимость лактозы выдавалась за СРК. Подагра теперь учитывается
+  // движком (ураты/фруктоза), а не висит мёртвой строкой.
   const conditionsList = useMemo(() => {
     const h = (ctx.healthIssues || []) as string[];
     const map: Record<string, string> = {
-      diabetes: 'diabetes', gi_issues: 'ibs', hypertension: 'hypertension',
-      kidney_stones: 'ckd', gout: 'gout', lactose_intolerance: 'ibs',
+      diabetes: 'diabetes',
+      gi_issues: 'ibs',
+      hypertension: 'hypertension',
+      kidney_stones: 'kidney_stones',
+      gout: 'gout',
     };
     return [...new Set(h.map(x => map[x]).filter(Boolean))];
   }, [ctx.healthIssues]);
@@ -219,19 +277,24 @@ export const OrganLoadCalculator: React.FC = () => {
     proteinG: protein, fatG: fat, satFatG: sat, transFatG: trans,
     carbsG: carbs, sugarG: sugar, fiberG: fiber, omega3Mg: omega3,
     cholesterolMg: chol, sodiumMg: sodium, potassiumMg: potass,
-    waterMl: water, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
+    phosphorusMg: planMicro?.P, magnesiumMg: planMicro?.Mg, calciumMg: planMicro?.Ca,
+    waterMl: water, bodyWeightKg: bw, heightCm: height, leanMassKg,
     trainingHours: train, mealsPerDay: meals, totalKcal,
     conditions: conditionsList.length > 0 ? conditionsList : undefined,
-  }), [protein, fat, sat, trans, carbs, sugar, fiber, omega3, chol, sodium, potass, water, bw, height, train, meals, totalKcal, conditionsList]);
+  }), [protein, fat, sat, trans, carbs, sugar, fiber, omega3, chol, sodium, potass, water, bw, height, leanMassKg, train, meals, totalKcal, conditionsList, planMicro]);
 
   const result = useMemo(() => calcOrganLoad(buildInput()), [buildInput]);
 
   // Save on change
   useEffect(() => {
-    if (activeMode === 'calc') {
-      const t = setTimeout(() => saveOrganLoadHistory(buildInput()), 800);
-      return () => clearTimeout(t);
-    }
+    if (activeMode !== 'calc') return;
+    const t = setTimeout(() => {
+      saveOrganLoadHistory(buildInput());
+      // Список истории обновляем сразу: иначе в режиме «История» видны только
+      // записи, загруженные при переключении вкладки.
+      setHistoryList(loadOrganLoadHistory());
+    }, 800);
+    return () => clearTimeout(t);
   }, [buildInput, activeMode]);
 
   const toggleOrgan = (key: string) => setExpandedOrgan(expandedOrgan === key ? null : key);
@@ -258,6 +321,8 @@ export const OrganLoadCalculator: React.FC = () => {
     cholesterolMg: scenB.chol, sodiumMg: scenB.sodium, potassiumMg: scenB.potassium,
     waterMl: scenB.water, bodyWeightKg: scenB.weight || bw, heightCm: height, leanMassKg: (scenB.weight || bw) * 0.75,
     trainingHours: train, mealsPerDay: meals, totalKcal: scenB.protein * 4 + scenB.fat * 9 + scenB.carbs * 4,
+    // Те же состояния, что у A: иначе «B лучше» на бумаге из-за множителей болезней.
+    conditions: conditionsList.length > 0 ? conditionsList : undefined,
   });
 
   const renderComparisonDeltas = () => {
@@ -318,7 +383,7 @@ export const OrganLoadCalculator: React.FC = () => {
         </div>;
       case 'cardiovascular':
         return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>
-          АИ: {item.atherogenicIndex} · Ω6/3: {item.omegaRatio}:1 · Нас.жиры: {sat.toFixed(0)} г · Транс: {trans.toFixed(1)} г
+          АИ: {item.atherogenicIndex} · Ω6/3: {item.omegaRatio != null ? `${item.omegaRatio}:1` : 'н/д'} · Нас.жиры: {sat.toFixed(0)} г · Транс: {trans.toFixed(1)} г
         </div>;
       case 'giTract':
         return <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>
@@ -391,16 +456,28 @@ export const OrganLoadCalculator: React.FC = () => {
                   carbs: setManualC, sugar: setManualSug, fiber: setManualFib, omega3: setManualO3,
                   chol: setManualChol, sodium: setManualNa, potassium: setManualK, water: setManualWater, weight: setManualWeight,
                 }}
+                heightCm={manualHeight}
+                onHeightChange={setManualHeight}
               />
             )}
 
-            {showConditions && conditionsList.length > 0 && (
+            {/* Состояния из профиля питания применяются ВСЕГДА (множители в
+                движке), поэтому чипы видны и без раскрытия — раньше блок был
+                скрыт, а множители молча работали. Кнопка 🏥 только поясняет. */}
+            {conditionsList.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 4 }}>
                 {conditionsList.map(c => (
                   <span key={c} style={{ fontSize: 7, padding: '2px 6px', borderRadius: 4, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>
-                    🏥 {c === 'diabetes' ? 'Диабет' : c === 'nafld' ? 'Жировой гепатоз' : c === 'ckd' ? 'ХБП' : c === 'hypertension' ? 'Гипертония' : c === 'gallstones' ? 'ЖКБ' : c === 'ibs' ? 'СРК' : c === 'gout' ? 'Подагра' : c}
+                    🏥 {CONDITION_LABELS[c] || c}
                   </span>
                 ))}
+              </div>
+            )}
+            {showConditions && (
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35, marginBottom: 4 }}>
+                {conditionsList.length > 0
+                  ? 'Состояния из профиля питания повышают множители органов (печень при гепатозе, почки при ХБП и т.д.). Уберите их в настройках плана, если они не актуальны.'
+                  : 'В профиле питания не отмечено хронических состояний — нагрузка считается без множителей.'}
               </div>
             )}
           </GlassCard>
@@ -545,7 +622,8 @@ export const OrganLoadCalculator: React.FC = () => {
                     setCompB({ proteinG: 120, fatG: 50, satFatG: 15, transFatG: 0, carbsG: 300, sugarG: 50,
                       fiberG: 30, omega3Mg: 2000, cholesterolMg: 200, sodiumMg: 1500, potassiumMg: 4700,
                       waterMl: 2800, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
-                      trainingHours: train, mealsPerDay: meals, totalKcal: 120 * 4 + 50 * 9 + 300 * 4 });
+                      trainingHours: train, mealsPerDay: meals, totalKcal: 120 * 4 + 50 * 9 + 300 * 4,
+                      conditions: conditionsList.length > 0 ? conditionsList : undefined });
                   }} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                     background: '#60a5fa', border: 'none', color: '#000', fontWeight: 700 }}>
                     🥗 ЗОЖ-сценарий
@@ -556,7 +634,8 @@ export const OrganLoadCalculator: React.FC = () => {
                     setCompB({ proteinG: bw * 2.2, fatG: bw * 1.4, satFatG: bw * 0.5, transFatG: 2, carbsG: bw * 2.5, sugarG: bw,
                       fiberG: 15, omega3Mg: 300, cholesterolMg: 600, sodiumMg: 3500, potassiumMg: 2500,
                       waterMl: bw * 25, bodyWeightKg: bw, heightCm: height, leanMassKg: bw * 0.75,
-                      trainingHours: train, mealsPerDay: 3, totalKcal: bw * 2.2 * 4 + bw * 1.4 * 9 + bw * 2.5 * 4 });
+                      trainingHours: train, mealsPerDay: 3, totalKcal: bw * 2.2 * 4 + bw * 1.4 * 9 + bw * 2.5 * 4,
+                      conditions: conditionsList.length > 0 ? conditionsList : undefined });
                   }} style={{ fontSize: 8, padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
                     background: '#ef4444', border: 'none', color: '#fff', fontWeight: 700 }}>
                     🍔 Массонабор

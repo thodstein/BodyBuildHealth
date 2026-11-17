@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useTodayIso } from '../../../core/use-today-iso';
 import { ModernHero, modernCardBg } from './nutrition-modern-kit';
+
+/** Выполненные квесты за конкретный день (ключ в хранилище — сама дата). */
+const readCompleted = (date: string): string[] => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('he_quests_completed') || '{}');
+    return Array.isArray(raw?.[date]) ? raw[date] : [];
+  } catch { return []; }
+};
 
 const QUESTS = [
   { id: 'protein_target', text: '🥩 Достигните 2.5 г белка на кг LBM', icon: '🥩' },
@@ -13,14 +22,16 @@ const QUESTS = [
 ];
 
 export const DailyQuests: React.FC = () => {
-  const today = new Date().toISOString().slice(0, 10);
+  // Локальная «сегодня» как состояние: раньше было toISOString (UTC) и дата
+  // в хранилище не совпадала с локальным днём до 07:00 — «квесты не обновились».
+  const today = useTodayIso();
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
   const todayQuestIdx = dayOfYear % QUESTS.length;
   const todayQuest = QUESTS[todayQuestIdx];
 
-  const [completed, setCompleted] = useState<string[]>(() => {
-    try { const raw = JSON.parse(localStorage.getItem('he_quests_completed') || '{}'); return raw[today] || []; } catch { return []; }
-  });
+  const [completed, setCompleted] = useState<string[]>(() => readCompleted(today));
+  // Смена дня → у нового дня свой список выполненных.
+  useEffect(() => { setCompleted(readCompleted(today)); }, [today]);
   const [score, setScore] = useState<number>(() => {
     try { return JSON.parse(localStorage.getItem('he_quest_score') || '0'); } catch { return 0; }
   });

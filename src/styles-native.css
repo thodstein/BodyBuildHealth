@@ -14339,6 +14339,17 @@ html.app-native .nd-addsheet {
   overflow: hidden !important;
   overscroll-behavior: contain !important;
 }
+/* Верхняя строка листа («✕» + «Добавление еды») уходила под шторку телефона:
+   лист — position: fixed, поэтому padding-top #app до него не доходит, а сам
+   лист стоит с padding: 0 (см. выше). Инсет берёт на себя шапка, её фон
+   #141417 при этом закрывает и полосу статус-бара. */
+html.app-native .nd-addsheet-head {
+  padding-top: calc(8px + var(--app-safe-top, max(env(safe-area-inset-top, 0px), 32px))) !important;
+}
+/* Сканер — тоже полноэкранный fixed-слой: его заголовок и «✕» под шторкой. */
+html.app-native .nd-scan {
+  padding-top: max(16px, var(--app-safe-top, max(env(safe-area-inset-top, 0px), 32px))) !important;
+}
 html.app-native .nd-addsheet .nd-sec-add {
   flex: 1 1 auto !important;
   min-height: 0 !important;

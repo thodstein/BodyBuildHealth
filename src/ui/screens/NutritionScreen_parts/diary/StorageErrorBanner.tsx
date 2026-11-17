@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getStorageInfo } from '../diary-storage-v2';
+import { localIsoDate } from '../../../../core/local-date';
 
 interface StorageErrorBannerProps {
   error: string | null;
@@ -40,7 +41,7 @@ export const StorageErrorBanner: React.FC<StorageErrorBannerProps> = ({
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `diary_backup_${new Date().toISOString().split('T')[0]}.json`;
+          a.download = `diary_backup_${localIsoDate()}.json`;
           a.click();
           URL.revokeObjectURL?.(url);
         }

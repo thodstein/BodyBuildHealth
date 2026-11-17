@@ -3,6 +3,8 @@
 // Физиология пищеварения, гепатология, нефрология, эндокринология,
 // нейрофизиология, остеология, кардиология.
 
+import { localIsoDate } from '../core/local-date';
+
 // ─── Interfaces ───
 
 export interface OrganLoadInput {
@@ -17,6 +19,12 @@ export interface OrganLoadInput {
   cholesterolMg: number;
   sodiumMg: number;
   potassiumMg?: number;
+  /** Минералы для PRAL (Remer-Manz). Без них формула берёт типичный рацион. */
+  phosphorusMg?: number;
+  magnesiumMg?: number;
+  calciumMg?: number;
+  /** Омега-6, мг/сут. Нужна для честного Ω6/Ω3 — раньше он был прибит к 4:1. */
+  omega6Mg?: number;
   waterMl?: number;
   bodyWeightKg: number;
   heightCm?: number;
@@ -39,7 +47,7 @@ export interface OrganLoadResult {
   kidneys: OrganLoadScore & { rslMosm: number; pralMEq: number; advice: string };
   pancreas: OrganLoadScore & { insulinDemandU: number; glycemicLoad: number; carbDensityPct: number; advice: string };
   gallbladder: OrganLoadScore & { bileDemandMg: number; fatPerMealG: number; advice: string };
-  cardiovascular: OrganLoadScore & { atherogenicIndex: number; omegaRatio: number; advice: string };
+  cardiovascular: OrganLoadScore & { atherogenicIndex: number; omegaRatio: number | null; advice: string };
   giTract: OrganLoadScore & { fermentationG: number; transitHours: number; advice: string };
   adipose: OrganLoadScore & { surplusKcal: number; storageRateGH: number; advice: string };
   bones: OrganLoadScore & { pralNet: number; calciumBalanceMg: number; advice: string };
@@ -108,25 +116,32 @@ function calcBMI(weight: number, heightCm: number): number {
 // ─── MAIN ENGINE ───
 
 export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
-  const bw = input.bodyWeightKg || 70;
-  const ht = input.heightCm || 175;
+  // Ноль — легальное значение (кетогенный рацион: сахар 0, насыщенные 0), поэтому
+  // `||` заменён на явную проверку: раньше 0 молча превращался в «среднюю»
+  // подстановку (сахар → 25% углеводов, омега-3 → 500 мг) и оценка врала.
+  const num = (v: number | undefined, fallback: number): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+
+  const bw = num(input.bodyWeightKg, 70) || 70;
+  const ht = num(input.heightCm, 175);
   const bmi = calcBMI(bw, ht);
-  const lbm = input.leanMassKg || bw * 0.75;
-  const p = input.proteinG;
-  const f = input.fatG;
-  const sf = input.satFatG || f * 0.3;
-  const tf = input.transFatG || 0;
-  const c = input.carbsG;
-  const sug = input.sugarG || c * 0.25;
-  const fib = input.fiberG || 0;
-  const o3 = input.omega3Mg || 500;
-  const chol = input.cholesterolMg || 0;
-  const na = input.sodiumMg || 0;
-  const k = input.potassiumMg || 0;
-  const water = input.waterMl || bw * 30;
-  const trainH = input.trainingHours || 0;
-  const meals = input.mealsPerDay || 4;
-  const totalKcal = input.totalKcal || (p * 4 + f * 9 + c * 4);
+  const lbm = num(input.leanMassKg, bw * 0.75);
+  const p = num(input.proteinG, 0);
+  const f = num(input.fatG, 0);
+  const sf = num(input.satFatG, f * 0.3);
+  const tf = num(input.transFatG, 0);
+  const c = num(input.carbsG, 0);
+  const sug = num(input.sugarG, c * 0.25);
+  const fib = num(input.fiberG, 0);
+  const o3 = num(input.omega3Mg, 0);
+  const o6 = num(input.omega6Mg, 0);
+  const chol = num(input.cholesterolMg, 0);
+  const na = num(input.sodiumMg, 0);
+  const k = num(input.potassiumMg, 0);
+  const water = num(input.waterMl, bw * 30);
+  const trainH = num(input.trainingHours, 0);
+  const meals = num(input.mealsPerDay, 4);
+  const totalKcal = num(input.totalKcal, p * 4 + f * 9 + c * 4);
   const conds = new Set(input.conditions || []);
 
   // ── Training modifier ──
@@ -144,7 +159,10 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   const liverFruct   = sug * 0.15;             // фруктоза = нагрузка ×2 на печень
   const liverRaw     = liverProtein + liverFat + liverCarbs + liverFruct;
   const ammoniaRate  = +(p * 0.16 * 1.21 / 24).toFixed(1); // г NH₃/ч (N→NH₃: ×17/14≈1.21)
-  const liverScore   = clamp(liverRaw * 1.1 * trainMult * (conds.has('nafld') ? 1.5 : 1) * bmiMult, 0, 100);
+  // Калибровка: обычный смешанный рацион (150 Б / 70 Ж / 250 У) даёт raw ≈ 49.
+  // Раньше ×1.1 превращало норму в «повышенную»; ×0.7 ставит её в «умеренную»,
+  // а действительно тяжёлый рацион (250/150/500) уводит за 70.
+  const liverScore   = clamp(liverRaw * 0.7 * trainMult * (conds.has('nafld') ? 1.5 : 1) * (conds.has('gout') ? 1.15 : 1) * bmiMult, 0, 100);
 
   let liverAdvice = 'Нагрузка на печень в пределах нормы.';
   if (liverScore > 75) liverAdvice = `Гепатотоксический профиль (NH₃ ${ammoniaRate} г/ч). Снизьте фруктозу ≤25 г/сут, насыщенные жиры ≤${(sf*0.5).toFixed(0)} г/сут. Добавьте холин (≥550 мг), NAC, расторопшу.`;
@@ -156,15 +174,32 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   const rsl      = p * 5.7 + na / 23;         // Renal Solute Load: protein mOsm + Na mEq (1 mEq = 23 mg)
   const rslPerKg = rsl / bw;
-  const pralVal  = calcPRAL(p, k);              // PRAL
-  const waterAdequacy = clamp(water / (bw * 35), 0.3, 1.5);
-  const kidneyRaw    = rslPerKg * 4.5 + Math.abs(pralVal) * 2;
-  const kidneyScore  = clamp(kidneyRaw / waterAdequacy * (conds.has('ckd') ? 1.8 : conds.has('hypertension') ? 1.3 : 1), 0, 100);
+  // PRAL — из реальных P/Mg/Ca плана, если они есть; иначе Remer-Manz берёт
+  // типичный рацион (1500/350/900 мг) и кислотная нагрузка недооценивается.
+  const pralVal  = calcPRAL(
+    p, k,
+    num(input.phosphorusMg, 1500), num(input.magnesiumMg, 350), num(input.calciumMg, 900),
+  );
+  // Камни в почках — НЕ ХБП: белок не ограничиваем, главный рычаг — вода (≥40 мл/кг).
+  const waterTarget = bw * (conds.has('kidney_stones') ? 40 : 35);
+  const hydrated    = clamp(water / waterTarget, 0, 1);
+  // Шкала: RSL 6 мОсм/кг — нижняя норма, 20 — край. Раньше score делился на
+  // гидратацию, и стандартные 150 г белка давали 100 «критическая».
+  const rslScore    = clamp(((rslPerKg - 6) / 14) * 100, 0, 100);
+  const pralScore   = clamp((pralVal / 40) * 100, 0, 100);
+  const kidneyScore = clamp(
+    (rslScore * 0.6 + pralScore * 0.25 + (1 - hydrated) * 20)
+      * (conds.has('ckd') ? 1.8 : conds.has('gout') ? 1.2 : conds.has('hypertension') ? 1.15 : 1),
+    0, 100,
+  );
 
   let kidneyAdvice = 'Почечная нагрузка в норме.';
-  if (kidneyScore > 75) kidneyAdvice = `RSL ${Math.round(rsl)} мОсм, PRAL ${pralVal > 0 ? '+' : ''}${pralVal} мЭкв. Вода: ≥${Math.round(bw*40)} мл/сут. Распределите белок по ${meals} приёмам (≤0.5 г/кг/приём). Добавьте калий (≥4700 мг).`;
-  else if (kidneyScore > 55) kidneyAdvice = `RSL ${Math.round(rsl)} мОсм. Увеличьте воду на ${Math.round(Math.max(0, bw*35 - water))} мл. Снизьте Na ≤2000 мг.`;
-  else if (kidneyScore > 35) kidneyAdvice = 'Лёгкая RSL. Вода ≥30 мл/кг — достаточно.';
+  if (kidneyScore > 75) kidneyAdvice = `RSL ${Math.round(rsl)} мОсм, PRAL ${pralVal > 0 ? '+' : ''}${pralVal} мЭкв. Вода: ≥${Math.round(waterTarget)} мл/сут. Распределите белок по ${meals} приёмам (≤0.5 г/кг/приём). Добавьте калий (≥4700 мг).`;
+  else if (kidneyScore > 55) kidneyAdvice = `RSL ${Math.round(rsl)} мОсм. Увеличьте воду на ${Math.round(Math.max(0, waterTarget - water))} мл. Снизьте Na ≤2000 мг.`;
+  else if (kidneyScore > 35) kidneyAdvice = `Лёгкая RSL. Вода ≥${Math.round(waterTarget / bw)} мл/кг — достаточно.`;
+  if (conds.has('kidney_stones')) {
+    kidneyAdvice = `Камни в почках: держите воду ≥${Math.round(waterTarget)} мл/сут (${Math.round(waterTarget / bw)} мл/кг) и натрий ≤2000 мг — это главные рычаги. ${kidneyAdvice}`;
+  }
 
   // ════════════════════════════════════
   // 3. PANCREAS (Инсулиновая нагрузка)
@@ -173,7 +208,8 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   const glycemicLoad = clamp((c - fib * 0.8) * (1 + sug / 100), 0, 200);
   const insulinU     = clamp(glycemicLoad * 0.25, 0, 100);  // Insulin demand ≈ 0.25×GL (simplified, without individual sensitivity)
   const pancMult     = conds.has('diabetes') ? 1.6 : 1;
-  const pancScore    = clamp(insulinU * 1.15 * pancMult * (carbDensity > 70 ? 1.2 : 1), 0, 100);
+  // 1.15 → 0.9: 250 г углеводов (обычный рацион) давали 57 «повышенная».
+  const pancScore    = clamp(insulinU * 0.9 * pancMult * (carbDensity > 70 ? 1.2 : 1), 0, 100);
 
   let pancreasAdvice = 'Инсулиновая нагрузка в норме.';
   if (pancScore > 75) pancreasAdvice = `Гиперинсулинемический профиль. Снизьте углеводную плотность с ${carbDensity}% до ≤50%, клетчатка ≥30 г/сут. Добавьте берберин 500 мг × 2.`;
@@ -196,13 +232,18 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 5. CARDIOVASCULAR (Атерогенная)
   // ════════════════════════════════════
-  const omegaRatio = 4; // Omega-6/3 ratio requires food-level data (not derivable from macros alone); assume optimal when o3 present
+  // Ω6/3 — только из реальных данных: раньше было прибито 4:1 и панель
+  // показывала «идеальное» соотношение при любом рационе. Нет омега-6 → null.
+  const omegaRatio = o6 > 0 && o3 > 0 ? +(o6 / o3).toFixed(1) : null;
   const ai = (sf * 0.25 + tf * 0.8 + chol * 0.0015) / bw * 8;  // Atherogenic Index (simplified: SFA + trans fat)
-  const cvScore = clamp(ai * 5.5 * (conds.has('hypertension') ? 1.4 : conds.has('diabetes') ? 1.2 : 1) * (tf > 2 ? 1.3 : 1), 0, 100);
+  // Калибровка по АИ: 0.4 — чистый рацион, 2.0 — выраженно атерогенный.
+  // Раньше ×5.5 давало 3-6 баллов даже на 40 г насыщенных жиров: ось не работала.
+  const cvScore = clamp(((ai - 0.4) / 1.6) * 100 * (conds.has('hypertension') ? 1.4 : conds.has('diabetes') ? 1.2 : 1) * (tf > 2 ? 1.3 : 1), 0, 100);
 
+  const omegaNote = omegaRatio != null ? `, Ω6/3 = ${omegaRatio}:1` : ' (Ω6/3 — нет данных об омега-6)';
   let cvAdvice = 'Атерогенная нагрузка низкая.';
-  if (cvScore > 75) cvAdvice = `АИ ${ai.toFixed(1)}, Ω6/3 = ${omegaRatio}:1. Замените насыщенные жиры на оливковое масло, рыбу. EPA+DHA ≥2 г/сут.`;
-  else if (cvScore > 55) cvAdvice = `АИ ${ai.toFixed(1)}. Добавьте омега-3 ≥${Math.round(Math.max(2000, o3*2))} мг. Контролируйте трансжиры.`;
+  if (cvScore > 75) cvAdvice = `АИ ${ai.toFixed(1)}${omegaNote}. Замените насыщенные жиры на оливковое масло, рыбу. EPA+DHA ≥2 г/сут.`;
+  else if (cvScore > 55) cvAdvice = `АИ ${ai.toFixed(1)}${omegaNote}. Добавьте омега-3 ≥${Math.round(Math.max(2000, o3*2))} мг. Контролируйте трансжиры.`;
   else if (cvScore > 35) cvAdvice = 'Умеренный профиль. Поддерживайте Ω3 ≥1 г/сут.';
 
   // ════════════════════════════════════
@@ -236,8 +277,11 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
   // ════════════════════════════════════
   // 8. BONES (Кислотно-щелочная)
   // ════════════════════════════════════
-  const caBalance = 800 - (pralVal * 2);  // ~1-2 mg urinary Ca lost per mEq net acid load (Remer 2003)
-  const boneScore = clamp((Math.abs(pralVal) * 4 + Math.max(0, -caBalance) * 0.02) * (k < 3000 ? 1.25 : 1), 0, 100);
+  const calciumMg = num(input.calciumMg, 900);
+  const caBalance = calciumMg - pralVal * 2;  // ~1-2 mg urinary Ca lost per mEq net acid load (Remer 2003)
+  // Нормировка по PRAL, а не по модулю: обычный рацион (+13 мЭкв) больше не
+  // получает 52 «повышенная». 40 мЭкв — верхняя граница физкоридора.
+  const boneScore = clamp((Math.max(0, pralVal) / 40) * 70 + (k < 3000 ? 15 : 0) + (caBalance < 600 ? 15 : 0), 0, 100);
 
   let boneAdvice = 'Костный метаболизм в балансе.';
   if (boneScore > 55) boneAdvice = `PRAL ${pralVal > 0 ? '+' : ''}${pralVal} мЭкв — кислая нагрузка. Ca баланс ${Math.round(caBalance)} мг. Увеличьте калий (≥4700 мг), зелень.`;
@@ -276,7 +320,9 @@ export function calcOrganLoad(input: OrganLoadInput): OrganLoadResult {
 
   let profile = 'Сбалансированный';
   const top3 = scores10.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s).slice(0, 3);
-  if (top3[0].i >= 7) profile = 'Остеогенный (высокая кислотная нагрузка)';
+  // i === 7 именно кости; раньше >= 7 вешало «остеогенный» профиль и на ЦНС
+  // (i=8), и на эндокринную (i=9).
+  if (top3[0].i === 7) profile = 'Остеогенный (высокая кислотная нагрузка)';
   else if (liverScore > 60 && pancScore > 50) profile = 'Смешанный гепато-инсулиновый';
   else if (liverScore > 55 && gbScore > 50) profile = 'Липидный (жировой)';
   else if (kidneyScore > 55) profile = 'Протеиновый (высокобелковый)';
@@ -345,8 +391,9 @@ export function loadOrganLoadHistory(): OrganLoadHistoryEntry[] {
 
 export function saveOrganLoadHistory(input: OrganLoadInput): void {
   const result = calcOrganLoad(input);
+  const date = localIsoDate();
   const entry: OrganLoadHistoryEntry = {
-    date: new Date().toISOString().slice(0, 10),
+    date,
     input,
     result: {
       totalMetabolicLoad: result.totalMetabolicLoad,
@@ -357,7 +404,10 @@ export function saveOrganLoadHistory(input: OrganLoadInput): void {
       metabolicProfile: result.metabolicProfile,
     },
   };
-  const history = loadOrganLoadHistory();
+  // Одна запись на календарный день: панель сохраняет историю на каждое
+  // изменение ввода (debounce 800 мс), и раньше 30 строк были копиями
+  // сегодняшнего дня — истории как динамики не было.
+  const history = loadOrganLoadHistory().filter(h => h.date !== date);
   history.unshift(entry);
   if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch {}

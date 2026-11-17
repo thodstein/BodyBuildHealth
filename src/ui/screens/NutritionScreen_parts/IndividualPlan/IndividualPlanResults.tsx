@@ -38,7 +38,7 @@ import {
   AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
 } from "./planner-ab-compare";
 import {
-  readActivePlan, readPlanArchive, restorePlanFromArchive, removeArchivedPlan,
+  readActivePlan, readPlanArchive, restorePlanFromArchive, removeArchivedPlan, archivePlan,
   PLAN_ARCHIVE_EVENT, publishPlanTargetsFor,
 } from "./planner-plan-archive";
 
@@ -2724,13 +2724,29 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {/* Архив планов: сюда уезжает предыдущий активный план при сохранении
-          нового. Можно вернуть в работу или удалить. */}
-      {planArchive.length > 0 && (
-        <GlassCard title="Архив планов" icon="🗄" color="#94a3b8">
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>
-            Здесь лежат предыдущие планы. При сохранении нового активный план автоматически уходит сюда.
-          </div>
-          {planArchive.slice(0, 10).map((p: any) => (
+          нового. Карточка видна ВСЕГДА: пустой архив раньше не рендерился вовсе,
+          и выглядело так, будто функции нет. */}
+      <GlassCard title={planArchive.length > 0 ? `Архив планов · ${planArchive.length}` : 'Архив планов'} icon="🗄" color="#94a3b8">
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>
+          {planArchive.length > 0
+            ? 'Здесь лежат предыдущие планы. При сохранении нового активный план автоматически уходит сюда — его можно вернуть в работу или удалить.'
+            : 'Пока пусто. Сохраните новый план — текущий активный автоматически уедет сюда целиком, со всеми днями и КБЖУ.'}
+        </div>
+        {planArchive.length === 0 && visibleSavedPlans.length > 1 && (
+          <button
+            aria-label="Убрать прошлые планы в архив"
+            onClick={() => {
+              const activeId = activePlan?.id ?? visibleSavedPlans[0]?.id;
+              visibleSavedPlans.filter((p: any) => p.id !== activeId).forEach((p: any) => {
+                try { archivePlan(p); } catch { /* квота — архив не критичен */ }
+              });
+            }}
+            style={{ width: '100%', padding: '12px 14px', minHeight: 48, borderRadius: 12, cursor: 'pointer', marginBottom: 8,
+              background: 'rgba(148,163,184,0.10)', border: '1px dashed rgba(148,163,184,0.35)', color: '#cbd5e1', fontSize: 11, fontWeight: 700 }}>
+            🗄 Убрать прошлые планы в архив
+          </button>
+        )}
+        {planArchive.slice(0, 12).map((p: any) => (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', marginBottom: 6, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{p.name || p.date}</div>
@@ -2763,9 +2779,8 @@ const doImportPlan = (raw: string): boolean => {
                 ✕
               </button>
             </div>
-          ))}
-        </GlassCard>
-      )}
+        ))}
+      </GlassCard>
 
       {/* Волна-3: A/B двух планов — снапшоты дня в слоты A/B + diff (КБЖУ/приёмы/состав/заметки) */}
       {generated && dayPlan && (

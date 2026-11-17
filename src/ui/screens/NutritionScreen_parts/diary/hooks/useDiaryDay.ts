@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { aggregateDiaryMicros } from '../../diary-storage';
 import { calcMealQuality, getQualityLabel } from '../../../../../engines/nutrition-quality.engine';
@@ -10,7 +10,29 @@ export function useDiaryDay({ diaryData, refreshKey }: {
   diaryData: Record<string, any>;
   refreshKey: number;
 }) {
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()));
+
+  // Автопереход на новый день: пока приложение открыто через полночь, «сегодня»
+  // должно стать новым днём, иначе дневник и hero показывают вчерашние цифры
+  // до перезапуска. Если пользователь сам ушёл на другую дату — не трогаем.
+  useEffect(() => {
+    let lastToday = formatDate(new Date());
+    const sync = () => {
+      const today = formatDate(new Date());
+      if (today === lastToday) return;
+      const prevToday = lastToday;
+      lastToday = today;
+      setSelectedDate(prev => (prev === prevToday ? today : prev));
+    };
+    const id = window.setInterval(sync, 60_000);
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
 
   const weekStart = useMemo(() => { const d = parseDateOnly(selectedDate); const day = d.getDay(); d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)); return d; }, [selectedDate]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate() + i); return formatDate(d); }), [weekStart]);

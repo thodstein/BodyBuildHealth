@@ -8,6 +8,7 @@ import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 import { ModernHero, ModernPill, modernCardBg } from './nutrition-modern-kit';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 import { readDiaryV2 } from './diary-storage-v2';
+import { localIsoDate } from '../../../core/local-date';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap' | 'targeting';
 type SortKey = 'score' | 'name' | 'protein' | 'kcal';
@@ -240,7 +241,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   const gapResult: NutrientGapResult = useMemo(() => {
     if (mealProducts.length === 0) {
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const today = localIsoDate();
         const diaryProds = getDiaryProductsForDate(today);
         if (diaryProds.length > 0) return analyzeNutrientGaps(diaryProds);
       } catch {}
@@ -375,7 +376,7 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         return;
       }
       if (source === 'diary') {
-        const today = new Date().toISOString().split('T')[0];
+        const today = localIsoDate();
         const entries = getDiaryProductsForDate(today);
         if (entries.length === 0) { showToast('Нет записей в дневнике за сегодня'); return; }
         setMealProducts(prev => [...prev, ...entries]);

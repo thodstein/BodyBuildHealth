@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 interface WeightEntry { date: string; weight: number; fatPct?: number; }
@@ -15,7 +16,8 @@ export const ProgressTracker: React.FC = () => {
 
   const addEntry = () => {
     if (!weightInput) return;
-    const today = new Date().toISOString().slice(0, 10);
+    // Локальная дата: UTC-дата писала утренний вес во вчерашний день.
+    const today = localIsoDate();
     const copy = [...entries];
     const existing = copy.findIndex(e => e.date === today);
     if (existing >= 0) copy[existing] = { date: today, weight: parseFloat(weightInput), fatPct: fatInput ? parseFloat(fatInput) : copy[existing].fatPct };

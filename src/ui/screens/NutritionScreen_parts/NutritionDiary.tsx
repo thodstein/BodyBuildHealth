@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { findFood, quantityToGrams } from '../../../engines/nutrition-ocr-parser';
 import { useAndroidBackHandler } from '../../../core/use-android-back';
+import { localIsoDate } from '../../../core/local-date';
 import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiaryJSON, getStorageInfo } from './diary-storage-v2';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
@@ -53,6 +54,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const { foodSearch, setFoodSearch, debouncedSearch, usdaFoods } = useDiarySearch();
   const { mealType, setMealType, allMealTypes, customMealInput, setCustomMealInput, addCustomMeal } = useDiaryMealTypes({ tab, safeSet, showToast });
   const { selectedDate, setSelectedDate, weekDays, dayMeals, dayTotals, dayMicros, mealQuality, dayQuality, favoriteFoods, recentFoods } = useDiaryDay({ diaryData, refreshKey });
+  const isToday = selectedDate === localIsoDate();
   const {
     ocrText, setOcrText, parsedItems, setParsedItems, ocrError, ocrHint, ocrFileLoading, ocrProgress,
     showCustomFood, setShowCustomFood,
@@ -201,8 +203,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       
       <ModernHero icon="📓" title="Дневник питания" subtitle="Учёт приёмов, КБЖУ, микронутриенты и качество — с OCR, штрихкодом и аналитикой. Все данные локально." count={Object.keys(diaryData).length} stats={[
         { k:'Дней', v: Object.keys(diaryData).length, sub:'записей', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
-        { k:'Ккал', v: Math.round(dayTotals.kcal), sub:'сегодня', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
-        { k:'Приёмов', v: Object.values(dayMeals).filter(list => Array.isArray(list) && list.length > 0).length, sub:'сегодня', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+        // «сегодня» — только для сегодняшней даты: на другом дне подпись врала.
+        { k:'Ккал', v: Math.round(dayTotals.kcal), sub: isToday ? 'сегодня' : shortRuDate(selectedDate), col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+        { k:'Приёмов', v: Object.values(dayMeals).filter(list => Array.isArray(list) && list.length > 0).length, sub: isToday ? 'сегодня' : shortRuDate(selectedDate), col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
       ]} />
 
       {/* Week day selector */}
@@ -239,20 +242,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         <MacroSummary dayTotals={dayTotals} targets={targets} />
       </div>
 
-      {/* Переход к добавлению — обычная кнопка в потоке, на одном и том же месте.
-          Плавающих/FAB-кнопок в дневнике нет: только закреплённые в раскладке.
-          Классы `nut-diary-fabbar` / `nut-diary-fab` — якоря APK-слоя
-          (styles-native.css §75): там они работают как обёртка и кнопка в потоке,
-          но с гарантированным safe-area отступом. */}
-      {tab !== 'add' && (
-        <div className="nut-diary-fabbar" style={{ display: 'flex' }}>
-          <button onClick={() => setTab('add')} aria-label="Быстро добавить" className="nd-addfood-pin nut-diary-fab"
-            style={{ flex: 1, width: '100%', minHeight: 52, borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 13, fontWeight: 800 }}>
-            <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> Добавить еду
-          </button>
-        </div>
-      )}
+      {/* Перехода «＋ Добавить еду» в середине экрана больше нет: он дублировал
+          вкладку «Добавить» в nd-tabs и на телефоне занимал центр экрана.
+          Добавление открывается вкладкой «＋ Добавить» и кнопками внутри дня. */}
 
       {/* Tab content */}
       {tab === 'add' && (
@@ -526,7 +518,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `diary_${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `diary_${localIsoDate()}.json`;
             a.click();
           }}
           className="nd-data-btn"
@@ -542,7 +534,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `diary_${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `diary_${localIsoDate()}.csv`;
             a.click();
           }}
           className="nd-data-btn"

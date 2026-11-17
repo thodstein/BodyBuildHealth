@@ -525,7 +525,6 @@ describe('APK TOP pack', () => {
     const anchors: [string, string][] = [
       ['src/ui/screens/NutritionScreen.tsx', 'nutrition-rt-toast'],
       ['src/ui/screens/NutritionScreen_parts/NutritionDiary.tsx', 'nut-diary-toast'],
-      ['src/ui/screens/NutritionScreen_parts/NutritionDiary.tsx', 'nut-diary-fab'],
       ['src/ui/screens/NutritionScreen_parts/RecipesTabModern.tsx', 'recipes-toast'],
       ['src/ui/screens/SupportScreen_parts/SupportCatalogView.tsx', 'sup-catalog-toast'],
       ['src/ui/screens/SupportScreen_parts/SymptomSolverTab.tsx', 'symptom-toast'],
