@@ -181,11 +181,14 @@ export const SafetyLabFindings: React.FC<{ planResult?: PlanResult }> = ({ planR
     (groups[key] ||= []).push(f);
   }
   const cnt = (sev: string) => labFindings.filter((f: any) => f.severity === sev).length;
+  // Проход 116: «всего N» считает все находки, а перечислены только три тяжести —
+  // мягкие (low/info) попадали в итог, не попадая ни в одну цифру.
+  const rest = labFindings.length - cnt('critical') - cnt('high') - cnt('medium');
   return (
     <div className="calc-safetylabs" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: 8, fontWeight: 700, color: '#f472b6', marginBottom: 3 }}>🔬 Лабораторные находки (персональный мониторинг)</div>
       <div style={{ fontSize: 6.5, color: 'rgba(255,255,255,0.7)', marginBottom: 4, padding: '3px 7px', borderRadius: 6, background: 'rgba(244,114,182,0.06)', border: '1px solid rgba(244,114,182,0.16)' }}>
-        📊 Итого: <b style={{ color: '#ef4444' }}>{cnt('critical')}</b> критичных · <b style={{ color: '#f59e0b' }}>{cnt('high')}</b> высоких · <b style={{ color: '#fbbf24' }}>{cnt('medium')}</b> средних · всего {labFindings.length}
+        📊 Итого: <b style={{ color: '#ef4444' }}>{cnt('critical')}</b> критичных · <b style={{ color: '#f59e0b' }}>{cnt('high')}</b> высоких · <b style={{ color: '#fbbf24' }}>{cnt('medium')}</b> средних{rest > 0 ? ` · ${rest} прочих` : ''} · всего {labFindings.length}
       </div>
       {ORGAN_ORDER.filter((k: string) => groups[k] && groups[k].length > 0).map((k: string) => (
         <div key={k} style={{ marginBottom: 4 }}>
