@@ -5,18 +5,26 @@ import {
   BILIRUBIN_FLAG_STEPS, LDL_FLAG_STEPS, TG_FLAG_STEPS, HDL_LOW,
   CREATININE_ULN, CREATININE_FLAG_STEP,
 } from '../../../engines/lab-norms.engine';
+import { LAB_UNIT_CHOICES, labUnitKey } from '../../../core/constants';
+import { resolveLabMarker } from '../../../core/labs-mapping';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
 //  Маркер → панель: авт-определение панели для code из LabPoint
 // ═══════════════════════════════════════════════════════════════
 const MARKER_TO_PANEL: Record<string, keyof LabSlice> = {};
+/** Точное имя маркера в бланке по любому написанию (регистр не важен). */
+const MARKER_BY_NAME: Record<string, string> = {};
 for (const p of FULL_PANELS) {
   for (const m of p.markers) {
-    MARKER_TO_PANEL[m.toLowerCase()] = p.key;
+    // Проход 111: первое совпадение главнее. «Glucose» есть и в биохимии, и в
+    // анализе мочи; кровяная глюкоза (`GLU`/`GLUCOSE`) — это биохимия, а моча
+    // приходит отдельными кодами. Раньше побеждала моча, и импорт ложился не туда.
+    if (!MARKER_BY_NAME[m.toLowerCase()]) MARKER_BY_NAME[m.toLowerCase()] = m;
+    if (!MARKER_TO_PANEL[m.toLowerCase()]) MARKER_TO_PANEL[m.toLowerCase()] = p.key;
     // Также — альтернативные написания
     const alt = m.replace(/\s+/g, '_').replace(/[()]/g, '').toLowerCase();
-    if (alt !== m.toLowerCase()) MARKER_TO_PANEL[alt] = p.key;
+    if (alt !== m.toLowerCase() && !MARKER_TO_PANEL[alt]) MARKER_TO_PANEL[alt] = p.key;
   }
 }
 // Дополнительные синонимы маркеров (UCUM-коды из labs_log)
@@ -101,6 +109,119 @@ MARKER_TO_PANEL['protein'] = 'panelUrinalysis';
 MARKER_TO_PANEL['ketones'] = 'panelUrinalysis';
 
 // ═══════════════════════════════════════════════════════════════
+//  Код анализа → имя маркера бланка (проход 111)
+// ═══════════════════════════════════════════════════════════════
+//  Один анализ живёт в приложении в трёх словарях: имя в бланке калькулятора
+//  ('Total T', 'Prolactin', 'Hemoglobin'), плоский код риска и тиров ('TT',
+//  'PRL', 'HGB') и то, что вернул `resolveLabMarker` для бумажного бланка
+//  ('HGB', 'BIL', 'GLU', а для незнакомого названия — имя в верхнем регистре).
+//  Импорт (LabPoint, маркеры дневника) приносит второй и третий, а `LabSlice`
+//  читается по первому — поэтому без моста значение либо терялось совсем
+//  (`PRL`, `TT`), либо ложилось под ключом, которого не видит ни форма, ни
+//  движок (`HEMOGLOBIN`, `DHEA_S`). Вывести таблицу из `resolveLabMarker`
+//  нельзя: он не сводит 'Total T' к 'TT', а незнакомое возвращает как есть.
+const LAB_CODE_TO_MARKER: Record<string, string> = {
+  // ── половые гормоны и надпочечники ──
+  'TT': 'Total T', 'TOTAL_T': 'Total T', 'TESTO': 'Total T', 'TESTOSTERONE': 'Total T', 'TESTOSTERONE_TOTAL': 'Total T',
+  'FT': 'Free T', 'FREE_T': 'Free T', 'FTESTO': 'Free T', 'FREE_TESTOSTERONE': 'Free T', 'TESTOSTERONE_FREE': 'Free T',
+  'E2': 'E2', 'ESTR': 'E2', 'ESTRADIOL': 'E2',
+  'PRL': 'Prolactin', 'PROL': 'Prolactin', 'PROLACTIN': 'Prolactin',
+  'PROG': 'Progesterone', 'PROGESTERONE': 'Progesterone',
+  'CORT': 'Cortisol', 'CORTISOL': 'Cortisol',
+  'DHEA_S': 'DHEA-S', 'DHEAS': 'DHEA-S', 'DHEA': 'DHEA-S',
+  // ── кровь ──
+  'HGB': 'Hemoglobin', 'HB': 'Hemoglobin', 'HEMOGLOBIN': 'Hemoglobin',
+  'HCT': 'HCT', 'HEMATOCRIT': 'HCT',
+  'PLT': 'Platelets', 'PLATELETS': 'Platelets',
+  'NEUT': 'Neutrophils', 'NEUTROPHILS': 'Neutrophils',
+  'LYMPH': 'Lymphocytes', 'LYM': 'Lymphocytes', 'LYMPHOCYTES': 'Lymphocytes',
+  // ── биохимия ──
+  'GLU': 'Glucose', 'GLUCOSE': 'Glucose',
+  'CREAT': 'Creatinine', 'CREA': 'Creatinine', 'CREATININE': 'Creatinine',
+  'BUN': 'Urea', 'UREA': 'Urea',
+  'UA': 'Uric acid', 'URIC': 'Uric acid', 'URIC_ACID': 'Uric acid',
+  'BIL': 'Bilirubin', 'BILIRUBIN': 'Bilirubin', 'BILIRUBIN_TOTAL': 'Bilirubin',
+  'HCY': 'Homocysteine', 'HOMOCYSTEINE': 'Homocysteine',
+  'CRP': 'CRP', 'HS_CRP': 'hsCRP', 'HSCRP': 'hsCRP',
+  // ── липиды ──
+  'TC': 'Total Cholesterol', 'TOTAL_CHOLESTEROL': 'Total Cholesterol', 'CHOLESTEROL': 'Total Cholesterol',
+  'TG': 'Triglycerides', 'TRIGLYCERIDES': 'Triglycerides',
+  'APO_B': 'ApoB', 'APOB': 'ApoB', 'APO_A1': 'ApoA1', 'APOA1': 'ApoA1',
+  'LP_A': 'Lp(a)', 'LPA': 'Lp(a)',
+  // ── щитовидная железа ──
+  'FT3': 'T3 free', 'T3_FREE': 'T3 free', 'FT4': 'T4 free', 'T4_FREE': 'T4 free',
+  'TPO_AB': 'Anti-TPO', 'ANTI_TPO': 'Anti-TPO', 'TG_AB': 'Anti-TG', 'ANTI_TG': 'Anti-TG',
+  // ── железо, витамины ──
+  'FERR': 'Ferritin', 'FERRITIN': 'Ferritin', 'FE': 'Iron', 'IRON': 'Iron',
+  'TIBC': 'TIBC', 'TRANSFERRIN': 'Transferrin', 'TRANSFERRIN_SAT': 'Transferrin Sat',
+  'B12': 'B12', 'VITAMIN_B12': 'B12',
+  'FOL': 'Folate', 'FOLATE': 'Folate', 'B9': 'Folate',
+  'VITD': 'Vitamin D (25-OH)', 'VITAMIN_D': 'Vitamin D (25-OH)',
+  'VITAMIN_D_25_OH': 'Vitamin D (25-OH)', '25_OH_D': 'Vitamin D (25-OH)', '25(OH)D': 'Vitamin D (25-OH)',
+  // ── свёртывание, сердце, воспаление, опухолевые маркеры ──
+  'D_DIMER': 'D-dimer', 'DDIMER': 'D-dimer', 'DIMER': 'D-dimer',
+  'FIB': 'Fibrinogen', 'FIBRINOGEN': 'Fibrinogen',
+  'CK_MB': 'CK-MB', 'TROPONIN_I': 'Troponin I', 'TROPONIN_T': 'Troponin T',
+  'NT_PROBNP': 'NT-proBNP', 'PROBNP': 'NT-proBNP',
+  'IL_6': 'IL-6', 'IL6': 'IL-6', 'TNF_ALPHA': 'TNF-alpha', 'TNF': 'TNF-alpha',
+  'PSA': 'PSA total', 'PSA_TOTAL': 'PSA total', 'PSA_FREE': 'PSA free',
+  'CA125': 'CA-125', 'CA_125': 'CA-125', 'CEA': 'CEA', 'AFP': 'AFP',
+  // ── электролиты и прочее ──
+  'CA': 'Calcium', 'CALCIUM': 'Calcium', 'MG': 'Magnesium', 'MAGNESIUM': 'Magnesium',
+  'NA': 'Sodium', 'SODIUM': 'Sodium', 'K': 'Potassium', 'POTASSIUM': 'Potassium',
+  'CL': 'Chloride', 'CHLORIDE': 'Chloride', 'PHOS': 'Phosphorus', 'PHOSPHORUS': 'Phosphorus',
+  'ALDO': 'Aldosterone', 'ALDOSTERONE': 'Aldosterone', 'RENIN': 'Renin',
+  'PTH': 'PTH', 'PARATHYROID': 'PTH', 'ANDROSTENEDIONE': 'Androstenedione',
+  '3A_ADG': '3a-ADG',
+  'PH': 'pH', 'PROTEIN': 'Protein', 'KETONES': 'Ketones',
+  'LEUKOCYTES': 'Leukocytes', 'NITRITE': 'Nitrite',
+  // моча приходит отдельными кодами — маркер тот же, панель выбирается по коду
+  'URINE_GLUCOSE': 'Glucose', 'GLUCOSE_URINE': 'Glucose',
+  'URINE_PROTEIN': 'Protein', 'PROTEIN_URINE': 'Protein',
+  'URINE_KETONES': 'Ketones', 'KETONES_URINE': 'Ketones',
+  'URINE_LEUKOCYTES': 'Leukocytes', 'URINE_NITRITE': 'Nitrite', 'URINE_PH': 'pH',
+  'INR': 'INR', 'PT': 'PT', 'APTT': 'APTT', 'CK': 'CK',
+  'LDL': 'LDL', 'HDL': 'HDL', 'VLDL': 'VLDL', 'LH': 'LH', 'FSH': 'FSH',
+  'SHBG': 'SHBG', 'DHT': 'DHT', 'TSH': 'TSH',
+  'ALT': 'ALT', 'AST': 'AST', 'GGT': 'GGT', 'RBC': 'RBC', 'WBC': 'WBC',
+};
+
+/** Имя маркера бланка по коду в любом написании; null — это не наш маркер. */
+export function sliceMarkerFor(code: string): string | null {
+  const raw = String(code || '').trim();
+  if (!raw) return null;
+  const direct = MARKER_BY_NAME[raw.toLowerCase()];
+  if (direct) return direct;
+  const norm = raw.toUpperCase().replace(/[\s-]+/g, '_');
+  const byTable = LAB_CODE_TO_MARKER[norm];
+  if (byTable) return byTable;
+  // Свободное или русское название («Эстрадиол», «гемоглобин») — через общий
+  // резолвер бланков; он же отсекает мусор, возвращая незнакомое как есть.
+  const resolved = resolveLabMarker(raw);
+  if (resolved && resolved !== norm) {
+    return MARKER_BY_NAME[resolved.toLowerCase()] ?? LAB_CODE_TO_MARKER[resolved] ?? null;
+  }
+  return null;
+}
+
+/**
+ * Единица бланка → `slice.units` (проход 111), если её вообще можно выбрать
+ * в форме. Иначе значение читалось бы по величине, хотя единица была в данных:
+ * пролактин 15 нг/мл из дневника превращался в 15 мМЕ/л, эстрадиол 1800 пмоль/л
+ * — в 1800 пг/мл. Незнакомая единица не выдумывается и не подменяется.
+ */
+function putMarkerUnit(slice: LabSlice, panel: string, marker: string, unit?: string) {
+  if (!unit) return;
+  const choices = LAB_UNIT_CHOICES[marker];
+  if (!choices) return;
+  const key = labUnitKey(unit);
+  if (!key || !choices.includes(key)) return;
+  const units = slice.units || (slice.units = {});
+  const bucket = units[panel] || (units[panel] = {});
+  bucket[marker] = key;
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Конвертация из LabPoint[] → LabSlice
 //  Принимает: LabPoint[], массив {code,value,unit,date}, LabDiaryEntry[]
 // ═══════════════════════════════════════════════════════════════
@@ -114,31 +235,43 @@ export function labPointsToSlice(input: any): LabSlice | null {
   };
   let count = 0;
 
-  // ── Case 1: массив LabPoint [{code, value, ...}] ──
+  // Проход 111: код → имя маркера бланка, панель — по имени маркера. Код,
+  // который не наш, просто пропускается (как и раньше), но пустое значение
+  // больше не считается «импортированным»: раньше счётчик врал, и бланк с
+  // нераспознанными кодами возвращался как заполненный.
+  const put = (rawCode: string, rawVal: any, unit?: string, valueStr?: string): boolean => {
+    const marker = sliceMarkerFor(rawCode);
+    if (!marker) return false;
+    // Моча приходит отдельными кодами (`GLUCOSE_URINE`, `URINE_PROTEIN`): у неё
+    // свои поля, иначе глюкоза мочи заняла бы место кровяной.
+    const isUrine = /(^|[_\s-])(URINE|МОЧА?|MOCH)/i.test(rawCode);
+    const panel = isUrine ? 'panelUrinalysis' : MARKER_TO_PANEL[marker.toLowerCase()];
+    if (!panel) return false;
+    const val = rawVal != null && rawVal !== '' ? String(rawVal) : '';
+    const text = val || (valueStr != null ? String(valueStr) : '');
+    if (!text) return false;
+    (slice[panel] as Record<string, string>)[marker] = text;
+    putMarkerUnit(slice, panel, marker, unit);
+    return true;
+  };
+
+  // ── Case 1: массив LabPoint [{code, value, unit, ...}] ──
   if (Array.isArray(input)) {
     for (const lp of input) {
       if (!lp || typeof lp !== 'object') continue;
       const code = String(lp.code || lp.name || lp.marker || '').trim();
       if (!code) continue;
-      const panel = MARKER_TO_PANEL[code.toLowerCase()];
-      if (!panel) continue;
-      const val = lp.value != null ? String(lp.value) : '';
-      if (!val && lp.valueStr) (slice[panel] as Record<string, string>)[code] = lp.valueStr;
-      else (slice[panel] as Record<string, string>)[code] = val;
-      if (lp.date && !slice.date) slice.date = lp.date;
-      count++;
+      if (put(code, lp.value, lp.unit, lp.valueStr)) count++;
+      if (lp.date && !slice.date) slice.date = String(lp.date);
     }
   }
-  // ── Case 2: LabDiaryEntry {markers: [{code, value, ...}]} ──
+  // ── Case 2: LabDiaryEntry {markers: [{code, value, unit, ...}]} ──
   else if (input.markers && Array.isArray(input.markers)) {
     if (input.date) slice.date = String(input.date);
     for (const m of input.markers) {
       const code = String(m.code || m.name || '').trim();
       if (!code) continue;
-      const panel = MARKER_TO_PANEL[code.toLowerCase()];
-      if (!panel) continue;
-      (slice[panel] as Record<string, string>)[code] = String(m.value ?? '');
-      count++;
+      if (put(code, m.value, m.unit)) count++;
     }
   }
   // ── Case 3: уже LabSlice {panelBiochem: {...}, ...} ──
@@ -148,10 +281,7 @@ export function labPointsToSlice(input: any): LabSlice | null {
   // ── Case 4: plain record {ALT: '40', AST: '35', ...} ──
   else if (typeof input === 'object') {
     for (const [k, v] of Object.entries(input)) {
-      const panel = MARKER_TO_PANEL[k.toLowerCase()];
-      if (!panel) continue;
-      (slice[panel] as Record<string, string>)[k] = String(v ?? '');
-      count++;
+      if (put(k, v)) count++;
     }
   }
 
