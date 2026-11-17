@@ -1141,8 +1141,9 @@ function extractLabValues(
   if (num(s.Progesterone) !== undefined) v['PROG'] = readHormone('Progesterone', 'panelSex', num(s.Progesterone)!);
 
   // panelThyroid доп: T3 free, T4 free, Anti-TPO
-  if (num(th['T3 free']) !== undefined) v['T3'] = num(th['T3 free'])!;
-  if (num(th['T4 free']) !== undefined) v['T4'] = num(th['T4 free'])!;
+  // Проход 120: Т3/Т4 читаются по единице бланка (пг/мл против пмоль/л).
+  if (num(th['T3 free']) !== undefined) v['T3'] = readHormone('T3 free', 'panelThyroid', num(th['T3 free'])!);
+  if (num(th['T4 free']) !== undefined) v['T4'] = readHormone('T4 free', 'panelThyroid', num(th['T4 free'])!);
   if (num(th['Anti-TPO']) !== undefined) v['ANTI_TPO'] = num(th['Anti-TPO'])!;
 
   // eGFR: CKD-EPI 2021 (race-free) — учитывает пол, но не возраст при отсутствии возраста.

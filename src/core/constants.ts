@@ -726,6 +726,9 @@ export const PROG_NG_TO_NMOL = 3.18;     // 1 ng/mL = 3.18 nmol/L
 // Проход 119: свободный тестостерон дают и в пг/мл, и в пмоль/л (РФ чаще пмоль/л).
 // Множитель — тот же, что в конвертере импорта: 1000 / M(288.42 г/моль).
 export const FT_PG_TO_PMOL = 3.4672;     // 1 pg/mL = 3.4672 pmol/L
+// Проход 120: свободные Т3/Т4 бланки дают и в пмоль/л, и в пг/мл (разница ~1.3–1.5).
+export const FT3_PG_TO_PMOL = 1.536;     // 1 pg/mL = 1.536 pmol/L (M = 650.97)
+export const FT4_PG_TO_PMOL = 1.2872;    // 1 pg/mL = 1.2872 pmol/L (M = 776.87)
 export const TT_NMOL_TO_NG_DL = 28.84;   // 1 nmol/L = 28.84 ng/dL
 export const CORTISOL_UG_DL_TO_NMOL = 27.59;
 export const DHEAS_UMOL_TO_UG_DL = 36.9;
@@ -807,6 +810,8 @@ export const LAB_READ_UNIT: Record<string, string> = {
   'Progesterone': 'нг/мл',
   // Проход 119: свободный тестостерон (пг/мл против пмоль/л, разница 3.47).
   'Free T': 'пг/мл',
+  // Проход 120: свободные Т3/Т4 — канон приложения пмоль/л (нормы 3.5–6.5 и 9–22).
+  'T3 free': 'пмоль/л', 'T4 free': 'пмоль/л',
 };
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
@@ -818,6 +823,8 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'DHEA-S': ['мкг/дл', 'мкмоль/л'],
   'Progesterone': ['нг/мл', 'нмоль/л'],
   'Free T': ['пг/мл', 'пмоль/л'],
+  'T3 free': ['пмоль/л', 'пг/мл'],
+  'T4 free': ['пмоль/л', 'пг/мл'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -875,6 +882,9 @@ export function readLabValue(
       case 'Progesterone': return { value: Math.round(rawValue / PROG_NG_TO_NMOL * 10) / 10, guessed: false };
       // Проход 119: 30 пмоль/л свободного тестостерона — это 8.7 пг/мл.
       case 'Free T': return { value: Math.round(rawValue / FT_PG_TO_PMOL * 10) / 10, guessed: false };
+      // Проход 120: канон Т3/Т4 — пмоль/л, поэтому пг/мл умножаем, а не делим.
+      case 'T3 free': return { value: Math.round(rawValue * FT3_PG_TO_PMOL * 10) / 10, guessed: false };
+      case 'T4 free': return { value: Math.round(rawValue * FT4_PG_TO_PMOL * 10) / 10, guessed: false };
     }
     return { value: rawValue, guessed: false };
   }

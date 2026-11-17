@@ -77,9 +77,9 @@ describe('проход 106: readLabValue — единица есть, догад
 
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
-    // проход 118: прогестерон; проход 119: свободный тестостерон — в обоих случаях
-    // единицы расходятся в 3+ раза, и догадка по величине тут не работает
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T']);
+    // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4 —
+    // в каждом случае единицы расходятся в 1.3+ раза, и догадка по величине не работает
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -428,5 +428,37 @@ describe('проход 119: свободный тестостерон читае
   it('движок берёт свободный тест через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['FT'] = readHormone('Free T', 'panelSex'");
+  });
+});
+
+/**
+ * Проход 120: свободные Т3/Т4. Нормы приложения — в пмоль/л (Т3 3.5–6.5,
+ * Т4 9–22), а бланк может дать пг/мл. 3.2 пг/мл свободного Т4 — это 4.1 пмоль/л
+ * (тяжёлый гипотиреоз), а читалось как 3.2 пмоль/л — «почти норма».
+ */
+describe('проход 120: свободные Т3/Т4 читаются по единице бланка', () => {
+  it('пг/мл приводится к пмоль/л', () => {
+    const t3 = readLabValue('T3 free', 3.2, 'пг/мл');
+    expect(t3.guessed).toBe(false);
+    expect(t3.value).toBe(4.9);
+    const t4 = readLabValue('T4 free', 1.2, 'пг/мл');
+    expect(t4.guessed).toBe(false);
+    expect(t4.value).toBe(1.5);
+  });
+
+  it('пмоль/л остаётся как есть', () => {
+    expect(readLabValue('T3 free', 4.9, 'пмоль/л')).toEqual({ value: 4.9, guessed: false });
+    expect(readLabValue('T4 free', 15, 'пмоль/л')).toEqual({ value: 15, guessed: false });
+  });
+
+  it('пересчёт совпадает с конвертером импорта', () => {
+    const fromImport = normalizeLabMeasurement('FT4', 1.2, 'pg/mL');
+    expect(readLabValue('T4 free', 1.2, 'пг/мл').value).toBeCloseTo(fromImport.value, 0);
+  });
+
+  it('движок берёт Т3/Т4 через чтение с единицей', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['T3'] = readHormone('T3 free', 'panelThyroid'");
+    expect(src).toContain("v['T4'] = readHormone('T4 free', 'panelThyroid'");
   });
 });
