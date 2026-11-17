@@ -1098,7 +1098,8 @@ function extractLabValues(
 
   // panelVitamin: B12, Folate, Vitamin D (25-OH)
   const vit = (fp.panelVitamin || {}) as Record<string, any>;
-  if (num(vit['Vitamin D (25-OH)']) !== undefined) v['VITD'] = num(vit['Vitamin D (25-OH)'])!;
+  // Проход 121: витамин D читается по единице бланка (нг/мл против нмоль/л, 2.5).
+  if (num(vit['Vitamin D (25-OH)']) !== undefined) v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin', num(vit['Vitamin D (25-OH)'])!);
   if (num(vit.B12) !== undefined) v['B12'] = num(vit.B12)!;
   if (num(vit.Folate) !== undefined) v['FOLATE'] = num(vit.Folate)!;
 

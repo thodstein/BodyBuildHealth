@@ -729,6 +729,9 @@ export const FT_PG_TO_PMOL = 3.4672;     // 1 pg/mL = 3.4672 pmol/L
 // Проход 120: свободные Т3/Т4 бланки дают и в пмоль/л, и в пг/мл (разница ~1.3–1.5).
 export const FT3_PG_TO_PMOL = 1.536;     // 1 pg/mL = 1.536 pmol/L (M = 650.97)
 export const FT4_PG_TO_PMOL = 1.2872;    // 1 pg/mL = 1.2872 pmol/L (M = 776.87)
+// Проход 121: витамин D дают и в нг/мл, и в нмоль/л (разница 2.5). Канон — нг/мл,
+// как в нормах приложения (30–100).
+export const VITD_NG_TO_NMOL = 2.496;    // 1 ng/mL = 2.496 nmol/L (M = 400.64)
 export const TT_NMOL_TO_NG_DL = 28.84;   // 1 nmol/L = 28.84 ng/dL
 export const CORTISOL_UG_DL_TO_NMOL = 27.59;
 export const DHEAS_UMOL_TO_UG_DL = 36.9;
@@ -812,6 +815,8 @@ export const LAB_READ_UNIT: Record<string, string> = {
   'Free T': 'пг/мл',
   // Проход 120: свободные Т3/Т4 — канон приложения пмоль/л (нормы 3.5–6.5 и 9–22).
   'T3 free': 'пмоль/л', 'T4 free': 'пмоль/л',
+  // Проход 121: витамин D — канон нг/мл (нормы приложения 30–100).
+  'Vitamin D (25-OH)': 'нг/мл',
 };
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
@@ -825,6 +830,7 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'Free T': ['пг/мл', 'пмоль/л'],
   'T3 free': ['пмоль/л', 'пг/мл'],
   'T4 free': ['пмоль/л', 'пг/мл'],
+  'Vitamin D (25-OH)': ['нг/мл', 'нмоль/л'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -885,6 +891,9 @@ export function readLabValue(
       // Проход 120: канон Т3/Т4 — пмоль/л, поэтому пг/мл умножаем, а не делим.
       case 'T3 free': return { value: Math.round(rawValue * FT3_PG_TO_PMOL * 10) / 10, guessed: false };
       case 'T4 free': return { value: Math.round(rawValue * FT4_PG_TO_PMOL * 10) / 10, guessed: false };
+      // Проход 121: 62 нмоль/л витамина D — это 24.8 нг/мл, то есть дефицит,
+      // а не 62 нг/мл (которое читалось бы как «выше нормы»).
+      case 'Vitamin D (25-OH)': return { value: Math.round(rawValue / VITD_NG_TO_NMOL * 10) / 10, guessed: false };
     }
     return { value: rawValue, guessed: false };
   }

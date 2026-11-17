@@ -107,8 +107,13 @@ describe('проход 112: единица импорта приводится �
     expect(Number(point('CRP', 0.5, 'mg/dL')!.panelBiochem!.CRP)).toBeCloseTo(5, 2);
   });
 
-  it('витамин D из нмоль/л и железо из мкг/дл', () => {
-    expect(Number(point('VITD', 62, 'nmol/L')!.panelVitamin!['Vitamin D (25-OH)'])).toBeCloseTo(24.84, 1);
+  it('витамин D остаётся в единице бланка: пересчёт делает чтение', () => {
+    // проход 121: у витамина D появился выбор единицы, поэтому импорт не
+    // пересчитывает число, а несёт единицу бланка (как у гормонов): 62 нмоль/л
+    // прочитается как 24.8 нг/мл.
+    const d = point('VITD', 62, 'nmol/L')!;
+    expect(Number(d.panelVitamin!['Vitamin D (25-OH)'])).toBe(62);
+    expect(d.units!.panelVitamin!['Vitamin D (25-OH)']).toBe('нмоль/л');
     expect(Number(point('IRON', 80, 'ug/dL')!.panelIron!.Iron)).toBeCloseTo(14.33, 1);
   });
 
@@ -150,7 +155,6 @@ describe('проход 114: подсказка единицы в форме', ()
     expect(labUnitHint('Creatinine')).toBe('мкмоль/л');
     expect(labUnitHint('Glucose')).toBe('ммоль/л');
     expect(labUnitHint('LDL')).toBe('ммоль/л');
-    expect(labUnitHint('Vitamin D (25-OH)')).toBe('нг/мл');
     expect(labUnitHint('Platelets')).toBe('10⁹/л');
   });
 

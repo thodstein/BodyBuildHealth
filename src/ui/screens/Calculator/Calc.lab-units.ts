@@ -28,7 +28,7 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'TSH': 'TSH', 'Anti-TPO': 'TPO_AB', 'Anti-TG': 'TG_AB',
   // ── железо, витамины ──
   'Iron': 'IRON', 'TIBC': 'TIBC', 'Transferrin': 'TRANSFERRIN', 'Ferritin': 'FERRITIN',
-  'Vitamin D (25-OH)': 'VITD', 'B12': 'B12', 'Folate': 'FOL',
+  'B12': 'B12', 'Folate': 'FOL',
   // ── электролиты ──
   'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K',
   // ── свёртывание, сердце, опухолевые маркеры ──

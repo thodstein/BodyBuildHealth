@@ -77,9 +77,9 @@ describe('проход 106: readLabValue — единица есть, догад
 
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
-    // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4 —
-    // в каждом случае единицы расходятся в 1.3+ раза, и догадка по величине не работает
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free']);
+    // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
+    // 121: витамин D — в каждом случае единицы расходятся, и догадка по величине не работает
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -460,5 +460,32 @@ describe('проход 120: свободные Т3/Т4 читаются по е�
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['T3'] = readHormone('T3 free', 'panelThyroid'");
     expect(src).toContain("v['T4'] = readHormone('T4 free', 'panelThyroid'");
+  });
+});
+
+/**
+ * Проход 121: витамин D. Канон приложения — нг/мл (нормы 30–100), а российские
+ * бланки чаще дают нмоль/л. 62 нмоль/л — это 24.8 нг/мл, то есть дефицит; как
+ * 62 нг/мл то же число выглядело бы «выше нормы», и дефицит исчезал.
+ */
+describe('проход 121: витамин D читается по единице бланка', () => {
+  it('нмоль/л приводится к нг/мл, догадки нет', () => {
+    const r = readLabValue('Vitamin D (25-OH)', 62, 'нмоль/л');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(24.8);
+  });
+
+  it('нг/мл остаётся как есть', () => {
+    expect(readLabValue('Vitamin D (25-OH)', 24.8, 'нг/мл')).toEqual({ value: 24.8, guessed: false });
+  });
+
+  it('пересчёт совпадает с конвертером импорта', () => {
+    const fromImport = normalizeLabMeasurement('VITD', 62, 'nmol/L');
+    expect(readLabValue('Vitamin D (25-OH)', 62, 'нмоль/л').value).toBeCloseTo(fromImport.value, 0);
+  });
+
+  it('движок берёт витамин D через чтение с единицей', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin'");
   });
 });
