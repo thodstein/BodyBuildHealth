@@ -96,6 +96,25 @@ function UnitPicker({ panel, marker, slice, onChange }: {
   );
 }
 
+/**
+ * Запись значения маркера (проход 117). Единица — часть данных о числе, а не
+ * настройка поля. Если человек очистил значение, оставленная единица начнёт
+ * пересчитывать следующее число, вписанное из другого бланка: 1800 пмоль/л →
+ * очистка → 500 (это уже пг/мл) читалось бы как 500 пмоль/л, то есть 136 пг/мл.
+ * Поэтому пустое значение уносит с собой и свою единицу.
+ */
+export function withLabValue(slice: LabSlice, panel: string, marker: string, value: string): LabSlice {
+  const anySlice = slice as any;
+  const next: any = { ...anySlice, [panel]: { ...(anySlice[panel] || {}), [marker]: value } };
+  if (value !== '') return next as LabSlice;
+  const bucket = anySlice.units?.[panel];
+  if (!bucket || bucket[marker] === undefined) return next as LabSlice;
+  const rest = { ...bucket };
+  delete rest[marker];
+  next.units = { ...(anySlice.units || {}), [panel]: rest };
+  return next as LabSlice;
+}
+
 export function LabSliceInput({ label, slice, onChange }: { label: string; slice: LabSlice | null; onChange: (v: any) => void; fullSpectrum?: boolean }) {
   return <div className="calc-labslice" style={{ marginBottom: 6 }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -124,7 +143,7 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['LH','FSH','Total T','Free T','E2','Prolactin','SHBG','DHT','Progesterone','Cortisol'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelSex?.[m] || ''} onChange={e => onChange({ ...slice, panelSex: { ...slice.panelSex, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelSex?.[m] || ''} onChange={e => onChange(withLabValue(slice, 'panelSex', m, e.target.value))} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
             <UnitPicker panel="panelSex" marker={m} slice={slice} onChange={onChange} />
           </div>)}
       </div>
@@ -132,21 +151,21 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['ALT','AST','GGT','Bilirubin','Glucose','Creatinine','Urea','Uric acid','CRP','Homocysteine'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelBiochem?.[m] || ''} onChange={e => onChange({ ...slice, panelBiochem: { ...slice.panelBiochem, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelBiochem?.[m] || ''} onChange={e => onChange(withLabValue(slice, 'panelBiochem', m, e.target.value))} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#fbbf24', marginBottom: 2 }}>Гематология</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
         {['HCT','Hemoglobin','RBC','WBC','Platelets','Neutrophils','Lymphocytes'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelHematology?.[m] || ''} onChange={e => onChange({ ...slice, panelHematology: { ...slice.panelHematology, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelHematology?.[m] || ''} onChange={e => onChange(withLabValue(slice, 'panelHematology', m, e.target.value))} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
       <div style={{ fontSize: 8, fontWeight: 600, color: '#a855f7', marginBottom: 2 }}>Тиреоидные</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
         {['TSH','T3 free','T4 free','Anti-TPO','Anti-TG'].map(m =>
           <div key={m}><span style={{ fontSize: 7, color: 'var(--text-dim)' }}>{ruMarker(m)}</span>
-            <input value={slice.panelThyroid?.[m] || ''} onChange={e => onChange({ ...slice, panelThyroid: { ...slice.panelThyroid, [m]: e.target.value } })} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
+            <input value={slice.panelThyroid?.[m] || ''} onChange={e => onChange(withLabValue(slice, 'panelThyroid', m, e.target.value))} placeholder={labUnitHint(m)} style={{ ...INPUT, padding: '3px 6px', fontSize: 9 }} />
           </div>)}
       </div>
     </>}
@@ -156,8 +175,9 @@ export function LabSliceInput({ label, slice, onChange }: { label: string; slice
 export function FullLabInput({ values, onChange }: { values: LabSlice | null; onChange: (v: LabSlice) => void }) {
   const s = values || { date:'', panelSex:{}, panelBiochem:{}, panelHematology:{}, panelThyroid:{}, panelLipid:{}, panelIron:{}, panelVitamin:{}, panelCardiac:{}, panelCoagulation:{}, panelInflammatory:{}, panelAdrenal:{}, panelMineral:{}, panelTumor:{}, panelUrinalysis:{} };
   const upd = (panel: keyof LabSlice, marker: string, val: string) => {
-    const pv = s[panel] as Record<string,string> || {};
-    onChange({ ...s, [panel]: { ...pv, [marker]: val } });
+    // Проход 117: пустая ячейка уносит свою единицу — иначе следующее число,
+    // вписанное из другого бланка, прочитается по чужой единице.
+    onChange(withLabValue(s, String(panel), marker, val));
   };
   return <div className="calc-fulllab">
     {FULL_PANELS.map(pan => <div key={pan.key} style={{ marginBottom:6 }}>
