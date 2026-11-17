@@ -1131,7 +1131,9 @@ function extractLabValues(
   if (num(h.WBC) !== undefined) v['WBC'] = num(h.WBC)!;
 
   // panelSex доп: Free T, DHT, Progesterone
-  if (num(s['Free T']) !== undefined) v['FT'] = num(s['Free T'])!;
+  // Проход 119: свободный тестостерон тоже читается по единице бланка —
+  // 30 пмоль/л иначе попадали в движок как 30 пг/мл (втрое выше реального).
+  if (num(s['Free T']) !== undefined) v['FT'] = readHormone('Free T', 'panelSex', num(s['Free T'])!);
   if (num(s.DHT) !== undefined) v['DHT'] = num(s.DHT)!;
   // Проход 118: прогестерон читается по единице бланка, как E2/PRL/TT.
   // Раньше 60 нмоль/л попадали в движок как 60 нг/мл — уровень, при котором

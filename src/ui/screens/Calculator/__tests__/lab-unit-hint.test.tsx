@@ -50,5 +50,10 @@ describe('проход 114: единица стоит подсказкой в п
     const prog = container.querySelector('select[aria-label="Единица: Прогестерон"]') as HTMLSelectElement;
     expect(prog, 'у прогестерона должен быть выбор единицы').toBeTruthy();
     expect(Array.from(prog.options).map(o => o.value)).toEqual(['', 'нг/мл', 'нмоль/л']);
+    // проход 119: свободный тестостерон — тем же путём
+    expect(labUnitHint('Free T')).toBeUndefined();
+    const ft = container.querySelector('select[aria-label="Единица: Своб. тестостерон"]') as HTMLSelectElement;
+    expect(ft, 'у свободного тестостерона должен быть выбор единицы').toBeTruthy();
+    expect(Array.from(ft.options).map(o => o.value)).toEqual(['', 'пг/мл', 'пмоль/л']);
   });
 });

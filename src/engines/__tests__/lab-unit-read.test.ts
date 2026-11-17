@@ -18,6 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES } from '../../core/constants';
+import { normalizeLabMeasurement } from '../../core/labs-mapping';
 import { evaluateRecommendations } from '../../engines/recommendation-engine';
 import { buildLabFindings } from '../support-plan/display';
 import { normalizeCalculatorState } from '../../ui/screens/Calculator/Calc.types';
@@ -76,8 +77,9 @@ describe('проход 106: readLabValue — единица есть, догад
 
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
-    // проход 118: прогестерон добавлен — нг/мл и нмоль/л расходятся в 3.18 раза
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone']);
+    // проход 118: прогестерон; проход 119: свободный тестостерон — в обоих случаях
+    // единицы расходятся в 3+ раза, и догадка по величине тут не работает
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -390,5 +392,41 @@ describe('проход 118: прогестерон читается по еди�
   it('движок берёт прогестерон через чтение с единицей, а не сырым числом', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['PROG'] = readHormone('Progesterone', 'panelSex'");
+  });
+});
+
+/**
+ * Проход 119: свободный тестостерон — та же ловушка, что у прогестерона.
+ * Лаборатории дают его в пмоль/л и в пг/мл (разница 3.47). Пока единицы не
+ * было, 30 пмоль/л входили в движок как 30 пг/мл — «высокий свободный тест» и
+ * ложный повод снижать дозу.
+ */
+describe('проход 119: свободный тестостерон читается по единице бланка', () => {
+  it('пмоль/л приводится к пг/мл, догадки нет', () => {
+    const r = readLabValue('Free T', 30, 'пмоль/л');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(8.7);
+  });
+
+  it('пг/мл остаётся как есть', () => {
+    const r = readLabValue('Free T', 8.7, 'пг/мл');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(8.7);
+  });
+
+  it('без единицы число не меняется и помечается догадкой', () => {
+    const r = readLabValue('Free T', 30);
+    expect(r.guessed).toBe(true);
+    expect(r.value).toBe(30);
+  });
+
+  it('пересчёт совпадает с конвертером импорта', () => {
+    const fromImport = normalizeLabMeasurement('FT', 30, 'pmol/L');
+    expect(readLabValue('Free T', 30, 'пмоль/л').value).toBeCloseTo(fromImport.value, 0);
+  });
+
+  it('движок берёт свободный тест через чтение с единицей', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['FT'] = readHormone('Free T', 'panelSex'");
   });
 });

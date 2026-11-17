@@ -723,6 +723,9 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
 export const E2_PG_TO_PMOL = 3.671;      // 1 pg/mL = 3.671 pmol/L
 export const PRL_NG_TO_MIU = 21.2;       // 1 ng/mL = 21.2 mIU/L
 export const PROG_NG_TO_NMOL = 3.18;     // 1 ng/mL = 3.18 nmol/L
+// Проход 119: свободный тестостерон дают и в пг/мл, и в пмоль/л (РФ чаще пмоль/л).
+// Множитель — тот же, что в конвертере импорта: 1000 / M(288.42 г/моль).
+export const FT_PG_TO_PMOL = 3.4672;     // 1 pg/mL = 3.4672 pmol/L
 export const TT_NMOL_TO_NG_DL = 28.84;   // 1 nmol/L = 28.84 ng/dL
 export const CORTISOL_UG_DL_TO_NMOL = 27.59;
 export const DHEAS_UMOL_TO_UG_DL = 36.9;
@@ -802,6 +805,8 @@ export const LAB_READ_UNIT: Record<string, string> = {
   // разница 3.18). Без единицы не угадываем: 5 нг/мл и 5 нмоль/л — разные
   // клинические картины (лютеиновая норма против ановуляции).
   'Progesterone': 'нг/мл',
+  // Проход 119: свободный тестостерон (пг/мл против пмоль/л, разница 3.47).
+  'Free T': 'пг/мл',
 };
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
@@ -812,6 +817,7 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'Cortisol': ['нмоль/л', 'мкг/дл'],
   'DHEA-S': ['мкг/дл', 'мкмоль/л'],
   'Progesterone': ['нг/мл', 'нмоль/л'],
+  'Free T': ['пг/мл', 'пмоль/л'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -867,6 +873,8 @@ export function readLabValue(
       case 'DHEA-S': return { value: Math.round(rawValue * DHEAS_UMOL_TO_UG_DL * 10) / 10, guessed: false };
       // Проход 118: 60 нмоль/л лютеиновой фазы — это 18.9 нг/мл, а не 60 нг/мл.
       case 'Progesterone': return { value: Math.round(rawValue / PROG_NG_TO_NMOL * 10) / 10, guessed: false };
+      // Проход 119: 30 пмоль/л свободного тестостерона — это 8.7 пг/мл.
+      case 'Free T': return { value: Math.round(rawValue / FT_PG_TO_PMOL * 10) / 10, guessed: false };
     }
     return { value: rawValue, guessed: false };
   }
