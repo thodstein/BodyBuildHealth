@@ -175,3 +175,58 @@ describe('проход 106: единица переживает сохранен
     expect(st.labs.fullPanel!.units).toBeUndefined();
   });
 });
+
+/**
+ * Проход 107: один анализ — один совет. В таблице `labRules` стояли правила для
+ * маркеров, у которых уже есть свой блок с тем же порогом и теми же веществами:
+ * АЛТ (гепатоблок), ферритин, гомоцистеин, СРБ, витамин D, B12, E2, пролактин,
+ * ДГЕА-С. Такие правила либо молча умирали (`addRec` отбрасывает рекомендацию, все
+ * вещества которой уже выданы), либо грозили вторым советом по одному анализу.
+ * Теперь в таблице только маркеры без блока; эти проверки держат инвариант живым
+ * прогоном движка, а не чтением исходника.
+ */
+describe('проход 107: один анализ — один совет', () => {
+  const recIds = (labs: Record<string, any>) =>
+    evaluateRecommendations(mkState('male', labs) as any, {} as any).map(r => r.id);
+
+  /** id, которые убраны из таблицы — они не должны появляться ни при каких числах. */
+  const REMOVED = /^lab_(ALT|Ferritin|Homocysteine|CRP|Vitamin D \(25-OH\)|B12|E2|Prolactin|DHEA-S)/;
+
+  const CASES: Array<[string, Record<string, any>, string]> = [
+    ['АЛТ 80 → гепатоблок', { panelBiochem: { ALT: '80' } }, 'hepatic'],
+    ['ферритин 400 → блок железа', { panelIron: { Ferritin: '400' }, panelBiochem: { ALT: '20' } }, 'lab_ferritin'],
+    ['гомоцистеин 20 → метилирование', { panelBiochem: { Homocysteine: '20' } }, 'lab_hcy'],
+    ['СРБ 8 → воспаление', { panelBiochem: { CRP: '8' } }, 'lab_crp'],
+    ['витамин D 20 → дефицит', { panelVitamin: { 'Vitamin D (25-OH)': '20' } }, 'lab_vitd'],
+    ['B12 150 → дефицит', { panelVitamin: { B12: '150' } }, 'lab_b12'],
+    ['E2 120 (мужчина) → ароматизация', { panelSex: { E2: '120' } }, 'estradiol'],
+    ['пролактин 50 (мужчина) → пролактин', { panelSex: { Prolactin: '50' } }, 'prolactin'],
+    ['ДГЕА-С 60 → надпочечники', { panelAdrenal: { 'DHEA-S': '60' } }, 'lab_dheas'],
+    ['АСТ 60 → таблица', { panelBiochem: { AST: '60' } }, 'lab_AST'],
+    ['ГГТ 80 → таблица', { panelBiochem: { GGT: '80' } }, 'lab_GGT'],
+    ['билирубин 30 → таблица', { panelBiochem: { Bilirubin: '30' } }, 'lab_Bilirubin'],
+    ['креатинин 120 → таблица', { panelBiochem: { Creatinine: '120' } }, 'lab_Creatinine'],
+    ['мочевина 10 → таблица', { panelBiochem: { Urea: '10' } }, 'lab_Urea'],
+    ['ТГ 2.5 → таблица', { panelLipid: { Triglycerides: '2.5' } }, 'lab_Triglycerides'],
+    ['ЛПВП 0.8 → таблица', { panelLipid: { HDL: '0.8' } }, 'lab_HDL'],
+    ['кортизол 700 → таблица', { panelSex: { Cortisol: '700' } }, 'lab_Cortisol'],
+    ['фибриноген 6 → таблица', { panelCoagulation: { Fibrinogen: '6' } }, 'lab_Fibrinogen'],
+    ['ТТГ 7 → таблица', { panelThyroid: { TSH: '7' } }, 'lab_TSH'],
+    ['ПСА 5 → таблица', { panelTumor: { 'PSA total': '5' } }, 'lab_PSA total'],
+  ];
+
+  it('каждый маркер даёт свой совет, а убранных дублей нет', () => {
+    for (const [name, labs, expectedId] of CASES) {
+      const ids = recIds(labs);
+      expect(ids, `${name}: нет ${expectedId} в ${ids.join(',')}`).toContain(expectedId);
+      expect(ids.filter(id => REMOVED.test(id)), `${name}: дубль правила таблицы`).toHaveLength(0);
+    }
+  });
+
+  it('в таблице `labRules` больше нет маркеров со своим блоком', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/recommendation-engine.ts'), 'utf8');
+    for (const marker of ['ALT', 'Ferritin', 'Homocysteine', 'CRP', 'Vitamin D (25-OH)', 'B12', 'E2', 'Prolactin', 'DHEA-S']) {
+      expect(src, `в labRules вернулся ${marker}`).not.toContain(`{ marker:'${marker}'`);
+    }
+  });
+});

@@ -611,33 +611,30 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       'CRP');
   }
 
-  // Проход 104: числа-цели (ниже ВГН) собраны в `SCREEN_TARGETS`, и рекомендация по
+    // Проход 104: числа-цели (ниже ВГН) собраны в `SCREEN_TARGETS`, и рекомендация по
   // ним печатается как «выше цели курса», а не как отклонение от границы. Билирубин
   // идёт от ВГН (`BILIRUBIN_FLAG_STEPS.mild` = 17.1), как флаг на обоих экранах.
+  // Проход 107: в таблице только те маркеры, у которых НЕТ своего блока выше. Раньше
+  // здесь стояли АЛТ, ферритин, гомоцистеин, СРБ, витамин D, B12, E2, пролактин и
+  // ДГЕА-С — у каждого уже есть блок с тем же порогом и теми же веществами, поэтому
+  // правило либо молча умирало (addRec отбрасывает рекомендацию, все вещества которой
+  // уже выданы), либо грозило вторым советом по одному анализу. Проверено живым
+  // прогоном: при повышенном маркере печатается ровно один совет — блока, не таблицы.
   const labRules: { marker: string; panels: (keyof LabSlice)[]; threshold: { higherIsWorse: boolean; value: number }; system: string; label: string; goal?: boolean }[] = [
-    { marker:'ALT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.ALT[sexT] }, system:'hepatic', label:'Печень', goal: true },
     { marker:'AST', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.AST[sexT] }, system:'hepatic', label:'Печень', goal: true },
     { marker:'GGT', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.GGT[sexT] }, system:'hepatic', label:'Печень', goal: true },
     { marker:'Bilirubin', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: BILIRUBIN_FLAG_STEPS.mild }, system:'hepatic', label:'Печень' },
     { marker:'Creatinine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.CREATININE[sexT] }, system:'renal', label:'Почки', goal: true },
     { marker:'Urea', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:8 }, system:'renal', label:'Почки' },
     { marker:'Glucose', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5.6 }, system:'metabolic', label:'Метаболизм' },
-    { marker:'Homocysteine', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:15 }, system:'', label:'Метилирование' },
     { marker:'LDL', panels:['panelLipid'], threshold:{ higherIsWorse:true, value:2.6 }, system:'cardio', label:'Липиды', goal: true },
     { marker:'Triglycerides', panels:['panelLipid'], threshold:{ higherIsWorse:true, value: TG_FLAG_STEPS.elevated }, system:'cardio', label:'Липиды' },
     { marker:'HDL', panels:['panelLipid'], threshold:{ higherIsWorse:false, value: HDL_LOW[sexT] }, system:'cardio', label:'Липиды', goal: true },
-    { marker:'CRP', panels:['panelBiochem'], threshold:{ higherIsWorse:true, value:5 }, system:'', label:'Воспаление' },
     { marker:'Cortisol', panels:['panelSex'], threshold:{ higherIsWorse:true, value:550 }, system:'neuro', label:'Стресс' },
     { marker:'D-dimer', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value: age > 50 ? age * 0.01 : 0.5 }, system:'hematologic', label:'Гемостаз' },
     { marker:'Fibrinogen', panels:['panelCoagulation'], threshold:{ higherIsWorse:true, value:4 }, system:'hematologic', label:'Гемостаз' },
-    { marker:'Ferritin', panels:['panelIron'], threshold:{ higherIsWorse:true, value: SCREEN_TARGETS.FERRITIN[sexT] }, system:'', label:'Железо', goal: true },
-    { marker:'Vitamin D (25-OH)', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:30 }, system:'endocrine', label:'Витамины' },
-    { marker:'B12', panels:['panelVitamin'], threshold:{ higherIsWorse:false, value:200 }, system:'', label:'Витамины' },
     { marker:'TSH', panels:['panelThyroid'], threshold:{ higherIsWorse:true, value:4.5 }, system:'endocrine', label:'Щитовидная' },
-    { marker:'E2', panels:['panelSex'], threshold:{ higherIsWorse:true, value:40 }, system:'endocrine', label:'Гормоны' },
-    { marker:'Prolactin', panels:['panelSex'], threshold:{ higherIsWorse:true, value:25 }, system:'endocrine', label:'Гормоны' },
     { marker:'PSA total', panels:['panelTumor'], threshold:{ higherIsWorse:true, value: age >= 70 ? 4.5 : age >= 60 ? 4.0 : age >= 50 ? 3.0 : 2.5 }, system:'', label:'Простата' },
-    { marker:'DHEA-S', panels:['panelAdrenal'], threshold:{ higherIsWorse:false, value: age < 30 ? 200 : age < 40 ? 150 : age < 50 ? 100 : 50 }, system:'endocrine', label:'Надпочечники' },
   ];
 
   // Track which markers already have recs from Phase 1 to avoid duplication

@@ -122,12 +122,14 @@ describe('проход 104: в тексте — то число, которое 
 describe('проход 104: источник порогов в движке', () => {
   const src = readFileSync(resolve(process.cwd(), 'src/engines/recommendation-engine.ts'), 'utf8');
 
-  it('таблица читает SCREEN_TARGETS и ВГН билирубина', () => {
-    expect(src).toContain('value: SCREEN_TARGETS.ALT[sexT]');
+  it('таблица и блоки читают SCREEN_TARGETS и ВГН билирубина', () => {
+    // Проход 107: АЛТ и ферритина в таблице больше нет — у них свои блоки, но пороги
+    // всё равно берутся из `SCREEN_TARGETS`, а не из литералов.
+    expect(src).toContain('SCREEN_TARGETS.ALT[sexT]');
     expect(src).toContain('value: SCREEN_TARGETS.AST[sexT]');
     expect(src).toContain('value: SCREEN_TARGETS.GGT[sexT]');
     expect(src).toContain('value: SCREEN_TARGETS.CREATININE[sexT]');
-    expect(src).toContain('value: SCREEN_TARGETS.FERRITIN[sexT]');
+    expect(src).toContain('SCREEN_TARGETS.FERRITIN[sexT]');
     expect(src).toContain('value: BILIRUBIN_FLAG_STEPS.mild');
     expect(src).toContain("rule.goal ? ' (цель курса)' : ''");
   });
