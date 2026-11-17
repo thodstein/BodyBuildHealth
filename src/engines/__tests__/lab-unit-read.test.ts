@@ -264,8 +264,8 @@ describe('проход 108: находка без новых веществ ос
 /**
  * Проход 109: тот же режим у блоков, а не только у таблицы. Блоки «Гепатотоксичность»,
  * гематокрит, эстрадиол, пролактин, витамин D, B12, ферритин, ДГЕА-С, гомоцистеин и СРБ
- * тоже молчали, если их вещества уже забрали другие блоки. Плюс cap находок: если их
- * больше двадцати, раньше отрезались последние по порядку движка — теперь самые мягкие.
+ * тоже молчали, если их вещества уже забрали другие блоки. Порядок находок — по тяжести
+ * (срез до двадцати снят в 113-м проходе).
  */
 describe('проход 109: находка из блока и порядок тяжести', () => {
   const SEV_W: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
@@ -279,7 +279,7 @@ describe('проход 109: находка из блока и порядок т�
     }
   });
 
-  it('тяжёлые находки идут первыми: при переполнении отрезаются мягкие', () => {
+  it('тяжёлые находки идут первыми', () => {
     const list = findings({
       panelBiochem: { ALT: '200' },
       panelHematology: { HCT: '58' },
@@ -289,5 +289,45 @@ describe('проход 109: находка из блока и порядок т�
     expect(list.length).toBeGreaterThan(3);
     const w = list.map(f => SEV_W[f.severity] ?? 5);
     expect([...w].sort((a, b) => a - b)).toEqual(w);
+  });
+});
+
+/**
+ * Проход 113: находки не режутся молча. Раньше `buildLabFindings` обрезал список
+ * до двадцати, а «всего N» в интерфейсе показывало уже обрезанное число: часть
+ * отклонений исчезала, и какие именно — решал порядок блоков в движке, а не
+ * тяжесть. Теперь список отдаётся целиком (сгруппировать по органам — дело UI).
+ */
+describe('проход 113: находки не режутся', () => {
+  const findings = (labs: Record<string, any>) =>
+    buildLabFindings(mkState('male', labs) as any, {} as any);
+
+  it('при большом бланке находок больше двадцати — никто не срезан', () => {
+    const list = findings({
+      panelBiochem: { ALT: '300', AST: '280', GGT: '400', Bilirubin: '80', Glucose: '7.5', Creatinine: '160', Urea: '14', 'Uric acid': '700', CRP: '25', Homocysteine: '35' },
+      panelHematology: { HCT: '58', Hemoglobin: '200', RBC: '6.6', WBC: '12', Platelets: '450' },
+      panelSex: { 'Total T': '60', 'Free T': '60', E2: '120', Prolactin: '40', SHBG: '90', DHT: '3000', Progesterone: '4', Cortisol: '900', LH: '0.1', FSH: '0.1' },
+      panelThyroid: { TSH: '9', 'T3 free': '9', 'T4 free': '30', 'Anti-TPO': '700' },
+      panelLipid: { LDL: '6', HDL: '0.5', Triglycerides: '5', 'Total Cholesterol': '9', ApoB: '2' },
+      panelIron: { Ferritin: '1200', Iron: '40', TIBC: '700', 'Transferrin Sat': '70' },
+      panelVitamin: { 'Vitamin D (25-OH)': '6', B12: '120', Folate: '1.5' },
+      panelCoagulation: { 'D-dimer': '3', Fibrinogen: '7' },
+      panelInflammatory: { hsCRP: '20', 'IL-6': '20', 'TNF-alpha': '40' },
+      panelAdrenal: { 'DHEA-S': '900', Aldosterone: '700', PTH: '900' },
+      panelMineral: { Calcium: '3.2', Potassium: '6', Sodium: '150', Magnesium: '0.5', Phosphorus: '2' },
+      panelTumor: { 'PSA total': '9' },
+      panelCardiac: { CK: '2000', 'CK-MB': '60', 'NT-proBNP': '900' },
+      panelUrinalysis: { Protein: '0.5' },
+    });
+    expect(list.length, 'список снова обрезан').toBeGreaterThan(20);
+    expect(list[0].severity).toBe('critical');
+  });
+
+  it('в display.ts нет молчаливых срезов находок, конфликтов и мониторинга', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/display.ts'), 'utf8');
+    expect(src).not.toContain('.slice(0, 20)');
+    expect(src).not.toContain('out.slice(0, 15)');
+    // остаток синергий и конфликтов называется словами, а не прячется
+    expect(src).toContain('…и ещё');
   });
 });

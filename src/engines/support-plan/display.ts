@@ -81,9 +81,13 @@ export function buildSynergyComment(ids: string[]): string {
     }
   }
   const parts: string[] = [];
-  if (syns.length > 0) parts.push(`Синергии (${syns.length}):\n${syns.slice(0, 15).join('\n')}`);
-  if (confs.length > 0) parts.push(`Конфликты (${confs.length}):\n${confs.slice(0, 10).join('\n')}`);
-  if (cauts.length > 0) parts.push(`Осторожности (${cauts.length}):\n${cauts.slice(0, 10).join('\n')}`);
+  // Проход 113: список не режется молча. Раньше печаталось «Синергии (25)», а под
+  // заголовком было 15 строк — число обещало больше, чем показывали. Теперь
+  // остаток называется словами.
+  const tail = (n: number, shown: number) => (n > shown ? `\n…и ещё ${n - shown}` : '');
+  if (syns.length > 0) parts.push(`Синергии (${syns.length}):\n${syns.slice(0, 15).join('\n')}${tail(syns.length, 15)}`);
+  if (confs.length > 0) parts.push(`Конфликты (${confs.length}):\n${confs.slice(0, 10).join('\n')}${tail(confs.length, 10)}`);
+  if (cauts.length > 0) parts.push(`Осторожности (${cauts.length}):\n${cauts.slice(0, 10).join('\n')}${tail(cauts.length, 10)}`);
   return parts.length > 0 ? parts.join('\n\n') : 'Синергии и конфликты не выявлены.';
 }
 
@@ -100,7 +104,9 @@ export function buildMonitoring(ids: string[]): string[] {
       }
     }
   }
-  return Array.from(set).slice(0, 20);
+  // Проход 113: без среза. Молчаливые 20 маркеров читались как «контролируйте
+  // только это», хотя в каталоге их больше.
+  return Array.from(set);
 }
 
 /** Особые указания по приёму (union из SUPPORT_CATALOG_DATA). */
@@ -115,7 +121,8 @@ export function buildSpecialInstructions(ids: string[]): string[] {
       }
     }
   }
-  return Array.from(set).slice(0, 20);
+  // Проход 113: без среза — по той же причине, что и мониторинг.
+  return Array.from(set);
 }
 
 /** Конфликты между выбранными веществами (из ALL_INTERACTIONS).
@@ -149,7 +156,9 @@ export function buildConflicts(
       }
     }
   }
-  return out.slice(0, 15);
+  // Проход 113: без среза — конфликт, не попавший в первые пятнадцать, всё равно
+  // остаётся конфликтом, и прятать его нельзя.
+  return out;
 }
 
 /** Осторожности между выбранными веществами (из ALL_INTERACTIONS). */
@@ -175,7 +184,10 @@ export function buildCautions(
       }
     }
   }
-  return out.slice(0, 15);
+  // Проход 113: без среза. Раньше осторожность за пределами пятнадцати
+  // исчезала и из списка, и из счёта синергии стека — то есть штраф за неё
+  // тоже пропадал.
+  return out;
 }
 
 /**
@@ -345,16 +357,16 @@ export function buildLabFindings(
       });
     }
   } catch {}
-  // Проход 109: находок может быть больше двадцати (пустые находки тоже считаются).
-  // Раньше cap отрезал «как пришло», то есть последними в списке, — и критичная
-  // находка могла исчезнуть из-за порядка блоков в движке. Теперь при переполнении
-  // отрезаются самые мягкие, а внутри одной тяжести порядок движка сохранён.
+  // Проход 113: среза больше нет. Раньше список обрезался до двадцати, и
+  // «всего N» в интерфейсе показывало обрезанное число — находки исчезали
+  // молча, а какие именно, решал порядок блоков в движке. Список и так
+  // сгруппирован по органам, поэтому честнее показать всё, отсортировав по
+  // тяжести: внутри одной тяжести порядок движка сохранён.
   const sevWeight: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
   return out
     .map((f, i) => ({ f, i }))
     .sort((a, b) => (sevWeight[a.f.severity] ?? 5) - (sevWeight[b.f.severity] ?? 5) || a.i - b.i)
-    .map(x => x.f)
-    .slice(0, 20);
+    .map(x => x.f);
 }
 
 /**
