@@ -320,11 +320,13 @@ export function suggestSynergyAdditions(
  *  мониторингом и эскалацией) — без схлопывания в одну строку. */
 export function buildLabFindings(
   state: CalculatorState,
-  tzRes: CalculatorResult
+  tzRes: CalculatorResult,
+  evaluate: (s: CalculatorState, r: CalculatorResult, w?: number) => any[] = evaluateRecommendations,
 ): LabFinding[] {
   const out: LabFinding[] = [];
+  let failed: string | null = null;
   try {
-    const recs = evaluateRecommendations(state, tzRes, state.courseWeek);
+    const recs = evaluate(state, tzRes, state.courseWeek);
     const seen = new Set<string>();
     for (const rec of recs) {
       // Проход 108: находка без веществ — это не мусор, а анализ, по которому поддержка
@@ -356,7 +358,26 @@ export function buildLabFindings(
         conflicts: rec.conflicts || [],
       });
     }
-  } catch {}
+  } catch (e) {
+    // Проход 115: исключение в движке нельзя оставлять без следа. Раньше оно
+    // глушилось, список получался пустым, секция находок не показывалась — и
+    // ошибка выглядела как «отклонений нет».
+    failed = e instanceof Error ? e.message : String(e);
+  }
+  if (failed) {
+    out.push({
+      id: '__lab_analysis_failed',
+      severity: 'low',
+      system: 'other',
+      systemLabel: 'Разбор анализов',
+      title: 'Разбор анализов не завершился',
+      status: 'blocked',
+      substances: [],
+      escalation: `Разбор анализов прерван ошибкой (${failed}). Часть отклонений не показана — это не значит, что их нет.`,
+      monitoring: '',
+      conflicts: [],
+    });
+  }
   // Проход 113: среза больше нет. Раньше список обрезался до двадцати, и
   // «всего N» в интерфейсе показывало обрезанное число — находки исчезали
   // молча, а какие именно, решал порядок блоков в движке. Список и так

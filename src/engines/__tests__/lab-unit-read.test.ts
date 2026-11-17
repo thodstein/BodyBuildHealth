@@ -331,3 +331,28 @@ describe('проход 113: находки не режутся', () => {
     expect(src).toContain('…и ещё');
   });
 });
+
+/**
+ * Проход 115: исключение в движке не выглядит как «отклонений нет». Раньше
+ * `buildLabFindings` глушил любую ошибку (`catch {}`), возвращал пустой список,
+ * и секция находок просто не показывалась — ошибка читалась как чистая картина.
+ */
+describe('проход 115: ошибка разбора анализов видна', () => {
+  it('исключение движка даёт находку, а не пустой список', () => {
+    const list = buildLabFindings(
+      mkState('male', {}) as any,
+      {} as any,
+      () => { throw new Error('boom'); },
+    );
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe('__lab_analysis_failed');
+    expect(list[0].severity).toBe('low');
+    expect(list[0].escalation).toContain('не значит');
+    expect(list[0].escalation).toContain('boom');
+  });
+
+  it('без ошибки лишней находки нет', () => {
+    const list = buildLabFindings(mkState('male', { ALT: '45' }) as any, {} as any);
+    expect(list.every(f => f.id !== '__lab_analysis_failed')).toBe(true);
+  });
+});
