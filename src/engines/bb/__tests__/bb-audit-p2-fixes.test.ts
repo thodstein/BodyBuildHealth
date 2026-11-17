@@ -17,6 +17,8 @@
  * - P2-7 (ядро): auto-MEV-feeder считает разрыв до MEV по каждой неделе и не перебирает цель.
  * - P2-9 (ядро): лабораторные предупреждения и заметка по интенсивности попадают в rationale
  *   и без снижения MRV (раньше выводились только при `labMrvMultiplier < 1`).
+ * - P2-7 (финализация): финальный кап/порядок упражнений выполняется для всех сессий, а не
+ *   только для тех, где есть разминка-активатор (сторож инварианта, см. комментарий у теста).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -276,5 +278,46 @@ describe('P2-9 (ядро): лабораторные предупреждения
     expect(text).toContain('Лабораторная коррекция: MRV ×0.85');
     expect(lines.filter(l => l.includes(LAB[0])).length).toBe(1);
     expect(lines.filter(l => l.includes('Интенсивность:')).length).toBe(1);
+  });
+});
+
+// P2-7 (финализация; пункт §4 аудита): финальный проход «кап упражнений на мышцу + порядок»
+// стоял под `if (warmups.length && …)`, то есть применялся только к сессиям с
+// warmupActivator (фактически — дни спины). Изменение защитное: на 336 сборках матрицы
+// (7 сплитов × 3 уровня × 2 цели × 8 вариантов опций) планы до и после правки побайтово
+// совпадают, поэтому тест — сторож инварианта, а не «красный» тест: если проход снова
+// сузится до разминочных дней, инвариант «плечи ≤ кап группы» перестанет проверяться
+// на всех сессиях и тест потеряет смысл.
+describe('P2-7 (финализация): финальный кап/порядок применяется ко всем сессиям', () => {
+  it('группа «плечи» (shoulders + delt_*) не превышает кап 4 ни в одной сессии, разминка — первая', () => {
+    for (const patternId of ['upper_lower_4', 'ppl_6', 'bro_5']) {
+      const p: any = buildBBPlan(makeInput({ patternId, weeks: 8 }));
+      for (const w of p.weeks || []) {
+        for (const s of w.sessions || []) {
+          const all = s.exercises || [];
+          const working = all.filter((e: any) => !e.warmupActivator);
+          const shoulders = working.filter((e: any) => /^(shoulders|delt_)/.test(String(e.muscle))).length;
+          expect(shoulders, `${patternId} нед.${w.week} ${s.sessionTag}: плечи ${shoulders}`).toBeLessThanOrEqual(4);
+          if (all.some((e: any) => e.warmupActivator)) {
+            expect(all[0].warmupActivator, `${patternId} нед.${w.week} ${s.sessionTag}: разминка не первая`).toBe(true);
+          }
+          // Порядок: ни одно упражнение мышцы не должно стоять после чужой мышцы, если
+          // сессия не круги (full-body/верх тела чередуются намеренно).
+          const interleaved = /FullBody|Full|Комбинир|Круг/i.test(String(s.sessionTag || ''));
+          if (!interleaved) {
+            const seen = new Set<string>();
+            let last = '';
+            for (const e of working) {
+              const m = String(e.muscle);
+              if (m !== last && seen.has(m)) {
+                throw new Error(`${patternId} нед.${w.week} ${s.sessionTag}: мышца ${m} разорвана (порядок: ${working.map((x: any) => x.muscle).join(',')})`);
+              }
+              seen.add(m);
+              last = m;
+            }
+          }
+        }
+      }
+    }
   });
 });

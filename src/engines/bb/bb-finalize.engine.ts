@@ -7666,16 +7666,21 @@ for (const week of next.weeks) {
       }
     }
   }
-  // Гарантия: разминка-активация всегда первая в дне — даже после GVT/ротации/добивок
-  for (const week of next.weeks) for (const session of week.sessions) {
-    const warmups: any[] = (session.exercises as any[]).filter((e: any) => (e as any).warmupActivator);
-    const rest: any[] = (session.exercises as any[]).filter((e: any) => !(e as any).warmupActivator);
-    if (warmups.length && options.reorder !== false && !options.preserveSource) {
+  // Гарантия: разминка-активация всегда первая в дне — даже после GVT/ротации/добивок.
+  // P2-7 (аудит 2026-11): раньше вся эта финальная сортировка+кап применялись только к
+  // сессиям, где уже есть `warmupActivator` (по факту — дни спины). Остальные дни
+  // (жим/ноги/руки) уходили в план в том порядке, в каком их оставили поздние
+  // аддитивные проходы, и без финального капа упражнений на мышцу. Теперь проход
+  // выполняется для КАЖДОЙ сессии; при наличии разминки она по-прежнему первая.
+  if (options.reorder !== false && !options.preserveSource) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      const warmups: any[] = (session.exercises as any[]).filter((e: any) => (e as any).warmupActivator);
+      const rest: any[] = (session.exercises as any[]).filter((e: any) => !(e as any).warmupActivator);
       // Сохраняем порядок остальных через orderSessionExercises, но warmup — вне очереди, первым
       const orderedRest = (() => {
         try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4, options.goal) as any; } catch { return rest; }
       })();
-      (session as any).exercises = [...warmups, ...orderedRest];
+      (session as any).exercises = warmups.length ? [...warmups, ...orderedRest] : orderedRest;
     }
   }
   // Bodyweight-safety: последний проход, потому что поздние аддитивные пассы
