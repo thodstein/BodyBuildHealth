@@ -6,7 +6,7 @@ import {
   CREATININE_ULN, CREATININE_FLAG_STEP,
 } from '../../../engines/lab-norms.engine';
 import { LAB_UNIT_CHOICES, labUnitKey } from '../../../core/constants';
-import { resolveLabMarker } from '../../../core/labs-mapping';
+import { normalizeLabMeasurement, resolveLabMarker } from '../../../core/labs-mapping';
 import { FULL_PANELS } from './Calc.lab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -186,6 +186,25 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'ALT': 'ALT', 'AST': 'AST', 'GGT': 'GGT', 'RBC': 'RBC', 'WBC': 'WBC',
 };
 
+/**
+ * Маркер бланка → код UCUM для пересчёта единиц (проход 112).
+ *
+ * Пересчёт есть только у тех маркеров, для которых он описан в общем конвертере
+ * (`normalizeLabMeasurement`): мг/дл → мкмоль/л, г/дл → г/л, нмоль/л → нг/мл
+ * и так далее. Гормонов с выбором единицы тут нет намеренно: у них единица
+ * бланка остаётся частью данных (`slice.units`), а пересчёт делает чтение
+ * (`readLabValue`), которое знает пол и фазу.
+ */
+export const MARKER_TO_UCUM: Record<string, string> = {
+  'Hemoglobin': 'HGB', 'HCT': 'HCT',
+  'Creatinine': 'CREATININE', 'Urea': 'UREA', 'Uric acid': 'UA',
+  'Bilirubin': 'BIL', 'Glucose': 'GLU',
+  'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',
+  'CRP': 'CRP', 'Vitamin D (25-OH)': 'VITD', 'B12': 'B12', 'Folate': 'FOL',
+  'Iron': 'IRON', 'Calcium': 'CA', 'Magnesium': 'MG', 'Phosphorus': 'P',
+  'Fibrinogen': 'FIBRINOGEN', 'D-dimer': 'D_DIMER', 'Ferritin': 'FERRITIN',
+};
+
 /** Имя маркера бланка по коду в любом написании; null — это не наш маркер. */
 export function sliceMarkerFor(code: string): string | null {
   const raw = String(code || '').trim();
@@ -248,8 +267,21 @@ export function labPointsToSlice(input: any): LabSlice | null {
     const panel = isUrine ? 'panelUrinalysis' : MARKER_TO_PANEL[marker.toLowerCase()];
     if (!panel) return false;
     const val = rawVal != null && rawVal !== '' ? String(rawVal) : '';
-    const text = val || (valueStr != null ? String(valueStr) : '');
+    let text = val || (valueStr != null ? String(valueStr) : '');
     if (!text) return false;
+    // Проход 112: значение приводится к единице приложения тем же конвертером,
+    // что и в остальном импорте. Без этого гемоглобин 15 г/дл из FHIR или
+    // дневника ложился как «15» в поле, где норма 130–170 г/л, и нормальный
+    // бланк читался как тяжёлая анемия.
+    const ucum = MARKER_TO_UCUM[marker];
+    if (ucum && unit && !LAB_UNIT_CHOICES[marker]) {
+      const num = Number(text.replace(',', '.'));
+      if (Number.isFinite(num)) {
+        const norm = normalizeLabMeasurement(ucum, num, unit);
+        if (Number.isFinite(norm.value)) text = String(norm.value);
+        if (norm.unit) unit = norm.unit;
+      }
+    }
     (slice[panel] as Record<string, string>)[marker] = text;
     putMarkerUnit(slice, panel, marker, unit);
     return true;

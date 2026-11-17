@@ -9,7 +9,9 @@
  * хотя она была в данных.
  */
 import { describe, it, expect } from 'vitest';
-import { labPointsToSlice, sliceMarkerFor } from '../Calc.labs-derived';
+import { labPointsToSlice, sliceMarkerFor, MARKER_TO_UCUM } from '../Calc.labs-derived';
+import { FULL_PANELS } from '../Calc.lab';
+import { LAB_UNIT_CHOICES } from '../../../../core/constants';
 
 const point = (code: string, value: number | string, unit?: string) =>
   labPointsToSlice([{ code, value, unit, date: '2026-11-01' }]);
@@ -82,5 +84,53 @@ describe('проход 111: код анализа → имя маркера бл
     expect(sliceMarkerFor('prolactin')).toBe('Prolactin');
     expect(sliceMarkerFor('TSH')).toBe('TSH');
     expect(sliceMarkerFor('')).toBeNull();
+  });
+});
+
+/**
+ * Проход 112: импорт приводил число, но не единицу. Гемоглобин 15 г/дл из FHIR
+ * или дневника ложился как «15» в поле, где норма 130–170 г/л — нормальный бланк
+ * читался как тяжёлая анемия. Креатинин 1.0 мг/дл становился 1.0 мкмоль/л, ЛПНП
+ * 130 мг/дл — 130 ммоль/л (норма «в 40 раз хуже нормы»), и так далее.
+ */
+describe('проход 112: единица импорта приводится к единице приложения', () => {
+  it('гемоглобин 15 г/дл становится 150 г/л', () => {
+    expect(point('HGB', 15, 'g/dL')!.panelHematology!.Hemoglobin).toBe('150');
+    expect(point('HEMOGLOBIN', 15, 'г/дл')!.panelHematology!.Hemoglobin).toBe('150');
+  });
+
+  it('креатинин, глюкоза, ЛПНП и СРП из мг/дл', () => {
+    expect(Number(point('CREATININE', 1, 'mg/dL')!.panelBiochem!.Creatinine)).toBeCloseTo(88.42, 1);
+    expect(Number(point('GLU', 90, 'mg/dL')!.panelBiochem!.Glucose)).toBeCloseTo(4.995, 2);
+    expect(Number(point('LDL', 130, 'mg/dL')!.panelLipid!.LDL)).toBeCloseTo(3.362, 2);
+    expect(Number(point('CRP', 0.5, 'mg/dL')!.panelBiochem!.CRP)).toBeCloseTo(5, 2);
+  });
+
+  it('витамин D из нмоль/л и железо из мкг/дл', () => {
+    expect(Number(point('VITD', 62, 'nmol/L')!.panelVitamin!['Vitamin D (25-OH)'])).toBeCloseTo(24.84, 1);
+    expect(Number(point('IRON', 80, 'ug/dL')!.panelIron!.Iron)).toBeCloseTo(14.33, 1);
+  });
+
+  it('единица уже та — число не меняется', () => {
+    expect(point('HGB', 150, 'g/L')!.panelHematology!.Hemoglobin).toBe('150');
+    expect(point('GLU', 5.5, 'mmol/L')!.panelBiochem!.Glucose).toBe('5.5');
+    expect(point('HCT', 45, '%')!.panelHematology!.HCT).toBe('45');
+  });
+
+  it('гормоны не пересчитываются на импорте: единица бланка остаётся в данных', () => {
+    const e = point('E2', 1800, 'pmol/L')!;
+    expect(e.panelSex!.E2).toBe('1800');
+    expect(e.units!.panelSex.E2).toBe('пмоль/л');
+    const p = point('PRL', 318, 'mIU/L')!;
+    expect(p.panelSex!.Prolactin).toBe('318');
+    expect(p.units!.panelSex.Prolactin).toBe('мМЕ/л');
+  });
+
+  it('в таблице пересчёта только настоящие маркеры бланка', () => {
+    const markers = new Set(FULL_PANELS.flatMap(p => p.markers));
+    for (const marker of Object.keys(MARKER_TO_UCUM)) {
+      expect(markers.has(marker), `${marker} нет в форме — опечатка выключит пересчёт`).toBe(true);
+      expect(LAB_UNIT_CHOICES[marker], `${marker}: у гормонов с выбором единицы пересчёт делает чтение`).toBeUndefined();
+    }
   });
 });
