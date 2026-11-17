@@ -25,7 +25,7 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   // ── липиды ──
   'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',
   // ── гормоны без выбора единицы ──
-  'Free T': 'FT', 'Progesterone': 'PROG',
+  'Free T': 'FT',
   'TSH': 'TSH', 'T3 free': 'FT3', 'T4 free': 'FT4', 'Anti-TPO': 'TPO_AB', 'Anti-TG': 'TG_AB',
   // ── железо, витамины ──
   'Iron': 'IRON', 'TIBC': 'TIBC', 'Transferrin': 'TRANSFERRIN', 'Ferritin': 'FERRITIN',

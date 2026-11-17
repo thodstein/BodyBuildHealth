@@ -75,8 +75,9 @@ describe('проход 106: readLabValue — единица есть, догад
 });
 
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
-  it('в бланке есть выбор единицы для пяти гормональных маркеров', () => {
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S']);
+  it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
+    // проход 118: прогестерон добавлен — нг/мл и нмоль/л расходятся в 3.18 раза
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone']);
     for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
   });
 
@@ -354,5 +355,40 @@ describe('проход 115: ошибка разбора анализов вид�
   it('без ошибки лишней находки нет', () => {
     const list = buildLabFindings(mkState('male', { ALT: '45' }) as any, {} as any);
     expect(list.every(f => f.id !== '__lab_analysis_failed')).toBe(true);
+  });
+});
+
+/**
+ * Проход 118: прогестерон приходит в двух единицах — нг/мл и нмоль/л (разница
+ * 3.18). Пока единицы не было, 60 нмоль/л лютеиновой фазы ложились в движок
+ * как 60 нг/мл: нормальная лютеиновая фаза читалась как беременность, а
+ * «ановуляция» ставилась по числу, которого в бланке не было.
+ */
+describe('проход 118: прогестерон читается по единице бланка', () => {
+  it('нмоль/л приводится к нг/мл, догадки нет', () => {
+    const r = readLabValue('Progesterone', 60, 'нмоль/л');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(18.9);
+  });
+
+  it('нг/мл остаётся как есть', () => {
+    const r = readLabValue('Progesterone', 18.9, 'нг/мл');
+    expect(r.guessed).toBe(false);
+    expect(r.value).toBe(18.9);
+  });
+
+  it('без единицы число не пересчитывается и помечается догадкой', () => {
+    const r = readLabValue('Progesterone', 60);
+    expect(r.guessed).toBe(true);
+    expect(r.value).toBe(60);
+  });
+
+  it('в форме есть выбор единицы, поэтому подсказка не нужна', () => {
+    expect(LAB_UNIT_CHOICES['Progesterone']).toEqual(['нг/мл', 'нмоль/л']);
+  });
+
+  it('движок берёт прогестерон через чтение с единицей, а не сырым числом', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+    expect(src).toContain("v['PROG'] = readHormone('Progesterone', 'panelSex'");
   });
 });

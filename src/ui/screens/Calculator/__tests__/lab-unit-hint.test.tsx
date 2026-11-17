@@ -9,7 +9,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { FullLabInput, LabSliceInput } from '../Calc.lab';
+import { FullLabInput, LabSliceInput, labUnitHint } from '../Calc.lab';
 
 afterEach(cleanup);
 
@@ -39,9 +39,16 @@ describe('проход 114: единица стоит подсказкой в п
   });
 
   it('у гормонов с выбором единицы подсказки нет — там UnitPicker', () => {
+    expect(labUnitHint('E2')).toBeUndefined();
+    expect(labUnitHint('Total T')).toBeUndefined();
+    expect(labUnitHint('Prolactin')).toBeUndefined();
+    // проход 118: прогестерон переехал в этот же список — у него две единицы
+    expect(labUnitHint('Progesterone')).toBeUndefined();
     const { container } = render(<FullLabInput values={null} onChange={() => {}} />);
-    // селекты единиц присутствуют, значит подсказка им не нужна
     const selects = container.querySelectorAll('select');
     expect(selects.length).toBeGreaterThan(0);
+    const prog = container.querySelector('select[aria-label="Единица: Прогестерон"]') as HTMLSelectElement;
+    expect(prog, 'у прогестерона должен быть выбор единицы').toBeTruthy();
+    expect(Array.from(prog.options).map(o => o.value)).toEqual(['', 'нг/мл', 'нмоль/л']);
   });
 });

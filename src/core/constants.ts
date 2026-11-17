@@ -798,6 +798,10 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
 export const LAB_READ_UNIT: Record<string, string> = {
   'E2': 'пг/мл', 'Prolactin': 'нг/мл', 'Total T': 'нмоль/л',
   'Cortisol': 'нмоль/л', 'DHEA-S': 'мкг/дл',
+  // Проход 118: прогестерон тоже приходит в двух единицах (нг/мл и нмоль/л,
+  // разница 3.18). Без единицы не угадываем: 5 нг/мл и 5 нмоль/л — разные
+  // клинические картины (лютеиновая норма против ановуляции).
+  'Progesterone': 'нг/мл',
 };
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
@@ -807,6 +811,7 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'Total T': ['нмоль/л', 'нг/дл'],
   'Cortisol': ['нмоль/л', 'мкг/дл'],
   'DHEA-S': ['мкг/дл', 'мкмоль/л'],
+  'Progesterone': ['нг/мл', 'нмоль/л'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -860,6 +865,8 @@ export function readLabValue(
       case 'Total T': return { value: Math.round(rawValue / TT_NMOL_TO_NG_DL * 10) / 10, guessed: false };
       case 'Cortisol': return { value: Math.round(rawValue * CORTISOL_UG_DL_TO_NMOL * 10) / 10, guessed: false };
       case 'DHEA-S': return { value: Math.round(rawValue * DHEAS_UMOL_TO_UG_DL * 10) / 10, guessed: false };
+      // Проход 118: 60 нмоль/л лютеиновой фазы — это 18.9 нг/мл, а не 60 нг/мл.
+      case 'Progesterone': return { value: Math.round(rawValue / PROG_NG_TO_NMOL * 10) / 10, guessed: false };
     }
     return { value: rawValue, guessed: false };
   }
