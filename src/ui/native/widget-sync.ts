@@ -57,6 +57,7 @@ import {
   readCoachNotes,
   writeCoachNotes,
   sortCoachNotes,
+  noteAttachments,
   noteChecklistProgress,
   addCoachNote,
 } from '../../engines/coach/coach-notes.engine';
@@ -553,9 +554,13 @@ function collectNotes(): {
   return {
     notes: sorted.slice(0, 5).map(n => {
       const p = noteChecklistProgress(n);
+      const hasFiles = noteAttachments(n).length > 0;
       return {
         id: n.id,
-        title: String(n.title || n.body.split('\n')[0] || 'Без названия').slice(0, 90),
+        // Заметка без текста, но с фото/аудио — это не «Без названия», а файл.
+        title: String(
+          n.title || n.body.split('\n')[0] || (hasFiles ? 'Заметка с фото/аудио' : 'Без названия'),
+        ).slice(0, 90),
         done: p.done,
         total: p.total,
       };

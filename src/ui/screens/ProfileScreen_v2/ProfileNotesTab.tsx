@@ -6,20 +6,38 @@
  * Заметки закрепляются (памятка на виду), ищутся по заголовку и тексту и могут
  * быть привязаны к атлету из режима тренера.
  *
- * Честно: заметки не влияют на расчёты планов и не уходят в отчёты — это
- * текстовый блокнот, а не медицинский документ.
+ * Вложения (2026-11): к заметке можно приложить фото и аудио, записать голос,
+ * надиктовать текст (речь → текст) и озвучить заметку (текст → речь).
+ * Байты живут в IndexedDB (`note-media-store`), в localStorage — только
+ * метаданные: иначе один снимок в base64 выжег бы квоту всех заметок.
+ *
+ * Честно:
+ *  • заметки не влияют на расчёты планов и не уходят в отчёты — это блокнот,
+ *    а не медицинский документ;
+ *  • в Android WebView распознавания речи обычно нет вообще, а микрофон
+ *    работает только при разрешении RECORD_AUDIO (оно в манифесте, спрашивает
+ *    сам Capacitor). Если система всё же отказала, UI прямо говорит «здесь
+ *    недоступно» и предлагает рабочий путь: записать диктофоном и приложить
+ *    файл. Кнопок-пустышек, которые «ничего не делают», быть не должно;
+ *  • расшифровка приложенного аудио не выдумывается: «голос в текст» работает
+ *    только вживую во время диктовки.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
+import { pickPhoto } from '../../../core/native-bridge';
 import { readCoachState } from '../../../engines/coach/coach-mode.engine';
 import {
+  COACH_NOTE_ATTACHMENT_BYTES_MAX,
+  COACH_NOTE_ATTACHMENTS_MAX,
   COACH_NOTE_BODY_MAX,
   COACH_NOTE_CHECKLIST_TEXT_MAX,
   COACH_NOTE_TITLE_MAX,
   COACH_NOTES_MAX,
   addCoachNote,
   filterCoachNotes,
+  noteAttachmentIds,
+  noteAttachments,
   noteChecklistProgress,
   readCoachNotes,
   removeCoachNote,
@@ -28,9 +46,37 @@ import {
   updateCoachNote,
   writeCoachNotes,
   type CoachNote,
+  type CoachNoteAttachment,
+  type CoachNoteAttachmentKind,
   type CoachNoteChecklistItem,
   type CoachNotesStore,
 } from '../../../engines/coach/coach-notes.engine';
+import {
+  NOTE_AUDIO_MAX_MS,
+  attachmentSummary,
+  compressPhotoDataUrl,
+  dataUrlBytes,
+  formatBytes,
+  formatDuration,
+  isDictationSupported,
+  isSpeechOutputSupported,
+  isVoiceRecordingSupported,
+  probeAudioDurationMs,
+  readDictationChunk,
+  recordingMime,
+  speakText,
+  speechRecognitionCtor,
+  stopSpeaking,
+  type SpeechRecognitionLike,
+} from '../../../engines/note-media.engine';
+import {
+  cleanupNoteMedia,
+  deleteNoteMedia,
+  deleteNoteMediaForNote,
+  getNoteMedia,
+  saveNoteMediaMany,
+  type NoteMediaRecord,
+} from '../../../engines/note-media-store';
 
 const AMBER = '#f59e0b';
 
@@ -42,6 +88,18 @@ const ls = (): Storage | null => {
   }
 };
 
+/** Вложение в редакторе: метаданные + предпросмотр и «ещё не сохранено». */
+interface DraftAttachment extends CoachNoteAttachment {
+  /** dataUrl фото или blob:-URL аудио — только для предпросмотра. */
+  previewUrl: string;
+  /** Новый файл: в IndexedDB его ещё нет (пишем при сохранении заметки). */
+  pending?: boolean;
+  /** Аудио: байты до сохранения. */
+  blob?: Blob;
+  /** Фото: сжатый dataUrl до сохранения. */
+  dataUrl?: string;
+}
+
 interface EditorState {
   id: string | null;
   title: string;
@@ -49,9 +107,18 @@ interface EditorState {
   athleteId: string;
   pinned: boolean;
   checklist: CoachNoteChecklistItem[];
+  attachments: DraftAttachment[];
 }
 
-const EMPTY_EDITOR: EditorState = { id: null, title: '', body: '', athleteId: '', pinned: false, checklist: [] };
+const EMPTY_EDITOR: EditorState = {
+  id: null,
+  title: '',
+  body: '',
+  athleteId: '',
+  pinned: false,
+  checklist: [],
+  attachments: [],
+};
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -100,6 +167,31 @@ const fmtDate = (iso: string): string => {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
 
+const newAttachmentId = (): string => `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+const isBlobUrl = (url: string): boolean => typeof url === 'string' && url.startsWith('blob:');
+
+const revokeBlobUrl = (url: string): void => {
+  if (!isBlobUrl(url)) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    /* ignore */
+  }
+};
+
+const createObjectUrl = (blob: Blob): string => {
+  try {
+    return typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' ? URL.createObjectURL(blob) : '';
+  } catch {
+    return '';
+  }
+};
+
+type MediaView = { photo?: string; audioUrl?: string; missing?: boolean };
+
+type DictationState = 'idle' | 'listening' | 'error';
+
 export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initialAthleteId }) => {
   const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const [store, setStore] = useState<CoachNotesStore>(() => readCoachNotes(ls()));
@@ -112,7 +204,35 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceBusy, setVoiceBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  /* ── Медиа, загруженное из IndexedDB (для списка) ─────────────────── */
+  const [media, setMedia] = useState<Record<string, MediaView>>({});
+  const [viewer, setViewer] = useState<{ url: string; kind: CoachNoteAttachmentKind } | null>(null);
+
+  /* ── Запись голоса ───────────────────────────────────────────────── */
+  const [recording, setRecording] = useState(false);
+  const [recordingMs, setRecordingMs] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recStartedRef = useRef(0);
+  /** Запись брошена (закрыли редактор/сохранили): её результат не прикладываем. */
+  const discardRecordingRef = useRef(false);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recAutoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const voiceInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* ── Диктовка (речь → текст) и озвучка (текст → речь) ────────────── */
+  const [dictation, setDictation] = useState<DictationState>('idle');
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+
+  const dictationSupported = useMemo(() => isDictationSupported(), []);
+  const speechOutputSupported = useMemo(() => isSpeechOutputSupported(), []);
 
   const nameOf = (id: string | null): string =>
     id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
@@ -127,12 +247,113 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     [store, query, athleteFilter],
   );
 
+  /* ── Загрузка медиа для видимых заметок ──────────────────────────── */
+  const mediaUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    const urls: string[] = [];
+    const ids = store.items.flatMap(n => noteAttachmentIds(n));
+    if (!ids.length) {
+      for (const old of mediaUrlsRef.current) revokeBlobUrl(old);
+      mediaUrlsRef.current = [];
+      setMedia({});
+      return () => undefined;
+    }
+    (async () => {
+      const next: Record<string, MediaView> = {};
+      for (const id of ids) {
+        const rec = await getNoteMedia(id);
+        if (!alive) {
+          // Пока грузили, стейт сменился — созданные URL отзываем сразу.
+          for (const url of urls) revokeBlobUrl(url);
+          return;
+        }
+        if (!rec) {
+          next[id] = { missing: true };
+          continue;
+        }
+        if (rec.kind === 'photo' && rec.dataUrl) {
+          next[id] = { photo: rec.dataUrl };
+        } else if (rec.kind === 'audio' && rec.blob) {
+          const url = createObjectUrl(rec.blob);
+          if (url) urls.push(url);
+          next[id] = url ? { audioUrl: url } : { missing: true };
+        } else {
+          next[id] = { missing: true };
+        }
+      }
+      if (!alive) {
+        for (const url of urls) revokeBlobUrl(url);
+        return;
+      }
+      // Старые URL отзываем ПОСЛЕ подмены карты: иначе проигрыватель на миг
+      // остаётся с уже мёртвой ссылкой.
+      const stale = mediaUrlsRef.current;
+      mediaUrlsRef.current = urls;
+      setMedia(next);
+      for (const url of stale) revokeBlobUrl(url);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [store]);
+
+  /* ── Освобождение blob-URL при размонтировании ───────────────────── */
+  useEffect(
+    () => () => {
+      for (const url of mediaUrlsRef.current) revokeBlobUrl(url);
+      mediaUrlsRef.current = [];
+    },
+    [],
+  );
+
+  /* ── Уборка осиротевших файлов (сбой сохранения/импорта) ─────────── */
+  useEffect(() => {
+    const keep = new Set(store.items.flatMap(n => noteAttachmentIds(n)));
+    void cleanupNoteMedia(keep);
+    // Только на маунте: дальше чистим точечно после сохранения/удаления.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Остановка записи/диктовки/озвучки при уходе с вкладки ───────── */
+  useEffect(
+    () => () => {
+      if (recTimerRef.current) clearInterval(recTimerRef.current);
+      if (recAutoStopRef.current) clearTimeout(recAutoStopRef.current);
+      discardRecordingRef.current = true;
+      try {
+        recorderRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      try {
+        recognitionRef.current?.abort?.();
+      } catch {
+        /* ignore */
+      }
+      stopSpeaking();
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    },
+    [],
+  );
+
   const openNew = () => {
-    setEditor({ ...EMPTY_EDITOR });
+    setEditor({ ...EMPTY_EDITOR, attachments: [] });
     setError(null);
+    setVoiceError(null);
   };
 
   const openEdit = (n: CoachNote) => {
+    const attachments: DraftAttachment[] = noteAttachments(n).map(a => {
+      const view = media[a.id];
+      return {
+        ...a,
+        previewUrl: view?.photo ?? view?.audioUrl ?? '',
+        pending: false,
+      };
+    });
     setEditor({
       id: n.id,
       title: n.title,
@@ -140,53 +361,436 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       athleteId: n.athleteId ?? '',
       pinned: n.pinned,
       checklist: (n.checklist ?? []).map(c => ({ ...c })),
+      attachments,
     });
     setError(null);
+    setVoiceError(null);
     setConfirmDeleteId(null);
   };
 
-  const save = () => {
+  const closeEditor = () => {
+    if (editor) {
+      for (const a of editor.attachments) {
+        if (a.pending) revokeBlobUrl(a.previewUrl);
+      }
+    }
+    stopVoiceCapture();
+    setEditor(null);
+    setError(null);
+    setVoiceError(null);
+  };
+
+  /* ── Запись голоса ────────────────────────────────────────────────── */
+
+  const stopVoiceCapture = () => {
+    discardRecordingRef.current = true;
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    try {
+      recognitionRef.current?.abort?.();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+    setDictation('idle');
+  };
+
+  const stopTracks = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+  };
+
+  const clearRecTimers = () => {
+    if (recTimerRef.current) {
+      clearInterval(recTimerRef.current);
+      recTimerRef.current = null;
+    }
+    if (recAutoStopRef.current) {
+      clearTimeout(recAutoStopRef.current);
+      recAutoStopRef.current = null;
+    }
+  };
+
+  const addDraftAttachment = (draft: DraftAttachment, limitMessage: string) => {
+    if (!editor) {
+      revokeBlobUrl(draft.previewUrl);
+      return;
+    }
+    if (editor.attachments.length >= COACH_NOTE_ATTACHMENTS_MAX) {
+      revokeBlobUrl(draft.previewUrl);
+      setVoiceError(limitMessage);
+      return;
+    }
+    setEditor(s => (s ? { ...s, attachments: [...s.attachments, draft] } : s));
+  };
+
+  const addAudioBlob = (blob: Blob, durationMs: number, name?: string) => {
+    if (!blob || blob.size === 0) return;
+    if (blob.size > COACH_NOTE_ATTACHMENT_BYTES_MAX) {
+      setVoiceError(`Аудио больше ${formatBytes(COACH_NOTE_ATTACHMENT_BYTES_MAX)} — такое вложение не сохраняю.`);
+      return;
+    }
+    const mime = blob.type && blob.type.startsWith('audio/') ? blob.type : 'audio/webm';
+    const previewUrl = createObjectUrl(blob);
+    addDraftAttachment(
+      {
+        id: newAttachmentId(),
+        kind: 'audio',
+        mime,
+        size: blob.size,
+        ...(durationMs > 0 ? { durationMs: Math.min(Math.round(durationMs), NOTE_AUDIO_MAX_MS) } : {}),
+        ...(name ? { name: name.slice(0, 120) } : {}),
+        createdAt: new Date().toISOString(),
+        previewUrl,
+        pending: true,
+        blob,
+      },
+      `К заметке можно приложить не больше ${COACH_NOTE_ATTACHMENTS_MAX} файлов.`,
+    );
+  };
+
+  const startRecording = async () => {
+    setVoiceError(null);
     if (!editor) return;
-    const checklist = editor.checklist
-      .map(c => ({ ...c, text: c.text.trim() }))
-      .filter(c => c.text.length > 0);
-    const payload = {
-      title: editor.title,
-      body: editor.body,
-      athleteId: editor.athleteId || null,
-      pinned: editor.pinned,
-      checklist,
-    };
-    if (editor.id) {
-      const next = updateCoachNote(store, editor.id, payload);
-      if (next === store) {
-        setError('Пустая заметка не сохраняется — заполните заголовок или текст.');
+    if (!isVoiceRecordingSupported()) {
+      setVoiceError(
+        'Микрофон приложению здесь недоступен. Приложите аудиофайл (кнопка «Аудиофайл») — запись диктофона тоже подойдёт.',
+      );
+      voiceInputRef.current?.click();
+      return;
+    }
+    setVoiceBusy(true);
+    discardRecordingRef.current = false;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mime = recordingMime();
+      const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      chunksRef.current = [];
+      recorder.ondataavailable = ev => {
+        if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+      };
+      recorder.onstop = () => {
+        clearRecTimers();
+        stopTracks();
+        recorderRef.current = null;
+        const discarded = discardRecordingRef.current;
+        discardRecordingRef.current = false;
+        const durationMs = Math.min(Date.now() - recStartedRef.current, NOTE_AUDIO_MAX_MS);
+        const type = recorder.mimeType || recordingMime() || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type });
+        chunksRef.current = [];
+        setRecording(false);
+        setRecordingMs(0);
+        // Редактор закрыли/сохранили, пока шла запись — голос уже не к чему крепить.
+        if (discarded) return;
+        addAudioBlob(blob, durationMs);
+      };
+      recStartedRef.current = Date.now();
+      recorder.start(1000);
+      setRecording(true);
+      setRecordingMs(0);
+      recTimerRef.current = setInterval(() => {
+        setRecordingMs(Date.now() - recStartedRef.current);
+      }, 500);
+      recAutoStopRef.current = setTimeout(() => {
+        try {
+          recorder.stop();
+        } catch {
+          /* ignore */
+        }
+      }, NOTE_AUDIO_MAX_MS);
+      setVoiceBusy(false);
+    } catch {
+      setVoiceBusy(false);
+      stopTracks();
+      setVoiceError(
+        'Микрофон не открылся: система не дала доступ. Можно приложить аудиофайл системного диктофона — кнопка «Аудиофайл».',
+      );
+      voiceInputRef.current?.click();
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      recorderRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleVoice = () => {
+    if (recording) {
+      stopRecording();
+      return;
+    }
+    void startRecording();
+  };
+
+  /* ── Аудиофайл / фото ─────────────────────────────────────────────── */
+
+  const handleAudioFile = async (file: File | null) => {
+    if (!file) return;
+    setVoiceError(null);
+    if (file.size > COACH_NOTE_ATTACHMENT_BYTES_MAX) {
+      setVoiceError(`Файл больше ${formatBytes(COACH_NOTE_ATTACHMENT_BYTES_MAX)} — не сохраняю.`);
+      return;
+    }
+    const durationMs = await probeAudioDurationMs(file);
+    addAudioBlob(file, durationMs, file.name);
+  };
+
+  const handleVoiceInput = (input: HTMLInputElement) => {
+    const file = input.files?.[0] ?? null;
+    if (file) void handleAudioFile(file);
+    input.value = '';
+  };
+
+  const addPhoto = async () => {
+    if (!editor) return;
+    setVoiceError(null);
+    setVoiceBusy(true);
+    try {
+      const picked = await pickPhoto();
+      if (!picked || !picked.uri) {
+        setVoiceBusy(false);
         return;
+      }
+      const compressed = await compressPhotoDataUrl(picked.uri);
+      const dataUrl = compressed ?? picked.uri;
+      if (!dataUrl.startsWith('data:image/')) {
+        setVoiceError('Фото не удалось прочитать — попробуйте другое.');
+        setVoiceBusy(false);
+        return;
+      }
+      const size = dataUrlBytes(dataUrl);
+      if (size > COACH_NOTE_ATTACHMENT_BYTES_MAX) {
+        setVoiceError(`Фото больше ${formatBytes(COACH_NOTE_ATTACHMENT_BYTES_MAX)} даже после сжатия — не сохраняю.`);
+        setVoiceBusy(false);
+        return;
+      }
+      const mimeMatch = /^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl);
+      addDraftAttachment(
+        {
+          id: newAttachmentId(),
+          kind: 'photo',
+          mime: (mimeMatch?.[1] ?? 'image/jpeg').toLowerCase(),
+          size,
+          createdAt: new Date().toISOString(),
+          previewUrl: dataUrl,
+          pending: true,
+          dataUrl,
+        },
+        `К заметке можно приложить не больше ${COACH_NOTE_ATTACHMENTS_MAX} файлов.`,
+      );
+    } finally {
+      setVoiceBusy(false);
+    }
+  };
+
+  const removeDraftAttachment = (id: string) => {
+    setEditor(s => {
+      if (!s) return s;
+      const target = s.attachments.find(a => a.id === id);
+      if (target?.pending) revokeBlobUrl(target.previewUrl);
+      return { ...s, attachments: s.attachments.filter(a => a.id !== id) };
+    });
+  };
+
+  /* ── Речь в текст ─────────────────────────────────────────────────── */
+
+  const toggleDictation = () => {
+    setVoiceError(null);
+    if (dictation === 'listening') {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    const Ctor = speechRecognitionCtor();
+    if (!Ctor) {
+      setDictation('error');
+      setVoiceError(
+        'Речь в текст здесь недоступна: это WebView без распознавания речи. Голос всё равно можно записать и приложить к заметке.',
+      );
+      return;
+    }
+    try {
+      const recognition = new Ctor();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.onresult = event => {
+        const chunk = readDictationChunk(event);
+        if (!chunk.text) return;
+        setEditor(s => {
+          if (!s) return s;
+          const base = s.body.trimEnd();
+          const body = base ? `${base} ${chunk.text}` : chunk.text;
+          return { ...s, body: body.slice(0, COACH_NOTE_BODY_MAX) };
+        });
+      };
+      recognition.onerror = () => {
+        setDictation('error');
+        setVoiceError(
+          'Распознавание прервалось. Проверьте доступ к микрофону; распознавание идёт через сервис системы и в офлайне не работает.',
+        );
+      };
+      recognition.onend = () => {
+        recognitionRef.current = null;
+        setDictation('idle');
+      };
+      recognitionRef.current = recognition;
+      recognition.start();
+      setDictation('listening');
+    } catch {
+      setDictation('error');
+      setVoiceError('Не удалось начать диктовку — распознавание речи не запустилось.');
+    }
+  };
+
+  /* ── Текст в речь ─────────────────────────────────────────────────── */
+
+  const toggleSpeak = (note: CoachNote) => {
+    if (speakingId === note.id) {
+      stopSpeaking();
+      setSpeakingId(null);
+      return;
+    }
+    const text = [note.title, note.body].filter(Boolean).join('. ');
+    const ok = speakText(text, {
+      onEnd: () => setSpeakingId(current => (current === note.id ? null : current)),
+    });
+    if (!ok) {
+      setVoiceError('Озвучка недоступна в этом приложении — голосового движка нет.');
+      return;
+    }
+    setSpeakingId(note.id);
+  };
+
+  /* ── Сохранение ───────────────────────────────────────────────────── */
+
+  const trimmedChecklist = (draft: EditorState): CoachNoteChecklistItem[] =>
+    draft.checklist.map(c => ({ ...c, text: c.text.trim() })).filter(c => c.text.length > 0);
+
+  const strippedAttachments = (draft: EditorState): CoachNoteAttachment[] =>
+    draft.attachments.map(a => ({
+      id: a.id,
+      kind: a.kind,
+      mime: a.mime,
+      size: a.size,
+      ...(a.durationMs ? { durationMs: a.durationMs } : {}),
+      ...(a.name ? { name: a.name } : {}),
+      createdAt: a.createdAt,
+    }));
+
+  const commitSave = (draft: EditorState, noteId: string, attachments: CoachNoteAttachment[]): boolean => {
+    const payload = {
+      title: draft.title,
+      body: draft.body,
+      athleteId: draft.athleteId || null,
+      pinned: draft.pinned,
+      checklist: trimmedChecklist(draft),
+      attachments,
+    };
+    if (draft.id) {
+      const next = updateCoachNote(store, draft.id, payload);
+      if (next === store) {
+        setError('Пустая заметка не сохраняется — заполните заголовок, текст или приложите фото/аудио.');
+        return false;
       }
       apply(next);
     } else {
-      const res = addCoachNote(store, payload);
+      const res = addCoachNote(store, payload, { id: noteId });
       if (res.error === 'empty') {
-        setError('Пустая заметка не сохраняется — заполните заголовок или текст.');
-        return;
+        setError('Пустая заметка не сохраняется — заполните заголовок, текст или приложите фото/аудио.');
+        return false;
       }
       if (res.error === 'limit') {
         setError(
           `Лимит ${COACH_NOTES_MAX} заметок. Удалите неактуальные — движок не стирает ваши заметки автоматически.`,
         );
-        return;
+        return false;
       }
       apply(res.store);
     }
     setEditor(null);
     setError(null);
+    setVoiceError(null);
+    stopVoiceCapture();
+    return true;
+  };
+
+  const save = () => {
+    if (!editor) return;
+    const draft = editor;
+    const noteId = draft.id ?? `n_${Date.now().toString(36)}_${store.items.length + 1}`;
+    const attachments = strippedAttachments(draft);
+    const pending = draft.attachments.filter(a => a.pending && (a.blob || a.dataUrl));
+
+    const writeMedia = async (): Promise<boolean> => {
+      const records: NoteMediaRecord[] = pending.map(a => ({
+        id: a.id,
+        noteId,
+        kind: a.kind,
+        mime: a.mime,
+        size: a.size,
+        ...(a.durationMs ? { durationMs: a.durationMs } : {}),
+        ...(a.name ? { name: a.name } : {}),
+        createdAt: Date.now(),
+        ...(a.kind === 'photo' ? { dataUrl: a.dataUrl ?? a.previewUrl } : { blob: a.blob as Blob }),
+      }));
+      const ok = records.length ? await saveNoteMediaMany(records) : true;
+      if (!ok) {
+        setError(
+          'Не хватило места в хранилище — вложение не сохранено. Удалите лишние фото/аудио и попробуйте снова.',
+        );
+        return false;
+      }
+      return true;
+    };
+
+    if (pending.length === 0) {
+      commitSave(draft, noteId, attachments);
+      return;
+    }
+    void (async () => {
+      const ok = await writeMedia();
+      if (!ok) return;
+      const saved = commitSave(draft, noteId, attachments);
+      if (!saved) {
+        // Заметка не сохранилась (стала пустой) — только что записанные файлы
+        // не должны остаться сиротами в квоте.
+        void deleteNoteMedia(pending.map(a => a.id));
+        return;
+      }
+      for (const a of draft.attachments) {
+        if (a.pending) revokeBlobUrl(a.previewUrl);
+      }
+      const keep = new Set(
+        // Заметку, которую только что сохранили, считаем по новому набору:
+        // убранные вложения не должны попасть в «нужное» (иначе файл повиснет).
+        store.items
+          .filter(n => n.id !== noteId)
+          .flatMap(n => noteAttachmentIds(n)),
+      );
+      for (const a of attachments) keep.add(a.id);
+      void cleanupNoteMedia(keep);
+    })();
   };
 
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
       apply(removeCoachNote(store, id));
+      void deleteNoteMediaForNote(id);
       setConfirmDeleteId(null);
-      if (editor?.id === id) setEditor(null);
+      if (editor?.id === id) closeEditor();
       return;
     }
     setConfirmDeleteId(id);
@@ -270,7 +874,157 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }}
             data-notes="body"
           />
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => void addPhoto()}
+              disabled={voiceBusy}
+              data-notes="add-photo"
+              style={{ ...btn('ghost'), fontSize: 12, opacity: voiceBusy ? 0.6 : 1 }}
+            >
+              Фото
+            </button>
+            <button
+              type="button"
+              onClick={toggleVoice}
+              data-notes="add-voice"
+              data-recording={recording}
+              style={{
+                ...btn('ghost'),
+                fontSize: 12,
+                ...(recording
+                  ? { borderColor: 'rgba(239,68,68,0.55)', color: '#fca5a5', background: 'rgba(239,68,68,0.14)' }
+                  : {}),
+              }}
+            >
+              {recording ? `Стоп · ${formatDuration(recordingMs)}` : 'Записать голос'}
+            </button>
+            <button
+              type="button"
+              onClick={() => audioInputRef.current?.click()}
+              data-notes="add-audio-file"
+              style={{ ...btn('ghost'), fontSize: 12 }}
+            >
+              Аудиофайл
+            </button>
+            <button
+              type="button"
+              onClick={toggleDictation}
+              data-notes="dictate"
+              data-dictation={dictation}
+              style={{ ...btn('ghost'), fontSize: 12, opacity: dictationSupported ? 1 : 0.55 }}
+            >
+              {dictation === 'listening' ? 'Стоп диктовку' : 'Голос в текст'}
+            </button>
+          </div>
+
+          <input
+            ref={audioInputRef}
+            type="file"
+            accept="audio/*"
+            aria-label="Аудиофайл к заметке"
+            data-notes="audio-input"
+            style={{ display: 'none' }}
+            onChange={e => {
+              void handleAudioFile(e.target.files?.[0] ?? null);
+              e.target.value = '';
+            }}
+          />
+          {/* APK: системный диктофон/Camera-UI. getUserMedia в WebView обычно
+              заблокирован — это рабочий путь записи голоса. */}
+          <input
+            ref={voiceInputRef}
+            type="file"
+            accept="audio/*"
+            capture
+            aria-label="Записать голос диктофоном"
+            data-notes="voice-record-input"
+            style={{ display: 'none' }}
+            onChange={e => handleVoiceInput(e.currentTarget)}
+          />
+
+          {!dictationSupported && (
+            <div data-notes="dictation-hint" style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}>
+              Речь в текст здесь недоступна (WebView без распознавания). Голос можно записать и
+              приложить к заметке — расшифровка останется за вами.
+            </div>
+          )}
+
+          {editor.attachments.length > 0 && (
+            <div
+              data-notes="attach-list"
+              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}
+            >
+              {editor.attachments.map(a => (
+                <div
+                  key={a.id}
+                  data-notes="attach-item"
+                  data-kind={a.kind}
+                  style={{
+                    position: 'relative',
+                    padding: 6,
+                    paddingRight: 30,
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.04)',
+                    maxWidth: 240,
+                  }}
+                >
+                  {a.kind === 'photo' ? (
+                    a.previewUrl ? (
+                      <img
+                        src={a.previewUrl}
+                        alt={a.name ?? 'Фото заметки'}
+                        style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, display: 'block' }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 11.5, color: colors.textSubtle }}>Фото загружается…</div>
+                    )
+                  ) : a.previewUrl ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: colors.textSubtle, marginBottom: 4 }}>
+                        Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}
+                      </div>
+                      <audio src={a.previewUrl} controls preload="metadata" style={{ maxWidth: 190, height: 34 }} />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11.5, color: colors.textSubtle }}>Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeDraftAttachment(a.id)}
+                    aria-label="Убрать вложение"
+                    data-notes="attach-remove"
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.16)',
+                      background: 'rgba(0,0,0,0.45)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {voiceError && (
+            <div role="alert" data-notes="voice-error" style={{ marginTop: 8, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}>
+              {voiceError}
+            </div>
+          )}
+
+          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '12px 0 5px' }}>
             Чек-лист
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-notes="checklist-edit">
@@ -367,7 +1121,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </button>
             <button
               type="button"
-              onClick={() => { setEditor(null); setError(null); }}
+              onClick={closeEditor}
               data-notes="cancel"
               style={btn('ghost')}
             >
@@ -388,6 +1142,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         {visible.map(n => {
           const athleteName = nameOf(n.athleteId);
           const isDeleting = confirmDeleteId === n.id;
+          const attachments = noteAttachments(n);
+          const photos = attachments.filter(a => a.kind === 'photo');
+          const audios = attachments.filter(a => a.kind === 'audio');
           return (
             <div
               key={n.id}
@@ -405,7 +1162,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word' }}>
-                    {n.title || n.body.split('\n')[0].slice(0, 80)}
+                    {n.title || n.body.split('\n')[0].slice(0, 80) || 'Заметка с вложением'}
                   </div>
                   {n.title && n.body && (
                     <div
@@ -417,6 +1174,65 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       {n.body}
                     </div>
                   )}
+
+                  {attachments.length > 0 && (
+                    <div data-notes="attachments" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 10.5, color: colors.textSubtle }}>{attachmentSummary(attachments)}</div>
+                      {photos.length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {photos.map(a => {
+                            const view = media[a.id];
+                            return view?.photo ? (
+                              <button
+                                key={a.id}
+                                type="button"
+                                data-notes="photo"
+                                aria-label={a.name ? `Открыть фото: ${a.name}` : 'Открыть фото заметки'}
+                                onClick={() => setViewer({ url: view.photo as string, kind: 'photo' })}
+                                style={{ padding: 0, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, background: 'transparent', cursor: 'pointer', overflow: 'hidden' }}
+                              >
+                                <img
+                                  src={view.photo}
+                                  alt={a.name ?? 'Фото заметки'}
+                                  style={{ width: 88, height: 88, objectFit: 'cover', display: 'block' }}
+                                />
+                              </button>
+                            ) : (
+                              <div
+                                key={a.id}
+                                data-notes="media-missing"
+                                style={{ fontSize: 11, color: colors.textSubtle, border: '1px dashed rgba(255,255,255,0.18)', borderRadius: 10, padding: '10px 12px' }}
+                              >
+                                Фото не найдено в хранилище
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {audios.map(a => {
+                        const view = media[a.id];
+                        return view?.audioUrl ? (
+                          <audio
+                            key={a.id}
+                            data-notes="audio-player"
+                            src={view.audioUrl}
+                            controls
+                            preload="metadata"
+                            style={{ width: '100%', maxWidth: 320, height: 36 }}
+                          />
+                        ) : (
+                          <div
+                            key={a.id}
+                            data-notes="media-missing"
+                            style={{ fontSize: 11, color: colors.textSubtle, border: '1px dashed rgba(255,255,255,0.18)', borderRadius: 10, padding: '8px 12px' }}
+                          >
+                            Аудио не найдено в хранилище (файл удалён)
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {(n.checklist?.length ?? 0) > 0 && (() => {
                     const prog = noteChecklistProgress(n);
                     return (
@@ -487,6 +1303,17 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                 <button type="button" data-notes="edit" onClick={() => openEdit(n)} style={{ ...btn('ghost'), fontSize: 12 }}>
                   Изменить
                 </button>
+                {speechOutputSupported && (n.title || n.body) && (
+                  <button
+                    type="button"
+                    data-notes="speak"
+                    data-speaking={speakingId === n.id}
+                    onClick={() => toggleSpeak(n)}
+                    style={{ ...btn('ghost'), fontSize: 12 }}
+                  >
+                    {speakingId === n.id ? 'Стоп озвучку' : 'Озвучить'}
+                  </button>
+                )}
                 <button type="button" data-notes="delete" onClick={() => askDelete(n.id)} style={{ ...btn('danger'), fontSize: 12 }}>
                   {isDeleting ? 'Точно удалить' : 'Удалить'}
                 </button>
@@ -506,9 +1333,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         })}
       </div>
 
+      {viewer && (
+        <div
+          data-notes="viewer"
+          role="dialog"
+          aria-label="Просмотр вложения"
+          onClick={() => setViewer(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.86)', cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={viewer.url}
+            alt="Вложение заметки"
+            style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12, objectFit: 'contain' }}
+          />
+        </div>
+      )}
+
       <div style={{ fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.55, padding: '0 4px' }}>
         Заметки — это контекст, а не дневник: они не меняют расчёты планов и не попадают в отчёты
-        автоматически.
+        автоматически. Фото и аудио хранятся только на этом устройстве (IndexedDB) и в резервную
+        копию не входят.
       </div>
     </div>
   );

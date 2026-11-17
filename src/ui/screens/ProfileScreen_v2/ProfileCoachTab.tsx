@@ -119,6 +119,7 @@ import {
   writeCoachNotes,
   type CoachNotesStore,
 } from '../../../engines/coach/coach-notes.engine';
+import { deleteAllNoteMedia } from '../../../engines/note-media-store';
 import {
   emptyCoachPlanner,
   readCoachPlanner,
@@ -1365,6 +1366,8 @@ export const ProfileCoachTab: React.FC<{
       await forgetAllAthletes();
       const storage = ls();
       writeCoachNotes(storage, emptyCoachNotes());
+      // Заметки стёрты — их фото/аудио тоже не должны остаться на телефоне.
+      void deleteAllNoteMedia();
       writeCoachPlanner(storage, emptyCoachPlanner());
       writeCoachLog(storage, emptyCoachLog());
       apply({ ...state, athletes: [], activeAthleteId: null });

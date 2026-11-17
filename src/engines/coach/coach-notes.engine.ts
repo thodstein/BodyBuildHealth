@@ -11,6 +11,9 @@
  *  • лимит 500 заметок и 8000 символов: localStorage не резиновый, а молча
  *    выкидывать старые заметки нельзя (это чужие данные) — при переполнении
  *    возвращаем ошибку `limit` и просим удалить лишнее;
+ *  • вложения (фото/аудио) живут НЕ здесь: в заметке только метаданные
+ *    (`attachments`), сами байты — в IndexedDB (`note-media-store.ts`).
+ *    Иначе одно фото в base64 раздуло бы localStorage и убило все заметки;
  *  • парсер терпимый, чужая версия/битый JSON → пусто, без исключений.
  */
 
@@ -20,11 +23,39 @@ export const COACH_NOTE_TITLE_MAX = 120;
 export const COACH_NOTE_BODY_MAX = 8000;
 export const COACH_NOTE_CHECKLIST_MAX = 100;
 export const COACH_NOTE_CHECKLIST_TEXT_MAX = 300;
+/** Сколько вложений можно прикрепить к одной заметке. */
+export const COACH_NOTE_ATTACHMENTS_MAX = 6;
+/** Потолок одного вложения: дальше файл просто не сохраняем (и говорим об этом). */
+export const COACH_NOTE_ATTACHMENT_BYTES_MAX = 25 * 1024 * 1024;
+export const COACH_NOTE_ATTACHMENT_NAME_MAX = 120;
+export const COACH_NOTE_ATTACHMENT_ID_MAX = 80;
+/** Аудио длиннее суток — это уже не голосовая заметка, а архив. */
+export const COACH_NOTE_AUDIO_MS_MAX = 24 * 60 * 60 * 1000;
 
 export interface CoachNoteChecklistItem {
   id: string;
   text: string;
   done: boolean;
+}
+
+export type CoachNoteAttachmentKind = 'photo' | 'audio';
+
+/**
+ * Вложение заметки — только метаданные. `id` — ключ записи в IndexedDB;
+ * без самого файла метаданные бесполезны, поэтому UI обязан показать
+ * «файл не найден», а не пустую картинку.
+ */
+export interface CoachNoteAttachment {
+  id: string;
+  kind: CoachNoteAttachmentKind;
+  mime: string;
+  /** Размер в байтах (0 — неизвестен, например у старого импорта). */
+  size: number;
+  /** Длительность аудио в мс (у фото отсутствует). */
+  durationMs?: number;
+  /** Имя файла или короткая подпись. */
+  name?: string;
+  createdAt: string;
 }
 
 export interface CoachNote {
@@ -43,6 +74,8 @@ export interface CoachNote {
   updatedAt: string;
   /** Чек-лист (TickTick-подобный): пункты с отметками. Опционален для старых заметок. */
   checklist?: CoachNoteChecklistItem[];
+  /** Фото/аудио заметки — только метаданные, байты в IndexedDB. */
+  attachments?: CoachNoteAttachment[];
 }
 
 export interface CoachNotesStore {
@@ -87,6 +120,67 @@ export function normalizeChecklist(raw: unknown): CoachNoteChecklistItem[] {
   return out;
 }
 
+/**
+ * Терпимый парсер вложений: id обязателен, mime — только image/* или audio/*,
+ * размер больше потолка выбрасывается (иначе метаданные ссылались бы на файл,
+ * которого в хранилище нет). Лимит на заметку сохраняется.
+ */
+export function normalizeAttachments(raw: unknown): CoachNoteAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: CoachNoteAttachment[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') continue;
+    const a = row as Partial<CoachNoteAttachment> & Record<string, unknown>;
+    const mime = text(a.mime, 60).toLowerCase();
+    const kind: CoachNoteAttachmentKind | null =
+      a.kind === 'photo' || a.kind === 'audio'
+        ? a.kind
+        : mime.startsWith('image/')
+          ? 'photo'
+          : mime.startsWith('audio/')
+            ? 'audio'
+            : null;
+    if (!kind || !/^(image|audio)\/[a-z0-9.+-]+$/i.test(mime)) continue;
+    if (kind === 'photo' && !mime.startsWith('image/')) continue;
+    if (kind === 'audio' && !mime.startsWith('audio/')) continue;
+    const sizeRaw = Number(a.size);
+    const size = Number.isFinite(sizeRaw) && sizeRaw > 0 ? Math.round(sizeRaw) : 0;
+    if (size > COACH_NOTE_ATTACHMENT_BYTES_MAX) continue;
+    let id = text(a.id, COACH_NOTE_ATTACHMENT_ID_MAX) || `a_${i + 1}`;
+    if (seen.has(id)) id = `a_${i + 1}_${out.length + 1}`;
+    const durRaw = Number(a.durationMs);
+    const durationMs =
+      kind === 'audio' && Number.isFinite(durRaw) && durRaw > 0
+        ? Math.min(Math.round(durRaw), COACH_NOTE_AUDIO_MS_MAX)
+        : undefined;
+    const name = text(a.name, COACH_NOTE_ATTACHMENT_NAME_MAX);
+    seen.add(id);
+    out.push({
+      id,
+      kind,
+      mime,
+      size,
+      ...(durationMs === undefined ? {} : { durationMs }),
+      ...(name ? { name } : {}),
+      createdAt: text(a.createdAt, 40) || nowIso(),
+    });
+    if (out.length >= COACH_NOTE_ATTACHMENTS_MAX) break;
+  }
+  return out;
+}
+
+/** Вложения заметки в нормализованном виде (для UI/виджета). */
+export function noteAttachments(note: CoachNote): CoachNoteAttachment[] {
+  return normalizeAttachments(note.attachments);
+}
+
+/** id вложений заметки — нужно хранилищу, чтобы вычистить осиротевшие файлы. */
+export function noteAttachmentIds(note: CoachNote): string[] {
+  return noteAttachments(note).map(a => a.id);
+}
+
 function normalizeNote(raw: unknown): CoachNote | null {
   if (!raw || typeof raw !== 'object') return null;
   const n = raw as Partial<CoachNote> & Record<string, unknown>;
@@ -94,7 +188,8 @@ function normalizeNote(raw: unknown): CoachNote | null {
   const title = text(n.title, COACH_NOTE_TITLE_MAX);
   const body = text(n.body, COACH_NOTE_BODY_MAX);
   const checklist = normalizeChecklist(n.checklist);
-  if (!id || (!title && !body && checklist.length === 0)) return null;
+  const attachments = normalizeAttachments(n.attachments);
+  if (!id || (!title && !body && checklist.length === 0 && attachments.length === 0)) return null;
   const createdAt = text(n.createdAt, 40) || nowIso();
   return {
     id,
@@ -106,6 +201,7 @@ function normalizeNote(raw: unknown): CoachNote | null {
     createdAt,
     updatedAt: text(n.updatedAt, 40) || createdAt,
     checklist,
+    attachments,
   };
 }
 
@@ -176,13 +272,17 @@ export function addCoachNote(
     /** Неделя `YYYY-MM-DD` (понедельник) — для «комментария к неделе». */
     week?: string | null;
     checklist?: CoachNoteChecklistItem[];
+    attachments?: CoachNoteAttachment[];
   },
   opts: { id?: string; now?: string } = {},
 ): AddCoachNoteResult {
   const title = text(input.title, COACH_NOTE_TITLE_MAX);
   const body = text(input.body, COACH_NOTE_BODY_MAX);
   const checklist = normalizeChecklist(input.checklist);
-  if (!title && !body && checklist.length === 0) return { store, note: null, error: 'empty' };
+  const attachments = normalizeAttachments(input.attachments);
+  if (!title && !body && checklist.length === 0 && attachments.length === 0) {
+    return { store, note: null, error: 'empty' };
+  }
   if (store.items.length >= COACH_NOTES_MAX) return { store, note: null, error: 'limit' };
   const now = opts.now ?? nowIso();
   const note: CoachNote = {
@@ -195,6 +295,7 @@ export function addCoachNote(
     createdAt: now,
     updatedAt: now,
     checklist,
+    attachments,
   };
   return { store: { version: 1, items: [note, ...store.items] }, note, error: null };
 }
@@ -209,6 +310,7 @@ export function updateCoachNote(
     pinned?: boolean;
     week?: string | null;
     checklist?: CoachNoteChecklistItem[];
+    attachments?: CoachNoteAttachment[];
   },
   opts: { now?: string } = {},
 ): CoachNotesStore {
@@ -218,7 +320,10 @@ export function updateCoachNote(
   const title = patch.title === undefined ? prev.title : text(patch.title, COACH_NOTE_TITLE_MAX);
   const body = patch.body === undefined ? prev.body : text(patch.body, COACH_NOTE_BODY_MAX);
   const checklist = patch.checklist === undefined ? normalizeChecklist(prev.checklist) : normalizeChecklist(patch.checklist);
-  if (!title && !body && checklist.length === 0) return store; // пустая заметка — мусор, не сохраняем
+  const attachments =
+    patch.attachments === undefined ? normalizeAttachments(prev.attachments) : normalizeAttachments(patch.attachments);
+  // пустая заметка — мусор, не сохраняем (но вложение без текста — валидная заметка)
+  if (!title && !body && checklist.length === 0 && attachments.length === 0) return store;
   const items = [...store.items];
   items[idx] = {
     ...prev,
@@ -228,8 +333,51 @@ export function updateCoachNote(
     week: patch.week === undefined ? prev.week : weekDay(patch.week),
     pinned: patch.pinned === undefined ? prev.pinned : patch.pinned === true,
     checklist,
+    attachments,
     updatedAt: opts.now ?? nowIso(),
   };
+  return { version: 1, items };
+}
+
+/**
+ * Прикрепить вложение к заметке. Возвращает тот же store, если лимит исчерпан
+ * или вложение битое — UI обязан сказать «больше 6 не влезет», а не молчать.
+ */
+export function addNoteAttachment(
+  store: CoachNotesStore,
+  noteId: string,
+  attachment: CoachNoteAttachment,
+  opts: { now?: string } = {},
+): CoachNotesStore {
+  const idx = store.items.findIndex(n => n.id === noteId);
+  if (idx < 0) return store;
+  const note = store.items[idx];
+  const current = normalizeAttachments(note.attachments);
+  const next = normalizeAttachments([
+    ...current,
+    { ...attachment, createdAt: attachment.createdAt || (opts.now ?? nowIso()) },
+  ]);
+  if (next.length === current.length) return store; // лимит/битое вложение
+  const items = [...store.items];
+  items[idx] = { ...note, attachments: next, updatedAt: opts.now ?? nowIso() };
+  return { version: 1, items };
+}
+
+/** Убрать вложение из заметки (сам файл из IndexedDB удаляет UI). */
+export function removeNoteAttachment(
+  store: CoachNotesStore,
+  noteId: string,
+  attachmentId: string,
+  opts: { now?: string } = {},
+): CoachNotesStore {
+  const idx = store.items.findIndex(n => n.id === noteId);
+  if (idx < 0) return store;
+  const note = store.items[idx];
+  const current = normalizeAttachments(note.attachments);
+  const next = current.filter(a => a.id !== attachmentId);
+  if (next.length === current.length) return store;
+  const items = [...store.items];
+  items[idx] = { ...note, attachments: next, updatedAt: opts.now ?? nowIso() };
   return { version: 1, items };
 }
 

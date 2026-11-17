@@ -1,5 +1,6 @@
 import { currentSpaceId, DATA_SPACE_KEY, HOME_SPACE_ID, parseRegistry } from './data-space';
 import { closeWeightPhotoDb, weightPhotoDbNameFor } from '../engines/weight-photo-store';
+import { deleteNoteMediaDatabaseSync } from '../engines/note-media-store';
 
 const DB_NAME = 'HealthEngineDB_v3';
 const DB_VERSION = 7;
@@ -691,6 +692,12 @@ export async function deleteWeightPhotoDatabase(spaceId: string): Promise<void> 
     spaces = []; // реестр недоступен — хотя бы домашнюю базу
   }
   const targets = new Set<string>([HOME_SPACE_ID, ...spaces]);
+  // Вложения заметок — база уровня устройства, не пространства: удаляем один раз.
+  try {
+    deleteNoteMediaDatabaseSync();
+  } catch {
+    /* ignore */
+  }
   for (const id of targets) {
     try {
       indexedDB.deleteDatabase(dbNameFor(id));

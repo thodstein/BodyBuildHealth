@@ -435,6 +435,49 @@ for (const rel of [
   if (line >= 0) fails.push(`MOJIBAKE ${rel}:${line + 1}`);
 }
 
+// 7e. Голосовые заметки (2026-11): без RECORD_AUDIO запись голоса в WebView
+// молча падает, а без проверки возможностей UI показывал бы кнопку-пустышку.
+mustContain(
+  'android/app/src/main/AndroidManifest.xml',
+  'android.permission.RECORD_AUDIO',
+  'voice notes: microphone permission',
+);
+mustContain(
+  'src/engines/note-media.engine.ts',
+  'export function isVoiceRecordingSupported',
+  'voice notes: honest recording probe',
+);
+mustContain(
+  'src/engines/note-media.engine.ts',
+  'export function isDictationSupported',
+  'voice notes: honest dictation probe',
+);
+mustContain(
+  'src/engines/coach/coach-notes.engine.ts',
+  'export interface CoachNoteAttachment',
+  'voice notes: attachment metadata model',
+);
+mustContain(
+  'src/engines/note-media-store.ts',
+  'export async function cleanupNoteMedia',
+  'voice notes: orphan media cleanup',
+);
+mustContain(
+  'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx',
+  'data-notes="add-voice"',
+  'voice notes: record button',
+);
+mustContain(
+  'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx',
+  'data-notes="dictate"',
+  'voice notes: dictation button',
+);
+mustContain(
+  'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx',
+  'data-notes="attach-remove"',
+  'voice notes: remove attachment',
+);
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',
