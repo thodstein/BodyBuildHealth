@@ -27,6 +27,7 @@ import {
   CATEGORY_PROFILES, isoAddDays, isoToday,
   canonicalWaterStrategy, canonicalSodiumStrategy, trialCarbDoseGPerKg,
   type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization,
+  type ContestEventEntry,
   type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
@@ -203,6 +204,83 @@ export function prepTrialDose(
   } catch {
     return undefined;
   }
+}
+
+/** Ключ курсора: какая дата шоу годового блока уже применена к prep-контуру. */
+export const ANNUAL_SHOWDATE_CURSOR_KEY = 'he_contest_annual_synced';
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export interface PrepContourSeed {
+  competitions: ContestEventEntry[];
+  /** Дата главного старта (ранний A, иначе самый ранний датированный). */
+  showDate?: string;
+}
+
+/** Дата главного старта: ранний старт приоритета A, иначе самый ранний датированный. */
+export function showDateFromCompetitions(
+  comps: ReadonlyArray<ContestEventEntry> | null | undefined,
+): string | undefined {
+  const dated = (comps ?? []).filter(c => typeof c?.date === 'string' && ISO_DATE_RE.test(c.date));
+  if (dated.length === 0) return undefined;
+  const byDate = (a: ContestEventEntry, b: ContestEventEntry) => String(a.date).localeCompare(String(b.date));
+  const main = dated.filter(c => c.priority === 'A').sort(byDate);
+  return (main.length ? main : [...dated].sort(byDate))[0]?.date;
+}
+
+/**
+ * Старты годового макроцикла → записи prep-контура.
+ *
+ * Аудит UI (P2): «два prep-контура пишут в одно хранилище» — макроцикл знает старты
+ * (`competitions` с датами и приоритетами), а prep-панель их не видела: те же старты
+ * заводились руками заново. Пустые записи (ни имени, ни даты) пропускаются, id
+ * сохраняется (на него ссылаются блоки макроцикла), иначе генерируется.
+ */
+export function prepSeedFromMacrocycle(
+  macro: { competitions?: ReadonlyArray<{ id?: string; name?: string; date?: string; priority?: string }> } | null | undefined,
+): PrepContourSeed {
+  const raw = Array.isArray(macro?.competitions) ? macro!.competitions! : [];
+  const competitions: ContestEventEntry[] = [];
+  raw.forEach((c, i) => {
+    if (!c || typeof c !== 'object') return;
+    const name = String(c.name ?? '').trim();
+    const date = typeof c.date === 'string' && ISO_DATE_RE.test(c.date.trim()) ? c.date.trim() : undefined;
+    if (!name && !date) return; // пустая запись ничего не сообщает
+    const priority: ContestEventEntry['priority'] =
+      c.priority === 'A' || c.priority === 'B' || c.priority === 'C' ? c.priority : undefined;
+    competitions.push({
+      id: String(c.id ?? '').trim() || `comp_${i + 1}`,
+      name: name || `Старт ${i + 1}`,
+      date,
+      priority,
+    });
+  });
+  return { competitions, showDate: showDateFromCompetitions(competitions) };
+}
+
+/**
+ * Нужно ли переносить дату шоу из годового блока в prep-контур.
+ *
+ * Аудит UI (P2): синк шёл только в UI-state (prep-план оставался со старой датой) и
+ * «на 7 дней» после ручной правки — через неделю он молча перетирал ручную дату.
+ * Теперь курсор последнего применённого значения: изменение даты в годовом блоке
+ * применяется ровно один раз, а ручная правка в prep не перетирается, пока годовой
+ * блок не изменят. Первое наблюдение (курсора нет) ничего не меняет — кто из контуров
+ * новее, неизвестно, а молча сдвигать уже настроенную подготовку нельзя.
+ */
+export function annualShowDateDecision(args: {
+  blockShowDate?: string | null;
+  lastSyncedShowDate?: string | null;
+  currentShowDate?: string | null;
+}): { date: string; action: 'apply' | 'adopt' } | null {
+  const block = typeof args.blockShowDate === 'string' ? args.blockShowDate.trim() : '';
+  if (!ISO_DATE_RE.test(block)) return null;
+  if (args.lastSyncedShowDate == null || args.lastSyncedShowDate === '') {
+    return { date: block, action: 'adopt' }; // первое наблюдение: только запоминаем
+  }
+  if (args.lastSyncedShowDate === block) return null; // это значение уже применено
+  if (args.currentShowDate === block) return { date: block, action: 'adopt' };
+  return { date: block, action: 'apply' };
 }
 
 /** Ручной суперсет: связать упражнение `index` с реальным партнёром в той же сессии.

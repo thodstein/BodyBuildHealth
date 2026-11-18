@@ -102,7 +102,7 @@ import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine
 
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
-import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, applyManualSupersetTo, prepTrialDose, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, applyManualSupersetTo, prepTrialDose, prepSeedFromMacrocycle, annualShowDateDecision, ANNUAL_SHOWDATE_CURSOR_KEY, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { resolveBbAutoOpenStep, shouldFollowExternalPlan, annualBlockCtxIsFresh, clampBbWeek } from './bb-auto-nav';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
@@ -196,18 +196,8 @@ export const BbAutoConstructor: React.FC = () => {
     window.addEventListener('he-annual-training-plan-updated', onUpd);
     return () => window.removeEventListener('he-annual-training-plan-updated', onUpd);
   }, []);
-  // PRO annualBlockId sync: если годовой план имеет contest prep блок — синкать дату шоу
-  useEffect(() => {
-    if (!annualPlan) return;
-    try {
-      const block = (annualPlan.blocks||[]).find((b:any)=>b.ref?.phase==='contest_prep' && b.status==='built');
-      if ((block?.result as any)?.showDate && (block?.result as any)?.showDate !== prepShowDate) {
-        // не перезаписываем если пользователь уже вручную менял в этом месяце
-        const isRecentManual = (()=>{ try{ const v=localStorage.getItem('he_contest_manual_date'); if(!v) return false; return Date.now() - Number(v) < 86400000*7; } catch{ return false; }})();
-        if (!isRecentManual) setPrepShowDate((block?.result as any)?.showDate);
-      }
-    } catch {}
-  }, [annualPlan]);
+  // PRO annualBlockId sync (дата шоу из годового блока) живёт ниже, после объявления
+  // prep-состояния: синк обязан сдвигать и prep-план, а не только UI-state (аудит UI, P2).
   // Стаж + любимые/нелюбимые упражнения (синхронизируются с профилем тренированности).
   const [bbTrainingYears, setBbTrainingYears] = useState<number>(prof.trainingYears || 3);
   const [bbFavEx, setBbFavEx] = useState<string[]>(prof.favoriteExercises || []);
@@ -913,10 +903,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     return storeContestPrepPlan(plan, cfg, { source: plan.source ?? 'bb_auto' });
   };
 
-  /** Перенос даты шоу с пересчётом фаз (завершённые недели — с предупреждением). */
-  const handleShiftPrepShowDate = (d: string) => {
-    try { localStorage.setItem('he_contest_manual_date', String(Date.now())); } catch {}
-    if (!prepPlan) { setPrepShowDate(d); return; }
+  /**
+   * Перенос даты шоу в prep-контуре: prep-план + профиль + оверлей тренировочного плана.
+   * Общее тело ручного переноса и синка из годового блока (у синка нет флеша — он
+   * приходит из фонового эффекта).
+   */
+  const applyPrepShowDate = (d: string): { changedFrozen: boolean; warnings: string[] } | null => {
+    if (!prepPlan) { setPrepShowDate(d); return null; }
     const { plan, changedFrozen, warnings } = shiftBBContestPrepShowDate(prepPlan, d);
     // Аудит UI (P2): персональная доза trial пик-недели не теряется при переносе даты —
     // доза едет в плане (`peakWeek.carbDoseGPerKg`), но её нужно явно передать в оверлей.
@@ -926,8 +919,6 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       : plan;
     setPrepPlan(planWithDose);
     setPrepShowDate(d);
-    if (changedFrozen) flash(warnings[0] ?? 'Завершённые недели требуют подтверждения');
-    else if (warnings.length) flash(warnings[0]);
     // PRO-3 Э1/D1: персист под НОВУЮ дату: cfg с явной датой (state prepShowDate ещё stale —
     // setState асинхронен), план сохраняется вместе с ним (раньше перенос терялся до пересборки).
     const cfgShifted = { ...buildContestPrepConfig(), showDate: d };
@@ -945,7 +936,44 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setEditsHistory([]);
       setRedosHistory([]);
     }
+    return { changedFrozen, warnings };
   };
+
+  /** Перенос даты шоу с пересчётом фаз (завершённые недели — с предупреждением). */
+  const handleShiftPrepShowDate = (d: string) => {
+    const res = applyPrepShowDate(d);
+    if (!res) return;
+    if (res.changedFrozen) flash(res.warnings[0] ?? 'Завершённые недели требуют подтверждения');
+    else if (res.warnings.length) flash(res.warnings[0]);
+  };
+
+  /**
+   * Синк «годовой блок → prep-контур» (аудит UI, P2: два prep-контура пишут в одно
+   * хранилище). Раньше эффект трогал только `prepShowDate` — prep-план оставался со
+   * старой датой, а ручную правку он защищал всего 7 дней и потом молча перетирал.
+   * Теперь применяется каждое НОВОЕ значение даты годового блока (курсор
+   * `ANNUAL_SHOWDATE_CURSOR_KEY`): сдвиг prep-плана, персист и оверлей. Первое
+   * наблюдение только запоминается — кто из контуров новее, неизвестно.
+   */
+  useEffect(() => {
+    if (!annualPlan) return;
+    let blockDate: string | undefined;
+    try {
+      const block = (annualPlan.blocks || []).find((b: any) => b.ref?.phase === 'contest_prep' && b.status === 'built');
+      blockDate = (block?.result as any)?.showDate;
+    } catch { return; }
+    if (!blockDate) return;
+    let lastSynced: string | undefined;
+    try { lastSynced = localStorage.getItem(ANNUAL_SHOWDATE_CURSOR_KEY) ?? undefined; } catch { /* ignore */ }
+    const decision = annualShowDateDecision({
+      blockShowDate: blockDate,
+      lastSyncedShowDate: lastSynced,
+      currentShowDate: prepPlan?.showDate ?? prepShowDate,
+    });
+    if (!decision) return;
+    if (decision.action === 'apply') applyPrepShowDate(decision.date);
+    try { localStorage.setItem(ANNUAL_SHOWDATE_CURSOR_KEY, decision.date); } catch { /* ignore */ }
+  }, [annualPlan, prepPlan?.showDate, prepShowDate, prepApplied, builtPlan]);
 
   /** Расширить только подготовительный блок (+/- недели). */
   const handleExtendPrep = (delta: number) => {
@@ -5102,6 +5130,17 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
               return;
             }
             setBbAnnualMacrocycle(source as BBMacrocycle);
+            // Аудит UI (P2): старты и дата шоу макроцикла доезжают до prep-контура — раньше
+            // их приходилось заводить в prep-панели заново. Заполняем только пустое: годовой
+            // план — источник, но уже настроенную подготовку молча не перетираем.
+            const seed = prepSeedFromMacrocycle(source as BBMacrocycle);
+            if (seed.competitions.length > 0 && !(prepCompetitions && prepCompetitions.length > 0)) {
+              setPrepCompetitions(seed.competitions);
+            }
+            if (seed.showDate && !prepPlan) {
+              setPrepShowDate(seed.showDate);
+              setPcShowDate(seed.showDate);
+            }
             setPlanMode('generic_split');
             setBbWeeks(source.totalWeeks);
             setBbTrainingFocus(source.trainingFocus);
