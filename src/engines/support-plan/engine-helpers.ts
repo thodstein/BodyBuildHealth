@@ -31,6 +31,8 @@ import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber as num } from './lab-field-number';
+import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
+import { getLabEntry } from '../../data/lab-tier-ranges';
 
 //  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
 // ═══════════════════════════════════════════════════════════════
@@ -954,32 +956,112 @@ export function getBlacklist(state: CalculatorState): string[] {
   return state.journal.negative.map(n => n.substanceId);
 }
 
+/**
+ * Динамика анализов: до курса → середина курса → после ПКТ.
+ *
+ * Проход 137. Раньше здесь было три дефекта одного класса — «сравниваем то, что
+ * не сравнивается»:
+ *  - маркеры искались только в четырёх панелях (`panelSex`, `panelBiochem`,
+ *    `panelHematology`, `panelThyroid`), поэтому липиды, железо, витамины, коагуляция
+ *    и моча в динамику не попадали вовсе;
+ *  - значения брались сырыми строками: `Number('>1000')` = NaN, `Number('5,4')` = NaN,
+ *    а разные единицы одного анализа (тестостерон нмоль/л и нг/дл) сравнивались
+ *    напрямую (550 против 20 — «рост», хотя это одно и то же);
+ *  - тренд решался по абсолютной разнице (`|Δ| > 20`), то есть порог 20 был
+ *    бессмысленным для любых единиц, а рост любого маркера назывался «ухудшением» —
+ *    даже рост тестостерона, витамина D, ферритина, где хуже как раз снижение.
+ *
+ * Теперь число читает тот же `readLabValue` (единица бланка главнее), имя — та же
+ * таблица `labMarkerCanon`, а направление «хуже/лучше» — из шкалы ступеней
+ * (`getLabEntry(...).direction`), то есть из единственного источника порогов.
+ * Если шкалы у маркера нет, динамика честно называется «изменился» (`changed`), а
+ * не «ухудшение»; при первом значении 0 процент не вычисляется — тогда изменение
+ * тоже не эскалируется до критического.
+ */
 export function calcLabDeltas(state: CalculatorState): LabDelta[] {
-  const { preCourse, midCourse, postPCT } = state.labs;
-  const markers = new Set<string>();
-  for (const slice of [preCourse, midCourse, postPCT]) {
-    if (slice) for (const k of Object.keys(slice.panelSex || {})) markers.add(k);
-    if (slice) for (const k of Object.keys(slice.panelBiochem || {})) markers.add(k);
-    if (slice) for (const k of Object.keys(slice.panelHematology || {})) markers.add(k);
-    if (slice) for (const k of Object.keys(slice.panelThyroid || {})) markers.add(k);
+  const slices = [state.labs.preCourse, state.labs.midCourse, state.labs.postPCT];
+  const sex: 'male' | 'female' = state.profile?.sex === 'female' ? 'female' : 'male';
+
+  interface Row {
+    label: string;
+    canon: string;
+    raw: (string | undefined)[];
+    num: (number | undefined)[];
   }
-  const res: LabDelta[] = [];
-  const getVal = (slice: LabSlice | null, marker: string): string | undefined => {
-    if (!slice) return undefined;
-    return slice.panelSex[marker] ?? slice.panelBiochem[marker] ?? slice.panelHematology[marker] ?? slice.panelThyroid[marker] ?? undefined;
-  };
-  for (const marker of markers) {
-    const preV = getVal(preCourse, marker); const midV = getVal(midCourse, marker); const postV = getVal(postPCT, marker);
-    const dPreMid = preV !== undefined && midV !== undefined ? Math.round((Number(midV) - Number(preV)) / Number(preV) * 100) : undefined;
-    let trend: LabDelta['trend'] = 'stable';
-    const vals = [preV, midV, postV].filter(v => v !== undefined).map(Number);
-    if (vals.length >= 2) {
-      const last = vals[vals.length - 1]; const first = vals[0];
-      const delta = last - first;
-      trend = Math.abs(delta) > 20 ? (delta > 0 ? 'worsening' : 'improving') : 'stable';
-      if (Math.abs(delta) > 50) trend = 'critical';
+  const rows = new Map<string, Row>();
+
+  slices.forEach((slice, i) => {
+    if (!slice) return;
+    for (const pk of LAB_PANEL_KEYS) {
+      const panel = (slice as any)[pk] as Record<string, string> | undefined;
+      if (!panel) continue;
+      for (const [label, raw] of Object.entries(panel)) {
+        if (raw === undefined || raw === null || raw === '') continue;
+        const canon = labMarkerCanon(label);
+        let row = rows.get(canon);
+        if (!row) {
+          row = { label, canon, raw: [undefined, undefined, undefined], num: [undefined, undefined, undefined] };
+          rows.set(canon, row);
+        }
+        row.raw[i] = String(raw);
+        const n = num(raw);
+        row.num[i] = n === undefined
+          ? undefined
+          : readLabValue(label, n, slice.units?.[pk]?.[label], sex).value;
+      }
     }
-    res.push({ marker, sliceValues: [preV, midV, postV], trend });
+  });
+
+  const res: LabDelta[] = [];
+  for (const row of rows.values()) {
+    // Если ни в одном бланке нет числа (человек написал «следы», «отр.»), строку не
+    // показываем: «—→—» выглядит как данные, а данных нет.
+    if (row.num.every((v) => v === undefined)) continue;
+    const entry = getLabEntry(row.canon);
+    const defined = row.num.map((v, i) => (v === undefined ? -1 : i)).filter((i) => i >= 0);
+    let trend: LabDelta['trend'] = 'stable';
+
+    if (defined.length >= 2) {
+      const first = row.num[defined[0]]!;
+      const last = row.num[defined[defined.length - 1]]!;
+      const bothNormal = !!entry
+        && first >= entry.normal[0] && first <= entry.normal[1]
+        && last >= entry.normal[0] && last <= entry.normal[1];
+
+      if (!bothNormal) {
+        const pct = first === 0 ? null : ((last - first) / Math.abs(first)) * 100;
+        const dir = entry?.direction;
+        const dist = (v: number) => (v < entry!.normal[0] ? entry!.normal[0] - v
+          : v > entry!.normal[1] ? v - entry!.normal[1] : 0);
+        let worse: boolean | null = null;
+        if (dir === 'high') worse = last > first;
+        else if (dir === 'low') worse = last < first;
+        else if (dir === 'both' && entry) worse = dist(last) > dist(first);
+
+        // При первом значении 0 процент не определён: изменение видно, но «критическим»
+        // его не называем (это была бы выдуманная величина), максимум — ухудшение.
+        const magnitude = pct === null ? (last === first ? 0 : 20) : Math.abs(pct);
+        if (worse === null) trend = magnitude >= 20 ? 'changed' : 'stable';
+        else if (worse) trend = magnitude >= 50 ? 'critical' : magnitude >= 20 ? 'worsening' : 'stable';
+        else trend = magnitude >= 20 ? 'improving' : 'stable';
+      }
+    }
+
+    // В карточке показываем числа в каноне (в той же единице, что и стрелка), а знак
+    // границы («>1000») сохраняем: выдать «≥» за точное значение нельзя.
+    const shown = row.num.map((v, i) => {
+      if (v === undefined) return undefined;
+      const raw = (row.raw[i] || '').trim();
+      const bound = /^[<>≤≥]/.test(raw) ? raw[0].replace('≤', '<').replace('≥', '>') : '';
+      return `${bound}${Math.round(v * 100) / 100}`;
+    });
+
+    res.push({
+      marker: row.label,
+      sliceValues: shown,
+      unit: entry?.unit || undefined,
+      trend,
+    });
   }
   return res;
 }

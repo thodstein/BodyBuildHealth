@@ -10,6 +10,7 @@ import type { CalculatorState, LabSlice } from './types';
 import { readLabValue } from '../../core/constants';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber } from './lab-field-number';
+import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import type { MapperCtx } from '../tz-mapper-engine';
 import type { PhaseContext, PhaseKey } from '../tz-bridge-phase';
@@ -18,51 +19,32 @@ import { classifyPed } from '../../data/ped-potency-table';
 import { resolvePedAlias } from '../../data/ped-alias-map';
 import { assessPedRisk } from '../ped-risk-matrix';
 
-const PANEL_KEYS = [
-  'panelBiochem', 'panelSex', 'panelHematology', 'panelThyroid',
-  'panelLipid', 'panelIron', 'panelVitamin', 'panelCardiac',
-  'panelCoagulation', 'panelInflammatory', 'panelAdrenal',
-  'panelMineral', 'panelTumor', 'panelUrinalysis',
-] as const;
-
-const MARKER_RENAME: Record<string, string> = {
-  'Total T': 'TESTOSTERONE', 'Free T': 'FREE_TESTOSTERONE', 'E2': 'ESTRADIOL',
-  'Bilirubin': 'BILIRUBIN', 'Uric acid': 'URIC_ACID', 'HCT': 'HEMATOCRIT',
-  'Hemoglobin': 'HEMOGLOBIN', 'Total Cholesterol': 'TOTAL_CHOLESTEROL',
-  'Triglycerides': 'TRIGLYCERIDES', 'T3 free': 'T3_FREE', 'T4 free': 'T4_FREE',
-  'Anti-TPO': 'ANTI_TPO', 'Anti-TG': 'ANTI_TG', 'Vitamin D (25-OH)': 'VITAMIN_D',
-  'Transferrin Sat': 'TRANSFERRIN_SAT', 'CK-MB': 'CK_MB', 'D-dimer': 'D_DIMER',
-  'IL-6': 'IL_6', 'TNF-alpha': 'TNF_ALPHA', 'DHEA-S': 'DHEA_S', '3a-ADG': '3A_ADG',
-  'PSA total': 'PSA_TOTAL', 'PSA free': 'PSA_FREE', 'CA-125': 'CA_125', 'Lp(a)': 'LP_A',
-};
-
 /**
  * Плоская карта «маркер → число» для `MapperCtx`.
  *
  * Проход 135: единица бланка — часть данных (проход 106), и здесь она терялась.
  * Раньше число разбиралось сырой строкой, без учёта единицы, поэтому значение
  * приходило в мост механизмов и в ступени в той единице, которую человек выбрал
- * в форме: пролактин 300 мМЕ/л
- * (это 14.2 нг/мл) читался как 300 нг/мл — «экстренно» по `cns1` и по ступеням;
- * кортизол 15 мкг/дл (414 нмоль/л, норма) — как 15 нмоль/л, то есть «лечение»;
- * витамин D 62 нмоль/л (24.8 нг/мл, недостаточность) — как 62 нг/мл, «норма».
- * Теперь число читает тот же читатель, что и риск-модель (`readLabValue`): единица
- * из бланка главнее, без единицы — прежняя догадка по величине. У маркеров без
- * выбора единицы число не меняется.
+ * в форме: пролактин 300 мМЕ/л (это 14.2 нг/мл) читался как 300 нг/мл —
+ * «экстренно» по `cns1` и по ступеням; кортизол 15 мкг/дл (414 нмоль/л, норма) —
+ * как 15 нмоль/л, то есть «лечение»; витамин D 62 нмоль/л (24.8 нг/мл,
+ * недостаточность) — как 62 нг/мл, «норма». Теперь число читает тот же читатель,
+ * что и риск-модель (`readLabValue`): единица из бланка главнее, без единицы —
+ * прежняя догадка по величине. У маркеров без выбора единицы число не меняется.
+ * Имя маркера переводится одной таблицей (`labMarkerCanon`), проход 136.
  */
 export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): Record<string, number> {
   if (!fp) return {};
   const out: Record<string, number> = {};
   const units = fp.units;
-  for (const pk of PANEL_KEYS) {
+  for (const pk of LAB_PANEL_KEYS) {
     const panel = (fp as any)[pk] as Record<string, string> | undefined;
     if (!panel) continue;
     for (const [marker, val] of Object.entries(panel)) {
       if (!val) continue;
       const num = labFieldNumber(val);
       if (num === undefined) continue;
-      const rename = MARKER_RENAME[marker] || marker.toUpperCase().replace(/\s+/g, '_');
-      out[rename] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
+      out[labMarkerCanon(marker)] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
     }
   }
   return out;

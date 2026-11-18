@@ -77,15 +77,22 @@ export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
   if (deltas.length === 0) return <div className="calc-labdelta" style={{ ...GLASS, padding: 12, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>Нет данных</div>;
   const critical = deltas.filter(d => d.trend === 'critical');
   const worsening = deltas.filter(d => d.trend === 'worsening');
+  // Проход 137: значения показаны в каноне (той же единице, что и направление стрелки),
+  // поэтому единица печатается в подсказке строки. `changed` — «изменился, но шкалы,
+  // которая говорит, хуже это или лучше, в приложении нет»: не зелёный и не жёлтый.
+  const trendMark = (t: LabDelta['trend']) =>
+    t === 'critical' ? '❗' : t === 'worsening' ? '⚠' : t === 'changed' ? '⇄' : '✓';
+  const trendColor = (t: LabDelta['trend']) =>
+    t === 'critical' ? '#ef4444' : t === 'worsening' ? '#fbbf24' : t === 'changed' ? 'var(--text-dim)' : '#22c55e';
   return <div className="calc-labdelta">
     {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(d => d.marker).join(', ')}</span></div>}
     {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(d => d.marker).join(', ')}</span></div>}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
       {deltas.slice(0, 16).map(d =>
-        <div key={d.marker} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
+        <div key={d.marker} title={d.unit ? `${d.marker}, ${d.unit}` : d.marker} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
           <span style={{ fontWeight: 600, color: 'var(--text)', width: 60 }}>{d.marker}</span>
           <span style={{ color: 'var(--text-dim)' }}>{d.sliceValues.map(v => v ?? '—').join('→')}</span>
-          <span style={{ marginLeft: 'auto', color: d.trend === 'critical' ? '#ef4444' : d.trend === 'worsening' ? '#fbbf24' : '#22c55e' }}>{d.trend === 'critical' ? '❗' : d.trend === 'worsening' ? '⚠' : '✓'}</span>
+          <span style={{ marginLeft: 'auto', color: trendColor(d.trend) }}>{trendMark(d.trend)}</span>
         </div>
       )}
     </div>

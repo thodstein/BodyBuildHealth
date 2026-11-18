@@ -401,7 +401,7 @@ export type TimeBlock = 'morning' | 'afternoon' | 'evening';
 export interface ScheduleItem { substanceId: string; name: string; dose: string; timeBlock: TimeBlock; instructions: string; synergyGroup?: SynergyId; }
 
 // ─── Lab Deltas ───
-export interface LabDelta { marker: string; sliceValues: (string|undefined)[]; trend: 'stable'|'improving'|'worsening'|'critical'; }
+export interface LabDelta { marker: string; sliceValues: (string|undefined)[]; trend: 'stable'|'improving'|'worsening'|'critical'|'changed'; unit?: string; }
 
 // ─── Synergy_ID Groups ───
 export type SynergyId =
