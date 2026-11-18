@@ -29,6 +29,8 @@ import { e2PgPerMl, ckdEpi2021 } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
+import { currentLabSlice } from './lab-slice';
+import { labFieldNumber as num } from './lab-field-number';
 
 //  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
 // ═══════════════════════════════════════════════════════════════
@@ -1000,27 +1002,9 @@ function extractLabValues(
   age?: number,
 ): Record<string, number> {
   const v: Record<string, number> = {};
-  const fp = labs?.fullPanel || labs?.midCourse || labs?.preCourse;
+  // Проход 136: бланк выбирается одним правилом на всё приложение.
+  const fp = currentLabSlice(labs);
   if (!fp) return v;
-
-  const num = (val: any): number | undefined => {
-    if (val === undefined || val === null || val === '') return undefined;
-    // Проход 130: «1+», «2+», «++» — это полоска, а не концентрация.
-    // `parseFloat('1+')` даёт 1, и «+1» белка мочи становился 1 г/л, то есть
-    // нефротической протеинурией из ничего.
-    if (typeof val === 'string' && val.includes('+')) return undefined;
-    // Проход 131: бланк печатает «>1000» и «<0.5». `parseFloat` на такой строке
-    // даёт NaN, и анализ пропадал целиком: ферритин «>1000» (перегрузка железом)
-    // не давал ни находки, ни вклада в риск. Границу читаем как её число — так же,
-    // как это уже делает авто-разбор бланка (`core/lab-auto-parser`: `[<>≤≥]?число`),
-    // а интерфейс говорит об этом баннером «граница вместо числа» (`labBoundNotes`).
-    if (typeof val === 'string' && /^[<>≤≥]/.test(val.trim())) {
-      const bound = parseFloat(val.trim().replace(/^[<>≤≥]\s*/, '').replace(',', '.'));
-      return isNaN(bound) ? undefined : bound;
-    }
-    const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
-    return isNaN(n) ? undefined : n;
-  };
 
   // panelBiochem: ALT, AST, GGT, Bilirubin, Glucose, Creatinine, Urea, Uric acid, CRP, Homocysteine
   const b = (fp.panelBiochem || {}) as Record<string, any>;

@@ -20,6 +20,8 @@ import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
 import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
 import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
+import { currentLabSlice } from '../../../engines/support-plan';
+import { TT_NMOL_TO_NG_DL } from '../../../core/constants';
 import { applyGeneticsToRecSubs, applyDietAwareToRecSubs } from '../../../engines/support-genetics-diet.engine';
 import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
@@ -441,7 +443,9 @@ function buildNeuroSymptomsFromState(state: any): Set<string> {
   const n = state?.neuro || {};
   const p = state?.profile || {};
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
+  // Проход 136: бланк выбирается одним правилом (`currentLabSlice`), иначе анализам,
+  // заполненным только в «середине курса», здесь нечего было прочитать.
+  const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
   if ((n.aggressionScore || 0) >= 4) s.add('aggression');
   if (n.gabaBalance === 'overexcited') { s.add('anxiety'); s.add('inner_tremor'); }
   if (p.sleepHours != null && p.sleepHours < 6) s.add('sleep_onset2');
@@ -464,7 +468,9 @@ function buildJointSymptomsFromState(state: any): Set<string> {
   const s = new Set<string>();
   const oda = state?.oda || {};
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
+  // Проход 136: бланк выбирается одним правилом (`currentLabSlice`), иначе анализам,
+  // заполненным только в «середине курса», здесь нечего было прочитать.
+  const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
   const jp = oda.jointPain;
   if (jp === 'mild') s.add('load_pain');
   if (jp === 'moderate') { s.add('load_pain'); s.add('crepitus'); }
@@ -480,7 +486,9 @@ function buildJointSymptomsFromState(state: any): Set<string> {
 function buildHematoSymptomsFromState(state: any): Set<string> {
   const s = new Set<string>();
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
+  // Проход 136: бланк выбирается одним правилом (`currentLabSlice`), иначе анализам,
+  // заполненным только в «середине курса», здесь нечего было прочитать.
+  const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
   const hct = labs['HEMATOCRIT'] || labs['HCT'];
   const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
   const plt = labs['PLT'];
@@ -671,7 +679,7 @@ function analyzeStackModule(
 
   const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
   const symptoms = state.symptoms || [];
-  const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
+  const labs = labSliceToValues(currentLabSlice(state.labs), state.profile.sex);
   const jointPain = state.oda.jointPain;
   const hasJointSymptom = symptoms.includes('joint_pain');
   const crp = labs['CRP'] || labs['HSCRP'];
@@ -1107,10 +1115,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   useEffect(() => {
     if (!finalRec) { setCalcNotifs([]); return; }
     try {
-      const notifLabs = labSliceToValues(state.labs?.fullPanel ?? null, state?.profile?.sex);
+      // Проход 136: уведомления читают тот же бланк, что и расчёт (полный → середина
+      // курса → до курса). Раньше смотрели только полный бланк.
+      const curLabs = currentLabSlice(state.labs);
+      const notifLabs = labSliceToValues(curLabs, state?.profile?.sex);
       const notifState: any = {
         labs: {
-          lastLabDate: state.labs?.fullPanel?.date,
+          lastLabDate: curLabs?.date,
           alt: notifLabs['ALT'] ?? notifLabs['АЛТ'],
           ast: notifLabs['AST'] ?? notifLabs['АСТ'],
           e2: notifLabs['ESTRADIOL'] ?? notifLabs['ЭСТРАДИОЛ'],
@@ -1120,7 +1131,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           egfr: notifLabs['EGFR'] ?? notifLabs['СКФ'],
           dDimer: notifLabs['D_DIMER'] ?? notifLabs['D_ДИМЕР'],
         },
-        fullPanel: state.labs?.fullPanel ?? null,
+        fullPanel: curLabs,
         // Пол нужен для честных порогов: HCT 48/52, АЛТ 2.5×ULN 31, E2-диапазон цикла.
         sex: state.profile?.sex === 'female' ? 'female' : 'male',
         pharma: {
@@ -1137,15 +1148,19 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   }, [finalRec, state.labs, rec?.phase, state.profile?.sex]);
 
   // Sticky-баннер «Сдайте анализы»: группировка по системам, не перекрывает нижние кнопки.
+  // Проход 136: сданным считается тот бланк, по которому считается расчёт
+  // (полный → середина курса → до курса), иначе свежая середина курса выглядела
+  // как «ничего не сдано».
+  const overdueLabSlice = currentLabSlice(state.labs);
   const overdueSystems: SystemOverdue[] = useMemo(() => {
     try {
       return computeOverdueSystems({
-        fullPanel: state.labs?.fullPanel ?? null,
+        fullPanel: overdueLabSlice,
         phase: rec?.phase || 'course',
-        lastLabDate: state.labs?.fullPanel?.date,
+        lastLabDate: overdueLabSlice?.date,
       });
     } catch { return []; }
-  }, [state.labs?.fullPanel, rec?.phase]);
+  }, [overdueLabSlice, rec?.phase]);
 
   const [bannerDismissSig, setBannerDismissSig] = useState<string | null>(() => {
     try { return localStorage.getItem('he_calc_labs_banner_dismissed'); }
@@ -1158,11 +1173,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
     try {
       return JSON.stringify({
         p: rec?.phase || '',
-        d: state.labs?.fullPanel?.date || '',
+        d: overdueLabSlice?.date || '',
         s: overdueSystems.map((s) => [s.system, s.count, ...s.markers]),
       });
     } catch { return ''; }
-  }, [overdueSystems, rec?.phase, state.labs?.fullPanel]);
+  }, [overdueSystems, rec?.phase, overdueLabSlice]);
 
   // Миграция legacy-флага '1' (вечное скрытие): приравниваем к текущей сигнатуре,
   // чтобы карточка вернулась при смене состава просрочки.
@@ -1911,7 +1926,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Универсальные системные popup-ы: тот же каркас, что у Нейро/Кровь/Суставы ── */}
       {genericEnhancementPopup && GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup] && ReactDOM.createPortal((() => {
         const cfg = GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup];
-        const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
+        const labs = labSliceToValues(currentLabSlice(state.labs), state.profile.sex);
         const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
         const activeDomains = domains.filter(d => d.trigger?.(labs, state));
         const activeMarkers = cfg.markers.filter(m => labs[m] != null);
@@ -1998,7 +2013,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         if (stackModulePopup === 'articular_stack') {
           const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
           const symptoms = state.symptoms || [];
-          const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
+          const labs = labSliceToValues(currentLabSlice(state.labs), state.profile.sex);
           const jointPain = state.oda.jointPain;
           const hasJointSymptom = symptoms.includes('joint_pain');
           const crp = labs['CRP'] || labs['HSCRP'];
@@ -2412,7 +2427,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const hematoCoverage = finalRecWithResidual?.pedRisk?.hematoCoverage;
           const hematoCovered = finalRecWithResidual?.pedRisk?.hematoCovered ?? 0;
           const hematoRecommended = finalRecWithResidual?.pedRisk?.hematoRecommended ?? 0;
-          const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
+          // Проход 136: бланк выбирается одним правилом (`currentLabSlice`), иначе анализам,
+  // заполненным только в «середине курса», здесь нечего было прочитать.
+  const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
           const hct = labs['HEMATOCRIT'] || labs['HCT'];
           const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
           const plt = labs['PLT'];
@@ -3927,7 +3944,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const cycleWeeks = state.goals?.cycleWeeks || 12;
         const pctProtocol = rec?.pedFlags?.hasTest ? 'hcg+clomid' : 'clomid+nolva';
 
-        const fp: any = state.labs?.fullPanel || {};
+        // Проход 136: базовые значения берутся из того же бланка и того же читателя,
+        // что и остальной расчёт (`labSliceToValues` умеет единицы). Раньше здесь стояло
+        // `state.labs.fullPanel` и ключи `fp.TESTOSTERONE` — у среза таких ключей нет
+        // (они лежат в `panelSex`/`panelBiochem`), поэтому прогноз всегда шёл на
+        // дефолтах 650/28/14/450, даже когда человек сдал анализы.
+        // Модель ребаунда ждёт тестостерон в нг/дл (её дефолт 650, FT = TT × 0.02),
+        // а канон чтения — нмоль/л: переводим явно, а не «как получится».
+        const fp = labSliceToValues(currentLabSlice(state.labs), state.profile?.sex);
         const reboundInput: any = {
           peds: peds.map((p: any) => ({ id: p.id, pClass: p.pClass, mgPerWeek: p.mgPerWeek, iuPerDay: p.iuPerDay, mcgPerDay: p.mcgPerDay })),
           cycleWeeks,
@@ -3938,13 +3962,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           supportSubs: finalRec.subs.map((s: any) => s.substanceId),
           userProfile: {
             age: state.profile?.age || 30,
-            baselineTT: fp.TESTOSTERONE || 650,
-            baselineE2: fp.ESTRADIOL || 28,
-            baselinePRL: fp.PROLACTIN || 14,
-            baselineCortisol: fp.CORTISOL || 450,
-            baselineSHBG: fp.SHBG || 30,
-            baselineLH: fp.LH || 5,
-            baselineFSH: fp.FSH || 4,
+            baselineTT: fp['TESTOSTERONE'] ? fp['TESTOSTERONE'] * TT_NMOL_TO_NG_DL : 650,
+            baselineE2: fp['ESTRADIOL'] || 28,
+            baselinePRL: fp['PROLACTIN'] || 14,
+            baselineCortisol: fp['CORTISOL'] || 450,
+            baselineSHBG: fp['SHBG'] || 30,
+            baselineLH: fp['LH'] || 5,
+            baselineFSH: fp['FSH'] || 4,
           },
         };
         

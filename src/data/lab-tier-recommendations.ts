@@ -8,7 +8,7 @@
 //  computeTierAdjustments(labs) → {addSubs, titrationFactors, nutritionTips, alerts, stopCourse}
 // ════════════════════════════════════════════════════════════════════════════
 
-import { deriveTier, getTierLabel, LAB_TIERS, type Tier } from './lab-tier-ranges';
+import { deriveTier, getTierLabel, LAB_TIERS, tierMarkerKey, type Tier } from './lab-tier-ranges';
 import { FEMALE_HORMONE_ULN } from '../engines/lab-norms.engine';
 
 export interface TierAddSub {
@@ -233,7 +233,10 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'FT4', tier1: { add: [['selenium', 'Селен 200 мкг']], nutrition: [['Йод', '150 мкг']] }, tier2: { nutrition: [['Врач', 'Эндокринолог']] }, tier3: { alerts: ['T4 св. = {value} пмоль/л — гипертиреоз. Эндокринолог.'] } },
 
-  { marker: 'CHOLESTEROL_TOTAL', tier1: { nutrition: [['↓ насыщ. жиры', '<10%'], ['Клетчатка', '30+ г']] }, tier2: { add: [['bergamot', 'Бергамот 1000 мг']], nutrition: [['Врач', 'Кардиолог']] }, tier3: { alerts: ['Холестерин = {value} — высокий. Кардиолог.'] } },
+  // Проход 136: второй `CHOLESTEROL_TOTAL` (слабый дубль того, что выше в разделе
+  // печени/липидов) удалён. `TIER_RULES.find` берёт первое правило, поэтому дубль
+  // был мёртвым кодом: правка в нём ничего бы не изменила, а два совета на один
+  // анализ выглядели как разные рекомендации.
 
   // ─── МАРКЁРЫ МОЧИ (ОАМ) ───
   { marker: 'URINE_PH', tier1: { nutrition: [['Контроль', 'Повтор через 2 нед'], ['Вода', '40+ мл/кг']] }, tier2: { nutrition: [['Диета', 'Закисление/ощелачивание'], ['Врач', 'Нефролог']] }, tier3: { alerts: ['pH мочи = {value} — нарушение кислотно-щелочного баланса. Врач.'] } },
@@ -373,6 +376,14 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
   for (const [marker, value] of Object.entries(labs)) {
     if (typeof value !== 'number' || isNaN(value)) continue;
 
+    // Проход 136: имя анализа переводится в словарь лестниц одной таблицей
+    // (`tierMarkerKey`), иначе `HEMATOCRIT`/`TOTAL_CHOLESTEROL`/`PROTEIN` (моча)/
+    // `ANTI_TPO`/`IL_6` из формы не находили ни шкалы, ни действий. Если в карте
+    // есть и каноническое имя — считаем его, а псевдоним пропускаем, чтобы одна
+    // находка не задвоилась.
+    const ruleKey = tierMarkerKey(marker);
+    if (ruleKey !== marker.toUpperCase() && labs[ruleKey] !== undefined) continue;
+
     // Проход 83: женские гормоны идут своим путём. `deriveTier` для них вернёт 0
     // (мужская лестница не применяется), поэтому тревожные бэнды женской модели
     // печатаем здесь — своей формулировкой, без анастрозола и кломифена.
@@ -398,7 +409,7 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
     const tier = deriveTier(marker, value, sex);
     if (tier === 0) continue;
 
-    const rule = TIER_RULES.find(r => r.marker === marker.toUpperCase());
+    const rule = TIER_RULES.find(r => r.marker === ruleKey);
     if (!rule) continue;
 
     tierSummary.push({
@@ -411,7 +422,7 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
 
     // CRITICAL: калий/натрий — direction:'both'. Добавлять препарат/соль ТОЛЬКО при НИЗКОЙ стороне.
     // При ВЫСОКОЙ стороне (гиперкалиемия/гипернатриемия) добавка K⁺/соли — фатальна → ограничение.
-    const mkey = marker.toUpperCase();
+    const mkey = ruleKey;
     const tdef = LAB_TIERS[mkey];
     const isHighSide = !!tdef && tdef.direction === 'both' && value > (tdef.normal[0] + tdef.normal[1]) / 2;
     if ((mkey === 'POTASSIUM' || mkey === 'SODIUM') && isHighSide && tier > 0 && tier < 3) {

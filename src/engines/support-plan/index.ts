@@ -223,5 +223,7 @@ export { calculateSupportTZ, hydrateState } from './engine';
 export { generateSynergyRecommendations } from './engine-helpers';
 export { SYNERGY_ID_LABELS, SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYSTEM_LABELS_RU, SYS_ORDER, clamp, sysName, sysEmoji, catalogEntry, defaultDosage } from './types';
 export { canonId, SUB_ALIAS, TZ_AUTO_BLACKLIST, sameClassIds } from './shared-constants';
+// Проход 136: какое поле бланка считается текущим — одно правило на все контуры.
+export { currentLabSlice } from './lab-slice';
 export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase, SynergyRecommendation, LabFlagOverride } from './types';
 export { buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildCautions, buildLabFindings, calcStackSynergyScore, suggestSynergyAdditions, flagLevelRu } from './display';

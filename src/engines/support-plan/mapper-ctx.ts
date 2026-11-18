@@ -8,6 +8,8 @@
 
 import type { CalculatorState, LabSlice } from './types';
 import { readLabValue } from '../../core/constants';
+import { currentLabSlice } from './lab-slice';
+import { labFieldNumber } from './lab-field-number';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import type { MapperCtx } from '../tz-mapper-engine';
 import type { PhaseContext, PhaseKey } from '../tz-bridge-phase';
@@ -35,25 +37,12 @@ const MARKER_RENAME: Record<string, string> = {
 };
 
 /**
- * Число из поля формы.
- *
- * Проход 131: бланк печатает границу («>1000», «<0.5») — это число с оговоркой,
- * а не пустое поле. Проход 130: полоска («1+») числом не считается.
- */
-function fieldNumber(raw: string): number | undefined {
-  if (raw.includes('+')) return undefined;
-  const cleaned = raw.trim().replace(/^[<>≤≥]\s*/, '').replace(',', '.');
-  if (!cleaned) return undefined;
-  const n = parseFloat(cleaned);
-  return Number.isNaN(n) ? undefined : n;
-}
-
-/**
  * Плоская карта «маркер → число» для `MapperCtx`.
  *
  * Проход 135: единица бланка — часть данных (проход 106), и здесь она терялась.
- * Раньше стоял `parseFloat(val)`, поэтому значение приходило в мост механизмов и в
- * ступени в той единице, которую человек выбрал в форме: пролактин 300 мМЕ/л
+ * Раньше число разбиралось сырой строкой, без учёта единицы, поэтому значение
+ * приходило в мост механизмов и в ступени в той единице, которую человек выбрал
+ * в форме: пролактин 300 мМЕ/л
  * (это 14.2 нг/мл) читался как 300 нг/мл — «экстренно» по `cns1` и по ступеням;
  * кортизол 15 мкг/дл (414 нмоль/л, норма) — как 15 нмоль/л, то есть «лечение»;
  * витамин D 62 нмоль/л (24.8 нг/мл, недостаточность) — как 62 нг/мл, «норма».
@@ -70,7 +59,7 @@ export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): 
     if (!panel) continue;
     for (const [marker, val] of Object.entries(panel)) {
       if (!val) continue;
-      const num = fieldNumber(val);
+      const num = labFieldNumber(val);
       if (num === undefined) continue;
       const rename = MARKER_RENAME[marker] || marker.toUpperCase().replace(/\s+/g, '_');
       out[rename] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
@@ -103,7 +92,9 @@ export function buildMapperCtx(
   // Пол нужен и чтению анализов (женский E2 без единицы читается как пг/мл), и
   // PED-риску. Профиль без пола идёт мужским путём — как во всей модели.
   const sex: 'male' | 'female' = state.profile?.sex === 'female' ? 'female' : 'male';
-  const labs = labSliceToValues(state.labs.fullPanel, sex);
+  // Проход 136: бланк выбирается тем же правилом, что в риск-модели и баннерах
+  // формы (`currentLabSlice`): полный → середина курса → до курса.
+  const labs = labSliceToValues(currentLabSlice(state.labs), sex);
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({

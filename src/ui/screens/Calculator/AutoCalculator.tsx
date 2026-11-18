@@ -14,6 +14,7 @@ import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
+import { currentLabSlice } from '../../../engines/support-plan/lab-slice';
 import { ruMarker, labBoundNotes } from './Calc.lab';
 import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
@@ -31,7 +32,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
    * высокая пг/мл, либо нормальная пмоль/л, и вердикт зависит от выбора.
    */
   const unitMissing = useMemo(() => {
-    const slice = state.labs?.fullPanel || state.labs?.midCourse || state.labs?.preCourse;
+    const slice = currentLabSlice(state.labs);
     if (!slice) return [] as { marker: string; text: string }[];
     const sex = state.profile?.sex === 'female' ? 'female' as const : 'male' as const;
     const out: { marker: string; text: string }[] = [];
@@ -63,7 +64,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
    * экран обязан сказать, что число — граница, а не измерение.
    */
   const boundNotes = useMemo(() => {
-    const slice = state.labs?.fullPanel || state.labs?.midCourse || state.labs?.preCourse;
+    const slice = currentLabSlice(state.labs);
     return labBoundNotes(slice);
   }, [state.labs]);
   const [fillStatus, setFillStatus] = useState('');

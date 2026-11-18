@@ -79,7 +79,12 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
 
   // ─── COAGULATION ───
   INR:              { marker:'INR', normal:[0.8,1.2], borderline:[1.2,1.5], treatment:[1.5,3], emergencyHigh:3, emergencyLow:0.7, direction:'both', unit:'', label:'МНО' },
-  TT:               { marker:'TT', normal:[0.9,1.1], borderline:[1.1,1.3], treatment:[1.3,2], emergencyHigh:2, direction:'high', unit:'INR', label:'Протромбин' },
+  // Проход 136: строка `TT` (протромбин, 0.9–2, unit 'INR') удалена. Она была
+  // недостижима из формы (поле «Total T» переименовывается в TESTOSTERONE), дублировала
+  // `INR` другими числами и делила имя `TT` с тестостероном, который в словарях
+  // маркеров (`lab-priority-map`, `pharma-lab-marker-map`, `constants`) — то же `TT`.
+  // Теперь `TT` — псевдоним тестостерона (`TIER_MARKER_ALIAS`), а протромбин живёт
+  // одной строкой `INR`.
 
   // ─── HORMONAL ───
   E2:               { marker:'E2', normal:[20,40], borderline:[40,60], treatment:[60,100], emergencyHigh:100, direction:'high', unit:'pg/mL', label:'Эстрадиол' },
@@ -220,8 +225,39 @@ const MALE_ONLY_TIER = new Set([
   'E2', 'ESTRADIOL', 'PROG', 'PROGESTERONE', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT',
 ]);
 
+/**
+ * Одно имя на один анализ (проход 136).
+ *
+ * Один и тот же анализ приходит в лестницы под разными именами: форма
+ * (`support-plan/mapper-ctx`) отдаёт `HEMATOCRIT`, `TOTAL_CHOLESTEROL`, `PROTEIN`
+ * (моча), `ANTI_TPO`, `IL_6`, а `LAB_TIERS`/`TIER_RULES` знают `HCT`,
+ * `CHOLESTEROL_TOTAL`, `PROTEIN_URINE`, `TPO_AB`, `IL6`. Из-за этого анализ молча
+ * не получал ни ступени, ни совета: `deriveTier('HEMATOCRIT', 58)` возвращал 0, хотя
+ * `deriveTier('HCT', 58)` — ступень лечения. Таблица — единственное место перевода:
+ * через неё читают `deriveTier` (и `computeTierAdjustments` через него).
+ *
+ * `TT` здесь — тестостерон общий: так его называют все словари маркеров
+ * (`lab-priority-map`, `pharma-lab-marker-map`, `constants`), а протромбин
+ * остался одной строкой `INR`.
+ */
+export const TIER_MARKER_ALIAS: Record<string, string> = {
+  TT: 'TESTOSTERONE',
+  HEMATOCRIT: 'HCT',
+  TOTAL_CHOLESTEROL: 'CHOLESTEROL_TOTAL',
+  PROTEIN: 'PROTEIN_URINE',
+  ANTI_TPO: 'TPO_AB',
+  IL_6: 'IL6',
+  PLATELETS: 'PLT',
+};
+
+/** Имя маркёра в словаре лестниц (`LAB_TIERS`/`TIER_RULES`). */
+export function tierMarkerKey(marker: string): string {
+  const up = marker.toUpperCase().replace('-', '');
+  return TIER_MARKER_ALIAS[up] ?? up;
+}
+
 export function deriveTier(marker: string, value: number, sex?: 'male' | 'female'): Tier {
-  const key = marker.toUpperCase().replace('-', '');
+  const key = tierMarkerKey(marker);
   const base = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
   if (!base) return 0;
   if (sex === 'female' && MALE_ONLY_TIER.has(key)) return 0;
@@ -292,5 +328,5 @@ export function getTierColor(tier: Tier): string {
 }
 
 export function getLabEntry(marker: string): LabTierThreshold | null {
-  return LAB_TIERS[marker.toUpperCase()] || null;
+  return LAB_TIERS[tierMarkerKey(marker)] || null;
 }
