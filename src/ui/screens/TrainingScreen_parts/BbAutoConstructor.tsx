@@ -73,7 +73,7 @@ import { useOriginalPrograms } from './useOriginalPrograms';
 import { PlanExportCard } from './PlanExportCard';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
-import { deserializeBBPrepConfig, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
+import { deserializeBBPrepConfig, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, shrinkBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
 import { loadPeakWeekLog, peakWeekAdherence, peakWeekTrendAdvice, emergencyLines } from '../../../engines/bb/bb-peak-pro.engine';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
@@ -964,9 +964,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setPrepPlan(planWithDose);
     // PRO-3 Э1/D2: персист расширения (раньше state/план менялись, профиль — нет, флеш врал).
     const cfg = buildContestPrepConfig();
+    let planNote = '';
     if (builtPlan && prepApplied) {
       let base: BBPlanWithPrep = applyEditsToPlan(builtPlan) as BBPlanWithPrep;
-      if (delta > 0) base = extendBBPlanPreparation(base, delta);
+      const weeksBefore = base.weeks.length;
+      // Аудит UI (P2): «➖ неделя» сокращает и тренировочный план — раньше убирались только
+      // недели prep-плана, а в плане они оставались (флеш «сокращена» расходился с планом).
+      base = delta > 0 ? extendBBPlanPreparation(base, delta) : shrinkBBPlanPreparation(base, -delta);
+      if (delta < 0 && base.weeks.length === weeksBefore) {
+        planNote = ' — в плане нет свободных недель подготовки (тапер и пик не трогаются)';
+      }
       const updated = applyContestPrepToBBPlan(base, cfg, {
         prepWeeks: newWeeks,
         taperWeeks: planWithDose.taper.weeks,
@@ -980,7 +987,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setRedosHistory([]);
     }
     savePrepToProfile(planWithDose, cfg);
-    flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
+    flash(delta > 0
+      ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)`
+      : `Подготовка сокращена до ${newWeeks} нед (тапер и пик не тронуты)${planNote}`);
   };
 
   /** 🖨 Печать полной сводки contest prep (фазы/тапер/пик-неделя/шоу-день/post-show + история + выполнение). */

@@ -2154,10 +2154,7 @@ export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number):
   const total = weeks.length;
   const endIdx = total - 1;
   const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[]; showDate?: string; weeksOut?: number } | undefined;
-  const taperPhases = (meta?.phases ?? []).filter(p => p.key === 'taper' || p.key === 'peak_week');
-  const taperWeeks = taperPhases.length > 0
-    ? Math.max(1, taperPhases.filter(p => p.key === 'taper').reduce((s, p) => s + (p.weekEnd - p.weekStart + 1), 0) || 1)
-    : Math.max(1, Math.min(4, (plan as any).contestPrep?.weeksOut ?? 3));
+  const taperWeeks = prepTaperWeeksOf(plan);
   const taperStart = Math.max(1, endIdx - taperWeeks);
   const prepIdx = taperStart - 1;
   const template = weeks[prepIdx] ?? weeks[Math.max(0, taperStart - 2)] ?? weeks[0];
@@ -2180,11 +2177,69 @@ export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number):
     inserted.push(c);
   }
   const newWeeks = [...weeks.slice(0, prepIdx), ...inserted, ...weeks.slice(prepIdx)];
-  const newTotal = newWeeks.length;
   const showDate = meta?.showDate || (plan as any).contestPrep?.showDate;
+  const retagged = retagPrepWeeks(newWeeks, taperWeeks, showDate, meta?.phases);
+  const result = { ...plan, weeks: retagged.weeks } as BBPlanWithPrep;
+  (result as any).contestPrep = { ...(plan as any).contestPrep, phases: retagged.phases, showDate };
+  return result;
+}
+
+/**
+ * Сократить ТОЛЬКО подготовительный блок плана (пик и тапер не трогаются):
+ * убирает последние недели подготовки ПЕРЕД началом тапера — зеркально
+ * `extendBBPlanPreparation`. Раньше «➖ неделя» в prep-панели сокращала лишь
+ * prep-план (и писала «Подготовка сокращена»), а тренировочный план оставался
+ * прежней длины: недели продолжали жить в плане, их фазы больше не совпадали с
+ * подготовкой и «сокращение» видел только редактор подготовки.
+ *
+ * Одну неделю подготовки оставляем всегда (пик и тапер удалять нельзя), поэтому
+ * на плане «тапер + пик» функция — no-op. Возвращает тот же объект, если удалять
+ * нечего.
+ */
+export function shrinkBBPlanPreparation(plan: BBPlanWithPrep, removeWeeks: number): BBPlanWithPrep {
+  if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
+  const remove = Math.max(1, Math.round(Math.abs(removeWeeks)));
+  const weeks = plan.weeks as any[];
+  const total = weeks.length;
+  const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[]; showDate?: string; weeksOut?: number } | undefined;
+  const taperWeeks = prepTaperWeeksOf(plan);
+  const taperStart = Math.max(1, total - 1 - taperWeeks);
+  const prepCount = taperStart;                    // недели [0, taperStart) — подготовка
+  const removable = Math.max(0, prepCount - 1);    // минимум 1 неделя подготовки остаётся
+  const drop = Math.min(remove, removable);
+  if (drop <= 0) return plan;
+  const newWeeks = [...weeks.slice(0, prepCount - drop), ...weeks.slice(prepCount)];
+  const showDate = meta?.showDate || (plan as any).contestPrep?.showDate;
+  const retagged = retagPrepWeeks(newWeeks, taperWeeks, showDate, meta?.phases);
+  const result = { ...plan, weeks: retagged.weeks } as BBPlanWithPrep;
+  (result as any).contestPrep = { ...(plan as any).contestPrep, phases: retagged.phases, showDate };
+  return result;
+}
+
+/** Длина тапера в плане: из фаз prep-метаданных, иначе из `weeksOut` (1–4). */
+function prepTaperWeeksOf(plan: BBPlanWithPrep): number {
+  const meta = (plan as any).contestPrep as { phases?: PrepPhaseRange[]; weeksOut?: number } | undefined;
+  const taperPhases = (meta?.phases ?? []).filter(p => p.key === 'taper' || p.key === 'peak_week');
+  return taperPhases.length > 0
+    ? Math.max(1, taperPhases.filter(p => p.key === 'taper').reduce((s, p) => s + (p.weekEnd - p.weekStart + 1), 0) || 1)
+    : Math.max(1, Math.min(4, (plan as any).contestPrep?.weeksOut ?? 3));
+}
+
+/**
+ * Перенумеровать недели и разметить фазы после вставки/удаления недель подготовки.
+ * Диапазоны фаз пересчитываются от даты шоу (как это делает `applyContestPrepToBBPlan`);
+ * без даты остаются прежние диапазоны — тем же правилом живёт `extendBBPlanPreparation`.
+ */
+function retagPrepWeeks(
+  newWeeks: any[],
+  taperWeeks: number,
+  showDate: string | undefined,
+  fallbackPhases: PrepPhaseRange[] | undefined,
+): { weeks: any[]; phases: PrepPhaseRange[] } {
+  const total = newWeeks.length;
   const phases = showDate
-    ? computePrepPhaseRanges(Math.max(1, newTotal - taperWeeks - 1), taperWeeks, showDate, true)
-    : (meta?.phases ?? []);
+    ? computePrepPhaseRanges(Math.max(1, total - taperWeeks - 1), taperWeeks, showDate, true)
+    : (fallbackPhases ?? []);
   newWeeks.forEach((w, i) => {
     w.week = i + 1;
     const phase = phases.find(p => i + 1 >= p.weekStart && i + 1 <= p.weekEnd);
@@ -2192,9 +2247,7 @@ export function extendBBPlanPreparation(plan: BBPlanWithPrep, addWeeks: number):
     w.contestPhase = phase.key === 'final_preparation' ? 'final_preparation' : phase.key === 'taper' ? 'taper' : phase.key === 'peak_week' ? 'peak_week' : 'preparation';
     if (phase.key === 'peak_week') w.peakWeek = true;
   });
-  const result = { ...plan, weeks: newWeeks } as BBPlanWithPrep;
-  (result as any).contestPrep = { ...(plan as any).contestPrep, phases, showDate };
-  return result;
+  return { weeks: newWeeks, phases };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
