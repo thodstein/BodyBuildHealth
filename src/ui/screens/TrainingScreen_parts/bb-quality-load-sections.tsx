@@ -18,7 +18,7 @@ import { DELOAD_PROTOCOLS, detectGarbageVolume } from '../../../engines/bb/bb-au
 import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { getPhaseConfig } from '../../../engines/periodization';
-import { CollapsibleCard, type BBPhase } from './bb-auto-constructor-shared';
+import { CollapsibleCard, weekPhaseOf, type BBPhase } from './bb-auto-constructor-shared';
 import { CARD, SMALL } from './training-ui';
 import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
@@ -191,8 +191,9 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({ ct
         {(() => {
           const Wq = builtPlan.weeks;
           const wkq = Wq[Math.min(bbWeekSel, Wq.length) - 1] || Wq[0];
-          const curPhRaw = ((wkq as any).phase || (wkq as any).deload ? 'deload' : 'accumulation') as BBPhase;
-          const curPh = (['accumulation','intensification','deload','peaking'].includes(curPhRaw) ? curPhRaw : 'accumulation') as BBPhase;
+          // Аудит UI P2: фаза недели — из общего хелпера `weekPhaseOf` (раньше приоритет
+          // операторов в `phase || deload ? 'deload' : …` всегда давал «Разгрузка»).
+          const curPh = weekPhaseOf(wkq);
           const acwrQ = ratio;
           const needsDeloadQ = autoDeload && acwrQ && acwrQ.ratio > 1.3;
           const wkExs = wkq.sessions.flatMap(s => s.exercises);

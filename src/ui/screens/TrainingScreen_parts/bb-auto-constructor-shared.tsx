@@ -110,7 +110,45 @@ export interface BBInlineEdit {
 export function bbExerciseIdentity(e: any): string {
   return String(e?.exerciseName || e?.name || e?.id || '');
 }
+
+/** Число из inline-поля: `null` = «ввод пока не число» (пусто, «-», «1.»).
+ *
+ *  Аудит UI (P2): очистка поля «Сеты» отправляла в план 0 сетов (`parseInt('') || 0`),
+ *  а вес «82.5» обрезался `parseInt` до 82. Теперь пустой/нечисловой ввод возвращает
+ *  `null`, вызывающий оставляет прежнее значение, а дробное значение сохраняется. */
+export function parseInlineNumber(raw: string | number | null | undefined): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  const s = String(raw ?? '').trim().replace(',', '.');
+  if (s === '') return null;
+  const v = Number(s);
+  return Number.isFinite(v) ? v : null;
+}
+
+/** Inline-правка с клампом: пустой/нечисловой ввод → `fallback` (прежнее значение). */
+export function clampInlineNumber(
+  raw: string | number | null | undefined,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  const v = parseInlineNumber(raw);
+  if (v == null) return fallback;
+  return Math.max(min, Math.min(max, v));
+}
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
+
+/** Фаза недели по факту плана.
+ *
+ *  Аудит UI (P2): карточка «Фаза (факт)» всегда показывала «Разгрузка» из-за приоритета
+ *  операторов — `(week.phase || week.deload) ? 'deload' : 'accumulation'`: `||` связывает
+ *  крепче `?:`, поэтому любая неделя с заполненным `phase` (то есть всегда) давала deload. */
+export function weekPhaseOf(week: any): BBPhase {
+  const raw = String((week as any)?.phase || '').toLowerCase();
+  if (raw === 'deload' || (week as any)?.deload) return 'deload';
+  if (raw === 'peaking' || raw === 'peak') return 'peaking';
+  if (raw === 'intensification') return 'intensification';
+  return 'accumulation';
+}
 export type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
 
 export const WEAK_GROUPS = [

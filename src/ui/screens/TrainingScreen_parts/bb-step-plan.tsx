@@ -24,7 +24,7 @@ import type { PrepPhaseKey } from '../../../engines/bb/bb-contest-prep.engine';
 import { PREP_PHASE_COLORS } from '../../../engines/bb/bb-contest-prep.engine';
 import type { PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import { collectPlanExercises } from '../../../engines/bb/bb-weight-calibration.engine';
-import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { Chip, BTN, BTN_GHOST, H, SMALL, IN } from './training-ui';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -701,9 +701,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                       {/* Редактирование (inline) */}
                       {isEditing && (
                         <div style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center', padding:'6px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)' }}>
-                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:55, ...IN }} /></div>
+                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, reps: clampInlineNumber(e2.target.value, 1, 30, edit.reps) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, weight: clampInlineNumber(e2.target.value, 0, 500, edit.weight) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:55, ...IN }} /></div>
                         </div>
                       )}
 
