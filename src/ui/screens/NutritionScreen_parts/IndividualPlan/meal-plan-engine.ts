@@ -1945,7 +1945,7 @@ export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budget
  */
 export function enforcePortionHygiene(
   meals: any[],
-  opts?: { goal?: { kcal: number; p: number; f: number; c: number }; tolPct?: number },
+  opts?: { goal?: { kcal: number; p: number; f: number; c: number }; tolPct?: number; blocked?: boolean },
 ): { merged: number; grown: number; removed: number } {
   const res = { merged: 0, grown: 0, removed: 0 };
   const list = (meals || []).filter((m: any) => m && Array.isArray(m.items));
@@ -1969,6 +1969,14 @@ export function enforcePortionHygiene(
     if (!goal) return 0;
     const rel = (v: number, t: number) => (t > 0 ? (Math.abs(v - t) / t) * 100 : 0);
     return Math.max(rel(a.k, goal.kcal), rel(a.p, goal.p), rel(a.f, goal.f), rel(a.c, goal.c));
+  };
+  /** Отклонение по каждой оси в процентах — чтобы замена не создавала НОВЫХ нарушений. */
+  const relsOf = (a: { p: number; f: number; c: number; k: number }) => {
+    const rel = (v: number, t: number) => (goal && t > 0 ? (Math.abs(v - t) / t) * 100 : 0);
+    return {
+      k: goal ? rel(a.k, goal.kcal) : 0, p: goal ? rel(a.p, goal.p) : 0,
+      f: goal ? rel(a.f, goal.f) : 0, c: goal ? rel(a.c, goal.c) : 0,
+    };
   };
   // «Приём остаётся приёмом» — та же мерка, что у замка QG52: цель приёма по калориям
   // (4Б+9Ж+4У) и порог «не еда» (<50 % цели или <150 ккал при недоборе заметнее 10 %).
@@ -2159,6 +2167,90 @@ export function enforcePortionHygiene(
   const restore = (it: any, s: ReturnType<typeof snapOf>) => {
     it.amount = s.amount; it.p = s.p; it.f = s.f; it.c = s.c;
     it.kcal = s.kcal; it.fiber = s.fiber; it.leucine_mg = s.leucine_mg;
+  };
+
+  /**
+   * §8.112: порошок мельче полупорции (10–15 г) — это «пол-ложки» на тарелке, а не еда.
+   * Замена на ЦЕЛЬНЫЙ молочный белок в законной порции: сыворотка 0.76–0.88 г Б/г ↔ творог
+   * 0.15–0.18 г Б/г, поэтому 45–65 г творога приносят те же 8–12 г белка, и день почти не
+   * двигается. Парный «подъём до 20 г + срез донора» здесь арифметически невозможен: донор
+   * обязан остаться на своём полу 40 г, а выросший порошок требует +7–9 г белка (замер:
+   * пул `tuna_steak 45/40`, `egg_whole 55/40` — отдают 1.1–1.5 г, нужно 6.8–9).
+   *
+   * Замена ЩАДЯЩАЯ (иначе не делается вовсе):
+   *  · калории позиции парны (±35 % или ±25 ккал);
+   *  · углеводный хвост творога возвращается углеводному носителю ТОГО ЖЕ приёма (не ниже
+   *    его пола), иначе день 45/4/R/cut/manual уходил по углеводам 1.21 → 2.37 %;
+   *  · день, стоявший в каноне, обязан в нём остаться, а день вне канона — не ухудшиться:
+   *    «нет обрезка» не покупается новым нарушением 3 % (владелец: «не больше 3 %»);
+   *  · творог 0 % «худой» (0.6 г Ж/100 г), 5 % «жирный» (5 г Ж): дню, которому жира не
+   *    хватает, предлагается жирный (45/6/R/mass: 4.00 → 1.11 %), иначе худой (55/5/R/mass
+   *    с худым уходил 2.73 → 3.40 %).
+   */
+  const swapPowderToDairy = (m: any, crumb: any, cls: string, minG: number): boolean => {
+    if (cls !== 'p' || !isProteinPowderId(crumb.id) || opts?.blocked) return false;
+    const needP = Number(crumb.p) || 0;
+    if (!(needP > 0)) return false;
+    const items = (m.items as any[]) || [];
+    const d0 = devOf(dayAxes());
+    const fHit = goal ? (Number((dayAxes() as any).f) || 0) - Number((goal as any).f || 0) : 0;
+    const cands = (fHit < 0
+      ? ['cottage_cheese_5', 'cottage_cheese_0']
+      : ['cottage_cheese_0', 'cottage_cheese_5'])
+      .map((id) => FOOD_DB.find((f: any) => String(f.id) === id))
+      .filter((f) => !!f && (Number((f as any).protein) || 0) > 0) as any[];
+    for (const fd of cands) {
+      const g = Math.max(minG, Math.round((needP / ((Number(fd.protein) || 0) / 100)) / 5) * 5);
+      const kNew = (Number(fd.kcal) || 0) * g / 100;
+      const kOld = Number(crumb.kcal) || 0;
+      if (Math.abs(kNew - kOld) > Math.max(25, kOld * 0.35)) continue;
+      const snap = snapOf(crumb);
+      const id0 = crumb.id; const name0 = crumb.name; const role0 = crumb.role;
+      const c0 = Number(crumb.c) || 0;
+      const rBefore = relsOf(dayAxes());
+      crumb.id = fd.id; crumb.name = fd.name; crumb.role = role0 || 'protein';
+      crumb.amount = g;
+      crumb.p = Math.round((Number(fd.protein) || 0) * g / 100 * 10) / 10;
+      crumb.f = Math.round((Number(fd.fat) || 0) * g / 100 * 10) / 10;
+      crumb.c = Math.round((Number(fd.carbs) || 0) * g / 100 * 10) / 10;
+      crumb.kcal = Math.round(kNew);
+      crumb.fiber = Math.round((Number(fd.fiber) || 0) * g / 100 * 10) / 10;
+      // Углеводный хвост — углеводному носителю того же приёма (сначала «настоящий» гарнир,
+      // затем любая позиция с углеводами; у роли `other` пол берём 40 г).
+      const dC = (Number(crumb.c) || 0) - c0;
+      let trim: { it: any; snap: ReturnType<typeof snapOf> } | null = null;
+      if (dC > 0.2) {
+        const host = items
+          .filter((x: any) => x !== crumb && !x._fixedGrams && (Number(x.c) || 0) > 0)
+          .sort((a: any, b: any) => {
+            const ac = classOf(a) === 'c' ? 1 : 0; const bc = classOf(b) === 'c' ? 1 : 0;
+            if (ac !== bc) return bc - ac;
+            return (Number(b.c) || 0) - (Number(a.c) || 0);
+          })[0];
+        if (host) {
+          const perC = (Number(host.c) || 0) / Math.max(1, Number(host.amount) || 1);
+          const hMin = Math.max(1, minOf(host) || 40);
+          const give = Math.min(Math.floor((Number(host.amount) || 0) - hMin),
+            Math.ceil(dC / Math.max(1e-9, perC)));
+          if (give >= 1) {
+            trim = { it: host, snap: snapOf(host) };
+            scaleTo(host, (Number(host.amount) || 0) - give);
+          }
+        }
+      }
+      const rAfter = relsOf(dayAxes());
+      const devAfter = devOf(dayAxes());
+      // Ось, которая была в каноне, обязана в нём остаться.
+      const noNew = (['k', 'p', 'f', 'c'] as const)
+        .every((ax) => rBefore[ax] > tol || rAfter[ax] <= tol);
+      // День из канона остаётся в каноне; день вне канона — не ухудшается.
+      const devOk = d0 <= tol ? devAfter <= tol : devAfter <= d0 + 1e-9;
+      if (noNew && devOk) return true;
+      if (trim) restore(trim.it, trim.snap);
+      restore(crumb, snap);
+      crumb.id = id0; crumb.name = name0; crumb.role = role0;
+    }
+    return false;
   };
 
   for (const m of list) {
@@ -2369,6 +2461,11 @@ export function enforcePortionHygiene(
           restore(crumb, _cSnap);
           for (const c of _cuts) restore(c.it, c.snap);
         }
+      }
+      // §8.112: последний шанс обрезка порошка — замена на творог в законной порции.
+      if (swapPowderToDairy(m, crumb, cls, minG)) {
+        res.grown++;
+        continue;
       }
       noGrow.add(crumb);
       continue;
@@ -18544,6 +18641,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         if (!Array.isArray(meals) || meals.length === 0) return;
         const _rH = enforcePortionHygiene(meals as any, {
           goal: _lmGoal, tolPct: __manualDay ? 2 : PLANNER_CONVERGENCE_PCT,
+          // §8.112: замена «порошок → творог» уважает исключения пользователя (аллергия
+          // на молочку исключает и сыворотку, но конкретный продукт мог быть исключён сам).
+          blocked: !!(((input as any).excludedIds as any)?.has?.('cottage_cheese_0')
+            || ((input as any).excludedIds as any)?.has?.('cottage_cheese_5')
+            || ((input as any).allergenTags as any)?.has?.('dairy')
+            || ((input as any).allergenTags as any)?.has?.('lactose')),
         });
         if (_rH.merged + _rH.grown + _rH.removed === 0) return;
         recalcMealTotals(meals);
