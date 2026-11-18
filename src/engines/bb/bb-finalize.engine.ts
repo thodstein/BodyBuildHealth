@@ -5197,8 +5197,12 @@ function enforceExerciseLevels(plan: BBPlan, options: BBFinalizeOptions): void {
  * calves/подтягивания/жимы получали 20–28 сетов на одно упражнение).
  * Не трогает делоды/prep/taper; соблюдает maxExercises/maxWorkingSets сессии;
  * для graded (щадящих) мышц не добавляет. Без expandAllMuscles — no-op.
+ *
+ * Аудит P3-6: новый кандидат подбирается с ДРУГИМ паттерном движения, чем уже есть в
+ * дне (два жима лёжа подряд), и с весом по фактической интенсивности мышцы в сессии,
+ * а не «плоскими 50 % workMax». Экспортируется для адресных тестов.
  */
-function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinalizeOptions): void {
+export function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinalizeOptions): void {
   if (!(options as any).expandAllMuscles) return;
   const yrs = options.trainingYears ?? 0;
   const onCourse = !!options.onCourse;
@@ -5246,10 +5250,17 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
         if (working().length >= maxEx || sessSets() >= maxSessionSets) break;
         const used = new Set(working().map((e: any) => e.name));
         const strengthLiftName = /становая|сумо|мёртв|мертв|жим стоя|армейск|швунг|толчок|рывок|overhead.?squat/i;
-        const cand = EXERCISE_CATALOG.find((x: any) =>
+        // Аудит P3-6: добивка ставила ВТОРОЕ упражнение того же паттерна в один день
+        // (два жима лёжа подряд). Сначала ищем кандидата с другим паттерном; прежний
+        // поиск остаётся запасным — цель сессии важнее «идеального» выбора движения.
+        const sessionPatterns = new Set(working()
+          .map((e: any) => String(e.movementPattern || ''))
+          .filter(Boolean));
+        const findCand = (avoidSamePattern: boolean) => EXERCISE_CATALOG.find((x: any) =>
           bbExerciseTier(x) <= 2
           && trueMuscleOf(x) === m
           && !used.has(x.name)
+          && (!avoidSamePattern || !sessionPatterns.has(String((x as any).movementPattern || '')))
           && !options.excludedExercises?.includes(x.id)
           && !options.excludedExercises?.includes(x.name)
           && !excludedMuscles.has((x as any).group)
@@ -5257,14 +5268,28 @@ function ensureMuscleSessionCapacity(week: any, plan: BBPlan, options: BBFinaliz
           && (!options.avoidAxialLoad || !isAxialLoadExercise(x))
           && !isMobilityRestricted(x, options.mobilityRestrictions)
           && equipmentOk(x));
+        const cand = findCand(true) || findCand(false);
         if (!cand) break;
         const room = maxSessionSets - sessSets();
         const sets = Math.max(3, Math.min(exCap, perSessionGoal - sessDirect, room, 4));
         if (sets < 3 || room < 3) break;
         const wm = (options.workMax && (options.workMax[m] || options.workMax.chest)) || 60;
-        const w = Math.round(wm * 0.5 * 10) / 10;
+        // Вес — по ФАКТИЧЕСКОЙ интенсивности этой мышцы в сессии (аудит P3-6: жёсткие
+        // 50 % workMax ставили второму жиму «ровный» вес, не связанный со схемой дня —
+        // например 82.5 кг при схеме 40/60 %). Нет данных о рабочих весах — прежние 50 %.
+        const ratios = exs.flatMap((e: any) => (Array.isArray(e.workSets) ? e.workSets : [])
+          .map((ws: any) => Number(ws?.weight))
+          .filter((wt: number) => Number.isFinite(wt) && wt > 0)
+          .map((wt: number) => wt / wm));
+        const ratio = ratios.length
+          ? Math.min(0.9, Math.max(0.4, ratios.reduce((a: number, b: number) => a + b, 0) / ratios.length))
+          : 0.5;
+        const w = Math.round(wm * ratio * 10) / 10;
         s.exercises.push({
           muscle: m, name: cand.name, exerciseName: cand.name, role: 'accessory', character: 'памп',
+          // Паттерн движения из каталога: без него отчёты/сводки по паттернам видели
+          // добавленное упражнение как «без паттерна» (аудит P3-6).
+          movementPattern: (cand as any).movementPattern,
           sets, repsRange: [10, 15], rir: 3, restSeconds: 90, warmupSets: [],
           workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: w, restSeconds: 90 })),
           comment: `➕ Ёмкость сессии: ${cand.name} (${m}) — упражнения мышцы на капе ${exCap}, цель сессии ${ruCount(perSessionGoal, RU_SETS)}.`,
