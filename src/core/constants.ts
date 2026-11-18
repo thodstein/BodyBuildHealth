@@ -562,6 +562,14 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'APO_B': { prefUnit: 'g/L', coeff: 1, uln: 1.2, lln: 0.5, name: 'АпоB' },
   'LP_A': { prefUnit: 'mg/dL', coeff: 1, uln: 30, lln: 0, name: 'Липопротеин(a)' },
   'TRANSFERRIN': { prefUnit: 'g/L', coeff: 1, uln: 3.8, lln: 2.0, name: 'Трансферрин' },
+  // Проход 132: насыщение трансферрина. Анализ просили в трёх местах под тремя
+  // кодами (`IRON_SAT` в каталоге, `TSAT` в мосте механизмов, `TRANSFERRIN_SAT`
+  // в складе анализов), а записи норм не было ни под одним — поле в форме стояло
+  // без единицы, и «0.45» (доля) выглядело как 0.45 %. Диапазон 20–45 % совпадает
+  // во всех источниках репозитория (`support-phase-labs`, `substance-monitoring-db`,
+  // `tz-mapper-engine`, `supportProtocolWomenData`: норма 20–45, тревога 15–20
+  // и <15 / >50), нижняя граница 20 — `tz-bridge-marker` (`TSAT` lln 20).
+  'TRANSFERRIN_SAT': { prefUnit: '%', coeff: 1, uln: 45, lln: 20, name: 'Насыщение трансферрина' },
   'IRON': { prefUnit: 'umol/L', coeff: 1, uln: 30, lln: 10, name: 'Железо' },
   'UIBC': { prefUnit: 'umol/L', coeff: 1, uln: 45, lln: 20, name: 'Лат. ЖСС' },
   'RETICULOCYTES': { prefUnit: '%', coeff: 1, uln: 2.5, lln: 0.5, name: 'Ретикулоциты' },

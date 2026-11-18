@@ -112,6 +112,13 @@ const CODE_ALIAS: Record<string, string> = {
   'PROINSULIN': 'PROINSULIN',
   'FRUCTOSAMINE': 'FRUCTOSAMINE',
   'TRANSFERRIN': 'TRANSFERRIN',
+  // Проход 132: насыщение трансферрина — один анализ под тремя кодами.
+  // `IRON_SAT` — как его зовут списки каталога «Анализы», `TSAT` — как его зовёт
+  // мост механизмов (`tz-bridge-marker`), `TRANSFERRIN_SAT` — склад анализов
+  // (`labs-derived`, `labs-overdue`). Канон — `TRANSFERRIN_SAT`.
+  'TRANSFERRIN_SAT': 'TRANSFERRIN_SAT',
+  'IRON_SAT': 'TRANSFERRIN_SAT',
+  'TSAT': 'TRANSFERRIN_SAT',
   'TIBC': 'TIBC',
   'FERRITIN': 'FERRITIN',
   'IRON': 'IRON',
@@ -365,6 +372,13 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
   // canonical profile stores percent (45%). This conversion is only applied
   // when the source is explicitly fractional or unitless.
   if (canonical === 'HCT' && value >= 0 && value <= 1 && (!from || from === 'fraction' || from === '%')) {
+    return { value: round(value * 100), unit: info.prefUnit };
+  }
+
+  // Проход 132: насыщение трансферрина печатают и долей (0.45), и процентом (45 %).
+  // Тот же случай, что HCT: канон — процент, доля меньше 1 в клинике не встречается
+  // (0.45 % насыщения — не результат анализа, а доля).
+  if (canonical === 'TRANSFERRIN_SAT' && value >= 0 && value <= 1 && (!from || from === 'fraction' || from === '%')) {
     return { value: round(value * 100), unit: info.prefUnit };
   }
 

@@ -155,6 +155,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
     'TRANSFERRIN': { 'hematologic': 1.0 },
     'TIBC': { 'hematologic': 1.0 },
     'IRON_SAT': { 'hematologic': 1.0 },
+    'TRANSFERRIN_SAT': { 'hematologic': 1.0 }, // проход 132: канон того же анализа
 
     // Coagulation
     'FIBRINOGEN': { 'cardio': 1.0, 'hepatic': 1.0 },

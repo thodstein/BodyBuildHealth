@@ -9,7 +9,7 @@ const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.
 const PANELS: { id: string; icon: string; label: string; codes: string[] }[] = [
   { id: 'hormones', icon: '🧬', label: 'Гормональная панель', codes: ['TT','FT','E2','LH','FSH','PRL','SHBG','DHT','PROG','PROGESTERONE','CORTISOL','DHEA_S','ANDROSTENEDIONE','AMH','INHB','INHIBIN_B','GH','IGF1','IGFBP3'] },
   { id: 'biochem', icon: '🫁', label: 'Биохимия', codes: ['ALT','AST','GGT','ALP','BIL','DBIL','DIRECT_BIL','BILIRUBIN_TOTAL','BILIRUBIN_DIRECT','BILIRUBIN_INDIRECT','LDH','CK','CK_MB','AMYLASE','LIPASE','CHOLINESTERASE','UREA','UA','URIC_ACID','CREATININE','EGFR','GLU','HbA1c','TP','TOTAL_PROTEIN','ALB','PREALBUMIN','GLOBULIN','A_G_RATIO','BILE_ACIDS'] },
-  { id: 'hematology', icon: '🩸', label: 'Гематология', codes: ['HGB','HCT','RBC','MCV','MCH','MCHC','RDW','PLT','WBC','RETICULOCYTES','FERRITIN','IRON','TIBC','TRANSFERRIN','IRON_SAT','HAPTOGLOBIN','ERYTHROPOIETIN'] },
+  { id: 'hematology', icon: '🩸', label: 'Гематология', codes: ['HGB','HCT','RBC','MCV','MCH','MCHC','RDW','PLT','WBC','RETICULOCYTES','FERRITIN','IRON','TIBC','TRANSFERRIN','TRANSFERRIN_SAT','HAPTOGLOBIN','ERYTHROPOIETIN'] },
   { id: 'lipids', icon: '❤️', label: 'Липиды', codes: ['LDL','HDL','TG','APO_A1','APO_B','LP_A','NON_HDL'] },
   { id: 'thyroid', icon: '🦋', label: 'Щитовидная железа', codes: ['TSH','FT3','FT4'] },
   { id: 'metabolism', icon: '⚡', label: 'Метаболизм', codes: ['INS','HOMA','HOMAIR','C_PEPTIDE','PROINSULIN','FRUCTOSAMINE','VITD','B12','FOL','VITAMIN_A','VITAMIN_E','VITAMIN_D','VITAMIN_B12','CALCIDIOL'] },

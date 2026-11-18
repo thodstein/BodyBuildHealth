@@ -213,3 +213,33 @@ describe('saveParsedLabs: референс бланка важнее полов�
     expect(savedLabPoints[0]?.refHigh).toBe(160);
   });
 });
+
+/**
+ * Проход 132: насыщение трансферрина — один анализ под тремя кодами и один канон
+ * единицы.
+ *
+ * Каталог «Анализы» звал его `IRON_SAT`, мост механизмов — `TSAT`, склад анализов —
+ * `TRANSFERRIN_SAT`, а записи норм не было ни под одним: поле в форме стояло без
+ * единицы, и «0.45» (доля) читалось как 0.45 % — то есть как тяжёлый дефицит железа
+ * из нормального бланка. Канон — процент: норма 20–45 % (`support-phase-labs`,
+ * `substance-monitoring-db`, `supportProtocolWomenData`), нижняя граница 20 —
+ * `tz-bridge-marker` (`TSAT` lln 20).
+ */
+describe('проход 132: насыщение трансферрина', () => {
+  it('три кода сводятся к одному', () => {
+    expect(mapToUcumCode('IRON_SAT')).toBe('TRANSFERRIN_SAT');
+    expect(mapToUcumCode('TSAT')).toBe('TRANSFERRIN_SAT');
+    expect(mapToUcumCode('TRANSFERRIN_SAT')).toBe('TRANSFERRIN_SAT');
+  });
+
+  it('норма — процент, 20–45', () => {
+    expect(UCUM_MAP['TRANSFERRIN_SAT']).toMatchObject({ prefUnit: '%', uln: 45, lln: 20 });
+  });
+
+  it('доля читается как процент, процент остаётся процентом', () => {
+    expect(normalizeLabMeasurement('TRANSFERRIN_SAT', 0.45, '')).toEqual({ value: 45, unit: '%' });
+    expect(normalizeLabMeasurement('IRON_SAT', 0.3, 'fraction')).toEqual({ value: 30, unit: '%' });
+    expect(normalizeLabMeasurement('TRANSFERRIN_SAT', 45, '%')).toEqual({ value: 45, unit: '%' });
+    expect(normalizeLabMeasurement('TSAT', 28, '')).toEqual({ value: 28, unit: '%' });
+  });
+});

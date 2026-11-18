@@ -35,6 +35,8 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'hsCRP': 'CRP',
   // ── железо (витамины D, B12 и фолат переехали в выбор единицы — проходы 121–123) ──
   'Iron': 'IRON', 'TIBC': 'TIBC', 'Transferrin': 'TRANSFERRIN', 'Ferritin': 'FERRITIN',
+  // Проход 132: насыщение трансферрина — процент (канон `TRANSFERRIN_SAT`).
+  'Transferrin Sat': 'TRANSFERRIN_SAT',
   // ── электролиты ──
   'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K',
   // ── свёртывание, сердце, опухолевые маркеры ──
