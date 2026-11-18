@@ -26,6 +26,13 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',
   // ── гормоны без выбора единицы ──
   'TSH': 'TSH', 'Anti-TPO': 'TPO_AB', 'Anti-TG': 'TG_AB',
+  // ── остальные поля формы (проход 129) ──
+  // Единица у них есть в каталоге UCUM, но моста не было, и поле просило число
+  // без единицы: ГСПГ легко вписать в мкг/дл (разница 34.7), ПТГ — в пмоль/л.
+  // Пересчёт делает общий конвертер, где он вообще возможен.
+  'SHBG': 'SHBG', 'PTH': 'PARATHYROID', 'VLDL': 'VLDL',
+  // hsCRP — тот же СРБ, только высокочувствительный: канон общий, мг/л.
+  'hsCRP': 'CRP',
   // ── железо (витамины D, B12 и фолат переехали в выбор единицы — проходы 121–123) ──
   'Iron': 'IRON', 'TIBC': 'TIBC', 'Transferrin': 'TRANSFERRIN', 'Ferritin': 'FERRITIN',
   // ── электролиты ──

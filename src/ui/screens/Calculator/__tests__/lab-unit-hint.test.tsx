@@ -9,7 +9,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import React from 'react';
-import { FullLabInput, LabSliceInput, labUnitHint } from '../Calc.lab';
+import { FullLabInput, LabSliceInput, labUnitHint, FULL_PANELS } from '../Calc.lab';
+import { LAB_UNIT_CHOICES } from '../../../../core/constants';
 
 afterEach(cleanup);
 
@@ -78,5 +79,50 @@ describe('проход 114: единица стоит подсказкой в п
     const b12 = container.querySelector('select[aria-label="Единица: В12"]') as HTMLSelectElement;
     expect(b12, 'у B12 должен быть выбор единицы').toBeTruthy();
     expect(Array.from(b12.options).map(o => o.value)).toEqual(['', 'пг/мл', 'пмоль/л']);
+  });
+});
+
+/**
+ * Проход 129: единица нужна не только «звёздным» маркерам. Каталог маркеров держит
+ * единицу для АпоB, Лп(а), ГСПГ, ПТГ, гомоцистеина — но поле формы подписано
+ * человеческим именем (`Lp(a)`, `NT-proBNP`, `CK-MB`), и сравнение строк в нижнем
+ * регистре пару не находило. Поле просило число без единицы: 95 мг/дл АпоB и
+ * 0.95 г/л — одно и то же, но форма об этом молчала.
+ */
+describe('проход 129: у каждого поля формы есть единица или выбор единицы', () => {
+  it('мост UCUM закрывает ГСПГ, ПТГ, ЛПОНП, ПСА и hsCRP', () => {
+    expect(labUnitHint('SHBG')).toBe('нмоль/л');
+    expect(labUnitHint('PTH')).toBe('пг/мл');
+    expect(labUnitHint('VLDL')).toBe('ммоль/л');
+    expect(labUnitHint('PSA total')).toBe('нг/мл');
+    expect(labUnitHint('hsCRP')).toBe('мг/л');
+  });
+
+  it('каталог маркеров находится без учёта написания', () => {
+    expect(labUnitHint('ApoB')).toBe('г/л');
+    expect(labUnitHint('ApoA1')).toBe('г/л');
+    expect(labUnitHint('Lp(a)')).toBe('мг/дл');
+    expect(labUnitHint('CK-MB')).toBe('нг/мл');
+    expect(labUnitHint('NT-proBNP')).toBe('пг/мл');
+    expect(labUnitHint('IL-6')).toBe('пг/мл');
+    expect(labUnitHint('Uric acid')).toBe('мкмоль/л');
+  });
+
+  it('ни одно поле полного бланка не просит число без единицы', () => {
+    // Исключения честные, а не забытые:
+    //  - без концентрации: INR — отношение, pH мочи — безразмерный, мочевые
+    //    полосы (белок, кетоны, лейкоциты, нитриты) — «следы/+/++»;
+    //  - не описаны в каталоге единиц вовсе: 3a-ADG, витамин K, насыщение
+    //    трансферрина (процент), тропонин T (не тот же анализ, что тропонин I).
+    // Новое имя в этом списке — повод завести запись в каталоге, а не привычка.
+    const KNOWN = [
+      'INR', 'pH', 'Protein', 'Ketones', 'Leukocytes', 'Nitrite',
+      '3a-ADG', 'Vitamin K', 'Transferrin Sat', 'Troponin T',
+    ];
+    const missing = FULL_PANELS
+      .flatMap(p => p.markers)
+      .filter(m => !LAB_UNIT_CHOICES[m] && !labUnitHint(m))
+      .filter(m => !KNOWN.includes(m));
+    expect(missing).toEqual([]);
   });
 });

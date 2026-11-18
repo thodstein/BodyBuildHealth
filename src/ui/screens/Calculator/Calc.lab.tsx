@@ -44,10 +44,20 @@ export const LAB_MARKER_RU: Record<string, string> = {
 };
 export const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
 
+/**
+ * Ключ сравнения для каталога маркеров (проход 129). Каталог держит коды
+ * (`APO_B`, `LP_A`, `CK_MB`, `NT_PROBNP`, `TNF_ALPHA`), а поле формы подписано
+ * человеческим именем (`ApoB`, `Lp(a)`, `CK-MB`, `NT-proBNP`, `TNF-alpha`).
+ * Прямое сравнение строк в нижнем регистре такую пару не находило, и поле
+ * просило число без единицы: 95 ApoB в мг/дл и 0.95 г/л — одно и то же, но
+ * форма об этом молчала.
+ */
+const unitKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9а-яё]/g, '');
+
 /** Единица, в которой калькулятор ждёт число: общий каталог маркеров — единственный источник. */
 const MARKER_UNIT: Record<string, string> = {};
 for (const e of LAB_MARKER_MAP) {
-  const key = String(e.marker || '').toLowerCase();
+  const key = unitKey(String(e.marker || ''));
   if (e.unit && key && !MARKER_UNIT[key]) MARKER_UNIT[key] = e.unit;
 }
 
@@ -61,7 +71,7 @@ export function labUnitHint(marker: string): string | undefined {
   if (LAB_UNIT_CHOICES[marker]) return undefined;
   // Сначала каталог UCUM — это та единица, к которой импорт приводит значение;
   // каталог маркеров (`LAB_MARKER_MAP`) остаётся для маркеров без пересчёта.
-  const hint = markerReadUnit(marker) ?? MARKER_UNIT[marker.toLowerCase()];
+  const hint = markerReadUnit(marker) ?? MARKER_UNIT[unitKey(marker)];
   return hint ? ruUnit(hint) : undefined;
 }
 
