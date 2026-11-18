@@ -315,6 +315,18 @@ export function suggestSynergyAdditions(
   return out.slice(0, maxSuggestions || 8);
 }
 
+/**
+ * След сбоя разбора анализов (проход 128). Находка `__lab_analysis_failed` говорит
+ * человеку «часть отклонений не показана», но по ней сбой не воспроизвести: в
+ * проекте нет логгера, поэтому пишем в консоль. Тесты подменяют приёмник через
+ * четвёртый аргумент `buildLabFindings`.
+ */
+function logLabAnalysisError(error: unknown): void {
+  try {
+    console.warn('[support-plan] разбор анализов не завершился:', error);
+  } catch { /* консоль недоступна — молчать нельзя, падать тем более */ }
+}
+
 /** Лабораторные отклонения и рекомендации по веществам (из evaluateRecommendations).
  *  Возвращает СТРУКТУРИРОВАННЫЙ список LabFinding (с тяжестью, системой, веществами,
  *  мониторингом и эскалацией) — без схлопывания в одну строку. */
@@ -322,6 +334,7 @@ export function buildLabFindings(
   state: CalculatorState,
   tzRes: CalculatorResult,
   evaluate: (s: CalculatorState, r: CalculatorResult, w?: number) => any[] = evaluateRecommendations,
+  onError: (error: unknown) => void = logLabAnalysisError,
 ): LabFinding[] {
   const out: LabFinding[] = [];
   let failed: string | null = null;
@@ -363,6 +376,9 @@ export function buildLabFindings(
     // глушилось, список получался пустым, секция находок не показывалась — и
     // ошибка выглядела как «отклонений нет».
     failed = e instanceof Error ? e.message : String(e);
+    // Проход 128: находку видит человек, а след сбоя должен остаться и вне экрана —
+    // иначе по жалобе «часть отклонений не показана» нечего разбирать.
+    try { onError(e); } catch { /* приёмник сбоя не должен ломать вердикт */ }
   }
   if (failed) {
     out.push({

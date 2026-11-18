@@ -55,11 +55,14 @@ describe('проход 114: единица стоит подсказкой в п
     const ft = container.querySelector('select[aria-label="Единица: Своб. тестостерон"]') as HTMLSelectElement;
     expect(ft, 'у свободного тестостерона должен быть выбор единицы').toBeTruthy();
     expect(Array.from(ft.options).map(o => o.value)).toEqual(['', 'пг/мл', 'пмоль/л']);
-    // проход 120: свободные Т3/Т4 — тоже с выбором единицы
+    // проход 120: свободные Т3/Т4 — тоже с выбором единицы; 127: плюс нг/дл (США)
     expect(labUnitHint('T3 free')).toBeUndefined();
     const t3 = container.querySelector('select[aria-label="Единица: Т3 своб."]') as HTMLSelectElement;
     expect(t3, 'у Т3 свободного должен быть выбор единицы').toBeTruthy();
-    expect(Array.from(t3.options).map(o => o.value)).toEqual(['', 'пмоль/л', 'пг/мл']);
+    expect(Array.from(t3.options).map(o => o.value)).toEqual(['', 'пмоль/л', 'пг/мл', 'нг/дл']);
+    const t4 = container.querySelector('select[aria-label="Единица: Т4 своб."]') as HTMLSelectElement;
+    expect(t4, 'у Т4 свободного должен быть выбор единицы').toBeTruthy();
+    expect(Array.from(t4.options).map(o => o.value)).toEqual(['', 'пмоль/л', 'пг/мл', 'нг/дл']);
     // проход 121: витамин D — тоже с выбором единицы
     expect(labUnitHint('Vitamin D (25-OH)')).toBeUndefined();
     const vd = container.querySelector('select[aria-label="Единица: Вит. D"]') as HTMLSelectElement;

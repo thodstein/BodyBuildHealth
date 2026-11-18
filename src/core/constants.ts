@@ -729,6 +729,11 @@ export const FT_PG_TO_PMOL = 3.4672;     // 1 pg/mL = 3.4672 pmol/L
 // Проход 120: свободные Т3/Т4 бланки дают и в пмоль/л, и в пг/мл (разница ~1.3–1.5).
 export const FT3_PG_TO_PMOL = 1.536;     // 1 pg/mL = 1.536 pmol/L (M = 650.97)
 export const FT4_PG_TO_PMOL = 1.2872;    // 1 pg/mL = 1.2872 pmol/L (M = 776.87)
+// Проход 127: американские бланки дают свободные Т3/Т4 в нг/дл. 1 нг/дл = 10 пг/мл,
+// поэтому множитель — десять пг-множителей. Отдельные числа здесь не появляются:
+// источник — те же молярные массы (650.97 / 776.87), что выше.
+export const FT3_NGDL_TO_PMOL = FT3_PG_TO_PMOL * 10; // 1 нг/дл = 15.36 пмоль/л
+export const FT4_NGDL_TO_PMOL = FT4_PG_TO_PMOL * 10; // 1 нг/дл = 12.872 пмоль/л
 // Проход 121: витамин D дают и в нг/мл, и в нмоль/л (разница 2.5). Канон — нг/мл,
 // как в нормах приложения (30–100).
 export const VITD_NG_TO_NMOL = 2.496;    // 1 ng/mL = 2.496 nmol/L (M = 400.64)
@@ -835,8 +840,15 @@ export const LAB_UNIT_READ: Record<string, LabUnitConversion> = {
   // 119: 30 пмоль/л свободного тестостерона — это 8.7 пг/мл.
   'Free T': { canon: 'пг/мл', others: { 'пмоль/л': { factor: FT_PG_TO_PMOL, op: 'div' } } },
   // 120: канон Т3/Т4 — пмоль/л, поэтому пг/мл умножается, а не делится.
-  'T3 free': { canon: 'пмоль/л', others: { 'пг/мл': { factor: FT3_PG_TO_PMOL, op: 'mul' } } },
-  'T4 free': { canon: 'пмоль/л', others: { 'пг/мл': { factor: FT4_PG_TO_PMOL, op: 'mul' } } },
+  // 127: нг/дл (США) — те же 10 пг/мл, множитель выведен из пг-множителя.
+  'T3 free': { canon: 'пмоль/л', others: {
+    'пг/мл': { factor: FT3_PG_TO_PMOL, op: 'mul' },
+    'нг/дл': { factor: FT3_NGDL_TO_PMOL, op: 'mul' },
+  } },
+  'T4 free': { canon: 'пмоль/л', others: {
+    'пг/мл': { factor: FT4_PG_TO_PMOL, op: 'mul' },
+    'нг/дл': { factor: FT4_NGDL_TO_PMOL, op: 'mul' },
+  } },
   // 121: 62 нмоль/л витамина D — это 24.8 нг/мл (дефицит), а не 62 нг/мл.
   'Vitamin D (25-OH)': { canon: 'нг/мл', others: { 'нмоль/л': { factor: VITD_NG_TO_NMOL, op: 'div' } } },
   // 122: 15 нмоль/л фолата — это 6.6 нг/мл (пограничный дефицит).
@@ -859,8 +871,8 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'DHEA-S': ['мкг/дл', 'мкмоль/л'],
   'Progesterone': ['нг/мл', 'нмоль/л'],
   'Free T': ['пг/мл', 'пмоль/л'],
-  'T3 free': ['пмоль/л', 'пг/мл'],
-  'T4 free': ['пмоль/л', 'пг/мл'],
+  'T3 free': ['пмоль/л', 'пг/мл', 'нг/дл'],
+  'T4 free': ['пмоль/л', 'пг/мл', 'нг/дл'],
   'Vitamin D (25-OH)': ['нг/мл', 'нмоль/л'],
   'Folate': ['нг/мл', 'нмоль/л'],
   'B12': ['пг/мл', 'пмоль/л'],

@@ -15,7 +15,7 @@ import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
 import { ruMarker } from './Calc.lab';
-import { LAB_UNIT_CHOICES } from '../../../core/constants';
+import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
 export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult, onResetEdits }) => {
@@ -32,8 +32,9 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
    */
   const unitMissing = useMemo(() => {
     const slice = state.labs?.fullPanel || state.labs?.midCourse || state.labs?.preCourse;
-    if (!slice) return [] as string[];
-    const out: string[] = [];
+    if (!slice) return [] as { marker: string; text: string }[];
+    const sex = state.profile?.sex === 'female' ? 'female' as const : 'male' as const;
+    const out: { marker: string; text: string }[] = [];
     for (const panel of Object.keys(slice)) {
       if (panel === 'units' || panel === 'date') continue;
       const markers = (slice as any)[panel] as Record<string, string> | undefined;
@@ -41,11 +42,21 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       for (const marker of Object.keys(markers)) {
         if (!markers[marker] || !LAB_UNIT_CHOICES[marker]) continue;
         if (slice.units?.[panel]?.[marker]) continue;
-        out.push(ruMarker(marker));
+        // Проход 128: сказать «единица не указана» мало — надо назвать число, с которым
+        // движок реально работает. Догадка по величине могла его пересчитать, и тогда
+        // «500» в бланке превратилось в 136 пг/мл без всякого следа на экране.
+        const raw = Number(String(markers[marker]).replace(',', '.'));
+        const canon = LAB_READ_UNIT[marker] || '';
+        const read = Number.isFinite(raw) ? readLabValue(marker, raw, undefined, sex).value : undefined;
+        const text = read !== undefined && read !== raw && canon
+          ? `${ruMarker(marker)} ${raw} → ${read} ${canon}`
+          : `${ruMarker(marker)}${canon ? ` · ${canon}` : ''}`;
+        out.push({ marker, text });
       }
     }
-    return Array.from(new Set(out));
-  }, [state.labs]);
+    const seen = new Set<string>();
+    return out.filter(x => (seen.has(x.marker) ? false : (seen.add(x.marker), true)));
+  }, [state.labs, state.profile?.sex]);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
   const [labSyncFlash, setLabSyncFlash] = useState(false);
@@ -724,8 +735,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
             ⚠ Единица не указана
           </div>
           <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
-            {unitMissing.join(', ')} — прочитано по величине. Выберите единицу в бланке анализов,
-            иначе вердикт может быть противоположным (пг/мл против пмоль/л).
+            {unitMissing.map(u => u.text).join(' · ')} — прочитано по величине. Выберите единицу
+            в бланке анализов, иначе вердикт может быть противоположным (пг/мл против пмоль/л).
           </div>
         </div>
       )}

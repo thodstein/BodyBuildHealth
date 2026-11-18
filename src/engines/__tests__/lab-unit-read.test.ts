@@ -80,7 +80,10 @@ describe('проход 106: выбор единицы на месте, эври�
     // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
     // 121–123: витамин D, фолат, B12 — везде единицы расходятся, догадка не работает
     expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12']);
-    for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBe(2);
+    // Проход 127: у свободных Т3/Т4 три варианта — пмоль/л (канон), пг/мл и нг/дл (США).
+    expect(LAB_UNIT_CHOICES['T3 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);
+    expect(LAB_UNIT_CHOICES['T4 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);
+    for (const opts of Object.values(LAB_UNIT_CHOICES)) expect(opts.length).toBeGreaterThanOrEqual(2);
   });
 
   it('`normalizeLabValue` остался прежним — мужской путь байт-в-байт', () => {
@@ -361,6 +364,41 @@ describe('проход 115: ошибка разбора анализов вид�
 });
 
 /**
+ * Проход 128: у сбоя должен остаться след вне экрана. Находка говорит человеку
+ * «часть отклонений не показана», но по ней сбой не воспроизвести — поэтому
+ * ошибка уходит в приёмник (по умолчанию `console.warn`: логгера в проекте нет).
+ */
+describe('проход 128: сбой разбора оставляет след', () => {
+  it('приёмник получает исходную ошибку, вердикт не меняется', () => {
+    const seen: unknown[] = [];
+    const boom = new Error('boom-128');
+    const list = buildLabFindings(
+      mkState('male', {}) as any,
+      {} as any,
+      () => { throw boom; },
+      (e) => seen.push(e),
+    );
+    expect(seen).toEqual([boom]);
+    expect(list[0].id).toBe('__lab_analysis_failed');
+  });
+
+  it('сбой самого приёмника не ломает вердикт', () => {
+    const list = buildLabFindings(
+      mkState('male', {}) as any,
+      {} as any,
+      () => { throw new Error('boom'); },
+      () => { throw new Error('sink'); },
+    );
+    expect(list[0].id).toBe('__lab_analysis_failed');
+  });
+
+  it('по умолчанию след идёт в консоль', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/display.ts'), 'utf8');
+    expect(src).toContain("console.warn('[support-plan] разбор анализов не завершился:'");
+  });
+});
+
+/**
  * Проход 118: прогестерон приходит в двух единицах — нг/мл и нмоль/л (разница
  * 3.18). Пока единицы не было, 60 нмоль/л лютеиновой фазы ложились в движок
  * как 60 нг/мл: нормальная лютеиновая фаза читалась как беременность, а
@@ -460,6 +498,33 @@ describe('проход 120: свободные Т3/Т4 читаются по е�
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['T3'] = readHormone('T3 free', 'panelThyroid'");
     expect(src).toContain("v['T4'] = readHormone('T4 free', 'panelThyroid'");
+  });
+});
+
+/**
+ * Проход 127: американские бланки дают свободные Т3/Т4 в нг/дл. 1 нг/дл = 10 пг/мл,
+ * то есть 1.0 нг/дл свободного Т4 — это 12.9 пмоль/л (норма), а не 1.0 пмоль/л
+ * (тяжёлый гипотиреоз). Такой единицы в выборе не было вовсе.
+ */
+describe('проход 127: свободные Т3/Т4 в нг/дл', () => {
+  it('нг/дл приводится к пмоль/л', () => {
+    const t4 = readLabValue('T4 free', 1.0, 'нг/дл');
+    expect(t4.guessed).toBe(false);
+    expect(t4.value).toBe(12.9);
+    const t3 = readLabValue('T3 free', 0.3, 'нг/дл');
+    expect(t3.guessed).toBe(false);
+    expect(t3.value).toBe(4.6);
+  });
+
+  it('пересчёт совпадает с пг/мл ×10 (1 нг/дл = 10 пг/мл)', () => {
+    expect(readLabValue('T4 free', 1.0, 'нг/дл').value).toBeCloseTo(readLabValue('T4 free', 10, 'пг/мл').value, 1);
+    expect(readLabValue('T3 free', 0.3, 'нг/дл').value).toBeCloseTo(readLabValue('T3 free', 3, 'пг/мл').value, 1);
+  });
+
+  it('выбор единицы есть в форме, канон — первый', () => {
+    expect(LAB_UNIT_CHOICES['T3 free']).toContain('нг/дл');
+    expect(LAB_UNIT_CHOICES['T4 free']).toContain('нг/дл');
+    expect(LAB_UNIT_CHOICES['T4 free'][0]).toBe(LAB_UNIT_READ['T4 free'].canon);
   });
 });
 
