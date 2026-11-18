@@ -14,7 +14,7 @@
  *
  * Сохранение → ProgramStore (localStorage, версионирование через revisions).
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
@@ -210,6 +210,16 @@ const ManualModeToggle: React.FC<{ mode: ManualMode; onMode: (m: ManualMode) => 
 
 import { hapticImpact } from '../../../core/telegram';
 
+/**
+ * Закреплённая шапка ручного конструктора: карточка-заголовок со сводкой и
+ * пилюли шагов остаются на месте при прокрутке (раньше уезжали вместе с
+ * контентом — «шапка бегала по экрану»). Полоса непрозрачная
+ * (CSS .manual-sticky-top), поэтому контент проезжает ПОД ней, а не сквозь неё.
+ */
+const ManualStickyTop: React.FC<{ innerRef?: React.Ref<HTMLDivElement>; children: React.ReactNode }> = ({ innerRef, children }) => (
+  <div className="manual-sticky-top" ref={innerRef}>{children}</div>
+);
+
 export const ProgramManagerPanel: React.FC = () => {
   const { confirm } = useConfirmDialog();
   const [programs, setPrograms] = useState<UserProgram[]>(() => loadUserPrograms());
@@ -268,6 +278,25 @@ export const ProgramManagerPanel: React.FC = () => {
       disabledIds={!editing ? new Set(['editor', 'final']) : undefined}
     />
   );
+
+  // Высота закреплённой шапки (карточка + шаги) нужна редактору:
+  // scroll-margin-top карточек = высота шапки + 12px (styles.css), иначе
+  // фокус/скроллIntoView прячет карточку ПОД закреплённой шапкой.
+  const stickyHeadRef = useRef<HTMLDivElement>(null);
+  const [stickyHeadH, setStickyHeadH] = useState(0);
+  useEffect(() => {
+    const el = stickyHeadRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      setStickyHeadH(prev => (prev === h ? prev : h));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mstep, editing?.meta.id, programs.length]);
 
   // F3.1: Undo/Redo history через useProgramUndo hook (извлечено из inline-кода)
   const { pushSnapshot, undo, redo } = useProgramUndo(editing, setEditing);
@@ -812,6 +841,25 @@ export const ProgramManagerPanel: React.FC = () => {
     if (mstep === 'final') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ManualStickyTop innerRef={stickyHeadRef}>
+            <ManualHeader
+              title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
+              subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${goalLabelOf(editing.meta.goal)} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
+              progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
+              chips={[
+                { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
+                { label: editing.meta.level, color: '#fff' },
+              ]}
+            />
+            {renderMstepNav()}
+          </ManualStickyTop>
+          {renderFinalStep()}
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, ...({ '--manual-sticky-h': `${stickyHeadH}px` } as React.CSSProperties) }}>
+        <ManualStickyTop innerRef={stickyHeadRef}>
           <ManualHeader
             title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
             subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${goalLabelOf(editing.meta.goal)} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
@@ -822,22 +870,7 @@ export const ProgramManagerPanel: React.FC = () => {
             ]}
           />
           {renderMstepNav()}
-          {renderFinalStep()}
-        </div>
-      );
-    }
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <ManualHeader
-          title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
-          subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${goalLabelOf(editing.meta.goal)} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
-          progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
-          chips={[
-            { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
-            { label: editing.meta.level, color: '#fff' },
-          ]}
-        />
-        {renderMstepNav()}
+        </ManualStickyTop>
         <ProgramEditor
           program={editing}
           onChange={onEditChange}
@@ -936,13 +969,15 @@ export const ProgramManagerPanel: React.FC = () => {
   if (programs.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <ManualHeader
-          title="✋ Ручной конструктор программ"
-          subtitle={`Соберите программу с нуля, клонируйте из библиотеки ${allLibraryPrograms.length} шаблонов или подключите LMS-цикл ${plCycles.length} — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля.`}
-          progress={{ current: 1, total: 3, label: 'Выбор' }}
-          chips={[{ label: `${allLibraryPrograms.length} шаблонов`, color: '#00e68a' }, { label: `${ruCount(plCycles.length, RU_CYCLES)}`, color: '#a78bfa' }]}
-        />
-        {renderMstepNav()}
+        <ManualStickyTop innerRef={stickyHeadRef}>
+          <ManualHeader
+            title="✋ Ручной конструктор программ"
+            subtitle={`Соберите программу с нуля, клонируйте из библиотеки ${allLibraryPrograms.length} шаблонов или подключите LMS-цикл ${plCycles.length} — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля.`}
+            progress={{ current: 1, total: 3, label: 'Выбор' }}
+            chips={[{ label: `${allLibraryPrograms.length} шаблонов`, color: '#00e68a' }, { label: `${ruCount(plCycles.length, RU_CYCLES)}`, color: '#a78bfa' }]}
+          />
+          {renderMstepNav()}
+        </ManualStickyTop>
 
         {/* Онбординг — красивый тур 3 шага (ManualUI) */}
         {onboardingOpen && (
@@ -1068,13 +1103,15 @@ export const ProgramManagerPanel: React.FC = () => {
 
   return (
     <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <ManualHeader
-        title={`✋ Ручной конструктор — Мои программы (${programs.length})`}
-        subtitle="Создавайте с нуля, клонируйте из библиотеки или подключайте LMS-циклы — процентовки цикла не меняются, ваш оверлей сверху."
-        progress={{ current: 1, total: 3, label: 'Выбор' }}
-        chips={[{ label: `${programs.length} сохранено`, color: '#00e68a' }, { label: 'Выбор', color: '#fff' }]}
-      />
-      {renderMstepNav()}
+      <ManualStickyTop innerRef={stickyHeadRef}>
+        <ManualHeader
+          title={`✋ Ручной конструктор — Мои программы (${programs.length})`}
+          subtitle="Создавайте с нуля, клонируйте из библиотеки или подключайте LMS-циклы — процентовки цикла не меняются, ваш оверлей сверху."
+          progress={{ current: 1, total: 3, label: 'Выбор' }}
+          chips={[{ label: `${programs.length} сохранено`, color: '#00e68a' }, { label: 'Выбор', color: '#fff' }]}
+        />
+        {renderMstepNav()}
+      </ManualStickyTop>
 
       {/* Онбординг — тур 3 шага (красивый) */}
       {onboardingOpen && (

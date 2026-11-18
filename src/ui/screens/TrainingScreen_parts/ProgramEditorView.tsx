@@ -304,17 +304,42 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   }, [estep, program.meta.id]);
   const estepIdx = editorSteps.indexOf(estep);
   const isLastEditorStep = estepIdx >= editorSteps.length - 1;
-  // При переключении внутреннего шага — скролл контента наверх (шапки в потоке)
+  // При переключении внутреннего шага — скролл контента наверх. Шапка
+  // конструктора закреплена (.manual-sticky-top), а сама прокрутка живёт на
+  // .tp-cbody окна конструктора — поэтому сначала ищем именно её.
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const scrollEditorTop = useCallback(() => {
     const root = editorRootRef.current;
     if (!root) return;
     try {
-      const scroller = root.closest('.screen.training-screen') as HTMLElement | null;
+      const scroller = (root.closest('.tp-cbody') ?? root.closest('.screen.training-screen')) as HTMLElement | null;
       if (scroller && typeof scroller.scrollTo === 'function') scroller.scrollTo({ top: 0, behavior: 'smooth' });
       else if (typeof root.scrollIntoView === 'function') root.scrollIntoView({ block: 'start', behavior: 'smooth' });
     } catch { /* jsdom и т.п. — scroll API может отсутствовать */ }
   }, []);
+  // Компактная панель действий: её высоту отдаём в CSS (--editor-compact-h),
+  // чтобы scroll-margin-top карточек учитывал не только шапку, но и панель.
+  const compactBarRef = useRef<HTMLDivElement | null>(null);
+  const [compactBarH, setCompactBarH] = useState(0);
+  useEffect(() => {
+    const el = compactBarRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setCompactBarH(h);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // «⋯» живёт в закреплённой панели, а сетка «Ещё» рендерится ниже в потоке:
+  // при раскрытии уводим прокрутку наверх, иначе панель раскрылась бы за кадром.
+  const toggleMore = useCallback(() => {
+    if (!showMore) scrollEditorTop();
+    setShowMore(v => !v);
+  }, [showMore, scrollEditorTop]);
   const goNextStep = useCallback(() => {
     if (isLastEditorStep) onNext?.();
     else { setEstep(editorSteps[estepIdx + 1]); scrollEditorTop(); }
@@ -333,10 +358,11 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [goNextStep, goPrevStep, estepIdx]);
-  // Шапки редактора — обычный поток (НЕ sticky, правило в styles.css
-  // .manual-constructor--editor .editor-topbar-shell): раньше они липли к
-  // краям и перекрывали контент при скролле. Развёрнутая сетка «⋯ Ещё» —
-  // вне шапки, иначе на телефоне она съедала бы треть экрана.
+  // Шапка конструктора закреплена (styles.css .manual-sticky-top): карточка
+  // с шагами живёт на экране при прокрутке. Под ней закреплена компактная
+  // панель действий (.editor-compactbar — «Сохранить» + «⋯»), а ряд экспорта
+  // остаётся в потоке: два ряда кнопок вместе с шапкой съедали бы экран.
+  // Развёрнутая сетка «⋯ Ещё» — тоже вне шапки.
   const originalPrograms = useOriginalPrograms();
   const libraryPrograms = useMemo(() => [...getAllPrograms(), ...WOMENS_PROGRAMS, ...CUSTOM_PROGRAMS, ...originalPrograms], [originalPrograms]);
   const plCycleList = useMemo(() => LMS_CYCLES, []);
@@ -722,26 +748,65 @@ for (const w of program.hybrid.bbWeeks ?? []) {
     }, [program, dir, showToast]);
 
 return (
-      <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div
+        className="manual-constructor manual-constructor--editor"
+        ref={editorRootRef}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          // Высоту панели меряет effect выше — CSS берёт её для scroll-margin-top.
+          ...(compactBarH > 0 ? ({ '--editor-compact-h': `${compactBarH}px` } as React.CSSProperties) : {}),
+        }}
+      >
         <style>{MANUAL_STYLE_TAG}</style>
-        {/* Панель действий — иерархия: акцент слева по направлению, стекло, 2 ряда */}
-         <div className="editor-topbar-shell" style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'linear-gradient(180deg, rgba(26,28,38,0.82), rgba(18,20,30,0.68))', borderRadius: 14, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${DIR_COLOR[dir]}`, boxShadow: '0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(14px)' }}>
-         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-           <button style={{ ...BTN_GHOST, padding: '7px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)' }} onClick={safeBack}>← К списку</button>
-           <span style={{ fontSize: 11, fontWeight: 850, color: DIR_COLOR[dir], background: DIR_COLOR[dir] + '18', border: `1px solid ${DIR_COLOR[dir]}35`, borderRadius: 8, padding: '3px 8px' }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', fontWeight: 600, whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '3px 8px' }}>
-              🎯 {goalLabelOf(program.meta.goal)} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
-            </span>
-           {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 20, padding: '2px 7px' }} title="Несохранённые изменения">● не сохранено</span>}
-           {!isDirty && <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.20)', borderRadius: 20, padding: '2px 7px' }}>✓ сохранено</span>}
-           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-             <button style={{ ...BTN, padding: '7px 14px', fontSize: 11, minHeight: 38, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу (Ctrl+S)">
-               {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
-             </button>
-           </div>
-         </div>
-        {/* Быстрые действия — группировка: вид | история | экспорт | неделя → выполнение | ещё */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 8, alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Компактная панель действий закреплена под шапкой конструктора
+            (top = --manual-sticky-h): «Сохранить» и «⋯» всегда под рукой.
+            Два ряда экспорта остаются в потоке ниже — иначе панель действий
+            (~335px) вместе с шапкой съедала бы почти весь экран телефона. */}
+        <div className="editor-compactbar" ref={compactBarRef}>
+          <button
+            type="button"
+            className="editor-compactbar__back"
+            onClick={safeBack}
+            title="К списку программ"
+            aria-label="К списку"
+            style={{ ...BTN_GHOST, width: 38, minWidth: 38, minHeight: 38, padding: 0, fontSize: 15, borderColor: 'rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)' }}
+          >←</button>
+          <span
+            className="editor-compactbar__dir"
+            style={{ fontSize: 11, fontWeight: 850, color: DIR_COLOR[dir], background: DIR_COLOR[dir] + '18', border: `1px solid ${DIR_COLOR[dir]}35`, borderRadius: 8, padding: '3px 8px', whiteSpace: 'nowrap' }}
+          >{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+          <span
+            className={`editor-compactbar__state${isDirty ? ' is-dirty' : ''}`}
+            title={isDirty ? 'Есть несохранённые изменения' : 'Все изменения сохранены'}
+          >
+            <span aria-hidden="true">{isDirty ? '●' : '✓'}</span>
+            <span className="editor-compactbar__state-text">{isDirty ? 'не сохранено' : 'сохранено'}</span>
+          </span>
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="editor-compactbar__save"
+            onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }}
+            title="Сохранить программу (Ctrl+S)"
+            style={{ ...BTN, padding: '7px 14px', fontSize: 11, minHeight: 38, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }}
+          >{savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}</button>
+          <button
+            type="button"
+            className="editor-compactbar__more"
+            onClick={toggleMore}
+            title="Ещё действия"
+            aria-label="Ещё действия"
+            aria-expanded={showMore}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: 10, cursor: 'pointer', background: showMore ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: showMore ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.10)', color: showMore ? '#00e68a' : 'rgba(255,255,255,0.65)', fontSize: 16 }}
+          >⋯</button>
+        </div>
+        {/* Быстрые действия — в потоке: контекст | вид | история | экспорт | неделя → выполнение */}
+        <div className="editor-topbar-shell" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', background: 'linear-gradient(180deg, rgba(26,28,38,0.82), rgba(18,20,30,0.68))', borderRadius: 14, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${DIR_COLOR[dir]}`, boxShadow: '0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(14px)' }}>
+          <span style={{ fontSize: 10, color: 'var(--constructor-muted, rgba(255,255,255,0.58))', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            🎯 {goalLabelOf(program.meta.goal)} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
+          </span>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 }}>
             <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: showTableView ? 'rgba(0,230,138,0.14)' : 'transparent', border: showTableView ? '1px solid rgba(0,230,138,0.30)' : '1px solid transparent', color: showTableView ? '#00e68a' : 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Переключить в редактор' : 'Показать таблицу плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
             <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)' }} />
@@ -769,8 +834,6 @@ return (
               {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '5px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(167,139,250,0.35)', color: '#a78bfa', background: 'rgba(167,139,250,0.08)' }} onClick={sendToExecution} title="Отправить ПЛ-неделю к выполнению">🚚 К вып.</button>}
             </span>
           )}
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', background: showMore ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: showMore ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.10)', color: showMore ? '#00e68a' : 'rgba(255,255,255,0.65)', fontSize: 14, marginLeft: 'auto' }} onClick={() => setShowMore(v => !v)} title="Ещё действия" aria-expanded={showMore}>⋯</button>
-        </div>
         </div>
         {/* «Ещё» — вне шапки: развёрнутая сетка не должна висеть третьей
             экрана поверх контента. */}

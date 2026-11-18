@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
 import { buildProgramIcs } from '../ManualExport';
 import { ManualLibraryGallery } from '../ManualLibraryGallery';
 import { ProgramManagerPanelWithProvider } from '../ProgramManagerPanel';
@@ -317,5 +318,70 @@ describe('ManualUI хуки для APK-слоя (§100)', () => {
     );
     expect(s.querySelector('.manual-stepper')).toBeInTheDocument();
     expect(s.querySelector('.manual-stepper button')).toBeInTheDocument();
+  });
+});
+
+// Шапка конструктора «бегала по экрану»: карточка-заголовок и шаги уезжали
+// вместе с контентом. Теперь они в закреплённой полосе, а топбар редактора
+// липнет сразу под ней (top = измеренная высота полосы).
+describe('Шапка ручного конструктора закреплена', () => {
+  it('карточка-заголовок и шаги лежат в полосе .manual-sticky-top', () => {
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    const { container } = render(<ProgramManagerPanelWithProvider />);
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    const band = container.querySelector('.manual-sticky-top');
+    expect(band).toBeInTheDocument();
+    expect(band!.querySelector('.manual-head')).toBeInTheDocument();
+    expect(band!.querySelector('.manual-stepper')).toBeInTheDocument();
+  });
+
+  it('CSS: полоса шапки sticky, топбар редактора — в потоке', () => {
+    const css = readFileSync('src/styles.css', 'utf8');
+    expect(css).toMatch(/\.manual-sticky-top\s*\{[^}]*position:\s*sticky/);
+    expect(css).toMatch(/\.manual-sticky-top\s*\{[^}]*top:\s*0/);
+    // Шапка закреплена, полоса действий — в потоке: две липкие полосы
+    // (шапка + два ряда кнопок) съедали бы почти весь экран телефона.
+    expect(css).toMatch(/\.manual-constructor--editor \.editor-topbar-shell\s*\{[^}]*position:\s*static/);
+    // APK-слой: та же схема (раньше топбар лип к top:0 и наезжал на шапку)
+    const native = readFileSync('src/styles-native.css', 'utf8');
+    expect(native).toMatch(/html\.app-native \.manual-constructor \.editor-topbar-shell\s*\{[^}]*position:\s*static/);
+    expect(native).toMatch(/html\.app-native \.manual-constructor \.editor-compactbar\s*\{/);
+    expect(native).toMatch(/html\.app-native \.manual-sticky-top\s*\{/);
+  });
+});
+
+// Панель действий редактора была двумя рядами (~335px) и уезжала с контентом.
+// Теперь «Сохранить» и «⋯» — в компактной полосе, закреплённой под шапкой,
+// а ряд экспорта остался в потоке.
+describe('Компактная панель действий редактора закреплена', () => {
+  it('CSS: полоса sticky под шапкой (top = --manual-sticky-h)', () => {
+    const css = readFileSync('src/styles.css', 'utf8');
+    expect(css).toMatch(/\.manual-constructor--editor \.editor-compactbar\s*\{[^}]*position:\s*sticky/);
+    expect(css).toMatch(/\.manual-constructor--editor \.editor-compactbar\s*\{[^}]*top:\s*var\(--manual-sticky-h/);
+    // Карточки не прячутся под двумя закреплёнными полосами.
+    expect(css).toMatch(/scroll-margin-top:\s*calc\(var\(--manual-sticky-h[^;]*var\(--editor-compact-h/);
+  });
+
+  it('в редакторе есть «Сохранить» и «⋯», ряд экспорта — без сохранения', async () => {
+    try { localStorage.removeItem('he_user_programs'); } catch { /* ignore */ }
+    const { container } = render(<ProgramManagerPanelWithProvider />);
+    fireEvent.click(screen.getAllByText('ББ')[0]);
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 25000 });
+
+    const bar = container.querySelector('.editor-compactbar');
+    expect(bar, 'закреплённая панель действий не отрендерена').toBeTruthy();
+    const save = Array.from(bar!.querySelectorAll('button')).find(b => (b.textContent || '').includes('Сохранить'));
+    expect(save, 'в закреплённой панели нет «Сохранить»').toBeTruthy();
+    const more = bar!.querySelector('button[aria-label="Ещё действия"]');
+    expect(more, 'в закреплённой панели нет «⋯»').toBeTruthy();
+    // Ряд экспорта в потоке дубля сохранения не держит.
+    const shell = container.querySelector('.editor-topbar-shell');
+    expect(shell).toBeTruthy();
+    expect(shell!.textContent || '').not.toContain('Сохранить');
+
+    // «⋯» раскрывает сетку «Ещё» (панель закреплена, а сетка — в потоке).
+    expect(screen.queryByText('Авто-черновик')).toBeNull();
+    fireEvent.click(more as HTMLElement);
+    expect(screen.getByText('Авто-черновик')).toBeTruthy();
   });
 });

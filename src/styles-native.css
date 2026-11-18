@@ -11814,12 +11814,13 @@ html.app-native .lib-manlib .lib-seg button {
 
 /* ─── 100. MANUAL MANAGER/EDITOR PRO — менеджер, редактор и визард топ-уровня ───
  * Корни: .manual-constructor (.manual-constructor--editor), шапка
- * .manual-head, степпер .manual-stepper, топбар .editor-topbar-shell
- * (.editor-topbar), чипы .editor-chip, ячейки расписания
- * .editor-schedule-cell, поверхности .constructor-surface (.editor-meta-card),
- * нижняя навигация .editor-bottomnav.
- * Тач 44px (инпуты 44px/16px без iOS-зума), липкие топбар/низ над пилюлей,
- * press 0.97-0.98, focus-visible лайм, tabular-цифры, 380px, reduced-motion.
+ * .manual-head, степпер .manual-stepper, закреплённая панель действий
+ * .editor-compactbar, ряд экспорта .editor-topbar-shell, чипы .editor-chip,
+ * ячейки расписания .editor-schedule-cell, поверхности .constructor-surface
+ * (.editor-meta-card), нижняя навигация .editor-bottomnav.
+ * Тач 44px (инпуты 44px/16px без iOS-зума), липкие шапка + компактная панель
+ * действий/низ над пилюлей, press 0.97-0.98, focus-visible лайм, tabular-цифры,
+ * 380px, reduced-motion.
  * Только APK: TG/web — байт-в-байт как было. */
 
 /* ── Шапка и степпер: дыхание, лента 44px со snap ── */
@@ -11845,21 +11846,40 @@ html.app-native .manual-constructor .manual-stepper button {
   font-size: 12px !important;
 }
 
-/* ── Топбар редактора: липкое стекло 18px, кнопки/инпуты 44px ── */
-html.app-native .manual-constructor .editor-topbar-shell {
-  position: sticky !important;
-  top: 0 !important;
-  z-index: 30 !important;
-  border-radius: 18px !important;
-  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
-  /* Непрозрачный фон: контент, уезжающий под закреплённую шапку, не должен
-     просвечивать сквозь стекло — иначе шапка визуально «плавает». */
-  background: linear-gradient(180deg, rgba(9, 18, 34, 0.98), rgba(9, 18, 34, 0.97)) !important;
+/* ── Шапка конструктора закреплена (ряд экспорта — в потоке) ── */
+html.app-native .manual-sticky-top {
+  /* Полоса шапки непрозрачная (базовое правило styles.css), на APK — цвет
+     окна конструктора (#050b16), плюс акцентная линия снизу: видно, что
+     шапка закреплена, а не «плавает». */
+  background: #050b16 !important;
+  box-shadow: 0 -12px 0 0 #050b16 !important;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.22) !important;
 }
 
-html.app-native .manual-constructor .editor-topbar button {
+/* ── Компактная панель действий закреплена под шапкой («Сохранить» + «⋯») ── */
+html.app-native .manual-constructor .editor-compactbar {
+  /* Тот же цвет окна конструктора, что и у закреплённой шапки: две
+     непрозрачные полосы подряд читаются как одна панель. */
+  background: #050b16 !important;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.22) !important;
+}
+
+html.app-native .manual-constructor .editor-compactbar button {
   min-height: 44px !important;
+  min-width: 44px !important;
   border-radius: 12px !important;
+}
+
+/* ── Топбар редактора: ряд экспорта в потоке, кнопки/инпуты 44px ── */
+html.app-native .manual-constructor .editor-topbar-shell {
+  /* Раньше лип тут: две закреплённые полосы (шапка ~200px + действия ~335px)
+     оставляли на телефоне ~200px контента. Закреплены шапка и компактная
+     панель действий, полный ряд экспорта — в потоке. */
+  position: static !important;
+  border-radius: 18px !important;
+  border-top: 2px solid rgba(var(--accent-rgb), 0.35) !important;
+  /* Непрозрачный фон: полупрозрачное стекло inline просвечивало контентом. */
+  background: linear-gradient(180deg, rgba(9, 18, 34, 0.98), rgba(9, 18, 34, 0.97)) !important;
 }
 
 html.app-native .manual-constructor .editor-topbar-shell button {
@@ -11946,7 +11966,7 @@ html.app-native .manual-constructor table {
 }
 
 @media (max-width: 380px) {
-  html.app-native .manual-constructor .editor-topbar {
+  html.app-native .manual-constructor .editor-compactbar {
     gap: 6px !important;
   }
 }
