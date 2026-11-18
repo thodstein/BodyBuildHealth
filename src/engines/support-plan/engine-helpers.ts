@@ -1009,6 +1009,15 @@ function extractLabValues(
     // `parseFloat('1+')` даёт 1, и «+1» белка мочи становился 1 г/л, то есть
     // нефротической протеинурией из ничего.
     if (typeof val === 'string' && val.includes('+')) return undefined;
+    // Проход 131: бланк печатает «>1000» и «<0.5». `parseFloat` на такой строке
+    // даёт NaN, и анализ пропадал целиком: ферритин «>1000» (перегрузка железом)
+    // не давал ни находки, ни вклада в риск. Границу читаем как её число — так же,
+    // как это уже делает авто-разбор бланка (`core/lab-auto-parser`: `[<>≤≥]?число`),
+    // а интерфейс говорит об этом баннером «граница вместо числа» (`labBoundNotes`).
+    if (typeof val === 'string' && /^[<>≤≥]/.test(val.trim())) {
+      const bound = parseFloat(val.trim().replace(/^[<>≤≥]\s*/, '').replace(',', '.'));
+      return isNaN(bound) ? undefined : bound;
+    }
     const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
     return isNaN(n) ? undefined : n;
   };

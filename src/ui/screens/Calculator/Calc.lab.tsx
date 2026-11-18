@@ -86,6 +86,32 @@ export function labUnitHint(marker: string, panel?: string): string | undefined 
 }
 
 /**
+ * Граница вместо числа (проход 131). Бланки печатают «>1000» ферритина и «<0.5» СРБ:
+ * `parseFloat` на такой строке даёт NaN, и анализ пропадал целиком — перегрузка
+ * железом не давала ни находки, ни вклада в риск. Движок читает границу как её
+ * число (иначе данные теряются), поэтому интерфейс обязан назвать это вслух.
+ */
+export function labBoundNotes(slice?: LabSlice | null): { marker: string; text: string }[] {
+  if (!slice) return [];
+  const out: { marker: string; text: string }[] = [];
+  for (const panel of Object.keys(slice)) {
+    if (panel === 'units' || panel === 'date') continue;
+    const markers = (slice as any)[panel] as Record<string, string> | undefined;
+    if (!markers) continue;
+    for (const [marker, raw] of Object.entries(markers)) {
+      const text = String(raw ?? '').trim();
+      if (!/^[<>≤≥]/.test(text)) continue;
+      const value = parseFloat(text.replace(/^[<>≤≥]\s*/, '').replace(',', '.'));
+      out.push({
+        marker,
+        text: Number.isFinite(value) ? `${ruMarker(marker)} «${text}» → ${value}` : `${ruMarker(marker)} «${text}»`,
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Единица бланка (проход 106). Бланки дают E2 и в пг/мл, и в пмоль/л, пролактин — в
  * нг/мл и мМЕ/л, и «угадать» по величине можно только там, где значение невозможно в
  * обеих единицах. Поэтому единица выбирается здесь и едет вместе с числом: чтение

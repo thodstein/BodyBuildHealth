@@ -46,6 +46,22 @@ function doseOf(input: ReturnType<typeof buildTzInput>, name: string): number | 
   return input?.drugs?.find((d) => d.drugName === name)?.dose;
 }
 
+/** Вход модели с одним заполненным полным бланком (проходы 130–131). */
+function tzInputWithLabs(panels: Record<string, unknown>, units?: Record<string, Record<string, string>>) {
+  const state = mockState({
+    // Без препаратов `buildTzInput` честно возвращает null (моделировать нечего).
+    pharma: {
+      ...mockState().pharma,
+      aas: [{ id: 'testosterone_enanthate', doseMgWeek: 400, weeks: 10 }],
+    },
+  } as Partial<CalculatorState>);
+  state.labs = {
+    ...state.labs,
+    fullPanel: { date: '2026-01-10', ...panels, ...(units ? { units } : {}) },
+  } as any;
+  return buildTzInput(state, [])!;
+}
+
 describe('buildTzInput: препараты списка курса', () => {
   it('берёт дозу и недели из списка, а не из хардкода', () => {
     const state = mockState({
@@ -168,20 +184,7 @@ describe('buildTzInput: поддержка и профиль', () => {
  * полях молча выигрывала биохимия (СРБ 1 при вчСРБ 7 = «воспаления нет»).
  */
 describe('проход 130: белок мочи — свой маркер, а не UACR', () => {
-  function inputWith(panels: Record<string, unknown>, units?: Record<string, Record<string, string>>) {
-    const state = mockState({
-      // Без препаратов `buildTzInput` честно возвращает null (моделировать нечего).
-      pharma: {
-        ...mockState().pharma,
-        aas: [{ id: 'testosterone_enanthate', doseMgWeek: 400, weeks: 10 }],
-      },
-    } as Partial<CalculatorState>);
-    state.labs = {
-      ...state.labs,
-      fullPanel: { date: '2026-01-10', ...panels, ...(units ? { units } : {}) },
-    } as any;
-    return buildTzInput(state, [])!;
-  }
+  const inputWith = tzInputWithLabs;
 
   it('г/л уходит в PROTEIN_URINE, UACR не выдумывается', () => {
     const input = inputWith({ panelUrinalysis: { Protein: '0.3' } });
@@ -225,5 +228,37 @@ describe('проход 130: белок мочи — свой маркер, а н
   it('вчСРБ без СРБ читается как СРБ', () => {
     const input = inputWith({ panelInflammatory: { hsCRP: '7' } });
     expect(input.labValues!['CRP']).toBe(7);
+  });
+});
+
+/**
+ * Проход 131: граница вместо числа.
+ *
+ * Бланк печатает «>1000» и «<0.5». `parseFloat` на такой строке даёт NaN, и анализ
+ * пропадал целиком: ферритин «>1000» (перегрузка железом) не давал ни находки, ни
+ * вклада в риск. Границу читаем как её число — так же, как это уже делает авто-разбор
+ * бланка (`core/lab-auto-parser`), — а интерфейс называет это баннером
+ * «граница вместо числа» (`labBoundNotes`).
+ */
+describe('проход 131: граница «>N» / «<N» не теряет анализ', () => {
+  it('ферритин «>1000» читается как 1000 и даёт m_i 3', () => {
+    const input = tzInputWithLabs({ panelIron: { Ferritin: '>1000' } });
+    expect(input.labValues!['FERRITIN']).toBe(1000);
+    expect(getMiFromLab('cns2', input.labValues!)).toBe(3);
+  });
+
+  it('«<0,5» СРБ — это 0.5, «>300» — 300', () => {
+    expect(tzInputWithLabs({ panelBiochem: { CRP: '<0,5' } }).labValues!['CRP']).toBe(0.5);
+    expect(tzInputWithLabs({ panelBiochem: { CRP: '>300' } }).labValues!['CRP']).toBe(300);
+  });
+
+  it('белок мочи «>1» — 1 г/л, полоска «1+» по-прежнему не число', () => {
+    expect(tzInputWithLabs({ panelUrinalysis: { Protein: '>1' } }).labValues!['PROTEIN_URINE']).toBe(1);
+    expect(tzInputWithLabs({ panelUrinalysis: { Protein: '1+' } }).labValues!['PROTEIN_URINE']).toBeUndefined();
+  });
+
+  it('граница без числа ничего не выдумывает', () => {
+    const input = tzInputWithLabs({ panelBiochem: { CRP: '>—' } });
+    expect(input.labValues!['CRP']).toBeUndefined();
   });
 });

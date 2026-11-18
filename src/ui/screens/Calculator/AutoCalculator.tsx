@@ -14,7 +14,7 @@ import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
-import { ruMarker } from './Calc.lab';
+import { ruMarker, labBoundNotes } from './Calc.lab';
 import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
@@ -57,6 +57,15 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     const seen = new Set<string>();
     return out.filter(x => (seen.has(x.marker) ? false : (seen.add(x.marker), true)));
   }, [state.labs, state.profile?.sex]);
+  /**
+   * Проход 131: в полях бывают границы — «>1000» ферритина, «<0.5» СРБ. Движок
+   * читает такую строку как её число (иначе анализ пропадал бы целиком), значит
+   * экран обязан сказать, что число — граница, а не измерение.
+   */
+  const boundNotes = useMemo(() => {
+    const slice = state.labs?.fullPanel || state.labs?.midCourse || state.labs?.preCourse;
+    return labBoundNotes(slice);
+  }, [state.labs]);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
   const [labSyncFlash, setLabSyncFlash] = useState(false);
@@ -737,6 +746,20 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
             {unitMissing.map(u => u.text).join(' · ')} — прочитано по величине. Выберите единицу
             в бланке анализов, иначе вердикт может быть противоположным (пг/мл против пмоль/л).
+          </div>
+        </div>
+      )}
+
+      {/* Проход 131: граница вместо числа. «>1000» ферритина — не 1000, а «не меньше
+          1000»; движок читает границу как число, чтобы анализ не исчезал молча. */}
+      {boundNotes.length > 0 && (
+        <div data-lab-bound-note style={{ ...GLASS, padding: '6px 10px', marginBottom: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 2 }}>
+            ⚠ Граница вместо числа
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
+            {boundNotes.map(n => n.text).join(' · ')} — прочитано как само число, точного значения
+            в бланке нет. Если лаборатория даёт точное — впишите его.
           </div>
         </div>
       )}
