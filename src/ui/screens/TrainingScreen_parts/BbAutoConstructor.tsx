@@ -102,7 +102,7 @@ import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine
 
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
-import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, applyManualSupersetTo, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, applyManualSupersetTo, prepTrialDose, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { resolveBbAutoOpenStep, shouldFollowExternalPlan, annualBlockCtxIsFresh, clampBbWeek } from './bb-auto-nav';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
@@ -918,19 +918,26 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     try { localStorage.setItem('he_contest_manual_date', String(Date.now())); } catch {}
     if (!prepPlan) { setPrepShowDate(d); return; }
     const { plan, changedFrozen, warnings } = shiftBBContestPrepShowDate(prepPlan, d);
-    setPrepPlan(plan);
+    // Аудит UI (P2): персональная доза trial пик-недели не теряется при переносе даты —
+    // доза едет в плане (`peakWeek.carbDoseGPerKg`), но её нужно явно передать в оверлей.
+    const dose = prepTrialDose(plan, lastTest);
+    const planWithDose = dose != null && Number(plan.peakWeek?.carbDoseGPerKg) !== dose
+      ? { ...plan, peakWeek: { ...plan.peakWeek, carbDoseGPerKg: dose } }
+      : plan;
+    setPrepPlan(planWithDose);
     setPrepShowDate(d);
     if (changedFrozen) flash(warnings[0] ?? 'Завершённые недели требуют подтверждения');
     else if (warnings.length) flash(warnings[0]);
     // PRO-3 Э1/D1: персист под НОВУЮ дату: cfg с явной датой (state prepShowDate ещё stale —
     // setState асинхронен), план сохраняется вместе с ним (раньше перенос терялся до пересборки).
     const cfgShifted = { ...buildContestPrepConfig(), showDate: d };
-    savePrepToProfile(plan, cfgShifted);
+    savePrepToProfile(planWithDose, cfgShifted);
     if (builtPlan && prepApplied) {
       const updated = applyContestPrepToBBPlan(applyEditsToPlan(builtPlan), cfgShifted, {
-        prepWeeks: plan.preparation.weeks,
-        taperWeeks: plan.taper.weeks,
+        prepWeeks: planWithDose.preparation.weeks,
+        taperWeeks: planWithDose.taper.weeks,
         prepVolumeMult: prepVolumeMode,
+        carbDoseGPerKg: dose,
         force: true,
       });
       setBuiltPlan(updated);
@@ -948,7 +955,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setPrepWeeks(newWeeks);
     // PRO-3 Э12: расширение/сужение — через единый хелпер движка (addPrepWeeks).
     const replanned = addPrepWeeks(prepPlan, delta);
-    setPrepPlan(replanned);
+    // Аудит UI (P2): та же доза trial, что и при сборке prep, — иначе «±неделя» теряла
+    // персональную дозу углеводов пик-недели в плане и питании.
+    const dose = prepTrialDose(replanned, lastTest);
+    const planWithDose = dose != null && Number(replanned.peakWeek?.carbDoseGPerKg) !== dose
+      ? { ...replanned, peakWeek: { ...replanned.peakWeek, carbDoseGPerKg: dose } }
+      : replanned;
+    setPrepPlan(planWithDose);
     // PRO-3 Э1/D2: персист расширения (раньше state/план менялись, профиль — нет, флеш врал).
     const cfg = buildContestPrepConfig();
     if (builtPlan && prepApplied) {
@@ -956,8 +969,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       if (delta > 0) base = extendBBPlanPreparation(base, delta);
       const updated = applyContestPrepToBBPlan(base, cfg, {
         prepWeeks: newWeeks,
-        taperWeeks: replanned.taper.weeks,
+        taperWeeks: planWithDose.taper.weeks,
         prepVolumeMult: prepVolumeMode,
+        carbDoseGPerKg: dose,
         force: true,
       });
       setBuiltPlan(updated);
@@ -965,7 +979,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setEditsHistory([]);
       setRedosHistory([]);
     }
-    savePrepToProfile(replanned, cfg);
+    savePrepToProfile(planWithDose, cfg);
     flash(delta > 0 ? `Подготовка расширена до ${newWeeks} нед (пик и тапер не тронуты)` : `Подготовка сокращена до ${newWeeks} нед`);
   };
 

@@ -75,11 +75,15 @@ describe('PRO-3 Э1 — контур записи', () => {
     const src = readFileSync(resolve(__dirname, '..', '..', '..', 'ui', 'screens', 'TrainingScreen_parts', 'BbAutoConstructor.tsx'), 'utf8');
     // D1: пересборка и сохранение с ЯВНОЙ новой датой (state prepShowDate ещё stale)
     expect(src).toMatch(/const cfgShifted = \{ \.\.\.buildContestPrepConfig\(\), showDate: d \}/);
-    expect(src).toMatch(/savePrepToProfile\(plan, cfgShifted\)/);
+    // `planWithDose` — тот же сдвинутый план плюс персональная доза trial пик-недели,
+    // которая раньше терялась при переносе даты (аудит UI, P2).
+    expect(src).toMatch(/savePrepToProfile\(plan(WithDose)?, cfgShifted\)/);
     // зов drive-степ остался на новой дате; ручные правки входят в базу (effective plan)
     expect(src).toMatch(/applyContestPrepToBBPlan\(applyEditsToPlan\(builtPlan\), cfgShifted/);
     // D2: расширение подготовки сохраняется в профиль
-    expect(src).toMatch(/savePrepToProfile\(replanned, cfg\)/);
+    expect(src).toMatch(/savePrepToProfile\(plan(WithDose)?, cfg\)/);
     expect(src).toMatch(/applyEditsToPlan\(builtPlan\) as BBPlanWithPrep/);
+    // Доза trial едет и в оверлей плана тренировок — иначе пик-неделя теряла её.
+    expect(src).toMatch(/carbDoseGPerKg: dose/);
   });
 });

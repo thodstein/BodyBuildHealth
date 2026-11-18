@@ -25,7 +25,7 @@ import { techniqueLabel } from './bb-technique-display';
 import { distributePhases as distributePhasesUnified, type PhaseDistribution } from '../../../engines/periodization';
 import {
   CATEGORY_PROFILES, isoAddDays, isoToday,
-  canonicalWaterStrategy, canonicalSodiumStrategy,
+  canonicalWaterStrategy, canonicalSodiumStrategy, trialCarbDoseGPerKg,
   type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization,
   type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
 } from '../../../engines/bb/bb-contest-prep.engine';
@@ -181,6 +181,28 @@ export function computeBulkWeekEdits(args: {
     }
   }
   return { edits: next };
+}
+
+/** Персональная доза trial для пик-неделы: сначала сохранённая в плане, иначе — из
+ *  последнего результата пробного пика.
+ *
+ *  Аудит UI (P2): «перенос даты шоу» и «±неделя подготовки» пересобирали оверлей без
+ *  `carbDoseGPerKg`, поэтому персональная доза углеводов пик-недели терялась — план и
+ *  питание возвращались к среднему коридора. Доза едет в плане (`peakWeek.carbDoseGPerKg`),
+ *  значит достаточно не забыть её при пересборке. */
+export function prepTrialDose(
+  plan: { peakWeek?: { carbDoseGPerKg?: number } | null; category?: string; sex?: string } | null | undefined,
+  lastTest: any,
+): number | undefined {
+  const stored = Number(plan?.peakWeek?.carbDoseGPerKg);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+  if (!lastTest) return undefined;
+  try {
+    const dose = Number(trialCarbDoseGPerKg(lastTest, (plan?.category || 'mens_physique') as any, (plan?.sex || 'male') as any));
+    return Number.isFinite(dose) && dose > 0 ? dose : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Ручной суперсет: связать упражнение `index` с реальным партнёром в той же сессии.
