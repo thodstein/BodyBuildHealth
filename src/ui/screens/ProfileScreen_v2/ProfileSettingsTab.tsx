@@ -135,9 +135,15 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
     setBackupBusy(true);
     try {
       const { backupFile } = await import('../../../core/data-backup');
-      const { name, text } = await backupFile();
+      const { name, text, info } = await backupFile();
       const outcome = await saveTextFileApk(name, text, 'application/json;charset=utf-8');
-      toast(shareOutcomeLabel(outcome));
+      // Про вложения говорим сразу: «копия готова» соврала бы, если файл их не взял.
+      const media = info?.noteMediaOmitted
+        ? ' Вложения заметок не вошли: их объём больше лимита копии.'
+        : info && info.noteMedia > 0
+          ? ` Вложений заметок в копии: ${info.noteMedia}.`
+          : '';
+      toast(shareOutcomeLabel(outcome) + media);
     } catch (e) {
       toast('Ошибка экспорта: ' + (e as Error).message);
     } finally {
@@ -177,10 +183,15 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
             : info.photos > 0
               ? `Фотографий веса в файле: ${info.photos}.`
               : 'Фотографий веса в файле нет.';
+          const noteFiles = info.noteMediaOmitted
+            ? 'Фото и голос заметок в файл не вошли (слишком большой объём).'
+            : info.noteMedia > 0
+              ? `Вложений заметок в файле: ${info.noteMedia}.`
+              : 'Вложений заметок (фото/голос) в файле нет.';
           const ok = confirm(
             `Копия от ${date}: ${spaces}, ${ruCount(info.records, RU_ENTRIES)} в базе, ${ruCount(info.keys, RU_SETTINGS)}.\n\n` +
               'Восстановление ЗАМЕНИТ все данные на этом устройстве — профиль, дневники, анализы и ' +
-              'данные всех атлетов. ' + photos + ' ' +
+              'данные всех атлетов. ' + photos + ' ' + noteFiles + ' ' +
               'Черновики в файл не входят и останутся как есть. ' +
               'Отменить это нельзя.\n\nПродолжить?',
           );
@@ -320,7 +331,9 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
           ><span style={{ display:'inline-flex', width:30, height:30, borderRadius:10, alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', border:'1px solid rgba(59,130,246,0.35)', flexShrink:0 }}><NativeIcon name="inbox" size={14} /></span>Восстановить всё из файла</button>
         </div>
         <div style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }} data-backup="note">
-          В копию входят все пространства: ваши данные и данные всех атлетов, включая фотографии веса.
+          В копию входят все пространства: ваши данные и данные всех атлетов, включая фотографии веса,
+          а также фото и голос из заметок — пока они влезают в лимит копии (иначе файл прямо скажет,
+          что вложения не вошли).
           Чего в файле нет: недописанных черновиков — они остаются на устройстве.
           Внутри лежит ключ шифрования базы, поэтому файл стоит хранить как пароль.
         </div>

@@ -29,6 +29,14 @@ import {
 } from './data-space';
 import { requestSpacePurge } from './space-purge';
 import { listLiveSpaceTokens } from './space-tokens';
+import {
+  base64ToBytes,
+  bytesToBase64,
+  deleteAllNoteMedia,
+  listNoteMedia,
+  noteMediaBytes,
+  saveNoteMedia,
+} from '../engines/note-media-store';
 
 /** Сырое хранилище: бэкап и полная очистка обязаны видеть все пространства. */
 function rawLs() {
@@ -44,6 +52,29 @@ export const BACKUP_VERSION = '3.0';
  * целиком (не «часть»), и сводка скажет об этом прямо.
  */
 export const MAX_BACKUP_PHOTO_BYTES = 32 * 1024 * 1024;
+
+/**
+ * Потолок на вложения заметок в файле копии (в символах base64, то есть
+ * примерно в байтах файла). Голос и фото тяжёлые, а файл целиком читается в
+ * память при восстановлении (`JSON.parse`), поэтому ограничение честное и с
+ * явным флагом «не вошло». 20 МБ выбраны так, чтобы худший случай (32 МБ фото
+ * веса + вложения + ключи) оставался ниже лимита чтения копии в 60 МБ.
+ */
+export const MAX_BACKUP_NOTE_MEDIA_BYTES = 20 * 1024 * 1024;
+
+/** Вложение заметки в файле копии: метаданные + байты в base64. */
+export interface NoteMediaBackupRecord {
+  id: string;
+  noteId: string;
+  kind: 'photo' | 'audio';
+  mime: string;
+  size: number;
+  durationMs?: number;
+  name?: string;
+  createdAt: number;
+  /** Байты файла в base64 (переживают JSON без потерь). */
+  data: string;
+}
 
 export interface AppBackup {
   app: 'health-engine';
@@ -69,6 +100,14 @@ export interface AppBackup {
   photoStores?: Record<string, WeightPhotoRecord[]>;
   /** Фото не влезли по объёму: пустой `photoStores` значит «не смогли», а не «фото не было». */
   photosOmitted?: boolean;
+  /**
+   * Вложения заметок (фото/голос) — третья отдельная база. Без этого поля
+   * после переноса на новый телефон заметка приезжала бы с метаданными
+   * вложений и пустым хранилищем, то есть «Фото не найдено».
+   */
+  noteMedia?: NoteMediaBackupRecord[];
+  /** Вложения не влезли по объёму — так же честно, как `photosOmitted`. */
+  noteMediaOmitted?: boolean;
   localStorage: Record<string, string>;
 }
 
@@ -91,7 +130,10 @@ function allSpaceIds(): string[] {
   return Array.from(new Set(ids));
 }
 
-export async function collectBackup(opts?: { maxPhotoBytes?: number }): Promise<AppBackup> {
+export async function collectBackup(opts?: {
+  maxPhotoBytes?: number;
+  maxNoteMediaBytes?: number;
+}): Promise<AppBackup> {
   await db.init();
   const spaceIds = allSpaceIds();
   // База каждого пространства: атлеты живут в своих базах IndexedDB.
@@ -142,6 +184,44 @@ export async function collectBackup(opts?: { maxPhotoBytes?: number }): Promise<
   }
   if (photosOmitted) photoStores = {};
 
+  // Вложения заметок (фото/голос) — своя база уровня устройства. Считаем объём
+  // ДО упаковки: base64-в-JSON тяжёлый, а восстановление читает файл целиком.
+  let noteMedia: NoteMediaBackupRecord[] = [];
+  let mediaBytesTotal = 0;
+  let noteMediaOmitted = false;
+  try {
+    const rows = (await listNoteMedia()) ?? [];
+    for (const row of rows) {
+      const bytes = await noteMediaBytes(row);
+      if (!bytes || bytes.byteLength === 0) continue;
+      const payload = bytesToBase64(bytes);
+      if (!payload) continue;
+      // Считаем размер В ФАЙЛЕ (base64), а не сырые байты: иначе лимит файла
+      // на 33 % оптимистичнее реальности.
+      if (mediaBytesTotal + payload.length > (opts?.maxNoteMediaBytes ?? MAX_BACKUP_NOTE_MEDIA_BYTES)) {
+        noteMediaOmitted = true;
+        break;
+      }
+      mediaBytesTotal += payload.length;
+      noteMedia.push({
+        id: row.id,
+        noteId: row.noteId || '',
+        kind: row.kind === 'audio' ? 'audio' : 'photo',
+        mime: row.mime || 'application/octet-stream',
+        size: Number.isFinite(row.size) ? row.size : bytes.byteLength,
+        ...(typeof row.durationMs === 'number' ? { durationMs: row.durationMs } : {}),
+        ...(row.name ? { name: row.name } : {}),
+        createdAt: Number.isFinite(row.createdAt) ? row.createdAt : Date.now(),
+        data: payload,
+      });
+    }
+  } catch {
+    // Хранилище не читается — это не «вложений не было», но копию ломать нельзя.
+    noteMedia = [];
+    noteMediaOmitted = true;
+  }
+  if (noteMediaOmitted) noteMedia = [];
+
   return {
     app: 'health-engine',
     version: BACKUP_VERSION,
@@ -150,6 +230,8 @@ export async function collectBackup(opts?: { maxPhotoBytes?: number }): Promise<
     spaceStores,
     ...(Object.keys(photoStores).length ? { photoStores } : {}),
     ...(photosOmitted ? { photosOmitted: true } : {}),
+    ...(noteMedia.length ? { noteMedia } : {}),
+    ...(noteMediaOmitted ? { noteMediaOmitted: true } : {}),
     localStorage: local,
   };
 }
@@ -212,11 +294,17 @@ export function exportToJSON(b: AppBackup): string {
  * скачивание, в APK — Documents + share (`core/apk-share`), и только там
  * известно, что сработало и что сказать пользователю.
  */
-export async function backupFile(): Promise<{ name: string; text: string }> {
+export async function backupFile(): Promise<{
+  name: string;
+  text: string;
+  /** Что именно попало в файл: по этой сводке UI честно говорит про вложения. */
+  info: ReturnType<typeof describeBackup>;
+}> {
   const b = await collectBackup();
   return {
     name: `health-engine-backup-${b.createdAt.slice(0, 10)}.json`,
     text: exportToJSON(b),
+    info: describeBackup(b),
   };
 }
 
@@ -234,6 +322,11 @@ export function describeBackup(b: AppBackup): {
   photoBytes: number;
   /** Фото не влезли по объёму — это не то же самое, что «фото не было». */
   photosOmitted: boolean;
+  /** Вложений заметок в файле и их суммарный объём в байтах. */
+  noteMedia: number;
+  noteMediaBytes: number;
+  /** Вложения не влезли по объёму (или хранилище не читалось). */
+  noteMediaOmitted: boolean;
   createdAt: string;
 } {
   const perSpace: Record<string, Record<string, any[]>> =
@@ -256,6 +349,14 @@ export function describeBackup(b: AppBackup): {
       for (const p of r.photos) if (typeof p === 'string') photoBytes += p.length;
     }
   }
+  let noteMediaCount = 0;
+  let noteMediaBytes = 0;
+  for (const m of b.noteMedia || []) {
+    if (!m || typeof m.data !== 'string') continue;
+    noteMediaCount += 1;
+    // Длина base64 → байты: так считаем то, что реально лежит в файле.
+    noteMediaBytes += Math.floor((m.data.length * 3) / 4);
+  }
   return {
     spaces: Object.keys(perSpace).length,
     records,
@@ -263,6 +364,9 @@ export function describeBackup(b: AppBackup): {
     photos,
     photoBytes,
     photosOmitted: b.photosOmitted === true,
+    noteMedia: noteMediaCount,
+    noteMediaBytes,
+    noteMediaOmitted: b.noteMediaOmitted === true,
     createdAt: typeof b.createdAt === 'string' ? b.createdAt : '',
   };
 }
@@ -307,6 +411,34 @@ export async function importBackup(b: AppBackup): Promise<void> {
       } catch {
         /* одно фото/одна дата не должны срывать восстановление */
       }
+    }
+  }
+  // Вложения заметок: восстановление ЗАМЕНЯЕТ данные, поэтому старую базу
+  // вложений чистим — иначе файлы прошлой установки остались бы сиротами и
+  // занимали место до следующего открытия «Заметок».
+  try {
+    await deleteAllNoteMedia();
+  } catch {
+    /* не удалось — сирот подберёт cleanup при открытии заметок */
+  }
+  for (const rec of b.noteMedia || []) {
+    if (!rec || typeof rec.id !== 'string' || typeof rec.data !== 'string') continue;
+    try {
+      const bytes = base64ToBytes(rec.data);
+      if (!bytes.length) continue;
+      await saveNoteMedia({
+        id: rec.id.slice(0, 80),
+        noteId: String(rec.noteId || '').slice(0, 80),
+        kind: rec.kind === 'audio' ? 'audio' : 'photo',
+        mime: String(rec.mime || 'application/octet-stream').slice(0, 80),
+        size: Number.isFinite(rec.size) ? rec.size : bytes.length,
+        ...(Number.isFinite(rec.durationMs) ? { durationMs: rec.durationMs as number } : {}),
+        ...(rec.name ? { name: String(rec.name).slice(0, 120) } : {}),
+        createdAt: Number.isFinite(rec.createdAt) ? rec.createdAt : Date.now(),
+        bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      });
+    } catch {
+      /* одно вложение не должно срывать восстановление */
     }
   }
   _resetDataSpaceCache();

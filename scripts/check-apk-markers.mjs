@@ -437,6 +437,8 @@ for (const rel of [
 
 // 7e. Голосовые заметки (2026-11): без RECORD_AUDIO запись голоса в WebView
 // молча падает, а без проверки возможностей UI показывал бы кнопку-пустышку.
+// Вторая половина секции — нативный HeSpeech: в WebView нечего распознавать,
+// поэтому диктовка/озвучка идут через системные SpeechRecognizer/TextToSpeech.
 mustContain(
   'android/app/src/main/AndroidManifest.xml',
   'android.permission.RECORD_AUDIO',
@@ -476,6 +478,39 @@ mustContain(
   'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx',
   'data-notes="attach-remove"',
   'voice notes: remove attachment',
+);
+// Нативный мост: без него голосовые кнопки в WebView — «недоступно».
+mustContain(
+  'android/app/src/main/java/com/healthengine/app/HeSpeechPlugin.java',
+  'name = "HeSpeech"',
+  'voice notes: native speech plugin',
+);
+mustContain(
+  'android/app/src/main/AndroidManifest.xml',
+  'android.speech.RecognitionService',
+  'voice notes: recognition service visibility',
+);
+mustContain(
+  'src/core/speech-native.ts',
+  'export function nativeSpeechCaps',
+  'voice notes: native capability probe',
+);
+mustContain(
+  'src/engines/note-speech.ts',
+  'export async function startDictation',
+  'voice notes: one speech entry point',
+);
+// Вложения в резервной копии: без этого перенос терял фото/голос.
+mustContain(
+  'src/core/data-backup.ts',
+  'noteMediaOmitted',
+  'voice notes: media in backup',
+);
+// Файл можно забрать из приложения (Документы/шаринг).
+mustContain(
+  'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx',
+  'data-notes="share"',
+  'voice notes: share attachment',
 );
 
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).

@@ -22,11 +22,16 @@ export const NOTE_PHOTO_QUALITY = 0.82;
 /** Одна голосовая заметка — не дольше 15 минут. */
 export const NOTE_AUDIO_MAX_MS = 15 * 60 * 1000;
 
-/** Кандидаты mime для MediaRecorder, по убыванию предпочтения. */
+/**
+ * Кандидаты mime для MediaRecorder, по убыванию предпочтения.
+ * mp4/m4a — первым: webm/opus играет внутри приложения, но не открывается в
+ * WhatsApp/Telegram и части плееров, а голосовую заметку почти всегда кому-то
+ * пересылают. Не поддержан — берём следующий (isTypeSupported ниже).
+ */
 export const NOTE_RECORDING_MIMES = [
+  'audio/mp4',
   'audio/webm;codecs=opus',
   'audio/webm',
-  'audio/mp4',
   'audio/ogg;codecs=opus',
 ] as const;
 
@@ -52,11 +57,11 @@ export function attachmentSummary(
   const photos = items.filter(i => i.kind === 'photo').length;
   const audios = items.filter(i => i.kind === 'audio');
   const parts: string[] = [];
-  if (photos) parts.push(`${photos} ${photos === 1 ? 'фото' : 'фото'}`);
+  // «фото» и «аудио» не склоняются по числу — форма одна на любое количество.
+  if (photos) parts.push(`${photos} фото`);
   if (audios.length) {
     const total = audios.reduce((sum, a) => sum + (Number.isFinite(a.durationMs) ? Math.max(0, a.durationMs ?? 0) : 0), 0);
-    const label = audios.length === 1 ? 'аудио' : 'аудио';
-    parts.push(total > 0 ? `${audios.length} ${label} ${formatDuration(total)}` : `${audios.length} ${label}`);
+    parts.push(total > 0 ? `${audios.length} аудио ${formatDuration(total)}` : `${audios.length} аудио`);
   }
   return parts.join(' · ');
 }
@@ -313,6 +318,38 @@ export function dataUrlBytes(dataUrl: string): number {
 }
 
 /**
+ * dataUrl → байты. Чистая функция без atob-цикла по мегабайтной строке в одном
+ * вызове: photo-сжатие на телефоне иначе рвёт WebView по памяти.
+ */
+export function dataUrlToBytes(dataUrl: string): Uint8Array | null {
+  const s = String(dataUrl ?? '');
+  const comma = s.indexOf(',');
+  if (comma < 0) return null;
+  const meta = s.slice(0, comma);
+  const payload = s.slice(comma + 1);
+  try {
+    if (/;base64/i.test(meta)) {
+      const bin = atob(payload.replace(/\s+/g, ''));
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+    const decoded = decodeURIComponent(payload);
+    const out = new Uint8Array(decoded.length);
+    for (let i = 0; i < decoded.length; i++) out[i] = decoded.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** Mime из dataUrl (для записи вложения). */
+export function dataUrlMime(dataUrl: string): string {
+  const m = /^data:([^;,]+)/i.exec(String(dataUrl ?? ''));
+  return (m?.[1] ?? 'image/jpeg').toLowerCase();
+}
+
+/**
  * Сжать фото перед хранением: длинная сторона ≤ 1600, JPEG q0.82.
  * null — сжать нельзя (нет canvas/декодера, тестовое окружение); тогда
  * вызывающий сохраняет оригинал как есть.
@@ -358,3 +395,68 @@ export async function compressPhotoDataUrl(dataUrl: string): Promise<string | nu
     return null;
   }
 }
+
+/* ── Место в хранилище ─────────────────────────────────────────────────── */
+
+const isVitestEnv = (): boolean =>
+  typeof process !== 'undefined' && process.env?.VITEST === 'true';
+
+const storageApi = (): {
+  persist?: () => Promise<boolean>;
+  persisted?: () => Promise<boolean>;
+  estimate?: () => Promise<{ usage?: number; quota?: number }>;
+} | null => {
+  try {
+    const s = typeof navigator !== 'undefined' ? (navigator as unknown as { storage?: unknown }).storage : null;
+    return s && typeof s === 'object' ? (s as never) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Попросить ОС не вычищать наше хранилище под давлением квоты.
+ * 'unsupported' — браузер/WebView такого не умеет; это не ошибка и не повод
+ * что-то говорить пользователю.
+ */
+export async function ensurePersistentStorage(): Promise<'granted' | 'denied' | 'unsupported'> {
+  if (isVitestEnv()) return 'unsupported';
+  const s = storageApi();
+  if (!s || typeof s.persist !== 'function') return 'unsupported';
+  try {
+    if (typeof s.persisted === 'function' && (await s.persisted())) return 'granted';
+    return (await s.persist()) ? 'granted' : 'denied';
+  } catch {
+    return 'unsupported';
+  }
+}
+
+/** Свободно байт в хранилище приложения; null — система не сообщает. */
+export async function storageFreeBytes(): Promise<number | null> {
+  if (isVitestEnv()) return null;
+  const s = storageApi();
+  if (!s || typeof s.estimate !== 'function') return null;
+  try {
+    const est = await s.estimate();
+    const quota = Number(est?.quota);
+    const usage = Number(est?.usage);
+    if (!Number.isFinite(quota) || quota <= 0) return null;
+    return Math.max(0, quota - (Number.isFinite(usage) && usage > 0 ? usage : 0));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Хватит ли места под файл. true — «можно пробовать» (в том числе когда ОС
+ * объём не сообщает: отказывать наугад нельзя). Запас 20 % — под индексы,
+ * шифрование и служебные записи.
+ */
+export async function hasRoomForBytes(bytes: number): Promise<boolean> {
+  const need = Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
+  if (!need) return true;
+  const free = await storageFreeBytes();
+  if (free === null) return true;
+  return free >= need * 1.2;
+}
+

@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Видимость системных речевых сервисов (Android 11+). Без queries
+         SpeechRecognizer.isRecognitionAvailable() и TextToSpeech не видят
+         движок, и голосовые заметки ложно считались бы недоступными. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -217,8 +229,9 @@
          Галерея идёт через системный picker и отдельных разрешений не требует. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- Микрофон для голосовых заметок: getUserMedia/MediaRecorder в WebView.
-         Runtime-разрешение спрашивает сам Capacitor (BridgeWebChromeClient). -->
+    <!-- Микрофон для голосовых заметок: getUserMedia/MediaRecorder в WebView и
+         нативный SpeechRecognizer (HeSpeechPlugin). Runtime-разрешение спрашивает
+         Capacitor: BridgeWebChromeClient для WebView-записи, плагин — для речи. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />

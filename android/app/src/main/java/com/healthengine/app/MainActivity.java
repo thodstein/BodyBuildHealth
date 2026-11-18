@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WidgetBridgePlugin.class);
         registerPlugin(AppUpdaterPlugin.class);
         registerPlugin(DynamicColorPlugin.class);
+        registerPlugin(HeSpeechPlugin.class);
         super.onCreate(savedInstanceState);
         ensureNotificationChannels();
         captureWidgetTarget(getIntent());

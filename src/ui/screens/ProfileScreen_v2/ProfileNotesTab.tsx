@@ -10,17 +10,24 @@
  * надиктовать текст (речь → текст) и озвучить заметку (текст → речь).
  * Байты живут в IndexedDB (`note-media-store`), в localStorage — только
  * метаданные: иначе один снимок в base64 выжег бы квоту всех заметок.
+ * Там же байты шифруются AES-GCM ключом устройства, а забрать файл наружу
+ * можно кнопкой «Сохранить/Поделиться» (Documents + системный шаринг).
+ *
+ * Как выбирается голосовой движок (`note-speech`): сначала нативный мост APK
+ * (системные SpeechRecognizer/TextToSpeech), затем web-API, иначе — честное
+ * «недоступно» без кнопок-пустышек.
  *
  * Честно:
  *  • заметки не влияют на расчёты планов и не уходят в отчёты — это блокнот,
  *    а не медицинский документ;
- *  • в Android WebView распознавания речи обычно нет вообще, а микрофон
- *    работает только при разрешении RECORD_AUDIO (оно в манифесте, спрашивает
- *    сам Capacitor). Если система всё же отказала, UI прямо говорит «здесь
- *    недоступно» и предлагает рабочий путь: записать диктофоном и приложить
- *    файл. Кнопок-пустышек, которые «ничего не делают», быть не должно;
+ *  • микрофон работает только при разрешении RECORD_AUDIO (оно в манифесте,
+ *    спрашивает сам Capacitor). Если система всё же отказала, UI прямо говорит
+ *    «здесь недоступно» и предлагает рабочий путь: записать диктофоном и
+ *    приложить файл;
  *  • расшифровка приложенного аудио не выдумывается: «голос в текст» работает
- *    только вживую во время диктовки.
+ *    только вживую во время диктовки;
+ *  • файлы входят в резервную копию, пока влезают в её лимит; если нет — копия
+ *    прямо говорит «вложения не вошли», а не делает вид, что их не было.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
@@ -55,28 +62,36 @@ import {
   NOTE_AUDIO_MAX_MS,
   attachmentSummary,
   compressPhotoDataUrl,
-  dataUrlBytes,
+  dataUrlMime,
+  dataUrlToBytes,
+  ensurePersistentStorage,
+  extensionForMime,
   formatBytes,
   formatDuration,
-  isDictationSupported,
-  isSpeechOutputSupported,
+  hasRoomForBytes,
   isVoiceRecordingSupported,
   probeAudioDurationMs,
-  readDictationChunk,
   recordingMime,
-  speakText,
-  speechRecognitionCtor,
-  stopSpeaking,
-  type SpeechRecognitionLike,
 } from '../../../engines/note-media.engine';
+import {
+  speakTextBest,
+  speechSupport,
+  speechSupportSync,
+  startDictation,
+  stopAllSpeech,
+  stopSpeakingBest,
+} from '../../../engines/note-speech';
 import {
   cleanupNoteMedia,
   deleteNoteMedia,
   deleteNoteMediaForNote,
   getNoteMedia,
+  noteMediaPayload,
+  noteMediaTotalBytes,
   saveNoteMediaMany,
   type NoteMediaRecord,
 } from '../../../engines/note-media-store';
+import { saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const AMBER = '#f59e0b';
 
@@ -96,8 +111,8 @@ interface DraftAttachment extends CoachNoteAttachment {
   pending?: boolean;
   /** Аудио: байты до сохранения. */
   blob?: Blob;
-  /** Фото: сжатый dataUrl до сохранения. */
-  dataUrl?: string;
+  /** Фото: байты сжатого JPEG до сохранения (не base64-строка). */
+  bytes?: ArrayBuffer;
 }
 
 interface EditorState {
@@ -188,7 +203,10 @@ const createObjectUrl = (blob: Blob): string => {
   }
 };
 
-type MediaView = { photo?: string; audioUrl?: string; missing?: boolean };
+/** Загруженный файл: blob:-URL (фото или аудио) либо «в хранилище нет». */
+type MediaView = { src?: string; missing?: boolean };
+
+type ViewerState = { attachmentId: string; url: string; kind: CoachNoteAttachmentKind };
 
 type DictationState = 'idle' | 'listening' | 'error';
 
@@ -207,10 +225,14 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  /** Статус «поделиться/сохранить» для последнего вложения. */
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  /** Сколько занимают файлы заметок — по нему видно, что квота не бесконечна. */
+  const [mediaTotal, setMediaTotal] = useState(0);
 
   /* ── Медиа, загруженное из IndexedDB (для списка) ─────────────────── */
   const [media, setMedia] = useState<Record<string, MediaView>>({});
-  const [viewer, setViewer] = useState<{ url: string; kind: CoachNoteAttachmentKind } | null>(null);
+  const [viewer, setViewer] = useState<ViewerState | null>(null);
 
   /* ── Запись голоса ───────────────────────────────────────────────── */
   const [recording, setRecording] = useState(false);
@@ -228,18 +250,40 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /* ── Диктовка (речь → текст) и озвучка (текст → речь) ────────────── */
   const [dictation, setDictation] = useState<DictationState>('idle');
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  /** Промежуточная гипотеза распознавания — показываем, что нас слышат. */
+  const [interim, setInterim] = useState('');
+  const dictationRef = useRef<{ stop: () => void } | null>(null);
+  /** Старт диктовки асинхронный: двойной тап не должен поднять второй микрофон. */
+  const dictationStartingRef = useRef(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
+  /** Номер текущей озвучки: поздний onEnd прошлой не должен гасить новую. */
+  const speakSeqRef = useRef(0);
 
-  const dictationSupported = useMemo(() => isDictationSupported(), []);
-  const speechOutputSupported = useMemo(() => isSpeechOutputSupported(), []);
+  // Первый рендер — по web-API, затем уточняем нативным мостом APK: в WebView
+  // распознавания нет, но системный SpeechRecognizer есть. Так кнопка не
+  // «мигает» и не обещает того, чего нет.
+  const [speech, setSpeech] = useState(() => speechSupportSync());
+  const dictationSupported = speech.dictation !== 'none';
+  const speechOutputSupported = speech.speak !== 'none';
 
   const nameOf = (id: string | null): string =>
     id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
 
+  /**
+   * Предпросмотр вложения в редакторе: для нового файла — свой dataUrl/blob:,
+   * для уже сохранённого — из кэша (он мог догрузиться уже после открытия).
+   */
+  const draftPreview = (a: DraftAttachment): string =>
+    a.previewUrl || (a.pending ? '' : (media[a.id]?.src ?? ''));
+
   const apply = (next: CoachNotesStore) => {
     writeCoachNotes(ls(), next);
     setStore(next);
+  };
+
+  /** «Сколько занимают файлы» — считаем после каждой записи/удаления. */
+  const refreshMediaTotal = () => {
+    void noteMediaTotalBytes().then(n => setMediaTotal(n));
   };
 
   const visible = useMemo(
@@ -247,53 +291,56 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     [store, query, athleteFilter],
   );
 
-  /* ── Загрузка медиа для видимых заметок ──────────────────────────── */
-  const mediaUrlsRef = useRef<string[]>([]);
+  /* ── Медиа из IndexedDB: кэш по id ───────────────────────────────── */
+  // Кэш, а не «перечитать всё при каждом изменении заметок»: иначе сохранение
+  // любой заметки пересоздавало бы blob-URL всех вложений и обрывало звук,
+  // который сейчас играет.
+  const mediaCacheRef = useRef<Map<string, MediaView>>(new Map());
 
   useEffect(() => {
     let alive = true;
-    const urls: string[] = [];
     const ids = store.items.flatMap(n => noteAttachmentIds(n));
-    if (!ids.length) {
-      for (const old of mediaUrlsRef.current) revokeBlobUrl(old);
-      mediaUrlsRef.current = [];
-      setMedia({});
-      return () => undefined;
+    const wanted = new Set(ids);
+    const cache = mediaCacheRef.current;
+
+    // Вложений больше нет в заметках — снимаем с кэша и освобождаем URL.
+    for (const [id, view] of [...cache]) {
+      if (wanted.has(id)) continue;
+      revokeBlobUrl(view.src ?? '');
+      cache.delete(id);
     }
-    (async () => {
-      const next: Record<string, MediaView> = {};
-      for (const id of ids) {
-        const rec = await getNoteMedia(id);
-        if (!alive) {
-          // Пока грузили, стейт сменился — созданные URL отзываем сразу.
-          for (const url of urls) revokeBlobUrl(url);
-          return;
-        }
-        if (!rec) {
-          next[id] = { missing: true };
+
+    const missing = ids.filter(id => !cache.has(id));
+    if (!missing.length) {
+      setMedia(Object.fromEntries(cache));
+      return () => {
+        alive = false;
+      };
+    }
+
+    void (async () => {
+      const loaded = await Promise.all(
+        missing.map(async id => ({ id, rec: await getNoteMedia(id) })),
+      );
+      const fresh = new Map<string, MediaView>();
+      for (const { id, rec } of loaded) {
+        const blob = await noteMediaPayload(rec);
+        if (!blob) {
+          fresh.set(id, { missing: true });
           continue;
         }
-        if (rec.kind === 'photo' && rec.dataUrl) {
-          next[id] = { photo: rec.dataUrl };
-        } else if (rec.kind === 'audio' && rec.blob) {
-          const url = createObjectUrl(rec.blob);
-          if (url) urls.push(url);
-          next[id] = url ? { audioUrl: url } : { missing: true };
-        } else {
-          next[id] = { missing: true };
-        }
+        const src = createObjectUrl(blob);
+        fresh.set(id, src ? { src } : { missing: true });
       }
       if (!alive) {
-        for (const url of urls) revokeBlobUrl(url);
+        // Список сменился, пока грузили: созданные URL никто не увидит.
+        for (const view of fresh.values()) revokeBlobUrl(view.src ?? '');
         return;
       }
-      // Старые URL отзываем ПОСЛЕ подмены карты: иначе проигрыватель на миг
-      // остаётся с уже мёртвой ссылкой.
-      const stale = mediaUrlsRef.current;
-      mediaUrlsRef.current = urls;
-      setMedia(next);
-      for (const url of stale) revokeBlobUrl(url);
+      for (const [id, view] of fresh) cache.set(id, view);
+      setMedia(Object.fromEntries(cache));
     })();
+
     return () => {
       alive = false;
     };
@@ -302,16 +349,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   /* ── Освобождение blob-URL при размонтировании ───────────────────── */
   useEffect(
     () => () => {
-      for (const url of mediaUrlsRef.current) revokeBlobUrl(url);
-      mediaUrlsRef.current = [];
+      for (const view of mediaCacheRef.current.values()) revokeBlobUrl(view.src ?? '');
+      mediaCacheRef.current.clear();
     },
     [],
   );
 
-  /* ── Уборка осиротевших файлов (сбой сохранения/импорта) ─────────── */
+  /* ── Уборка сирот, постоянное хранилище, нативные возможности ─────── */
   useEffect(() => {
-    const keep = new Set(store.items.flatMap(n => noteAttachmentIds(n)));
-    void cleanupNoteMedia(keep);
+    void cleanupNoteMedia(new Set(store.items.flatMap(n => noteAttachmentIds(n))));
+    // Без persist ОС вправе вычистить IndexedDB под давлением квоты — тогда
+    // фото и голос исчезли бы «сами».
+    void ensurePersistentStorage();
+    void noteMediaTotalBytes().then(n => setMediaTotal(n));
+    let alive = true;
+    void speechSupport().then(next => {
+      if (!alive) return;
+      setSpeech(prev =>
+        prev.dictation === next.dictation && prev.speak === next.speak ? prev : next,
+      );
+    });
+    return () => {
+      alive = false;
+    };
     // Только на маунте: дальше чистим точечно после сохранения/удаления.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -328,11 +388,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         /* ignore */
       }
       try {
-        recognitionRef.current?.abort?.();
+        dictationRef.current?.stop();
       } catch {
         /* ignore */
       }
-      stopSpeaking();
+      // Нативная диктовка/озвучка живут в системе — их тоже гасим, иначе
+      // телефон продолжит слушать или говорить после закрытия вкладки.
+      stopAllSpeech();
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     },
@@ -350,7 +412,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       const view = media[a.id];
       return {
         ...a,
-        previewUrl: view?.photo ?? view?.audioUrl ?? '',
+        previewUrl: view?.src ?? '',
         pending: false,
       };
     });
@@ -390,11 +452,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       /* ignore */
     }
     try {
-      recognitionRef.current?.abort?.();
+      dictationRef.current?.stop();
     } catch {
       /* ignore */
     }
-    recognitionRef.current = null;
+    dictationRef.current = null;
+    setInterim('');
     setDictation('idle');
   };
 
@@ -427,10 +490,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     setEditor(s => (s ? { ...s, attachments: [...s.attachments, draft] } : s));
   };
 
-  const addAudioBlob = (blob: Blob, durationMs: number, name?: string) => {
+  const addAudioBlob = async (blob: Blob, durationMs: number, name?: string) => {
     if (!blob || blob.size === 0) return;
     if (blob.size > COACH_NOTE_ATTACHMENT_BYTES_MAX) {
       setVoiceError(`Аудио больше ${formatBytes(COACH_NOTE_ATTACHMENT_BYTES_MAX)} — такое вложение не сохраняю.`);
+      return;
+    }
+    // Место проверяем ДО записи: иначе файл молча не сохранится, а человек
+    // узнает об этом только при следующем открытии заметки.
+    if (!(await hasRoomForBytes(blob.size))) {
+      setVoiceError(
+        'В хранилище телефона не хватает места под это аудио. Удалите лишние фото/записи и попробуйте снова.',
+      );
       return;
     }
     const mime = blob.type && blob.type.startsWith('audio/') ? blob.type : 'audio/webm';
@@ -488,7 +559,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         setRecordingMs(0);
         // Редактор закрыли/сохранили, пока шла запись — голос уже не к чему крепить.
         if (discarded) return;
-        addAudioBlob(blob, durationMs);
+        void addAudioBlob(blob, durationMs);
       };
       recStartedRef.current = Date.now();
       recorder.start(1000);
@@ -541,7 +612,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       return;
     }
     const durationMs = await probeAudioDurationMs(file);
-    addAudioBlob(file, durationMs, file.name);
+    await addAudioBlob(file, durationMs, file.name);
   };
 
   const handleVoiceInput = (input: HTMLInputElement) => {
@@ -567,23 +638,40 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         setVoiceBusy(false);
         return;
       }
-      const size = dataUrlBytes(dataUrl);
+      // Храним байты, а не base64-строку: строка в IndexedDB — это +33 %
+      // объёма и лишняя мегабайтная копия в памяти WebView.
+      const decoded = dataUrlToBytes(dataUrl);
+      if (!decoded || decoded.length === 0) {
+        setVoiceError('Фото не удалось прочитать — попробуйте другое.');
+        setVoiceBusy(false);
+        return;
+      }
+      const size = decoded.byteLength;
       if (size > COACH_NOTE_ATTACHMENT_BYTES_MAX) {
         setVoiceError(`Фото больше ${formatBytes(COACH_NOTE_ATTACHMENT_BYTES_MAX)} даже после сжатия — не сохраняю.`);
         setVoiceBusy(false);
         return;
       }
-      const mimeMatch = /^data:(image\/[a-z0-9.+-]+)/i.exec(dataUrl);
+      if (!(await hasRoomForBytes(size))) {
+        setVoiceError(
+          'В хранилище телефона не хватает места под это фото. Удалите лишние вложения и попробуйте снова.',
+        );
+        setVoiceBusy(false);
+        return;
+      }
       addDraftAttachment(
         {
           id: newAttachmentId(),
           kind: 'photo',
-          mime: (mimeMatch?.[1] ?? 'image/jpeg').toLowerCase(),
+          mime: dataUrlMime(dataUrl),
           size,
           createdAt: new Date().toISOString(),
           previewUrl: dataUrl,
           pending: true,
-          dataUrl,
+          bytes: decoded.buffer.slice(
+            decoded.byteOffset,
+            decoded.byteOffset + decoded.byteLength,
+          ) as ArrayBuffer,
         },
         `К заметке можно приложить не больше ${COACH_NOTE_ATTACHMENTS_MAX} файлов.`,
       );
@@ -606,72 +694,76 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const toggleDictation = () => {
     setVoiceError(null);
     if (dictation === 'listening') {
-      try {
-        recognitionRef.current?.stop();
-      } catch {
-        /* ignore */
-      }
+      dictationRef.current?.stop();
       return;
     }
-    const Ctor = speechRecognitionCtor();
-    if (!Ctor) {
-      setDictation('error');
-      setVoiceError(
-        'Речь в текст здесь недоступна: это WebView без распознавания речи. Голос всё равно можно записать и приложить к заметке.',
-      );
-      return;
-    }
-    try {
-      const recognition = new Ctor();
-      recognition.lang = 'ru-RU';
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.onresult = event => {
-        const chunk = readDictationChunk(event);
-        if (!chunk.text) return;
-        setEditor(s => {
-          if (!s) return s;
-          const base = s.body.trimEnd();
-          const body = base ? `${base} ${chunk.text}` : chunk.text;
-          return { ...s, body: body.slice(0, COACH_NOTE_BODY_MAX) };
-        });
-      };
-      recognition.onerror = () => {
+    if (dictationStartingRef.current) return;
+    dictationStartingRef.current = true;
+    void (async () => {
+      const session = await startDictation({
+        lang: 'ru-RU',
+        onText: (text, final) => {
+          // Промежуточную гипотезу показываем отдельной строкой: писать её в
+          // текст заметки нельзя — она меняется на лету и дублировалась бы.
+          if (!final) {
+            setInterim(text);
+            return;
+          }
+          setInterim('');
+          setEditor(s => {
+            if (!s) return s;
+            const base = s.body.trimEnd();
+            const body = base ? `${base} ${text}` : text;
+            return { ...s, body: body.slice(0, COACH_NOTE_BODY_MAX) };
+          });
+        },
+        onError: message => {
+          setDictation('error');
+          setVoiceError(message);
+        },
+        onEnd: () => {
+          dictationRef.current = null;
+          setInterim('');
+          setDictation('idle');
+        },
+      });
+      dictationStartingRef.current = false;
+      if (!session) {
         setDictation('error');
         setVoiceError(
-          'Распознавание прервалось. Проверьте доступ к микрофону; распознавание идёт через сервис системы и в офлайне не работает.',
+          'Речь в текст здесь недоступна: распознавание речи не подключено. Голос всё равно можно записать и приложить к заметке.',
         );
-      };
-      recognition.onend = () => {
-        recognitionRef.current = null;
-        setDictation('idle');
-      };
-      recognitionRef.current = recognition;
-      recognition.start();
+        return;
+      }
+      dictationRef.current = session;
       setDictation('listening');
-    } catch {
-      setDictation('error');
-      setVoiceError('Не удалось начать диктовку — распознавание речи не запустилось.');
-    }
+    })();
   };
 
   /* ── Текст в речь ─────────────────────────────────────────────────── */
 
   const toggleSpeak = (note: CoachNote) => {
     if (speakingId === note.id) {
-      stopSpeaking();
+      // Номер меняем ДО остановки: поздний onEnd уже не должен ничего гасить.
+      speakSeqRef.current += 1;
+      stopSpeakingBest();
       setSpeakingId(null);
       return;
     }
     const text = [note.title, note.body].filter(Boolean).join('. ');
-    const ok = speakText(text, {
-      onEnd: () => setSpeakingId(current => (current === note.id ? null : current)),
-    });
-    if (!ok) {
-      setVoiceError('Озвучка недоступна в этом приложении — голосового движка нет.');
-      return;
-    }
+    const seq = (speakSeqRef.current += 1);
+    // Ставим сразу, а не после ответа движка: иначе короткая фраза успевает
+    // закончиться раньше, чем кнопка станет «Стоп», и залипает навсегда.
     setSpeakingId(note.id);
+    void speakTextBest(text, {
+      onEnd: () => {
+        if (speakSeqRef.current === seq) setSpeakingId(null);
+      },
+    }).then(ok => {
+      if (ok || speakSeqRef.current !== seq) return;
+      setSpeakingId(null);
+      setVoiceError('Озвучка недоступна в этом приложении — голосового движка нет.');
+    });
   };
 
   /* ── Сохранение ───────────────────────────────────────────────────── */
@@ -732,7 +824,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     const draft = editor;
     const noteId = draft.id ?? `n_${Date.now().toString(36)}_${store.items.length + 1}`;
     const attachments = strippedAttachments(draft);
-    const pending = draft.attachments.filter(a => a.pending && (a.blob || a.dataUrl));
+    const pending = draft.attachments.filter(a => a.pending && (a.blob || a.bytes));
 
     const writeMedia = async (): Promise<boolean> => {
       const records: NoteMediaRecord[] = pending.map(a => ({
@@ -744,7 +836,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         ...(a.durationMs ? { durationMs: a.durationMs } : {}),
         ...(a.name ? { name: a.name } : {}),
         createdAt: Date.now(),
-        ...(a.kind === 'photo' ? { dataUrl: a.dataUrl ?? a.previewUrl } : { blob: a.blob as Blob }),
+        ...(a.bytes ? { bytes: a.bytes } : { blob: a.blob as Blob }),
       }));
       const ok = records.length ? await saveNoteMediaMany(records) : true;
       if (!ok) {
@@ -757,10 +849,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     };
 
     if (pending.length === 0) {
-      commitSave(draft, noteId, attachments);
+      if (commitSave(draft, noteId, attachments)) refreshMediaTotal();
       return;
     }
     void (async () => {
+      // Место под всю пачку — до записи, а не «по факту не сохранилось».
+      const need = pending.reduce((sum, a) => sum + (Number.isFinite(a.size) ? a.size : 0), 0);
+      if (!(await hasRoomForBytes(need))) {
+        setError(
+          `В хранилище телефона не хватает места: нужно ${formatBytes(need)}. Удалите лишние вложения и попробуйте снова.`,
+        );
+        return;
+      }
       const ok = await writeMedia();
       if (!ok) return;
       const saved = commitSave(draft, noteId, attachments);
@@ -768,6 +868,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         // Заметка не сохранилась (стала пустой) — только что записанные файлы
         // не должны остаться сиротами в квоте.
         void deleteNoteMedia(pending.map(a => a.id));
+        refreshMediaTotal();
         return;
       }
       for (const a of draft.attachments) {
@@ -782,18 +883,37 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       );
       for (const a of attachments) keep.add(a.id);
       void cleanupNoteMedia(keep);
+      refreshMediaTotal();
     })();
   };
 
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
       apply(removeCoachNote(store, id));
-      void deleteNoteMediaForNote(id);
+      void deleteNoteMediaForNote(id).then(refreshMediaTotal);
       setConfirmDeleteId(null);
       if (editor?.id === id) closeEditor();
       return;
     }
     setConfirmDeleteId(id);
+  };
+
+  /** Поделиться/сохранить вложение: сохраняется в «Документы» и в шаринг. */
+  const shareAttachment = (att: CoachNoteAttachment) => {
+    setVoiceError(null);
+    setShareNote('Готовлю файл…');
+    void (async () => {
+      const rec = await getNoteMedia(att.id);
+      const blob = await noteMediaPayload(rec);
+      if (!blob) {
+        setShareNote(null);
+        setVoiceError('Файл не найден в хранилище — поделиться нечем.');
+        return;
+      }
+      const base = (att.name ?? `note-${att.id}`).replace(/\.[^.]+$/, '').slice(0, 60) || 'note-file';
+      const outcome = await saveBlobApk(`${base}.${extensionForMime(att.mime)}`, blob);
+      setShareNote(shareOutcomeLabel(outcome));
+    })();
   };
 
   return (
@@ -808,6 +928,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Заметки</div>
               <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
                 {store.items.length} из {COACH_NOTES_MAX}
+                {mediaTotal > 0 ? ` · файлы ${formatBytes(mediaTotal)}` : ''}
               </div>
             </div>
           </div>
@@ -946,8 +1067,17 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
           {!dictationSupported && (
             <div data-notes="dictation-hint" style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}>
-              Речь в текст здесь недоступна (WebView без распознавания). Голос можно записать и
-              приложить к заметке — расшифровка останется за вами.
+              Речь в текст здесь недоступна. Голос можно записать и приложить к заметке —
+              расшифровка останется за вами.
+            </div>
+          )}
+
+          {interim && (
+            <div
+              data-notes="dictation-interim"
+              style={{ marginTop: 8, fontSize: 11.5, color: AMBER, lineHeight: 1.5 }}
+            >
+              Слышу: {interim}
             </div>
           )}
 
@@ -972,21 +1102,21 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   }}
                 >
                   {a.kind === 'photo' ? (
-                    a.previewUrl ? (
+                    draftPreview(a) ? (
                       <img
-                        src={a.previewUrl}
+                        src={draftPreview(a)}
                         alt={a.name ?? 'Фото заметки'}
                         style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, display: 'block' }}
                       />
                     ) : (
                       <div style={{ fontSize: 11.5, color: colors.textSubtle }}>Фото загружается…</div>
                     )
-                  ) : a.previewUrl ? (
+                  ) : draftPreview(a) ? (
                     <div>
                       <div style={{ fontSize: 11, color: colors.textSubtle, marginBottom: 4 }}>
                         Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}
                       </div>
-                      <audio src={a.previewUrl} controls preload="metadata" style={{ maxWidth: 190, height: 34 }} />
+                      <audio src={draftPreview(a)} controls preload="metadata" style={{ maxWidth: 190, height: 34 }} />
                     </div>
                   ) : (
                     <div style={{ fontSize: 11.5, color: colors.textSubtle }}>Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}</div>
@@ -1182,21 +1312,41 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {photos.map(a => {
                             const view = media[a.id];
-                            return view?.photo ? (
-                              <button
-                                key={a.id}
-                                type="button"
-                                data-notes="photo"
-                                aria-label={a.name ? `Открыть фото: ${a.name}` : 'Открыть фото заметки'}
-                                onClick={() => setViewer({ url: view.photo as string, kind: 'photo' })}
-                                style={{ padding: 0, border: '1px solid rgba(255,255,255,0.14)', borderRadius: 12, background: 'transparent', cursor: 'pointer', overflow: 'hidden' }}
-                              >
-                                <img
-                                  src={view.photo}
-                                  alt={a.name ?? 'Фото заметки'}
-                                  style={{ width: 88, height: 88, objectFit: 'cover', display: 'block' }}
-                                />
-                              </button>
+                            return view?.src ? (
+                              <div key={a.id} style={{ position: 'relative', width: 88, height: 88 }}>
+                                <button
+                                  type="button"
+                                  data-notes="photo"
+                                  aria-label={a.name ? `Открыть фото: ${a.name}` : 'Открыть фото заметки'}
+                                  onClick={() =>
+                                    setViewer({ attachmentId: a.id, url: view.src as string, kind: 'photo' })
+                                  }
+                                  style={{
+                                    padding: 0, width: '100%', height: '100%', border: '1px solid rgba(255,255,255,0.14)',
+                                    borderRadius: 12, background: 'transparent', cursor: 'pointer', overflow: 'hidden',
+                                  }}
+                                >
+                                  <img
+                                    src={view.src}
+                                    alt={a.name ?? 'Фото заметки'}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  data-notes="share"
+                                  aria-label="Поделиться фото"
+                                  onClick={() => shareAttachment(a)}
+                                  style={{
+                                    position: 'absolute', right: 3, bottom: 3, width: 26, height: 26,
+                                    borderRadius: 8, border: '1px solid rgba(255,255,255,0.18)',
+                                    background: 'rgba(0,0,0,0.55)', color: '#fff', cursor: 'pointer',
+                                    fontSize: 12, lineHeight: 1,
+                                  }}
+                                >
+                                  ⤓
+                                </button>
+                              </div>
                             ) : (
                               <div
                                 key={a.id}
@@ -1211,15 +1361,25 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       )}
                       {audios.map(a => {
                         const view = media[a.id];
-                        return view?.audioUrl ? (
-                          <audio
-                            key={a.id}
-                            data-notes="audio-player"
-                            src={view.audioUrl}
-                            controls
-                            preload="metadata"
-                            style={{ width: '100%', maxWidth: 320, height: 36 }}
-                          />
+                        return view?.src ? (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <audio
+                              data-notes="audio-player"
+                              src={view.src}
+                              controls
+                              preload="metadata"
+                              style={{ flex: '1 1 220px', maxWidth: 320, height: 36 }}
+                            />
+                            <button
+                              type="button"
+                              data-notes="share"
+                              aria-label="Поделиться аудио"
+                              onClick={() => shareAttachment(a)}
+                              style={{ ...btn('ghost'), minHeight: 34, padding: '4px 10px', fontSize: 11.5 }}
+                            >
+                              ⤓ Сохранить
+                            </button>
+                          </div>
                         ) : (
                           <div
                             key={a.id}
@@ -1349,13 +1509,42 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             alt="Вложение заметки"
             style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 12, objectFit: 'contain' }}
           />
+          <button
+            type="button"
+            data-notes="viewer-share"
+            aria-label="Поделиться вложением"
+            onClick={e => {
+              e.stopPropagation();
+              const att = store.items
+                .flatMap(n => noteAttachments(n))
+                .find(a => a.id === viewer.attachmentId);
+              if (att) shareAttachment(att);
+            }}
+            style={{
+              position: 'absolute', right: 20, bottom: 28, minHeight: 44, padding: '10px 16px',
+              borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+            }}
+          >
+            ⤓ Сохранить / Поделиться
+          </button>
+        </div>
+      )}
+
+      {shareNote && (
+        <div
+          data-notes="share-status"
+          role="status"
+          style={{ fontSize: 11.5, color: colors.textMuted, padding: '0 4px' }}
+        >
+          {shareNote}
         </div>
       )}
 
       <div style={{ fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.55, padding: '0 4px' }}>
         Заметки — это контекст, а не дневник: они не меняют расчёты планов и не попадают в отчёты
-        автоматически. Фото и аудио хранятся только на этом устройстве (IndexedDB) и в резервную
-        копию не входят.
+        автоматически. Фото и аудио хранятся на этом устройстве (IndexedDB, шифруются ключом
+        устройства) и входят в резервную копию, пока влезают в её лимит объёма.
       </div>
     </div>
   );

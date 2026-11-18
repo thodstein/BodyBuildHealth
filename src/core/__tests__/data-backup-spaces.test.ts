@@ -245,6 +245,9 @@ describe('файл копии для пользователя', () => {
       photos: 0,
       photoBytes: 0,
       photosOmitted: false,
+      noteMedia: 0,
+      noteMediaBytes: 0,
+      noteMediaOmitted: false,
       createdAt: '2026-11-01T10:20:00.000Z',
     });
   });

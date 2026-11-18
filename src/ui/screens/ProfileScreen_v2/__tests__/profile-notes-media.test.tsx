@@ -14,13 +14,29 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { pickPhoto } from '../../../../core/native-bridge';
 import { ProfileNotesTab } from '../ProfileNotesTab';
 import { addCoachNote, emptyCoachNotes, readCoachNotes, writeCoachNotes } from '../../../../engines/coach/coach-notes.engine';
-import { __resetNoteMediaForTests, listNoteMedia, saveNoteMedia } from '../../../../engines/note-media-store';
+import { __resetNoteMediaForTests, listNoteMedia, noteMediaPayload, saveNoteMedia } from '../../../../engines/note-media-store';
 
 vi.mock('../../../../core/native-bridge', () => ({
   pickPhoto: vi.fn(),
 }));
 
+const saveBlobApk = vi.hoisted(() => vi.fn(async (_name: string, _blob: Blob) => 'saved' as const));
+vi.mock('../../../../core/apk-share', () => ({
+  saveBlobApk: (name: string, blob: Blob) => saveBlobApk(name, blob),
+  shareOutcomeLabel: (outcome: string) => (outcome === 'saved' ? 'Сохранено' : 'Не удалось'),
+}));
+
 const PHOTO_URI = 'data:image/jpeg;base64,AAAA';
+
+/** jsdom не умеет objectURL — без него файлы из хранилища «не находятся». */
+const ensureObjectUrl = () => {
+  const u = URL as unknown as {
+    createObjectURL?: (b: Blob) => string;
+    revokeObjectURL?: (url: string) => void;
+  };
+  if (typeof u.createObjectURL !== 'function') u.createObjectURL = () => 'blob:test-media';
+  if (typeof u.revokeObjectURL !== 'function') u.revokeObjectURL = () => {};
+};
 
 const openNew = (c: HTMLElement) => fireEvent.click(c.querySelector('[data-notes="new"]') as HTMLElement);
 const save = (c: HTMLElement) => fireEvent.click(c.querySelector('[data-notes="save"]') as HTMLElement);
@@ -32,12 +48,20 @@ beforeEach(() => {
   } catch {
     /* ignore */
   }
+  ensureObjectUrl();
   __resetNoteMediaForTests();
   vi.mocked(pickPhoto).mockReset();
+  saveBlobApk.mockClear();
 });
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
+  try {
+    delete (navigator as unknown as { mediaDevices?: unknown }).mediaDevices;
+  } catch {
+    /* ignore */
+  }
   try {
     localStorage.clear();
   } catch {
@@ -67,7 +91,11 @@ describe('фото в заметке', () => {
 
     const media = await listNoteMedia();
     expect(media).toHaveLength(1);
-    expect(media?.[0].dataUrl).toContain('data:image/jpeg');
+    // Фото лежит байтами, а не base64-строкой: читается только как файл.
+    expect(media?.[0].dataUrl).toBeUndefined();
+    const photoBlob = await noteMediaPayload(media?.[0] ?? null);
+    expect(photoBlob?.size).toBe(3);
+    expect(photoBlob?.type).toContain('image/');
 
     await waitFor(() => expect(container.querySelector('[data-notes="photo"]')).not.toBeNull());
     fireEvent.click(container.querySelector('[data-notes="photo"]') as HTMLElement);
@@ -109,7 +137,8 @@ describe('аудио в заметке', () => {
     expect(note.attachments?.[0]).toMatchObject({ kind: 'audio', mime: 'audio/webm', size: 3 });
     const media = await listNoteMedia();
     expect(media?.[0]).toMatchObject({ kind: 'audio', noteId: note.id, size: 3 });
-    expect(media?.[0].blob).toBeInstanceOf(Blob);
+    expect(media?.[0].bytes).toBeTruthy();
+    expect((await noteMediaPayload(media?.[0] ?? null))?.size).toBe(3);
     // Сводка в карточке называет вложение, а не молчит.
     expect(items(container)[0].textContent).toContain('1 аудио');
   });
@@ -151,12 +180,14 @@ describe('голос: честные границы платформы', () => {
     expect(await listNoteMedia()).toHaveLength(0);
   });
 
-  it('без распознавания речи — подсказка и явная ошибка, а не тишина', () => {
+  it('без распознавания речи — подсказка и явная ошибка, а не тишина', async () => {
     const { container } = render(<ProfileNotesTab />);
     openNew(container);
     expect(container.querySelector('[data-notes="dictation-hint"]')?.textContent).toContain('недоступна');
     fireEvent.click(container.querySelector('[data-notes="dictate"]') as HTMLElement);
-    expect(container.querySelector('[data-notes="voice-error"]')?.textContent).toContain('недоступна');
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="voice-error"]')?.textContent).toContain('недоступна'),
+    );
   });
 
   it('без микрофона «Записать голос» предлагает диктофон системы', () => {
@@ -177,5 +208,150 @@ describe('голос: честные границы платформы', () => {
     writeCoachNotes(localStorage, store);
     const { container } = render(<ProfileNotesTab />);
     expect(container.querySelector('[data-notes="speak"]')).toBeNull();
+  });
+});
+
+describe('вложение можно забрать из приложения', () => {
+  it('«Сохранить» отдаёт файл в Документы/шаринг, статус виден', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      {
+        title: 'С голосом',
+        attachments: [
+          {
+            id: 'm1',
+            kind: 'audio',
+            mime: 'audio/mp4',
+            size: 3,
+            name: 'voice.m4a',
+            durationMs: 3000,
+            createdAt: '2026-11-17T09:00:00.000Z',
+          },
+        ],
+      },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+    await saveNoteMedia({
+      id: 'm1',
+      noteId: 'n1',
+      kind: 'audio',
+      mime: 'audio/mp4',
+      size: 3,
+      createdAt: 1,
+      bytes: new Uint8Array([1, 2, 3]).buffer as ArrayBuffer,
+    });
+
+    const { container } = render(<ProfileNotesTab />);
+    await waitFor(() => expect(container.querySelector('[data-notes="audio-player"]')).not.toBeNull());
+    fireEvent.click(container.querySelector('[data-notes="share"]') as HTMLElement);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="share-status"]')?.textContent).toContain('Сохранено'),
+    );
+    expect(saveBlobApk).toHaveBeenCalledTimes(1);
+    expect(saveBlobApk.mock.calls[0][0]).toBe('voice.m4a');
+    expect((saveBlobApk.mock.calls[0][1] as Blob).size).toBe(3);
+  });
+});
+
+describe('уборка ресурсов', () => {
+  it('уход с вкладки отпускает blob-URL вложений', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      {
+        title: 'С фото',
+        attachments: [
+          {
+            id: 'p1',
+            kind: 'photo',
+            mime: 'image/jpeg',
+            size: 3,
+            createdAt: '2026-11-17T09:00:00.000Z',
+          },
+        ],
+      },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+    await saveNoteMedia({
+      id: 'p1',
+      noteId: 'n1',
+      kind: 'photo',
+      mime: 'image/jpeg',
+      size: 3,
+      createdAt: 1,
+      bytes: new Uint8Array([1, 2, 3]).buffer as ArrayBuffer,
+    });
+
+    const u = URL as unknown as {
+      createObjectURL: (b: Blob) => string;
+      revokeObjectURL: (url: string) => void;
+    };
+    const createdBefore = u.createObjectURL;
+    const revokedBefore = u.revokeObjectURL;
+    const created: string[] = [];
+    const revoked: string[] = [];
+    u.createObjectURL = () => {
+      const url = `blob:test-${created.length + 1}`;
+      created.push(url);
+      return url;
+    };
+    u.revokeObjectURL = (url: string) => revoked.push(url);
+    try {
+      const { container, unmount } = render(<ProfileNotesTab />);
+      await waitFor(() => expect(container.querySelector('[data-notes="photo"] img')).not.toBeNull());
+      expect(created.length).toBeGreaterThan(0);
+      unmount();
+      expect(revoked).toEqual(created);
+    } finally {
+      u.createObjectURL = createdBefore;
+      u.revokeObjectURL = revokedBefore;
+    }
+  });
+});
+
+describe('запись голоса через MediaRecorder', () => {
+  it('запись становится вложением и сохраняется в хранилище файлом', async () => {
+    const track = { stop: vi.fn() };
+    const stream = { getTracks: () => [track] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => stream) },
+    });
+    const chunk = new Blob([new Uint8Array([9, 8, 7])], { type: 'audio/mp4' });
+    class FakeRecorder {
+      static isTypeSupported = () => true;
+      mimeType = 'audio/mp4';
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {}
+      stop() {
+        this.ondataavailable?.({ data: chunk });
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal('MediaRecorder', FakeRecorder);
+
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    const voice = container.querySelector('[data-notes="add-voice"]') as HTMLElement;
+    fireEvent.click(voice);
+    await waitFor(() => expect(voice.getAttribute('data-recording')).toBe('true'));
+
+    fireEvent.click(voice);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="attach-item"][data-kind="audio"]')).not.toBeNull(),
+    );
+
+    save(container);
+    await waitFor(() => expect(items(container)).toHaveLength(1));
+
+    const media = await listNoteMedia();
+    expect(media?.[0]).toMatchObject({ kind: 'audio', size: 3 });
+    expect((await noteMediaPayload(media?.[0] ?? null))?.size).toBe(3);
+    // Микрофон отпущен: иначе индикатор записи горел бы после сохранения.
+    expect(track.stop).toHaveBeenCalled();
   });
 });
