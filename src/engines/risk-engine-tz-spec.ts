@@ -3,7 +3,8 @@
 import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, TzDrugEntry } from '../data/support-db';
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
-import { HCT_THRESHOLDS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, UA_STAGE_ULN } from './lab-norms.engine';
+import { HCT_THRESHOLDS, HCT_STEPS, HGB_STEPS, RBC_STEPS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, UA_STAGE_ULN,
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -419,7 +420,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     case'cv4': { // протромботический: HCT, D-dimer, Fibrinogen, Platelets
-      const hctMi = labMi(hct,fem?[44,48,52]:[48,51,54]);
+      // Ступени HCT — из `HCT_STEPS` (проход 126): здесь стояли литералы
+      // [48,51,54] / [44,48,52], то есть третья копия ряда в том же файле.
+      const hctMi = labMi(hct, HCT_STEPS[fem ? 'female' : 'male']);
       const dMi = labMi(dDimer,[0.5,1.0,2.0]);
       const fibMi = labMi(fib,[4.0,5.0,6.0]);
       const pltMi = labMi(plt,[400,500,600]);
@@ -429,11 +432,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
     }
     case'cv5': { // аритмогенный: K (low), HCT (high = hyperviscosity)
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
-      // Ступени HCT — из `HCT_THRESHOLDS` (♂ 51/54, ♀ 48/52): раньше здесь жили
+      // Ступени HCT — из `HCT_STEPS` (♂ 51/54/58, ♀ 48/52/56): раньше здесь жили
       // литералы [50,54,58] / [46,50,54], на 1–2 п.п. ниже клинического порога.
-      // Третья ступень — порог флеботомии +4 п.п. (гипервязкость).
-      const hctCut = fem ? HCT_THRESHOLDS.female : HCT_THRESHOLDS.male;
-      const hctMi = labMi(hct,[hctCut.erythrocytosis, hctCut.block, hctCut.block + 4]);
+      const hctMi = labMi(hct, HCT_STEPS[fem ? 'female' : 'male']);
       const vals = [kMi,hctMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
@@ -455,7 +456,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       // «печёночная» шкала считалась двумя способами, женская ВГН — 32 вместо 31.
       const ggtCut = fem ? GGT_ULN.female : GGT_ULN.male;
       const ggtMi = labMi(ggt,[ggtCut, GGT_STAGE_ULN.double[fem ? 'female' : 'male'], GGT_STAGE_ULN.triple[fem ? 'female' : 'male']]);
-      const bilMi = labMi(bil,[21,50,100]);
+      const bilMi = labMi(bil,[BILIRUBIN_FLAG_STEPS.mild, BILIRUBIN_FLAG_STEPS.moderate, BILIRUBIN_FLAG_STEPS.severe]);
       const vals = [ggtMi,bilMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
@@ -475,7 +476,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       // ВГН креатинина — из резолвера (♂ 110 / ♀ 97); мужская первая ступень
       // стояла на 90 (ниже своей ВГН) — норма читалась как отклонение.
       const egfrMi = labMiInv(egfr,[90,60,30]);
-      const crMi = labMi(creat,fem?[CREATININE_ULN.female, 110, 120]:[CREATININE_ULN.male, 130, 200]);
+      const crMi = labMi(creat, fem ? CREATININE_STEPS.female : CREATININE_STEPS.male);
       const ureaMi = labMi(urea,[8,12,20]);
       // ВГН мочевой кислоты — из резолвера (♂ 420 / ♀ 350), ступени `UA_STAGE_ULN`
       // (♀ 350/400/450): 380 у женщины — ступень внимания, а не норма (проход 77).
@@ -508,7 +509,8 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
     }
     // ── ЦНС ──
     case'cns1': { // нейромедиаторная: Prolactin (↑ = дофамин ↓)
-      const prlMi = labMi(prl,[15,25,50]);
+      // Женский ряд — `PRL_STEPS.female` (800/1500 мМЕ/л = 37.7/70.8 нг/мл, проход 126).
+      const prlMi = labMi(prl, fem ? PRL_STEPS.female : PRL_STEPS.male);
       if (prlMi !== undefined) labResult = prlMi;
       break;
     }
@@ -517,7 +519,7 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       const homocMi = labMi(homoc,[15,20,30]);
       const il6Mi = labMi(il6,[2,5,10]);
       const tnfaMi = labMi(tnfa,[3,5,10]);
-      const ferMi = labMi(ferritin,[300,400,500]);
+      const ferMi = labMi(ferritin, fem ? FERRITIN_STEPS.female : FERRITIN_STEPS.male);
       const vals = [crpMi,homocMi,il6Mi,tnfaMi,ferMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
@@ -557,7 +559,9 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       // Женщины: TT ВЫСОКИЙ = вирилизация (прямая шкала 2.5/4/6), FT высокая = вирилизация (10/15/25),
       // SHBG высокие физиологичны до 100 (пороги выше).
       const ttMi = fem ? labMi(tt,[2.5,4,6]) : labMiInv(tt,[12,8,4]);
-      const ftMi = fem ? labMi(ft,[10,15,25]) : labMiInv(ft,[250,150,50]);
+      // FT — в пг/мл (проход 125): ряд [250,150,50] был в пмоль/л, и нормальные
+      // 15 пг/мл получали m=3. Канон и ряд — `FT_STEPS` в резолвере норм.
+      const ftMi = fem ? labMi(ft, FT_STEPS.female) : labMiInv(ft, FT_STEPS.male);
       const shbgMi = labMi(shbg,fem?[100,150,200]:[60,80,100]);
       const vals = [ttMi,ftMi,shbgMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -582,10 +586,14 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       break;
     }
     // ── Гематолого-метаболический ──
-    case'hem1': { // эритроцитоз: HCT, Hemoglobin, RBC, WBC (женские зоны 48/52, HGB 150/165, RBC 5.2/5.6)
-      const hctMi = labMi(hct,fem?[44,48,52]:[48,51,54]);
-      const hgbMi = labMi(hgb,fem?[150,165,180]:[170,180,190]);
-      const rbcMi = labMi(rbcVal,fem?[5.2,5.6,6.0]:[5.5,6.0,6.5]);
+    case'hem1': { // эритроцитоз: HCT, Hemoglobin, RBC, WBC
+      // Ступени — из резолвера (проход 126): литералы [170,180,190] и [5.5,6.0,6.5]
+      // держали «эритроцитоз» ниже ВГН (RBC 5.5 при норме 5.8) и расходились с
+      // каталогом «Анализы» (там уже 5.8/6.2/6.6).
+      const hemSex = fem ? 'female' : 'male';
+      const hctMi = labMi(hct, HCT_STEPS[hemSex]);
+      const hgbMi = labMi(hgb, HGB_STEPS[hemSex]);
+      const rbcMi = labMi(rbcVal, RBC_STEPS[hemSex]);
       const wbcMi = labMi(wbc,[11,13,15]);
       const vals = [hctMi,hgbMi,rbcMi,wbcMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);

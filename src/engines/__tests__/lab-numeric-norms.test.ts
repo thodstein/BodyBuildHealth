@@ -17,8 +17,8 @@ import { resolve } from 'node:path';
 import { deriveTier, LAB_TIERS } from '../../data/lab-tier-ranges';
 import {
   GGT_ULN, GGT_STAGE_ULN, LFT_ULN, LFT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, RBC_ULN,
-  UA_ULN, UA_STAGE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, CREATININE_STEPS, RBC_ULN,
+  UA_ULN, UA_STAGE_ULN, SCREEN_TARGETS, FT_STEPS, PRL_STEPS, FERRITIN_STEPS,
 } from '../lab-norms.engine';
 import { VERIFICATION_SYSTEMS, markerThresholds, type VerifMarker } from '../risk-verification.engine';
 
@@ -163,11 +163,17 @@ describe('исходник главной модели: литеральные �
     expect(tz).not.toContain('[32,48,96]');
   });
 
-  it('креатинин и гематокрит — от резолвера', () => {
-    expect(tz).toContain('CREATININE_ULN');
-    expect(tz).toContain('hctCut.erythrocytosis');
+  it('креатинин, гематокрит, гемоглобин и эритроциты — от резолвера', () => {
+    // Проход 126: ступени переехали в `lab-norms` (CREATININE_STEPS/HCT_STEPS/
+    // HGB_STEPS/RBC_STEPS), чтобы каталог «Анализы» и эта модель читали один ряд.
+    expect(tz).toContain('CREATININE_STEPS');
+    expect(tz).toContain('HCT_STEPS');
+    expect(tz).toContain('HGB_STEPS');
+    expect(tz).toContain('RBC_STEPS');
     expect(tz).not.toContain('[90,130,200]');
     expect(tz).not.toContain('[50,54,58]');
+    expect(tz).not.toContain('[170,180,190]');
+    expect(tz).not.toContain('[5.5,6.0,6.5]');
   });
 
   // Проход 77: мочевая кислота держала мужской литерал, поэтому у женщины 380
@@ -175,6 +181,54 @@ describe('исходник главной модели: литеральные �
   it('мочевая кислота — от UA_STAGE_ULN, литерала [420,480,540] нет', () => {
     expect(tz).toContain('UA_STAGE_ULN');
     expect(tz).not.toContain('[420,480,540]');
+  });
+
+  // Проходы 125/126: свободный тест, пролактин, ферритин и билирубин держали
+  // собственные литералы в обоих движках. Свободный тест — в пмоль/л при каноне
+  // пг/мл (норма 15 пг/мл читалась как m=3), билирубин — второй ряд 21/50/100,
+  // пролактин и ферритин — без женских веток.
+  it('FT/PRL/ферритин/билирубин — от резолвера', () => {
+    expect(tz).toContain('FT_STEPS');
+    expect(tz).toContain('PRL_STEPS');
+    expect(tz).toContain('FERRITIN_STEPS');
+    expect(tz).toContain('BILIRUBIN_FLAG_STEPS');
+    expect(tz).not.toContain('[250,150,50]');
+    expect(tz).not.toContain('[10,15,25]');
+    expect(tz).not.toContain('[300,400,500]');
+    expect(tz).not.toContain('[21,50,100]');
+  });
+});
+
+describe('проходы 125/126: ступени гормонов и почек — одна запись в резолвере', () => {
+  it('свободный тест: канон пг/мл, мужской ряд от LLN 8', () => {
+    expect(FT_STEPS.male).toEqual([8, 6, 4]);
+    expect(FT_STEPS.female).toEqual([10, 15, 25]);
+  });
+
+  it('пролактин: женский ряд — 800/1500 мМЕ/л в нг/мл', () => {
+    expect(PRL_STEPS.male).toEqual([15, 25, 50]);
+    expect(PRL_STEPS.female).toEqual([37.7, 50, 70.8]);
+  });
+
+  it('ферритин: цель ♂ 300 / ♀ 150 (SCREEN_TARGETS), дальше 400', () => {
+    expect(FERRITIN_STEPS.male).toEqual([SCREEN_TARGETS.FERRITIN.male, 400, 500]);
+    expect(FERRITIN_STEPS.female).toEqual([SCREEN_TARGETS.FERRITIN.female, SCREEN_TARGETS.FERRITIN.male, 400]);
+  });
+
+  it('креатинин: оба пола начинаются со своей ВГН', () => {
+    expect(CREATININE_STEPS.male[0]).toBe(CREATININE_ULN.male);
+    expect(CREATININE_STEPS.female[0]).toBe(CREATININE_ULN.female);
+    expect(CREATININE_STEPS.male.slice(1)).toEqual([130, 200]);
+    expect(CREATININE_STEPS.female.slice(1)).toEqual([130, 200]);
+  });
+
+  it('каталог «Анализы» читает те же ряды', () => {
+    const ft = findMarker('reproductive', 'rep2', 'FT');
+    expect(ft.unit).toBe('пг/мл');
+    expect(markerThresholds(ft)).toEqual(FT_STEPS.male);
+    expect(markerThresholds(ft, 'female')).toEqual(FT_STEPS.female);
+    const fer = findMarker('cns', 'cns2', 'FERRITIN');
+    expect(markerThresholds(fer, 'female')).toEqual(FERRITIN_STEPS.female);
   });
 });
 

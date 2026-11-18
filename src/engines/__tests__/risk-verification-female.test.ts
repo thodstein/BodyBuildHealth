@@ -39,10 +39,33 @@ describe('женские пороги маркеров (паритет с getMiF
     expect(markerStatus(ggt, 70, 'female')).toBe(2);
   });
 
-  it('Креатинин: 125 мкмоль/л → муж m1 / жен m3', () => {
+  it('Креатинин: 125 мкмоль/л — у мужчины и у женщины m1 (♀ ВГН 97, дальше 130/200)', () => {
     const cr = findMarker('renal', 'ren1', 'CREAT');
     expect(markerStatus(cr, 125, 'male')).toBe(1);
-    expect(markerStatus(cr, 125, 'female')).toBe(3);
+    expect(markerStatus(cr, 125, 'female')).toBe(1);
+    // Проход 126: женский ряд стал ВГН 97 · 130 · 200. До него вторая ступень
+    // стояла на 110, третья — на 120, и 125 мкмоль/л у женщины читались как
+    // m=3 «тяжело», хотя это лёгкое превышение её нормы.
+    expect(markerStatus(cr, 100, 'female')).toBe(1);   // выше её ВГН 97
+    expect(markerStatus(cr, 100, 'male')).toBe(0);     // ниже мужской ВГН 110
+    expect(markerStatus(cr, 135, 'female')).toBe(2);
+    expect(markerStatus(cr, 210, 'female')).toBe(3);
+  });
+
+  it('Пролактин: 30 нг/мл — муж m2, женщина m0 (♀ верх 800 мМЕ/л = 37.7)', () => {
+    const prl = findMarker('cns', 'cns1', 'PRL');
+    expect(markerStatus(prl, 30, 'male')).toBe(2);
+    expect(markerStatus(prl, 30, 'female')).toBe(0);
+    expect(markerStatus(prl, 45, 'female')).toBe(1);
+    expect(markerStatus(prl, 75, 'female')).toBe(3);
+  });
+
+  it('Ферритин: 200 мкг/л — женщина m1 (цель 150), мужчина m0', () => {
+    const fer = findMarker('cns', 'cns2', 'FERRITIN');
+    expect(markerStatus(fer, 200, 'male')).toBe(0);
+    expect(markerStatus(fer, 200, 'female')).toBe(1);
+    expect(markerStatus(fer, 320, 'female')).toBe(2);
+    expect(markerStatus(fer, 420, 'female')).toBe(3);
   });
 
   it('Тестостерон: направление инвертируется (высокий = вирилизация)', () => {
@@ -52,7 +75,7 @@ describe('женские пороги маркеров (паритет с getMiF
     expect(markerStatus(tt, 3, 'female')).toBe(1);
   });
 
-  it('E2: 100 пмоль/л — муж m3 / жен m0 (физиология до ~200)', () => {
+  it('E2: 100 пг/мл — муж m3 / жен m0 (физиология до ~200)', () => {
     const e2 = findMarker('reproductive', 'rep4', 'E2');
     expect(markerStatus(e2, 100, 'male')).toBe(3);
     expect(markerStatus(e2, 100, 'female')).toBe(0);

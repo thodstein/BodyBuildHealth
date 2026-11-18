@@ -5,7 +5,8 @@
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, RBC_ULN, UA_STAGE_ULN,
+  HCT_STEPS, HGB_STEPS, RBC_STEPS, UA_STAGE_ULN,
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS,
 } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
@@ -54,38 +55,12 @@ export interface VerifSystem {
 // ── Каталог маркеров (T4) — пороги m_i: 1/2/3 ──
 
 /**
- * Ступени гематокрита и гемоглобина — ОДИН ряд на маркер, из резолвера.
- * Раньше в трёх механизмах жили три разных HCT-ряда: `[48,51,54]`/`[44,48,52]`
- * (cv4, hem1) и `[50,54,58]`/`[46,50,54]` (cv5) — «верх нормы», «эритроцитоз» и
- * «флеботомия» были перемешаны, и один и тот же HCT 50 давал разный статус в
- * сердце и в крови. Теперь ступень называется действием:
- *  1) `erythrocytosis` — начало эритроцитоза (♂ 51, ♀ 48);
- *  2) `block` — флеботомия/отмена (♂ 54, ♀ 52);
- *  3) `block + 4 п.п.` — гипервязкость (♂ 58, ♀ 56).
- * Гемоглобин — та же пара: `upper` (♂ 170 / ♀ 150), `block` (♂ 185 / ♀ 165),
- * далее +15 г/л.
+ * Ступени HCT/HGB/RBC — из резолвера (`HCT_STEPS`/`HGB_STEPS`/`RBC_STEPS`), один
+ * ряд на маркер для этого каталога и главной модели. Раньше здесь жили три
+ * собственных HCT-ряда (`[48,51,54]`/`[44,48,52]` в cv4/hem1 и `[50,54,58]`/`[46,50,54]`
+ * в cv5): «верх нормы», «эритроцитоз» и «флеботомия» были перемешаны, и HCT 50
+ * давал разный статус в сердце и в крови. Проход 126 убрал последние копии.
  */
-const HCT_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
-  male: [HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 4],
-  female: [HCT_THRESHOLDS.female.erythrocytosis, HCT_THRESHOLDS.female.block, HCT_THRESHOLDS.female.block + 4],
-};
-
-const HGB_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
-  male: [HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block, HGB_THRESHOLDS.male.block + 15],
-  female: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
-};
-
-/**
- * Ступени эритроцитов: ВГН · +0.4 · +0.8 (10¹²/л). Мужской ряд начинался с 5.5
- * при ВГН 5.8 — норма читалась как эритроцитоз; женский уже совпадал с
- * резолвером (5.2/5.6/6.0), поэтому ряд просто выведен из `RBC_ULN`.
- */
-const rbcStep = (uln: number, k: number) => Math.round((uln + k) * 10) / 10;
-
-const RBC_STEPS: { male: [number, number, number]; female: [number, number, number] } = {
-  male: [RBC_ULN.male, rbcStep(RBC_ULN.male, 0.4), rbcStep(RBC_ULN.male, 0.8)],
-  female: [RBC_ULN.female, rbcStep(RBC_ULN.female, 0.4), rbcStep(RBC_ULN.female, 0.8)],
-};
 
 const M = (
   code: string,
@@ -147,10 +122,12 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ] },
       { id: 'liv2', weight: 0.7, markers: [
         M('GGT', 'ГГТ', 'Ед/л', 'high', [GGT_ULN.male, GGT_STAGE_ULN.double.male, GGT_STAGE_ULN.triple.male], { thresholds: [GGT_ULN.female, GGT_STAGE_ULN.double.female, GGT_STAGE_ULN.triple.female] }),
-        // Билирубин — единственный литерал в рядах намеренно: у него нет половой
-        // нормы (резолвер даёт 17.1 как верх UCUM, а ступени здесь клинические —
-        // 21 верх большинства лабораторий, 50 желтуха/риск, 100 тяжёлый).
-        M('BIL', 'Билирубин общий', 'мкмоль/л', 'high', [21, 50, 100]),
+        // Билирубин — от резолвера (проход 126): 17.1 (ВГН) · 39.3 (×2.3) · 59.9
+        // (×3.5), тот же ряд `BILIRUBIN_FLAG_STEPS`, что у печёночных карточек.
+        // До прохода 126 здесь жили литералы 21/50/100 — второй ряд на один анализ:
+        // билирубин 20 в карточке был «мягким повышением», а в риске давал ноль.
+        M('BIL', 'Билирубин общий', 'мкмоль/л', 'high',
+          [BILIRUBIN_FLAG_STEPS.mild, BILIRUBIN_FLAG_STEPS.moderate, BILIRUBIN_FLAG_STEPS.severe]),
         M('ALP', 'Щелочная фосфатаза', 'Ед/л', 'high', [150, 200, 300]),
       ] },
       { id: 'liv3', weight: 1.0, markers: [
@@ -175,7 +152,10 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     mechanisms: [
       { id: 'ren1', weight: 1.0, markers: [
         M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'low', [90, 60, 30]),
-        M('CREAT', 'Креатинин', 'мкмоль/л', 'high', [90, 130, 200], { thresholds: [97, 110, 120] }),
+        // Ступени — из `CREATININE_STEPS` (♂ 110/130/200, ♀ 97/130/200, проход 126):
+        // мужской ряд начинался с 90, то есть ниже ВГН 110 — норма читалась как
+        // отклонение, а у женщины вторая ступень стояла на 110 при её ВГН 97.
+        M('CREAT', 'Креатинин', 'мкмоль/л', 'high', CREATININE_STEPS.male, { thresholds: CREATININE_STEPS.female }),
         M('UREA', 'Мочевина', 'ммоль/л', 'high', [8, 12, 20]),
         // Ступени — из резолвера (`UA_STAGE_ULN`): ♂ 420/480/540, ♀ 350/400/450.
         // До прохода 77 у женщины не было ни ВГН, ни ступеней: 380 мкмоль/л не
@@ -205,14 +185,17 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'cns', name: TZ_SYSTEM_LABELS.cns, icon: TZ_SYSTEM_ICONS.cns, color: '#a855f7',
     mechanisms: [
       { id: 'cns1', weight: 0.6, markers: [
-        M('PRL', 'Пролактин', 'нг/мл', 'high', [15, 25, 50]),
+        // Женский ряд — из `PRL_STEPS.female` (800/1500 мМЕ/л = 37.7/70.8 нг/мл, проход 126).
+        M('PRL', 'Пролактин', 'нг/мл', 'high', PRL_STEPS.male, { thresholds: PRL_STEPS.female }),
       ] },
       { id: 'cns2', weight: 0.5, markers: [
         M('CRP', 'СРБ', 'мг/л', 'high', [5, 10, 20]),
         M('HOMOCYSTEINE', 'Гомоцистеин', 'мкмоль/л', 'high', [15, 20, 30]),
         M('IL6', 'IL-6', 'пг/мл', 'high', [2, 5, 10]),
         M('TNFA', 'TNF-α', 'пг/мл', 'high', [3, 5, 10]),
-        M('FERRITIN', 'Ферритин', 'мкг/л', 'high', [300, 400, 500]),
+        // Женский ряд — `FERRITIN_STEPS.female` (♀ цель 150 · 300 · 400, проход 126):
+        // раньше женской ветки не было, и 200 мкг/л у женщины давали ноль вклада.
+        M('FERRITIN', 'Ферритин', 'мкг/л', 'high', FERRITIN_STEPS.male, { thresholds: FERRITIN_STEPS.female }),
       ] },
       { id: 'cns3', weight: 0.5, markers: [
         M('HOMOCYSTEINE', 'Гомоцистеин', 'мкмоль/л', 'high', [15, 20, 30]),
@@ -220,8 +203,14 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       { id: 'cns4', weight: 0.7, markers: [
         M('TSH', 'ТТГ', 'мМЕ/л', 'high', [4.0, 6.0, 10.0]),
         M('CORTISOL', 'Кортизол', 'нмоль/л', 'high', [690, 900, 1380]),
+        // Первая ступень Т3/Т4 (4.5 / 12 пмоль/л) выше нижней нормы тиров (3.5 / 9)
+        // намеренно — это функциональная цель, как 12 нмоль/л у общего тестостерона
+        // при LLN 8.6; вторая ступень уже совпадает с LLN. Проверено в проходе 126.
         M('T3', 'Т3 свободный', 'пмоль/л', 'low', [4.5, 3.5, 2.5]),
         M('T4', 'Т4 свободный', 'пмоль/л', 'low', [12, 9, 6]),
+        // ДГЭА-С: женской ветки нет намеренно — её норма возрастная (пик 20–30 лет
+        // и спад после 40), одного числа в репозитории нет, а ряд «по памяти»
+        // запрещён (проход 126). Мужской ряд — 100/50/20 мкг/дл.
         M('DHEAS', 'DHEA-S', 'мкг/дл', 'low', [100, 50, 20]),
       ] },
       { id: 'cns5', weight: 0.8, markers: [
@@ -243,14 +232,19 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ] },
       { id: 'rep2', weight: 0.8, markers: [
         M('TT', 'Тестостерон общий', 'нмоль/л', 'low', [12, 8, 4], { thresholds: [2.5, 4, 6], direction: 'high' }),
-        M('FT', 'Тестостерон свободный', 'пмоль/л', 'low', [250, 150, 50], { thresholds: [10, 15, 25], direction: 'high' }),
+        // Свободный тест — в пг/мл (канон `UCUM_MAP.FT` 8–30, проход 125): ряд
+        // [250,150,50] был в пмоль/л, и нормальные 15 пг/мл давали m=3 «тяжело».
+        M('FT', 'Тестостерон свободный', 'пг/мл', 'low', FT_STEPS.male, { thresholds: FT_STEPS.female, direction: 'high' }),
         M('SHBG', 'ГСПГ', 'нмоль/л', 'high', [60, 80, 100], { thresholds: [100, 150, 200] }),
       ] },
       { id: 'rep3', weight: 0.8, markers: [
         M('FSH', 'ФСГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),
       ], note: 'олигозооспермия при супрессии ФСГ' },
       { id: 'rep4', weight: 0.5, markers: [
-        M('E2', 'Эстрадиол', 'пмоль/л', 'high', [40, 55, 80], { thresholds: [150, 220, 400] }),
+        // Подпись единицы врала (проход 126): пороги и данные — пг/мл
+        // (`FLAT_TARGET_UNIT.E2 = pg/mL`, `readLabValue` канон пг/мл), а рядом с числом
+        // печаталось «пмоль/л» — 60 пг/мл читались как 60 пмоль/л (16 пг/мл).
+        M('E2', 'Эстрадиол', 'пг/мл', 'high', [40, 55, 80], { thresholds: [150, 220, 400] }),
       ] },
       { id: 'rep5', weight: 0.6, markers: [
         M('LH', 'ЛГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),

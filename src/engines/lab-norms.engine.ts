@@ -260,6 +260,28 @@ export const RBC_ULN = {
 } as const;
 
 /**
+ * Ступени m_i гемоглобина и эритроцитов (проход 126) — ОДИН ряд на маркер для
+ * обоих движков (`risk-engine-tz-spec` hem1 и каталог «Анализы» `risk-verification`).
+ * Гемоглобин: верх нормы → флеботомия → +15 г/л (♂ 170/185/200, ♀ 150/165/180).
+ * Эритроциты: ВГН → +0.4 → +0.8 (♂ 5.8/6.2/6.6, ♀ 5.2/5.6/6.0).
+ *
+ * Зачем: в главной модели жили литералы [170,180,190] и [5.5,6.0,6.5] — там
+ * эритроцитоз начинался с 5.5 при ВГН 5.8, и норма читалась как отклонение,
+ * а у гемоглобина вторая ступень была на 5 г/л ниже клинического порога.
+ */
+const step = (base: number, k: number) => Math.round((base + k) * 10) / 10;
+
+export const HGB_STEPS: Record<'male' | 'female', [number, number, number]> = {
+  male: [HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block, HGB_THRESHOLDS.male.block + 15],
+  female: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
+};
+
+export const RBC_STEPS: Record<'male' | 'female', [number, number, number]> = {
+  male: [RBC_ULN.male, step(RBC_ULN.male, 0.4), step(RBC_ULN.male, 0.8)],
+  female: [RBC_ULN.female, step(RBC_ULN.female, 0.4), step(RBC_ULN.female, 0.8)],
+};
+
+/**
  * ♀ Клинические зоны гормонов, которых НЕТ в резолвере: TT/E2/PRL/LH/FSH
  * намеренно не переопределяются в V7 (§6.2 — им нужна фазовая модель цикла).
  * Числа взяты из женского протокола (`supportProtocolWomenData`, блок «Лабы»),
@@ -419,6 +441,62 @@ export const SCREEN_TARGETS = {
   GGT: { male: 40, female: 30 },
   CREATININE: { male: 106, female: 97 },
   FERRITIN: { male: 300, female: 150 },
+} as const;
+
+/**
+ * Свободный тестостерон — ступени m_i в пг/мл (проход 125).
+ *
+ * Канон приложения — пг/мл: `UCUM_MAP.FT` 8–30, `labs-phase-panels` ref [8, 30],
+ * `readLabValue` переводит пмоль/л множителем `FT_PG_TO_PMOL`, импорт бланка
+ * «пмоль/л» несёт уже пг/мл. Мужской ряд — «ниже нормы»: LLN 8 · 0.75·LLN = 6 ·
+ * 0.5·LLN = 4 (три ступени от нижней границы, как у общего тестостерона 12/8/4).
+ * До прохода 125 здесь стоял ряд [250, 150, 50] — это пмоль/л, и мужчина с
+ * нормальным 15 пг/мл получал худшую ступень m=3 «тяжело».
+ * Женский ряд — обратный (высокий FT = вирилизация), пг/мл: 10/15/25.
+ */
+const FT_LLN = getLabNorm('FT', 'male')?.lln ?? 8;
+export const FT_STEPS = {
+  male: [FT_LLN, Math.round(FT_LLN * 0.75 * 10) / 10, Math.round(FT_LLN * 0.5 * 10) / 10] as [number, number, number],
+  female: [10, 15, 25] as [number, number, number],
+} as const;
+
+/**
+ * Пролактин m_i (проход 126). Мужской ряд — 15/25/50 нг/мл (тиры `PRL`: норма до
+ * 15, пограничное до 25, ступень «лечения» 50). Женский — от `FEMALE_HORMONE_ULN.PRL`
+ * (800/1500 мМЕ/л = 37.7/70.8 нг/мл), средняя ступень 50. До прохода 126 женской
+ * ветки не было: у женщины 30 нг/мл (её норма) и у мужчины 30 (уже высокий)
+ * была одна ступень.
+ */
+export const PRL_STEPS = {
+  male: [15, 25, 50] as [number, number, number],
+  female: [
+    Math.round((FEMALE_HORMONE_ULN.PRL.high / PRL_NG_TO_MIU) * 10) / 10,
+    50,
+    Math.round((FEMALE_HORMONE_ULN.PRL.criticalHigh / PRL_NG_TO_MIU) * 10) / 10,
+  ] as [number, number, number],
+} as const;
+
+/**
+ * Ферритин m_i (проход 126) — от цели курса (`SCREEN_TARGETS.FERRITIN`: ♂ 300,
+ * ♀ 150) и границ бэндов 400/500 (`lab-tier-ranges`). Женский ряд — ♀ цель 150 ·
+ * мужская цель 300 · 400: до прохода 126 женской ветки не было, и женщина с
+ * ферритином 200 (выше её цели 150) получала ноль вклада в риск.
+ */
+export const FERRITIN_STEPS = {
+  male: [SCREEN_TARGETS.FERRITIN.male, 400, 500] as [number, number, number],
+  female: [SCREEN_TARGETS.FERRITIN.female, SCREEN_TARGETS.FERRITIN.male, 400] as [number, number, number],
+} as const;
+
+/**
+ * Креатинин m_i (проход 126): ВГН · 130 · 200. 130 и 200 — абсолютные клинические
+ * ступени из `lab-tier-ranges` (пограничное начинается на 130, «лечение» — на 200).
+ * До прохода 126 мужской ряд начинался с 90 — НИЖЕ ВГН 110: нормальные 95 давали
+ * «мягкое отклонение» здоровому человеку, а женский ряд (97/110/120) держал
+ * вторую ступень на 110 — то есть отклонением считалось почти всё выше её ВГН.
+ */
+export const CREATININE_STEPS = {
+  male: [CREATININE_ULN.male, 130, 200] as [number, number, number],
+  female: [CREATININE_ULN.female, 130, 200] as [number, number, number],
 } as const;
 
 /**

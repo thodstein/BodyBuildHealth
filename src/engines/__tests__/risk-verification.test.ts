@@ -255,3 +255,52 @@ describe('экспорт', () => {
     expect(html).not.toMatch(/<script/i);
   });
 });
+
+/**
+ * Проходы 125/126: подпись единицы — часть вердикта. Таблица печатает «число + unit»
+ * рядом с порогами, поэтому неверная подпись читается как неверное число: свободный
+ * тест 15 пг/мл с подписью «пмоль/л» выглядит критически низким, а E2 60 пг/мл с
+ * подписью «пмоль/л» — как 16 пг/мл. Здесь же закреплены лестницы, которые до
+ * прохода 126 расходились с резолвером норм.
+ */
+describe('проходы 125/126: единицы и лестницы m_i', () => {
+  const marker = (sysId: string, code: string) =>
+    VERIFICATION_SYSTEMS.find(s => s.id === sysId)!.mechanisms.flatMap(m => m.markers).find(m => m.code === code)!;
+
+  it('свободный тест — пг/мл, ряд от нижней границы 8', () => {
+    const ft = marker('reproductive', 'FT');
+    expect(ft.unit).toBe('пг/мл');
+    expect(ft.thresholds).toEqual([8, 6, 4]);
+    expect(markerStatus(ft, 15)).toBe(0);   // норма; до прохода 125 здесь было m=3
+    expect(markerStatus(ft, 7)).toBe(1);
+    expect(markerStatus(ft, 5)).toBe(2);
+    expect(markerStatus(ft, 3)).toBe(3);
+    expect(markerStatus(ft, 12, 'female')).toBe(1); // у женщины высокий FT = вирилизация
+  });
+
+  it('эстрадиол подписан пг/мл — как читается и как считается', () => {
+    const e2 = marker('reproductive', 'E2');
+    expect(e2.unit).toBe('пг/мл');
+    expect(markerStatus(e2, 60)).toBe(2);
+  });
+
+  it('билирубин — один ряд с карточками печени (BILIRUBIN_FLAG_STEPS)', () => {
+    const bil = marker('hepatic', 'BIL');
+    expect(bil.thresholds).toEqual([17.1, 39.3, 59.9]);
+    expect(markerStatus(bil, 20)).toBe(1);
+  });
+
+  it('креатинин начинается с ВГН, а не ниже неё', () => {
+    const cr = marker('renal', 'CREAT');
+    expect(cr.thresholds).toEqual([110, 130, 200]);
+    expect(cr.femaleThresholds).toEqual([97, 130, 200]);
+    expect(markerStatus(cr, 95)).toBe(0);
+    expect(markerStatus(cr, 95, 'female')).toBe(0);
+    expect(markerStatus(cr, 100, 'female')).toBe(1);
+  });
+
+  it('у ферритина и пролактина есть женские ветки из резолвера', () => {
+    expect(marker('cns', 'FERRITIN').femaleThresholds).toEqual([150, 300, 400]);
+    expect(marker('cns', 'PRL').femaleThresholds).toEqual([37.7, 50, 70.8]);
+  });
+});
