@@ -25,7 +25,7 @@ import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { normalizeLabValue, readLabValue } from '../../core/constants';
 import { convertToUnit } from '../../core/labs-mapping';
-import { e2PgPerMl } from '../lab-norms.engine';
+import { e2PgPerMl, ckdEpi2021 } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
@@ -1173,17 +1173,12 @@ function extractLabValues(
   // eGFR: CKD-EPI 2021 (race-free) — учитывает пол, но не возраст при отсутствии возраста.
   // Раньше был MDRD без пола/возраста → у женщин СКФ систематически завышалась
   // (~на 10-15%), и ренальный риск занижался.
+  // Проход 133: сама формула одна на приложение (`lab-norms.engine`, `ckdEpi2021`):
+  // вторая копия в `clinical-indices` считала по смешанным коэффициентам 2009/2021.
   if (v['CREAT'] !== undefined) {
-    const scr = v['CREAT'] / 88.4; // μmol/L → mg/dL
-    const female = sex === 'female';
-    const kappa = female ? 0.7 : 0.9;
-    const alpha = female ? -0.241 : -0.302;
-    const ratio = scr / kappa;
-    const e = 142 * Math.pow(Math.min(ratio, 1), alpha) * Math.pow(Math.max(ratio, 1), -1.2);
     // Возраст: при отсутствии — 40 лет (нейтральная точка CKD-EPI).
-    const ageFactor = Math.pow(0.9938, Number.isFinite(age) && (age as number) > 0 ? (age as number) : 40);
-    const sexFactor = female ? 1.012 : 1;
-    const egfr = Math.round(e * ageFactor * sexFactor);
+    const years = Number.isFinite(age) && (age as number) > 0 ? (age as number) : 40;
+    const egfr = Math.round(ckdEpi2021(v['CREAT'], years, sex));
     v['eGFR'] = Math.min(150, Math.max(5, egfr));
   }
 

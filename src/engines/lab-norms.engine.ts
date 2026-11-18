@@ -535,3 +535,37 @@ export const FEMALE_LABS_NOTE =
 /** Л10: короткая строка-пометка для панелей/дневника (та же формулировка в 4 точках). */
 export const FEMALE_LABS_TAB_NOTE =
   '♀ Женские пороги активны (профиль: женщина). Отклонения считаются по женским границам; полная таблица — Поддержка → «Женщины и ААС» → Лабы.';
+
+/**
+ * СКФ по CKD-EPI 2021 (race-free) — единственный расчёт в приложении.
+ *
+ * Формула жила в двух местах: в риск-модели (`support-plan/engine-helpers`) и в
+ * индексах здоровья (`clinical-indices.engine`). Во втором коэффициенты были
+ * смешаны — константа 142, женский множитель 1.012 и `0.9938^возраст` из редакции
+ * 2021, а показатели степени `−0.329/−0.411` из редакции 2009. Для креатинина
+ * ниже каппа (женщины, низкая мышечная масса) это давало другое число СКФ на том
+ * же бланке. Теперь обе поверхности считают здесь.
+ *
+ * Числа — 142, каппа 0.7/0.9, степени −0.241/−0.302, множители `max^(−1.2)`,
+ * `0.9938^возраст`, `1.012` для женщины — те же, что уже были в риск-модели.
+ *
+ * @param creatinineUmolL креатинин сыворотки, мкмоль/л
+ * @param ageYears возраст, лет (вызывающий сам решает, что подставить, если возраста нет)
+ * @param sex пол; без пола — мужской путь, как во всей модели
+ * @returns СКФ, мл/мин/1.73 м²; `NaN` при непригодном входе
+ */
+export function ckdEpi2021(
+  creatinineUmolL: number,
+  ageYears: number,
+  sex?: 'male' | 'female' | null,
+): number {
+  if (!Number.isFinite(creatinineUmolL) || creatinineUmolL <= 0) return NaN;
+  if (!Number.isFinite(ageYears) || ageYears <= 0) return NaN;
+  const female = sex === 'female';
+  const kappa = female ? 0.7 : 0.9;
+  const alpha = female ? -0.241 : -0.302;
+  const scr = creatinineUmolL / 88.4; // мкмоль/л → мг/дл
+  const ratio = scr / kappa;
+  const base = 142 * Math.pow(Math.min(ratio, 1), alpha) * Math.pow(Math.max(ratio, 1), -1.2);
+  return base * Math.pow(0.9938, ageYears) * (female ? 1.012 : 1);
+}

@@ -1,5 +1,6 @@
 import { LabPoint } from '../core/types';
 import { UCUM_MAP } from '../core/constants';
+import { ckdEpi2021 } from './lab-norms.engine';
 
 export interface ClinicalIndices {
   homaIR: { value: number; status: 'normal'|'ir'|'severe_ir'; ref: [number, number]; alert?: string };
@@ -60,11 +61,11 @@ export function calculateIndices(labs: LabPoint[], sex: 'male'|'female' = 'male'
     ref: ftRef as [number, number]
   };
 
-  // eGFR (CKD-EPI 2021) — convert creatinine from µmol/L to mg/dL
-  const creat_mg_dL = creat / 88.42;
-  const k = sex === 'female' ? 0.7 : 0.9;
-  const a = sex === 'female' ? -0.329 : -0.411;
-  const egfrVal = 142 * Math.pow(Math.min(creat_mg_dL/k, 1), a) * Math.pow(Math.max(creat_mg_dL/k, 1), -1.2) * 0.9938 ** age * (sex === 'female' ? 1.012 : 1);
+  // eGFR (CKD-EPI 2021) — единственный расчёт в приложении (проход 133).
+  // Здесь стояли смешанные коэффициенты: 142/1.012/0.9938 из редакции 2021,
+  // а показатели степени −0.329/−0.411 из 2009 — для креатинина ниже каппа
+  // (женщины, низкая мышечная масса) число расходилось с риск-моделью.
+  const egfrVal = ckdEpi2021(creat, age, sex);
   const egfrStatus = egfrVal >= 90 ? 'normal' : egfrVal >= 60 ? 'g2' : egfrVal >= 45 ? 'g3a' : egfrVal >= 30 ? 'g3b' : egfrVal >= 15 ? 'g4' : 'g5';
   const egfr: ClinicalIndices['egfr'] = {
     value: parseFloat(egfrVal.toFixed(1)),
