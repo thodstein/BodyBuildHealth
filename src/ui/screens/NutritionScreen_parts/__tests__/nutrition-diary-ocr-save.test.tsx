@@ -38,6 +38,16 @@ vi.mock('../../../../core/ocr-engine', () => ({
 import { NutritionDiary } from '../NutritionDiary';
 import { readDiaryV2 } from '../diary-storage-v2';
 
+/**
+ * OCR-панель живёт внутри листа «Добавить», а дневник по умолчанию открывается
+ * на «Дне». Тесты OCR явно открывают лист добавления.
+ */
+const renderDiaryAdd = () => {
+  const utils = render(<NutritionDiary foodEntries={[]} />);
+  fireEvent.click(screen.getByRole('tab', { name: 'Добавить' }));
+  return utils;
+};
+
 beforeEach(() => {
   localStorage.clear();
 });
@@ -48,7 +58,7 @@ afterEach(() => {
 
 describe('Дневник: сохранение распознанных скриншотов', () => {
   it('кнопка сохранения переносит распознанные продукты в приём пищи', async () => {
-    const { getByLabelText, getByText, queryByText } = render(<NutritionDiary foodEntries={[]} />);
+    const { getByLabelText, getByText, queryByText } = renderDiaryAdd();
 
     fireEvent.click(getByLabelText('Текст'));
     fireEvent.change(getByLabelText('Текст для распознавания'), {
@@ -74,7 +84,7 @@ describe('Дневник: сохранение распознанных скри
   });
 
   it('скриншот из галереи: распознанные строки тоже сохраняются в дневник', async () => {
-    const { container, getByLabelText } = render(<NutritionDiary foodEntries={[]} />);
+    const { container, getByLabelText } = renderDiaryAdd();
 
     const fileInput = container.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
     expect(fileInput).toBeTruthy();
@@ -99,7 +109,7 @@ describe('Дневник: сохранение распознанных скри
       return new Promise<any>((resolve) => { finish = resolve; });
     });
 
-    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    const { container } = renderDiaryAdd();
     fireEvent.click(screen.getByLabelText('Текст'));
     const fileInput = container.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
     fireEvent.change(fileInput, { target: { files: [new File([new Uint8Array([1])], 's.png', { type: 'image/png' })] } });
@@ -129,7 +139,7 @@ describe('Дневник: сохранение распознанных скри
   });
 
   it('поиск не sticky, а строка добавления закреплена над пилюлей навигации', async () => {
-    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    const { container } = renderDiaryAdd();
 
     // Карточка поиска — в потоке: иначе она накрывала распознанные продукты.
     expect(container.querySelector('.nd-add-sticky')).toBeNull();
@@ -151,7 +161,7 @@ describe('Дневник: сохранение распознанных скри
   });
 
   it('после добавления уводит на «День», чтобы результат было видно', async () => {
-    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    const { container } = renderDiaryAdd();
     const fileInput = container.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement;
     fireEvent.change(fileInput, { target: { files: [new File([new Uint8Array([1])], 's.png', { type: 'image/png' })] } });
 
@@ -164,7 +174,7 @@ describe('Дневник: сохранение распознанных скри
   });
 
   it('в панели добавления нет плавающих (fixed) кнопок', async () => {
-    const { container } = render(<NutritionDiary foodEntries={[]} />);
+    const { container } = renderDiaryAdd();
     fireEvent.click(screen.getByLabelText('Текст'));
     const fixedButtons = Array.from(container.querySelectorAll('button'))
       .filter(btn => (btn as HTMLElement).style.position === 'fixed');

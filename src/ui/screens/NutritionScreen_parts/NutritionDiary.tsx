@@ -44,7 +44,9 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const weight = w || 80;
   const age = a || 30;
   const sex = s || 'male';
-  const [tab, setTab] = useState<'add' | 'day' | 'week'>('add');
+  // Дневник открывается на «Дне»: пользователь приходит смотреть, что съел,
+  // а не сразу в поиск. Добавление — вкладка «Добавить» / «＋» в приёмах.
+  const [tab, setTab] = useState<'add' | 'day' | 'week'>('day');
   const [showOCR, setShowOCR] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
 
@@ -98,6 +100,14 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     // Новый заход в лист — с чистым поиском; набранная очередь (черновик) остаётся.
     setFoodSearch('');
   }, [setFoodSearch]);
+
+  // Панель камеры этикетки рендерится внутри листа «Добавить». Открыть её
+  // можно и снаружи (виджет «Фото» → событие из NutritionScreen), поэтому
+  // при её открытии принудительно переключаемся на «Добавить» — иначе панель
+  // отрендерится в невидимой ветке.
+  React.useEffect(() => {
+    if (labelOpen && tab !== 'add') setTab('add');
+  }, [labelOpen, tab]);
 
   // Системная «назад» на Android: сначала закрываем вложенные слои листа
   // (штрихкод → упаковка → текст), и только потом сам лист. Без этого

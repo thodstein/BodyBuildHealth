@@ -298,10 +298,14 @@ describe('nutrition-diary-pro hooks', () => {
     expect(screen.getByText(/Импорт JSON/)).toBeInTheDocument();
   });
 
-  it('NutritionDiary: табы обёрнуты в секции add/week', () => {
+  it('NutritionDiary: табы обёрнуты в секции day/add/week', () => {
     const { container } = render(<NutritionDiary foodEntries={[]} />);
-    expect(container.querySelector('.nd-sec-add')).not.toBeNull();
+    // По умолчанию открыт «День» — сразу видно, что уже съедено.
+    expect(container.querySelector('.nd-sec-meals')).not.toBeNull();
+    expect(container.querySelector('.nd-sec-add')).toBeNull();
     expect(container.querySelector('.nd-sec-week')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Добавить' }));
+    expect(container.querySelector('.nd-sec-add')).not.toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: 'Неделя' }));
     expect(container.querySelector('.nd-sec-week')).not.toBeNull();
   });
