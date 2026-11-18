@@ -135,6 +135,89 @@ export function clampInlineNumber(
   if (v == null) return fallback;
   return Math.max(min, Math.min(max, v));
 }
+
+/** Ручной суперсет: связать упражнение `index` с реальным партнёром в той же сессии.
+ *
+ *  Аудит UI (P3). Правка живёт в `exerciseEdits` и переприменяется при каждой пересборке
+ *  плана. Раньше это давало два дефекта: (1) после замены/перестановки упражнения поиск
+ *  партнёра шёл по «свободным» и находил другого (или никого, если прежний партнёр уже
+ *  был в суперсете); (2) в случае неудачи в план навсегда дописывался комментарий
+ *  «⚠ суперсет: подходящий партнёр не найден» — ложное предупреждение в данных плана.
+ *  Теперь повторное применение идемпотентно, оборванная ссылка снимается и партнёр
+ *  ищется заново, а неудача возвращает `false`, не трогая план.
+ *
+ *  @returns `true` — суперсет стоит (применён сейчас или уже был), `false` — партнёр не найден.
+ */
+export function applyManualSupersetTo(exercises: any[], index: number, mode: string): boolean {
+  const ex = exercises[index];
+  if (!ex) return false;
+  const muscleOf = (x: any) => canonicalMuscle(String(x?.muscle || ''));
+  const antagonists: Record<string, string[]> = {
+    chest: ['back'], back: ['chest'],
+    biceps: ['triceps'], triceps: ['biceps'],
+    quads: ['hamstrings', 'glutes'], hamstrings: ['quads', 'glutes'], glutes: ['quads', 'hamstrings'],
+    shoulders: ['back'], abs: ['back'], calves: [], forearms: [],
+  };
+  const nameOf = (x: any) => String(x?.name || x?.exerciseName || '');
+  const currentMuscle = muscleOf(ex);
+  const m = String(mode || '').toLowerCase();
+  const isAntagonist = m === 'антагонист' || m === 'antagonist';
+  const isSameMuscle = m === 'та же группа' || m === 'same_muscle' || m === 'same muscle';
+  const isNameMode = !isAntagonist && !isSameMuscle;
+  const matchesMode = (x: any) => {
+    const mm = muscleOf(x);
+    if (isNameMode) return nameOf(x) === mode;
+    if (isAntagonist) return (antagonists[currentMuscle] || []).includes(mm);
+    return mm === currentMuscle;
+  };
+  // Правка уже применена к этому упражнению с подходящим партнёром — не переприменяем.
+  const existing = ex.supersetWith
+    ? exercises.find((x: any, i: number) => i !== index && nameOf(x) === String(ex.supersetWith))
+    : null;
+  if (ex.supersetGroup && existing && matchesMode(existing)) return true;
+  // Партнёр исчез (замена/удаление) — снимаем оборванную ссылку и ищем заново.
+  if (ex.supersetGroup && !existing) {
+    delete ex.supersetWith;
+    delete ex.supersetGroup;
+    delete ex.supersetSlot;
+  }
+  const isFree = (x: any) => !x?.supersetWith && !x?.supersetGroup;
+  let partnerIdx = -1;
+  if (isNameMode) {
+    partnerIdx = exercises.findIndex((x: any, i: number) => i !== index && nameOf(x) === mode);
+  } else if (isAntagonist) {
+    const targets = antagonists[currentMuscle] || [];
+    partnerIdx = exercises.findIndex((x: any, i: number) => i !== index && isFree(x) && targets.includes(muscleOf(x)));
+  } else {
+    partnerIdx = exercises.findIndex((x: any, i: number) => i !== index && isFree(x) && muscleOf(x) === currentMuscle);
+  }
+  if (partnerIdx < 0) return false; // ложное «партнёр не найден» в комментарий плана больше не пишем
+  const partner = exercises[partnerIdx];
+  const used = new Set<number>();
+  for (const x of exercises) {
+    const g = Number(x?.supersetGroup);
+    if (Number.isFinite(g)) used.add(g);
+  }
+  let groupId = 1000 + index + 1;
+  while (used.has(groupId)) groupId++;
+  ex.supersetWith = nameOf(partner);
+  partner.supersetWith = nameOf(ex);
+  ex.supersetGroup = groupId;
+  partner.supersetGroup = groupId;
+  ex.supersetSlot = 0;
+  partner.supersetSlot = 1;
+  ex.restSeconds = 0;
+  partner.restSeconds = 0;
+  if (Array.isArray(ex.workSets)) ex.workSets = ex.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
+  if (Array.isArray(partner.workSets)) partner.workSets = partner.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
+  if (!String(ex.comment || '').includes('🔗 Суперсет с')) {
+    ex.comment = (ex.comment || '') + ` | 🔗 Суперсет с «${nameOf(partner)}»`;
+  }
+  if (!String(partner.comment || '').includes('🔗 Суперсет с')) {
+    partner.comment = (partner.comment || '') + ` | 🔗 Суперсет с «${nameOf(ex)}»`;
+  }
+  return true;
+}
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 
 /** Фаза недели по факту плана.

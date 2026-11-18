@@ -102,7 +102,7 @@ import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine
 
 /* ── Вынесенный служебный слой (этап 1 §4.3): CollapsibleCard, типы шагов/фаз,
    константы групп и чистые хелперы — в `bb-auto-constructor-shared.tsx`. ── */
-import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, WEAK_GROUPS, PHASE_TECHNIQUES, backSubgroupLabel, armHeadLabel, isAbRotationActive, annualBlockCtxToPrepPatch, annualActiveBlockLine, DONOR_GROUPS, normalizeDonorTargets, computePhases, useInlineDialogA11y, BbCard, bbExerciseIdentity, applyManualSupersetTo, type Step, type PlanMode, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { resolveBbAutoOpenStep, shouldFollowExternalPlan, annualBlockCtxIsFresh, clampBbWeek } from './bb-auto-nav';
 import { BbSplitStep } from './bb-step-split';
 import { BbPedWorkMaxStep } from './bb-step-ped';
@@ -3059,62 +3059,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // P2-9: применить inline-правки к плану перед сохранением/экспортом.
   // Раньше exerciseEdits были display-only — не мутатируют builtPlan/he_pl_runtime.
   // Теперь: если есть edits — мутируем workSets упражнений.
-  /** Ручной суперсет: реальный партнёр в той же сессии + group/slot/rest.
-   *  Раньше в `supersetWith` писался литерал «антагонист»/«та же группа»,
-   *  который финализатор удалял как dangling-ссылку — правка была косметикой. */
-  const applyManualSuperset = (exercises: any[], index: number, mode: string) => {
-    const ex = exercises[index];
-    if (!ex) return;
-    const muscleOf = (x: any) => canonicalMuscle(String(x?.muscle || ''));
-    const antagonists: Record<string, string[]> = {
-      chest: ['back'], back: ['chest'],
-      biceps: ['triceps'], triceps: ['biceps'],
-      quads: ['hamstrings', 'glutes'], hamstrings: ['quads', 'glutes'], glutes: ['quads', 'hamstrings'],
-      shoulders: ['back'], abs: ['back'], calves: [], forearms: [],
-    };
-    const currentMuscle = muscleOf(ex);
-    const isFree = (x: any) => !x?.supersetWith && !x?.supersetGroup;
-    let partnerIdx = -1;
-    const m = String(mode || '').toLowerCase();
-    if (m === 'антагонист' || m === 'antagonist') {
-      const targets = antagonists[currentMuscle] || [];
-      partnerIdx = exercises.findIndex((x, i) => i !== index && isFree(x) && targets.includes(muscleOf(x)));
-    } else if (m === 'та же группа' || m === 'same_muscle' || m === 'same muscle') {
-      partnerIdx = exercises.findIndex((x, i) => i !== index && isFree(x) && muscleOf(x) === currentMuscle);
-    } else {
-      partnerIdx = exercises.findIndex((x, i) => i !== index && (
-        String(x?.name || '') === mode || String(x?.exerciseName || '') === mode
-      ));
-    }
-    if (partnerIdx < 0) {
-      ex.comment = (ex.comment || '') + ' | ⚠ суперсет: подходящий партнёр не найден';
-      return;
-    }
-    const partner = exercises[partnerIdx];
-    const used = new Set<number>();
-    for (const x of exercises) {
-      const g = Number(x?.supersetGroup);
-      if (Number.isFinite(g)) used.add(g);
-    }
-    let groupId = 1000 + index + 1;
-    while (used.has(groupId)) groupId++;
-    ex.supersetWith = String(partner.name || partner.exerciseName || '');
-    partner.supersetWith = String(ex.name || ex.exerciseName || '');
-    ex.supersetGroup = groupId;
-    partner.supersetGroup = groupId;
-    ex.supersetSlot = 0;
-    partner.supersetSlot = 1;
-    ex.restSeconds = 0;
-    partner.restSeconds = 0;
-    if (Array.isArray(ex.workSets)) ex.workSets = ex.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
-    if (Array.isArray(partner.workSets)) partner.workSets = partner.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
-    if (!String(ex.comment || '').includes('🔗 Суперсет с')) {
-      ex.comment = (ex.comment || '') + ` | 🔗 Суперсет с «${partner.name}»`;
-    }
-    if (!String(partner.comment || '').includes('🔗 Суперсет с')) {
-      partner.comment = (partner.comment || '') + ` | 🔗 Суперсет с «${ex.name}»`;
-    }
-  };
+  // Ручной суперсет вынесен в общий хелпер `applyManualSupersetTo` (аудит UI P3):
+  // повторное применение правки идемпотентно, оборванная ссылка снимается,
+  // а неудача больше не пишет ложное «подходящий партнёр не найден» в план.
 
   const applyEditsToPlan = (plan: BBPlan): BBPlan => {
     if (!plan || Object.keys(exerciseEdits).length === 0) return plan;
@@ -3186,7 +3133,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           const edit = exerciseEdits[`${w.week}-${si}-${ei}`];
           if (!edit?.supersetWith || edit.supersetWith === 'none') continue;
           if (edit.exerciseKey && edit.exerciseKey !== bbExerciseIdentity(exercises[ei])) continue;
-          applyManualSuperset(exercises, ei, edit.supersetWith);
+          applyManualSupersetTo(exercises, ei, edit.supersetWith);
         }
         return { ...s, exercises };
       }),
