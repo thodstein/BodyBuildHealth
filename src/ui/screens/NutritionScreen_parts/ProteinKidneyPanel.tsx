@@ -660,9 +660,12 @@ export const ProteinKidneyPanel: React.FC = () => {
 
   const statusMeta = STATUS_META[result.status];
   // «Переносится» можно говорить только когда потолок подтверждён анализами.
-  const statusText = result.status === 'above_benefit' && !result.toleranceVerified
-    ? 'Выше пользы'
-    : statusMeta.text;
+  const statusText = result.extreme
+    ? result.status === 'above_tolerance' ? 'Выше переносимости' : 'Экстремальный режим'
+    : result.status === 'above_benefit' && !result.toleranceVerified
+      ? 'Выше пользы'
+      : statusMeta.text;
+  const statusColor = result.extreme ? '#f97316' : statusMeta.color;
   const overToleranceG = Math.max(0, result.proteinGPerDay - result.capGPerDay);
   const overBenefitG = Math.max(0, result.proteinGPerDay - result.benefitCapGPerDay);
   const util = result.utilization;
@@ -671,20 +674,31 @@ export const ProteinKidneyPanel: React.FC = () => {
     ? 'нужны анализы'
     : result.capGPerKg < result.benefitCapGPerKg - 1e-9
       ? `${result.capGPerDay} г/сут · ограничение`
-      : result.toleranceVerified
-        ? `${result.capGPerDay} г/сут`
-        : `${result.capGPerDay} г/сут · не подтверждено`;
+      : result.extreme
+        ? `${result.capGPerDay} г/сут · экстремальный`
+        : result.toleranceVerified
+          ? `${result.capGPerDay} г/сут`
+          : `${result.capGPerDay} г/сут · не подтверждено`;
   const toleranceHeadValue = !result.toleranceAssessed
     ? '—'
     : result.toleranceHeadroomGPerDay > 0 ? `+${result.toleranceHeadroomGPerDay}` : `−${overToleranceG}`;
-  const toleranceHeadSub = result.toleranceAssessed ? 'г/сут' : 'после анализов';
+  const toleranceHeadSub = result.toleranceAssessed
+    ? result.extreme ? 'г/сут · врач' : 'г/сут'
+    : 'после анализов';
+  const toleranceHeadColor = !result.toleranceAssessed
+    ? '#94a3b8'
+    : result.extreme
+      ? '#f97316'
+      : result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : '#ef4444';
   const barMax = Math.max(result.toleranceAssessed ? result.capGPerKg : result.benefitCapGPerKg, result.proteinGPerKg);
   const planTone = result.increaseAllowed && !result.increasePaused ? '#22c55e'
-    : result.canIncreaseToTolerance ? '#eab308'
-      : result.increasePaused ? '#f59e0b' : '#ef4444';
+    : result.increasePaused ? '#f59e0b'
+      : result.extreme && result.status !== 'above_tolerance' ? '#f97316'
+        : result.canIncreaseToTolerance ? '#eab308' : '#ef4444';
   const planLabel = result.increaseAllowed && !result.increasePaused ? 'рекомендуется'
-    : result.canIncreaseToTolerance ? 'только переносимость'
-      : result.increasePaused ? 'пауза' : 'нельзя';
+    : result.increasePaused ? 'пауза'
+      : result.extreme && result.status !== 'above_tolerance' ? 'под контролем'
+        : result.canIncreaseToTolerance ? 'только переносимость' : 'нельзя';
   const historyPoints = useMemo(() => history.map((h) => h.score), [history]);
   const hydrationTone = result.hydrationStatus === 'dehydrated'
     ? '#ef4444'
@@ -846,7 +860,7 @@ export const ProteinKidneyPanel: React.FC = () => {
           <MhNum label="Вес" value={state.weightKg} min={30} max={250} suffix=" кг" onChange={(v) => setRequired('weightKg', v)} />
           <MhNum label="Рост" value={state.heightCm} min={120} max={230} suffix=" см" onChange={(v) => setRequired('heightCm', v)} />
           <MhNum label="Возраст" value={state.age} min={14} max={100} suffix=" лет" onChange={(v) => setRequired('age', v)} />
-          <MhNum label="Белок сейчас" value={state.proteinGPerDay} min={0} max={500} suffix=" г/сут" onChange={(v) => setRequired('proteinGPerDay', v)} />
+          <MhNum label="Белок сейчас" value={state.proteinGPerDay} min={0} max={1500} suffix=" г/сут" hint="до 5 г/кг; выше 3.2 — под контролем врача" onChange={(v) => setRequired('proteinGPerDay', v)} />
           <MhNum label="Приёмов пищи" value={state.mealsPerDay} min={1} max={8} suffix="" onChange={(v) => setRequired('mealsPerDay', v)} />
           <MhNum label="% жира (необяз.)" {...numberProps('bodyFatPct')} min={3} max={60} suffix=" %" optional />
           <MhNum label="Вода (необяз.)" {...numberProps('waterMlPerDay')} min={0} max={8000} step={100} suffix=" мл/сут" optional />
@@ -890,6 +904,10 @@ export const ProteinKidneyPanel: React.FC = () => {
           {result.benefitCapLbmGPerKg != null && <Pep color="#60a5fa">{`польза ≈ до ${result.benefitCapLbmGPerKg} г/кг LBM`}</Pep>}
           {result.toleranceCapLbmGPerKg != null && <Pep color="#22c55e">{`переносимость ≈ до ${result.toleranceCapLbmGPerKg} г/кг LBM`}</Pep>}
           {state.aasUse && <Pep color="#f97316">ААС: СКФ подтверждать цистатином C</Pep>}
+        </div>
+
+        <div style={{ marginTop: 8, fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+          Калькулятор оценивает белок до 5 г/кг. Выше 3.2 г/кг доказанной переносимости нет — такие режимы только под наблюдением врача и с контролем анализов каждые 7–14 дней.
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, marginTop: 8 }}>
@@ -1049,7 +1067,7 @@ export const ProteinKidneyPanel: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6 }}>
           <MhTile label="Индекс" value={result.score} sub="из 100" color={result.color} accent={result.color} />
           <MhTile label="Польза" value={`${result.benefitCapGPerKg}`} sub={`${result.benefitCapGPerDay} г/сут`} color="#fff" accent="#60a5fa" />
-          <MhTile label="Переносимость" value={toleranceValue} sub={toleranceSub} color="#fff" accent="#a78bfa" />
+          <MhTile label="Переносимость" value={toleranceValue} sub={toleranceSub} color="#fff" accent={result.extreme ? '#f97316' : '#a78bfa'} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 6, marginTop: 6 }}>
           <MhTile
@@ -1063,13 +1081,13 @@ export const ProteinKidneyPanel: React.FC = () => {
             label="Запас переносимости"
             value={toleranceHeadValue}
             sub={toleranceHeadSub}
-            color={result.toleranceAssessed && result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : result.toleranceAssessed ? '#ef4444' : '#94a3b8'}
-            accent={result.toleranceAssessed && result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : result.toleranceAssessed ? '#ef4444' : '#94a3b8'}
+            color={toleranceHeadColor}
+            accent={toleranceHeadColor}
           />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 6px' }}>
-          <MhBar v={result.proteinGPerKg} max={barMax} color={statusMeta.color} label={`Сейчас ${result.proteinGPerKg} г/кг`} />
+          <MhBar v={result.proteinGPerKg} max={barMax} color={statusColor} label={`Сейчас ${result.proteinGPerKg} г/кг`} />
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
             {result.toleranceAssessed ? `переносимость ${result.capGPerKg}` : `польза ${result.benefitCapGPerKg}`}
           </span>
@@ -1077,11 +1095,13 @@ export const ProteinKidneyPanel: React.FC = () => {
 
         <div style={{
           padding: '8px 10px', borderRadius: 10, fontSize: 10, lineHeight: 1.45,
-          background: `${statusMeta.color}10`, border: `1px solid ${statusMeta.color}33`, color: '#fff',
+          background: `${statusColor}10`, border: `1px solid ${statusColor}33`, color: '#fff',
         }}>
-          <strong style={{ color: statusMeta.color }}>{statusText}.</strong>{' '}
+          <strong style={{ color: statusColor }}>{statusText}.</strong>{' '}
           Сейчас {result.proteinGPerDay} г/сут ({result.proteinGPerKg} г/кг).
-          {result.status === 'above_tolerance'
+          {result.extreme
+            ? ` Это выше 3.2 г/кг — вне доказанной переносимости. 5 г/кг — верхняя граница калькулятора, а не безопасная норма: нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней.${result.status === 'above_tolerance' ? ` При этом белок на ${overToleranceG} г/сут выше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение до него.` : ''}`
+            : result.status === 'above_tolerance'
             ? ` Это на ${overToleranceG} г/сут больше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение, потом любые прибавки.`
             : result.status === 'above_benefit'
               ? result.aasEgfrUnverified
@@ -1096,9 +1116,13 @@ export const ProteinKidneyPanel: React.FC = () => {
             ? ` Прибавка рекомендуется: +${result.headroomGPerDay} г/сут шагами по 5–15 г.`
             : result.increasePaused
               ? ' Прибавка на паузе до нормализации анализов.'
-              : result.canIncreaseToTolerance
-                ? ` По переносимости можно до ${result.capGPerDay} г/сут (+${result.toleranceHeadroomGPerDay} г), но дополнительного прироста это в среднем не даёт.`
-                : result.status === 'above_tolerance' ? ' Сначала вернитесь к потолку.' : ' Прибавка сейчас не рекомендуется.'}
+              : result.extreme
+                ? result.status === 'above_tolerance'
+                  ? ' Сначала вернитесь к потолку переносимости.'
+                  : ' Дальше — только под наблюдением врача и с контролем каждые 7–14 дней.'
+                : result.canIncreaseToTolerance
+                  ? ` По переносимости можно до ${result.capGPerDay} г/сут (+${result.toleranceHeadroomGPerDay} г), но дополнительного прироста это в среднем не даёт.`
+                  : result.status === 'above_tolerance' ? ' Сначала вернитесь к потолку.' : ' Прибавка сейчас не рекомендуется.'}
         </div>
 
         {result.capReasons.length > 1 && (
@@ -1261,7 +1285,7 @@ export const ProteinKidneyPanel: React.FC = () => {
             label="Планируемая прибавка"
             {...numberProps('plannedIncreaseGPerDay')}
             min={0}
-            max={200}
+            max={1000}
             step={5}
             suffix=" г/сут"
             optional

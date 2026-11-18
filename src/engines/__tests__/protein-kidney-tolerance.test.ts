@@ -103,6 +103,15 @@ describe('protein-kidney-tolerance: потолок белка', () => {
     // Без белка мочи расширения нет: «не проверено» ≠ «чисто».
     expect(proteinToleranceCap({ training: 'resistance', age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.015 }).cap).toBe(2.2);
   });
+
+  it('до 5 г/кг расширяет только уже экстремальный белок, а не «с нуля»', () => {
+    const clean = { training: 'resistance' as const, age: 30, egfr: 105, ureaMmolL: 5, urineSg: 1.015, hasProteinuriaData: true };
+    expect(proteinToleranceCap({ ...clean, proteinGPerKg: 2.0 }).cap).toBe(3.0);
+    expect(proteinToleranceCap({ ...clean, proteinGPerKg: 4.5 }).cap).toBe(5.0);
+    // Для рекреационных — 4.0, для малоподвижных — 3.2: 5 г/кг не универсальная норма.
+    expect(proteinToleranceCap({ ...clean, training: 'recreational', proteinGPerKg: 4.5 }).cap).toBe(4.0);
+    expect(proteinToleranceCap({ ...clean, training: 'sedentary', proteinGPerKg: 4.5 }).cap).toBe(3.2);
+  });
 });
 
 describe('protein-kidney-tolerance: вердикт', () => {
@@ -134,6 +143,44 @@ describe('protein-kidney-tolerance: вердикт', () => {
     expect(r.utilization.status).toBe('handled');
     expect(r.steps.length).toBeGreaterThan(0);
     expect(r.steps.every((s) => s.beyondBenefit)).toBe(true);
+  });
+
+  it('4.5 г/кг + чистые анализы: предел 5, но это экстремальный режим с врачом и контролем', () => {
+    const r = calcProteinKidney(base({ proteinGPerDay: 360 }));
+    expect(r.proteinGPerKg).toBe(4.5);
+    expect(r.capGPerKg).toBe(5);
+    expect(r.extreme).toBe(true);
+    expect(r.status).toBe('above_benefit');
+    expect(r.utilization.status).toBe('partial');
+    expect(r.utilization.label).toContain('доказанной переносимости');
+    expect(r.retest.afterDays).toBe(7);
+    expect(r.retest.title).toContain('Экстремальный');
+    expect(r.retest.urgent).toBe(true);
+    expect(r.retest.items).toContain('UACR (альбумин/креатинин мочи)');
+    expect(r.retest.items).toContain('консультация нефролога/спортмедицины');
+    expect(r.flags.some((f) => f.code === 'extreme_protein')).toBe(true);
+    expect(r.recommendations.some((x) => /врач/i.test(x))).toBe(true);
+    expect(r.canIncreaseToTolerance).toBe(false);
+    expect(r.steps).toHaveLength(0);
+  });
+
+  it('3.5 г/кг: предел 5 для оценки, но автоприбавку выше не предлагает', () => {
+    const r = calcProteinKidney(base({ proteinGPerDay: 280 }));
+    expect(r.proteinGPerKg).toBe(3.5);
+    expect(r.capGPerKg).toBe(5);
+    expect(r.extreme).toBe(true);
+    expect(r.increaseAllowed).toBe(false);
+    expect(r.canIncreaseToTolerance).toBe(false);
+    expect(r.steps).toHaveLength(0);
+  });
+
+  it('выше 5 г/кг — вне предела калькулятора, потолок не расширяется', () => {
+    const r = calcProteinKidney(base({ proteinGPerDay: 420 }));
+    expect(r.proteinGPerKg).toBe(5.3);
+    expect(r.dataIssues.some((d) => d.code === 'protein')).toBe(true);
+    expect(r.capGPerKg).toBe(2.2);
+    expect(r.retest.afterDays).toBe(0);
+    expect(r.utilization.status).toBe('unknown');
   });
 
   it('2.4 г/кг + мочевина 9: часть белка окисляется, прибавка на паузе', () => {

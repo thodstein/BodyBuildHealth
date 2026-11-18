@@ -195,6 +195,8 @@ export interface ProteinKidneyResult {
 
   proteinGPerDay: number;
   proteinGPerKg: number;
+  /** Белок выше 3.2 г/кг: вне доказанной переносимости, нужен врач и частый контроль. */
+  extreme: boolean;
   /** Потолок переносимости по почкам (может быть выше спортивной пользы). */
   capGPerKg: number;
   capGPerDay: number;
@@ -318,6 +320,28 @@ const AAS_EXTENDED_CAP: Record<PkTraining, number> = {
   recreational: 2.8,
   resistance: 3.2,
   athlete: 3.2,
+};
+
+/**
+ * Верхняя граница калькулятора — 5 г/кг. Это НЕ доказанная безопасная норма:
+ * прямых данных о 4–5 г/кг у людей нет. Диапазон нужен, чтобы оценить уже
+ * существующий экстремальный рацион и честно сказать «вне доказанной
+ * переносимости, только под наблюдением врача».
+ */
+export const PROTEIN_ABS_MAX_G_PER_KG = 5;
+/** Граница, выше которой переносимость не доказана (Antonio 2016: до 3.3). */
+export const PROTEIN_EVIDENCE_MAX_G_PER_KG = 3.2;
+
+/**
+ * Потолок для уже экстремального белка (>3.2 г/кг): расширяем только тем, кто
+ * сознательно уже находится в этом диапазоне. Это не рекомендация дойти до 5:
+ * выше 3.2 нет доказанной безопасности, нужен врач и частый контроль.
+ */
+const EXTREME_CAP: Record<PkTraining, number> = {
+  sedentary: 3.2,
+  recreational: 4.0,
+  resistance: 5.0,
+  athlete: 5.0,
 };
 
 /** Почему потолок пользы именно такой — источник, а не «цифра с потолка». */
@@ -526,10 +550,14 @@ export function renalSoluteLoad(args: {
  *  - если есть почечные/острые ограничения — снижаем;
  *  - если все маркеры чистые — расширяем до переносимости (до 3.0 г/кг),
  *    но это не рекомендация: пользы сверх базы не добавляет.
+ *  - если человек уже ест >3.2 г/кг и анализы чистые — оцениваем до 5 г/кг,
+ *    но помечаем как экстремальный режим (врач + контроль каждые 7–14 дней).
  */
 export function proteinToleranceCap(args: {
   training: PkTraining;
   age: number;
+  /** Текущий белок, г/кг: нужно, чтобы не рекомендовать 5 г/кг «с нуля». */
+  proteinGPerKg?: number;
   knownCkd?: boolean;
   aasUse?: boolean;
   egfr?: number;
@@ -618,11 +646,20 @@ export function proteinToleranceCap(args: {
   let verified = false;
   if (renalClean) {
     let ext = (args.aasUse ? AAS_EXTENDED_CAP : EXTENDED_CAP)[args.training] ?? benefit;
+    // 3.2–5 г/кг оцениваем только для того, кто уже в этом диапазоне: не
+    // подталкиваем здорового человека с 2 г/кг сразу к 5. Выше 3.2 доказанной
+    // переносимости нет — это экстремальный режим, а не норма.
+    if (args.proteinGPerKg != null && args.proteinGPerKg > PROTEIN_EVIDENCE_MAX_G_PER_KG + 1e-9) {
+      ext = Math.max(ext, EXTREME_CAP[args.training] ?? PROTEIN_EVIDENCE_MAX_G_PER_KG);
+    }
     // На ААС 3.2 г/кг — только когда СКФ подтверждена цистатином C или измерением.
     if (args.aasUse && args.aasCreatinineOnly) ext = Math.min(ext, 2.8);
     if (ext > cap) {
       cap = ext;
       verified = true;
+      if (ext > PROTEIN_EVIDENCE_MAX_G_PER_KG + 1e-9) {
+        reasons.push(`3.2–${r1(ext)} г/кг — экстремальный диапазон: доказанной переносимости нет, только под наблюдением врача и с контролем каждые 7–14 дней`);
+      }
       reasons.push(args.aasUse
         ? `ААС + чистые анализы: переносимость до ${r1(ext)} г/кг${args.aasCreatinineOnly ? ' (без цистатина C — 2.8, не 3.2)' : ''}`
         : `Почки без отклонений: переносимость до ${r1(ext)} г/кг (здоровые тренированные; сверх ${r1(benefit)} пользы не добавляет)`);
@@ -632,7 +669,7 @@ export function proteinToleranceCap(args: {
     }
   }
 
-  return { cap: r1(clamp(cap, 0.6, 3.2)), reasons, verified };
+  return { cap: r1(clamp(cap, 0.6, PROTEIN_ABS_MAX_G_PER_KG)), reasons, verified };
 }
 
 function scoreLevel(score: number): { level: PkLevel; label: string; color: string } {
@@ -658,6 +695,8 @@ function buildUtilization(args: {
   proteinuriaScore?: number;
   urineProteinGL?: number;
   proteinGkg: number;
+  /** Белок выше 3.2 г/кг: доказанной переносимости нет. */
+  extremeProtein?: boolean;
   benefitCapGPerKg: number;
   /** СКФ посчитана по креатинину у человека на ААС — она может быть занижена. */
   aasCreatinineEgfr?: boolean;
@@ -838,6 +877,19 @@ function buildUtilization(args: {
     ? ` Сверх ~${benefit} г/кг массы дополнительная мышечная польза в среднем не доказана (плато дозы): лишний белок окисляется. Поднимать выше есть смысл только при очень больших объёмах/дефиците калорий и с контролем анализов.`
     : '';
 
+  // 3.2–5 г/кг: маркеры могут быть нормальными, но доказанной переносимости
+  // здесь нет. Не пишем «переносится» — это было бы ложным подтверждением.
+  if (args.extremeProtein) {
+    return {
+      status: 'partial',
+      label: 'Выше доказанной переносимости',
+      detail: `Мочевина, СКФ и белок мочи не показывают отклонений, но ${gkg} г/кг — выше 3.2 г/кг, где доказанной переносимости нет. Это наблюдение, а не подтверждение безопасности: нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней.${waterNote}${aasNote}`,
+      color: '#f97316',
+      confidence: 'low',
+      markers,
+    };
+  }
+
   return {
     status: 'handled',
     label: beyondBenefit ? `Переносится, но сверх ${benefit} г/кг польза не доказана` : 'Переносится',
@@ -865,6 +917,8 @@ function buildRetest(args: {
   needsCystatin?: boolean;
   /** Есть кровь, но нет белка/альбумина мочи — переносимость не подтвердить. */
   missingUrineProtein?: boolean;
+  /** Белок >3.2 г/кг: частый контроль и врач. */
+  extremeProtein?: boolean;
   today?: string;
 }): PkRetest {
   const items = new Set(['мочевина крови', 'креатинин крови', 'ОАМ — утренняя моча, средняя струя']);
@@ -875,6 +929,11 @@ function buildRetest(args: {
   if (args.needsCystatin) items.add('цистатин C (eGFR-cys)');
   if (args.pediatric) items.add('консультация детского нефролога');
   if (args.hardStop || args.aasUse) items.add('UACR (альбумин/креатинин мочи)');
+  if (args.extremeProtein) {
+    items.add('UACR (альбумин/креатинин мочи)');
+    items.add('электролиты крови (калий, натрий)');
+    items.add('консультация нефролога/спортмедицины');
+  }
 
   const today = args.today ?? localIsoDate();
   const make = (afterDays: number, title: string, reason: string, color: string, urgent = false): PkRetest => ({
@@ -898,6 +957,9 @@ function buildRetest(args: {
   }
   if (args.hardStop) {
     return make(14, 'Контроль через 2 недели', 'Пока белок не наращиваем: проверяем, стойкое ли отклонение, и не появилось ли новых признаков.', '#f97316', true);
+  }
+  if (args.extremeProtein) {
+    return make(7, 'Экстремальный белок: контроль через 7 дней', 'Выше 3.2 г/кг доказанной переносимости нет. Нужны врач (нефролог/спортмедицина) и контроль мочевины, креатинина, СКФ, ОАМ, UACR, электролитов и АД каждые 7–14 дней.', '#ef4444', true);
   }
   if (args.missingUrineProtein) {
     return make(14, 'Досдать ОАМ с белком', 'Мочевина и креатинин есть, но без белка/альбумина мочи нельзя подтвердить переносимость. ОАМ с белком закрывает этот пробел.', '#60a5fa');
@@ -927,6 +989,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const heightRaw = input.heightCm;
   const proteinG = Math.max(0, Number(input.proteinGPerDay) || 0);
   const proteinGkg = weight > 0 ? proteinG / weight : 0;
+  const extreme = proteinGkg > PROTEIN_EVIDENCE_MAX_G_PER_KG + 1e-9;
 
   // ── Правдоподобие: мусор на входе не должен расширять потолок ───────────
   const dataIssues: PkDataIssue[] = [];
@@ -982,8 +1045,15 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   if (!heightOk) issue('height', `Рост ${heightRaw} см вне диапазона 120–230`, 'Проверьте единицы: см, не м.');
   const weightOk = rawWeight >= 30 && rawWeight <= 350;
   if (!weightOk) issue('weight', `Вес ${rawWeight} кг вне диапазона 30–350`, 'Проверьте единицы: кг, не фунты.');
-  const proteinOk = Number.isFinite(proteinG) && proteinG <= 600;
-  if (!proteinOk) issue('protein', `Белок ${proteinG} г/сут вне диапазона 0–600`, 'Проверьте, не указаны ли граммы на приём вместо суток.');
+  const proteinMaxG = PROTEIN_ABS_MAX_G_PER_KG * weight;
+  const proteinOk = Number.isFinite(proteinG) && proteinG <= proteinMaxG + 1e-9;
+  if (!proteinOk) {
+    issue(
+      'protein',
+      `Белок ${r0(proteinG)} г/сут (${r1(proteinGkg)} г/кг) выше предела калькулятора 5 г/кг`,
+      'Калькулятор оценивает до 5 г/кг. Выше — вне диапазона: проверьте единицы (граммы за сутки, не за приём) и обсудите с врачом.',
+    );
+  }
   const leuRaw = input.urineLeuPerUl;
   const leuOk = inRange(leuRaw, 0, 100000);
   if (!leuOk) issue('urine_leu', `Лейкоциты ${leuRaw}/мкл вне диапазона`, 'Проверьте единицы: /мкл, не /поле зрения.');
@@ -1132,6 +1202,9 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   if (pediatric) {
     addFlag('pediatric', 'warn', 'Возраст до 18 лет', 'CKD-EPI 2021 — взрослая формула: для подростка СКФ и потолок белка считаются по детским нормам. Потолок переносимости не расширяем, нужен педиатр/нефролог.');
   }
+  if (extreme) {
+    addFlag('extreme_protein', 'danger', 'Экстремальный белок (>3.2 г/кг)', `Сейчас ${r1(proteinGkg)} г/кг. Выше 3.2 г/кг доказанной переносимости нет — это не «безопасная норма». Нужны врач (нефролог/спортмедицина) и контроль крови/ОАМ каждые 7–14 дней: мочевина, креатинин, СКФ, ОАМ, UACR, электролиты, АД. При симптомах или ухудшении анализов — снижать.`);
+  }
 
   if (egfr != null && egfr < 30) {
     addFlag('egfr_critical', 'danger', 'СКФ ниже 30', 'Это стадия G4–G5. Наращивание белка и высокобелковые диеты — только после нефролога. Срочно обсудите тактику.');
@@ -1246,6 +1319,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const capInfo = proteinToleranceCap({
     training: input.training,
     age,
+    proteinGPerKg: proteinGkg,
     knownCkd: input.knownCkd,
     aasUse: input.aasUse,
     egfr,
@@ -1285,7 +1359,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const pausedByInfection = infectionSigns;
   const increasePaused = !hardStop && (pausedByHydration || pausedByUrea || pausedByInfection);
   const increaseRecommended = !hardStop && !increasePaused && headroom >= 5;
-  const canIncreaseToTolerance = !hardStop && !increasePaused && toleranceVerified && toleranceHeadroom >= 5;
+  const canIncreaseToTolerance = !hardStop && !increasePaused && !extreme && toleranceVerified && toleranceHeadroom >= 5;
   const increaseAllowed = increaseRecommended;
   const pauseReason = increasePaused
     ? (pausedByHydration
@@ -1316,6 +1390,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     proteinuriaScore,
     urineProteinGL,
     proteinGkg,
+    extremeProtein: extreme,
     benefitCapGPerKg: benefitCapGkg,
     aasCreatinineEgfr,
     dataSuspect: dataIssues.length > 0,
@@ -1369,6 +1444,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     pediatric,
     needsCystatin: input.aasUse === true && egfrSource === 'ckd-epi',
     missingUrineProtein: !hasProteinuriaData,
+    extremeProtein: extreme,
   });
 
   // ── Индекс нагрузки ──────────────────────────────────────────────────────
@@ -1436,16 +1512,19 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   if (pediatric) {
     recs.push('До 18 лет СКФ и потолок белка считаются по детским нормам — обсудите с педиатром/нефрологом.');
   }
+  if (extreme) {
+    recs.push(`Белок ${r1(proteinGkg)} г/кг — экстремальный режим: выше 3.2 г/кг доказанной переносимости нет. 5 г/кг — верхняя граница калькулятора, а не безопасная норма. Нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней; при росте мочевины/креатинина, белка мочи, отёках или ухудшении самочувствия — снижайте.`);
+  }
   if (utilization.status === 'excess') {
     recs.push(`Признаки перегрузки: ${utilization.label.toLowerCase()}. Сначала снизьте белок до ${capGday} г/сут, добавьте воду и повторите анализы.`);
   } else if (utilization.status === 'partial') {
-    recs.push(`Ограничение по переносимости: ${utilization.label.toLowerCase()}. Прибавка — только после повторного анализа (2–3 дня) и нормализации воды.`);
+    recs.push(`Ограничение по переносимости: ${utilization.label.toLowerCase()}. ${extreme ? 'Контроль — каждые 7–14 дней и под наблюдением врача.' : 'Прибавка — только после повторного анализа (2–3 дня) и нормализации воды.'}`);
   } else if (utilization.status === 'handled' && proteinGkg > benefitCapGkg && status !== 'above_tolerance') {
     recs.push(`Анализы в норме: ${r1(proteinGkg)} г/кг переносятся. Но дополнительной пользы сверх ${r1(benefitCapGkg)} г/кг в среднем не доказано — прибавка имеет смысл только по причине (дефицит, очень большие объёмы) и с контролем.`);
   }
   if (status === 'above_tolerance') {
     recs.push(`Сейчас белка на ${overTolerance} г/сут больше потолка переносимости (${r1(capGkg)} г/кг). Снизьте до ${capGday} г/сут и повторите urea/creatinine/ОАМ через 2–3 недели.`);
-  } else if (status === 'above_benefit') {
+  } else if (status === 'above_benefit' && !extreme) {
     if (aasEgfrUnverified) {
       recs.push(`Сейчас ${r1(proteinGkg)} г/кг — выше ориентира пользы. Снижать до ${r1(benefitCapGkg)} не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но и наращивать нельзя, пока не сдадите цистатин C (eGFR-cys).`);
     } else {
@@ -1516,6 +1595,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     { id: 'sg-osm', text: 'Оценка осмолярности мочи по SG: (SG−1)×40 000 — приближение, ломается при глюкозе/протеинурии.', grade: 'C' },
     { id: 'bun-cr', text: 'BUN/креатинин 10–20 — ориентир, а не диагноз: высокий белок и дегидратация дают тот же сдвиг.', grade: 'B' },
     { id: 'pediatric', text: 'CKD-EPI 2021 валидирована у взрослых; до 18 лет применяются детские уравнения и нормы, поэтому расширение потолка у подростков заблокировано.', grade: 'A' },
+    { id: 'extreme-5', text: '3.2–5 г/кг — верхняя граница калькулятора, а не доказанная норма: прямых данных о безопасности 4–5 г/кг у людей нет. Такие режимы допустимы только под наблюдением врача и с частым контролем функции почек.', grade: 'E' },
   ];
 
   return {
@@ -1525,6 +1605,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
 
     proteinGPerDay: r0(proteinG),
     proteinGPerKg: r1(proteinGkg),
+    extreme,
     capGPerKg: capGkg,
     capGPerDay: capGday,
     benefitCapGPerKg: benefitCapGkg,
@@ -1676,12 +1757,13 @@ export function buildDoctorSummary(
   today = localIsoDate(),
 ): string {
   const tol = r.toleranceAssessed
-    ? `${r.capGPerKg} г/кг (${r.capGPerDay} г/сут)${r.toleranceVerified ? '' : ' — расширение не подтверждено чистыми анализами'}`
+    ? `${r.capGPerKg} г/кг (${r.capGPerDay} г/сут)${r.toleranceVerified ? '' : ' — расширение не подтверждено чистыми анализами'}${r.extreme ? ' — верхняя граница калькулятора, не доказанная норма' : ''}`
     : 'не оценена (нужны мочевина + СКФ)';
   const lines = [
     `Белок и почки — сводка от ${ruDate(today)}`,
     `Вес ${r.weightKg} кг, рост ${input.heightCm ?? '—'}, возраст ${input.age}, пол ${input.sex === 'female' ? 'женский' : 'мужской'}, тренировки: ${input.training}, цель: ${input.goal}`,
     `Белок: ${r.proteinGPerDay} г/сут (${r.proteinGPerKg} г/кг)`,
+    ...(r.extreme ? ['Экстремальный белок >3.2 г/кг: доказанной переносимости нет; только под наблюдением врача и с контролем анализов каждые 7–14 дней.'] : []),
     `Потолок пользы: ${r.benefitCapGPerKg} г/кг (${r.benefitCapGPerDay} г/сут)`,
     `Потолок переносимости: ${tol}`,
     `СКФ: ${r.egfr ?? '—'} (${r.egfrSource}), категория ${r.gfrCategory}; мочевина ${input.ureaMmolL ?? '—'} ммоль/л; креатинин ${input.creatinineUmolL ?? '—'} мкмоль/л; цистатин C ${input.cystatinCMgL ?? '—'} мг/л`,

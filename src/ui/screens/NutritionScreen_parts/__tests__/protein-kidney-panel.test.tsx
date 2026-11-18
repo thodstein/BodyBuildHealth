@@ -232,4 +232,29 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     // Поля реально заполнены: значение ушло в расчёт, а не только в сообщение.
     expect(bodyText()).toContain('мочевина 7.4');
   });
+
+  it('16. 4.5 г/кг: предел 5, «экстремальный режим», врач и контроль через 7 дней', () => {
+    render(<ProteinKidneyPanel />);
+    setNumber('Белок сейчас', 360);
+    setNumber('Вода (необяз.)', 4500);
+    setNumber('Мочевина', 5);
+    setNumber('Креатинин', 80);
+    setNumber('Плотность (SG)', 1.015);
+    pickScore('Белок в тест-полоске', 'отр');
+
+    expect(bodyText()).toContain('Экстремальный режим');
+    expect(bodyText()).toContain('5 г/кг — верхняя граница калькулятора');
+    expect(bodyText()).toContain('врач');
+    expect(bodyText()).toContain('каждые 7–14 дней');
+    expect(bodyText()).toContain('Экстремальный белок: контроль через 7 дней');
+    expect(bodyText()).toContain('через 7 дн.');
+    expect(bodyText()).toContain('под контролем');
+  });
+
+  it('17. выше 5 г/кг — прямо говорит, что это вне предела калькулятора', () => {
+    render(<ProteinKidneyPanel />);
+    setNumber('Белок сейчас', 420); // 5.25 г/кг при 80 кг
+    expect(bodyText()).toContain('выше предела калькулятора 5 г/кг');
+    expect(bodyText()).toContain('Проверьте единицы');
+  });
 });
