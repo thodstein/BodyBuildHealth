@@ -139,6 +139,8 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   // ── биохимия ──
   'GLU': 'Glucose', 'GLUCOSE': 'Glucose',
   'CREAT': 'Creatinine', 'CREA': 'Creatinine', 'CREATININE': 'Creatinine',
+  // Проход 134: инсулин — поле «Биохимии»; без него HOMA-IR не считался.
+  'INS': 'Insulin', 'INSULIN': 'Insulin',
   'BUN': 'Urea', 'UREA': 'Urea',
   'UA': 'Uric acid', 'URIC': 'Uric acid', 'URIC_ACID': 'Uric acid',
   'BIL': 'Bilirubin', 'BILIRUBIN': 'Bilirubin', 'BILIRUBIN_TOTAL': 'Bilirubin',

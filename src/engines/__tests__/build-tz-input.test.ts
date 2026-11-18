@@ -262,3 +262,30 @@ describe('проход 131: граница «>N» / «<N» не теряет а�
     expect(input.labValues!['CRP']).toBeUndefined();
   });
 });
+
+/**
+ * Проход 134: инсулин — поле формы, а не только импорт.
+ *
+ * `extractLabValues` считал HOMA-IR по инсулину и глюкозе ещё с самого начала, но в
+ * форме поля «Инсулин» не было: `FULL_PANELS.panelBiochem` его не перечислял. Значит
+ * механизм инсулинорезистентности (`hem2`, ступени HOMA 2.0/3.0/5.0) не мог
+ * сработать с бланка — только если инсулин приходил импортом в склад анализов.
+ */
+describe('проход 134: инсулин и HOMA-IR', () => {
+  it('глюкоза 6 + инсулин 20 → HOMA 5.33 и m_i 3 у hem2', () => {
+    const input = tzInputWithLabs({ panelBiochem: { Glucose: '6', Insulin: '20' } });
+    expect(input.labValues!['HOMA']).toBeCloseTo(5.33, 2);
+    expect(getMiFromLab('hem2', input.labValues!)).toBe(3);
+  });
+
+  it('без инсулина HOMA не выдумывается — hem2 читает только глюкозу', () => {
+    const input = tzInputWithLabs({ panelBiochem: { Glucose: '6' } });
+    expect(input.labValues!['HOMA']).toBeUndefined();
+    expect(getMiFromLab('hem2', input.labValues!)).toBe(1);
+  });
+
+  it('инсулин без глюкозы не даёт HOMA', () => {
+    const input = tzInputWithLabs({ panelBiochem: { Insulin: '20' } });
+    expect(input.labValues!['HOMA']).toBeUndefined();
+  });
+});
