@@ -31,6 +31,9 @@ export const FEMALE_GLUTE_SPLITS = new Set([
 
 export interface BBSelectorInput {
   level: string;
+  /** Стаж в годах (ядро P3-1 аудита 2026-11): раньше капы сессии всегда считались
+   *  как для 0 лет, и опытный атлет видел ориентир новичка. */
+  trainingYears?: number;
   goal: BBGoal;
   daysPerWeek?: number;
   weakPoints?: string[];
@@ -318,9 +321,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     }
 
     // PED-адаптация ранжирования: все сплиты масштабируются, бонус мягкий (+3..+5), не навязывает.
-    const hasAAS = (input.peds || []).some(x => String(x).toLowerCase().includes('aas') || String(x).toLowerCase().includes('тест')) || Number((input.pedDoses as any)?.['AAS'] || 0) >= 500;
-    const hasGH = (input.peds || []).includes('GH' as any) || Number((input.pedDoses as any)?.['GH'] || 0) > 0;
-    const hasIns = (input.peds || []).includes('insulin' as any) || Number((input.pedDoses as any)?.['insulin'] || 0) > 0;
+    const { hasAAS, hasGH, hasIns } = pedProfileOf(input);
     if (hasAAS && (p.id === 'arnold_6' || p.id === 'bro_5')) { score += 3; rationale.push('AAS: bro/Arnold допустим (длинный синтез)'); }
     if (hasGH && hasIns && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 3; rationale.push('GH+insulin: частый памп-сплит предпочтителен'); }
     if (!hasAAS && (p.id === 'bro_5')) { score -= 2; warnings.push('Натурал: bro 1×/нед — неоптимально, лучше 2×/нед'); }
@@ -332,7 +333,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     // явный выбор пользователя в UI приоритетнее (selectedSplitId).
     // Аудит 2026-09: усилено — фулбоди-дни (≥8 групп) при высоком объёме
     // физически не влезают в реалистичную сессию (≤16 движений), штраф −10.
-    const highVolumeDemand = lvl === 'enhanced' || hasAAS || hasGH || hasIns;
+    const highVolumeDemand = highVolumeDemandOf(input);
     let maxTagSize = 0;
     for (const d of p.schedule) {
       if (d.kind !== 'тренировка' || !d.sessionTag) continue;
@@ -419,12 +420,56 @@ export function selectBestBBSplit(input: BBSelectorInput): BBRankedPattern | nul
   return rankBBSplits(input)[0] ?? null;
 }
 
+/**
+ * PED-профиль пользователя (ядро P3-2 аудита 2026-11).
+ *
+ * До правки одно и то же решение о сплите опиралось на ТРИ разных определения
+ * «высокого объёма»: `rankBBSplits` — дозо-зависимое (AAS ≥ 500 мг, GH/инсулин
+ * по имени или дозе), `splitFitWarnings` — по самому факту наличия любого PED в
+ * списке (креатин тоже делал атлета «высокообъёмным»), капы сессии — по
+ * `peds.length > 0`. Правило теперь одно и живёт здесь.
+ *
+ * AAS определяется как раньше: имя содержит `aas`/`тест` ИЛИ доза ≥ 500 мг.
+ */
+export function pedProfileOf(
+  input: Pick<BBSelectorInput, 'peds' | 'pedDoses'>,
+): { hasAAS: boolean; hasGH: boolean; hasIns: boolean } {
+  const peds = input.peds || [];
+  const doses = (input.pedDoses || {}) as Record<string, number>;
+  const hasAAS = peds.some((x) => {
+    const s = String(x).toLowerCase();
+    return s.includes('aas') || s.includes('тест');
+  }) || Number(doses['AAS'] || 0) >= 500;
+  const hasGH = peds.some((x) => String(x) === 'GH') || Number(doses['GH'] || 0) > 0;
+  const hasIns = peds.some((x) => String(x) === 'insulin') || Number(doses['insulin'] || 0) > 0;
+  return { hasAAS, hasGH, hasIns };
+}
+
+/** «Высокий объём» для решения о сплите: enhanced или реальный PED-профиль. */
+export function highVolumeDemandOf(
+  input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses'>,
+): boolean {
+  if (normLevel(input.level) === 'enhanced') return true;
+  const { hasAAS, hasGH, hasIns } = pedProfileOf(input);
+  return hasAAS || hasGH || hasIns;
+}
+
 /** Капы сессии сплита для уровня/режима + число групп в самом плотном дне. */
-export function splitSessionBudget(p: SplitPattern, input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses' | 'mode'>): { maxExercises: number; maxWorkingSets: number; maxGroups: number } {
-  const years = 0; // без стажа капы консервативнее — это честный ориентир
+export function splitSessionBudget(p: SplitPattern, input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses' | 'mode'> & { trainingYears?: number }): { maxExercises: number; maxWorkingSets: number; maxGroups: number } {
+  // Стаж берём из входа (ядро P3-1 аудита 2026-11): раньше здесь было жёстко
+  // `years = 0`, и капы сессии опытного атлета считались как для новичка.
+  // `undefined` = стаж неизвестен → прежнее консервативное значение.
+  const years = Number.isFinite(input.trainingYears) ? Number(input.trainingYears) : 0;
   let lim = { maxExercises: 10, maxWorkingSets: 24 };
   try {
-    lim = sessionLimitsFor({ level: input.level, trainingYears: years, peds: input.peds, onCourse: (input.peds || []).length > 0 } as any, { id: p.id });
+    lim = sessionLimitsFor({
+      level: input.level,
+      trainingYears: years,
+      peds: input.peds,
+      // «На курсе» — явный режим или реальный PED-профиль, а не любой PED в
+      // списке: креатин не делает атлета курсовым (ядро P3-2).
+      onCourse: input.mode === 'on_course' || highVolumeDemandOf(input),
+    } as any, { id: p.id });
   } catch { /* дефолт */ }
   let maxGroups = 0;
   for (const d of (p.schedule || [])) {
@@ -457,7 +502,7 @@ export function splitFitWarnings(input: BBSelectorInput, patternId: string): str
     else if (diff < -2.5) out.push(`только ${ruFracCount(eff.toFixed(1), RU_SESSIONS)}/нед при ${input.daysPerWeek} днях — недоиспользуете неделю`);
   }
   if (input.sex === 'male' && patternId.startsWith('female_')) out.push('сплит для женского профиля');
-  const highVolumeDemand = lvl === 'enhanced' || (input.peds || []).length > 0;
+  const highVolumeDemand = highVolumeDemandOf(input);
   if (highVolumeDemand) {
     const budget = splitSessionBudget(p, input);
     if (budget.maxGroups >= 8) out.push(`день на ${budget.maxGroups} групп при высоком объёме — сессия не влезет в реалистичный лимит`);

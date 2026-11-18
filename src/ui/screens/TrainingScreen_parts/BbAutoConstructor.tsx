@@ -1843,6 +1843,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   const ranked = useMemo(() => rankBBSplits({
     level: bbLevel,
+    // Ядро P3-1 (аудит 2026-11): стаж доезжает до капов сессии — раньше там было
+    // жёстко 0 лет, и опытный атлет видел ориентир новичка.
+    trainingYears: bbTrainingYears,
     goal: bbGoal as any,
     daysPerWeek: bbDays,
     weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
@@ -1856,7 +1859,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     injuries,
     mobilityRestrictions,
     preset: proPreset,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
+  }), [bbLevel, bbTrainingYears, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
   // Авто-синхронизация сплита (аудит 2026-09): раньше once-set `selectedSplitId`
   // навсегда «прилипал» — смена числа дней/уровня/фармы оставляла неподходящий
@@ -1883,14 +1886,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const keyChanged = splitFitKeyRef.current !== '' && splitFitKeyRef.current !== key;
     splitFitKeyRef.current = key;
     const hard = selectedSplitId
-      ? splitFitWarnings({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays, peds: effectivePeds, sex }, selectedSplitId)
+      ? splitFitWarnings({ level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, daysPerWeek: bbDays, peds: effectivePeds, pedDoses, sex }, selectedSplitId)
       : [];
     const shouldSync = !selectedSplitId || (!splitTouched.current ? keyChanged : hard.length > 0);
     if (shouldSync && selectedSplitId !== bestSplit.pattern.id) {
       setSelectedSplitId(bestSplit.pattern.id);
       if (selectedSplitId) flash(`🔄 Сплит обновлён под параметры: «${bestSplit.pattern.name}»`);
     }
-  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbGoal, effectivePeds, linked.profile?.settings?.personal?.sex]);
+  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbTrainingYears, bbGoal, effectivePeds, pedDoses, linked.profile?.settings?.personal?.sex]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
