@@ -33,6 +33,7 @@ import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio, normalizeLabMeasurement } from '../../core/labs-mapping';
+import { labValueLabel } from '../../core/lab-value-label';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
@@ -1247,7 +1248,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         fontWeight: isSubmitted ? 800 : 600,
                       }}>
                         {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
-                        {latest && <span style={{ marginLeft:4, fontWeight:800 }}>{latest.value}</span>}
+                        {latest && <span style={{ marginLeft:4, fontWeight:800 }}>{labValueLabel(latest.value, latest.bound)}</span>}
                       </button>
                     );
                   })}
@@ -1409,18 +1410,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div style={{ maxHeight:200, overflowY:'auto', marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                     {labs.map((l:any,i:number) => (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', fontSize:12, color:'#fff', minHeight:44 }}>
-                        <span style={{ fontWeight:600 }}>{l.name||l.code}</span><span style={{ fontWeight:800, fontVariantNumeric:'tabular-nums' }}>{l.value} {l.unit}</span>
+                        <span style={{ fontWeight:600 }}>{l.name||l.code}</span><span style={{ fontWeight:800, fontVariantNumeric:'tabular-nums' }}>{labValueLabel(l.value, l.bound)} {l.unit}</span>
                       </div>
                     ))}
                   </div>
                   <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
                   <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
                     <button onClick={() => {
-                      const txt = `Анализы ${localIsoDate()} · ${ruCount(labs.length, RU_MARKERS)} (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${l.value} ${l.unit || ''} (${l.date || ''})`).join('\n');
+                      const txt = `Анализы ${localIsoDate()} · ${ruCount(labs.length, RU_MARKERS)} (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${labValueLabel(l.value, l.bound)} ${l.unit || ''} (${l.date || ''})`).join('\n');
                       void copyOrShareText(txt, 'Анализы').then(o => flashShare(shareOutcomeLabel(o)));
                     }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff' }}>📋 Копия / Share</button>
                     <button onClick={() => {
-                      const csv = 'code;name;value;unit;date\n' + labs.map((l: any) => `${l.code};${(l.name || l.code).replace(/;/g, ',')};${l.value};${l.unit || ''};${l.date || ''}`).join('\n');
+                      const csv = 'code;name;value;unit;date\n' + labs.map((l: any) => `${l.code};${(l.name || l.code).replace(/;/g, ',')};${labValueLabel(l.value, l.bound)};${l.unit || ''};${l.date || ''}`).join('\n');
                       void saveCsvApk(`labs-${localIsoDate()}.csv`, csv).then(o => flashShare(shareOutcomeLabel(o)));
                     }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff' }}>📥 CSV</button>
                   </div>
@@ -1442,7 +1443,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           {(r.labs||[]).map((l:any, i:number) => (
                             <div key={i} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:12, padding:'4px 0', color:'#fff' }}>
                               <span>{l.name || l.code}</span>
-                              <span style={{ fontWeight:700 }}>{l.value} {l.unit}</span>
+                              <span style={{ fontWeight:700 }}>{labValueLabel(l.value, l.bound)} {l.unit}</span>
                             </div>
                           ))}
                           {r.trends && (
@@ -2443,7 +2444,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
                       const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
                       const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : '#fff';
-                      return <span style={{ fontSize:11, color, fontWeight:700, marginLeft:6, whiteSpace:'nowrap' }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
+                      return <span style={{ fontSize:11, color, fontWeight:700, marginLeft:6, whiteSpace:'nowrap' }}>{arrow} {labValueLabel(existing.value, existing.bound)} → {labValueLabel(lab.value, lab.bound)} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
                     })() : null;
                     return (
                       <React.Fragment key={lab.code}>
@@ -2459,7 +2460,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                             <span style={{ fontSize:10, padding:'3px 8px', borderRadius:999, fontWeight:800, background:confidenceColor + '22', color:confidenceColor, border:`1px solid ${confidenceColor}30` }}>
                               {confidencePct}%
                             </span>
-                            <span style={{ fontWeight:900, fontSize:14, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)', fontVariantNumeric:'tabular-nums' }}>{lab.value} {lab.unit}{ratioLabel}</span>
+                            <span style={{ fontWeight:900, fontSize:14, color: lab.isAbnormal ? '#ef4444' : 'var(--accent)', fontVariantNumeric:'tabular-nums' }}>{labValueLabel(lab.value, lab.bound)} {lab.unit}{ratioLabel}</span>
                           </span>
                         </button>
                         {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (

@@ -3,6 +3,7 @@ import type { LabPoint } from '../../../core/types';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { UCUM_MAP } from '../../../core/constants';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { labValueLabel } from '../../../core/lab-value-label';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
@@ -159,7 +160,7 @@ export const LabsOverview: React.FC<{
                             <div style={{ fontSize:11, color:'#fff', marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.code} • {refInfo || '—'}</div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0 }}>
-                            <div style={{ fontSize:16, fontWeight:900, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{lab.value}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
+                            <div style={{ fontSize:16, fontWeight:900, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{labValueLabel(lab.value, lab.bound)}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
                             <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: statusColor+'1E', border:`1px solid ${statusColor}30`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?'—':'норма'}</div>
                           </div>
                         </div>

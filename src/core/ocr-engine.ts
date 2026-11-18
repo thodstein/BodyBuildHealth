@@ -1,6 +1,6 @@
 import { parseLabText as parseLabTextFromPdf, parseLabFile, ocrScannedPdf, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
 import { parseNutritionText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
-import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
+import { parseLabText as parseLabTextProviderAware, detectProvider, boundMakesConclusionUnsafe } from './lab-auto-parser';
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
 import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';
@@ -183,6 +183,13 @@ export interface ParsedLabValue {
   isAbnormal?: boolean;
   raw?: string;
   confidence?: number;
+  /**
+   * Проход 138: знак границы из бланка («>1000», «<0.5»). Число остаётся числом,
+   * но интерфейс обязан печатать «>1000», а не «1000»: обрезанное значение —
+   * не измерение. Знак переживает перевод единиц (шкала линейная), поэтому
+   * хранится отдельно от величины и не пересчитывается.
+   */
+  bound?: '<' | '>';
 }
 
 /**
@@ -191,7 +198,7 @@ export interface ParsedLabValue {
  */
 function mergeParsedResults(
   pdfResults: ParsedLabValue[],
-  providerResults: { marker: string; value: number; unit: string; confidence: number; refLow?: number; refHigh?: number }[],
+  providerResults: { marker: string; value: number; unit: string; confidence: number; refLow?: number; refHigh?: number; bound?: '<' | '>' }[],
   provider: string | undefined
 ): { labs: ParsedLabValue[]; warnings: string[] } {
   const warnings: string[] = [];
@@ -231,6 +238,22 @@ function mergeParsedResults(
       : providerValue?.refHigh !== undefined
       ? normalizeLabMeasurement(code, providerValue.refHigh, providerValue.unit || refUnit).value
       : undefined;
+    const bound = source.bound;
+    // Явный референс из бланка важнее среднепопуляционных границ UCUM_MAP.
+    // Раньше при односторонней границе «>12» (только refLow) проверялся
+    // лишь refHigh, и отклонение терялось: значение ниже нижней границы
+    // помечалось нормой по общим uln/lln.
+    let abnormal = refLow !== undefined || refHigh !== undefined
+      ? (refHigh !== undefined && normalized.value > refHigh)
+        || (refLow !== undefined && normalized.value < refLow)
+      : info ? normalized.value > info.uln || normalized.value < info.lln : table?.isAbnormal;
+    // Проход 138: по обрезанному числу нельзя делать вывод, который граница не
+    // доказывает. «<0.5» при верхней границе 3 — не «выше нормы», «>1000» при
+    // нижней 30 — не «ниже нормы»; такие вердикты остаются неизвестными.
+    if (abnormal && boundMakesConclusionUnsafe(
+      bound, normalized.value,
+      refLow ?? info?.lln, refHigh ?? info?.uln,
+    )) abnormal = undefined;
     const result = {
       code,
       name: info?.name ?? table?.name ?? code,
@@ -238,14 +261,8 @@ function mergeParsedResults(
       unit: normalized.unit,
       refLow,
       refHigh,
-      // Явный референс из бланка важнее среднепопуляционных границ UCUM_MAP.
-      // Раньше при односторонней границе «>12» (только refLow) проверялся
-      // лишь refHigh, и отклонение терялось: значение ниже нижней границы
-      // помечалось нормой по общим uln/lln.
-      isAbnormal: refLow !== undefined || refHigh !== undefined
-        ? (refHigh !== undefined && normalized.value > refHigh)
-          || (refLow !== undefined && normalized.value < refLow)
-        : info ? normalized.value > info.uln || normalized.value < info.lln : table?.isAbnormal,
+      isAbnormal: abnormal,
+      bound,
       raw: isUsefulRawLine(table?.raw) ? table?.raw : undefined,
     };
     if (table && providerValue) {
@@ -256,6 +273,17 @@ function mergeParsedResults(
     }
     return result;
   });
+  const bounded = labs.filter((l) => l.bound);
+  if (bounded.length > 0) {
+    // Проход 138: бланк напечатал границу («>1000», «<0.5»). Число сохранено, но
+    // человек должен видеть, что это не измерение: иначе в истории оно выглядит
+    // точным значением.
+    warnings.push(
+      'Границы вместо чисел: '
+      + bounded.map((l) => `${l.name} ${l.bound}${l.value}`).join(', ')
+      + ' — сохранено по числу из бланка, знак границы показан рядом.',
+    );
+  }
   return { labs, warnings };
 }
 
@@ -1159,6 +1187,7 @@ export async function saveParsedLabs(
         refLow: lab.refLow,
         refHigh: lab.refHigh,
         isAbnormal,
+        bound: lab.bound,
       };
       await db.put('labs_log', point);
       saved++;

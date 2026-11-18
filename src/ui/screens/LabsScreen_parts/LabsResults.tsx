@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 import { getLabNorm, FEMALE_HORMONE_ULN, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { labValueLabel } from '../../../core/lab-value-label';
 import {
   phaseHormoneBand, phaseHormoneUnit, phaseUnionBand,
   type CycleState, type PhaseHormone,
@@ -187,7 +188,7 @@ export const LabsResults: React.FC<{
                             </div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:92 }}>
-                            <div style={{ fontWeight:900, fontSize:16, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{lab.value}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
+                            <div style={{ fontWeight:900, fontSize:16, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{labValueLabel(lab.value, lab.bound)}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
                             <div style={{ marginTop:4, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: labsWithAlpha(statusColor, '1E'), border:`1px solid ${labsWithAlpha(statusColor, '30')}`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
                           </div>
                         </div>

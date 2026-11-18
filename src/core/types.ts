@@ -450,6 +450,8 @@ export interface LabPoint {
   refLow?: number;
   refHigh?: number;
   isAbnormal?: boolean;
+  /** Проход 138: знак границы из бланка («>1000», «<0.5») — обрезанное значение. */
+  bound?: '<' | '>';
 }
 export interface CourseEntry {
   id: string;

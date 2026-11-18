@@ -1,4 +1,5 @@
 import type { LabPoint, RiskResult, PCTSchedule, UserContext } from '../core/types';
+import { labValueLabel } from '../core/lab-value-label';
 
 export function generateMedicalReportHTML(
   ctx: UserContext,
@@ -38,7 +39,7 @@ export function generateMedicalReportHTML(
       <table style="width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:13px;">
         <thead><tr style="background:#f5f5f7;"><th style="padding:6px;text-align:left;border:1px solid #ddd;">Маркер</th><th style="padding:6px;text-align:center;border:1px solid #ddd;">Значение</th><th style="padding:6px;text-align:left;border:1px solid #ddd;">Дата</th></tr></thead>
         <tbody>
-          ${latestLabs.map(l=>`<tr><td style="padding:6px;border:1px solid #ddd;text-transform:uppercase;">${l.code}</td><td style="padding:6px;text-align:center;border:1px solid #ddd;">${l.value} ${l.unit}</td><td style="padding:6px;text-align:left;border:1px solid #ddd;">${l.date}</td></tr>`).join('')}
+          ${latestLabs.map(l=>`<tr><td style="padding:6px;border:1px solid #ddd;text-transform:uppercase;">${l.code}</td><td style="padding:6px;text-align:center;border:1px solid #ddd;">${labValueLabel(l.value, l.bound)} ${l.unit}</td><td style="padding:6px;text-align:left;border:1px solid #ddd;">${l.date}</td></tr>`).join('')}
         </tbody>
       </table>
 

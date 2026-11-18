@@ -1,3 +1,5 @@
+import { labValueLabel } from './lab-value-label';
+
 export function exportToJSON(data: any): string {
   return JSON.stringify(data, null, 2);
 }
@@ -23,7 +25,7 @@ export function generateReportText(data: any): string {
   if (data.labs?.length) {
     txt += `🔬 Последние анализы (5):\n`;
     data.labs.slice(-5).forEach((l: any) => {
-      txt += ` • ${l.code}: ${l.value} ${l.unit} (${l.phase}) [${l.date}]\n`;
+      txt += ` • ${l.code}: ${labValueLabel(l.value, l.bound)} ${l.unit} (${l.phase}) [${l.date}]\n`;
     });
     txt += '\n';
   }
