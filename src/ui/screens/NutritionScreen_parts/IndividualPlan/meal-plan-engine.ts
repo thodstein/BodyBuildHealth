@@ -66,6 +66,7 @@ import {
   FIBER_CAP_G, FIBER_HARD_CAP_G, FIBER_HV_CAP_MAX_G, fiberHvStepCapG, fiberHvTierFloorG, fiberP4CapG,
 } from "./planner-day-limits";
 
+
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
   id: string; name: string; amount: number;
@@ -616,6 +617,8 @@ export function microTuneDay(
     maxRounds?: number;
     /** §8.111: потолок натрия дня (мг). Доводчик не имеет права вывести день за него. */
     maxNaMg?: number;
+    /** §8.114b: открыть жировой нож пред-сна (орехи/семена). Только для канон-ремонта. */
+    presleepFatOnly?: boolean;
   },
 ): { devBefore: number; devAfter: number; rounds: number; applied: boolean } {
   const ms = Array.isArray(meals) ? meals.filter(Boolean) : [];
@@ -687,7 +690,23 @@ export function microTuneDay(
       // §8.111: окна тренировки и pre-sleep — НЕ «свободные граммы». У них собственные
       // капы (prew≤60, postw≤75, intra 40 г/ч, pre-sleep без углей), и доводчик туда не
       // ходит: иначе пост-воркаут 75 → 83 г (замок planner-high-volume «peri-капы целы»).
-      if ((m as any)._insulinWindow || ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type))) continue;
+      // §8.114b: пред-сон — слот МЕДЛЕННОГО белка, его белок по-прежнему неприкосновенен,
+      // но ЖИРОВОЙ нож там свободен: орехи/семена в пред-сне — обычный жир дня, и именно
+      // им чинится «жир недобран» на днях, где все масла заперты авторскими рецептами
+      // (замер 45/6/R/mass: Ж 43.2/45, свободного масла в дне нет — доводчик не мог
+      // поднять жир ни на грамм, и день застревал на Б 3.95 %).
+      //
+      // Нож ОПТ-ИН (`presleepFatOnly`) и включается только канон-ремонтом §8.114b. Если
+      // открыть его для всех вызовов, доводчик находит другую раскладку даже на днях,
+      // которые и так были в каноне (замер: 70 cut/5/отд — пред-сон отдавал 3 г семян,
+      // и рецептурная сборка уходила в 7.3 %). Инвариант «не ломай то, что работает».
+      const _periOrPS = (m as any)._insulinWindow
+        || ['preworkout', 'postworkout', 'intra', 'presleep'].includes(String(m.type));
+      if (_periOrPS) {
+        const _allow = !!opts?.presleepFatOnly
+          && String(m.type) === 'presleep' && String(it.role) === 'fat';
+        if (!_allow) continue;
+      }
       const role = String(it.role || '');
       // Замер по набору (40 красных, §8.110 v1): доводчик НЕ трогает «витрину» —
       // фрукты/овощи/яйца/джемы-кетчупы/добавки/жидкости и авторские позиции. У них своя
@@ -966,7 +985,13 @@ export function microTuneDay(
       // День уже держит 70% RDA — доводчик не имеет права уронить его ниже (QG18/QG19/QG20:
       // «ни одного дня с Ca < 70%»). День, дошедший до нас ниже (предельные профили),
       // защищён полом 50%: там приоритет — канон 3% по макросам.
-      const _caFloor = baseCa >= 700 ? 700 : 500;
+      // §8.113: день, пришедший УЖЕ НИЖЕ этого пола (замер: 45 кг/5/T/mass — Ca 384 мг = 38%
+      // RDA), прежней формулой запирался намертво: любой минус (даже −10 г риса) давал
+      // `baseCa + dCa < 500`, и доводчик не мог тронуть НИ ОДНОЙ позиции — день навсегда
+      // оставался на У +3.76%. Это ровно та же ошибка, что была у витамина E (см. ниже):
+      // абсолютный пол превращает «защиту» в запрет любого хода. День ниже пола защищаем
+      // «не хуже −10%» — как E, — чтобы канон 3% оставался достижимым.
+      const _caFloor = baseCa >= 700 ? 700 : baseCa >= 500 ? 500 : baseCa * 0.9;
       if (baseCa + dCa < _caFloor) { _em = Infinity; _es = Infinity; return false; }
     }
     // §8.111: E-богатый жир не режем — иначе день теряет витамин E ниже 70% RDA
@@ -4579,7 +4604,12 @@ function hvCarbConvSort(a: { id: string; carbs?: number; fiber?: number }, b: { 
             ?? pool.fastProtein.find(f => f.id === 'whey_isolate') ?? pool.fastProtein.find(f => f.id === 'whey_protein') ?? pool.fastProtein[0];
           const _needP = Math.max(5, _fillTarget - curP);
           const wheyLeuPer100 = whey ? getLeucine(whey) : 0;
-          const wheyGrams = whey ? Math.min(40, Math.max(15, Math.round(_needP / Math.max(1, whey.protein || 20) * 100))) : 0;
+          // §8.113: порошок — либо полчерпака (20 г), либо его нет. Прежний пол 15 г рождал
+          // ровно тот обрезок, который потом не чинился: «Полдник: whey_protein 15 г»
+          // (замер 45/4/отд/cut). Мелкий MPS-добор честнее добить до полу и отдать день
+          // доводчику, чем оставить недопорцию в плане.
+          const _powderFloor113 = Number(MIN_MEANINGFUL_G.fast_protein || PROTEIN_FLOOR_POWDER_G || 20);
+          const wheyGrams = whey ? Math.min(40, Math.max(_powderFloor113, Math.round(_needP / Math.max(1, whey.protein || 20) * 100))) : 0;
           const wItem = whey && wheyGrams > 0 ? makeItem(whey, wheyGrams, 'fast_protein') : null;
           // Гигиена композиции: если в приёме УЖЕ есть белок — растим ЕГО, а не
           // добавляем второй порошок (было: «whey_protein 20 г + whey_isolate 20 г»
@@ -4780,13 +4810,21 @@ function buildPreWorkout(
         const carbSource = pickPriority(_finalPwPool.length > 0 ? _finalPwPool : carbSourcePool, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
    const items: MealItem[] = [];
-   if (proteinSource) {
-     const proteinGrams = gramsForMacro(proteinSource, proteinG, 'protein');
-     const grams = (proteinSource.fat || 0) > 0
-       ? Math.min(proteinGrams, Math.floor(PREW_FAT_MAX_G / proteinSource.fat * 100))
-       : proteinGrams;
-     items.push(makeItem(proteinSource, grams, 'protein'));
-  }
+   // §8.113: белок окна — либо ЦЕЛАЯ порция, либо её нет. Бюджет окна бывает 5–9 г, а
+   // цельный продукт при таком бюджете даёт 21 г рыбы — обрезок (замер: 45/4/T/mass,
+   // барамунди 21 < 40). Поэтому дорисовываем порцию до пола (40 г цельного / 20 г
+   // порошка): перебор в 3–4 г белка дня забирает доводчик. Если жировой кап окна
+   // (PREW_FAT_MAX_G) не вмещает пол — окно остаётся углеводным, без белка вовсе.
+   if (proteinSource && proteinG > 0) {
+     const _pFloor = isProteinPowderId(String(proteinSource.id))
+       ? Number(MIN_MEANINGFUL_G.fast_protein || 20) : Number(MIN_MEANINGFUL_G.protein || 40);
+     let proteinGrams = Math.max(_pFloor, gramsForMacro(proteinSource, proteinG, 'protein'));
+     if ((proteinSource.fat || 0) > 0) {
+       const fatCap = Math.floor(PREW_FAT_MAX_G / proteinSource.fat * 100);
+       proteinGrams = fatCap < _pFloor ? 0 : Math.min(proteinGrams, fatCap);
+     }
+     if (proteinGrams > 0) items.push(makeItem(proteinSource, proteinGrams, 'protein'));
+   }
    if (carbSource) {
      // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
      const proteinFat = items.reduce((sum, item) => sum + item.f, 0);
@@ -4854,13 +4892,17 @@ function buildPostWorkout(
   const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : _carbBase, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
   const items: MealItem[] = [];
 
-   if (fastProtein) {
-     const proteinGrams = gramsForMacro(fastProtein, proteinG, 'protein');
-     const grams = (fastProtein.fat || 0) > 0
-       ? Math.min(proteinGrams, Math.floor(6 / fastProtein.fat * 100))
-       : proteinGrams;
-     items.push(makeItem(fastProtein, grams, 'fast_protein'));
-  }
+    // §8.113: то же правило, что в предтрене, — целая порция белка или ничего.
+    if (fastProtein && proteinG > 0) {
+      const _pFloor = isProteinPowderId(String(fastProtein.id))
+        ? Number(MIN_MEANINGFUL_G.fast_protein || 20) : Number(MIN_MEANINGFUL_G.protein || 40);
+      let proteinGrams = Math.max(_pFloor, gramsForMacro(fastProtein, proteinG, 'protein'));
+      if ((fastProtein.fat || 0) > 0) {
+        const fatCap = Math.floor(6 / fastProtein.fat * 100);
+        proteinGrams = fatCap < _pFloor ? 0 : Math.min(proteinGrams, fatCap);
+      }
+      if (proteinGrams > 0) items.push(makeItem(fastProtein, proteinGrams, 'fast_protein'));
+    }
     // P0 (HV-рацион): жидкая часть окна первой (до 60 г) — остаток добирается едой ниже.
     // FIX base-2026-09: роль 'liquid' (напиток 🥤), а не 'carb_fast' — иначе в пост-трене
     // всегда «2 каши» (амилопектин + гарнир) и D-18b добавлял третью.
@@ -6168,6 +6210,38 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
+  // §8.113b: пери-окна (предтрен/пост-трен) белка НЕ теряют — но их порция измеряется
+  // в цельных граммах (40 г рыбы/птицы), поэтому «субполовинный» бюджет там законен
+  // и не создаёт обрезка. Из раскладки дня их белок вычитается как заданный.
+  //
+  // Если бюджет окна МЕНЬШЕ цельной порции (40 г рыбы ≈ 9 г белка), окно физически не
+  // может нести белок: сборка дорисовывает порцию, а пасс «кап окна» срезает её обратно
+  // в обрезок («Предтрен: барамунди 21 г < 40»). Такое окно остаётся углеводным, а его
+  // граммы возвращаются основным приёмам — сумма белка дня не меняется, канон не страдает.
+  {
+    const _periMinP113 = 9;
+    let _freed113 = 0;
+    for (const _pk of ['prew', 'postw'] as const) {
+      const _pb: any = (mealBudget as any)[_pk];
+      const _pv = Number(_pb?.p) || 0;
+      if (_pv > 0 && _pv < _periMinP113) { _pb.p = 0; _freed113 += _pv; }
+    }
+    if (_freed113 > 0) {
+      const _mkeys113 = ['breakfast', 'lunch', 'dinner']
+        .filter((k) => Number(((mealBudget as any))[k]?.p) > 0);
+      if (_mkeys113.length > 0) {
+        let _rest113 = _freed113;
+        for (let _i113 = 0; _i113 < _mkeys113.length; _i113++) {
+          const _b: any = ((mealBudget as any))[_mkeys113[_i113]];
+          const _add = _i113 === _mkeys113.length - 1
+            ? _rest113 : Math.floor(_freed113 / _mkeys113.length);
+          _b.p = Number(_b.p) + _add; _rest113 -= _add;
+        }
+      }
+      notes.push(`🍽️ Предтрен/пост-трен остаются углеводными: бюджет белка окна (${_freed113} г) меньше цельной порции (40 г рыбы/птицы) — граммы переданы основным приёмам.`);
+    }
+  }
+
   const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0) + (mealBudget.snack3?.p || 0) + (mealBudget.snack4?.p || 0) + (mealBudget.snack5?.p || 0) + (mealBudget.snack6?.p || 0) + ((mealBudget as any).preSleep?.p || 0);
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
   // P1a (Шаг 1 плана): нормализация бюджетов ОТКАЧЕНА — ужимание сборки в цель сдвигало
@@ -6202,6 +6276,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       for (const _key of _pKeys) {
         const _b: any = (mealBudget as any)[_key];
         if (!_b || !(_b.p > 0)) continue;
+        // §8.114b: белóк пери-окон НЕ масштабируется. Окно — фиксированный болюс
+        // (periProteinBudget: 0.08 г/кг LBM до/после), он уже вычтен из дневной цели выше
+        // (`_regP`) и не является «гибким» бюджетом приёма. Ужатие до пола 8 г превращало
+        // окно в обрезок (порция 40 г рыбы = 9 г белка) и, что важнее, расходилось с
+        // фактической сборкой окна: `usedP` считал 8 г, а сборка ставила полную порцию —
+        // белок дня учитывался дважды. Замер (сетка 336 дней): окна в масштабирование ни
+        // разу не попадали ниже цельной порции, поэтому их исключение день не сдвигает,
+        // но убирает эту вилку.
+        if (_key === 'prew' || _key === 'postw') continue;
         // Пол приёма — 8 г: ниже этого приём перестаёт нести белок как таковой.
         _b.p = Math.max(8, Math.round(_b.p * _k));
       }
@@ -6453,7 +6536,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // 3. Pre-workout (если тренировка) — за 90 мин до старта ─────────────
   if (trainWindow && mealBudget.prew && input.trainStartMin) {
     const preTime = fmtTime(input.trainStartMin - 90);
-     const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout'), useEasyCarbs: true }, prewCarbG, _prewP);
+     const prew = buildPreWorkout(preTime, 'Предтрен', seedBase + 3, pool, input.budget, effectivePreferred, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'preworkout'), useEasyCarbs: true }, prewCarbG, mealBudget.prew.p);
     meals.push(prew);
     markUsed(prew);
     registerMealInQuota(quota, prew.items);
@@ -6483,7 +6566,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   if (trainWindow && mealBudget.postw && input.trainStartMin && !_mergePostwIntoDinner) {
     const postTime = fmtMin(postwMin);
-    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, excludedIds: combinedExcluded, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'postworkout') }, postwCarbG, undefined, _postwP);
+    const postw = buildPostWorkout(postTime, 'Пост-трен', seedBase + 5, pool, effectivePreferred, { lockedIds: input.lockedIds, excludedIds: combinedExcluded, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, quotaBlockedIds: blockedIdsForNextMeal(quota, 'postworkout') }, postwCarbG, undefined, mealBudget.postw.p);
     meals.push(postw);
     markUsed(postw);
     registerMealInQuota(quota, postw.items);
@@ -8533,7 +8616,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             const r = scale;
             // D-28: MPS-порция порошка peri не ужимается ниже 20 г (было 5 г — сыворотка
             // пост-трена 20→19 г при капе окна роняла инвариант).
-            const _minPg = (it.role === 'fast_protein' || it.role === 'slow_protein') && (it.amount || 0) >= 20 ? 20 : 5;
+            // §8.113: цельный белок окна тоже не режется в обрезок — пол 40 г (рыба/птица):
+            // иначе кап окна 9–10 г превращал 40 г барамунди в 21 г.
+            const _minPg = it.role === 'protein'
+              ? Number(MIN_MEANINGFUL_G.protein || 40)
+              : ((it.role === 'fast_protein' || it.role === 'slow_protein')
+                ? Number(MIN_MEANINGFUL_G.fast_protein || 20) : 5);
             it.amount = Math.max(_minPg, Math.round(it.amount * r));
            it.p = Math.round(it.p * r * 10) / 10;
            it.f = Math.round(it.f * r * 10) / 10;
@@ -9483,7 +9571,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         for (const m of meals) {
           if ((m as any)._insulinWindow) continue;
           const t = String((m as any).type || '');
-          if (t === 'postworkout' || t === 'intra') continue;
+          // §8.113: peri-угли в пери-окнах — законны и у ПРЕДтрена (декстроза/мальтодестрин
+          // перед работой — стандарт), а не только после. Иначе окно с бюджетом 21 г углеводов
+          // и нулевым белком остаётся пустой тарелкой.
+          if (t === 'postworkout' || t === 'intra' || t === 'preworkout') continue;
           const _bad = (m.items || []).filter((it: any) => _periOnly.has(it.id));
           if (_bad.length === 0) continue;
           m.items = (m.items || []).filter((it: any) => !_periOnly.has(it.id));
@@ -17592,7 +17683,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // Порция: порошок (whey/изолят/казеин) — от 10 г; еда — от 40 г в перекусе и от
         // 75 г в основном приёме у атлетов ≥80 кг (`planner-realism-guarantees` F1.8).
         const _minPortion72 = (x: any, meal: any) => {
-          if (isProteinPowderId(x?.id)) return 10;
+          // §8.113: порошок — не легче полчерпака (20 г). Прежний пол 10 г оставлял в плане
+          // «Пост-трен: whey_isolate 10 г» / «Полдник: whey_protein 15 г» — тот же обрезок,
+          // что не чинился ни доводчиком (там пол 20), ни гигиеной.
+          if (isProteinPowderId(x?.id)) return Number(MIN_MEANINGFUL_G.fast_protein || 20);
           const isMainMeal = ['breakfast', 'lunch', 'dinner'].includes(String(meal?.type || ''));
           return isMainMeal && _w72 >= 80 ? 75 : 40;
         };
@@ -18655,7 +18749,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       _consolidateGuarded();
       // Доводчик вызывается до корректора (дешёвый путь: только существующие позиции,
       // капы яиц/масел/орехов/крупы/тарелки — внутри) и ещё раз после него.
-      const _tuneOnce = (tolPct: number) => {
+      const _tuneOnce = (tolPct: number, presleepFatOnly = false) => {
         const r = microTuneDay(meals as any, _lmGoal, {
           // Ручной день: тол 2%, а не 3% — ветка «🎯 Точность рациона … (отклонение ≤2%)»
           // уже обещает пользователю 2%, и такой день обязан доходить до обещанного, а 3% —
@@ -18667,6 +18761,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           maxNaMg: input.isTrainingDay
             ? Math.max(3000, Math.round(3000 + (Number(input.weightKg) || 0) * 5))
             : 2300,
+          presleepFatOnly,
         });
         if (r.applied) {
           recalcMealTotals(meals);
@@ -18762,6 +18857,465 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_lmDev() > (__manualDay ? 2 : PLANNER_CONVERGENCE_PCT)) {
         _tuneOnce(__manualDay ? 2 : PLANNER_CONVERGENCE_PCT);
       }
+      /**
+       * §8.114: «обрезков нет» — последний рубеж ПОСЛЕ доводки.
+       *
+       * Доводчик и гигиена пол знают, но позицию ниже пола рожают и другие стадии конвейера
+       * (замер 336 дней: овсянка 20 г в завтраке, сыворотка 15 г в полднике, барамунди 21 г
+       * в предтрене — все три появились ДО последней мили и пережили её). Обрезок не
+       * «режется дальше» — он убирается одним из трёх заходов по возрастанию цены:
+       *   1) дорастить до пола, забрав макрос у позиции того же класса с запасом над полом;
+       *   2) убрать обрезок и отдать перебаланс доводчику (день остаётся собранным);
+       *   3) «меньше, но крупнее»: убрать обрезок целиком, а его макрос дорастить в других
+       *      позициях дня — доводчик двигает все оси разом, поэтому нет перекоса
+       *      «овсянка→рис: Б +4 / Ж −3», который даёт перенос граммов между приёмами.
+       * Заход принимается только если день остался В КАНОНЕ (≤2 % ручной / ≤3 % авто) по
+       * ккал и КАЖДОЙ оси и худшая ось не стала хуже. Иначе день откатывается к исходному
+       * состоянию, а обрезок остаётся с честной нотой «долг §8.114»: инвариант «≤3 %» не
+       * приносится в жертву порционности.
+       */
+      {
+      const _floorOf114 = (it: any): number => {
+        if (!it || it._fixedGrams) return 0;
+        const role = String(it.role || '');
+        if (!role || role === 'supplement' || role === 'liquid' || role === 'other') return 0;
+        if (isProteinPowderId(String(it.id || ''))) return 20;
+        if (role === 'veg' || role === 'fruit') return 40;
+        return Number(MIN_MEANINGFUL_G[role] || 0);
+      };
+      const _cls114 = (role: string): '' | 'p' | 'c' | 'f' | 'v' => {
+        if (role === 'protein' || role === 'fast_protein' || role === 'slow_protein') return 'p';
+        if (role === 'carb_slow' || role === 'carb_fast') return 'c';
+        if (role === 'fat') return 'f';
+        if (role === 'veg' || role === 'fruit') return 'v';
+        return '';
+      };
+      const _scale114 = (it: any, toG: number): void => {
+        const from = Math.max(1, Number(it.amount) || 0);
+        const r = toG / from;
+        it.amount = toG;
+        it.p = Math.round(((Number(it.p) || 0) * r) * 10) / 10;
+        it.f = Math.round(((Number(it.f) || 0) * r) * 10) / 10;
+        it.c = Math.round(((Number(it.c) || 0) * r) * 10) / 10;
+        if (it.fiber != null) it.fiber = Math.round((Number(it.fiber) || 0) * r * 10) / 10;
+        if (it.leucine_mg != null) it.leucine_mg = Math.round((Number(it.leucine_mg) || 0) * r);
+        it.kcal = Math.round(4 * (Number(it.p) || 0) + 9 * (Number(it.f) || 0) + 4 * (Number(it.c) || 0));
+      };
+      const _tok114 = __manualDay ? 2 : PLANNER_CONVERGENCE_PCT;
+      // Приёмка «канон соблюдён» по каждой оси: день обязан быть в каноне (≤2 % ручной /
+      // ≤3 % авто) по ккал и каждому из Б/Ж/У. Прежние жёсткие «|Δp|≤1.5 г, |Δc|≤3 г»
+      // запрещали ЛЮБОЙ сдвиг состава и блокировали честное «меньше, но крупнее» (удаление
+      // обрезка требует перераспределения, и итог всё равно был в каноне).
+      const _axisOk114 = (): boolean => {
+        const _rel = (v: number, g: number) => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
+        return _rel(Number(totals.kcal) || 0, Number(_lmGoal.kcal) || 0) <= _tok114 + 0.01
+          && _rel(Number(totals.p) || 0, Number(_lmGoal.p) || 0) <= _tok114 + 0.01
+          && _rel(Number(totals.f) || 0, Number(_lmGoal.f) || 0) <= _tok114 + 0.01
+          && _rel(Number(totals.c) || 0, Number(_lmGoal.c) || 0) <= _tok114 + 0.01;
+      };
+      const _stuck114 = new Set<string>();
+      for (let _pass114 = 0; _pass114 < 12; _pass114++) {
+        const _crumbs114: Array<{ m: any; it: any; fl: number; cls: 'p' | 'c' | 'f' | 'v' }> = [];
+        for (const m of meals as any[]) {
+          for (const it of ((m.items || []) as any[])) {
+            const fl = _floorOf114(it);
+            const g = Number(it.amount) || 0;
+            if (!(fl > 0 && g > 0 && g < fl - 1e-9)) continue;
+            const key = `${String(m.type)}:${String(it.id)}`;
+            if (_stuck114.has(key)) continue;
+            const cls = _cls114(String(it.role || ''));
+            if (!cls) continue;
+            _crumbs114.push({ m, it, fl, cls });
+          }
+        }
+        if (_crumbs114.length === 0) break;
+        let _did114 = false;
+        // Откат данных заменяет объекты позиций, поэтому ссылки в `_crumbs114` после него
+        // висячие: проход прерывается и список обрезков собирается заново.
+        let _restart114 = false;
+        for (const c of _crumbs114) {
+          const _key = `${String(c.m.type)}:${String(c.it.id)}`;
+          const _from = Number(c.it.amount) || 0;
+          const need = c.fl - _from;
+          if (!(need > 0)) continue;
+          const _macro: 'p' | 'f' | 'c' = c.cls === 'p' ? 'p' : c.cls === 'f' ? 'f' : 'c';
+          const perG = (Number((c.it as any)[_macro]) || 0) / Math.max(1, _from);
+          if (!(perG > 0.005)) { _stuck114.add(_key); continue; }
+          // Донор того же класса с запасом над полом: сначала другой приём (крупнейший),
+          // затем сосед по приёму (это уже свёртка двух носителей в один).
+          let donor: any = null;
+          let donorScore = -1;
+          for (const m2 of meals as any[]) {
+            for (const it2 of ((m2.items || []) as any[])) {
+              if (it2 === c.it || it2._fixedGrams) continue;
+              if (_cls114(String(it2.role || '')) !== c.cls) continue;
+              // растительные переносим только внутри своего приёма: иначе теряется смысл
+              if (c.cls === 'v' && m2 !== c.m) continue;
+              const fl2 = _floorOf114(it2);
+              const amt2 = Number(it2.amount) || 0;
+              if (!(amt2 > fl2 + 1)) continue;
+              const per2 = (Number((it2 as any)[_macro]) || 0) / Math.max(1, amt2);
+              if (!(per2 > 0.005)) continue;
+              if ((amt2 - fl2) * per2 + 1e-9 < need) continue;
+              const score = (m2 === c.m ? 0 : 1e6) + amt2;
+              if (score > donorScore) { donorScore = score; donor = { m2, it2, per2 }; }
+            }
+          }
+          // Донора с запасом над полом нет — фолбэк §8.114 «перенос»: обрезок уходит
+          // целиком, а его макрос дорастает в самой крупной позиции того же класса
+          // (тот же продукт в другом приёме — граммы просто переезжают). В плане
+          // остаётся одна целая порция вместо «половинки»; канон дня не двигается.
+          let recv: any = null;
+          if (!donor) {
+            let _recvScore = -1;
+            for (const m2 of meals as any[]) {
+              for (const it2 of ((m2.items || []) as any[])) {
+                if (it2 === c.it || it2._fixedGrams) continue;
+                if (_cls114(String(it2.role || '')) !== c.cls) continue;
+                const per2 = (Number((it2 as any)[_macro]) || 0) / Math.max(1, Number(it2.amount) || 0);
+                if (!(per2 > 0.005)) continue;
+                const score = (String(it2.id) === String(c.it.id) ? 1e9 : 0) + (Number(it2.amount) || 0);
+                if (score > _recvScore) { _recvScore = score; recv = { m2, it2, per2 }; }
+              }
+            }
+            if (!recv || ((c.m.items || []) as any[]).length <= 1) {
+              _stuck114.add(_key);
+              notes.push(`⚠ Обрезок «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)} г < ${c.fl} г — ни донора, ни приёмника в дне (долг §8.114).`);
+              continue;
+            }
+          }
+          const _snap114 = (meals as any[]).map((mm: any) => {
+            const orig = ((mm.items || []) as any[]).slice();
+            return { mm, orig, vals: orig.map((x: any) => ({ ...x })) };
+          });
+          // Откат ВОЗВРАЩАЕТ те же объекты позиций (а не копии): иначе ссылки `c.it`/`recv.it2`
+          // висят в воздухе и следующие заходы молча правят отвязанные объекты.
+          const _restore114 = (): void => {
+            for (const s of _snap114) {
+              const cur = ((s.mm.items || []) as any[]);
+              cur.splice(0, cur.length, ...s.orig);
+              s.orig.forEach((o: any, i: number) => {
+                for (const k of Object.keys(o)) if (!(k in s.vals[i])) delete o[k];
+                Object.assign(o, s.vals[i]);
+              });
+            }
+            recalcMealTotals(meals); recalcDayTotals(meals, totals);
+          };
+          const _devB = _lmDev();
+          const _pB = Number(totals.p) || 0, _fB = Number(totals.f) || 0, _cB = Number(totals.c) || 0;
+          // Ноты, добавленные заходами 2/3 (доводчик пишет «📏 Последняя точность»), при
+          // откате уходят вместе с граммами: иначе план объясняет несуществующую балансировку.
+          const _notesN114 = notes.length;
+          if (donor) {
+            // Доращивание обрезка: +need г еды, эквивалент (need × perG) макроса берём у донора.
+            _scale114(c.it, c.fl);
+            const _moveM = need * perG;
+            const _take = Math.min((Number(donor.it2.amount) || 0) - _floorOf114(donor.it2), _moveM / donor.per2);
+            _scale114(donor.it2, Math.round((Number(donor.it2.amount) || 0) - _take));
+          } else {
+            // Перенос: обрезок исчезает целиком, его макрос (from × perG) переезжает в приёмник.
+            const _ix114 = ((c.m.items || []) as any[]).indexOf(c.it);
+            if (_ix114 >= 0) ((c.m.items || []) as any[]).splice(_ix114, 1);
+            const _moveM = _from * perG;
+            _scale114(recv.it2, Math.round((Number(recv.it2.amount) || 0) + _moveM / recv.per2));
+          }
+          recalcMealTotals(meals); recalcDayTotals(meals, totals);
+          const _devA = _lmDev();
+          const _pA = Number(totals.p) || 0, _fA = Number(totals.f) || 0, _cA = Number(totals.c) || 0;
+          const _ok114 = _devA <= Math.max(_devB, PLANNER_CONVERGENCE_PCT) + 0.15
+            && Math.abs(_pA - _pB) <= 1.5
+            && Math.abs(_fA - _fB) <= Math.max(2, _fB * 0.02)
+            && Math.abs(_cA - _cB) <= Math.max(3, _cB * 0.02);
+          if (!_ok114) {
+            _restore114();
+            notes.length = _notesN114;
+            // Заход 2: дорастить обрезок до пола и отдать перебаланс доводчику. Перенос
+            // граммов между приёмами сохраняет МАКРОС класса, но у разных продуктов
+            // разъезжаются остальные оси (овсянка→рис: Б +4 / Ж −3) — доводчик же
+            // двигает все позиции сразу и держит канон.
+            const _okB114 = (() => {
+              _scale114(c.it, c.fl);
+              recalcMealTotals(meals); recalcDayTotals(meals, totals);
+              if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114);
+              // Доводчик может пересобрать массив позиций — ищем обрезок по id, а не по ссылке.
+              const _aliveIt = ((c.m.items || []) as any[]).find((x: any) => x && String(x.id) === String(c.it.id));
+              const _g2 = _aliveIt ? (Number(_aliveIt.amount) || 0) : 0;
+              const _alive = !!_aliveIt && _g2 >= c.fl - 1e-9;
+              const _fine = _lmDev() <= Math.max(_devB, _tok114) + 0.15 && _axisOk114();
+              return _alive && _fine;
+            })();
+            if (_okB114) {
+              _did114 = true;
+              notes.push(`🔧 Обрезок убран: «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)}→${c.fl} г, день перебалансирован доводчиком — канон сохранён.`);
+              _restart114 = true;
+              break;
+            }
+            _restore114();
+            notes.length = _notesN114;
+            // Заход 3 «меньше, но крупнее»: обрезок уходит из плана ЦЕЛИКОМ, а его макрос
+            // дорастает в других позициях дня через доводчик (он двигает все оси разом,
+            // поэтому не возникает перекоса «овсянка→рис: Б +4 / Ж −3»).
+            const _okC114 = (() => {
+              const _arr = ((c.m.items || []) as any[]);
+              const _ix3 = _arr.indexOf(c.it);
+              if (_ix3 < 0 || _arr.length <= 1) return false;
+              _arr.splice(_ix3, 1);
+              recalcMealTotals(meals); recalcDayTotals(meals, totals);
+              if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114);
+              const _fine3 = _axisOk114();
+              return _fine3;
+            })();
+            if (_okC114) {
+              _did114 = true;
+              notes.push(`🔧 Обрезок убран: «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)} г убран целиком (меньше, но крупнее), день перебалансирован доводчиком — канон сохранён.`);
+              _restart114 = true;
+              break;
+            }
+            // Все заходы не прошли — возвращаем день к исходному состоянию и фиксируем долг.
+            _restore114();
+            notes.length = _notesN114;
+            _stuck114.add(_key);
+            notes.push(`⚠ Обрезок «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)} г < ${c.fl} г — канон дня дороже порции (долг §8.114).`);
+            _restart114 = true;
+            break;
+          }
+          _did114 = true;
+          if (donor) {
+            notes.push(`🔧 Обрезок убран: «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)}→${c.fl} г, ${_macro.toUpperCase()} взят у «${String(donor.m2.label || donor.m2.type)}» — канон дня сохранён.`);
+          } else {
+            notes.push(`🔧 Обрезок перенесён: «${String(c.m.label || c.m.type)}» ${String(c.it.id)} ${Math.round(_from)} г убран целиком, порция дорастает в «${String(recv.m2.label || recv.m2.type)}» (${String(recv.it2.id)}) — канон дня сохранён.`);
+          }
+        }
+        if (_restart114) continue;
+        if (!_did114) break;
+      }
+      // §8.114b: канон-ремонт и ремонт оставшихся обрезков — ПОСЛЕ §8.114.
+      //
+      // §8.114 правит только обрезки и принимает ход лишь при дне в каноне, поэтому день,
+      // который «сошёлся не туда» (замер: 45/6/R/mass — Б 3.95 %, 45/6/R/maint/manual —
+      // Ж 3.11 %), оставался вне канона навсегда: доводчик двигает ГРАММЫ существующих
+      // позиций и упирается в свои полы/капы.
+      //
+      // Фаза 1 — канон: ход по ОСИ-ВИНОВНИКУ (перебор — убавить самую плотную позицию
+      // оси, недобор — дорастить), затем перебаланс доводчиком; если сдвига граммов мало —
+      // позиция убирается целиком. Принимается только СТРОГОЕ улучшение худшей оси и ни
+      // одного НОВОГО обрезка: оставшийся «долг §8.114» ход не блокирует (иначе день с
+      // долгом не ремонтируется никогда), но новых он не плодит.
+      //
+      // Фаза 2 — обрезки (включая унаследованный «долг §8.114»): дорастить до пола либо
+      // убрать целиком, если это уменьшает их число и день не выходит из допуска
+      // «не хуже». После успеха нота «долг §8.114» снимается — витрина не должна
+      // объяснять уже исправленный дефект.
+      {
+        const _relB114 = (v: number, g: number) => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
+        const _worstB114 = (): number => Math.max(
+          _relB114(Number(totals.kcal) || 0, Number(_lmGoal.kcal) || 0),
+          _relB114(Number(totals.p) || 0, Number(_lmGoal.p) || 0),
+          _relB114(Number(totals.f) || 0, Number(_lmGoal.f) || 0),
+          _relB114(Number(totals.c) || 0, Number(_lmGoal.c) || 0),
+        );
+        // Обрезки считаются ПО ШТУКАМ: «не создал новых» проверяется как «не больше, чем
+        // было», а не «нет ни одного» — иначе один унаследованный обрезок блокировал бы
+        // любой ход (замер: 45/6/R/mass, овсянка 20 г в завтраке).
+        const _crumbListB114 = (): Array<{ m: any; it: any; fl: number; g: number }> => {
+          const out: Array<{ m: any; it: any; fl: number; g: number }> = [];
+          for (const m of meals as any[]) {
+            for (const it of ((m.items || []) as any[])) {
+              const fl = _floorOf114(it);
+              const g = Number(it.amount) || 0;
+              if (fl > 0 && g > 0 && g < fl - 1e-9) out.push({ m, it, fl, g });
+            }
+          }
+          return out;
+        };
+        const _crumbCountB114 = (): number => _crumbListB114().length;
+        // Овощ — не «лишний белок»: снимать его ради оси нельзя, если после этого в приёме
+        // не останется овоща или день потеряет овощной пол (200 г, замок QG10). Ремонт
+        // канона не имеет права отнимать у тарелки овощи (замер: обед терял перец 120 г).
+        const _vegDayB114 = (): number => {
+          let v = 0;
+          for (const m of meals as any[]) {
+            for (const it of ((m.items || []) as any[])) {
+              if (String(it.role || '') === 'veg') v += Number(it.amount) || 0;
+            }
+          }
+          return v;
+        };
+        const _vegSafeToDropB114 = (m: any, it: any): boolean => {
+          if (String(it.role || '') !== 'veg') return true;
+          const inMeal = ((m.items || []) as any[]).filter((x) => String(x.role || '') === 'veg').length;
+          if (inMeal <= 1) return false;
+          return _vegDayB114() - (Number(it.amount) || 0) >= 200;
+        };
+        const _macroB114 = (): 'p' | 'f' | 'c' | '' => {
+          const ax: Array<[number, 'p' | 'f' | 'c' | '']> = [
+            [_relB114(Number(totals.p) || 0, Number(_lmGoal.p) || 0), 'p'],
+            [_relB114(Number(totals.f) || 0, Number(_lmGoal.f) || 0), 'f'],
+            [_relB114(Number(totals.c) || 0, Number(_lmGoal.c) || 0), 'c'],
+          ];
+          let best = ax[0];
+          for (const a of ax) if (a[0] > best[0] + 1e-9) best = a;
+          return best[1];
+        };
+        const _snapB114 = (): any[] => (meals as any[]).map((mm: any) => {
+          const orig = ((mm.items || []) as any[]).slice();
+          return { mm, orig, vals: orig.map((x: any) => ({ ...x })) };
+        });
+        const _restoreB114 = (snap: any[]): void => {
+          for (const s of snap) {
+            const cur = ((s.mm.items || []) as any[]);
+            cur.splice(0, cur.length, ...s.orig);
+            s.orig.forEach((o: any, i: number) => {
+              for (const k of Object.keys(o)) if (!(k in s.vals[i])) delete o[k];
+              Object.assign(o, s.vals[i]);
+            });
+          }
+          recalcMealTotals(meals); recalcDayTotals(meals, totals);
+        };
+        const _crumb0 = _crumbCountB114();
+        // ── фаза 1: канон (ось-виновник) ──
+        for (let _passB114 = 0; _passB114 < 6; _passB114++) {
+          const _dev0 = _worstB114();
+          if (_dev0 <= _tok114 + 0.05) break;
+          const _mb = _macroB114();
+          if (!_mb) break;
+          const _goalM = Number((_lmGoal as any)[_mb]) || 0;
+          if (!(_goalM > 0)) break;
+          const _factM = Number((totals as any)[_mb]) || 0;
+          const _over = _factM > _goalM;
+          const _needM = Math.abs(_factM - _goalM);
+          const _cands: Array<{ m: any; it: any; per: number; g: number; fl: number }> = [];
+          for (const m of meals as any[]) {
+            for (const it of ((m.items || []) as any[])) {
+              if (it._fixedGrams) continue;
+              const role = String(it.role || '');
+              if (!role || role === 'supplement' || role === 'liquid' || role === 'other') continue;
+              const g = Number(it.amount) || 0;
+              if (!(g > 0)) continue;
+              const per = (Number((it as any)[_mb]) || 0) / Math.max(1, g);
+              if (!(per > 0.005)) continue;
+              _cands.push({ m, it, per, g, fl: _floorOf114(it) });
+            }
+          }
+          if (!_cands.length) break;
+          let _doneB114 = false;
+          // Ход 1: сдвиг граммов самой плотной позиции оси (её форма порции страдает меньше).
+          const _denseB = [..._cands].sort((a, b) => b.per - a.per);
+          for (const cand of _denseB.slice(0, 6)) {
+            if (_over && !(cand.g > cand.fl + 1)) continue;
+            const _arrB = ((cand.m.items || []) as any[]);
+            if (_arrB.indexOf(cand.it) < 0) continue;
+            if (_arrB.length <= 1) continue;
+            const _snapB = _snapB114();
+            const _notesB = notes.length;
+            const _g0 = cand.g;
+            let _g1: number;
+            if (_over) {
+              const _cut = Math.min(cand.g - cand.fl, Math.max(1, Math.round(_needM / cand.per)));
+              _g1 = Math.round(cand.g - _cut);
+              if (!(_g1 >= cand.fl)) continue;
+            } else {
+              _g1 = Math.round(cand.g + Math.max(1, Math.round(_needM / cand.per)));
+            }
+            _scale114(cand.it, _g1);
+            recalcMealTotals(meals); recalcDayTotals(meals, totals);
+            if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114, true);
+            const _devA2 = _worstB114();
+            if (_devA2 < _dev0 - 0.05 && _crumbCountB114() <= _crumb0) {
+              notes.push(`🎯 Канон дня: «${String(cand.m.label || cand.m.type)}» ${String(cand.it.id)} ${Math.round(_g0)}→${_g1} г по оси ${_mb.toUpperCase()} — отклонение ${_dev0.toFixed(2)} → ${_devA2.toFixed(2)}% (§8.114b).`);
+              _doneB114 = true;
+              break;
+            }
+            _restoreB114(_snapB);
+            notes.length = _notesB;
+          }
+          // Ход 2: позиция оси убирается целиком, перебаланс — доводчиком.
+          if (!_doneB114) {
+            const _rareB = [..._cands].sort((a, b) => a.per - b.per);
+            for (const cand of _rareB.slice(0, 6)) {
+              const _arrB2 = ((cand.m.items || []) as any[]);
+              const _ix2 = _arrB2.indexOf(cand.it);
+              if (_ix2 < 0 || _arrB2.length <= 1) continue;
+              if (!_vegSafeToDropB114(cand.m, cand.it)) continue;
+              const _snapB2 = _snapB114();
+              const _notesB2 = notes.length;
+              const _rmG = Math.round(cand.g);
+              _arrB2.splice(_ix2, 1);
+              recalcMealTotals(meals); recalcDayTotals(meals, totals);
+              if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114, true);
+              const _devA3 = _worstB114();
+              if (_devA3 < _dev0 - 0.05 && _crumbCountB114() <= _crumb0) {
+                notes.push(`🎯 Канон дня: «${String(cand.m.label || cand.m.type)}» ${String(cand.it.id)} ${_rmG} г убран по оси ${_mb.toUpperCase()} — отклонение ${_dev0.toFixed(2)} → ${_devA3.toFixed(2)}% (§8.114b).`);
+                _doneB114 = true;
+                break;
+              }
+              _restoreB114(_snapB2);
+              notes.length = _notesB2;
+            }
+          }
+          if (!_doneB114) break;
+        }
+        // ── фаза 2: оставшиеся обрезки (в том числе «долг §8.114») ──
+        for (let _passC114 = 0; _passC114 < 6; _passC114++) {
+          const _crumbs0 = _crumbCountB114();
+          if (_crumbs0 === 0) break;
+          const _dev0 = _worstB114();
+          const _limitC114 = Math.max(_dev0, _tok114 + 0.15);
+          let _doneC114 = false;
+          // Порядок: сначала самый «мелкий» обрезок (ближе всех к полу), затем прочие.
+          const _listC114 = _crumbListB114().sort((a, b) => (a.g / Math.max(1, a.fl)) - (b.g / Math.max(1, b.fl)));
+          for (const c of _listC114) {
+            const _arrC = ((c.m.items || []) as any[]);
+            if (_arrC.length <= 1) continue;
+            const _labelC = String(c.m.label || c.m.type);
+            // Ход 1: дорастить до пола (и перебалансировать остальное доводчиком).
+            {
+              const _snapC = _snapB114();
+              const _notesC = notes.length;
+              const _g0C = Math.round(Number(c.it.amount) || 0);
+              _scale114(c.it, c.fl);
+              recalcMealTotals(meals); recalcDayTotals(meals, totals);
+              if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114, true);
+              const _devC = _worstB114();
+              if (_crumbCountB114() < _crumbs0 && _devC <= _limitC114 + 1e-9) {
+                notes.push(`🔧 Обрезок доращён до порции: «${_labelC}» ${String(c.it.id)} ${_g0C}→${c.fl} г, день в допуске (${_devC.toFixed(2)}%) (§8.114b).`);
+                _doneC114 = true;
+                break;
+              }
+              _restoreB114(_snapC);
+              notes.length = _notesC;
+            }
+            // Ход 2: обрезок убирается целиком, перебаланс — доводчиком.
+            {
+              const _snapC2 = _snapB114();
+              const _notesC2 = notes.length;
+              const _rmC = Math.round(Number(c.it.amount) || 0);
+              const _ixC = _arrC.indexOf(c.it);
+              if (_ixC < 0) continue;
+              if (!_vegSafeToDropB114(c.m, c.it)) continue;
+              _arrC.splice(_ixC, 1);
+              recalcMealTotals(meals); recalcDayTotals(meals, totals);
+              if (_lmDev() > _tok114 + 0.05) _tuneOnce(_tok114, true);
+              const _devC2 = _worstB114();
+              if (_crumbCountB114() < _crumbs0 && _devC2 <= _limitC114 + 1e-9) {
+                notes.push(`🔧 Обрезок убран целиком: «${_labelC}» ${String(c.it.id)} ${_rmC} г — день в допуске (${_devC2.toFixed(2)}%) (§8.114b).`);
+                _doneC114 = true;
+                break;
+              }
+              _restoreB114(_snapC2);
+              notes.length = _notesC2;
+            }
+          }
+          if (!_doneC114) break;
+        }
+        if (_crumbCountB114() === 0) {
+          // Обрезков не осталось — снять устаревшие ноты «долг §8.114» (витрина не врёт).
+          for (let _ni = notes.length - 1; _ni >= 0; _ni--) {
+            if (/\(долг §8\.114\)/.test(String(notes[_ni]))) notes.splice(_ni, 1);
+          }
+        }
+      }
+    }
       // ─── витрина не врёт: «Точность рациона» и отклонение дня — по ФАКТУ после стадии ───
       // Стадия меняет граммы последней, а нота §8.91 написана раньше; без пересчёта
       // пользователь видит «Б 2%» при факте 3% (замок QG34).
@@ -18802,6 +19356,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
           _dPxUnder, _dFx, _dCx,
         ) * 1000) / 10;
+        // §8.114b: нота «Не сошлось» пишется ДО последней мили. Если ремонт всё-таки свёл
+        // день в канон, она врёт («итог честный best-effort» при факте 2.2 %) — снимаем.
+        if (_dayDevPctP4 <= (__manualDay ? 2 : PLANNER_CONVERGENCE_PCT)) {
+          const _stalePrev = notes.findIndex((n) => /«Не сошлось»/.test(String(n)) && /пулы\/капы\/полы/.test(String(n)));
+          if (_stalePrev >= 0) notes.splice(_stalePrev, 1);
+        }
       }
     }
     // ─── §8.110: витрина идёт за последней милей ──────────────────────────────
@@ -19152,6 +19712,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (_fresh64.length > 0) {
         if (_firstIdx64 >= 0) notes.splice(Math.min(_firstIdx64, notes.length), 0, ..._fresh64);
         else notes.push(..._fresh64);
+      }
+    }
+    // §8.113 (финальная страховка): пустая тарелка в план не выходит. Поздние стадии
+    // (перенос углеводов из окон, посадка, чистка peri-углей) могут забрать последние
+    // пункты приёма, у которого бюджет белка нулевой, — лучше меньше приёмов, чем пустой слот.
+    {
+      const _keptMeals = meals.filter(m => (m.items || []).length > 0);
+      if (_keptMeals.length < meals.length) {
+        notes.push(`🍽️ Приёмов ${_keptMeals.length} вместо ${meals.length}: слоты без белка и углеводов не строятся (§8.113 «меньше, но крупнее»).`);
+        meals.splice(0, meals.length, ..._keptMeals);
+        recalcDayTotals(meals, totals);
       }
     }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
