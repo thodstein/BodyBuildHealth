@@ -77,6 +77,7 @@ import type { Macrocycle, MacroPhase, BBMacrocycle } from '../lms/macrocycle.eng
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules, stampBBPlanFinalizeSignature, repairSingleSetExercises, enforceFinalEffectiveMrv } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
+import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE, FEMALE_GLUTE_HIGH_CAP, FEMALE_GLUTE_TARGET_CAP } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
@@ -317,6 +318,14 @@ export interface BBBuilderInput {
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** DUP-волна тяж/лёг (проф-методика): чередование характера дня и диапазона
+   *  повторов. Накладывается в конце сборки — ДО финального снимка, поэтому
+   *  weeklyVolume/validation/report описывают уже DUP-план, а `dupMode` попадает
+   *  в `inputSnapshot` (иначе replan терял выбор: UI накладывал DUP снаружи, а
+   *  снимок билдера оставался пустым). Новичку не применяется. */
+  dupMode?: DUPMode;
+  /** Мышцы, к primary которых применяется DUP (пусто = ко всем primary). */
+  dupMuscles?: string[];
   /** Ручной оверрайд MGF/IGF1-фазы (UI-селектор): 'auto' — по стеку.
    *  Форсит pedPhase/pedPhaseByWeek целиком (схемы, пометки, превью). */
   pedPhaseOverride?: 'auto' | 'proliferation' | 'differentiation';
@@ -633,6 +642,8 @@ export interface BBPlan {
   supersetMode?: string;
   volumeScheme?: string;
   dupMode?: string;
+  /** Мышцы per-muscle DUP (пусто = все primary). */
+  dupMuscles?: string[];
   trainingYears?: number;
   courseIntensity?: string;
   bfrMode?: boolean;
@@ -649,6 +660,8 @@ export interface BBPlan {
     supersetMode?: string;
     volumeScheme?: string;
     dupMode?: string;
+    /** Мышцы per-muscle DUP (пусто = все primary). */
+    dupMuscles?: string[];
     trainingYears?: number;
     courseIntensity?: string;
     fewerCompound?: boolean;
@@ -5343,7 +5356,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     methodologyApplied: true,
     supersetMode: input.supersetMode,
     volumeScheme: effVolumeScheme,
-    dupMode: (input as any).dupMode,
+    dupMode: input.dupMode,
+    dupMuscles: input.dupMuscles && input.dupMuscles.length ? [...input.dupMuscles] : undefined,
     trainingYears: input.trainingYears,
     courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
     bfrMode: input.bfrMode,
@@ -5363,7 +5377,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       methodology: input.methodology,
       supersetMode: input.supersetMode,
       volumeScheme: input.volumeScheme,
-      dupMode: (input as any).dupMode,
+      dupMode: input.dupMode,
+      dupMuscles: input.dupMuscles && input.dupMuscles.length ? [...input.dupMuscles] : undefined,
       trainingYears: input.trainingYears,
       courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
       fewerCompound: input.fewerCompound,
@@ -5968,6 +5983,22 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // расчёта веса и переживала удаление праймера поздними проходами — методика
   // превращалась в скрытый делод для мышц без предутомления.
   if (input.methodology === 'pre_exhaust') applyPreExhaustLoadsToPlan(finalized);
+  // P3-3 (аудит 2026-11, ядро): DUP накладывался ТОЛЬКО снаружи (UI после сборки),
+  // поэтому `inputSnapshot.dupMode` оставался пустым, а replan читает именно его
+  // (bb-replan.engine.ts) — пересборка остатка мезоцикла теряла выбранную методику.
+  // Теперь наложение внутри сборки, ДО финального снимка: снимок описывает уже
+  // DUP-план, флаг попадает в снапшот. Повторное наложение из UI безвредно —
+  // обход детерминирован (те же rir/reps/характер), метка в комментарии и строка
+  // rationale добавляются только при отсутствии. Новичку DUP не применяется.
+  if (input.dupMode && input.dupMode !== 'none' && level !== 'beginner') {
+    const dupPlan = applyDUPOverlay(finalized, {
+      mode: input.dupMode,
+      cycleDays: input.dupMode === 'full_dup' ? 3 : 2,
+      muscles: input.dupMuscles && input.dupMuscles.length ? input.dupMuscles : undefined,
+    });
+    finalized.weeks = dupPlan.weeks;
+    finalized.rationale = dupPlan.rationale;
+  }
   // M/L/K: финальный снимок ФАКТА — одной точкой (bb-plan-snapshot.engine).
   // `finalizeBBPlan` снимает weeklyVolume/validation/balanceReport/report в конце
   // СВОЕГО прохода, но билдер после финализатора ещё меняет план: rehab-возврат,

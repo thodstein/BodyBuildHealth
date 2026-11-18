@@ -2604,6 +2604,11 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             : undefined,
           supersetMode,
           volumeScheme: effectiveVolumeScheme,
+          // P3-3 ядра (аудит 2026-11): DUP накладывает сама сборка — до финального
+          // снимка, иначе `inputSnapshot.dupMode` оставался пустым и replan
+          // пересобирал остаток мезоцикла без выбранной методики.
+          dupMode,
+          dupMuscles: dupMuscles.length ? dupMuscles : undefined,
           trainingVolumeMode,
           bfrMode,
           blastCruiseEnabled,
@@ -2649,6 +2654,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     }
 
     // Проф-методики: DUP поверх плана (все ветки). Суперсеты и схемы объёма для всех веток теперь обрабатываются внутри движка (finalize) через BBBuilderInput/CycleToPlanInput — единый путь.
+    // Generic-путь накладывает DUP уже внутри сборки (до финального снимка, см.
+    // P3-3 ядра): повторный вызов ниже идемпотентен и нужен только програмной
+    // ветке (programToBBPlan DUP в входе не принимает).
     if (dupMode !== 'none') {
       plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
     }

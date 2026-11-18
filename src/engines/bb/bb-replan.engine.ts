@@ -106,6 +106,7 @@ export function replanBBMesoFromFact(
     supersetMode: snap.supersetMode,
     volumeScheme: snap.volumeScheme,
     dupMode: snap.dupMode,
+    dupMuscles: Array.isArray(snap.dupMuscles) ? snap.dupMuscles : undefined,
     trainingVolumeMode: snap.trainingVolumeMode,
     trainingYears: Number.isFinite(snap.trainingYears) ? snap.trainingYears : undefined,
     courseIntensity: snap.courseIntensity as BBBuilderInput['courseIntensity'],
