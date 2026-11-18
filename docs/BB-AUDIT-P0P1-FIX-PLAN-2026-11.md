@@ -86,6 +86,19 @@ weeklyVolume/validation/report описывают уже DUP-план; флаг 
 список, где лежит только креатин, по-прежнему даёт курсовые капы — это уже вопрос чистоты
 профиля, а не решения о сплите (см. §4).
 
+Проход 12 — ядро P3-5: ACWR больше не притворяется измеренной нормой. `computeAcwr` глушил
+любые неудачи и возвращал «здоровые» 1.0 — при отсутствии sRPE-сессий, при одной сессии,
+при `ratio` = NaN и при поломке хранилища. План, отчёт и тапер-план получали значение,
+неотличимое от нормы 1.0. Теперь `computeAcwr(): number | null`, где `null` = «данных нет»
+(ошибка хранилища дополнительно логируется через `console.warn`); гейты авто-разгрузки в
+сборке проверяют `acwrRatio != null`, `PostPhaseInput` принимает `number | null` (там
+null-проверка уже была), а `recommendBBTaperConfig` перестал трактовать `Number(null) === 0`
+как «недогруз» — иначе `null` из нового контракта сокращал taper по несуществующему
+измерению. Заодно закрыт ряд, которого нет: сессии с нечитаемыми датами `toDailyLoads`
+отбрасывает, и `acuteChronicRatio([])` возвращает ratio 0 — тоже «недогруз», поэтому пустой
+дневной ряд теперь `null`. Поведение готовых планов не изменилось: без данных ACWR-строк и
+учащённых делодов не было и раньше, фантомным было только само значение 1.0.
+
 Документ заменяет три рабочих отчёта аудита (они удалены, суть сохранена здесь):
 `BB-CORE-BUILD-AUDIT-2026-11.md`, `BB-FINALIZE-VALIDATION-AUDIT-2026-11.md`,
 `bb-auto-constructor-audit-2026-11-15.md`.
@@ -142,10 +155,10 @@ P1 из аудита UI-конструктора (настройки шагов 
 node --max-old-space-size=3200 ./node_modules/typescript/bin/tsc --noEmit
 # exit 0 (проход 11: чистый прогон по всему репозиторию)
 
-# весь движок BB (315 тест-файлов — с учётом bb-audit-p2-fixes / p3-validation / p3-core-dup / p3-core-selector)
+# весь движок BB (316 тест-файлов — с учётом bb-audit-p2-fixes / p3-validation / p3-core-dup / p3-core-selector / p3-core-acwr)
 node --max-old-space-size=3600 ./node_modules/vitest/vitest.mjs run "src/engines/bb/__tests__" --pool=forks --poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1
-# Test Files: 311 passed | 4 skipped (315)
-# Tests:      3614 passed | 20 skipped (3634)   exit 0   (после прохода 11)
+# Test Files: 312 passed | 4 skipped (316)
+# Tests:      3623 passed | 20 skipped (3643)   exit 0   (после прохода 12)
 ```
 
 Примечание про `tsc` на прогонах проходов 1–10: в рабочем дереве параллельно шла чужая
@@ -188,6 +201,7 @@ passed, exit 0.
 | P3-3 (ядро) | `dupMode` не объявлен в `BBBuilderInput` и накладывался только снаружи (UI после сборки) → `inputSnapshot.dupMode` пустой, а replan читает именно его: пересборка остатка мезоцикла теряла DUP | `bb-builder.engine.ts` (вход + конец сборки), `bb-replan.engine.ts`, `BbAutoConstructor.tsx` | Поле типизировано (`DUPMode` + `dupMuscles`), DUP накладывает сборка — до финального снимка, флаг и мышцы попадают в снапшот и уходят в replan; новичку отказ. Замер: primary вне делод-недель получают метку `[DUP: …]`, снапшот заполнен |
 | P3-1 (ядро) | `splitSessionBudget` объявлял `pedDoses`/`mode`, но не читал их, а стаж ставил жёстко `years = 0`: капы сессии и предупреждение о плотном дне считались как для новичка при любом стаже | `bb-selector.engine.ts` (`splitSessionBudget`, `BBSelectorInput.trainingYears`), `BbAutoConstructor.tsx` | Стаж из `BBSelectorInput` уходит в `sessionLimitsFor` (UI передаёт `bbTrainingYears`), `mode: 'on_course'` читается. Замер: `ppl_6` enhanced+AAS — 0 лет 40 сетов/15 упражнений, 3 года 52/15, 8 лет 60/16; `undefined` = прежние консервативные капы; `upper_lower_4` advanced 5 лет: natural 40 → on_course 52 |
 | P3-2 (ядро) | Три определения «высокого объёма» в одном решении о сплите: `rankBBSplits` — дозо-зависимое (AAS ≥ 500 мг, GH, инсулин), `splitFitWarnings` — любой PED в списке (креатин тоже), капы сессии — `peds.length > 0` | `bb-selector.engine.ts` (`pedProfileOf`, `highVolumeDemandOf`) | Правило одно: enhanced или реальный PED-профиль (AAS по имени/дозе ≥ 500 мг, GH/инсулин по имени или дозе). `score` ранжирования не менялся (там стояло это же выражение); «плотный день» больше не предупреждается у «креатинового» профиля, `onCourse` для капов берётся из того же правила либо из явного `mode` |
+| P3-5 (ядро) | `computeAcwr` глушил любые ошибки и возвращал «здоровые» 1.0: нет sRPE-сессий, одна сессия, `ratio` = NaN и поломка хранилища давали одно и то же «нормальное» значение, неотличимое от измерения | `bb-builder.engine.ts` (`computeAcwr`, гейты авто-разгрузки), `bb-autocoach.engine.ts` (`PostPhaseInput`), `bb-contest-prep.engine.ts` (`recommendBBTaperConfig`) | `computeAcwr(): number \| null`, `null` = «данных нет», ошибка хранилища логируется; пустой дневной ряд (мусорные даты) — тоже `null`, а не ratio 0; гейты сборки требуют `acwrRatio != null`; тапер не считает `Number(null) === 0` недогрузом. Замер: 0 сессий / 1 сессия / битый JSON / мусорные даты → `null` (было 1, 1, 1, 0); равномерные 28 дней → норма; скачок в последнюю неделю → > 1.5 |
 
 Тесты: `src/engines/bb/__tests__/bb-audit-p2-fixes.test.ts` (19 тестов) — `{}` и
 `{ weeks: [{ week: 1 }] }` не роняют отчёт/safety-скор/анализ стресса; сообщение дефицита
@@ -309,6 +323,16 @@ advanced, 5 лет: 40 → 52 сета). P3-2: `highVolumeDemandOf` даёт `tr
 откат `bb-selector.engine.ts` валит 5 тестов из 7 — стаж и `mode`
 (`expected 40 to be greater than 40`), правило (`highVolumeDemandOf is not a function`).
 
+Проход 12, тесты: `bb-audit-p3-core-acwr.test.ts` (9) — без sRPE-сессий, с одной сессией,
+с битым JSON в хранилище и с нечитаемыми датами `computeAcwr()` возвращает `null`; на
+равномерных 28 днях значение измеренное и в коридоре нормы, а на скачке в последнюю неделю
+уходит в зону риска (`> 1.5`). В потребителях: `recommendBBTaperConfig({ acwrRatio: null })`
+не даёт ложного «недогруз» и не сокращает taper (3 недели остаются 3), а измеренный низкий
+`0.6` по-прежнему сокращает до 2; сборка плана без sRPE-данных не пишет ни строки `ACWR`, ни
+`null`/`NaN` в rationale. Проверка «на красное»: возврат `1` в `computeAcwr` валит три теста
+(`expected 1 to be null`), старый `Number(input.acwrRatio)` в тапере — `expected 2 to be 3`,
+снятый guard пустого дневного ряда — `expected +0 to be null`.
+
 Следствие правки ядра P2-1 для сторожа `bb-auto-audit-2026-10-p0.test.ts` (PRO-GAP1): делод
 теперь действительно меньше (без добивки до MEV), поэтому отношение «неделя после делода /
 делод» выросло с 2.10 до 2.35 при том же недельном объёме. Содержательный инвариант теста —
@@ -356,7 +380,8 @@ advanced, 5 лет: 40 → 52 сета). P3-2: `highVolumeDemandOf` даёт `tr
   флаг уходит в снапшот и в replan. Осталось: програмная ветка (`programToBBPlan`)
   по-прежнему получает DUP только снаружи — её вход волну не принимает.
 - P3-4. Подполя `bodyweightCapability` объявлены, но не читаются.
-- P3-5. `computeAcwr` глушит любые ошибки и возвращает «здоровые» 1.
+- P3-5. **Выпущено в проходе 12** (см. §3): `computeAcwr` возвращает `null` вместо
+  «здоровых» 1/0, ошибка хранилища логируется, потребители приведены к `number | null`.
 
 ### Валидация/финализация/качество
 

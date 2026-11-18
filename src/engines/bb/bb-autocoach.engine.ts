@@ -751,7 +751,9 @@ export interface PostPhaseInput {
   loadStrategy?: LoadStrategy;
   autoDeload?: boolean;
   deloadType?: DeloadType;
-  acwrRatio?: number;
+  /** `null` = ACWR не измерен (нет sRPE-данных): это НЕ 0 и НЕ норма 1.0 —
+   *  просто нет основания для ACWR-делоада (ядро P3-5 аудита 2026-11). */
+  acwrRatio?: number | null;
   autoRegResult?: {
     volumeMultiplier: number;
     topSetPctMultiplier: number;

@@ -818,7 +818,8 @@ export function sRPEAdjustment(sessions?: Array<{ sRPE?: number }>): { monotony:
 
 export function recommendBBTaperConfig(input: {
   fatigue?: number;
-  acwrRatio?: number;
+  /** `null` = ACWR не измерен (нет sRPE-данных) — не 0 и не норма (ядро P3-5). */
+  acwrRatio?: number | null;
   recentSessions?: Array<{ sRPE?: number }>;
   baseWeeksOut?: number;
 }): BBTaperRecommendation {
@@ -830,8 +831,10 @@ export function recommendBBTaperConfig(input: {
     if (fatigue >= 80) { weeksOut = Math.max(weeksOut, 3); reasons.push('Высокая усталость — taper 3 нед'); }
     else if (fatigue >= 60) { weeksOut = Math.max(weeksOut, 2); reasons.push('Умеренная усталость — taper ≥2 нед'); }
   }
-  const acwr = Number(input.acwrRatio);
-  if (Number.isFinite(acwr)) {
+  // Ядро P3-5 (аудит 2026-11): `null` = ACWR не измерен. `Number(null) === 0` давало
+  // ложный «недогруз» и сокращало taper по несуществующему измерению.
+  const acwr = input.acwrRatio == null ? null : Number(input.acwrRatio);
+  if (acwr != null && Number.isFinite(acwr)) {
     if (acwr > 1.5) { weeksOut = Math.max(weeksOut, 3); volumeMult *= 0.85; reasons.push(`ACWR ${acwr.toFixed(2)} — опасная зона: taper удлинён, объём −15%`); }
     else if (acwr > 1.3) { weeksOut = Math.max(weeksOut, 3); reasons.push(`ACWR ${acwr.toFixed(2)} — зона осторожности: taper 3 нед`); }
     else if (acwr < 0.8) { weeksOut = Math.min(weeksOut, 2); reasons.push(`ACWR ${acwr.toFixed(2)} — недогруз: taper 2 нед`); }

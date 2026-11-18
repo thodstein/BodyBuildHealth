@@ -3477,15 +3477,30 @@ function addDaysISO(from: string, days: number): string {
 // fix N: реальный auto-deload по ACWR. Читаем sRPE-сессии пользователя и вычисляем
 // acute:chronic ratio. При перетренированности (ratio > 1.5) разгрузочные недели
 // назначаются чаще, а в коротких планах (≥3 нед) — гарантированно появляется deload.
-function computeAcwr(): number {
+//
+// Ядро P3-5 (аудит 2026-11): раньше любая неудача (нет данных, одна сессия, битый
+// ratio, исключение) возвращала «здоровые» 1.0, и план/отчёт выглядели как измеренная
+// норма. Теперь `null` = «данных нет»: вызывающие обязаны отличать отсутствие
+// измерения от нормы, а не подставлять 1.0. Экспортируется для тестов и диагностики.
+export function computeAcwr(): number | null {
   try {
     const sessions = loadSRPESessions();
-    if (!sessions || sessions.length < 2) return 1;
+    // < 2 сессий: ACWR физически не из чего посчитать (нет ни acute, ни chronic окна).
+    if (!sessions || sessions.length < 2) return null;
     const daily = toDailyLoads(sessions as any);
+    // Мусорные/пустые даты `toDailyLoads` отбрасывает. Если дней не осталось,
+    // измерять нечего: `acuteChronicRatio([])` вернул бы ratio 0, а это «недогруз»
+    // по несуществующему ряду (и ложное сокращение taper).
+    if (daily.length === 0) return null;
     const r = acuteChronicRatio(daily);
-    return r && isFinite(r.ratio) ? r.ratio : 1;
-  } catch {
-    return 1;
+    if (!r || !isFinite(r.ratio)) return null;
+    return r.ratio;
+  } catch (e) {
+    // Тихий `1` скрывал и поломку хранилища: теперь причина видна в консоли, а
+    // результат — «нет данных».
+    console.warn('[bb-builder] ACWR не посчитан (sRPE-данные недоступны):',
+      e instanceof Error ? e.message : String(e));
+    return null;
   }
 }
 
@@ -3993,8 +4008,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // пересборке на другом устройстве менялся без изменения входа.
   // `undefined` = прежнее поведение (включено).
   const acwrAuto = input.autoDeload !== false;
-  const acwrCaution = acwrAuto && acwrRatio > 1.3 && acwrRatio <= 1.5 && input.weeks >= 3;
-  const acwrDanger = acwrAuto && acwrRatio > 1.5 && input.weeks >= 3;
+  // Ядро P3-5: `null` = данных нет (нет sRPE-сессий/битые данные) — это не «норма 1.0»,
+  // и такой план не должен получать ни предупреждений, ни учащённых делодов по ACWR.
+  const acwrCaution = acwrAuto && acwrRatio != null && acwrRatio > 1.3 && acwrRatio <= 1.5 && input.weeks >= 3;
+  const acwrDanger = acwrAuto && acwrRatio != null && acwrRatio > 1.5 && input.weeks >= 3;
   if (acwrDanger) {
     deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
