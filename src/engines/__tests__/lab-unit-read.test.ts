@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES } from '../../core/constants';
+import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES, LAB_UNIT_READ, LAB_READ_UNIT } from '../../core/constants';
 import { normalizeLabMeasurement } from '../../core/labs-mapping';
 import { evaluateRecommendations } from '../../engines/recommendation-engine';
 import { buildLabFindings } from '../support-plan/display';
@@ -541,5 +541,45 @@ describe('проход 123: B12 читается по единице бланк�
   it('движок берёт B12 через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(src).toContain("v['B12'] = readHormone('B12', 'panelVitamin'");
+  });
+});
+
+/**
+ * Проход 124: выбор единицы и пересчёт — одна таблица.
+ * Пока канон и множитель жили в разных местах (список канонов + `switch`), можно
+ * было дать маркеру выбор единицы и забыть пересчёт: выбранная единица молча
+ * ничего не делала, и 1800 «пг/мл» из пмольных 1800 читались как канон. Направление
+ * пересчёта тоже выбиралось руками, а ошибка в нём — та же тишина.
+ */
+describe('проход 124: выбор единицы не бывает без пересчёта', () => {
+  it('у каждого маркера с выбором единицы есть запись в таблице', () => {
+    for (const marker of Object.keys(LAB_UNIT_CHOICES)) {
+      expect(LAB_UNIT_READ[marker], `${marker}: выбор единицы без пересчёта`).toBeTruthy();
+    }
+  });
+
+  it('варианты в форме = канон + другая единица из таблицы', () => {
+    for (const [marker, choices] of Object.entries(LAB_UNIT_CHOICES)) {
+      const rec = LAB_UNIT_READ[marker];
+      expect(rec.canon, `${marker}: первым в форме идёт канон`).toBe(choices[0]);
+      expect(Object.keys(rec.others), `${marker}: варианты формы и таблицы`).toEqual(choices.slice(1));
+    }
+  });
+
+  it('выбранная единица действительно пересчитывает число', () => {
+    for (const [marker, choices] of Object.entries(LAB_UNIT_CHOICES)) {
+      const conv = LAB_UNIT_READ[marker].others[choices[1]];
+      const raw = 100;
+      const expected = conv.op === 'div' ? raw / conv.factor : raw * conv.factor;
+      expect(readLabValue(marker, raw, choices[1]).value, `${marker} (${choices[1]})`)
+        .toBeCloseTo(Math.round(expected * 10) / 10, 5);
+    }
+  });
+
+  it('канон чтения — производная таблицы, а не второй список', () => {
+    for (const [marker, rec] of Object.entries(LAB_UNIT_READ)) {
+      expect(LAB_READ_UNIT[marker]).toBe(rec.canon);
+      expect(LAB_UNIT_CHOICES[marker], `${marker}: пересчёт без выбора единицы в форме`).toBeTruthy();
+    }
   });
 });

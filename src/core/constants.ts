@@ -810,24 +810,45 @@ export function normalizeLabValue(marker: string, rawValue: number): number {
 //
 // Канонические единицы чтения — те же, к которым приводил `normalizeLabValue`
 // (и те, что перечислены в комментарии выше). Множители — из общего дома (проход 100).
-export const LAB_READ_UNIT: Record<string, string> = {
-  'E2': 'пг/мл', 'Prolactin': 'нг/мл', 'Total T': 'нмоль/л',
-  'Cortisol': 'нмоль/л', 'DHEA-S': 'мкг/дл',
-  // Проход 118: прогестерон тоже приходит в двух единицах (нг/мл и нмоль/л,
-  // разница 3.18). Без единицы не угадываем: 5 нг/мл и 5 нмоль/л — разные
-  // клинические картины (лютеиновая норма против ановуляции).
-  'Progesterone': 'нг/мл',
-  // Проход 119: свободный тестостерон (пг/мл против пмоль/л, разница 3.47).
-  'Free T': 'пг/мл',
-  // Проход 120: свободные Т3/Т4 — канон приложения пмоль/л (нормы 3.5–6.5 и 9–22).
-  'T3 free': 'пмоль/л', 'T4 free': 'пмоль/л',
-  // Проход 121: витамин D — канон нг/мл (нормы приложения 30–100).
-  'Vitamin D (25-OH)': 'нг/мл',
-  // Проход 122: фолат — канон нг/мл (норма приложения 7–50).
-  'Folate': 'нг/мл',
-  // Проход 123: B12 — канон пг/мл (норма приложения 200–900).
-  'B12': 'пг/мл',
+// Проход 124: канон и множитель теперь живут в одной записи. Раньше они были
+// разнесены — канон в `LAB_READ_UNIT`, пересчёт в `switch` внутри `readLabValue` —
+// и направление каждый раз выбиралось руками: у E2/PRL/TT/прогестерона/свободного
+// теста деление, у кортизола/ДГЕА-С/Т3/Т4 умножение. Ошибка в направлении даёт ту
+// же самую тишину, что раньше давала догадка: число втрое меньше или больше, и
+// никакой пометки. Поэтому направление записано рядом с множителем.
+type LabUnitConversion = {
+  /** Канон приложения: в этой единице движок сравнивает число с нормами. */
+  canon: string;
+  /** Единица бланка → множитель и действие: `div` — canon = raw / factor, `mul` — canon = raw * factor. */
+  others: Record<string, { factor: number; op: 'div' | 'mul' }>;
 };
+
+export const LAB_UNIT_READ: Record<string, LabUnitConversion> = {
+  'E2': { canon: 'пг/мл', others: { 'пмоль/л': { factor: E2_PG_TO_PMOL, op: 'div' } } },
+  'Prolactin': { canon: 'нг/мл', others: { 'мМЕ/л': { factor: PRL_NG_TO_MIU, op: 'div' } } },
+  'Total T': { canon: 'нмоль/л', others: { 'нг/дл': { factor: TT_NMOL_TO_NG_DL, op: 'div' } } },
+  'Cortisol': { canon: 'нмоль/л', others: { 'мкг/дл': { factor: CORTISOL_UG_DL_TO_NMOL, op: 'mul' } } },
+  'DHEA-S': { canon: 'мкг/дл', others: { 'мкмоль/л': { factor: DHEAS_UMOL_TO_UG_DL, op: 'mul' } } },
+  // 118: 60 нмоль/л лютеиновой фазы — это 18.9 нг/мл. Без единицы не угадываем:
+  // 5 нг/мл и 5 нмоль/л — разные клинические картины.
+  'Progesterone': { canon: 'нг/мл', others: { 'нмоль/л': { factor: PROG_NG_TO_NMOL, op: 'div' } } },
+  // 119: 30 пмоль/л свободного тестостерона — это 8.7 пг/мл.
+  'Free T': { canon: 'пг/мл', others: { 'пмоль/л': { factor: FT_PG_TO_PMOL, op: 'div' } } },
+  // 120: канон Т3/Т4 — пмоль/л, поэтому пг/мл умножается, а не делится.
+  'T3 free': { canon: 'пмоль/л', others: { 'пг/мл': { factor: FT3_PG_TO_PMOL, op: 'mul' } } },
+  'T4 free': { canon: 'пмоль/л', others: { 'пг/мл': { factor: FT4_PG_TO_PMOL, op: 'mul' } } },
+  // 121: 62 нмоль/л витамина D — это 24.8 нг/мл (дефицит), а не 62 нг/мл.
+  'Vitamin D (25-OH)': { canon: 'нг/мл', others: { 'нмоль/л': { factor: VITD_NG_TO_NMOL, op: 'div' } } },
+  // 122: 15 нмоль/л фолата — это 6.6 нг/мл (пограничный дефицит).
+  'Folate': { canon: 'нг/мл', others: { 'нмоль/л': { factor: FOLATE_NG_TO_NMOL, op: 'div' } } },
+  // 123: 300 пмоль/л B12 — это 406.6 пг/мл.
+  'B12': { canon: 'пг/мл', others: { 'пмоль/л': { factor: B12_PG_TO_PMOL, op: 'div' } } },
+};
+
+/** Канон чтения по маркеру — производная от таблицы, второго источника чисел нет. */
+export const LAB_READ_UNIT: Record<string, string> = Object.fromEntries(
+  Object.entries(LAB_UNIT_READ).map(([marker, rec]) => [marker, rec.canon]),
+);
 
 /** Единицы, между которыми путаются бланки: выбор даётся в поле ввода (порядок = показ). */
 export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
@@ -884,36 +905,17 @@ export function readLabValue(
   sex?: 'male' | 'female',
 ): LabValueRead {
   if (isNaN(rawValue)) return { value: rawValue, guessed: false };
-  const canon = LAB_READ_UNIT[marker];
-  if (!canon) return { value: rawValue, guessed: false };
+  const rec = LAB_UNIT_READ[marker];
+  if (!rec) return { value: rawValue, guessed: false };
 
   const u = labUnitKey(unit);
   if (u) {
-    if (u === canon) return { value: rawValue, guessed: false };
-    switch (marker) {
-      case 'E2': return { value: Math.round(rawValue / E2_PG_TO_PMOL * 10) / 10, guessed: false };
-      case 'Prolactin': return { value: Math.round(rawValue / PRL_NG_TO_MIU * 10) / 10, guessed: false };
-      case 'Total T': return { value: Math.round(rawValue / TT_NMOL_TO_NG_DL * 10) / 10, guessed: false };
-      case 'Cortisol': return { value: Math.round(rawValue * CORTISOL_UG_DL_TO_NMOL * 10) / 10, guessed: false };
-      case 'DHEA-S': return { value: Math.round(rawValue * DHEAS_UMOL_TO_UG_DL * 10) / 10, guessed: false };
-      // Проход 118: 60 нмоль/л лютеиновой фазы — это 18.9 нг/мл, а не 60 нг/мл.
-      case 'Progesterone': return { value: Math.round(rawValue / PROG_NG_TO_NMOL * 10) / 10, guessed: false };
-      // Проход 119: 30 пмоль/л свободного тестостерона — это 8.7 пг/мл.
-      case 'Free T': return { value: Math.round(rawValue / FT_PG_TO_PMOL * 10) / 10, guessed: false };
-      // Проход 120: канон Т3/Т4 — пмоль/л, поэтому пг/мл умножаем, а не делим.
-      case 'T3 free': return { value: Math.round(rawValue * FT3_PG_TO_PMOL * 10) / 10, guessed: false };
-      case 'T4 free': return { value: Math.round(rawValue * FT4_PG_TO_PMOL * 10) / 10, guessed: false };
-      // Проход 121: 62 нмоль/л витамина D — это 24.8 нг/мл, то есть дефицит,
-      // а не 62 нг/мл (которое читалось бы как «выше нормы»).
-      case 'Vitamin D (25-OH)': return { value: Math.round(rawValue / VITD_NG_TO_NMOL * 10) / 10, guessed: false };
-      // Проход 122: 15 нмоль/л фолата — это 6.6 нг/мл (пограничный дефицит),
-      // а как 15 нг/мл число выглядело бы уверенной нормой.
-      case 'Folate': return { value: Math.round(rawValue / FOLATE_NG_TO_NMOL * 10) / 10, guessed: false };
-      // Проход 123: 300 пмоль/л B12 — это 406.6 пг/мл (норма), а как 300 пг/мл
-      // число попадало в «пограничную» зону с ложным поводом колоть B12.
-      case 'B12': return { value: Math.round(rawValue / B12_PG_TO_PMOL * 10) / 10, guessed: false };
-    }
-    return { value: rawValue, guessed: false };
+    if (u === rec.canon) return { value: rawValue, guessed: false };
+    const conv = rec.others[u];
+    // Незнакомая единица не пересчитывается и не выдаётся за точную — как и до таблицы.
+    if (!conv) return { value: rawValue, guessed: false };
+    const canonValue = conv.op === 'div' ? rawValue / conv.factor : rawValue * conv.factor;
+    return { value: Math.round(canonValue * 10) / 10, guessed: false };
   }
 
   if (marker === 'E2' && sex === 'female') return { value: rawValue, guessed: true };
