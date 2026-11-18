@@ -136,6 +136,11 @@ export interface NotesWidgetNote {
   /** Прогресс чек-листа: сколько пунктов выполнено. */
   done: number;
   total: number;
+  /**
+   * Сколько у заметки файлов (фото/аудио). Нативная часть рисует по этому полю
+   * «📎» — без него значок молча пропадёт, ошибки не будет.
+   */
+  files: number;
 }
 
 export interface NotesWidgetSnapshot {

@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   attachmentSummary,
+  attachmentsBytes,
   dataUrlBytes,
   extensionForMime,
   formatBytes,
@@ -131,5 +132,14 @@ describe('озвучка', () => {
     delete w.speechSynthesis;
     delete w.SpeechSynthesisUtterance;
     expect(isSpeechOutputSupported()).toBe(false);
+  });
+});
+
+describe('объём вложений', () => {
+  it('складывает размеры и не раздувается от мусора', () => {
+    expect(attachmentsBytes([])).toBe(0);
+    expect(attachmentsBytes([{ size: 100 }, { size: 2 * 1024 * 1024 }])).toBe(100 + 2 * 1024 * 1024);
+    // Битая мета (NaN/undefined/минус) не должна превращаться в «минус гигабайт».
+    expect(attachmentsBytes([{ size: Number.NaN }, {}, { size: -5 }, { size: 7 }])).toBe(7);
   });
 });

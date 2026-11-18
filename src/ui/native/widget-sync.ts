@@ -38,6 +38,7 @@ import {
   syncNotesWidget,
   syncWorkoutWidget,
   drainWidgetQueue,
+  type NotesWidgetSnapshot,
   type QueuedItem,
   type WorkoutWidgetExercise,
   type WorkoutWidgetSnapshot,
@@ -60,6 +61,7 @@ import {
   noteAttachments,
   noteChecklistProgress,
   addCoachNote,
+  type CoachNotesStore,
 } from '../../engines/coach/coach-notes.engine';
 
 export type WidgetNavTarget = 'training' | 'nutrition' | 'support' | 'calendar' | 'notes' | 'home';
@@ -543,31 +545,36 @@ export function collectCalendar(): {
   };
 }
 
-/** Заметки для виджета: закреплённые сверху, затем свежие. */
-function collectNotes(): {
-  notes: { id: string; title: string; done: number; total: number }[];
-  total: number;
-  pinned: number;
-} {
-  const store = safe(() => readCoachNotes(localStorageRef()), { version: 1 as const, items: [] });
+/**
+ * Строки заметок для виджета: закреплённые сверху, затем свежие. Отдельной
+ * функцией — чтобы состав полей можно было проверить тестом: нативная часть
+ * (`NotesWidgetProvider`) читает `files` и рисует «📎».
+ */
+export function notesForWidget(store: CoachNotesStore): NotesWidgetSnapshot {
   const sorted = safe(() => sortCoachNotes(store.items), []);
   return {
     notes: sorted.slice(0, 5).map(n => {
       const p = noteChecklistProgress(n);
-      const hasFiles = noteAttachments(n).length > 0;
+      const files = noteAttachments(n).length;
       return {
         id: n.id,
         // Заметка без текста, но с фото/аудио — это не «Без названия», а файл.
         title: String(
-          n.title || n.body.split('\n')[0] || (hasFiles ? 'Заметка с фото/аудио' : 'Без названия'),
+          n.title || n.body.split('\n')[0] || (files > 0 ? 'Заметка с фото/аудио' : 'Без названия'),
         ).slice(0, 90),
         done: p.done,
         total: p.total,
+        files,
       };
     }),
     total: store.items.length,
     pinned: store.items.filter(n => n.pinned).length,
   };
+}
+
+function collectNotes() {
+  const store = safe(() => readCoachNotes(localStorageRef()), { version: 1 as const, items: [] });
+  return notesForWidget(store);
 }
 
 function localStorageRef(): Storage | null {

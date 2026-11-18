@@ -66,6 +66,14 @@ export function attachmentSummary(
   return parts.join(' · ');
 }
 
+/**
+ * Суммарный объём вложений по метаданным (без чтения байтов). Нужен, чтобы
+ * показать «сколько занимает эта заметка» и разбивку в списке.
+ */
+export function attachmentsBytes(items: ReadonlyArray<{ size?: number }>): number {
+  return items.reduce((sum, a) => sum + (Number.isFinite(a.size) ? Math.max(0, a.size ?? 0) : 0), 0);
+}
+
 /** Расширение для имени файла: восстановление по mime (для Share/скачивания). */
 export function extensionForMime(mime: string): string {
   const base = String(mime || '').toLowerCase().split(';')[0].trim();

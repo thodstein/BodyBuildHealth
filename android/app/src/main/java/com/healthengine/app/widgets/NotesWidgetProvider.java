@@ -79,7 +79,11 @@ public class NotesWidgetProvider extends AppWidgetProvider {
                 continue;
             }
             v.setViewVisibility(rowIds[i], View.VISIBLE);
-            v.setTextViewText(titleIds[i], n.optString("title", "Заметка"));
+            String title = n.optString("title", "Заметка");
+            // «📎» — у заметки есть фото/голос. Префикс, а не суффикс: значок
+            // остаётся виден даже когда длинный заголовок усекается.
+            if (Math.max(0, n.optInt("files", 0)) > 0) title = "📎 " + title;
+            v.setTextViewText(titleIds[i], title);
             int done = Math.max(0, n.optInt("done", 0));
             int items = Math.max(0, n.optInt("total", 0));
             if (items > 0) {

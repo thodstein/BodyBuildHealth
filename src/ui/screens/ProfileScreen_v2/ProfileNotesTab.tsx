@@ -61,6 +61,7 @@ import {
 import {
   NOTE_AUDIO_MAX_MS,
   attachmentSummary,
+  attachmentsBytes,
   compressPhotoDataUrl,
   dataUrlMime,
   dataUrlToBytes,
@@ -83,6 +84,7 @@ import {
 } from '../../../engines/note-speech';
 import {
   cleanupNoteMedia,
+  deleteAllNoteMedia,
   deleteNoteMedia,
   deleteNoteMediaForNote,
   getNoteMedia,
@@ -229,6 +231,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const [shareNote, setShareNote] = useState<string | null>(null);
   /** Сколько занимают файлы заметок — по нему видно, что квота не бесконечна. */
   const [mediaTotal, setMediaTotal] = useState(0);
+  /** Второй тап по «удалить все вложения» — подтверждение (как у заметки). */
+  const [confirmClearMedia, setConfirmClearMedia] = useState(false);
 
   /* ── Медиа, загруженное из IndexedDB (для списка) ─────────────────── */
   const [media, setMedia] = useState<Record<string, MediaView>>({});
@@ -289,6 +293,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const visible = useMemo(
     () => filterCoachNotes(store, { query, athleteId: athleteFilter === 'all' ? null : athleteFilter }),
     [store, query, athleteFilter],
+  );
+
+  /** Сколько заметок держат файлы: «занято X» — сумма именно по ним. */
+  const notesWithMedia = useMemo(
+    () => store.items.filter(n => noteAttachments(n).length > 0).length,
+    [store],
   );
 
   /* ── Медиа из IndexedDB: кэш по id ───────────────────────────────── */
@@ -354,6 +364,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     },
     [],
   );
+
+  /* ── «Удалить все файлы» подтверждается только в списке ──────────── */
+  // В редакторе кнопки нет; но если подтверждение было «взведено» и открыть
+  // заметку, оно не должно ждать там одним случайным тапом.
+  useEffect(() => {
+    if (editor) setConfirmClearMedia(false);
+  }, [editor]);
 
   /* ── Уборка сирот, постоянное хранилище, нативные возможности ─────── */
   useEffect(() => {
@@ -898,6 +915,33 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     setConfirmDeleteId(id);
   };
 
+  /**
+   * Стереть файлы ВСЕХ заметок: текст и сами заметки остаются. Действие необратимое
+   * (корзины нет), поэтому подтверждение двумя шагами — как у удаления заметки.
+   */
+  const askClearMedia = () => {
+    if (!confirmClearMedia) {
+      setConfirmClearMedia(true);
+      return;
+    }
+    setConfirmClearMedia(false);
+    void (async () => {
+      await deleteAllNoteMedia();
+      const cleaned = store.items.map(n =>
+        noteAttachments(n).length > 0 ? { ...n, attachments: [] } : n,
+      );
+      apply({ ...store, items: cleaned });
+      // Кэш держал файлы в памяти и в blob-URL — отпускаем сразу, а не ждём mount.
+      for (const view of mediaCacheRef.current.values()) revokeBlobUrl(view.src ?? '');
+      mediaCacheRef.current.clear();
+      setMedia({});
+      setViewer(null);
+      setShareNote(null);
+      setMediaTotal(0);
+      refreshMediaTotal();
+    })();
+  };
+
   /** Поделиться/сохранить вложение: сохраняется в «Документы» и в шаринг. */
   const shareAttachment = (att: CoachNoteAttachment) => {
     setVoiceError(null);
@@ -936,6 +980,44 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             + Новая заметка
           </button>
         </div>
+
+        {mediaTotal > 0 && (
+          <div
+            data-notes="media-total"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}
+          >
+            <span style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
+              Файлы занимают {formatBytes(mediaTotal)} (заметок с файлами: {notesWithMedia}).
+            </span>
+            {/* В редакторе файлы «в работе» — уборку там не предлагаем, чтобы не
+                оставить в заметке ссылки на уже удалённое. */}
+            {!editor && (
+              <button
+                type="button"
+                onClick={askClearMedia}
+                data-notes="clear-media"
+                style={{ ...btn(confirmClearMedia ? 'danger' : 'ghost'), fontSize: 11.5 }}
+              >
+                {confirmClearMedia ? 'Точно удалить все файлы?' : 'Удалить все вложения'}
+              </button>
+            )}
+            {!editor && confirmClearMedia && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearMedia(false)}
+                  data-notes="clear-media-cancel"
+                  style={{ ...btn('ghost'), fontSize: 11.5 }}
+                >
+                  Отмена
+                </button>
+                <span data-notes="clear-media-hint" style={{ fontSize: 11, color: colors.textSubtle }}>
+                  Заметки и текст останутся, файлы удалятся навсегда.
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <input
@@ -1148,6 +1230,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </div>
           )}
 
+          {/* Честная граница: расшифровки уже записанного звука нет — только живая диктовка. */}
+          {editor.attachments.some(a => a.kind === 'audio') && (
+            <div
+              data-notes="audio-no-transcript"
+              style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}
+            >
+              Расшифровать готовую запись нельзя: текст надиктовывается только вживую кнопкой «Голос в текст».
+            </div>
+          )}
+
           {voiceError && (
             <div role="alert" data-notes="voice-error" style={{ marginTop: 8, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}>
               {voiceError}
@@ -1273,6 +1365,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           const athleteName = nameOf(n.athleteId);
           const isDeleting = confirmDeleteId === n.id;
           const attachments = noteAttachments(n);
+          const attachBytes = attachmentsBytes(attachments);
           const photos = attachments.filter(a => a.kind === 'photo');
           const audios = attachments.filter(a => a.kind === 'audio');
           return (
@@ -1291,8 +1384,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             >
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word' }}>
-                    {n.title || n.body.split('\n')[0].slice(0, 80) || 'Заметка с вложением'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word', minWidth: 0 }}>
+                      {n.title || n.body.split('\n')[0].slice(0, 80) || 'Заметка с вложением'}
+                    </div>
+                    {attachments.length > 0 && (
+                      <span
+                        data-notes="attach-badge"
+                        title={`Вложений: ${attachments.length}${attachBytes > 0 ? ` · ${formatBytes(attachBytes)}` : ''}`}
+                        style={{
+                          fontSize: 10.5,
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          border: `1px solid ${withAlpha(AMBER, '59')}`,
+                          background: withAlpha(AMBER, '24'),
+                          color: AMBER,
+                          whiteSpace: 'nowrap',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        📎 {attachments.length}
+                        {attachBytes > 0 ? ` · ${formatBytes(attachBytes)}` : ''}
+                      </span>
+                    )}
                   </div>
                   {n.title && n.body && (
                     <div

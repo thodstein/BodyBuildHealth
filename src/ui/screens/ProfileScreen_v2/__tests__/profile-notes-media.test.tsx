@@ -355,3 +355,90 @@ describe('запись голоса через MediaRecorder', () => {
     expect(track.stop).toHaveBeenCalled();
   });
 });
+
+describe('значок «есть вложение» в списке', () => {
+  it('у заметки с файлами виден значок и её объём, у пустой — нет', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      {
+        title: 'С файлами',
+        attachments: [
+          { id: 'p1', kind: 'photo', mime: 'image/jpeg', size: 1024, createdAt: '2026-11-17T09:00:00.000Z' },
+          { id: 'a1', kind: 'audio', mime: 'audio/webm', size: 2048, createdAt: '2026-11-17T09:00:00.000Z' },
+        ],
+      },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    store = addCoachNote(store, { title: 'Просто текст' }, { id: 'n2', now: '2026-11-17T10:00:00.000Z' }).store;
+    writeCoachNotes(localStorage, store);
+
+    const { container } = render(<ProfileNotesTab />);
+    const badges = container.querySelectorAll('[data-notes="attach-badge"]');
+    // Только у заметки с файлами: значок — это факт, а не украшение.
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toContain('📎 2');
+    // Разбивка по заметкам: в значке — сколько занимают именно её файлы (1 + 2 КБ).
+    expect(badges[0].textContent).toContain('3 КБ');
+  });
+});
+
+describe('удаление всех вложений', () => {
+  it('просит подтверждение, стирает файлы, но оставляет заметки и текст', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      {
+        title: 'С голосом',
+        body: 'Текст остаётся',
+        attachments: [{ id: 'm1', kind: 'audio', mime: 'audio/webm', size: 3, createdAt: '2026-11-17T09:00:00.000Z' }],
+      },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+    await saveNoteMedia({
+      id: 'm1',
+      noteId: 'n1',
+      kind: 'audio',
+      mime: 'audio/webm',
+      size: 3,
+      createdAt: 1,
+      bytes: new Uint8Array([1, 2, 3]).buffer as ArrayBuffer,
+    });
+
+    const { container } = render(<ProfileNotesTab />);
+    const clear = () => container.querySelector('[data-notes="clear-media"]') as HTMLElement;
+    await waitFor(() => expect(clear()).not.toBeNull());
+
+    // Первый тап ничего не удаляет — только просит подтверждение.
+    fireEvent.click(clear());
+    expect(clear().textContent).toContain('Точно удалить');
+    expect(container.querySelector('[data-notes="clear-media-hint"]')?.textContent).toContain('останутся');
+    expect(await listNoteMedia()).toHaveLength(1);
+
+    // Второй тап — файлы стёрты, заметка на месте.
+    fireEvent.click(clear());
+    await waitFor(async () => expect(await listNoteMedia()).toHaveLength(0));
+    expect(items(container)).toHaveLength(1);
+    expect(items(container)[0].textContent).toContain('Текст остаётся');
+    expect(container.querySelector('[data-notes="attach-badge"]')).toBeNull();
+    // Файлов нет — и кнопка «удалить все вложения» больше не нужна.
+    await waitFor(() => expect(container.querySelector('[data-notes="clear-media"]')).toBeNull());
+    expect(readCoachNotes(localStorage).items[0].attachments ?? []).toHaveLength(0);
+  });
+});
+
+describe('расшифровка записанного аудио', () => {
+  it('у приложенного аудио UI прямо говорит, что расшифровки нет', async () => {
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    const file = new File([new Uint8Array([1, 2, 3])], 'voice.webm', { type: 'audio/webm' });
+    fireEvent.change(container.querySelector('[data-notes="audio-input"]') as HTMLInputElement, {
+      target: { files: [file] },
+    });
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="attach-item"][data-kind="audio"]')).not.toBeNull(),
+    );
+    expect(container.querySelector('[data-notes="audio-no-transcript"]')?.textContent).toContain('надиктовывается');
+  });
+});
