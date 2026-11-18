@@ -7,6 +7,7 @@
  */
 
 import type { CalculatorState, LabSlice } from './types';
+import { readLabValue } from '../../core/constants';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import type { MapperCtx } from '../tz-mapper-engine';
 import type { PhaseContext, PhaseKey } from '../tz-bridge-phase';
@@ -33,18 +34,46 @@ const MARKER_RENAME: Record<string, string> = {
   'PSA total': 'PSA_TOTAL', 'PSA free': 'PSA_FREE', 'CA-125': 'CA_125', 'Lp(a)': 'LP_A',
 };
 
-export function labSliceToValues(fp: LabSlice | null): Record<string, number> {
+/**
+ * Число из поля формы.
+ *
+ * Проход 131: бланк печатает границу («>1000», «<0.5») — это число с оговоркой,
+ * а не пустое поле. Проход 130: полоска («1+») числом не считается.
+ */
+function fieldNumber(raw: string): number | undefined {
+  if (raw.includes('+')) return undefined;
+  const cleaned = raw.trim().replace(/^[<>≤≥]\s*/, '').replace(',', '.');
+  if (!cleaned) return undefined;
+  const n = parseFloat(cleaned);
+  return Number.isNaN(n) ? undefined : n;
+}
+
+/**
+ * Плоская карта «маркер → число» для `MapperCtx`.
+ *
+ * Проход 135: единица бланка — часть данных (проход 106), и здесь она терялась.
+ * Раньше стоял `parseFloat(val)`, поэтому значение приходило в мост механизмов и в
+ * ступени в той единице, которую человек выбрал в форме: пролактин 300 мМЕ/л
+ * (это 14.2 нг/мл) читался как 300 нг/мл — «экстренно» по `cns1` и по ступеням;
+ * кортизол 15 мкг/дл (414 нмоль/л, норма) — как 15 нмоль/л, то есть «лечение»;
+ * витамин D 62 нмоль/л (24.8 нг/мл, недостаточность) — как 62 нг/мл, «норма».
+ * Теперь число читает тот же читатель, что и риск-модель (`readLabValue`): единица
+ * из бланка главнее, без единицы — прежняя догадка по величине. У маркеров без
+ * выбора единицы число не меняется.
+ */
+export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): Record<string, number> {
   if (!fp) return {};
   const out: Record<string, number> = {};
+  const units = fp.units;
   for (const pk of PANEL_KEYS) {
     const panel = (fp as any)[pk] as Record<string, string> | undefined;
     if (!panel) continue;
     for (const [marker, val] of Object.entries(panel)) {
       if (!val) continue;
-      const num = parseFloat(val);
-      if (isNaN(num)) continue;
+      const num = fieldNumber(val);
+      if (num === undefined) continue;
       const rename = MARKER_RENAME[marker] || marker.toUpperCase().replace(/\s+/g, '_');
-      out[rename] = num;
+      out[rename] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
     }
   }
   return out;
@@ -71,7 +100,10 @@ export function buildMapperCtx(
     onPCTDrug: state.pharma.phase === 'pct',
     inFertilityProgram: state.pharma.phase === 'fertility',
   };
-  const labs = labSliceToValues(state.labs.fullPanel);
+  // Пол нужен и чтению анализов (женский E2 без единицы читается как пг/мл), и
+  // PED-риску. Профиль без пола идёт мужским путём — как во всей модели.
+  const sex: 'male' | 'female' = state.profile?.sex === 'female' ? 'female' : 'male';
+  const labs = labSliceToValues(state.labs.fullPanel, sex);
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({
@@ -94,8 +126,6 @@ export function buildMapperCtx(
   if (t3Mcg > 0) pedDoses.push({ id: 't3', pClass: 't3', mcgPerDay: t3Mcg, form: 'oral' } as any);
 
   // ── PED-risk assessment (Фаза 1: нейро/суставы по стеку PED) ──
-  // Женский слой: пол из профиля калькулятора (state.profile.sex). Мужской путь без изменений.
-  const sex: 'male' | 'female' = state.profile?.sex === 'female' ? 'female' : 'male';
   const pedRisk = assessPedRisk(pedDoses, level, sex);
   const symptomsList = state.symptoms || [];
 

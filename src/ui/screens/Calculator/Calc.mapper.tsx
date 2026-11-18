@@ -441,7 +441,7 @@ function buildNeuroSymptomsFromState(state: any): Set<string> {
   const n = state?.neuro || {};
   const p = state?.profile || {};
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel);
+  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
   if ((n.aggressionScore || 0) >= 4) s.add('aggression');
   if (n.gabaBalance === 'overexcited') { s.add('anxiety'); s.add('inner_tremor'); }
   if (p.sleepHours != null && p.sleepHours < 6) s.add('sleep_onset2');
@@ -464,7 +464,7 @@ function buildJointSymptomsFromState(state: any): Set<string> {
   const s = new Set<string>();
   const oda = state?.oda || {};
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel);
+  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
   const jp = oda.jointPain;
   if (jp === 'mild') s.add('load_pain');
   if (jp === 'moderate') { s.add('load_pain'); s.add('crepitus'); }
@@ -480,7 +480,7 @@ function buildJointSymptomsFromState(state: any): Set<string> {
 function buildHematoSymptomsFromState(state: any): Set<string> {
   const s = new Set<string>();
   const symptoms = (state?.symptoms as string[]) || [];
-  const labs = labSliceToValues(state?.labs?.fullPanel);
+  const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
   const hct = labs['HEMATOCRIT'] || labs['HCT'];
   const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
   const plt = labs['PLT'];
@@ -671,7 +671,7 @@ function analyzeStackModule(
 
   const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
   const symptoms = state.symptoms || [];
-  const labs = labSliceToValues(state.labs.fullPanel);
+  const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
   const jointPain = state.oda.jointPain;
   const hasJointSymptom = symptoms.includes('joint_pain');
   const crp = labs['CRP'] || labs['HSCRP'];
@@ -1107,7 +1107,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   useEffect(() => {
     if (!finalRec) { setCalcNotifs([]); return; }
     try {
-      const notifLabs = labSliceToValues(state.labs?.fullPanel ?? null);
+      const notifLabs = labSliceToValues(state.labs?.fullPanel ?? null, state?.profile?.sex);
       const notifState: any = {
         labs: {
           lastLabDate: state.labs?.fullPanel?.date,
@@ -1911,7 +1911,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Универсальные системные popup-ы: тот же каркас, что у Нейро/Кровь/Суставы ── */}
       {genericEnhancementPopup && GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup] && ReactDOM.createPortal((() => {
         const cfg = GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup];
-        const labs = labSliceToValues(state.labs.fullPanel);
+        const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
         const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
         const activeDomains = domains.filter(d => d.trigger?.(labs, state));
         const activeMarkers = cfg.markers.filter(m => labs[m] != null);
@@ -1998,7 +1998,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         if (stackModulePopup === 'articular_stack') {
           const planIds = new Set((rec?.subs || []).map(s => canonIdLocal(s.substanceId)));
           const symptoms = state.symptoms || [];
-          const labs = labSliceToValues(state.labs.fullPanel);
+          const labs = labSliceToValues(state.labs.fullPanel, state.profile.sex);
           const jointPain = state.oda.jointPain;
           const hasJointSymptom = symptoms.includes('joint_pain');
           const crp = labs['CRP'] || labs['HSCRP'];
@@ -2412,7 +2412,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
           const hematoCoverage = finalRecWithResidual?.pedRisk?.hematoCoverage;
           const hematoCovered = finalRecWithResidual?.pedRisk?.hematoCovered ?? 0;
           const hematoRecommended = finalRecWithResidual?.pedRisk?.hematoRecommended ?? 0;
-          const labs = labSliceToValues(state?.labs?.fullPanel);
+          const labs = labSliceToValues(state?.labs?.fullPanel, state?.profile?.sex);
           const hct = labs['HEMATOCRIT'] || labs['HCT'];
           const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
           const plt = labs['PLT'];
@@ -3342,7 +3342,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 <div style={{ marginBottom:7 }}>
                   {/* Текущие показатели из анализов пользователя */}
                   {(() => {
-                    const labsValues = labSliceToValues(state.labs.fullPanel);
+                    const labsValues = labSliceToValues(state.labs.fullPanel, state.profile.sex);
                     const hasLabs = Object.keys(labsValues).length > 0;
                     if (hasLabs) {
                       return (
