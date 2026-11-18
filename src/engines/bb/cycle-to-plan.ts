@@ -20,6 +20,8 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
+import { onCourseOf } from './bb-ped-profile';
+import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { recommendPEDMethodology } from './bb-ped-methodology.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyRecoveryRelief } from './bb-recovery-relief.engine';
@@ -2107,6 +2109,14 @@ export interface ProgramToBBPlanOpts {
   abPatternRotation?: boolean;
   /** Единая методика порядка упражнений для всех BB-источников. */
   methodology?: SessionMethodology;
+  /**
+   * P3-3 (аудит 2026-11, ядро, остаток): DUP-волна програмной ветки.
+   * Раньше вход волну не принимал — UI накладывал её снаружи, уже после сборки:
+   * снимок и replan описывали план БЕЗ методики. Теперь поле читает сама сборка.
+   */
+  dupMode?: DUPMode;
+  /** Per-muscle DUP: применять волну только к primary этих мышц. */
+  dupMuscles?: string[];
   trainingFocus?: BBTrainingFocus;
   /** P0-1: Пол атлета — female активирует gluteBoost ×1.2, female_glute_5 split. */
   sex?: 'male' | 'female';
@@ -3003,7 +3013,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     // Аудит 2026-09 (методики должны применяться): объёмный режим и курс влияют
     // на лимиты сессии и в program-пути (раньше — NO-OP поле).
     trainingVolumeMode: opts.trainingVolumeMode,
-    onCourse: (opts.peds?.length || 0) > 0,
+    // Ядро P3-2: «на курсе» — дозо-зависимый PED-профиль, а не непустой список (креатин).
+    onCourse: onCourseOf({ peds: opts.peds }),
   });
   // Единый passthrough методик program-пути (аудит 2026-09):
   //  • volumeScheme: FST-7 7-in-1 только enhanced без joint-guard (паритет с generic);
@@ -3340,6 +3351,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     rehabMuscles: opts.rehabMuscles,
     dcMode: opts.dcMode,
     wearable: opts.wearable ? true : undefined,
+    // P3-3: флаг методики доезжает до снимка — replan пересобирает остаток с DUP.
+    dupMode: opts.dupMode,
+    dupMuscles: opts.dupMuscles,
   };
   // G5: боль/крепатура — паритет с generic-путём. Раньше painLevel/soreness010
   // существовали только в BBBuilderInput, и «программный» путь (циклы/программы)
@@ -3381,6 +3395,20 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // скидку базе можно считать по фактической сессии. Без этого pass'а
   // program-adapt менял только порядок, а вес компаунда оставался прежним.
   if (mode === 'adapt' && opts.methodology === 'pre_exhaust') applyPreExhaustLoadsToPlan(finalized);
+  // P3-3 (аудит 2026-11, ядро, остаток): програмная ветка получала DUP только снаружи
+  // (UI после сборки), поэтому `inputSnapshot.dupMode` оставался пустым и replan
+  // собирал остаток мезоцикла без выбранной методики. Теперь как в generic-пути —
+  // волна накладывается сборкой ДО финального снимка; поведение детерминировано,
+  // повторное наложение из UI безвредно. Новичку волна не применяется.
+  if (opts.dupMode && opts.dupMode !== 'none' && level !== 'beginner') {
+    const dupPlan = applyDUPOverlay(finalized, {
+      mode: opts.dupMode,
+      cycleDays: opts.dupMode === 'full_dup' ? 3 : 2,
+      muscles: opts.dupMuscles && opts.dupMuscles.length ? opts.dupMuscles : undefined,
+    });
+    finalized.weeks = dupPlan.weeks;
+    finalized.rationale = dupPlan.rationale;
+  }
   // Аудит Y: тот же класс, что и в цикл-пути — MRV-трим/rehab-relief правят
   // план после finalizeBBPlan, поэтому снимки факта пересобираются последними.
   refreshBBPlanSnapshots(finalized, {

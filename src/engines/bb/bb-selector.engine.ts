@@ -8,6 +8,7 @@ import { normLevel } from '../volume-landmarks.engine';
 import { TAG_MUSCLES } from './bb-day-types';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { sessionLimitsFor } from './bb-volume.engine';
+import { highVolumeDemandOf, pedProfileOf } from './bb-ped-profile';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -421,38 +422,11 @@ export function selectBestBBSplit(input: BBSelectorInput): BBRankedPattern | nul
 }
 
 /**
- * PED-профиль пользователя (ядро P3-2 аудита 2026-11).
- *
- * До правки одно и то же решение о сплите опиралось на ТРИ разных определения
- * «высокого объёма»: `rankBBSplits` — дозо-зависимое (AAS ≥ 500 мг, GH/инсулин
- * по имени или дозе), `splitFitWarnings` — по самому факту наличия любого PED в
- * списке (креатин тоже делал атлета «высокообъёмным»), капы сессии — по
- * `peds.length > 0`. Правило теперь одно и живёт здесь.
- *
- * AAS определяется как раньше: имя содержит `aas`/`тест` ИЛИ доза ≥ 500 мг.
+ * PED-профиль и «высокий объём» (ядро P3-2 аудита 2026-11) живут в `bb-ped-profile`:
+ * одно дозо-зависимое правило читают и решения о сплите, и объём (`bb-volume`).
+ * Селектор реэкспортирует их для прежних потребителей.
  */
-export function pedProfileOf(
-  input: Pick<BBSelectorInput, 'peds' | 'pedDoses'>,
-): { hasAAS: boolean; hasGH: boolean; hasIns: boolean } {
-  const peds = input.peds || [];
-  const doses = (input.pedDoses || {}) as Record<string, number>;
-  const hasAAS = peds.some((x) => {
-    const s = String(x).toLowerCase();
-    return s.includes('aas') || s.includes('тест');
-  }) || Number(doses['AAS'] || 0) >= 500;
-  const hasGH = peds.some((x) => String(x) === 'GH') || Number(doses['GH'] || 0) > 0;
-  const hasIns = peds.some((x) => String(x) === 'insulin') || Number(doses['insulin'] || 0) > 0;
-  return { hasAAS, hasGH, hasIns };
-}
-
-/** «Высокий объём» для решения о сплите: enhanced или реальный PED-профиль. */
-export function highVolumeDemandOf(
-  input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses'>,
-): boolean {
-  if (normLevel(input.level) === 'enhanced') return true;
-  const { hasAAS, hasGH, hasIns } = pedProfileOf(input);
-  return hasAAS || hasGH || hasIns;
-}
+export { pedProfileOf, highVolumeDemandOf };
 
 /** Капы сессии сплита для уровня/режима + число групп в самом плотном дне. */
 export function splitSessionBudget(p: SplitPattern, input: Pick<BBSelectorInput, 'level' | 'peds' | 'pedDoses' | 'mode'> & { trainingYears?: number }): { maxExercises: number; maxWorkingSets: number; maxGroups: number } {

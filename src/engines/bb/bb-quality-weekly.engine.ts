@@ -24,6 +24,7 @@ import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { aggregateBBVolume, computeMuscleBalance, sessionLimitsFor } from './bb-volume.engine';
+import { onCourseOf } from './bb-ped-profile';
 import { canonicalMuscle, specResForWeekSchedule, tradeoffForWeek, expandDonorMuscles, isSpecializationWeak, isSpecializationFocus } from './bb-specialization.engine';
 import { sessionsWithMuscleInWeek } from './bb-frequency';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -518,7 +519,7 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
   try {
     const limits = sessionLimitsFor({
       level, trainingYears: snap.trainingYears,
-      onCourse: !!((snap.peds || []).length > 0 || (plan as any).pedAdaptation),
+      onCourse: onCourseOf({ peds: snap.peds }) || !!(plan as any).pedAdaptation,
       peds: snap.peds, courseIntensity: snap.courseIntensity,
       calorieSurplus: snap.calorieSurplus, proteinPerKg: snap.proteinPerKg,
       labMrvMultiplier: snap.labMrvMultiplier, trainingVolumeMode: snap.trainingVolumeMode,

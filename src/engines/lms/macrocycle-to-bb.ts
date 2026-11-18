@@ -22,6 +22,7 @@ import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
 import { adaptForPEDs, type PEDAdaptation } from '../bb/bb-ped-adaptation.engine';
+import { onCourseOf } from '../bb/bb-ped-profile';
 
 export interface MacrocycleToBBOptions {
   level: string;
@@ -234,8 +235,9 @@ function buildBaseBBProgram(total: number, opts: MacrocycleToBBOptions, pedAdapt
     equipment: opts.equipment ?? [],
     weakPoints: opts.weakPoints ?? [],
     trainingFocus: opts.trainingFocus,
-    // MC-5: Pass PED parameters (simplified - uses onCourse flag)
-    onCourse: opts.peds && opts.peds.length > 0,
+    // MC-5: Pass PED parameters (simplified - uses onCourse flag).
+    // Ядро P3-2: «на курсе» — дозо-зависимый профиль, а не непустой список (креатин).
+    onCourse: onCourseOf({ peds: opts.peds }),
     courseIntensity: opts.courseIntensity,
     bodyFat: opts.bodyFat,
     leanMass: opts.leanMass,

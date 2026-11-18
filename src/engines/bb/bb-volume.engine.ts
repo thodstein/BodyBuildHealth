@@ -8,6 +8,7 @@
 import { trueMuscleOf } from '../movement-pattern';
 import { MUSCLE_LABEL_RU, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../pro/hrv-baseline.engine';
+import { onCourseOf } from './bb-ped-profile';
 
 /**
  * Волна-2.6 (аудит 2026-09): ЕДИНЫЙ допуск MRV для всех точек конвейера —
@@ -53,9 +54,12 @@ export const SECONDARY_FIXED_MUSCLES: ReadonlySet<string> = new Set(['traps']);
 export function computeRegimeMrvMult(input: {
   onCourse?: boolean;
   peds?: string[];
+  pedDoses?: Record<string, number>;
   courseIntensity?: string;
 }): number {
-  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  // Ядро P3-2: «на курсе» — явный режим или реальный PED-профиль (доза/имя), а не
+  // непустой список. Креатин больше не удваивает бюджет/MRV.
+  const onCourse = onCourseOf(input);
   if (!onCourse) return 1.0;
   // Базовый ×2. Тяжёлая интенсивность курса — чуть выше (×2.05-2.1).
   const intensity = input.courseIntensity === 'heavy' ? 1.06 : input.courseIntensity === 'mild' ? 0.98 : 1.0;
@@ -84,11 +88,12 @@ export function regimeMrvMultFor(muscle: string, regimeMult: number): number {
 export function computeMrvMult(input: {
   onCourse?: boolean;
   peds?: string[];
+  pedDoses?: Record<string, number>;
   courseIntensity?: string;
   /** Дозо-зависимый MRV-множитель от adaptForPEDs (combinedMrvMultiplier). */
   doseAwareMrv?: number;
 }): number {
-  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  const onCourse = onCourseOf(input);
   if (!onCourse) return 1.0;
   const dose = Number(input.doseAwareMrv);
   if (Number.isFinite(dose) && dose > 1) {
@@ -165,6 +170,7 @@ export function recoveryScoreToMult(score: number): number {
 export function computeBBWeeklyBudget(input: {
   onCourse?: boolean;
   peds?: string[];
+  pedDoses?: Record<string, number>;
   courseIntensity?: string;
   recoveryScore?: number;
   calorieSurplus?: number;
@@ -191,6 +197,7 @@ export function sessionLimitsFor(
   input: {
     onCourse?: boolean;
     peds?: string[];
+    pedDoses?: Record<string, number>;
     courseIntensity?: string;
     recoveryScore?: number;
     calorieSurplus?: number;
@@ -205,7 +212,9 @@ export function sessionLimitsFor(
   const weeklyWorkingSets = computeBBWeeklyBudget(input);
   const level = input.level || 'intermediate';
   const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
-  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  // Ядро P3-2: «на курсе» — тот же дозо-зависимый профиль, что у решений о сплите и
+  // MRV-множителя (креатин в списке `peds` больше не даёт тир «про на курсе»).
+  const onCourse = onCourseOf(input);
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
   if (onCourse && years >= 3) { // про НА ПЕД: без ПЕД — тир advanced (пропорционально ниже)
