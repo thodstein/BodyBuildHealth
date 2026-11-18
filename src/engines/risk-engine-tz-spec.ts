@@ -4,7 +4,7 @@ import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, T
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
 import { HCT_THRESHOLDS, HCT_STEPS, HGB_STEPS, RBC_STEPS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, UA_STAGE_ULN,
-  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS } from './lab-norms.engine';
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS } from './lab-norms.engine';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -238,7 +238,7 @@ export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number
 const MECH_LAB_MARKERS:Record<string,string[]>={
   cv1:['BNP','CK'],cv2:['LDL','HDL','TG','TC'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
   liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
-  ren1:['eGFR','CREAT','UREA','URIC'],ren2:['eGFR'],ren3:['UACR'],ren4:['K','NA','MG','CA'],
+  ren1:['eGFR','CREAT','UREA','URIC'],ren2:['eGFR'],ren3:['UACR','PROTEIN_URINE'],ren4:['K','NA','MG','CA'],
   cns1:['PRL'],cns2:['CRP','HOMOCYSTEINE','IL6','TNFA','FERRITIN'],cns3:['HOMOCYSTEINE'],cns4:['TSH','CORTISOL','T3','T4','DHEAS'],cns5:['GLU'],cns6:[],
   rep1:['LH','FSH'],rep2:['TT','FT','SHBG'],rep3:['FSH'],rep4:['E2'],rep5:['LH','TT'],
   hem1:['HCT','HGB','RBC','WBC'],hem2:['GLU','HOMA'],hem3:['GLU'],hem4:['K'],hem5:['K','NA','MG','CA'],
@@ -344,7 +344,8 @@ export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:
 };
 
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
-function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
+/** Экспортируется для гардов: вклад анализа проверяется напрямую, а не через весь расчёт. */
+export function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
   // Базовые defaults — единый источник M_I_BASE_DEFAULTS (модуль-левел, см. выше)
   const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
   const raw = M_I_BASE_DEFAULTS[mechId] ?? 0;
@@ -360,6 +361,8 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
   const hct=labValues['HCT'];const hgb=labValues['HGB'];const plt=labValues['PLT'];
   const alt=labValues['ALT'];const ast=labValues['AST'];const ggt=labValues['GGT'];const bil=labValues['BIL'];
   const k=labValues['K'];const na=labValues['NA'];const egfr=labValues['eGFR'];const creat=labValues['CREAT'];const uacr=labValues['UACR'];
+  // Проход 130: белок мочи — отдельный маркер (г/л), а не «UACR». См. `ren3`.
+  const proteinUrine=labValues['PROTEIN_URINE'];
   const lh=labValues['LH'];const fsh=labValues['FSH'];const tt=labValues['TT'];const e2=labValues['E2'];const prl=labValues['PRL'];const shbg=labValues['SHBG'];
   const glu=labValues['GLU'];const homa=labValues['HOMA'];const crp=labValues['CRP'];const homoc=labValues['HOMOCYSTEINE'];
   const tsh=labValues['TSH'];const bnp=labValues['BNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
@@ -493,9 +496,14 @@ function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:
       }
       break;
     }
-    case'ren3': { // протеинурия: UACR / proteinuria
+    case'ren3': { // протеинурия: UACR (мг/г) и белок мочи (г/л)
+      // Проход 130: белок мочи раньше приезжал сюда как UACR — 3 г/л
+      // (нефротический ряд) читались как «3 мг/г» и не давали вклада.
+      // Ступени белка — `PROTEINURIA_STEPS` (ВГН 0.15 · 0.5 · 1.0 г/л).
       const uacrMi = labMi(uacr,[30,300,1000]);
-      if (uacrMi !== undefined) labResult = uacrMi;
+      const proteinMi = labMi(proteinUrine,PROTEINURIA_STEPS);
+      const vals = [uacrMi,proteinMi].filter(v=>v!==undefined) as number[];
+      if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
     case'ren4': { // водно-электролитный: K, Na, Mg, Ca

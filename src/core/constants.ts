@@ -529,7 +529,13 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'HOMAIR': { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
   'EGFR': { prefUnit: 'mL/min', coeff: 1, uln: 120, lln: 60, name: 'СКФ' },
   'UACR': { prefUnit: 'mg/g', coeff: 1, uln: 30, lln: 0, name: 'Альбумин/креатинин мочи' },
-  'PROTEIN_URINE': { prefUnit: 'mg/L', coeff: 1, uln: 150, lln: 0, name: 'Протеинурия' },
+  // Проход 130: канон протеинурии — г/л. В репозитории жили два канона одного
+  // маркера: тиры (`lab-tier-ranges`: 0–0.15–0.5–1.0) и мост механизма
+  // (`tz-bridge-marker`: ВГН 0.15) считали в г/л, а каталог UCUM — в мг/л (150).
+  // Импорт приводил бланк к мг/л, и 3.0 г/л (нефротическая протеинурия)
+  // сравнивались с порогами 0.15/0.5/1.0 как «почти ноль». 0.15 г/л = 150 мг/л —
+  // это один и тот же порог, поэтому числа не меняются, меняется только единица.
+  'PROTEIN_URINE': { prefUnit: 'g/L', coeff: 1, uln: 0.15, lln: 0, name: 'Протеинурия' },
   'MICROALB': { prefUnit: 'mg/L', coeff: 1, uln: 30, lln: 0, name: 'Микроальбумин' },
   'ECHO_LV_MASS': { prefUnit: 'g', coeff: 1, uln: 200, lln: 90, name: 'Масса ЛЖ' },
   'ECHO_EF': { prefUnit: '%', coeff: 1, uln: 70, lln: 50, name: 'ФУ ЛЖ' },
@@ -855,6 +861,10 @@ export const LAB_UNIT_READ: Record<string, LabUnitConversion> = {
   'Folate': { canon: 'нг/мл', others: { 'нмоль/л': { factor: FOLATE_NG_TO_NMOL, op: 'div' } } },
   // 123: 300 пмоль/л B12 — это 406.6 пг/мл.
   'B12': { canon: 'пг/мл', others: { 'пмоль/л': { factor: B12_PG_TO_PMOL, op: 'div' } } },
+  // 130: белок мочи. Полоска печатает «следы/+/++», а количественный бланк —
+  // «0,3 г/л» или «300 мг/л»; без единицы эти два числа неразличимы в 1000 раз.
+  // Канон чтения = канон каталога (`PROTEIN_URINE` в г/л).
+  'Protein': { canon: 'г/л', others: { 'мг/л': { factor: 1000, op: 'div' } } },
 };
 
 /** Канон чтения по маркеру — производная от таблицы, второго источника чисел нет. */
@@ -876,6 +886,8 @@ export const LAB_UNIT_CHOICES: Record<string, readonly string[]> = {
   'Vitamin D (25-OH)': ['нг/мл', 'нмоль/л'],
   'Folate': ['нг/мл', 'нмоль/л'],
   'B12': ['пг/мл', 'пмоль/л'],
+  // 130: белок мочи — г/л (как в тирах и в мосте механизма) или мг/л.
+  'Protein': ['г/л', 'мг/л'],
 };
 
 /** Написание единицы → каноническое. Пустое/неизвестное — `''` (значит «не указана»). */
@@ -888,6 +900,8 @@ const UNIT_ALIAS: Record<string, string> = {
   'нг/дл': 'нг/дл', 'ng/dl': 'нг/дл',
   'мкг/дл': 'мкг/дл', 'µg/dl': 'мкг/дл', 'μg/dl': 'мкг/дл', 'ug/dl': 'мкг/дл',
   'мкмоль/л': 'мкмоль/л', 'µmol/l': 'мкмоль/л', 'μmol/l': 'мкмоль/л', 'umol/l': 'мкмоль/л',
+  'г/л': 'г/л', 'g/l': 'г/л',
+  'мг/л': 'мг/л', 'mg/l': 'мг/л',
 };
 
 /** Каноническое написание единицы (для сверки). Неизвестное — пустая строка. */
@@ -927,7 +941,10 @@ export function readLabValue(
     // Незнакомая единица не пересчитывается и не выдаётся за точную — как и до таблицы.
     if (!conv) return { value: rawValue, guessed: false };
     const canonValue = conv.op === 'div' ? rawValue / conv.factor : rawValue * conv.factor;
-    return { value: Math.round(canonValue * 10) / 10, guessed: false };
+    // Проход 130: у величин меньше единицы один знак после запятой обрезал данные —
+    // 150 мг/л белка мочи превращались в 0.2 г/л вместо 0.15, а ВГН стоит ровно на 0.15.
+    const step = Math.abs(canonValue) < 1 ? 1000 : 10;
+    return { value: Math.round(canonValue * step) / step, guessed: false };
   }
 
   if (marker === 'E2' && sex === 'female') return { value: rawValue, guessed: true };

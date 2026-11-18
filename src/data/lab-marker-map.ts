@@ -77,7 +77,7 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'NGAL', name:'NGAL', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:150, unit:'нг/мл', correctionIds:['astragalus','cordyceps'] },
   { marker:'KIM1', name:'KIM-1', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:2.0, unit:'нг/мл', correctionIds:['astragalus','cordyceps'] },
   { marker:'EGFR', name:'СКФ', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','OSMOREGULATION'], higherIsWorse:false, defaultValue:60, unit:'мл/мин', correctionIds:['astragalus','taurine','cordyceps','d_mannose'] },
-  { marker:'PROTEIN_URINE', name:'Протеинурия', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:150, unit:'мг/л', correctionIds:['astragalus','taurine','cordyceps'] },
+  { marker:'PROTEIN_URINE', name:'Протеинурия', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:0.15, unit:'г/л', correctionIds:['astragalus','taurine','cordyceps'] },
   { marker:'MICROALB', name:'Микроальбуминурия', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','OSMOREGULATION'], higherIsWorse:true, defaultValue:30, unit:'мг/л', correctionIds:['astragalus','taurine','cordyceps'] },
   { marker:'URIC_ACID', name:'Мочевая кислота', organ:'KIDNEYS', system:'renal', mechanisms:['ANTIOXIDANT','RENOPROTECTION'], higherIsWorse:true, defaultValue:420, unit:'мкмоль/л', correctionIds:['taurine','cordyceps','astragalus'] },
 

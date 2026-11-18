@@ -111,18 +111,57 @@ describe('проход 129: у каждого поля формы есть ед�
   it('ни одно поле полного бланка не просит число без единицы', () => {
     // Исключения честные, а не забытые:
     //  - без концентрации: INR — отношение, pH мочи — безразмерный, мочевые
-    //    полосы (белок, кетоны, лейкоциты, нитриты) — «следы/+/++»;
+    //    полосы (глюкоза, кетоны, лейкоциты, нитриты) — «следы/+/++»;
     //  - не описаны в каталоге единиц вовсе: 3a-ADG, витамин K, насыщение
     //    трансферрина (процент), тропонин T (не тот же анализ, что тропонин I).
     // Новое имя в этом списке — повод завести запись в каталоге, а не привычка.
+    // Пара «панель:маркер» нужна там, где один маркер в разных панелях разный:
+    // глюкоза мочи — полоска, глюкоза крови — ммоль/л (проход 130).
     const KNOWN = [
-      'INR', 'pH', 'Protein', 'Ketones', 'Leukocytes', 'Nitrite',
+      'INR', 'pH', 'Ketones', 'Leukocytes', 'Nitrite',
+      'panelUrinalysis:Glucose',
       '3a-ADG', 'Vitamin K', 'Transferrin Sat', 'Troponin T',
     ];
+    const known = new Set(KNOWN);
     const missing = FULL_PANELS
-      .flatMap(p => p.markers)
-      .filter(m => !LAB_UNIT_CHOICES[m] && !labUnitHint(m))
-      .filter(m => !KNOWN.includes(m));
+      .flatMap(p => p.markers.map(m => [m, String(p.key)] as const))
+      .filter(([m, panel]) => !LAB_UNIT_CHOICES[m] && !labUnitHint(m, panel))
+      .filter(([m, panel]) => !known.has(m) && !known.has(`${panel}:${m}`))
+      .map(([m]) => m);
     expect(missing).toEqual([]);
+  });
+});
+
+/**
+ * Проход 130: общий анализ мочи — полоски, а не концентрация.
+ *
+ * Подсказка «ммоль/л» у глюкозы мочи отправляла человека искать концентрацию
+ * там, где бланк пишет «следы/+». Белок мочи, наоборот, бывает количественным —
+ * но в двух единицах (0.3 г/л = 300 мг/л), поэтому у него выбор единицы.
+ */
+describe('проход 130: моча — полоска, белок мочи — с выбором единицы', () => {
+  it('у качественных полей мочи единицы нет, у глюкозы крови — есть', () => {
+    for (const m of ['Glucose', 'Ketones', 'Leukocytes', 'Nitrite', 'pH']) {
+      expect(labUnitHint(m, 'panelUrinalysis'), m).toBeUndefined();
+    }
+    expect(labUnitHint('Glucose', 'panelBiochem')).toBe('ммоль/л');
+    // Без панели — прежний ответ: глюкоза в форме читается как кровь.
+    expect(labUnitHint('Glucose')).toBe('ммоль/л');
+  });
+
+  it('белок мочи: выбор единицы, подсказки нет', () => {
+    expect(LAB_UNIT_CHOICES['Protein']).toEqual(['г/л', 'мг/л']);
+    expect(labUnitHint('Protein', 'panelUrinalysis')).toBeUndefined();
+  });
+
+  it('форма передаёт панель в подсказку: моча не просит ммоль/л', () => {
+    const { container } = render(<FullLabInput values={null} onChange={() => {}} />);
+    const hints = placeholders(container);
+    // Сколько полей честно ждут ммоль/л (мочевина, глюкоза крови, калий, натрий…).
+    const expected = FULL_PANELS
+      .flatMap(p => p.markers.map(m => [m, String(p.key)] as const))
+      .filter(([m, panel]) => labUnitHint(m, panel) === 'ммоль/л').length;
+    // Если бы форма забыла передать панель, глюкоза мочи добавила бы лишнюю подсказку.
+    expect(hints.filter(h => h === 'ммоль/л')).toHaveLength(expected);
   });
 });

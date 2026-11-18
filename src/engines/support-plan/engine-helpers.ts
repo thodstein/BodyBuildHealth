@@ -1005,6 +1005,10 @@ function extractLabValues(
 
   const num = (val: any): number | undefined => {
     if (val === undefined || val === null || val === '') return undefined;
+    // Проход 130: «1+», «2+», «++» — это полоска, а не концентрация.
+    // `parseFloat('1+')` даёт 1, и «+1» белка мочи становился 1 г/л, то есть
+    // нефротической протеинурией из ничего.
+    if (typeof val === 'string' && val.includes('+')) return undefined;
     const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
     return isNaN(n) ? undefined : n;
   };
@@ -1079,16 +1083,24 @@ function extractLabValues(
 
   // panelInflammatory: IL-6, TNF-alpha, hsCRP
   const infl = (fp.panelInflammatory || {}) as Record<string, any>;
-  if (num(infl.hsCRP) !== undefined && v['CRP'] === undefined) v['CRP'] = num(infl.hsCRP)!;
+  // Проход 130: вчСРБ и СРБ — один и тот же белок в одной единице (мг/л).
+  // Раньше при заполненных обоих полях молча выигрывала биохимия: СРБ 1 при
+  // вчСРБ 7 давал «воспаления нет». Берём худшее из двух чисел и не теряем ни одного.
+  const hsCrp = num(infl.hsCRP);
+  if (hsCrp !== undefined) v['CRP'] = v['CRP'] === undefined ? hsCrp : Math.max(v['CRP'], hsCrp);
 
   // panelTumor: PSA total
   const tum = (fp.panelTumor || {}) as Record<string, any>;
   if (num(tum['PSA total']) !== undefined) v['PSA'] = num(tum['PSA total'])!;
   if (num(tum['PSA free']) !== undefined) v['PSA_FREE'] = num(tum['PSA free'])!;
 
-  // panelUrinalysis: Protein
+  // panelUrinalysis: Protein — полоска («следы/+/++») или концентрация (г/л, мг/л)
+  // Проход 130: раньше это число уезжало в `UACR` — альбумин/креатинин мочи в мг/г,
+  // то есть другой анализ в другой единице. Белок 3 г/л (нефротическая
+  // протеинурия) читался как «UACR 3 мг/г» и почечный риск молчал. Теперь это
+  // `PROTEIN_URINE` в г/л — канон каталога UCUM, тиров и моста механизма (ren3).
   const ua = (fp.panelUrinalysis || {}) as Record<string, any>;
-  if (num(ua.Protein) !== undefined) v['UACR'] = num(ua.Protein)!;
+  if (num(ua.Protein) !== undefined) v['PROTEIN_URINE'] = readHormone('Protein', 'panelUrinalysis', num(ua.Protein)!);
 
   // panelIron: Ferritin, Iron, TIBC
   const iron = (fp.panelIron || {}) as Record<string, any>;

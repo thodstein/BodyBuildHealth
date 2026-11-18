@@ -403,7 +403,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'UREA', label: 'Мочевина', importance: 'important', highMeaning: '>7.5 ммоль/л — катаболизм + нарушение выведения', target: '<6.5 ммоль/л' },
       { code: 'URIC_ACID', label: 'Мочевая кислота', importance: 'important', highMeaning: '>420 мкмоль/л — подагра, уратная нефропатия', target: '<360 мкмоль/л' },
       { code: 'UACR', label: 'Альбумин/креатинин мочи', importance: 'critical', highMeaning: '>30 мг/г — микроальбуминурия; >300 — протеинурия', target: '<20 мг/г' },
-      { code: 'PROTEIN_URINE', label: 'Протеинурия', importance: 'critical', highMeaning: '>150 мг/л — клубочковое повреждение', target: '<100 мг/л' },
+      { code: 'PROTEIN_URINE', label: 'Протеинурия', importance: 'critical', highMeaning: '>0,15 г/л — клубочковое повреждение', target: '<0,1 г/л' },
       { code: 'NGAL', label: 'NGAL', importance: 'important', highMeaning: '>200 нг/мл — ОПП (опережает креатинин на 24-48ч)', target: '<130 нг/мл' },
       { code: 'KIM1', label: 'KIM-1', importance: 'optional', highMeaning: '>2.5 нг/мл — тубулярное повреждение', target: '<1.8 нг/мл' },
       { code: 'K', label: 'Калий', importance: 'critical', highMeaning: '>5.5 — гиперкалиемия при ХБП', target: '4.0-5.0 ммоль/л' },

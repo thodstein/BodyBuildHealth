@@ -287,7 +287,7 @@ export const UNIT_MAP: Record<string, string> = {
   'TPO_AB': 'IU/mL', 'TG_AB': 'IU/mL', 'MPV': 'fL',
   'Amylase': 'U/L', 'Lipase': 'U/L', 'Proinsulin': 'pmol/L', 'Fructosamine': 'mcmol/L',
   // ── Новые маркёры: UCUM_MAP canonical units ──
-  'AMH': 'ng/mL', 'BNP': 'pg/mL', 'PROTEIN_URINE': 'mg/L', 'ENDOTHELIN1': 'pg/mL',
+  'AMH': 'ng/mL', 'BNP': 'pg/mL', 'PROTEIN_URINE': 'g/L', 'ENDOTHELIN1': 'pg/mL',
   'NO_MARKER': 'umol/L', 'ESTRADIOL_SENS': 'pmol/L', 'PREALBUMIN': 'mg/L',
   'RETICULOCYTES': '%', 'HAPTOGLOBIN': 'g/L', 'NGAL': 'ng/mL',
   'TNF_ALPHA': 'pg/mL', 'IL6': 'pg/mL', 'IL1B': 'pg/mL',

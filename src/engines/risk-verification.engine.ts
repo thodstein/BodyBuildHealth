@@ -6,7 +6,7 @@ import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/suppo
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_STEPS, HGB_STEPS, RBC_STEPS, UA_STAGE_ULN,
-  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS,
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS,
 } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
@@ -167,6 +167,10 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ], note: 'гиперфильтрация — ранний признак перегрузки' },
       { id: 'ren3', weight: 0.8, markers: [
         M('UACR', 'Альбумин/креатинин мочи', 'мг/г', 'high', [30, 300, 1000]),
+        // Проход 130: белок мочи — свой маркер в г/л (ступени `PROTEINURIA_STEPS`).
+        // До этого поле «Белок» общего анализа мочи уезжало в UACR, то есть
+        // альбумин/креатинин, и протеинурия 3 г/л читалась как «3 мг/г».
+        M('PROTEIN_URINE', 'Белок мочи', 'г/л', 'high', PROTEINURIA_STEPS),
       ] },
       { id: 'ren4', weight: 0.7, markers: [
         M('K', 'Калий', 'ммоль/л', 'low', [3.5, 3.0, 2.5]),

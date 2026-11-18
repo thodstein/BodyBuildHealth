@@ -9,6 +9,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildTzInput } from '../support-plan/engine-helpers';
+import { getMiFromLab } from '../risk-engine-tz-spec';
+import { PROTEINURIA_STEPS } from '../lab-norms.engine';
+import { UCUM_MAP } from '../../core/constants';
 import type { CalculatorState } from '../support-plan/types';
 
 function mockState(overrides: Partial<CalculatorState> = {}): CalculatorState {
@@ -149,5 +152,78 @@ describe('buildTzInput: поддержка и профиль', () => {
     expect(input.genetics?.cyp19a1).toBe('normal');
     expect(input.nutrition?.proteinPerKg).toBeCloseTo(1.8, 5);
     expect(input.courseWeek).toBe(6);
+  });
+});
+
+/**
+ * Проход 130: белок мочи.
+ *
+ * Поле «Белок» общего анализа мочи уезжало в `UACR` — альбумин/креатинин мочи
+ * в мг/г, то есть другой анализ в другой единице. Белок 3 г/л (нефротическая
+ * протеинурия) читался как «UACR 3» и не давал вклада в почечный риск, а полоска
+ * «1+» через `parseFloat('1+')` становилась 1 г/л — протеинурией из ничего.
+ * Теперь это `PROTEIN_URINE` в г/л: канон каталога UCUM, тиров и моста механизма.
+ *
+ * Тут же вчСРБ: он и СРБ — один белок в одной единице, и при заполненных обоих
+ * полях молча выигрывала биохимия (СРБ 1 при вчСРБ 7 = «воспаления нет»).
+ */
+describe('проход 130: белок мочи — свой маркер, а не UACR', () => {
+  function inputWith(panels: Record<string, unknown>, units?: Record<string, Record<string, string>>) {
+    const state = mockState({
+      // Без препаратов `buildTzInput` честно возвращает null (моделировать нечего).
+      pharma: {
+        ...mockState().pharma,
+        aas: [{ id: 'testosterone_enanthate', doseMgWeek: 400, weeks: 10 }],
+      },
+    } as Partial<CalculatorState>);
+    state.labs = {
+      ...state.labs,
+      fullPanel: { date: '2026-01-10', ...panels, ...(units ? { units } : {}) },
+    } as any;
+    return buildTzInput(state, [])!;
+  }
+
+  it('г/л уходит в PROTEIN_URINE, UACR не выдумывается', () => {
+    const input = inputWith({ panelUrinalysis: { Protein: '0.3' } });
+    expect(input.labValues!['PROTEIN_URINE']).toBe(0.3);
+    expect(input.labValues!['UACR']).toBeUndefined();
+  });
+
+  it('единица бланка главнее: 300 мг/л = 0.3 г/л', () => {
+    const input = inputWith({ panelUrinalysis: { Protein: '300' } }, { panelUrinalysis: { Protein: 'мг/л' } });
+    expect(input.labValues!['PROTEIN_URINE']).toBeCloseTo(0.3, 6);
+  });
+
+  it('полоска «1+/2+/++» — не концентрация', () => {
+    for (const raw of ['1+', '2+', '++', '+']) {
+      const input = inputWith({ panelUrinalysis: { Protein: raw } });
+      expect(input.labValues!['PROTEIN_URINE'], raw).toBeUndefined();
+    }
+  });
+
+  it('ren3 видит белок мочи: 0.05 → 0, 0.3 → 1, 3 г/л → 3', () => {
+    const mi = (protein: string) =>
+      getMiFromLab('ren3', inputWith({ panelUrinalysis: { Protein: protein } }).labValues!);
+    expect(mi('0.05')).toBe(0);
+    expect(mi('0.3')).toBe(1);
+    expect(mi('3')).toBe(3);
+  });
+
+  it('ступени протеинурии — ВГН каталога + границы тиров, без новых чисел', () => {
+    expect(PROTEINURIA_STEPS).toEqual([UCUM_MAP.PROTEIN_URINE.uln, 0.5, 1.0]);
+  });
+
+  it('UACR остаётся своим маркером: белок мочи его не подменяет', () => {
+    expect(getMiFromLab('ren3', { UACR: 100, PROTEIN_URINE: 0.1 })).toBe(1);
+    expect(getMiFromLab('ren3', { UACR: 10, PROTEIN_URINE: 3 })).toBe(3);
+  });
+
+  it('вчСРБ и СРБ не теряются: при заполненных обоих берётся худшее', () => {
+    const input = inputWith({ panelBiochem: { CRP: '1' }, panelInflammatory: { hsCRP: '7' } });
+    expect(input.labValues!['CRP']).toBe(7);
+  });
+  it('вчСРБ без СРБ читается как СРБ', () => {
+    const input = inputWith({ panelInflammatory: { hsCRP: '7' } });
+    expect(input.labValues!['CRP']).toBe(7);
   });
 });

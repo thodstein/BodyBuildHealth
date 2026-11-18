@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES, LAB_UNIT_READ, LAB_READ_UNIT } from '../../core/constants';
+import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES, LAB_UNIT_READ, LAB_READ_UNIT, UCUM_MAP } from '../../core/constants';
 import { normalizeLabMeasurement } from '../../core/labs-mapping';
 import { evaluateRecommendations } from '../../engines/recommendation-engine';
 import { buildLabFindings } from '../support-plan/display';
@@ -78,8 +78,9 @@ describe('проход 106: readLabValue — единица есть, догад
 describe('проход 106: выбор единицы на месте, эвристика не тронута', () => {
   it('в бланке есть выбор единицы для гормональных маркеров с двумя единицами', () => {
     // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
-    // 121–123: витамин D, фолат, B12 — везде единицы расходятся, догадка не работает
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12']);
+    // 121–123: витамин D, фолат, B12 — везде единицы расходятся, догадка не работает;
+    // 130: белок мочи (г/л против мг/л — в 1000 раз).
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12', 'Protein']);
     // Проход 127: у свободных Т3/Т4 три варианта — пмоль/л (канон), пг/мл и нг/дл (США).
     expect(LAB_UNIT_CHOICES['T3 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);
     expect(LAB_UNIT_CHOICES['T4 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);
@@ -646,5 +647,38 @@ describe('проход 124: выбор единицы не бывает без �
       expect(LAB_READ_UNIT[marker]).toBe(rec.canon);
       expect(LAB_UNIT_CHOICES[marker], `${marker}: пересчёт без выбора единицы в форме`).toBeTruthy();
     }
+  });
+});
+
+/**
+ * Проход 130: белок мочи. Один и тот же маркер жил в двух единицах — каталог
+ * UCUM считал в мг/л (150), а тиры и мост механизма — в г/л (0.15). Импорт
+ * приводил бланк к мг/л, и 3 г/л (нефротическая протеинурия) сравнивались с
+ * порогами 0.15/0.5/1.0 как «почти ноль».
+ */
+describe('проход 130: белок мочи — г/л в каталоге и в чтении', () => {
+  it('канон каталога и канон чтения совпадают, порог не изменился физически', () => {
+    expect(UCUM_MAP.PROTEIN_URINE.prefUnit).toBe('g/L');
+    expect(UCUM_MAP.PROTEIN_URINE.uln).toBe(0.15);
+    expect(LAB_UNIT_READ['Protein'].canon).toBe('г/л');
+    expect(LAB_UNIT_CHOICES['Protein']).toEqual(['г/л', 'мг/л']);
+  });
+
+  it('мг/л делится на 1000, г/л идёт как есть', () => {
+    expect(readLabValue('Protein', 0.3, 'г/л')).toEqual({ value: 0.3, guessed: false });
+    expect(readLabValue('Protein', 300, 'мг/л').value).toBeCloseTo(0.3, 6);
+    expect(readLabValue('Protein', 300, 'mg/L').value).toBeCloseTo(0.3, 6);
+    expect(readLabValue('Protein', 0.15, 'г/л')).toEqual({ value: 0.15, guessed: false });
+  });
+
+  it('импорт бланка приводит мг/л к г/л', () => {
+    expect(normalizeLabMeasurement('PROTEIN_URINE', 150, 'мг/л').value).toBeCloseTo(0.15, 6);
+    expect(normalizeLabMeasurement('URINE_PROTEIN', 150, 'mg/L').value).toBeCloseTo(0.15, 6);
+    expect(normalizeLabMeasurement('PROTEIN_URINE', 0.3, 'г/л').value).toBeCloseTo(0.3, 6);
+  });
+
+  it('порог на границе не обрезается до 0.2', () => {
+    // 150 мг/л — ровно ВГН. Прежнее округление до одного знака давало 0.2.
+    expect(readLabValue('Protein', 150, 'мг/л').value).toBe(0.15);
   });
 });

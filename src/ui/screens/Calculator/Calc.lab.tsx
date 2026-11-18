@@ -62,13 +62,23 @@ for (const e of LAB_MARKER_MAP) {
 }
 
 /**
+ * Качественные поля общего анализа мочи (проход 130): полоска даёт «следы/+/++»,
+ * а не концентрацию, поэтому единицы у них нет.
+ */
+const URINE_QUALITATIVE = new Set(['pH', 'Glucose', 'Ketones', 'Leukocytes', 'Nitrite']);
+
+/**
  * Подсказка единицы в поле ввода (проход 114). У маркеров с выбором единицы
  * подсказку не печатаем — рядом стоит `UnitPicker`. Для остальных показываем
  * единицу, в которой движок сравнивает число: иначе человек вписывает 15 г/дл
  * гемоглобина в поле, где норма 130–170, и «анемия» берётся из воздуха.
  */
-export function labUnitHint(marker: string): string | undefined {
+export function labUnitHint(marker: string, panel?: string): string | undefined {
   if (LAB_UNIT_CHOICES[marker]) return undefined;
+  // Проход 130: общий анализ мочи — полоски, а не концентрация. Подсказка
+  // «ммоль/л» у глюкозы мочи заставляла искать число там, где бланк пишет
+  // «следы/+». Белок мочи сюда не входит — у него свой выбор единицы (г/л/мг/л).
+  if (panel === 'panelUrinalysis' && URINE_QUALITATIVE.has(marker)) return undefined;
   // Сначала каталог UCUM — это та единица, к которой импорт приводит значение;
   // каталог маркеров (`LAB_MARKER_MAP`) остаётся для маркеров без пересчёта.
   const hint = markerReadUnit(marker) ?? MARKER_UNIT[unitKey(marker)];
@@ -194,7 +204,7 @@ export function FullLabInput({ values, onChange }: { values: LabSlice | null; on
       <div style={{ fontSize:8, fontWeight:600, color:pan.color, marginBottom:2 }}>{pan.label}</div>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
         {pan.markers.map(m => <div key={m}><span style={{ fontSize:7, color:'var(--text-dim)' }}>{ruMarker(m)}</span>
-          <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} placeholder={labUnitHint(m)} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
+          <input value={(s[pan.key] as Record<string,string>)?.[m] || ''} onChange={e => upd(pan.key, m, e.target.value)} placeholder={labUnitHint(m, String(pan.key))} style={{ ...INPUT, padding:'3px 6px', fontSize:9 }} />
           <UnitPicker panel={String(pan.key)} marker={m} slice={s} onChange={onChange} />
         </div>)}
       </div>
