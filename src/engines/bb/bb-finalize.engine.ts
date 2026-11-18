@@ -35,7 +35,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { ruCount, ruAdjCount, RU_SETS, RU_EXERCISES, RU_ADJ_SECONDARY } from '../ru-plural';
 import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
-import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
+import { refreshBBPlanSnapshots, validationRationaleLines, VALIDATION_LINE_PREFIX, ERROR_LINE_PREFIX } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
 import { annotateBackExercise, verticalPullProfile, classifyLegExercise, annotateArmExercise, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
@@ -7483,10 +7483,9 @@ for (const week of next.weeks) {
     }
     next.volumeLandmarks = computeVolumeLandmarks(directPeak, options.level, { labMult: options.mrvMultiplier, peakWeek: peak.week });
   }
-  const warnings = validation.issues
-    .filter(issue => issue.level === 'warning')
-    .slice(0, 20)
-    .map(issue => `⚠ Валидация: ${issue.message}`);
+  // Порядок — по важности, с честным «ещё N» (аудит 2026-11, P3-7): раньше обрез
+  // `slice(0, 20)` в порядке выдачи валидатора скрывал дефицит объёма до MEV.
+  const warnings = validationRationaleLines(validation.issues, VALIDATION_LINE_PREFIX, { level: 'warning' });
   if (warnings.length) {
     const seen = new Set(next.rationale);
     for (const w of warnings) if (!seen.has(w)) { seen.add(w); next.rationale.push(w); }
@@ -7526,10 +7525,7 @@ for (const week of next.weeks) {
   // Суставной стресс пишется в ЕДИНОЙ точке снимков: здесь он был бы до
   // гарантии головок, гейта уровней и реализма сессии (замер: строка
   // расходилась во всех 23 планах).
-  const errors = validation.issues
-    .filter(issue => issue.level === 'error')
-    .slice(0, 20)
-    .map(issue => `🚫 Валидация: ${issue.message}`);
+  const errors = validationRationaleLines(validation.issues, ERROR_LINE_PREFIX, { level: 'error' });
   if (errors.length) next.rationale = [...next.rationale, ...errors];
   // Повторная гарантия головок рук ПОСЛЕ всех проходов (фит/тапер/филл могли
   // вернуть pushdown-изоляцию; замена — не добавление, лимиты не нарушаются).

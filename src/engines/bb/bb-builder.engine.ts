@@ -78,7 +78,7 @@ import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan, prioritizeBackSessions, reconcileVolumeTargets, pplWeeklyFloorFor, reconcileSchemeComments, normalizePlanMuscleTags, ensureFemaleHamstringFloor, ensureBodybuildingMinimums, assignProgressionRules, stampBBPlanFinalizeSignature, repairSingleSetExercises, enforceFinalEffectiveMrv } from './bb-finalize.engine';
 import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
-import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
+import { refreshBBPlanSnapshots, validationRationaleLines, VALIDATION_LINE_PREFIX } from './bb-plan-snapshot.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap, perSessionMuscleCap, sessionMrvRotCap, sessionMuscleRealismCap, sessionMuscleExerciseCap, sessionDensityExerciseCap, resolveMrvCap, weeklyCapFor, distributeSetsByRole, BB_MRV_TOLERANCE, FEMALE_GLUTE_HIGH_CAP, FEMALE_GLUTE_TARGET_CAP } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
@@ -5454,14 +5454,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   };
   syncBBPlanSetShape(output);
   const validation =   validateBBPlan(output, { level, trainingYears: input.trainingYears, specializationTargets: [...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])] });
-  const validationWarnings = validation.issues
-    .filter(issue => issue.level === 'warning')
-    // Ложные warning на этой стадии: weeklyVolume пересчитывается в finalize
-    // после allocation/taper, а кап-аджуст (cap-adjust) режет effective по
-    // факту. Финальная валидация даёт корректные значения.
-    .filter(issue => issue.code !== 'target_volume_deficit' && issue.code !== 'effective_mrv_overflow')
-    .slice(0, 20)
-    .map(issue => `⚠ Валидация: ${issue.message}`);
+  // Ложные warning на этой стадии: weeklyVolume пересчитывается в finalize
+  // после allocation/taper, а кап-аджуст (cap-adjust) режет effective по
+  // факту. Финальная валидация даёт корректные значения. Остальные строки —
+  // по важности, с честным «ещё N» (аудит 2026-11, P3-7).
+  const validationWarnings = validationRationaleLines(
+    validation.issues.filter(issue => issue.code !== 'target_volume_deficit' && issue.code !== 'effective_mrv_overflow'),
+    VALIDATION_LINE_PREFIX,
+    { level: 'warning' },
+  );
   if (validationWarnings.length > 0) {
     const seen = new Set(output.rationale);
     for (const w of validationWarnings) if (!seen.has(w)) { seen.add(w); output.rationale.push(w); }

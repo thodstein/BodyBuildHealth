@@ -41,6 +41,7 @@ import {
   frequencyDriftNote,
   reconcileFrequencyClaim,
 } from './bb-frequency';
+import { ruCount, RU_ERRORS, RU_WARNINGS } from '../ru-plural';
 
 export interface BBPlanSnapshotOptions {
   /** Опции валидатора. Без них `plan.validation` не пересчитывается (остаётся как есть). */
@@ -57,14 +58,76 @@ export interface BBPlanSnapshotOptions {
   refreshRotationRationale?: boolean;
 }
 
-const VALIDATION_LINE_PREFIX = '⚠ Валидация:';
+export const VALIDATION_LINE_PREFIX = '⚠ Валидация:';
 const ROTATION_LINE_PREFIX = '⚠ Ротация:';
 const BACK_SUMMARY_PREFIX = '🧩 Спина по паттернам:';
 const ARM_SUMMARY_PREFIX = '💪 Руки по паттернам:';
 const BACK_ISSUE_PREFIX = '⚠ Качество спины:';
 const ARM_ISSUE_PREFIX = '⚠ Качество рук:';
 const JOINT_LINE_PREFIX = '🦿 Суставы:';
-const ERROR_LINE_PREFIX = '🚫 Валидация:';
+export const ERROR_LINE_PREFIX = '🚫 Валидация:';
+
+/** Сколько строк валидации максимум попадает в rationale (прежний `slice(0, 20)`). */
+export const VALIDATION_RATIONALE_LIMIT = 20;
+
+/** Важность диагностики для ТЕКСТА плана: пользователь ищет в rationale сначала
+ *  «чего не хватает / что перегружено», а не мелкие замечания по отдельным подходам.
+ *
+ *  Аудит 2026-11 (P3-7): строки брались «первыми 20 в порядке выдачи валидатора»
+ *  (`slice(0, 20)` в 4 местах). В плане с 52 предупреждениями (bro_5/mass) реальный
+ *  дефицит объёма до MEV в текст не попадал вовсе — при этом он важнее всего списка.
+ *  Полный список остаётся в панели валидации, в rationale — приоритетные + честная
+ *  строка «ещё N предупреждений». */
+const VALIDATION_PRIORITY: Record<string, number> = {
+  target_volume_deficit: 0,
+  effective_mrv_overflow: 1,
+  session_working_set_cap: 2,
+  session_volume_puos: 2,
+  no_working_sets: 2,
+  low_training_frequency: 3,
+};
+
+export function validationIssuePriority(issue: any): number {
+  const known = VALIDATION_PRIORITY[String(issue?.code || '')];
+  return known == null ? 4 : known;
+}
+
+/** Стабильная сортировка по важности (порядок внутри группы сохраняется). */
+export function orderValidationIssues<T>(issues: readonly T[]): T[] {
+  return issues
+    .map((issue, index) => ({ issue, index }))
+    .sort((a, b) => validationIssuePriority(a.issue) - validationIssuePriority(b.issue) || a.index - b.index)
+    .map((entry) => entry.issue);
+}
+
+/** Строки валидации для rationale: приоритетные сначала, не больше `limit`, а
+ *  скрытое честно суммируется строкой «…и ещё N … — полный список в панели валидации».
+ *  Одинаковые сообщения (одна и та же претензия в разных неделях) схлопываются:
+ *  иначе «ещё N» считал бы дубли, а пользователь видел бы одну и ту же строку дважды. */
+export function validationRationaleLines(
+  issues: readonly any[] | undefined,
+  prefix: string,
+  options: { level?: 'warning' | 'error'; limit?: number } = {},
+): string[] {
+  const limit = options.limit ?? VALIDATION_RATIONALE_LIMIT;
+  const seen = new Set<string>();
+  const pool = (issues || [])
+    .filter((issue: any) => (options.level ? issue?.level === options.level : true))
+    .filter((issue: any) => {
+      const key = `${issue?.code || ''}|${issue?.message || ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  const ordered = orderValidationIssues(pool);
+  const lines = ordered.slice(0, limit).map((issue: any) => `${prefix} ${issue.message}`);
+  const hidden = ordered.length - lines.length;
+  if (hidden > 0) {
+    const forms = options.level === 'error' ? RU_ERRORS : RU_WARNINGS;
+    lines.push(`${prefix} …и ещё ${ruCount(hidden, forms)} — полный список в панели валидации.`);
+  }
+  return lines;
+}
 
 /** Сумма сетов по movement-паттернам для выбранных мышц (как в финализаторе). */
 function patternSummary(weeks: any[], muscles: string[]): string {
@@ -174,16 +237,12 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
 
   if (opts.refreshValidationRationale && plan.validation) {
     const issues = ((plan.validation.issues || []) as any[]);
-    const fresh = issues
-      .filter((issue) => issue.level === 'warning')
-      .slice(0, 20)
-      .map((issue) => `${VALIDATION_LINE_PREFIX} ${issue.message}`);
+    // Приоритет важности + честная строка «ещё N» (аудит 2026-11, P3-7): раньше
+    // обрез `slice(0, 20)` в порядке выдачи валидатора скрывал дефицит объёма.
+    const fresh = validationRationaleLines(issues, VALIDATION_LINE_PREFIX, { level: 'warning' });
     // Ошибки — то же обещание: цикл-путь после трима гасил их в плане, а строки
     // «🚫 Валидация» оставались (замер: 3 фантомные ошибки на 3 циклах).
-    const freshErrors = issues
-      .filter((issue) => issue.level === 'error')
-      .slice(0, 20)
-      .map((issue) => `${ERROR_LINE_PREFIX} ${issue.message}`);
+    const freshErrors = validationRationaleLines(issues, ERROR_LINE_PREFIX, { level: 'error' });
     const rationale: string[] = (Array.isArray(plan.rationale) ? plan.rationale : [])
       .filter((line: string) => !String(line).startsWith(VALIDATION_LINE_PREFIX)
         && !String(line).startsWith(ERROR_LINE_PREFIX));

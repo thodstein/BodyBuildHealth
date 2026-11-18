@@ -7,6 +7,7 @@ import { validateBBPlan } from '../bb-validator.engine';
 import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
+import { ERROR_LINE_PREFIX, VALIDATION_LINE_PREFIX, validationRationaleLines } from '../bb-plan-snapshot.engine';
 import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
@@ -114,23 +115,22 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
     rationale.filter(line => line.startsWith('🦿 Суставы:')),
     `${label}: строка суставов`,
   ).toEqual(jointIssues.length ? [`🦿 Суставы: ${jointIssues.join(' ')}`] : []);
-  const freshErrors = ((plan.validation?.issues || []) as any[])
-    .filter((issue: any) => issue.level === 'error')
-    .slice(0, 20)
-    .map((issue: any) => `🚫 Валидация: ${issue.message}`);
+  const freshErrors = validationRationaleLines(((plan.validation?.issues || []) as any[]), ERROR_LINE_PREFIX, { level: 'error' });
   expect(
     rationale.filter(line => line.startsWith('🚫 Валидация:')),
     `${label}: строки ошибок валидации`,
   ).toEqual(freshErrors);
 
-  const warningSet = new Set(
-    ((plan.validation?.issues || []) as any[])
-      .filter(i => i.level === 'warning')
-      .map(i => `⚠ Валидация: ${i.message}`),
-  );
-  const stale = ((plan.rationale || []) as string[])
-    .filter(line => String(line).startsWith('⚠ Валидация:') && !warningSet.has(line));
-  expect(stale, `${label}: rationale описывает снятые предупреждения`).toEqual([]);
+  const warnings = ((plan.validation?.issues || []) as any[]).filter(i => i.level === 'warning');
+  const validationLines = ((plan.rationale || []) as string[]).filter(line => String(line).startsWith(VALIDATION_LINE_PREFIX));
+  // P3-7 (аудит 2026-11): строки идут по важности, показывается не больше 20, а скрытое
+  // честно суммируется строкой «…и ещё N предупреждений». Сверяем с той же функцией,
+  // которой пользуется снимок: любая «фантомная» строка (снятое предупреждение) ломает
+  // равенство, а неполнота списка — тоже.
+  expect(
+    validationLines,
+    `${label}: строки валидации = факт валидации (важность, предел 20, «ещё N»)`,
+  ).toEqual(validationRationaleLines(warnings, VALIDATION_LINE_PREFIX, { level: 'warning' }));
 
   // «📉 Цель … переопределена» — обещание о текущей цели: число обязано
   // совпадать с volumeTargets, на мышцу — одна строка.
