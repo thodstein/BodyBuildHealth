@@ -136,6 +136,53 @@ export function clampInlineNumber(
   return Math.max(min, Math.min(max, v));
 }
 
+/** Пакетная правка недели: правки для всех упражнений недели.
+ *
+ *  Аудит UI (P2). Раньше обработчик читал значение как `parseFloat(v) || 0` (стёртое
+ *  поле → 0 → «× умножить» обнулял вес и сеты всей недели) и дописывал в правку
+ *  выдуманные поля (`reps: 10`, `weight: 80`): правка «Сеты» переписывала повторы всех
+ *  упражнений недели и ставила 80 кг упражнениям без веса.
+ *
+ *  Теперь: значение разбирается честно (пусто/нечисло — ошибка), в правку попадают
+ *  ФАКТИЧЕСКИЕ значения упражнения и меняется только выбранное поле.
+ *
+ *  @returns `{ edits }` для `commitEdits` либо `{ error }` с текстом для пользователя.
+ */
+export function computeBulkWeekEdits(args: {
+  sessions: any[];
+  weekNo: number;
+  field: 'sets' | 'reps' | 'weight';
+  mode: 'set' | 'mult';
+  rawValue: string | number | null | undefined;
+  existing?: Record<string, any>;
+}): { edits: Record<string, any> } | { error: string } {
+  const value = parseInlineNumber(args.rawValue);
+  if (value == null) return { error: 'укажите число' };
+  if (args.mode === 'mult' && !(value > 0)) return { error: 'множитель должен быть больше нуля' };
+  if (args.mode === 'set' && args.field !== 'weight' && !(value >= 1)) return { error: 'значение должно быть не меньше 1' };
+  const next: Record<string, any> = { ...(args.existing || {}) };
+  for (let si = 0; si < args.sessions.length; si++) {
+    const session = args.sessions[si];
+    const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
+    for (let ei = 0; ei < exercises.length; ei++) {
+      const ex: any = exercises[ei];
+      const key = `${args.weekNo}-${si}-${ei}`;
+      const first = ex?.workSets?.[0];
+      // Остальные поля — фактические: нет веса — 0, а не придуманные 80 кг.
+      const base = next[key] || {
+        sets: Number(ex?.sets) || 0,
+        reps: Number(first?.reps) || Number(ex?.repsRange?.[0]) || 10,
+        weight: Number.isFinite(Number(first?.weight)) ? Number(first.weight) : 0,
+        exerciseKey: bbExerciseIdentity(ex),
+      };
+      const cur = Number(base[args.field]) || 0;
+      const val = args.mode === 'mult' ? Math.round(cur * value * 10) / 10 : value;
+      next[key] = { ...base, [args.field]: val };
+    }
+  }
+  return { edits: next };
+}
+
 /** Ручной суперсет: связать упражнение `index` с реальным партнёром в той же сессии.
  *
  *  Аудит UI (P3). Правка живёт в `exerciseEdits` и переприменяется при каждой пересборке

@@ -23,7 +23,7 @@ import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { BTN, BTN_GHOST, IN, SMALL, H } from './training-ui';
 import { PHASE_COLORS } from './PlanOutput';
-import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, type BBPhase, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, computeBulkWeekEdits, type BBPhase, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { exerciseFeatureBadges, planSetsBreakdown, canonTechniqueId } from './bb-technique-display';
 import { muscleLabel } from './bb-labels';
 import type { SavedBBPlan } from './bb-plans-store';
@@ -50,8 +50,10 @@ export interface BbAdjustStepProps {
   setBulkField: React.Dispatch<React.SetStateAction<'sets' | 'reps' | 'weight'>>;
   bulkMode: 'set' | 'mult';
   setBulkMode: React.Dispatch<React.SetStateAction<'set' | 'mult'>>;
-  bulkValue: number;
-  setBulkValue: React.Dispatch<React.SetStateAction<number>>;
+  /** Пакетная правка недели: значение вводится как строка, чтобы пустое поле
+   *  («стёрли число») не превращалось в 0 и не обнуляло неделю (аудит UI, P2). */
+  bulkValue: string;
+  setBulkValue: React.Dispatch<React.SetStateAction<string>>;
   bbWeekSel: number;
   setBbWeekSel: React.Dispatch<React.SetStateAction<number>>;
   bbWeeks: number;
@@ -361,16 +363,18 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 onChange={v => setBulkMode(v as any)}
                 options={[{ id: 'set', label: '= задать' }, { id: 'mult', label: '× умножить' }]}
               />
-              <input type="number" value={bulkValue} onChange={e2 => setBulkValue(parseFloat(e2.target.value) || 0)} style={{ width:60, ...IN }} />
+              <input type="number" value={bulkValue} onChange={e2 => setBulkValue(e2.target.value)} style={{ width:60, ...IN }} />
               <button onClick={() => {
-                const next: any = { ...editsRef.current };
-                for (const s of wk.sessions) for (let ei = 0; ei < s.exercises.length; ei++) {
-                  const key = `${wk.week}-${wk.sessions.indexOf(s)}-${ei}`;
-                  const cur = next[key] || { sets: s.exercises[ei].sets, reps: s.exercises[ei].workSets?.[0]?.reps || 10, weight: s.exercises[ei].workSets?.[0]?.weight || 80 };
-                  if (bulkMode === 'mult') next[key] = { ...cur, [bulkField]: Math.round((cur[bulkField] || 0) * bulkValue) };
-                  else next[key] = { ...cur, [bulkField]: bulkValue };
-                }
-                commitEdits(next); setBulkModal(false); flash('⚡ Пакетно применено к неделе ' + bbWeekSel);
+                // Аудит UI, P2 «пакетная правка недели»: пустое поле раньше читалось как 0
+                // («× умножить» обнулял вес и сеты всей недели), а в правку дописывались
+                // выдуманные поля (`reps: 10`, `weight: 80`). Разбор и правила —
+                // `computeBulkWeekEdits` (меняется только выбранное поле).
+                const res = computeBulkWeekEdits({
+                  sessions: wk.sessions, weekNo: wk.week, field: bulkField, mode: bulkMode,
+                  rawValue: bulkValue, existing: editsRef.current,
+                });
+                if ('error' in res) { flash('⚡ Пакетно: ' + res.error); return; }
+                commitEdits(res.edits); setBulkModal(false); flash('⚡ Пакетно применено к неделе ' + bbWeekSel);
               }} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.35)', background:'rgba(245,158,11,0.15)', color:'#f59e0b', fontWeight:700 }}>Применить ко всем</button>
               <button onClick={() => setBulkModal(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff' }}>✕</button>
             </div>

@@ -549,7 +549,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   };
   const [bulkModal, setBulkModal] = useState(false);
   const [bulkField, setBulkField] = useState<'sets' | 'reps' | 'weight'>('weight');
-  const [bulkValue, setBulkValue] = useState(0);
+  // Пакетная правка недели: значение хранится строкой, чтобы пустое поле не читалось
+  // как 0 и не обнуляло неделю (аудит UI, P2); разбор — `parseInlineNumber` на «Применить».
+  const [bulkValue, setBulkValue] = useState('');
   const [bulkMode, setBulkMode] = useState<'set' | 'mult'>('set');
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>(null);
   const [exSwapModal, setExSwapModal] = useState<{ si: number; ei: number; muscle: string; currentName: string } | null>(null);
@@ -813,8 +815,33 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     };
     return base;
   };
-  const spillRisk = useMemo(() => { try { return spillRiskScore(buildContestPrepConfig()); } catch { return { level:'low' as const, note:'' }; } }, [peakWeekCategory, prepWaterMode, prepSodiumMode, prepCarbMode, linked.profile?.settings]);
-  const readiness = useMemo(() => { try { return computeReadiness(buildContestPrepConfig()); } catch { return { verdict:'on_track' as const, gap:null, targetBf:null, note:'' }; } }, [peakWeekCategory, prepWaterMode, prepCarbMode, linked.profile?.settings]);
+  // Аудит UI (P3): readiness и spillRisk не пересчитывались при смене даты шоу,
+  // противопоказаний и специализации — в зависимостях не было ни `prepShowDate`, ни
+  // `allPrepContra`, ни `peakSpec`, хотя `buildContestPrepConfig` читает их. Считаем
+  // конфиг один раз по всем его входам, а оценки — по конфигу: рассинхрон
+  // «показано ≠ считается» на этом исключён.
+  const prepConfig = useMemo(() => {
+    try { return buildContestPrepConfig(); } catch { return null; }
+  }, [
+    peakWeekCategory, bbLevel, expYearsForPrep, prepExperience, prepGlycogenLevel,
+    effectivePeds, pedDoses, prepShowDate, prepTaperWeeks, prepCarbMode, prepWaterMode,
+    prepSodiumMode, prepTrainingProtocol, prepPreferLowFiber, prepCreatineStop,
+    prepConfirmedManip, allPrepContra, peakSpec, prepCompetitions, prepMainCompetitionId,
+    prepPlan, linked.profile?.settings,
+  ]);
+  const spillRisk = useMemo(() => {
+    try { return prepConfig ? spillRiskScore(prepConfig) : { level:'low' as const, note:'' }; }
+    catch { return { level:'low' as const, note:'' }; }
+  }, [prepConfig]);
+  const readiness = useMemo(() => {
+    try {
+      return prepConfig
+        ? computeReadiness(prepConfig)
+        : { verdict:'on_track' as const, gap:null, targetBf:null, note:'' };
+    } catch {
+      return { verdict:'on_track' as const, gap:null, targetBf:null, note:'' };
+    }
+  }, [prepConfig]);
 
   /** Собрать единый prep-план, применить к текущему плану и сохранить в профиль. */
   const assembleContestPrep = (applyToPlan: boolean) => {
