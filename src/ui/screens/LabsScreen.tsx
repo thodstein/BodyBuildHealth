@@ -36,6 +36,7 @@ import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio, normalizeLabMeasurement, ratioPercentLabel } from '../../core/labs-mapping';
 import { labValueLabel } from '../../core/lab-value-label';
+import { computeMarkerDeviations, type MarkerRiskSummary } from './LabsScreen_parts/lab-marker-risks';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
@@ -448,7 +449,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   // норм, что и список отклонений ниже. Зависимости `currentLabs`/`profileSex`
   // добавлены осознанно: без них после правки пола или выбора другого анализа
   // мемо оставалось со старыми (мужскими) границами.
-  const labRisks = useMemo<{ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }>; markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] } | null>(() => {
+  // Проход 147: у маркера с границей («>1000») сторона отклонения доказывается
+  // правилом `boundProvesSide`, а процент — нет: число обрезано, и «150% к норме»
+  // было бы процентом от неизвестного значения. Неизвестная сторона не считается
+  // ни отклонением, ни нормой — она считается отдельно (`unknownCount`), чтобы
+  // «Все маркеры в норме» не выдавало её за норму.
+  const labRisks = useMemo<({ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }> } & MarkerRiskSummary) | null>(() => {
     if (!hasLabs) return null;
     const labData = currentLabs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
     const contribs = calculateRiskFromAnalyses(labData, profileSex as 'male' | 'female') as any;
@@ -463,43 +469,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const overallNet = nonZero.length > 0
       ? Math.round(nonZero.reduce((s, v) => s + v.net, 0) / nonZero.length)
       : 0;
-    const markerDeviations: { code: string; name: string; value: number; uln: number; lln: number; deviation: number; system: string }[] = [];
-    for (const lab of currentLabs) {
-      // P0 fix: HbA1c кейс — HBA1C vs HbA1c
-      const ref = (UCUM_MAP as any)[lab.code] || (UCUM_MAP as any)[lab.code.toUpperCase()] || (UCUM_MAP as any)[lab.code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === String(lab.code).toLowerCase())?.[1] as any);
-      if (!ref) continue;
-      const coeff = ref.coeff || 1;
-      // Проход 93: если единица бланка известна, число и диапазон бланка приводятся
-      // к единице приложения одним множителем (`normalizeLabMeasurement`): HGB
-      // 150 г/л больше не становится 1500 и не даёт 782% отклонения. Единицы нет —
-      // прежний `coeff`.
-      const hasUnit = !!String(lab.unit || '').trim();
-      const normalized = hasUnit ? normalizeLabMeasurement(lab.code, lab.value, String(lab.unit)) : null;
-      const factor = normalized && lab.value ? normalized.value / lab.value : coeff;
-      const norm = lab.value * factor;
-      // Prefer stored reference ranges from parsed lab forms;
-      // fall back to UCUM_MAP defaults (Л8: женские границы при sex=female) when not available.
-      const fallbackNorm = getLabNorm(lab.code, profileSex as 'male' | 'female');
-      const uln = lab.refHigh !== undefined ? lab.refHigh * factor : (fallbackNorm?.uln ?? ref.uln);
-      const lln = lab.refLow !== undefined ? lab.refLow * factor : (fallbackNorm?.lln ?? ref.lln);
-      let deviation = 0;
-      if (norm > uln) deviation = (norm - uln) / uln;
-      else if (norm < lln) deviation = -((lln - norm) / lln);
-      if (Math.abs(deviation) > 0.01) {
-        let sys = 'other';
-        for (const [s, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
-          if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
-        }
-        markerDeviations.push({
-          code: lab.code, name: ref.name || lab.code, value: lab.value,
-          uln, lln,
-          deviation: Math.round(deviation * 100),
-          system: sys,
-        });
-      }
-    }
-    markerDeviations.sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
-    return { overallNet, systemBreakdown, markerDeviations };
+    // Проход 147: список отклонений считает отдельный модуль — одно правило
+    // стороны на всё приложение (`boundProvesSide`), процент только у точных
+    // чисел, «без вывода» отдельным счётчиком.
+    const { markerDeviations, normalCount, unknownCount } = computeMarkerDeviations(currentLabs, profileSex as 'male' | 'female');
+    return { overallNet, systemBreakdown, markerDeviations, normalCount, unknownCount };
   }, [hasLabs, labs, currentLabs, profileSex]);
 
   const labIndexDetails = useMemo(() => {
@@ -2083,27 +2057,41 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               {deviationCount > 0 && labRisks ? (
                 <div style={{ display:'grid', gap:8 }}>
                   {labRisks.markerDeviations.map(m => {
-                    const isHigh = m.deviation > 0;
-                    const absDev = Math.abs(m.deviation);
-                    const devLevel = absDev <= 20 ? 'low' : absDev <= 50 ? 'medium' : absDev <= 100 ? 'high' : 'critical';
+                    const isHigh = m.side === 'high';
+                    const absDev = m.deviation == null ? null : Math.abs(m.deviation);
+                    // Проход 147: у обрезанного числа процента нет — силу не
+                    // заявляем, цвет говорит только о стороне.
+                    const devLevel = absDev == null ? null : absDev <= 20 ? 'low' : absDev <= 50 ? 'medium' : absDev <= 100 ? 'high' : 'critical';
                     const devColors: Record<string, { bg: string; text: string }> = {
                       low: { bg: 'rgba(34,197,94,0.08)', text: '#22c55e' }, medium: { bg: 'rgba(234,179,8,0.08)', text: '#eab308' },
                       high: { bg: 'rgba(249,115,22,0.08)', text: '#f97316' }, critical: { bg: 'rgba(239,68,68,0.08)', text: '#ef4444' },
                     };
-                    const dc = devColors[devLevel];
+                    const dc = devLevel ? devColors[devLevel] : {
+                      bg: isHigh ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)',
+                      text: isHigh ? '#ef4444' : '#3b82f6',
+                    };
                     return (
-                      <div key={m.code + m.value} style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 12px', borderRadius:14, background: dc.bg, border:`1px solid ${dc.bg.replace('0.08', '0.20')}`, borderLeft:`3px solid ${dc.text}`, minHeight:56 }}>
+                      <div key={m.code + m.value} data-lab-marker-side={m.side} data-lab-marker-percent={absDev == null ? 'none' : 'yes'} style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 12px', borderRadius:14, background: dc.bg, border:`1px solid ${dc.bg.replace('0.08', '0.20')}`, borderLeft:`3px solid ${dc.text}`, minHeight:56 }}>
                         <span style={{ fontSize:10, color:'#fff', minWidth:52, fontWeight:700 }}>{sysLabels[m.system] || m.system}</span>
                         <span style={{ fontSize:13, fontWeight:800, flex:1, color:'#fff', minWidth:0 }}>{m.name}</span>
                         <span style={{ fontSize:10, color:'#fff', whiteSpace:'nowrap' }}>{m.lln}–{m.uln}</span>
-                        <span style={{ fontSize:13, fontWeight:800, color: dc.text, whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>{m.value} <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, fontWeight:800, background: dc.text + '26', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev}%</span></span>
+                        <span style={{ fontSize:13, fontWeight:800, color: dc.text, whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' }}>{labValueLabel(m.value, m.bound)} <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, fontWeight:800, background: dc.text + '26', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev == null ? ' вне нормы' : `${absDev}%`}</span></span>
                       </div>
                     );
                   })}
+                  {labRisks.unknownCount > 0 && (
+                    <div data-lab-marker-unknown style={{ fontSize:10, color:'#94a3b8', textAlign:'center', padding:'4px 0' }}>
+                      Без вывода: {labRisks.unknownCount} — запись обрезана или норма неизвестна
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div style={{ fontSize: 10, color: '#fff', textAlign: 'center', padding: '12px 0' }}>
-                  {hasLabs ? 'Все маркеры в норме' : 'Введите анализы для просмотра отклонений'}
+                  {hasLabs
+                    ? (labRisks && labRisks.unknownCount > 0
+                        ? `В норме: ${labRisks.normalCount} · без вывода: ${labRisks.unknownCount}`
+                        : 'Все маркеры в норме')
+                    : 'Введите анализы для просмотра отклонений'}
                 </div>
               )}
               </div>)}</div>
@@ -2121,13 +2109,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 {riskSections.normalizeDrugs && (<div style={{ padding: '0 12px 12px' }}>
                   <div style={{ display: 'grid', gap: 6 }}>
                     {labRisks.markerDeviations.slice(0, 8).map(m => {
-                      const isHigh = m.deviation > 0;
+                      const isHigh = m.side === 'high';
                       const drugs = getDrugsToNormalizeMarker(m.code, isHigh).slice(0, 5);
                       if (!drugs.length) return null;
                       return (
                         <div key={m.code} style={{ padding: '6px 8px', borderRadius: 8, background: isHigh ? 'rgba(239,68,68,0.04)' : 'rgba(59,130,246,0.04)', border: `1px solid ${isHigh ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.1)'}` }}>
                           <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 4, color: isHigh ? '#ef4444' : '#3b82f6' }}>
-                            {m.name} {isHigh ? '↑' : '↓'} {Math.abs(m.deviation)}% → нормализация
+                            {m.name} {isHigh ? '↑' : '↓'} {m.deviation == null ? 'вне нормы' : `${Math.abs(m.deviation)}%`} → нормализация
                           </div>
                           <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
                             {drugs.map((d, i) => (
