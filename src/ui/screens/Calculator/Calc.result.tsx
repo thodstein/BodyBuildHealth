@@ -91,12 +91,16 @@ export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
   // Проход 139: в анализе мочи те же подписи, что в крови («Glucose»). Без пометки
   // две строки с одним именем выглядели одной находкой, а ключ списка совпадал.
   const name = (d: LabDelta) => d.panel === 'panelUrinalysis' ? `${d.marker} (моча)` : d.marker;
+  // Проход 158: карточка показывает 16 строк, но остальные не исчезают молча —
+  // их число называется, и они остаются в полном списке анализов.
+  const shown = deltas.slice(0, 16);
+  const hidden = deltas.length - shown.length;
   return <div className="calc-labdelta">
     {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(name).join(', ')}</span></div>}
     {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(name).join(', ')}</span></div>}
     {unproven.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8' }}>? Без вывода (в бланке граница): {unproven.map(name).join(', ')}</span></div>}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-      {deltas.slice(0, 16).map(d =>
+      {shown.map(d =>
         <div key={`${d.panel || ''}|${d.marker}`} data-lab-delta-trend={d.trend} title={`${d.unit ? `${name(d)}, ${d.unit}` : name(d)}${d.trend === 'unproven' ? ' — в бланке граница: ни сторона, ни величина не доказаны' : ''}`} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
           <span style={{ fontWeight: 600, color: 'var(--text)', width: 60 }}>{name(d)}</span>
           <span style={{ color: 'var(--text-dim)' }}>{d.sliceValues.map(v => v ?? '—').join('→')}</span>
@@ -104,5 +108,10 @@ export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
         </div>
       )}
     </div>
+    {hidden > 0 && (
+      <div data-lab-delta-more={hidden} style={{ marginTop: 4, fontSize: 8, color: 'var(--text-dim)' }}>
+        Ещё {hidden}: полный список — на экране «Анализы»
+      </div>
+    )}
   </div>;
 }

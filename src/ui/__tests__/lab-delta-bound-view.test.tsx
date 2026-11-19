@@ -39,3 +39,22 @@ describe('проход 156: «без вывода» не выглядит как
     expect(container.querySelector('[data-lab-delta-trend="improving"]')!.textContent).toContain('✓');
   });
 });
+
+describe('проход 158: обрезка карточки называется, а не молчит', () => {
+  const many = (n: number): LabDelta[] =>
+    Array.from({ length: n }, (_, i) => ({ marker: `M${i}`, trend: 'stable', sliceValues: ['1', '2'] }));
+
+  it('17 строк — 16 показаны, «Ещё 1» названа', () => {
+    const { container } = render(<LabDeltaView deltas={many(17)} />);
+    expect(container.querySelectorAll('[data-lab-delta-trend]')).toHaveLength(16);
+    const more = container.querySelector('[data-lab-delta-more]')!;
+    expect(more.getAttribute('data-lab-delta-more')).toBe('1');
+    expect(more.textContent).toContain('Ещё 1');
+  });
+
+  it('16 строк — обрезки нет, строки «Ещё» нет', () => {
+    const { container } = render(<LabDeltaView deltas={many(16)} />);
+    expect(container.querySelectorAll('[data-lab-delta-trend]')).toHaveLength(16);
+    expect(container.querySelector('[data-lab-delta-more]')).toBeNull();
+  });
+});
