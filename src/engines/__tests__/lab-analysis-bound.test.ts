@@ -43,12 +43,14 @@ describe('проход 150: «СРБ <5» — не воспаление', () => 
     expect(res.boundUnproven).toEqual([]);
   });
 
-  it('обрезанный СРБ не поднимает индекс воспаления', () => {
+  it('обрезанный СРБ — воспаление неизвестно, а не «норма»', () => {
     const cut = interpretLabs([point('CRP', 5, { bound: '<' })]);
     const exact = interpretLabs([point('CRP', 5)]);
-    // Обрезанный идёт как «не измерено» (значение по умолчанию), точный — как 5.
-    expect(cut.inflammation).toBeLessThan(exact.inflammation);
-    expect(cut.inflammation).toBe(3);
+    // Проход 150: обрезанный идёт как «не измерено». Проход 153: вместо
+    // подставленной нормы (2.5) индекс воспаления вовсе неизвестен, а точный
+    // СРБ 5 даёт 5 + ферритин/100 (ферритина нет — 0).
+    expect(cut.inflammation).toBeNull();
+    expect(exact.inflammation).toBe(5);
   });
 });
 

@@ -365,6 +365,10 @@ export function applyLabAdjustments(
     let labMarker = '';
     let severity: LabAdjustment['severity'] = 'info';
 
+    // Проход 153: индексы могут быть `null` (не измерен ни один маркер их
+    // состава). Сравнение с `null` ложное — снижение дозы не выдумывается, но и
+    // «орган здоров» молча не утверждается: причина остаётся без строки
+    // лабораторного маркера.
     // Renal impairment → reduce renally-cleared supplements
     if ((lab as any).kidneyStress > 60) {
       const renalIds = ['magnesium', 'potassium', 'creatine', 'taurine', 'calcium', 'zinc', 'selenium'];

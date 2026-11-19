@@ -24,6 +24,9 @@ const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: 
 const CARD_GLASS: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
 const SMALL_W: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
 const ru = (g: string) => GROUP_RU[g] || g;
+/** Цвет лабораторного индекса: нет данных — серый, а не «зелёная норма» (проход 153). */
+const tone = (v: number | null, bad: boolean, badColor = '#ef4444') =>
+  v === null ? '#94a3b8' : bad ? badColor : '#22c55e';
 
 type Division = 'bb' | 'pl';
 type LevelKey = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -340,11 +343,13 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
           {linked.labAnalysis ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
-              <span>Печень: <b style={{ color: linked.labAnalysis.liverStress > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.liverStress}</b></span>
-              <span>Почки: <b style={{ color: linked.labAnalysis.kidneyStress > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.kidneyStress}</b></span>
-              <span>Воспаление: <b style={{ color: linked.labAnalysis.inflammation > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.inflammation}</b></span>
-              <span>Гормоны: <b style={{ color: linked.labAnalysis.hormoneScore < 60 ? '#f59e0b' : '#22c55e' }}>{linked.labAnalysis.hormoneScore}</b></span>
-              <span>Кардио-риск: <b style={{ color: linked.labAnalysis.cardioRisk > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.cardioRisk}</b></span>
+              {/* Проход 153: неизмеренный индекс печатается «—», а не числом
+                  подставленной нормы; серый цвет = данных нет. */}
+              <span>Печень: <b style={{ color: tone(linked.labAnalysis.liverStress, (linked.labAnalysis.liverStress ?? 0) > 40) }}>{linked.labAnalysis.liverStress ?? '—'}</b></span>
+              <span>Почки: <b style={{ color: tone(linked.labAnalysis.kidneyStress, (linked.labAnalysis.kidneyStress ?? 0) > 40) }}>{linked.labAnalysis.kidneyStress ?? '—'}</b></span>
+              <span>Воспаление: <b style={{ color: tone(linked.labAnalysis.inflammation, (linked.labAnalysis.inflammation ?? 0) > 40) }}>{linked.labAnalysis.inflammation ?? '—'}</b></span>
+              <span>Гормоны: <b style={{ color: tone(linked.labAnalysis.hormoneScore, linked.labAnalysis.hormoneScore !== null && linked.labAnalysis.hormoneScore < 60, '#f59e0b') }}>{linked.labAnalysis.hormoneScore ?? '—'}</b></span>
+              <span>Кардио-риск: <b style={{ color: tone(linked.labAnalysis.cardioRisk, (linked.labAnalysis.cardioRisk ?? 0) > 40) }}>{linked.labAnalysis.cardioRisk ?? '—'}</b></span>
               <span>MRV ×{labMult.toFixed(2)}</span>
             </div>
           ) : <div style={{ marginBottom: 6, color: '#f59e0b' }}>Нет данных лаборатории — сдайте анализы для точной коррекции.</div>}

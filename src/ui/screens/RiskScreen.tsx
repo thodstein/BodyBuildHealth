@@ -28,7 +28,7 @@ import { getProfile, updateProfile } from '../../core/profile-manager';
 import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } from '../../engines/compliance-engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
-import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { interpretLabs, computeHOMA_IR, computeHealthIndices, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { labValueLabel } from '../../core/lab-value-label';
 import { computeMarkerDeviations } from './LabsScreen_parts/lab-marker-risks';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
@@ -329,20 +329,29 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   }, [linked.profile]);
 
   // Lab analysis risk — from lab-analysis.engine (HOMA-IR, liver, cardio, etc.)
+  // Проход 153: индекс без измеренных маркеров — `null`. Система с неизвестным
+  // индексом не получает «ноль риска», а общий уровень считается по измеренным.
+  // Нет ни одного индекса — вклада в риск нет вовсе (а не «всё в норме»).
   const labAnalysisRisk = useMemo(() => {
     if (!labAnalysis) return null;
+    const values: Record<string, number | null> = {
+      hepatic: labAnalysis.liverStress,
+      cardio: labAnalysis.cardioRisk,
+      renal: labAnalysis.kidneyStress,
+      endocrine: labAnalysis.hormoneScore,
+      hematologic: labAnalysis.inflammation === null ? null : labAnalysis.inflammation * 5,
+    };
+    const present = Object.values(values).filter((v): v is number => v !== null);
+    if (!present.length) return null;
+    const mean = present.reduce((s, v) => s + v, 0) / present.length;
     const breakdown: Record<string, { raw: number; net: number }> = {};
     for (const sys of ALL_RISK_SYSTEMS) {
-      let r = 0;
-      if (sys === 'hepatic') r = labAnalysis.liverStress;
-      else if (sys === 'cardio') r = labAnalysis.cardioRisk;
-      else if (sys === 'renal') r = labAnalysis.kidneyStress;
-      else if (sys === 'endocrine') r = labAnalysis.hormoneScore;
-      else if (sys === 'hematologic') r = labAnalysis.inflammation * 5;
-      else r = (labAnalysis.liverStress + labAnalysis.cardioRisk + labAnalysis.kidneyStress + labAnalysis.hormoneScore) / 8;
+      const known = Object.prototype.hasOwnProperty.call(values, sys);
+      const r = known ? values[sys] : mean / 2;
+      if (r === null) continue;
       breakdown[sys] = { raw: Math.min(100, r), net: Math.min(100, r * 0.7) };
     }
-    const overall = Math.min(100, (labAnalysis.liverStress + labAnalysis.cardioRisk + labAnalysis.kidneyStress + labAnalysis.hormoneScore + labAnalysis.inflammation * 5) / 5);
+    const overall = Math.min(100, mean);
     return { overallRaw: overall, overallNet: overall * 0.7, systemBreakdown: breakdown };
   }, [labAnalysis]);
 
@@ -1825,10 +1834,13 @@ export const LabsRisksTab: React.FC = () => {
     return interpretLabs(labs, profileSex === 'female' ? 'female' : undefined, cycleStateFromProfile(linked.profile));
   }, [hasLabs, labs, profileSex, linked.profile]);
 
-  const r = labAnalysisRes;
-  const ASI = r ? Math.max(0, Math.round(100 - ((r.hormoneScore||0)*0.4 + Math.min(100, (r.inflammation||0)/6*50)*0.3 + (r.kidneyStress||0)*0.3))) : null;
-  const HMI = r ? Math.round(Math.min(100, (r.liverStress||0) * 1.2 + (r.inflammation||0) * 0.5)) : null;
-  const CR = r ? Math.round(Math.min(100, (r.cardioRisk||0) * 1.1 + (r.inflammation||0) * 0.6)) : null;
+  // Проход 153: ASI/HMI/CR — одна формула (`computeHealthIndices`) на этот экран и
+  // на «Анализы → Риски»; неизмеренный показатель даёт «Нет данных», а не
+  // «Хорошо» по подставленным нормам.
+  const healthIndices = labAnalysisRes ? computeHealthIndices(labAnalysisRes) : null;
+  const ASI = healthIndices?.asi ?? null;
+  const HMI = healthIndices?.hmi ?? null;
+  const CR = healthIndices?.cr ?? null;
   const statusColor = (v: number|null, inv: boolean) => {
     if (v===null) return '#fff';
     if (inv) return v>=70 ? '#22c55e' : v>=40 ? '#eab308' : '#ef4444';
@@ -1892,7 +1904,7 @@ export const LabsRisksTab: React.FC = () => {
           <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
         {key:'indices',icon:'grid' as NativeIconName,title:'Композитные индексы здоровья',
          body:<div style={{display:'grid',gap:8}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
-          <div key={item.label} style={{padding:'12px',borderRadius:14,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.08)`:'rgba(255,255,255,0.04)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.24)`:'1px solid rgba(255,255,255,0.09)'}}>
+          <div key={item.label} data-health-index={item.label.slice(0, item.label.indexOf(' '))} data-health-index-value={item.val === null ? 'none' : item.val} style={{padding:'12px',borderRadius:14,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.08)`:'rgba(255,255,255,0.04)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.24)`:'1px solid rgba(255,255,255,0.09)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
               <div><div style={{fontSize:13,fontWeight:800,color:'#fff'}}>{item.label}</div><div style={{fontSize:11,color:'#fff',marginTop:3}}>{item.desc}</div></div>
               {item.val!==null ? <div style={{textAlign:'right',flexShrink:0}}><div style={{fontSize:22,fontWeight:900,color:statusColor(item.val,item.inv)}}>{item.val}%</div><div style={{fontSize:11,color:'#fff',fontWeight:700}}>{statusLabel(item.val,item.inv)}</div></div> : <div style={{fontSize:12,color:'#fff'}}>Нет данных</div>}

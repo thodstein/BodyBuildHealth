@@ -825,9 +825,13 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     }
     const labStress: Record<string, number> = {};
     if (labRes) {
-      labStress.cardio = labRes.cardioRisk; labStress.hepatic = labRes.liverStress;
-      labStress.renal = labRes.kidneyStress; labStress.endocrine = labRes.hormoneScore;
-      labStress.hematologic = labRes.inflammation * 5;
+      // Проход 153: неизмеренный индекс не отдаётся плану как «ноль стресса» —
+      // система просто не получает лабораторной надбавки.
+      if (labRes.cardioRisk !== null) labStress.cardio = labRes.cardioRisk;
+      if (labRes.liverStress !== null) labStress.hepatic = labRes.liverStress;
+      if (labRes.kidneyStress !== null) labStress.renal = labRes.kidneyStress;
+      if (labRes.hormoneScore !== null) labStress.endocrine = labRes.hormoneScore;
+      if (labRes.inflammation !== null) labStress.hematologic = labRes.inflammation * 5;
     }
     const plan = generateWeeklyPlan(allSubs, riskCalcMethod, baseWeights, drugLoads, labStress, calcResultData?.systemSupport ?? {});
     setWeeklyPlan(plan);

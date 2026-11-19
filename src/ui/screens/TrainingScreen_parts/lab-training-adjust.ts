@@ -19,19 +19,23 @@ export function labTrainingAdjust(lab: LabCompositeResult | null): LabTrainingAd
   let deload = false;
   let note = '';
 
-  if (lab.liverStress > 60) { mult = Math.min(mult, 0.85); warnings.push(`Печёночный стресс ${lab.liverStress}: снизить объём на ~15%, меньше отказных подходов.`); deload = true; }
-  else if (lab.liverStress > 40) { mult = Math.min(mult, 0.93); warnings.push(`Печёночный стресс ${lab.liverStress} (умеренно): избегать избытка объёма.`); }
+  // Проход 153: неизмеренный индекс (`null`) не снижает объём и не даёт
+  // предупреждения — «нет анализов» больше не выглядит как «печень в порядке 75».
+  const { liverStress, kidneyStress, inflammation, hormoneScore, cardioRisk } = lab;
 
-  if (lab.kidneyStress > 60) { mult = Math.min(mult, 0.9); warnings.push(`Почечный стресс ${lab.kidneyStress}: контролировать белок/объём, снизить интенсивность на ~10%.`); }
+  if (liverStress !== null && liverStress > 60) { mult = Math.min(mult, 0.85); warnings.push(`Печёночный стресс ${liverStress}: снизить объём на ~15%, меньше отказных подходов.`); deload = true; }
+  else if (liverStress !== null && liverStress > 40) { mult = Math.min(mult, 0.93); warnings.push(`Печёночный стресс ${liverStress} (умеренно): избегать избытка объёма.`); }
 
-  if (lab.inflammation > 60) { mult = Math.min(mult, 0.8); warnings.push(`Воспаление (CRP) ${lab.inflammation}: рекомендуется разгрузочная неделя, снизить объём на ~20%.`); deload = true; }
-  else if (lab.inflammation > 40) { mult = Math.min(mult, 0.92); warnings.push(`Воспаление ${lab.inflammation} (умеренно): ограничить объём.`); }
+  if (kidneyStress !== null && kidneyStress > 60) { mult = Math.min(mult, 0.9); warnings.push(`Почечный стресс ${kidneyStress}: контролировать белок/объём, снизить интенсивность на ~10%.`); }
+
+  if (inflammation !== null && inflammation > 60) { mult = Math.min(mult, 0.8); warnings.push(`Воспаление (CRP) ${inflammation}: рекомендуется разгрузочная неделя, снизить объём на ~20%.`); deload = true; }
+  else if (inflammation !== null && inflammation > 40) { mult = Math.min(mult, 0.92); warnings.push(`Воспаление ${inflammation} (умеренно): ограничить объём.`); }
 
   // hormoneScore: низкий тестостерон → меньше объёма/интенсивности
-  if (lab.hormoneScore != null && lab.hormoneScore < 40) { mult = Math.min(mult, 0.85); warnings.push(`Низкий гормональный фон (тестостерон): снизить объём на ~15%, добавить восстановление.`); note = 'При низком тестостероне упор на качество (RIR 2-3), меньше отказов.'; }
-  else if (lab.hormoneScore != null && lab.hormoneScore < 60) { mult = Math.min(mult, 0.93); note = 'Гормональный фон средний — умеренный объём, без перегруза.'; }
+  if (hormoneScore !== null && hormoneScore < 40) { mult = Math.min(mult, 0.85); warnings.push(`Низкий гормональный фон (тестостерон): снизить объём на ~15%, добавить восстановление.`); note = 'При низком тестостероне упор на качество (RIR 2-3), меньше отказов.'; }
+  else if (hormoneScore !== null && hormoneScore < 60) { mult = Math.min(mult, 0.93); note = 'Гормональный фон средний — умеренный объём, без перегруза.'; }
 
-  if (lab.cardioRisk > 60) { warnings.push(`Сердечно-сосудистый риск ${lab.cardioRisk}: исключить натуживание (Valsalva), контролировать АД, избегать максимальных подходов.`); note = note || 'Ограничить максимальные подходы, контролировать АД.'; }
+  if (cardioRisk !== null && cardioRisk > 60) { warnings.push(`Сердечно-сосудистый риск ${cardioRisk}: исключить натуживание (Valsalva), контролировать АД, избегать максимальных подходов.`); note = note || 'Ограничить максимальные подходы, контролировать АД.'; }
 
   mult = Math.max(0.7, mult);
   if (!note && mult < 1) note = `Объём снижен до ${Math.round(mult * 100)}% по данным лаборатории.`;

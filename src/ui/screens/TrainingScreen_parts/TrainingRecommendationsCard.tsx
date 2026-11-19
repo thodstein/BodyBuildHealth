@@ -18,7 +18,7 @@ export const TrainingRecommendationsCard: React.FC<{
   acwr?: number;
   nutrition?: { kcal: number; protein: number; fat: number; carbs: number };
   bodyWeight?: number;
-  labAnalysis?: { liverStress: number; cardioRisk: number; inflammation: number; kidneyStress: number; hormoneScore: number; homaIR: number | null };
+  labAnalysis?: { liverStress: number | null; cardioRisk: number | null; inflammation: number | null; kidneyStress: number | null; hormoneScore: number | null; homaIR: number | null };
   onCourse?: boolean;
   courseIntensity?: string;
   supportCoverage?: Record<string, number>;

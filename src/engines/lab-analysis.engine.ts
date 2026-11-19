@@ -21,11 +21,20 @@ export interface LabInterpretation {
 
 export interface LabCompositeResult {
   homaIR: number | null;
-  liverStress: number;
-  cardioRisk: number;
-  inflammation: number;
-  kidneyStress: number;
-  hormoneScore: number;
+  /**
+   * Проход 153: индекс — `null`, когда не измерен ни один его маркер.
+   *
+   * Раньше отсутствующий АЛТ/ЛПНП/СРБ подставлялся «нормой» (30, 2.5, 1.5), и
+   * `interpretLabs([])` выдавал «стресс печени 75», «кардиориск 40», «воспаление
+   * 2.5» — то есть отсутствие анализов выглядело как измерение, а экраны
+   * показывали ASI/HMI/CR по несуществующим данным.
+   */
+  liverStress: number | null;
+  cardioRisk: number | null;
+  inflammation: number | null;
+  kidneyStress: number | null;
+  /** `null` — не измерен ни один гормональный маркер (это не «идеальный фон»). */
+  hormoneScore: number | null;
   interpretations: LabInterpretation[];
   /**
    * Маркеры, у которых в бланке стоит граница, а сторону она не доказывает
@@ -230,15 +239,31 @@ function usable(
 }
 
 /**
- * Число маркера для составного индекса (проход 150).
+ * Число маркера для составного индекса (проходы 150, 153).
  *
  * Точное — как есть. С границей — только если доказана «плохая» сторона
- * (`usable`), иначе маркер считается неизмеренным и берётся прежнее значение по
- * умолчанию: индекс не должен ни расти, ни падать от обрезанного числа.
+ * (`usable`). Нет записи (или сторона не доказана) — `null`, а не значение по
+ * умолчанию: проход 153 убрал подстановку «нормы», из-за которой индекс считался
+ * по несуществующему анализу.
  */
-function metric(labs: LabPoint[], code: string, fallback: number, bad: 'high' | 'low' | 'both' = 'high'): number {
+function metric(labs: LabPoint[], code: string, bad: 'high' | 'low' | 'both' = 'high'): number | null {
   const ref = REFERENCE_RANGES[code];
-  return usable(findLabPoint(labs, code), ref?.low, ref?.high, bad) ?? fallback;
+  return usable(findLabPoint(labs, code), ref?.low, ref?.high, bad);
+}
+
+/**
+ * Среднее долей нормы по измеренным маркерам (проход 153).
+ *
+ * Вес нормируется на сумму весов присутствующих: отсутствующий маркер не
+ * считается «идеально нормальным» (раньше он заменялся нормой и тянул индекс к
+ * 75). Нет ни одного — `null`.
+ */
+function weightedRatio(parts: { value: number | null; ref: number; w: number }[]): number | null {
+  const present = parts.filter((p): p is { value: number; ref: number; w: number } => p.value !== null);
+  if (!present.length) return null;
+  const wSum = present.reduce((s, p) => s + p.w, 0);
+  if (wSum <= 0) return null;
+  return present.reduce((s, p) => s + (p.value / p.ref) * p.w, 0) / wSum;
 }
 
 /** Число без границы: «>N» не даёт ни отношения, ни вывода о стороне. */
@@ -395,32 +420,48 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
       ? computeHOMA_IR(glucose, insulin)
       : null;
 
-  // Индекс печени — в долях ВГН пациента (♀ 31, ♂ 40): раньше всегда делили на
-  // мужские 40, и её АЛТ 35 давал заниженный «стресс печени». Пустые значения по
-  // умолчанию держат индекс на прежнем уровне (75) у обоих полов.
+  // Индекс печени — в долях ВГН пациента (♀ 31, ♂ 40). Проход 153: считается
+  // только по измеренным трансаминазам, иначе стресс печени неизвестен, а не 75.
   const lftBase = fem ? LFT_ULN.ALT.female : LFT_ULN.ALT.male;
-  const defaultLft = Math.round(30 * (lftBase / 40));
-  const alt = metric(labs, 'ALT', defaultLft);
-  const ast = metric(labs, 'AST', defaultLft);
-  const ggt = metric(labs, 'GGT', defaultLft);
-  const liverStress = Math.round(((alt + ast + ggt) / 3 / lftBase) * 100);
+  const alt = metric(labs, 'ALT');
+  const ast = metric(labs, 'AST');
+  const ggt = metric(labs, 'GGT');
+  const liverRatio = weightedRatio([
+    { value: alt, ref: lftBase, w: 1 },
+    { value: ast, ref: lftBase, w: 1 },
+    { value: ggt, ref: lftBase, w: 1 },
+  ]);
+  const liverStress = liverRatio === null ? null : Math.round(liverRatio * 100);
 
   // Проход 150: для HDL «плохо» — низкое, для остальных липидов — высокое.
-  const ldl = metric(labs, 'LDL', 2.5);
-  const hdl = metric(labs, 'HDL', 1.3, 'low');
-  const tg = metric(labs, 'TRIGLYCERIDES', 1.2);
-  const apob = metric(labs, 'APOB', 0.8);
-  const cardioRisk = Math.round(((ldl + apob * 3 + tg / 2) / (hdl || 1)) * 10);
+  // Проход 153: кардиоиндекс требует ядро формулы — ЛПНП и ЛПВП; АПОБ и ТГ
+  // входят, только если измерены (отсутствующий АПОБ больше не подставляется
+  // как 0.8 — это был выдуманный анализ).
+  const ldl = metric(labs, 'LDL');
+  const hdl = metric(labs, 'HDL', 'low');
+  const tg = metric(labs, 'TRIGLYCERIDES');
+  const apob = metric(labs, 'APOB');
+  const cardioRisk =
+    ldl === null || hdl === null || hdl <= 0
+      ? null
+      : Math.round(((ldl + (apob ?? 0) * 3 + (tg ?? 0) / 2) / hdl) * 10);
 
-  const crp = metric(labs, 'CRP', 1.5);
-  const ferritin = metric(labs, 'FERRITIN', 100);
-  const inflammation = Math.round(crp + (ferritin / 100));
+  // Воспаление — сумма измеренных слагаемых: нет ни СРБ, ни ферритина — `null`.
+  const crp = metric(labs, 'CRP');
+  const ferritin = metric(labs, 'FERRITIN');
+  const inflammation =
+    crp === null && ferritin === null ? null : Math.round((crp ?? 0) + (ferritin ?? 0) / 100);
 
-  // Индекс почек — от ВГН креатинина пациента (♀ 97, ♂ 110), а не от 110 для всех.
+  // Индекс почек — от ВГН креатинина пациента (♀ 97, ♂ 110). Проход 153: веса
+  // 60/40 нормируются на измеренные; нет ни креатинина, ни мочевины — `null`.
   const crBase = fem ? CREATININE_ULN.female : CREATININE_ULN.male;
-  const creatinine = metric(labs, 'CREATININE', Math.round(90 * (crBase / 110)));
-  const urea = metric(labs, 'UREA', 5);
-  const kidneyStress = Math.round(((creatinine / crBase) * 60 + (urea / 8.3) * 40));
+  const creatinine = metric(labs, 'CREATININE');
+  const urea = metric(labs, 'UREA');
+  const renalRatio = weightedRatio([
+    { value: creatinine, ref: crBase, w: 60 },
+    { value: urea, ref: 8.3, w: 40 },
+  ]);
+  const kidneyStress = renalRatio === null ? null : Math.round(renalRatio * 100);
 
   // Гормоны штрафуются за обе стороны, поэтому доказанная граница годится в любую
   // сторону; недоказанная — как отсутствие записи (штрафа нет, вывода нет).
@@ -467,9 +508,63 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     }
   }
 
+  // Проход 153: «нет гормонов» — не «идеальный фон». Балл возвращается только
+  // когда измерен хотя бы один маркер, который в него входит; иначе `null`, и
+  // индексы, которые на него опираются, тоже неизвестны. Нормальный ФСГ 14 — это
+  // измеренный гормон (балл 0), а не отсутствие данных. Щитовидная железа в балл
+  // не входит (у неё свои механизмы), поэтому один ТТГ балла не создаёт.
+  const HORMONE_MARKERS = [
+    'TESTOSTERONE_TOTAL', 'TESTOSTERONE_FREE', 'ESTRADIOL', 'PROLACTIN',
+    'PROGESTERONE', 'LH', 'FSH',
+  ];
+  const hormoneMeasured = HORMONE_MARKERS.some((code) => findLabPoint(labs, code) !== null);
+
   hormoneScore = Math.min(100, hormoneScore);
 
-  return { homaIR, liverStress, cardioRisk, inflammation, kidneyStress, hormoneScore, interpretations, boundUnproven };
+  return {
+    homaIR, liverStress, cardioRisk, inflammation, kidneyStress,
+    hormoneScore: hormoneMeasured ? hormoneScore : null,
+    interpretations, boundUnproven,
+  };
+}
+
+/** Три сводных индекса экрана «Анализы → Риски» и «Риск». */
+export interface LabHealthIndices {
+  /** Анаболический синтез: 100 − (гормоны 40% + воспаление 30% + почки 30%). */
+  asi: number | null;
+  /** Гепатический метаболизм: стресс печени 1.2 + воспаление 0.5. */
+  hmi: number | null;
+  /** Кардиориск: кардиоиндекс 1.1 + воспаление 0.6. */
+  cr: number | null;
+}
+
+/**
+ * ASI / HMI / CR — одна формула на оба экрана (проход 153).
+ *
+ * Раньше каждый экран считал их сам из `interpretLabs`, подставляя `|| 0` для
+ * отсутствующего показателя: без анализов печаталось «ASI 72% Хорошо», «HMI 75»,
+ * «CR 45». Здесь вход `null` (индекс не измерен) даёт `null` на выходе — экран
+ * пишет «Нет данных», а не оценку по несуществующим числам.
+ */
+export function computeHealthIndices(res: LabCompositeResult): LabHealthIndices {
+  const { hormoneScore, inflammation, kidneyStress, liverStress, cardioRisk } = res;
+  const asI =
+    hormoneScore === null || inflammation === null || kidneyStress === null
+      ? null
+      : Math.round(100 - (hormoneScore * 0.4 + Math.min(100, (inflammation / 6) * 50) * 0.3 + kidneyStress * 0.3));
+  const hmi =
+    liverStress === null || inflammation === null
+      ? null
+      : Math.round(Math.min(100, liverStress * 1.2 + inflammation * 0.5));
+  const cr =
+    cardioRisk === null || inflammation === null
+      ? null
+      : Math.round(Math.min(100, cardioRisk * 1.1 + inflammation * 0.6));
+  return {
+    asi: asI === null ? null : Math.max(0, Math.min(100, asI)),
+    hmi,
+    cr,
+  };
 }
 
 export function computeRiskByModel(
@@ -485,12 +580,17 @@ export function computeRiskByModel(
     let raw = (baseRisk[system] ?? 15) + (substanceRisk[system] ?? 0);
 
     if (model === 'lab_weighted' || model === 'mechanism_driven' || model === 'pharma_integrated') {
+      // Проход 153: неизмеренный индекс не даёт вклада — раньше в формулу шло
+      // значение по умолчанию, и риск систем рос от несуществующих анализов.
+      const add = (value: number | null, k: number) => {
+        if (value !== null && Number.isFinite(value)) raw += value * k;
+      };
       switch (system) {
-        case 'hepatic': raw += labResult.liverStress * 0.5; break;
-        case 'cardio': raw += labResult.cardioRisk * 0.4; break;
-        case 'renal': raw += labResult.kidneyStress * 0.4; break;
-        case 'endocrine': raw += labResult.hormoneScore * 0.5; break;
-        case 'hematologic': raw += labResult.inflammation * 0.3; break;
+        case 'hepatic': add(labResult.liverStress, 0.5); break;
+        case 'cardio': add(labResult.cardioRisk, 0.4); break;
+        case 'renal': add(labResult.kidneyStress, 0.4); break;
+        case 'endocrine': add(labResult.hormoneScore, 0.5); break;
+        case 'hematologic': add(labResult.inflammation, 0.3); break;
       }
     }
 
@@ -543,13 +643,18 @@ export function generateMechanismReport(labResult: LabCompositeResult): {
 
 export function computePharmaAdjustedDose(
   baseDose: number,
-  liverStress: number,
-  kidneyStress: number,
+  liverStress: number | null,
+  kidneyStress: number | null,
   bioavailability: number,
 ): { liverAdjusted: number; kidneyAdjusted: number; finalDose: number } {
-  const liverAdjusted = baseDose * Math.max(0.3, 1 - liverStress / 100);
-  const kidneyAdjusted = baseDose * Math.max(0.3, 1 - kidneyStress / 100);
-  const finalDose = Math.round(baseDose * (bioavailability / 100) * Math.max(0.3, 1 - (liverStress + kidneyStress) / 200));
+  // Проход 153: неизмеренный индекс не снижает дозу (множитель 1) — «нет данных»
+  // не должно выглядеть как «орган здоров» в тексте, но и выдумывать снижение
+  // не из чего. Экран обязан назвать, что индекс не измерен (см. `labStress`).
+  const liver = liverStress ?? 0;
+  const kidney = kidneyStress ?? 0;
+  const liverAdjusted = baseDose * Math.max(0.3, 1 - liver / 100);
+  const kidneyAdjusted = baseDose * Math.max(0.3, 1 - kidney / 100);
+  const finalDose = Math.round(baseDose * (bioavailability / 100) * Math.max(0.3, 1 - (liver + kidney) / 200));
   return { liverAdjusted, kidneyAdjusted, finalDose };
 }
 

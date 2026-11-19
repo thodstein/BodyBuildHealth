@@ -8,7 +8,7 @@ import { ruCount, RU_MARKERS } from '../../engines/ru-plural';
 import { calculatePenaltyCoefficients } from '../../engines/labs-penalty.engine';
 import { LabDiaryTab } from './LabsScreen_parts/LabDiaryTab';
 import { computeLabIndexDetails, type LabIndexDetail } from '../../engines/labs-indices.engine';
-import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
+import { interpretLabs, computeHOMA_IR, computeHealthIndices, type LabCompositeResult } from '../../engines/lab-analysis.engine';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { getDrugsToNormalizeMarker, getMarkerName } from '../../data/support-lab-effects';
@@ -1867,12 +1867,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ≡≡≡ RISKS & INDICES TAB ≡≡≡ */}
       {mainTab === 'risks' && (() => {
         const r = labAnalysisResult;
-        const rawASI = r ? Math.max(0, Math.round(100 - (
-          (r.hormoneScore || 0) * 0.4 + Math.min(100, (r.inflammation || 0) / 6 * 50) * 0.3 + (r.kidneyStress || 0) * 0.3
-        ))) : null;
-        const ASI = rawASI !== null ? Math.min(100, rawASI) : null;
-        const HMI = r ? Math.round(Math.min(100, r.liverStress || 0)) : null;
-        const CR = r ? Math.round(Math.min(100, r.cardioRisk || 0)) : null;
+        // Проход 153: ASI/HMI/CR — одна формула (`computeHealthIndices`) на этот
+        // экран и на «Риск»; неизмеренный показатель — «Нет данных», а не оценка
+        // по подставленным нормам (раньше HMI здесь был просто `liverStress`, а на
+        // экране «Риск» — другая формула; теперь числа не расходятся).
+        const health = r ? computeHealthIndices(r) : null;
+        const ASI = health?.asi ?? null;
+        const HMI = health?.hmi ?? null;
+        const CR = health?.cr ?? null;
         const statusColor = (val: number, invert: boolean) => {
           if (!invert) { if (val <= 30) return '#22c55e'; if (val <= 60) return '#eab308'; return '#ef4444'; }
           if (val >= 70) return '#22c55e'; if (val >= 40) return '#eab308'; return '#ef4444';

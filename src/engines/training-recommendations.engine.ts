@@ -17,7 +17,7 @@ export interface RecommendationInput {
   acwr?: number;
   bodyWeight?: number;
   nutrition?: { kcal: number; protein: number; fat: number; carbs: number };
-  labAnalysis?: { liverStress: number; cardioRisk: number; inflammation: number; kidneyStress: number; hormoneScore: number; homaIR: number | null };
+  labAnalysis?: { liverStress: number | null; cardioRisk: number | null; inflammation: number | null; kidneyStress: number | null; hormoneScore: number | null; homaIR: number | null };
   onCourse?: boolean;
   courseIntensity?: string;
   supportCoverage?: Record<string, number>;
@@ -145,14 +145,16 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
     if (kcalG > 0 && kcalG < 25) recs.push({ id: 'nutr-kcal-low', severity: 'info', text: `Дефицит калорий (${kcalG.toFixed(0)} ккал/кг) — работоспособность может снижаться; учтите при прогрессии нагрузки (фаза жиросжигания).` });
   }
 
-  // 6.3: Labs → Training: лабораторные показатели влияют на рекомендации
+  // 6.3: Labs → Training: лабораторные показатели влияют на рекомендации.
+  // Проход 153: неизмеренный индекс (`null`) не даёт рекомендации — раньше
+  // подставленная норма делала вывод о несуществующем анализе.
   if (input.labAnalysis) {
     const la = input.labAnalysis;
-    if (la.liverStress >= 7) recs.push({ id: 'lab-liver', severity: 'warn', text: `Высокий стресс печени (${la.liverStress}/10) — снизить объём на 10%, избегать жимовых перегрузок и стимуляторов.` });
-    if (la.cardioRisk >= 7) recs.push({ id: 'lab-cardio', severity: 'warn', text: `Высокий кардиориск (${la.cardioRisk}/10) — ограничить тяжёлые сеты с задержкой дыхания, добавить кардио 150 мин/нед.` });
-    if (la.inflammation >= 7) recs.push({ id: 'lab-inflam', severity: 'warn', text: `Высокое воспаление (${la.inflammation}/10) — увеличить отдых между сессиями, рассмотреть делод.` });
-    if (la.kidneyStress >= 7) recs.push({ id: 'lab-kidney', severity: 'warn', text: `Стресс почек (${la.kidneyStress}/10) — контролировать гидратацию (≥35 мл/кг), избегать экстремального объёма.` });
-    if (la.hormoneScore <= 3) recs.push({ id: 'lab-hormone', severity: 'warn', text: `Низкий гормональный профиль (${la.hormoneScore}/10) — восстановление хуже, снизить частоту на 1 сессию или объём на 15%.` });
+    if (la.liverStress !== null && la.liverStress >= 7) recs.push({ id: 'lab-liver', severity: 'warn', text: `Высокий стресс печени (${la.liverStress}/10) — снизить объём на 10%, избегать жимовых перегрузок и стимуляторов.` });
+    if (la.cardioRisk !== null && la.cardioRisk >= 7) recs.push({ id: 'lab-cardio', severity: 'warn', text: `Высокий кардиориск (${la.cardioRisk}/10) — ограничить тяжёлые сеты с задержкой дыхания, добавить кардио 150 мин/нед.` });
+    if (la.inflammation !== null && la.inflammation >= 7) recs.push({ id: 'lab-inflam', severity: 'warn', text: `Высокое воспаление (${la.inflammation}/10) — увеличить отдых между сессиями, рассмотреть делод.` });
+    if (la.kidneyStress !== null && la.kidneyStress >= 7) recs.push({ id: 'lab-kidney', severity: 'warn', text: `Стресс почек (${la.kidneyStress}/10) — контролировать гидратацию (≥35 мл/кг), избегать экстремального объёма.` });
+    if (la.hormoneScore !== null && la.hormoneScore <= 3) recs.push({ id: 'lab-hormone', severity: 'warn', text: `Низкий гормональный профиль (${la.hormoneScore}/10) — восстановление хуже, снизить частоту на 1 сессию или объём на 15%.` });
     if (la.homaIR !== null && la.homaIR >= 2.5) recs.push({ id: 'lab-insulin', severity: 'info', text: `Инсулинорезистентность (HOMA-IR ${la.homaIR.toFixed(1)}) — углеводы вокруг тренировки, добавить кардио.` });
   }
 
@@ -167,13 +169,17 @@ export function generateTrainingRecommendations(input: RecommendationInput): Tra
   // 6.2: Support -> Training: низкое покрытие поддержки при нагрузке -> рекомендация
   if (input.supportCoverage) {
     const sc = input.supportCoverage;
-    const liverStress = input.labAnalysis?.liverStress ?? 0;
-    const cardioRisk = input.labAnalysis?.cardioRisk ?? 0;
-    const kidneyStress = input.labAnalysis?.kidneyStress ?? 0;
-    if ((sc.hepatic ?? 1) < 0.3 && (input.onCourse || liverStress >= 5)) recs.push({ id: 'supp-hepatic', severity: 'warn', text: 'Низкое покрытие поддержки печени при тренировочной/курсовой нагрузке — добавьте гепатопротекторы (UDCA, NAC, TUDCA, расторопша).' });
-    if ((sc.cardio ?? 1) < 0.3 && cardioRisk >= 5) recs.push({ id: 'supp-cardio', severity: 'warn', text: 'Низкое кардио-покрытие при кардиориске — добавьте омега-3, CoQ10, экстракт чеснока, витамин K2.' });
+    // Проход 153: лабораторный индекс может быть `null` — не измерен. Это не
+    // «ноль риска»: надбавка по покрытию требует измеренного риска, а `onCourse`
+    // остаётся достаточным основанием там, где он есть.
+    const atLeast = (v: number | null | undefined, n: number) => v !== null && v !== undefined && v >= n;
+    const liverStress = input.labAnalysis?.liverStress ?? null;
+    const cardioRisk = input.labAnalysis?.cardioRisk ?? null;
+    const kidneyStress = input.labAnalysis?.kidneyStress ?? null;
+    if ((sc.hepatic ?? 1) < 0.3 && (input.onCourse || atLeast(liverStress, 5))) recs.push({ id: 'supp-hepatic', severity: 'warn', text: 'Низкое покрытие поддержки печени при тренировочной/курсовой нагрузке — добавьте гепатопротекторы (UDCA, NAC, TUDCA, расторопша).' });
+    if ((sc.cardio ?? 1) < 0.3 && atLeast(cardioRisk, 5)) recs.push({ id: 'supp-cardio', severity: 'warn', text: 'Низкое кардио-покрытие при кардиориске — добавьте омега-3, CoQ10, экстракт чеснока, витамин K2.' });
     if ((sc.neuro ?? 1) < 0.3 && input.onCourse) recs.push({ id: 'supp-neuro', severity: 'warn', text: 'Низкое покрытие ЦНС на курсе — адаптогены (родиола, ашваганда), магний, холин, витамин B-комплекс.' });
-    if ((sc.renal ?? 1) < 0.3 && (input.onCourse || kidneyStress >= 5)) recs.push({ id: 'supp-renal', severity: 'warn', text: 'Низкое покрытие почек при нагрузке — антиоксиданты (NAC), контроль гидратации (35+ мл/кг), экстракт клюквы.' });
+    if ((sc.renal ?? 1) < 0.3 && (input.onCourse || atLeast(kidneyStress, 5))) recs.push({ id: 'supp-renal', severity: 'warn', text: 'Низкое покрытие почек при нагрузке — антиоксиданты (NAC), контроль гидратации (35+ мл/кг), экстракт клюквы.' });
   }
 
   if (recs.length === 0) recs.push({ id: 'ok', severity: 'info', text: 'Сбалансировано: объём, готовность, питание, лаборатория и поддержка в норме, рисков перетрена не обнаружено.' });
