@@ -67,7 +67,9 @@ describe('§8.60 цель приёма = план приёма (`target.fd` / `t
     let meals = 0;
     for (const { plan } of cells(true)) {
       for (const m of plan.meals || []) {
-        if (!Number.isFinite(Number(m.target?.fd))) continue;
+        // §8.121: у пери-окон `fd = 0` — «цель по жиру не задана» (жир окна — кап), их
+        // витрина показывает без цели; контракт §8.60 держим только на основных приёмах.
+        if (!Number.isFinite(Number(m.target?.fd)) || Number(m.target?.fd) === 0) continue;
         meals++;
         if (Math.abs((Number(m.totals?.f) || 0) - (Number(m.target.fd) || 0)) > 3) fat++;
         if (Math.abs((Number(m.totals?.c) || 0) - (Number(m.target.cd) || 0)) > 3) carb++;
@@ -111,7 +113,11 @@ describe('§8.60 цель приёма = план приёма (`target.fd` / `t
       for (const m of plan.meals || []) {
         const t = String(m.type);
         const fixed = ['preworkout', 'postworkout', 'intra', 'presleep'].includes(t) || (m as any)._insulinWindow;
-        if (fixed && (Number.isFinite(Number(m.target?.fd)) || Number.isFinite(Number(m.target?.cd)) || Number.isFinite(Number(m.target?.pd)))) bad.push(`${key}:${t}`);
+        // §8.121: `fd` у окна может стоять только нулём — «цель по жиру не задана»
+        // (жир окна — кап, §8.118). Ненулевой `fd` вернёт ложный бейдж «недобор жира».
+        const _fd = (m.target as any)?.fd;
+        const _fdBad = _fd !== undefined && _fd !== null && Number(_fd) !== 0;
+        if (fixed && (_fdBad || Number.isFinite(Number(m.target?.cd)) || Number.isFinite(Number(m.target?.pd)))) bad.push(`${key}:${t}`);
       }
     }
     expect(bad.slice(0, 5).join(', ')).toBe('');
