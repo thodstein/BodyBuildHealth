@@ -53,3 +53,19 @@ describe('проход 142: карточка аномалии', () => {
     expect(screen.queryByText(/^1000 нг\/мл$/)).toBeNull();
   });
 });
+
+describe('проход 160: правка значения доезжает до экрана', () => {
+  // Раньше авто-импорт обновлял экран, только если менялось ЧИСЛО ДНЕЙ: правка
+  // значения в тот же день не доезжала до истории до перемонтирования вкладки.
+  const lab = (value: number) => ({ id: 'g1', code: 'GGT', name: 'ГГТ', value, unit: 'Ед/л', date: '2026-11-02' });
+  const ggtRow = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('[data-range="in"]')).find(el => (el.textContent || '').includes('ГГТ'));
+
+  it('перерисовка с тем же днём обновляет число', () => {
+    const { container, rerender } = render(React.createElement(LabDiaryTab, { labs: [lab(30)] } as any));
+    fireEvent.click(screen.getByText(/📋 История/));
+    expect(ggtRow(container)?.textContent).toContain('30');
+    rerender(React.createElement(LabDiaryTab, { labs: [lab(35)] } as any));
+    expect(ggtRow(container)?.textContent).toContain('35');
+  });
+});

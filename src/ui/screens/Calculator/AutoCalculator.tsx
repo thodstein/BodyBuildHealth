@@ -225,6 +225,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
     let cancelled = false;
     void (async () => {
       let found: { date: string; slice: LabSlice; source: 'Лаборатории' | 'дневника' } | null = null;
+      // Проход 160: читался ли склад и сколько в нём неархивных записей. Зеркало
+      // дневника — производная склада (пишется из него), поэтому оно не спорит со
+      // складом, в котором есть записи.
+      let storeRows: any[] | null = null;
 
       // 1. Склад анализов (IndexedDB). Ошибка чтения — не повод молчать: ниже
       //    остаётся зеркало дневника.
@@ -233,24 +237,31 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         const pid = getProfile()?.id || 'current-user';
         const rows = (await db.getAll<any>('labs_log'))
           .filter((l: any) => l && !l.archived && (l.patientId === pid || !l.patientId));
+        storeRows = rows;
         const slice = rows.length > 0 ? labPointsToSlice(rows) : null;
         if (slice) found = { date: String(slice.date || ''), slice, source: 'Лаборатории' };
       } catch { /* IndexedDB недоступен — пробуем зеркало */ }
 
       // 2. Зеркало дневника (localStorage). Дневник отсортирован по дате, но
       //    берём не «последний элемент», а запись с позднейшей датой.
+      //    Проход 160: только когда склад пуст или недоступен. Раньше зеркало
+      //    могло «воскресить» удалённый бланк: запись удалили из склада (или её
+      //    вычистил optimizeDBSpace), а зеркало хранило её и подставляло как
+      //    более свежую — форма получала анализ, которого в Лаборатории нет.
       try {
-        const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
-        if (Array.isArray(hist)) {
-          let last: any = null;
-          for (const e of hist) {
-            if (!e || !Array.isArray(e.markers)) continue;
-            if (!last || String(e.date || '') > String(last.date || '')) last = e;
-          }
-          const lastDate = String(last?.date || '');
-          if (last && lastDate && (!found || lastDate > found.date)) {
-            const slice = labPointsToSlice(last.markers);
-            if (slice) found = { date: lastDate, slice: { ...slice, date: lastDate }, source: 'дневника' };
+        if (!storeRows || storeRows.length === 0) {
+          const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
+          if (Array.isArray(hist)) {
+            let last: any = null;
+            for (const e of hist) {
+              if (!e || !Array.isArray(e.markers)) continue;
+              if (!last || String(e.date || '') > String(last.date || '')) last = e;
+            }
+            const lastDate = String(last?.date || '');
+            if (last && lastDate && (!found || lastDate > found.date)) {
+              const slice = labPointsToSlice(last.markers);
+              if (slice) found = { date: lastDate, slice: { ...slice, date: lastDate }, source: 'дневника' };
+            }
           }
         }
       } catch { /* нет дневника — тихо */ }

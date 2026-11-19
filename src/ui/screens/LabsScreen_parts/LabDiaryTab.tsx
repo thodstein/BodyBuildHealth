@@ -12,6 +12,8 @@ import { NativeIcon } from '../../native/NativeIcons';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
 import { boundProvesSide } from '../../../core/lab-bound';
+// Проход 160: окно графика — местный календарь (UTC-срез вечером сдвигал окно на день).
+import { localIsoDateOffset } from '../../../core/local-date';
 import { ruCount, RU_DAYS, RU_MARKERS, RU_ENTRIES, RU_ANOMALIES } from '../../../engines/ru-plural';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
@@ -40,10 +42,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
         markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
       }
     }
-    const prevLen = getLabDiary().length;
+    const before = getLabDiary();
     importLabsToDiary(labs, markerNorms);
     const updated = getLabDiary();
-    if (updated.length !== prevLen) setDiary(updated);
+    // Проход 160: сравниваем содержимое, а не число дней. Правка значения или
+    // маркера в пределах той же даты не меняла длину дневника, и экран до
+    // перемонтирования показывал старые числа — «сохранено» было, а на экране нет.
+    if (JSON.stringify(updated) !== JSON.stringify(before)) setDiary(updated);
   }, [labs, sex]);
 
   const stats = useMemo(() => getLabDiaryStats(diary), [diary]);
@@ -56,7 +61,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
     const data = getMarkerChartData(diary, selectedMarker);
     if (data.labels.length === 0) return null;
     // filter by days
-    const cutoff = new Date(Date.now() - chartDays * 86400000).toISOString().slice(0, 10);
+    const cutoff = localIsoDateOffset(-chartDays);
     const idx = data.labels.findIndex(l => l >= cutoff);
     const start = idx >= 0 ? idx : 0;
     return {

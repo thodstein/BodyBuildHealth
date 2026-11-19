@@ -32,6 +32,7 @@ const ФАЙЛЫ = [
   'src/ui/screens/LabsScreen.tsx',
   'src/ui/screens/RiskScreen.tsx',
   'src/ui/components/UnifiedLabPanel.tsx',
+  'src/ui/screens/LabsScreen_parts/LabDiaryTab.tsx',
 ];
 /** Обе формы date-only: `.slice(0, 10)` и `.split('T')[0]`. */
 const DATE_ONLY = /\.toISOString\(\)\s*(?:\.slice\(\s*0\s*,\s*10\s*\)|\.split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\])/g;
@@ -53,7 +54,7 @@ describe('лаборатория и риски: канон дат', () => {
   it('поверхности берут даты из core/local-date', () => {
     for (const rel of ФАЙЛЫ) {
       const { src } = КОД_ФАЙЛА(rel);
-      expect(src, `${rel}: нет импорта канона`).toMatch(/import\s*\{[^}]*localIsoDate[^}]*\}\s*from\s*'\.\.\/\.\.\/core\/local-date'/);
+      expect(src, `${rel}: нет импорта канона`).toMatch(/import\s*\{[^}]*localIsoDate[^}]*\}\s*from\s*'(?:\.\.\/)+core\/local-date'/);
     }
   });
 

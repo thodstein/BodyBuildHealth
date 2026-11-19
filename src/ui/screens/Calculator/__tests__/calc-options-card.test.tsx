@@ -143,6 +143,33 @@ describe('📥 diaryLabs: склад Лаборатории (labs_log) — гл�
   });
 });
 
+describe('📥 diaryLabs: удалённый бланк не воскресает из зеркала (проход 160)', () => {
+  it('зеркало новее склада не подставляется, если в складе есть записи', async () => {
+    localStorage.clear();
+    localStorage.setItem('he_autocalc_state', JSON.stringify({
+      ...DEFAULT_STATE,
+      labs: { ...DEFAULT_STATE.labs, fullPanel: { date: '2026-01-01', panelBiochem: { ALT: '40' } } },
+      options: { diaryLabs: true },
+    }));
+    await db.init();
+    for (const r of await db.getAll<any>('labs_log')) await db.delete('labs_log', r.id);
+    // В складе — один бланк; зеркало держит день, которого в складе НЕТ
+    // (бланк удалили, а дневник не открывали).
+    await db.put('labs_log', { id: 's1', code: 'ALT', name: 'АЛТ', value: 180, unit: 'U/L', date: '2026-09-20', patientId: 'current-user' });
+    localStorage.setItem('he_lab_diary', JSON.stringify([
+      { date: '2026-10-05', totalMarkers: 1, abnormalCount: 1, markers: [{ code: 'CRP', name: 'СРБ', value: 9, unit: 'мг/л' }] },
+    ]));
+    mount();
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+      expect(saved?.labs?.fullPanel?.date).toBe('2026-09-20');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.ALT).toBe('180');
+    }, { timeout: 10000 });
+    // Удалённый CRP не вернулся, хотя зеркало «новее».
+    expect(JSON.parse(localStorage.getItem('he_autocalc_state') || '{}')?.labs?.fullPanel?.panelBiochem?.CRP).toBeUndefined();
+  });
+});
+
 describe('лок доз протоколов (аудит §9: исправленные хардкоды не регрессируют)', () => {
   // Источник-лок по канонической дозе: регресс («старая доза вернулась» = канон исчез)
   // роняет тест. Чтение исходника, т.к. SSR покрывает только дефолтный таб.
