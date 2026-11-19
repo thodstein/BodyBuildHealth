@@ -1,4 +1,6 @@
 import type { ComprehensiveReport, ReportMetric, SupportScheduleSection } from './comprehensive-report.engine';
+import { labValueLabelHtml } from '../core/lab-value-label';
+import type { LabBound } from '../core/lab-bound';
 
 export function generateComprehensiveReportHTML(report: ComprehensiveReport): string {
   const { meta, sections, support, userNotes, recommendations, photos, trends } = report;
@@ -16,7 +18,19 @@ export function generateComprehensiveReportHTML(report: ComprehensiveReport): st
     return String(v);
   };
 
+  // Проход 143: лабораторное значение печатается вместе со знаком границы, а
+  // знак «<» в HTML — сущность, иначе браузер видит начало тега.
+  const formatLabVal = (v: number | string | null | undefined, bound?: LabBound): string => {
+    const text = formatVal(v);
+    if (text === '—') return text;
+    return labValueLabelHtml(text, bound);
+  };
+
   const deltaStr = (m: ReportMetric) => {
+    // Проход 143: у обрезанного числа разность не доказана («>1000 → 800» — это
+    // «упало на 200 или меньше»), поэтому в ячейке «—», а не пусто: пустая
+    // ячейка читается как «без изменений».
+    if (m.bound || m.prevBound) return '—';
     if (m.delta === undefined || m.delta === null) return '';
     const sign = m.delta > 0 ? '+' : '';
     const pct = m.deltaPct !== undefined && m.deltaPct !== null ? ` (${m.deltaPct > 0 ? '+' : ''}${m.deltaPct.toFixed(1)}%)` : '';
@@ -34,8 +48,8 @@ export function generateComprehensiveReportHTML(report: ComprehensiveReport): st
     const metricsHTML = section.metrics.map(m => `
       <tr>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;">${m.label}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${formatVal(m.prev)}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;font-weight:600;">${formatVal(m.current)}${deltaArrow(m)}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${formatLabVal(m.prev, m.prevBound)}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;font-weight:600;">${formatLabVal(m.current, m.bound)}${deltaArrow(m)}</td>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${deltaStr(m)}</td>
         <td style="padding:4px 8px;border:1px solid #ddd;text-align:center;">${statusBadge(m.status)}</td>
       </tr>

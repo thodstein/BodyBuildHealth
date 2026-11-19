@@ -20,6 +20,7 @@ import {
 import { cycleState, phaseHormoneBand, phaseUnionBand, type CycleState, type PhaseHormone } from './female-cycle-phase.engine';
 import { DEFAULT_DOSAGES } from '../data/support-database';
 import { defaultDoseUnit } from '../data/dose-units';
+import { boundProvesSide, type LabBound } from '../core/lab-bound';
 import { supportNameRu } from '../data/support-names';
 import type { BodyMeasurement } from './log-analytics-progression.engine';
 import type { BodyCompEntry } from './body-composition.engine';
@@ -48,6 +49,15 @@ export interface ReportMetric {
   unit: string;
   prev?: number | string | null | undefined;
   current?: number | string | null | undefined;
+  /**
+   * Проход 143: знак границы бланка у текущего и прошлого значения.
+   *
+   * Число в отчёт идёт как есть (статус и динамика считаются по числу), но
+   * печатать его без знака нельзя: «Ферритин >1000» — не измерение 1000, а
+   * «не меньше 1000». Отчёт печатает знак через `labValueLabelHtml`.
+   */
+  bound?: LabBound;
+  prevBound?: LabBound;
   refLow?: number | null | undefined;
   refHigh?: number | null | undefined;
   delta?: number | null;
@@ -161,7 +171,18 @@ export function assignStatus(metric: ReportMetric): void {
   }
   const cur = typeof metric.current === 'number' ? metric.current : parseFloat(String(metric.current));
   if (!isNaN(cur) && metric.refLow != null && metric.refHigh != null) {
-    if (cur < metric.refLow || cur > metric.refHigh) {
+    // Проход 143: у обрезанного числа сторона берётся из знака. «>5» при норме
+    // 30–400 — не «в норме» и не «ниже нормы»: истинное значение может быть
+    // любым. «>400» при верхней 400 — уже высокое (сравнение нестрогое).
+    const side = metric.bound
+      ? boundProvesSide(metric.bound, cur, metric.refLow, metric.refHigh)
+      : undefined;
+    if (metric.bound) {
+      if (side) {
+        metric.status = (cur < metric.refLow * 0.7 || cur > metric.refHigh * 1.3) ? 'critical' : 'warning';
+      }
+      // Нет доказанной стороны — сравнение числа с нормой не наш вердикт.
+    } else if (cur < metric.refLow || cur > metric.refHigh) {
       metric.status = (cur < metric.refLow * 0.7 || cur > metric.refHigh * 1.3) ? 'critical' : 'warning';
     } else {
       metric.status = 'normal';
@@ -403,15 +424,27 @@ function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', c
       const recent = hist.filter(h => h.date >= dateFrom && h.date <= dateTo);
       const prev = hist.filter(h => h.date < dateFrom).sort((a, b) => b.date.localeCompare(a.date));
 
-      const current = recent.length > 0 ? recent[recent.length - 1].value : null;
-      const prevVal = prev.length > 0 ? prev[0].value : null;
-      const { delta, deltaPct, trend } = computeDelta(prevVal, current);
+      const lastCurrent = recent.length > 0 ? recent[recent.length - 1] : null;
+      const lastPrev = prev.length > 0 ? prev[0] : null;
+      const current = lastCurrent?.value ?? null;
+      const prevVal = lastPrev?.value ?? null;
+      // Проход 143: знак границы («>1000») — часть результата, а не украшение.
+      // Без него отчёт печатал точное измерение, которого в бланке не было.
+      // Разность двух обрезанных чисел тоже не доказана: «>1000 → 800» — это
+      // «упало на 200 или меньше», а не «−200», поэтому дельта не считается.
+      const bound = lastCurrent?.bound;
+      const prevBound = lastPrev?.bound;
+      const compared = bound || prevBound
+        ? { delta: null, deltaPct: null, trend: 'no_data' as const }
+        : computeDelta(prevVal, current);
       // Проход 76/77: числа референса — из резолвера по полу и фазе цикла.
       const refs = sexRefs(marker.code, sex, cycle);
 
       const m: ReportMetric = {
         label: marker.name, unit: marker.unit, prev: prevVal, current: current ?? 'Нет данных',
-        refLow: refs?.refLow ?? marker.refLow, refHigh: refs?.refHigh ?? marker.refHigh, delta, deltaPct, trend,
+        bound, prevBound,
+        refLow: refs?.refLow ?? marker.refLow, refHigh: refs?.refHigh ?? marker.refHigh,
+        delta: compared.delta, deltaPct: compared.deltaPct, trend: compared.trend,
         sparkline: computeSparkline(hist, 'value', dateFrom, dateTo),
       };
       assignStatus(m);
