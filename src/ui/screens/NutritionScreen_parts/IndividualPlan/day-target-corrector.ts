@@ -367,6 +367,11 @@ export function correctDayToTargets(
   if (safeTargets.kcal === 0 && safeTargets.p === 0 && safeTargets.f === 0 && safeTargets.c === 0) {
     return { meals, withinTolerance: true, deviationPct: 0 };
   }
+  // §8.118: жир в пери-окне — дефект только на «нормальном» дне. На кето/высокожировом
+  // дне (жир ≥40% ккал) окно получает жир по физиологии, а запрет отнимал белок дня
+  // (замер keto85/6/тр: ΔP 5.6 г и порог завтрака 6 вместо 7; veg-density — стадия
+  // переставала срабатывать). Поэтому запрет включается только ниже этой границы.
+  const _periFatBanned = safeTargets.kcal > 0 && (9 * safeTargets.f) / safeTargets.kcal < 0.40;
   // MealTargets: капы семейств скейлятся целью дня (900-1500У рисом 3 приёмами не закрыть).
   const _tsCap = dayTargetScale(safeTargets.kcal);
   // MealTargets: капы корректора тоже скейлятся целью дня. Фиксированные 85 г клетчатки
@@ -532,6 +537,13 @@ export function correctDayToTargets(
             // D-28: ужин «загрузки под утреннюю тренировку» — минимум жиров (бюджет ≤8 г):
             // жир-своп не кладёт авокадо/орехи/масло поверх бюджета (было Ж 19.2 > 14).
             if (under === 'f' && m.type === 'dinner' && ((m as any).target?.f ?? 99) <= 10) return;
+            // §8.118: жир-своп не кладёт жир в пост-трен. Физиология окна — 5 г предтрен /
+            // ≤12 г пост-трен: масло вместо углеводного пункта окна ломает и окно, и его
+            // собственную цель (замер 45/3/T/cut: пост-трен 19 г масла при target.f = 0,
+            // углеводы окна срезаны до нуля). Без окон уколов `_postLocked` = false,
+            // поэтому окно закрываем здесь явно. Кето/высокожировой день — исключение
+            // (`_periFatBanned`): там жир в окне физиологичен (замер keto85/6/тр).
+            if (_periFatBanned && under === 'f' && m.type === 'postworkout') return;
             // v3 portable: не-портативной заменой рабочее окно не трогаем (суп в офис — нет).
             if (_needPortM(m) && !isPortableFood(bestU as any)) return;
             // P1a: своп В завтрак — только завтрашними продуктами (иначе замена жирового
@@ -1283,6 +1295,9 @@ export function correctDayToTargets(
       // иначе корректор кладёт «батат 75 + 75 + 75» — растим существующий пункт.
       const _dupFilter = (m: CorrectorMeal) => conv ? !m.items.some(it => it.id === best!.id) : (COMFORT_CAP[best!.id] === undefined || !m.items.some(it => it.id === best!.id));
       const _freeMeals = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout' && !_postLocked(m) && !(m as any)._insulinWindow)
+        // §8.118: новый жировой пункт в пост-трен не кладём даже без окон уколов
+        // (`_postLocked` тогда false): окно получало 15-19 г масла при target.f = 0.
+        .filter(m => !(_periFatBanned && eff === 'f' && m.type === 'postworkout'))
         .filter(_dupFilter)
         // P1a: MPS-коридор — новый белок не кладём в полный приём (тест F2: второе мясо
         // корректора выбивало обед за 0.62 г/кг; недобор закроют другие приёмы).
