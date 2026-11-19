@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { PHARMA_DB, SUBSTANCES_BY_CLASS } from '../../core/pharma-database';
+import { PHARMA_DB, SUBSTANCES_BY_CLASS, getPharmaDetail } from '../../core/pharma-database';
 import { validateCourse } from '../../engines/pharmacology.engine';
 import { checkDrugInteractions } from '../../engines/interactions-calculator';
 import { db } from '../../core/db';
 import { notifyDataChange } from '../../core/data-link';
-import type { CourseEntry } from '../../core/types';
+import type { CourseEntry, PharmaSubstance } from '../../core/types';
 import { isNativeApp } from '../../core/app-platform';
 import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { NativeEmptyArt } from '../native/NativeEmpty';
@@ -55,6 +55,77 @@ const FREQ_SHORT: Record<string, string> = {
 };
 
 const UNIT_OPTIONS = ['mg/wk', 'mg', 'mcg', 'IU', 'ml'];
+
+const WEEKDAYS_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/** '2-3x/week' → '2–3×/нед', '1x/d' → '1×/день'. */
+const freqRangeLabel = (raw?: string | number): string => {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return '';
+  if (s.includes('/d') || s === 'daily') {
+    const m = s.match(/(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*x/);
+    if (!m) return 'ежедневно';
+    return `${m[1]}${m[2] ? `–${m[2]}` : ''}×/день`;
+  }
+  const m = s.match(/(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?\s*x\s*\/\s*w/);
+  if (m) return `${m[1]}${m[2] ? `–${m[2]}` : ''}×/нед`;
+  return s;
+};
+
+/** Единица дозировки препарата → опция из UNIT_OPTIONS (mg/d → mg, IU/day → IU). */
+const unitFromRange = (raw?: string): string => {
+  const s = String(raw || '').toLowerCase();
+  if (!s) return 'mg';
+  if (s.includes('/wk') || s.includes('/week')) return 'mg/wk';
+  if (s.startsWith('iu')) return 'IU';
+  if (s.startsWith('mcg')) return 'mcg';
+  if (s.startsWith('ml')) return 'ml';
+  return 'mg';
+};
+
+/** Дни недели (0=Пн) по рекомендованной частоте препарата: '2-3x/week', '1x/d', 'eod'. */
+const daysFromRangeFreq = (raw?: string | number): number[] => {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return [1, 4];
+  if (s === 'eod') return [0, 2, 4, 6];
+  if (s.includes('/d') || s === 'daily') return [0, 1, 2, 3, 4, 5, 6];
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*x\s*\/\s*w/);
+  if (m) {
+    const first = parseFloat(m[1]);
+    const last = m[2] ? parseFloat(m[2]) : first;
+    const n = Math.round((first + last) / 2);
+    if (n >= 7) return [0, 1, 2, 3, 4, 5, 6];
+    if (n <= 1) return [3];
+    if (n === 2) return [1, 4];
+    if (n === 3) return [0, 2, 4];
+    if (n === 4) return [0, 2, 4, 6];
+    if (n === 5) return [0, 1, 2, 4, 5];
+    if (n === 6) return [0, 1, 2, 3, 4, 5];
+  }
+  return [1, 4];
+};
+
+/** Единица/частота по классу там, где у препарата и класса нет dosageRange (пептиды, инсулин). */
+const CLASS_DOSE_FALLBACK: Record<string, { unit: string; frequency: string }> = {
+  peptide_ghrh: { unit: 'mcg', frequency: '1x/d' },
+  peptide_ghrp: { unit: 'mcg', frequency: '2x/d' },
+  peptide_gnrh: { unit: 'mcg', frequency: '1x/d' },
+  peptide_fat_loss: { unit: 'mcg', frequency: '1x/d' },
+  peptide_other: { unit: 'mcg', frequency: '1x/d' },
+  igf1: { unit: 'mcg', frequency: '1x/d' },
+  mgf: { unit: 'mcg', frequency: '3x/wk' },
+  insulin: { unit: 'IU', frequency: '1x/d' },
+};
+
+/** Черновик препарата: попап настройки дозы/частоты/недель перед добавлением в курс. */
+export type CourseDraft = {
+  substanceId: string;
+  dose: string;
+  unit: string;
+  days: number[];
+  startWeek: number;
+  endWeek: number;
+};
 
 const subClassOf = (id: string) => PHARMA_DB[id]?.class ?? '';
 const classColorOf = (cls: string) => CLASS_COLORS[cls] || '#8b5cf6';
@@ -159,12 +230,7 @@ export const PharmaCourseScreen: React.FC = () => {
   const [course, setCourse] = useState<CourseEntry[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerClass, setPickerClass] = useState('testosterone');
-  const [dose, setDose] = useState('');
-  const [unit, setUnit] = useState('mg/wk');
-  const [freq, setFreq] = useState('2x/wk');
-  const [selectedDays, setSelectedDays] = useState<number[]>([1, 4]);
-  const [startWeek, setStartWeek] = useState(0);
-  const [endWeek, setEndWeek] = useState(12);
+  const [draft, setDraft] = useState<CourseDraft | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<CourseEntry | null>(null);
   const [interactions, setInteractions] = useState<ReturnType<typeof checkDrugInteractions>>([]);
@@ -276,24 +342,57 @@ export const PharmaCourseScreen: React.FC = () => {
     }
   }, [course]);
 
-  const addEntry = async (substanceId: string, doseVal?: number) => {
-    const d = doseVal ?? parseFloat(dose);
-    if (!substanceId || isNaN(d) || d <= 0) return;
+  /** Открыть попап настройки препарата: доза, частота уколов, недели курса. */
+  const openDraft = (sub: PharmaSubstance) => {
+    // getPharmaDetail доклеивает дефолты класса (дозировка/частота), если у препарата их нет
+    const detail = getPharmaDetail(sub.id) ?? sub;
+    const range = detail.dosageRange;
+    const fallback = CLASS_DOSE_FALLBACK[detail.class] ?? { unit: 'mg', frequency: '2x/wk' };
+    const min = Number(range?.min) || 0;
+    const max = Number(range?.max) || 0;
+    const defDose = min > 0 && max > 0 ? String(Math.round((min + max) / 2)) : '';
+    setDraft({
+      substanceId: sub.id,
+      dose: defDose,
+      unit: unitFromRange(range?.unit || fallback.unit),
+      days: daysFromRangeFreq(range?.frequency || fallback.frequency),
+      startWeek: 0,
+      endWeek: 12,
+    });
+  };
+
+  const openPicker = () => {
+    setDraft(null);
+    setShowPicker(true);
+  };
+
+  const closePicker = () => {
+    setShowPicker(false);
+    setDraft(null);
+  };
+
+  const confirmDraft = async () => {
+    if (!draft) return;
+    const d = parseFloat(draft.dose);
+    if (!draft.substanceId || isNaN(d) || d <= 0) return;
+    const days = [...draft.days].sort((a, b) => a - b);
+    if (days.length === 0) return;
+    const start = Math.max(0, Math.floor(Number(draft.startWeek) || 0));
+    const end = Math.max(start, Math.floor(Number(draft.endWeek) || 0));
     const entry: CourseEntry = {
       id: crypto.randomUUID(),
-      substanceId,
+      substanceId: draft.substanceId,
       doseValue: d,
-      doseUnit: unit,
-      frequency: selectedDays.length >= 7 ? 'daily' : selectedDays.length <= 1 ? '1x/wk' : `${selectedDays.length}x/wk`,
-      injectionDays: [...selectedDays].sort((a,b)=>a-b),
-      startWeek,
-      endWeek
+      doseUnit: draft.unit,
+      frequency: freqFromDays(days),
+      injectionDays: days,
+      startWeek: start,
+      endWeek: end,
     };
     try {
       await db.put('course_log', entry);
       setCourse(prev => [...prev, entry]);
-      setDose('');
-      setShowPicker(false);
+      closePicker();
       notifyDataChange();
     } catch (e) { console.error(e); }
   };
@@ -434,6 +533,22 @@ export const PharmaCourseScreen: React.FC = () => {
 
   const subsForClass = SUBSTANCES_BY_CLASS[pickerClass] ?? [];
 
+  // Производные значения попапа настройки препарата (шаг 2 после выбора).
+  const draftSub = draft ? (getPharmaDetail(draft.substanceId) ?? PHARMA_DB[draft.substanceId]) : null;
+  const draftRange = draftSub?.dosageRange;
+  const draftColor = draftSub ? classColorOf(draftSub.class) : '#8b5cf6';
+  const draftDose = draft ? parseFloat(draft.dose) : NaN;
+  const draftWeeks = draft ? Math.max(1, Math.abs(Math.floor(draft.endWeek) - Math.floor(draft.startWeek)) + 1) : 0;
+  const draftReady = !!draft && draftDose > 0 && draft.days.length > 0;
+
+  /** Дата (дд.мм.гг) для недели курса относительно даты старта курса. */
+  const draftDateOfWeek = (week: number): string => {
+    const base = new Date(courseStartDate || new Date().toISOString().slice(0, 10));
+    if (isNaN(base.getTime())) return '';
+    const d = new Date(base.getTime() + Math.max(0, Math.floor(week)) * 7 * 86400000);
+    try { return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch { return ''; }
+  };
+
   return (
     <div className="pharma-course" style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <style>{`
@@ -506,7 +621,7 @@ export const PharmaCourseScreen: React.FC = () => {
               <NativeIcon name="inbox" size={12} /> Завершить
             </button>
           )}
-          <button onClick={() => setShowPicker(true)} className="pc-btn2" style={{
+          <button onClick={openPicker} className="pc-btn2" style={{
             background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: '#fff',
             border: '1px solid rgba(139,92,246,0.35)', borderRadius: 12, padding: '9px 14px', fontWeight:800,
             fontSize:12, display:'flex', alignItems:'center', gap:6,
@@ -634,8 +749,8 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 18px', borderStyle:'dashed', background:'rgba(20,20,24,0.42)' }}>
               <div style={{ width:52, height:52, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', background:'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(59,130,246,0.12))', border:'1px solid rgba(139,92,246,0.18)', color:'#c4b5fd' }}><NativeIcon name="pill" size={24} /></div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Курс пуст</div>
-              <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери класс и препарат, доза и недели настроятся автоматически</div>
-              <button onClick={()=>setShowPicker(true)} className="pc-btn2" style={{ background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'none', borderRadius:12, padding:'9px 16px', fontWeight:800, fontSize:12 }}>+ Добавить первый препарат</button>
+              <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери препарат, затем укажи дозу, частоту уколов и недели курса</div>
+              <button onClick={openPicker} className="pc-btn2" style={{ background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'none', borderRadius:12, padding:'9px 16px', fontWeight:800, fontSize:12 }}>+ Добавить первый препарат</button>
             </div>
           )}
           {validation.warnings.length > 0 && (
@@ -690,7 +805,7 @@ export const PharmaCourseScreen: React.FC = () => {
               (на телефоне уезжает вверх за экран), а empty-state кнопка исчезает
               после первого препарата — пользователь видел «кнопки нет». */}
           {course.length > 0 && (
-            <button onClick={() => setShowPicker(true)} className="pc-btn2" aria-label="Добавить ещё препарат" style={{
+            <button onClick={openPicker} className="pc-btn2" aria-label="Добавить ещё препарат" style={{
               background:'rgba(139,92,246,0.10)', color:'#fff',
               border:'1px dashed rgba(139,92,246,0.40)', borderRadius:14,
               padding:'12px 16px', fontWeight:800, fontSize:12,
@@ -943,7 +1058,7 @@ export const PharmaCourseScreen: React.FC = () => {
           background:'rgba(0,0,0,0.72)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
           display:'flex', flexDirection:'column', justifyContent:'center',
           alignItems:'center', padding:'12px',
-        }} onClick={() => setShowPicker(false)}>
+        }} onClick={closePicker}>
           <div style={{
             width:'100%', maxWidth:440,
             maxHeight:'90vh',
@@ -960,12 +1075,21 @@ export const PharmaCourseScreen: React.FC = () => {
               display:'flex', justifyContent:'space-between', alignItems:'center',
               background:'linear-gradient(90deg, rgba(139,92,246,0.10), transparent)',
             }}>
-              <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', color:'#c4b5fd' }}><NativeIcon name="pill" size={14} /></span>
-                <span style={{ fontWeight:800, fontSize:14, color:'#fff' }}>Добавить препарат</span>
-                <span style={{ fontSize:10, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)' }}>{subsForClass.length} в классе</span>
+              <div style={{ display:'flex', alignItems:'center', gap:9, minWidth:0 }}>
+                {draft ? (
+                  <button onClick={() => setDraft(null)} className="pc-btn2" aria-label="Назад к списку препаратов" style={{
+                    width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center',
+                    background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', padding:0,
+                  }}>←</button>
+                ) : (
+                  <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', color:'#c4b5fd' }}><NativeIcon name="pill" size={14} /></span>
+                )}
+                <span style={{ fontWeight:800, fontSize:14, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{draftSub ? draftSub.name : 'Добавить препарат'}</span>
+                <span style={{ fontSize:10, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)', whiteSpace:'nowrap', flexShrink:0 }}>
+                  {draftSub ? (CLASS_LABELS[draftSub.class] || draftSub.class) : `${subsForClass.length} в классе`}
+                </span>
               </div>
-              <button onClick={() => setShowPicker(false)} className="pc-btn2" style={{
+              <button onClick={closePicker} className="pc-btn2" aria-label="Закрыть выбор препарата" style={{
                 background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
                 color:'#fff', borderRadius:10, padding:'6px 10px',
                 fontSize:12, fontWeight:700,
@@ -974,6 +1098,7 @@ export const PharmaCourseScreen: React.FC = () => {
               </button>
             </div>
 
+            {!draft && (
             <div style={{
               padding:'8px 10px 6px',
               display:'flex', gap:5, flexWrap:'wrap',
@@ -1001,103 +1126,162 @@ export const PharmaCourseScreen: React.FC = () => {
                 );
               })}
             </div>
+            )}
 
             <div style={{ flex:1, overflowY:'auto', padding:'10px 10px 12px' }}>
+              {draft && draftSub ? (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {/* Рекомендации базы: диапазон дозы, частота, T½ */}
+                  <div style={{ background:`${draftColor}12`, border:`1px solid ${draftColor}2a`, borderRadius:14, padding:'10px 12px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#fff', opacity:0.75 }}>Рекомендуемый диапазон</span>
+                      <span style={{ marginLeft:'auto', fontSize:12, fontWeight:800, color:'#fff' }}>
+                        {draftRange ? `${draftRange.min}–${draftRange.max} ${draftRange.unit}` : 'нет в базе'}
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:5, fontSize:10, color:'#fff' }}>
+                      {freqRangeLabel(draftRange?.frequency) ? <span>частота: <b>{freqRangeLabel(draftRange?.frequency)}</b></span> : null}
+                      {draftSub.pk?.halfLifeHours ? (
+                        <span>T½: <b>{draftSub.pk.halfLifeHours >= 168 ? `${(draftSub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(draftSub.pk.halfLifeHours / 24).toFixed(1)} дн`}</b></span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* Дозировка */}
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>Дозировка</div>
+                    <div style={{ display:'flex', gap:6 }}>
+                      <input type="number" inputMode="decimal" value={draft.dose}
+                        aria-label="Дозировка препарата"
+                        placeholder="доза"
+                        onChange={e => setDraft({ ...draft, dose: e.target.value })}
+                        className="pc-input2" style={{
+                          flex:2, padding:'9px 10px', background:'rgba(0,0,0,0.32)',
+                          border:`1px solid ${draftDose > 0 ? draftColor+'88' : 'rgba(239,68,68,0.5)'}`, borderRadius:10,
+                          color:'#fff', fontSize:13, fontWeight:800, boxSizing:'border-box', minWidth:0,
+                        }} />
+                      <select value={draft.unit} aria-label="Единица дозировки"
+                        onChange={e => setDraft({ ...draft, unit: e.target.value })}
+                        style={{
+                          flex:1, padding:'9px 6px', background:'rgba(0,0,0,0.32)',
+                          border:'1px solid rgba(255,255,255,0.10)', borderRadius:10,
+                          color:'#fff', fontSize:11, fontWeight:700, boxSizing:'border-box', minWidth:64,
+                        }}>
+                        {UNIT_OPTIONS.map(u => <option key={u} value={u} style={{ background:'#1a1a1f' }}>{u}</option>)}
+                      </select>
+                    </div>
+                    {draftRange && draftRange.min > 0 && draftRange.max > 0 ? (
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>
+                        в базе: {draftRange.min}–{draftRange.max} {draftRange.unit}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>
+                        диапазон в базе не задан — укажи дозу и единицу сам
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Частота уколов */}
+                  <div>
+                    <div style={{ display:'flex', alignItems:'baseline', gap:6, marginBottom:6 }}>
+                      <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>Частота уколов</span>
+                      <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#c4b5fd' }}>
+                        {draft.days.length > 0
+                          ? `${draft.days.length}×/нед · ${[...draft.days].sort((a, b) => a - b).map(d => WEEKDAYS_RU[d]).join(', ')}`
+                          : 'выбери дни'}
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', gap:5 }}>
+                      {WEEKDAYS_RU.map((day, idx) => {
+                        const on = draft.days.includes(idx);
+                        return (
+                          <button key={idx} aria-pressed={on} aria-label={`День ${day} приёма`} onClick={() => setDraft({
+                            ...draft,
+                            days: on ? draft.days.filter(d => d !== idx) : [...draft.days, idx].sort((a, b) => a - b),
+                          })} className="pc-btn2" style={{
+                            flex:1, minWidth:0, height:34, borderRadius:9, fontSize:10, fontWeight:800, cursor:'pointer', padding:0,
+                            border:`1px solid ${on ? draftColor : 'rgba(255,255,255,0.08)'}`,
+                            background: on ? `${draftColor}2e` : 'rgba(255,255,255,0.04)',
+                            color:'#fff',
+                          }}>{day}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Начало и конец курса */}
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>Начало и конец курса</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.2)', padding:'7px 9px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)' }}>
+                        <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>с нед</span>
+                        <input type="number" min={0} value={draft.startWeek} aria-label="Начало курса, неделя"
+                          onChange={e => setDraft({ ...draft, startWeek: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                          className="pc-input2" style={{ flex:1, width:'100%', minWidth:0, padding:'5px 6px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'#fff', fontSize:12, fontWeight:800, boxSizing:'border-box' }} />
+                      </label>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.2)', padding:'7px 9px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)' }}>
+                        <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>по нед</span>
+                        <input type="number" min={0} value={draft.endWeek} aria-label="Конец курса, неделя"
+                          onChange={e => setDraft({ ...draft, endWeek: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                          className="pc-input2" style={{ flex:1, width:'100%', minWidth:0, padding:'5px 6px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, color:'#fff', fontSize:12, fontWeight:800, boxSizing:'border-box' }} />
+                      </label>
+                    </div>
+                    <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>
+                      {draftWeeks} нед · недели {draft.startWeek}–{Math.max(draft.startWeek, draft.endWeek)}
+                      {draftDateOfWeek(draft.startWeek) && draftDateOfWeek(draft.endWeek)
+                        ? ` · ${draftDateOfWeek(draft.startWeek)} → ${draftDateOfWeek(Math.max(draft.startWeek, draft.endWeek))}`
+                        : ''}
+                      {draft.endWeek < draft.startWeek ? ' · конец раньше начала, поправь' : ''}
+                    </div>
+                  </div>
+
+                  <div style={{ display:'flex', gap:8 }}>
+                    <button onClick={() => setDraft(null)} className="pc-btn2" style={{
+                      flex:1, padding:'11px 10px', borderRadius:12, fontWeight:800, fontSize:12, cursor:'pointer',
+                      background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)', color:'#fff',
+                    }}>← Назад</button>
+                    <button onClick={() => void confirmDraft()} disabled={!draftReady} className="pc-btn2" style={{
+                      flex:2, padding:'11px 10px', borderRadius:12, fontWeight:800, fontSize:12,
+                      cursor: draftReady ? 'pointer' : 'not-allowed',
+                      background: draftReady ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)' : 'rgba(255,255,255,0.07)',
+                      border: draftReady ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.07)',
+                      color: draftReady ? '#fff' : 'rgba(255,255,255,0.45)',
+                      boxShadow: draftReady ? '0 6px 18px rgba(139,92,246,0.28)' : 'none',
+                    }}>Добавить в курс</button>
+                  </div>
+                </div>
+              ) : (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, marginBottom:12 }}>
                 {subsForClass.map(sub => {
                   const color = CLASS_COLORS[sub.class] || '#8b5cf6';
-                  const defDose = sub.dosageRange?.min ? Math.round((sub.dosageRange.min + sub.dosageRange.max) / 2) : 250;
-                  const customDose = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : null;
-                  const hl = sub.pk?.halfLifeHours;
+                  const detail = getPharmaDetail(sub.id) ?? sub;
+                  const hl = detail.pk?.halfLifeHours;
                   return (
-                    <div key={sub.id} onClick={() => {
-                      const doseVal = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : defDose;
-                      addEntry(sub.id, doseVal);
-                    }} className="pc-sub-btn2" style={{
+                    <div key={sub.id} onClick={() => openDraft(sub)} title={`Настроить ${sub.name}`} className="pc-sub-btn2" style={{
                       background:'rgba(255,255,255,0.04)',
-                      border:`1px solid ${customDose ? color+'55' : 'rgba(255,255,255,0.07)'}`,
+                      border:'1px solid rgba(255,255,255,0.07)',
                       borderRadius:14, padding:'11px 9px',
                       cursor:'pointer', textAlign:'center',
                       position:'relative', overflow:'hidden',
                     }}>
-                      <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background: color, opacity: customDose ? 1 : 0.85 }} />
+                      <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background: color, opacity: 0.85 }} />
                       <div style={{ fontWeight:800, fontSize:11, color:'#fff', marginBottom:3, lineHeight:1.3 }}>{sub.name}</div>
                       <div style={{ fontSize:11, color:'#fff', marginBottom:6, lineHeight:1.3 }}>
                         {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
-                        {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
+                        {detail.dosageRange ? ` · ${detail.dosageRange.min}–${detail.dosageRange.max} ${detail.dosageRange.unit}` : ''}
                       </div>
                       <div style={{
                         display:'inline-flex', alignItems:'center', gap:3,
-                        background: customDose ? `${color}2a` : 'rgba(255,255,255,0.06)', color: customDose ? '#fff' : '#fff', border:`1px solid ${customDose ? color+'40' : 'rgba(255,255,255,0.06)'}`, borderRadius:20,
+                        background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:20,
                         padding:'4px 10px', fontSize:10, fontWeight:800,
                       }}>
-                        + {customDose ?? defDose} {unit}
+                        Настроить →
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              <div style={{
-                background:'rgba(139,92,246,0.07)', borderRadius:14, padding:'11px 12px',
-                border:'1px solid rgba(139,92,246,0.14)',
-              }}>
-                <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4, fontWeight:700 }}>
-                  ⚙️ Настрой дозировку и недели, затем тапни на препарат выше
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  <div style={{ display:'flex', gap:6 }}>
-                    <input type="number" value={dose || ''} onChange={e => setDose(e.target.value)} placeholder="250"
-                      className="pc-input2" style={{
-                        flex:2, padding:'8px 9px', background:'rgba(0,0,0,0.32)',
-                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:10,
-                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0,
-                      }} />
-                    <select value={unit} onChange={e => setUnit(e.target.value)}
-                      style={{
-                        flex:1, padding:'8px 6px', background:'rgba(0,0,0,0.32)',
-                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:10,
-                        color:'#fff', fontSize:10, fontWeight:700, boxSizing:'border-box', minWidth:56,
-                      }}>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u} style={{ background:'#1a1a1f' }}>{u}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:11, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
-                    {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
-                      <button key={idx} onClick={() => {
-                        setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
-                      }} style={{
-                        width:28, height:28, borderRadius:9, fontSize:11, fontWeight:800,
-                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#8b5cf6' : 'rgba(255,255,255,0.08)'}`,
-                        background: selectedDays.includes(idx) ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
-                        color: selectedDays.includes(idx) ? '#fff' : '#fff',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                      }}>{day}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>с нед</span>
-                    <input type="number" value={startWeek} onChange={e => setStartWeek(parseFloat(e.target.value) || 0 || 0)} min={0} placeholder="0"
-                      className="pc-input2" style={{
-                        flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',
-                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:9,
-                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0, width:'100%',
-                      }} />
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>по нед</span>
-                    <input type="number" value={endWeek} onChange={e => setEndWeek(parseFloat(e.target.value) || 0 || 12)} min={1} placeholder="12"
-                      className="pc-input2" style={{
-                        flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',
-                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:9,
-                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0, width:'100%',
-                      }} />
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
