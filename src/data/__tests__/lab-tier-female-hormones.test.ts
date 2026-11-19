@@ -82,14 +82,16 @@ describe('алерты женских гормонов: свои слова вм
     expect(computeTierAdjustments({ PROG: 12 }, 'female').alerts).toHaveLength(0);
   });
 
-  it('пролактин 300 молчит, 1600 — эндокринолог', () => {
-    expect(computeTierAdjustments({ PRL: 300 }, 'female').alerts).toHaveLength(0);
-    expect(alertText(computeTierAdjustments({ PRL: 1600 }, 'female'))).toContain('эндокринолог');
+  it('пролактин 30 нг/мл молчит, 80 — эндокринолог; канон PROLACTIN тоже срабатывает', () => {
+    expect(computeTierAdjustments({ PRL: 30 }, 'female').alerts).toHaveLength(0);
+    expect(alertText(computeTierAdjustments({ PRL: 80 }, 'female'))).toContain('эндокринолог');
+    expect(alertText(computeTierAdjustments({ PROLACTIN: 80 }, 'female'))).toContain('нг/мл');
   });
 
-  it('тестостерон 10 у женщины — вирилизация', () => {
-    expect(alertText(computeTierAdjustments({ TESTOSTERONE: 10 }, 'female'))).toContain('вирилизация');
-    expect(computeTierAdjustments({ TESTOSTERONE: 2 }, 'female').alerts).toHaveLength(0);
+  it('тестостерон 50 нг/дл (норма женщины) молчит, 200 — вирилизация', () => {
+    expect(computeTierAdjustments({ TESTOSTERONE: 50 }, 'female').alerts).toHaveLength(0);
+    expect(alertText(computeTierAdjustments({ TESTOSTERONE: 200 }, 'female'))).toContain('Вирилизация');
+    expect(alertText(computeTierAdjustments({ TESTOSTERONE: 200 }, 'female'))).toContain('нг/дл');
   });
 
   it('мужской путь гормонов не тронут: E2 900 — мужской текст и tier 3 в сводке', () => {

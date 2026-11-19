@@ -63,20 +63,20 @@ describe('проход 97: женская лестница шагов на по�
     expect(computeTierAdjustments({ PROG: 12 }, 'female').nutrition).toHaveLength(0);
   });
 
-  it('пролактин 1000: пересдать натощак + ТТГ и макропролактин; 300 — тишина', () => {
-    const r = computeTierAdjustments({ PRL: 1000 }, 'female');
+  it('пролактин 40 нг/мл: пересдать натощак + ТТГ и макропролактин; 30 — тишина', () => {
+    const r = computeTierAdjustments({ PRL: 40 }, 'female');
     expect(actions(r)).toContain('Повторить пролактин');
     expect(actions(r)).toContain('ТТГ и макропролактин');
     expect(r.alerts).toHaveLength(0);
-    expect(computeTierAdjustments({ PRL: 300 }, 'female').nutrition).toHaveLength(0);
+    expect(computeTierAdjustments({ PRL: 30 }, 'female').nutrition).toHaveLength(0);
   });
 
-  it('тестостерон 3.5: повторить с ГСПГ + гинеколог-эндокринолог; 2 — тишина', () => {
-    const r = computeTierAdjustments({ TESTOSTERONE: 3.5 }, 'female');
+  it('тестостерон 100 нг/дл: повторить с ГСПГ + гинеколог-эндокринолог; 50 — тишина', () => {
+    const r = computeTierAdjustments({ TESTOSTERONE: 100 }, 'female');
     expect(actions(r)).toContain('Повторить тестостерон');
     expect(actions(r)).toContain('Гинеколог-эндокринолог');
     expect(r.alerts).toHaveLength(0);
-    expect(computeTierAdjustments({ TESTOSTERONE: 2 }, 'female').nutrition).toHaveLength(0);
+    expect(computeTierAdjustments({ TESTOSTERONE: 50 }, 'female').nutrition).toHaveLength(0);
   });
 
   it('мужской путь и путь без пола шагов не получают', () => {
@@ -92,8 +92,8 @@ describe('проход 97: женская лестница шагов на по�
     const body = src.slice(src.indexOf('function femaleHormoneSteps('), src.indexOf('//  computeTierAdjustments — главная функция'));
     expect(body).toContain('FEMALE_HORMONE_ULN.E2');
     expect(body).toContain('FEMALE_HORMONE_ULN.PROG');
-    expect(body).toContain('FEMALE_HORMONE_ULN.PRL');
-    expect(body).toContain('FEMALE_HORMONE_ULN.TT');
+    expect(body).toContain('FEMALE_HORMONE_ULN_READ.PRL');
+    expect(body).toContain('FEMALE_HORMONE_ULN_READ.TT');
     expect(body).not.toMatch(/\b(800|1500|2\.5)\b/);
   });
 });

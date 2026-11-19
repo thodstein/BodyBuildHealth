@@ -9,7 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import { deriveTier, getTierLabel, LAB_TIERS, tierMarkerKey, type Tier } from './lab-tier-ranges';
-import { FEMALE_HORMONE_ULN } from '../engines/lab-norms.engine';
+import { FEMALE_HORMONE_ULN, FEMALE_HORMONE_ULN_READ } from '../engines/lab-norms.engine';
 
 export interface TierAddSub {
   id: string;
@@ -284,9 +284,15 @@ const TIER_RULES: TierRule[] = [
  * Женские гормоны не проходят мужскую лестницу действий (`MALE_ONLY_TIER` в
  * `lab-tier-ranges`), но и молчать о по-настоящему высоких значениях нельзя.
  * Здесь только те пороги, где действие очевидно и не зависит от фазы:
- * E2 >800 и <30, прогестерон >30, пролактин >1500, тестостерон >6.
+ * E2 >800 и <30, прогестерон >30, пролактин >1500 мМЕ/л, тестостерон >6 нмоль/л.
  * Фазовые коридоры (ЛГ, ФСГ, лютеиновая E2 450) — не повод для алерта: их
  * показывает строка результата своей фазовой нормой.
+ *
+ * Проход 148: пролактин и тестостерон переводятся в единицы калькулятора
+ * (`FEMALE_HORMONE_ULN_READ`): форма читает пролактин в нг/мл (порог 70.8), а
+ * тестостерон в нг/дл (порог 173). Раньше бэнд сравнивал 80 нг/мл с 1500 мМЕ/л
+ * (молчал всегда) и 50 нг/дл с 6 нмоль/л (кричал у каждой женщины), а `PROLACTIN`
+ * из формы не находил ветку `PRL` вовсе.
  */
 function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
   const out = (tier: Tier, message: string): TierAlert => ({ marker, value, tier, message });
@@ -307,13 +313,15 @@ function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
       }
       return null;
     case 'PRL':
-      if (value > FEMALE_HORMONE_ULN.PRL.criticalHigh) {
-        return out(3, `Пролактин = ${value} мМЕ/л — очень высоко для женщины: исключить пролактиному (макропролактин, МРТ) — эндокринолог.`);
+    case 'PROLACTIN':
+      if (value > FEMALE_HORMONE_ULN_READ.PRL.criticalHigh) {
+        return out(3, `Пролактин = ${value} нг/мл — очень высоко для женщины (порог ${FEMALE_HORMONE_ULN_READ.PRL.criticalHigh}): исключить пролактиному (макропролактин, МРТ) — эндокринолог.`);
       }
       return null;
     case 'TESTOSTERONE':
-      if (value > FEMALE_HORMONE_ULN.TT.criticalHigh) {
-        return out(2, `Тестостерон = ${value} нмоль/л — выше женской нормы 0.3–2.5: вирилизация (голос, клитор, акне). Гинеколог-эндокринолог.`);
+    case 'TT':
+      if (value > FEMALE_HORMONE_ULN_READ.TT.criticalHigh) {
+        return out(2, `Тестостерон = ${value} нг/дл — выше женской нормы 0.3–2.5 нмоль/л (порог ${FEMALE_HORMONE_ULN_READ.TT.criticalHigh} нг/дл). Вирилизация (голос, клитор, акне): гинеколог-эндокринолог.`);
       }
       return null;
     default:
@@ -335,6 +343,10 @@ function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
  * Пороги — `FEMALE_HORMONE_ULN` (те же числа, что у бэндов и у `interpretLabs`):
  * E2 «>400» и «<30», прогестерон «>20», пролактин «>800», тестостерон «>2.5».
  * Шаги — 1 = пересдать в правильную фазу, 2 = визуализация/смежный анализ.
+ *
+ * Проход 148: пролактин и тестостерон сравниваются в единицах калькулятора
+ * (`FEMALE_HORMONE_ULN_READ`: нг/мл и нг/дл) — иначе порог 800 против 80 нг/мл
+ * молчал, а 2.5 против 50 нг/дл срабатывал у всех.
  */
 function femaleHormoneSteps(marker: string, value: number): TierNutritionTip[] {
   const out: TierNutritionTip[] = [];
@@ -359,15 +371,17 @@ function femaleHormoneSteps(marker: string, value: number): TierNutritionTip[] {
       }
       break;
     }
-    case 'PRL': {
-      if (value > FEMALE_HORMONE_ULN.PRL.high) {
+    case 'PRL':
+    case 'PROLACTIN': {
+      if (value > FEMALE_HORMONE_ULN_READ.PRL.high) {
         tip(1, 'Повторить пролактин', 'утром натощак, без физнагрузки и стресса за сутки');
         tip(2, 'ТТГ и макропролактин', 'исключить гипотиреоз и макропролактин');
       }
       break;
     }
-    case 'TESTOSTERONE': {
-      if (value > FEMALE_HORMONE_ULN.TT.high) {
+    case 'TESTOSTERONE':
+    case 'TT': {
+      if (value > FEMALE_HORMONE_ULN_READ.TT.high) {
         tip(1, 'Повторить тестостерон', 'утро, 8–10 день цикла, вместе с ГСПГ');
         tip(2, 'Гинеколог-эндокринолог', 'оценка вирилизации: голос, кожа, цикл');
       }

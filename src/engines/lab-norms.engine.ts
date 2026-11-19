@@ -8,7 +8,7 @@
  *
  * Правило проекта: без sex/male getLabNorm возвращает ровно пару UCUM_MAP (lln/uln).
  */
-import { UCUM_MAP, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../core/constants';
+import { UCUM_MAP, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL, TT_NMOL_TO_NG_DL } from '../core/constants';
 import { LAB_REFERENCES_FEMALE } from './risk-engine-v7-matrix';
 
 export interface LabNorm {
@@ -405,6 +405,29 @@ export const FEMALE_HORMONE_ULN = {
 } as const;
 
 /**
+ * Женские бэнды в тех единицах, в которых калькулятор читает анализ (проход 148).
+ *
+ * `FEMALE_HORMONE_ULN` задан «лабораторными» единицами: пролактин в мМЕ/л,
+ * тестостерон в нмоль/л. Но форма через `LAB_UNIT_READ`/`LAB_TIERS` держит канон
+ * «пролактин нг/мл, тестостерон нг/дл», и тревожный бэнд сравнивал 80 нг/мл с
+ * порогом 800 мМЕ/л — не срабатывал никогда, а тестостерон 50 нг/дл (норма
+ * женщины) был «больше 2.5» и давал вирилизацию. Порог переводится единственным
+ * коэффициентом (`PRL_NG_TO_MIU`, `TT_NMOL_TO_NG_DL`) — второго числа нет.
+ */
+export const FEMALE_HORMONE_ULN_READ = {
+  PRL: {
+    high: Math.round((FEMALE_HORMONE_ULN.PRL.high / PRL_NG_TO_MIU) * 10) / 10,
+    criticalHigh: Math.round((FEMALE_HORMONE_ULN.PRL.criticalHigh / PRL_NG_TO_MIU) * 10) / 10,
+    unit: 'нг/мл',
+  },
+  TT: {
+    high: Math.round(FEMALE_HORMONE_ULN.TT.high * TT_NMOL_TO_NG_DL * 10) / 10,
+    criticalHigh: Math.round(FEMALE_HORMONE_ULN.TT.criticalHigh * TT_NMOL_TO_NG_DL * 10) / 10,
+    unit: 'нг/дл',
+  },
+} as const;
+
+/**
  * Пороги флагов липидных и печёночных карточек, которые не совпадают с ВГН
  * (`UCUM_MAP`) и потому живут отдельным рядом: ступени ЛПНП и ТГ — это
  * 1×/1.3×/1.6×ВГН (3.0/4.0/5.0 и 1.7/2.3), а «низкий ЛПВП» — кардио-цель, и у
@@ -469,11 +492,7 @@ export const FT_STEPS = {
  */
 export const PRL_STEPS = {
   male: [15, 25, 50] as [number, number, number],
-  female: [
-    Math.round((FEMALE_HORMONE_ULN.PRL.high / PRL_NG_TO_MIU) * 10) / 10,
-    50,
-    Math.round((FEMALE_HORMONE_ULN.PRL.criticalHigh / PRL_NG_TO_MIU) * 10) / 10,
-  ] as [number, number, number],
+  female: [FEMALE_HORMONE_ULN_READ.PRL.high, 50, FEMALE_HORMONE_ULN_READ.PRL.criticalHigh] as [number, number, number],
 } as const;
 
 /**
