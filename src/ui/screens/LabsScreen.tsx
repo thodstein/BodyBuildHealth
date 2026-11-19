@@ -1882,7 +1882,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           if (val >= 70) return 'Хорошо'; if (val >= 40) return 'Умеренно'; return 'Низкий';
         };
         const indexEntries = Object.entries(labIndexDetails).map(([key, detail]) => ({
-          key, label: detail.label, value: Math.round(detail.value * 100),
+          key, label: detail.label,
+          // Проход 149: индекс без измеренных маркеров — не «0%» (это читалось как
+          // «в норме»), а «нет данных»; частичный индекс говорит, сколько маркеров
+          // вошло в расчёт.
+          value: detail.value === null ? null : Math.round(detail.value * 100),
+          measured: detail.measured, total: detail.total,
         }));
         const verifLabMap: Record<string, number> = tzLabValues;
         return (
@@ -1995,9 +2000,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 {indexEntries.length > 0 && (
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:6, marginTop:4 }}>
                     {indexEntries.map(d => (
-                      <div key={d.key} style={{ padding:'10px 10px', borderRadius:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, minHeight:48 }}>
+                      <div key={d.key} data-lab-index={d.key} data-lab-index-null={d.value === null ? 'yes' : undefined} data-lab-index-partial={d.value !== null && d.measured < d.total ? `${d.measured}/${d.total}` : undefined} style={{ padding:'10px 10px', borderRadius:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.12)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:6, minHeight:48 }}>
                         <span style={{ fontSize:12, color:'#fff', fontWeight:600 }}>{d.label}</span>
-                        <span style={{ fontWeight:800, fontSize:13, color: getRiskColor(d.value), minWidth:28, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{d.value}%</span>
+                        {d.value === null ? (
+                          <span style={{ fontSize:11, color:'rgba(255,255,255,0.62)', fontWeight:700 }}>нет данных</span>
+                        ) : (
+                          <span style={{ fontWeight:800, fontSize:13, color: getRiskColor(d.value), minWidth:28, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>
+                            {d.value}%{d.measured < d.total ? <span style={{ fontSize:10, color:'rgba(255,255,255,0.6)', fontWeight:700 }}> · {d.measured}/{d.total}</span> : null}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>

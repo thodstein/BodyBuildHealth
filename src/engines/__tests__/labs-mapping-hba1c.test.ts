@@ -23,8 +23,8 @@ describe('labs-mapping HbA1c case P0', () => {
       { code: 'GLU', value: 5.5, unit: 'mmol/L', date: '2026-09-01' },
     ] as any[];
     const res = computeLabIndices(labs);
-    expect(res.metabolism).toBeGreaterThan(0);
-    expect(res.metabolism).not.toBe(0);
+    expect(res.metabolism).not.toBeNull();
+    expect(res.metabolism!).toBeGreaterThan(0);
   });
 
   it('до фикса HBA1C возвращал null → metabolism 0 (демо бага)', async () => {

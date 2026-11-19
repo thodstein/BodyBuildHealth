@@ -12,9 +12,10 @@ describe('labs-indices HOMA-IR P0', () => {
     ] as any[];
     const res = computeLabIndices(labs);
     // 5.5*10/22.5=2.44 /5 =0.488
-    expect(res.homaIR).toBeGreaterThan(0.4);
-    expect(res.homaIR).toBeLessThan(0.6);
-    expect(res.homaIR).not.toBeLessThan(0.1);
+    expect(res.homaIR).not.toBeNull();
+    expect(res.homaIR!).toBeGreaterThan(0.4);
+    expect(res.homaIR!).toBeLessThan(0.6);
+    expect(res.homaIR!).not.toBeLessThan(0.1);
   });
 
   it('GLU 5.5 + INS 20 → HOMA 4.88 → 0.97 (крит)', () => {
@@ -23,15 +24,17 @@ describe('labs-indices HOMA-IR P0', () => {
       { code: 'INS', value: 20, unit: 'мкЕд/мл', date: '2026-09-01' },
     ] as any[];
     const res = computeLabIndices(labs);
-    expect(res.homaIR).toBeGreaterThan(0.8);
+    expect(res.homaIR!).toBeGreaterThan(0.8);
   });
 
-  it('без INS → фолбэк глюкоза*0.7 + HbA1c*0.3', () => {
+  it('без INS → HOMA не считается (проход 149: фолбэк убран)', () => {
     const labs = [
       { code: 'GLU', value: 5.5, unit: 'mmol/L', date: '2026-09-01' },
       { code: 'HbA1c', value: 5.5, unit: '%', date: '2026-09-01' },
     ] as any[];
     const res = computeLabIndices(labs);
-    expect(res.homaIR).toBeGreaterThan(0);
+    // Раньше здесь печаталось glucose*0.7 + HbA1c*0.3 — не HOMA, а другой
+    // показатель под подписью «инсулинорезистентность».
+    expect(res.homaIR).toBeNull();
   });
 });
