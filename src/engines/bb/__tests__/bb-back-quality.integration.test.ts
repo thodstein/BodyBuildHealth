@@ -128,6 +128,19 @@ describe('experienced enhanced back prescription', () => {
     expect(excess).toBeLessThanOrEqual(1);
   }, 30000);
 
+  it('removes triceps/biceps work on the cable stack from vertical-pull detection', () => {
+    // Проход 17: «в верхнем блоке» — адрес тренажёра, а не паттерн спины.
+    // Раньше трицепсовый пушдаун считался vertical_pull/cable_vertical, и ремонт
+    // паттернов видел лишнюю «вертикальную тягу» в каждой Pull-сессии.
+    expect(classifyBackExercise('Разгибания на трицепс в верхнем блоке').pattern).toBe('other');
+    expect(verticalPullProfile('Разгибания на трицепс в верхнем блоке')).toBeNull();
+    expect(classifyBackExercise('Сгибания на бицепс в верхнем блоке').pattern).toBe('other');
+    expect(verticalPullProfile('Сгибания на бицепс в верхнем блоке')).toBeNull();
+    // Настоящая тяга с того же тренажёра не задета.
+    expect(classifyBackExercise('Тяга верхнего блока (прямой)').pattern).toBe('vertical_pull');
+    expect(verticalPullProfile('Тяга верхнего блока (прямой)')).toBe('cable_vertical');
+  });
+
   it('keeps distinct vertical profiles as valid specialization choices', () => {
     expect(verticalPullProfile('Тяга верхнего блока широким хватом')).toBe('wide');
     expect(verticalPullProfile('Тяга верхнего блока хаммерным хватом')).toBe('neutral_hammer');

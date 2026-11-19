@@ -7,6 +7,8 @@ import type { UserProgram, UserWeek } from '../user-program/user-program.types';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { analyzeManualVolume } from './manual-volume.engine';
 import { checkSessionCap, rirProfileCheck } from '../quality-score-v2.engine';
+import { volumeRegimeOf } from '../bb/bb-ped-profile';
+import { peptideMrvMultOf } from '../bb/bb-ped-adaptation.engine';
 
 export interface PlanQualityResult {
   score: number;
@@ -20,7 +22,7 @@ export interface PlanQualityResult {
 export function computePlanQualityFor(
   program: UserProgram,
   level: string,
-  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number; division?: 'bb'|'pl'; trainingYears?: number; enableV2?: boolean },
+  opts?: { onCourse?: boolean; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; labMult?: number; division?: 'bb'|'pl'; trainingYears?: number; enableV2?: boolean },
 ): PlanQualityResult {
   const BASE_MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
   // Попытка PRO-анализа effective (bb/hybrid). Fallback — direct старый путь.
@@ -37,6 +39,8 @@ export function computePlanQualityFor(
     if (program.bb || program.arm || program.hybrid?.bbWeeks) {
       const ana = analyzeManualVolume(program, level, {
         onCourse: opts?.onCourse,
+        peds: opts?.peds,
+        pedDoses: opts?.pedDoses,
         courseIntensity: opts?.courseIntensity,
         labMrvMultiplier: opts?.labMult,
         trainingYears: opts?.trainingYears,
@@ -118,8 +122,13 @@ export function computePlanQualityFor(
   const perMuscle: PlanQualityResult['perMuscle'] = [];
   const issues: string[] = [];
   let totalScore = 100;
-  const onCourse = opts?.onCourse ?? false;
   const courseIntensity = opts?.courseIntensity ?? 'moderate';
+  // Проход 17: режим — то же правило, что у бюджета/капов. Пептиды (MGF/IGF-1)
+  // растят MRV своей кривой (×1.13–1.24), а не курс-множителем ×1.2.
+  const regime = volumeRegimeOf({ peds: opts?.peds, pedDoses: opts?.pedDoses, onCourse: opts?.onCourse });
+  const peptideMult = regime === 'peptides'
+    ? peptideMrvMultOf(opts?.peds || [], opts?.pedDoses, courseIntensity)
+    : 1;
   const labMult = opts?.labMult ?? 1;
   const division = opts?.division || (program.meta.direction === 'pl' ? 'pl' : program.meta.direction === 'bb' ? 'bb' : undefined);
   const isPL = division === 'pl' || (!division && !!program.pl?.customWeeks && !program.bb && !program.arm);
@@ -130,11 +139,16 @@ export function computePlanQualityFor(
     let mrv = lm.mrv;
     let mav = lm.mav;
     let mev = lm.mev;
-    if (onCourse) {
+    if (regime === 'course') {
       const courseMult = courseIntensity === 'heavy' ? 1.3 : courseIntensity === 'mild' ? 1.15 : 1.2;
       mrv = Math.round(mrv * courseMult);
       mav = Math.round(mav * courseMult);
       mev = Math.round(mev * courseMult);
+    } else if (peptideMult > 1) {
+      // Пептидный тир: своя дозо-кривая (потолок 1.4), а не курс-множитель.
+      mrv = Math.round(mrv * peptideMult);
+      mav = Math.round(mav * peptideMult);
+      mev = Math.round(mev * peptideMult);
     }
     if (labMult < 1) {
       mrv = Math.round(mrv * labMult);

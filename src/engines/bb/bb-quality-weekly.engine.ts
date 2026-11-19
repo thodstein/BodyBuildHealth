@@ -24,7 +24,6 @@ import { BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { QUALITY_GRADE_THRESHOLDS } from '../quality-score-v2.engine';
 import { getVolumeLandmarks, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { aggregateBBVolume, computeMuscleBalance, sessionLimitsFor } from './bb-volume.engine';
-import { onCourseOf } from './bb-ped-profile';
 import { canonicalMuscle, specResForWeekSchedule, tradeoffForWeek, expandDonorMuscles, isSpecializationWeak, isSpecializationFocus } from './bb-specialization.engine';
 import { sessionsWithMuscleInWeek } from './bb-frequency';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
@@ -517,10 +516,13 @@ export function scoreVolumeWeek(plan: PlanLike, weekNo: number): BBVolumeWeekSco
   // Лимиты сессии — централизованные (уровень/стаж/курс/режим уже внутри)
   // + PPL-лифт финализатора (паритет: тяжёлый Pull задуман на 41 сет).
   try {
+    // Проход 17: режим объёма — из контекста сборки (пептиды ≠ курс), а не
+    // «есть pedAdaptation ⇒ курс». Раньше IGF1-план судился курсовыми капами 52/15.
     const limits = sessionLimitsFor({
       level, trainingYears: snap.trainingYears,
-      onCourse: onCourseOf({ peds: snap.peds }) || !!(plan as any).pedAdaptation,
-      peds: snap.peds, courseIntensity: snap.courseIntensity,
+      volumeRegime: (plan as any).buildContext?.volumeRegime,
+      onCourse: (plan as any).onCourse,
+      peds: snap.peds, pedDoses: snap.pedDoses, courseIntensity: snap.courseIntensity,
       calorieSurplus: snap.calorieSurplus, proteinPerKg: snap.proteinPerKg,
       labMrvMultiplier: snap.labMrvMultiplier, trainingVolumeMode: snap.trainingVolumeMode,
       patternId: (plan as any).pattern?.id,

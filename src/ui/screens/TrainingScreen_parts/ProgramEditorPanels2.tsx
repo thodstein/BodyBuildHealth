@@ -15,7 +15,7 @@ import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { cloneFromCycle } from '../../../engines/user-program/program-store';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { ACCENT, CARD, DIM, DIM_STRONG, IN, BTN, BTN_GHOST } from './training-ui';
-import type { TrainingProfile } from './training-profile';
+import { explicitOnCourseFor, type TrainingProfile } from './training-profile';
 import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 /* ─── RirWaveChart ─── */
@@ -124,7 +124,11 @@ export const QualityScorePanel: React.FC<QualityScorePanelProps> = ({ program, l
   const dir = program.meta.direction;
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks || dir === 'hybrid' && program.hybrid?.bbWeeks)) return null;
   const q = computePlanQualityFor(program, level, {
-    onCourse: tprofile.onCourse ?? false,
+    // Проход 17: список препаратов решает тир; профильный `true` — не «курс», а
+    // наследие авто-пересчёта (IGF1 не должен становиться курсом), `false` — фаза off.
+    onCourse: explicitOnCourseFor(tprofile),
+    peds: (tprofile as any).bbPeds,
+    pedDoses: (tprofile as any).pedDoses,
     courseIntensity: tprofile.courseIntensity ?? 'moderate',
     labMult: labMrvMult,
     trainingYears: (tprofile as any).trainingYears,

@@ -8,7 +8,8 @@
 import { trueMuscleOf } from '../movement-pattern';
 import { MUSCLE_LABEL_RU, getVolumeLandmarks } from '../volume-landmarks.engine';
 import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../pro/hrv-baseline.engine';
-import { onCourseOf } from './bb-ped-profile';
+import { volumeRegimeOf, type VolumeRegime } from './bb-ped-profile';
+import { peptideMrvMultOf, PEPTIDE_MRV_CEILING } from './bb-ped-adaptation.engine';
 
 /**
  * Волна-2.6 (аудит 2026-09): ЕДИНЫЙ допуск MRV для всех точек конвейера —
@@ -48,6 +49,7 @@ export const SECONDARY_FIXED_MUSCLES: ReadonlySet<string> = new Set(['traps']);
 /**
  * Единый множитель режима (ПЕД/курс).
  * - натурал: ×1.0
+ * - пептиды (MGF/IGF-1): дозо-кривая пептидов (×1.13–1.24), а не ×2.0
  * - на курсе: ×2.0 на ГЛАВНЫЕ мышцы + недельный бюджет (одно применение, без стэкинга)
  * Вторичные мышцы (SECONDARY_FIXED_MUSCLES) и игнор-мышцы НЕ умножаются.
  */
@@ -56,11 +58,16 @@ export function computeRegimeMrvMult(input: {
   peds?: string[];
   pedDoses?: Record<string, number>;
   courseIntensity?: string;
+  /** Явный режим (когда список препаратов не проброшен, но он известен). */
+  volumeRegime?: VolumeRegime;
 }): number {
   // Ядро P3-2: «на курсе» — явный режим или реальный PED-профиль (доза/имя), а не
-  // непустой список. Креатин больше не удваивает бюджет/MRV.
-  const onCourse = onCourseOf(input);
-  if (!onCourse) return 1.0;
+  // непустой список. Проход 17: пептиды — отдельный тир со своей кривой.
+  const regime = input.volumeRegime ?? volumeRegimeOf(input);
+  if (regime === 'natural') return 1.0;
+  if (regime === 'peptides') {
+    return peptideMrvMultOf(input.peds || [], input.pedDoses, input.courseIntensity);
+  }
   // Базовый ×2. Тяжёлая интенсивность курса — чуть выше (×2.05-2.1).
   const intensity = input.courseIntensity === 'heavy' ? 1.06 : input.courseIntensity === 'mild' ? 0.98 : 1.0;
   return Math.min(2.15, Math.max(1.9, 2.0 * intensity));
@@ -92,11 +99,20 @@ export function computeMrvMult(input: {
   courseIntensity?: string;
   /** Дозо-зависимый MRV-множитель от adaptForPEDs (combinedMrvMultiplier). */
   doseAwareMrv?: number;
+  /** Явный режим объёма (приоритет выше пересчёта по списку препаратов). */
+  volumeRegime?: VolumeRegime;
 }): number {
-  const onCourse = onCourseOf(input);
-  if (!onCourse) return 1.0;
+  // Проход 17: режим — три состояния. Пептиды (MGF/IGF-1) масштабируют MRV по
+  // своей кривой (×1.13–1.24, потолок 1.4), но не получают курс-тир ×2.0.
+  // Явное «не на курсе» по-прежнему гасит кривую: off-фаза = натурал.
+  const regime = input.volumeRegime ?? volumeRegimeOf(input);
+  if (regime === 'natural') return 1.0;
   const dose = Number(input.doseAwareMrv);
-  if (Number.isFinite(dose) && dose > 1) {
+  const doseAware = Number.isFinite(dose) && dose > 1;
+  if (regime === 'peptides') {
+    return doseAware ? Math.min(PEPTIDE_MRV_CEILING, dose) : computeRegimeMrvMult(input);
+  }
+  if (doseAware) {
     // Дозо-зависимая кривая adaptForPEDs: TRT 125 мг → ~1.1, лёгкий 250 → ~1.18,
     // средний 500 → ~1.30, мега-стек → до 2.15.
     // Аудит 2026-09: нижний флор 1.9 убивал дозо-зависимость (TRT получал ×1.9) —
@@ -164,7 +180,7 @@ export function recoveryScoreToMult(score: number): number {
 
 /**
  * НЕДЕЛЬНЫЙ БЮДЖЕТ ВОССТАНОВЛЕНИЯ (общий кап, первичный).
- * база по режиму (натурал ~110 / курс ~220) × recovery × nutrition × lab.
+ * база по режиму (натурал ~110 / пептиды ~130–139 / курс ~220) × recovery × nutrition × lab.
  * Применяется ко ВСЕМ путям ББ-авто (кроме faithful-программы).
  */
 export function computeBBWeeklyBudget(input: {
@@ -176,9 +192,12 @@ export function computeBBWeeklyBudget(input: {
   calorieSurplus?: number;
   proteinPerKg?: number;
   labMrvMultiplier?: number;
+  /** Явный режим объёма (приоритет выше пересчёта по списку препаратов). */
+  volumeRegime?: VolumeRegime;
 }): number {
   const regime = computeRegimeMrvMult(input);
-  // База: натурал ~112, на курсе ~220 (× ~2). Вторичные/игнор-мышцы вне этого бюджета.
+  // База: натурал ~112, пептиды — по своей кривой (112 × 1.13–1.24), курс ~220 (× ~2).
+  // Вторичные/игнор-мышцы вне этого бюджета.
   const base = Math.round(112 * Math.max(1.0, regime));
   const rec = recoveryScoreToMult(input.recoveryScore ?? 80);
   const nutrition = computeBBNutritionMultiplier({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
@@ -206,6 +225,8 @@ export function sessionLimitsFor(
     level?: string;
     trainingYears?: number;
     trainingVolumeMode?: 'standard' | 'high';
+    /** Явный режим объёма (приоритет выше пересчёта по списку препаратов). */
+    volumeRegime?: VolumeRegime;
   },
   split?: { id?: string; sessionGroups?: number },
 ): { weeklyWorkingSets: number; maxWorkingSets: number; maxExercises: number } {
@@ -214,7 +235,10 @@ export function sessionLimitsFor(
   const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
   // Ядро P3-2: «на курсе» — тот же дозо-зависимый профиль, что у решений о сплите и
   // MRV-множителя (креатин в списке `peds` больше не даёт тир «про на курсе»).
-  const onCourse = onCourseOf(input);
+  // Проход 17: пептиды (MGF/IGF-1) получают капы ПО УРОВНЮ — их кривая касается
+  // бюджета/MRV, но не превращает атлета в «про на курсе».
+  const regime = input.volumeRegime ?? volumeRegimeOf(input);
+  const onCourse = regime === 'course';
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
   if (onCourse && years >= 3) { // про НА ПЕД: без ПЕД — тир advanced (пропорционально ниже)
@@ -790,12 +814,16 @@ export function weeklyCapFor(input: {
   onCourse?: boolean;
   courseIntensity?: string;
   doseAwareMrv?: number;
+  /** Явный режим объёма (пептиды/курс/натурал) — приоритет выше флага onCourse. */
+  volumeRegime?: VolumeRegime;
+  /** Препараты (имена классов) — когда режим `peptides` и нет дозо-множителя. */
+  peds?: string[];
 }): number {
   const m = String(input.muscle || '').toLowerCase();
   const anchor = USER_ANCHOR_CAPS[m] || 0;
   const lm = getVolumeLandmarks(input.level || 'intermediate', m);
   if (!lm) return anchor;
-  const pedMult = computeMrvMult({ onCourse: input.onCourse, courseIntensity: input.courseIntensity, doseAwareMrv: input.doseAwareMrv });
+  const pedMult = computeMrvMult({ onCourse: input.onCourse, courseIntensity: input.courseIntensity, doseAwareMrv: input.doseAwareMrv, volumeRegime: input.volumeRegime, peds: input.peds });
   let cap = Math.round(lm.mrv * pedMult);
   // Потолок владельца бьёт только там, где он задан (спина/ноги).
   if (anchor > 0) cap = Math.min(cap, anchor);

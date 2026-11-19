@@ -19,6 +19,7 @@ import { buildBBPlanAsync } from '../../engines/bb/bb-build-async';
 import { arrangeSupersetBlocks } from '../../engines/bb/bb-session-order.engine';
 import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
+import { volumeRegimeOf } from '../../engines/bb/bb-ped-profile';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import {
@@ -934,7 +935,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
   useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus]);
   useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
-  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: peds.length > 0 }); } catch {} }, [peds]);
+  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: volumeRegimeOf({ peds }) === 'course' }); } catch {} }, [peds]);
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
   const diarySessions = useMemo(() => loadSessions(), []);

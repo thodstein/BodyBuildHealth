@@ -115,6 +115,8 @@ export interface BBPlan {
     level?: string;
     trainingYears?: number;
     onCourse?: boolean;
+    /** Проход 17: режим объёма (пептиды/курс/натурал). */
+    volumeRegime?: 'natural' | 'peptides' | 'course';
     doseAwareMrv?: number;
     courseIntensity?: string;
     maxWorkingSets?: number;

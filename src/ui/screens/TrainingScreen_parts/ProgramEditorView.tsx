@@ -26,7 +26,7 @@ import { CardioConstructor } from './CardioConstructor';
 import { EditorPopupSelect } from './EditorPopup';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
-import { loadTrainingProfile, useTrainingProfile, type TrainingProfile } from './training-profile';
+import { loadTrainingProfile, useTrainingProfile, explicitOnCourseFor, type TrainingProfile } from './training-profile';
 import { TrainingProfileCard } from './TrainingProfileCard';
 import { subscribePlannerApply, clearPlannerApply, type PlannerApply } from './planner-bridge';
 import { applyBridgePayloadDispatch, type BridgeCtx } from './planner-bridge-handlers';
@@ -1359,7 +1359,7 @@ return (
         {/* Compact фикс объёма — 1 клик, доступен всем (standard тоже) — недобор и перегруз */}
         {(() => {
           try {
-            const q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier });
+            const q = computePlanQualityFor(program, program.meta.level, { onCourse: explicitOnCourseFor(tprofile), peds: tprofile.bbPeds, pedDoses: tprofile.pedDoses, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier });
             const lows = q.perMuscle.filter(m => m.status === 'low').slice(0, 2);
             const overs = q.perMuscle.filter(m => m.status === 'over').slice(0, 2);
             if (lows.length === 0 && overs.length === 0) return null;
@@ -1460,7 +1460,7 @@ return (
             const daysMismatch = !!(guideWeeks[0] && guideWeeks[0].sessions.length !== program.meta.daysPerWeek);
             let q: any = null;
             if (dir === 'bb') {
-              try { q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier }); } catch {}
+              try { q = computePlanQualityFor(program, program.meta.level, { onCourse: explicitOnCourseFor(tprofile), peds: tprofile.bbPeds, pedDoses: tprofile.pedDoses, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier }); } catch {}
             }
             const lows = q?.perMuscle?.filter((m:any)=> m.status==='low') ?? [];
             const overs = q?.perMuscle?.filter((m:any)=> m.status==='over') ?? [];

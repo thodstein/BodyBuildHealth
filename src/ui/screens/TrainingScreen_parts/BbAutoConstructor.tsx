@@ -39,6 +39,7 @@ import { defaultTargetBodyFat } from '../../../engines/bb/bb-bodycomp.engine';
 import { bbExerciseExplanation } from '../../../engines/bb/bb-summary.engine';
 import { buildMEVCalibration, recordMEVCalibrationWeek, isMEVCalibrationComplete, saveMEVCalibration, loadMEVCalibration, clearMEVCalibration, type MEVCalibration, type MEVSignal } from '../../../engines/bb/bb-mev-calibration.engine';
 import { adaptForPEDs, type PED } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { volumeRegimeOf, type VolumeRegime } from '../../../engines/bb/bb-ped-profile';
 import { suggestMethodologyForStack, recommendPEDMethodology, applyPEDMethodologyToPlan } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
@@ -50,7 +51,7 @@ import { riskyOpenChainIds, decideBbOrthoIntake, subtractTracked } from '../../.
 import { resolveBbDiagIntakeExtras } from '../../../engines/bb/bb-diag-intake.engine';
 import { buildBbMovementPrintBlock } from '../../../engines/bb/bb-diagnostics-export.engine';
 import { replanSummary } from '../../../engines/bb/bb-replan.engine';
-import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
+import { loadTrainingProfile, saveTrainingProfile, explicitOnCourseFor, type TrainingProfile } from './training-profile';
 import { canonicalMuscleOf, exerciseKeyOf, makeWorkSets, estimatedWeightFor, loadRatioBetween, findCatalogExercise } from './bb-auto-injections';
 import { subscribePlannerApply, applyToPlanner, getPlannerApply, clearPlannerApply, type PlannerApply, type WeakpointsPayload } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
@@ -360,6 +361,18 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     ...(prof.pedDoses || {}),
   });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
+  // Проход 17: режим объёма — одно правило (`bb-ped-profile`), а не «список непуст».
+  // Пептиды (MGF/IGF-1): свой MRV-тир и капы по уровню, а не курс 52/15.
+  // Явный «на курсе» из профиля — только когда препаратов нет в списке.
+  const explicitOnCourse = useMemo(
+    () => explicitOnCourseFor({ onCourse: prof.onCourse, bbPeds: effectivePeds }),
+    [prof.onCourse, effectivePeds],
+  );
+  const bbVolumeRegime = useMemo<VolumeRegime>(
+    () => volumeRegimeOf({ peds: effectivePeds, onCourse: explicitOnCourse }),
+    [effectivePeds, explicitOnCourse],
+  );
+  const bbOnCourse = bbVolumeRegime === 'course';
   const [proPreset, setProPreset] = useState<string>('none');
   const [bfrMode, setBfrMode] = useState<boolean>(false);
   const [blastCruiseEnabled, setBlastCruiseEnabled] = useState<boolean>(false);
@@ -2032,7 +2045,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         mobilityRestrictions,
         equipment: bbEquipment,
         pedDoses,
-        onCourse: effectivePeds.length > 0,
+        onCourse: bbOnCourse,
         bbPeds: effectivePeds,
         courseIntensity,
         loadStrategy,
@@ -2299,7 +2312,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     prioritizeBackSessions(out, {
       level: bbLevel as any,
       trainingYears: bbTrainingYears,
-      onCourse: effectivePeds.length > 0,
+      onCourse: bbOnCourse,
       maxWorkingSets: edited.maxWorkingSets,
     });
     // Паритет с buildBBPlan (часть 2): после топ-апа спины переустановить
@@ -2331,7 +2344,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         checkOrder: true,
         methodology: bbMethodology,
         specializationTargets: out.priorityMuscles,
-        onCourse: effectivePeds.length > 0,
+        onCourse: bbOnCourse,
         maxWorkingSets: out.maxWorkingSets,
         maxExercises: out.maxExercises,
       },
@@ -2551,6 +2564,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           equipment: bbEquipment,
           peds: effectivePeds,
            pedDoses,
+           // Проход 17: явный «на курсе» из профиля сильнее списка (только без списка).
+           onCourse: explicitOnCourse,
            courseIntensity,
             level: bbLevel,
             trainingYears: bbTrainingYears,
@@ -2648,6 +2663,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
          loadStrategy,
          autoRegResult: autoRegPayload,
           pedDoses,
+          // Проход 17: классы препаратов — движок сам решает режим (пептиды MGF/IGF-1
+          // не получают курс-тир). Без списка билдер считал курсом любую дозу.
+          peds: effectivePeds,
+          onCourse: explicitOnCourse,
           courseIntensity,
           pedPhaseOverride,
           dcMode,
@@ -2753,7 +2772,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       // (движок даёт 15-20 для advanced/enhanced — добивки больше не глохнут).
       const maxExForInsert = (() => {
         try {
-          return sessionLimitsFor({ level: bbLevel as any, trainingYears: bbTrainingYears, onCourse: effectivePeds.length > 0, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
+          return sessionLimitsFor({ peds: effectivePeds, volumeRegime: bbVolumeRegime, level: bbLevel as any, trainingYears: bbTrainingYears, trainingVolumeMode: trainingVolumeMode as any } as any).maxExercises;
         } catch { return 10; }
       })();
       // Инвентарь плана: предпочтения/свопы обязаны его уважать, иначе финализация
@@ -4486,7 +4505,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       bbTrainingFocus={bbTrainingFocus}
       bbLevel={bbLevel}
       bbTrainingYears={bbTrainingYears}
-      onCourse={effectivePeds.length > 0}
+      onCourse={bbOnCourse}
       trainingVolumeMode={trainingVolumeMode === 'high' ? 'high' : 'standard'}
       setSubTarget={setSubTarget}
       handleSendToExecution={handleSendToExecution}
@@ -4690,7 +4709,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
                 pmBench: prof.pmBench,
                 pmDead: prof.pmDead,
                 weakPoints,
-                onCourse: effectivePeds.length > 0,
+                onCourse: bbOnCourse,
               }}
               level={bbLevel}
               weakPoints={weakPoints}

@@ -9,6 +9,7 @@ import { labTrainingAdjust } from './lab-training-adjust';
 import { PopupSelect, PopupNumber, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { volumeRegimeOf } from '../../../engines/bb/bb-ped-profile';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
 import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
 import { applyToPlanner } from './planner-bridge';
@@ -92,13 +93,17 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     const progForCalc = programForDivision(selectedProgram, division, (id: string) => getCycleById(id));
     if (!progForCalc) return null;
     return computePlanQualityFor(progForCalc as UserProgram, effectiveLevel, {
-      onCourse: usePed,
+      // Проход 17: «учитывать PED» — это режим, а не булев «курс»: IGF1/MGF
+      // судятся своей MRV-кривой, курс-множитель к ним не применяется.
+      onCourse: usePed && volumeRegimeOf({ peds: peds as string[], pedDoses: pedDosesEdit }) === 'course' ? true : undefined,
+      peds: usePed ? (peds as string[]) : undefined,
+      pedDoses: usePed ? pedDosesEdit : undefined,
       courseIntensity: courseIntensity as any,
       labMult: labMult,
       division,
       enableV2: true,
     });
-  }, [selectedProgram, effectiveLevel, usePed, courseIntensity, labMult, division]);
+  }, [selectedProgram, effectiveLevel, usePed, peds, pedDosesEdit, courseIntensity, labMult, division]);
 
   const analysisNatural = useMemo(() => {
     if (!usePed || !selectedProgram) return null;

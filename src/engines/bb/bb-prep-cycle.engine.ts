@@ -322,6 +322,9 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
     planStartWeek: prepStartIso,
     courseIntensity: cfg.courseIntensity ?? 'moderate',
     pedDoses: cfg.pedDoses,
+    // Prep-цикл «enhanced» — это курс по определению (AAS-адаптация ниже): режим
+    // объёма задаём явно, иначе пептидные ключи в дозах уводили план в свой тир.
+    onCourse: cfg.enhanced ? true : undefined,
     trainingFocus: cfg.trainingFocus ?? profile.trainingFocus,
     intensityTechnique: cfg.intensityTechnique,
     autoDeload: cfg.autoDeload,

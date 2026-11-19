@@ -198,7 +198,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   const isPrograms = planMode === 'programs';
   const isGeneric = planMode === 'generic_split';
   const limitText = (() => {
-    try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse: peds.length > 0 }); return `${ruCount(l.maxWorkingSets, RU_SETS)} / ${l.maxExercises} упр.`; }
+    try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, peds }); return `${ruCount(l.maxWorkingSets, RU_SETS)} / ${l.maxExercises} упр.`; }
     catch { return '24/10'; }
   })();
   const aasEquiv = computeAASEquivDose(pedDoses);

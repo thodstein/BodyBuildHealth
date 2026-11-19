@@ -11,7 +11,7 @@ import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestEx
 import { prescribeLoad } from '../../../engines/bb/bb-autocoach.engine';
 import { selectSplit } from '../../../engines/split-selector.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
-import { loadTrainingProfile } from './training-profile';
+import { loadTrainingProfile, explicitOnCourseFor } from './training-profile';
 import { distributePhases } from './phase-periodization';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { Exercise } from '../../../core/types';
@@ -32,11 +32,13 @@ const PHASE_LABELS: Record<string, string> = { accumulation: 'Накоплени
 export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
   const prof = loadTrainingProfile();
+  const pedsKey = (prof.bbPeds ?? []).join(',');
+  const dosesKey = JSON.stringify(prof.pedDoses ?? {});
   const q = useMemo(() => {
     try {
-      return computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+      return computePlanQualityFor(program, program.meta.level, { onCourse: explicitOnCourseFor(prof), peds: prof.bbPeds, pedDoses: prof.pedDoses, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
     } catch { return null; }
-  }, [program, prof.onCourse, prof.courseIntensity, labMrvMult]);
+  }, [program, prof.onCourse, prof.courseIntensity, labMrvMult, pedsKey, dosesKey]);
   if (!q || q.perMuscle.length === 0) return null;
 
   const weak = q.perMuscle.filter(m => m.status === 'low');

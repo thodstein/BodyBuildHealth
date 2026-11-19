@@ -173,8 +173,16 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // пересобирается ПОСЛЕ post-finalize `expandPlanToTargets` и MRV-трима.
     // Прежние 8 по груди были до-расширения (в плане реально 14 сетов;
     // кап 28, валидатор без ошибок). Остальные мышцы не сдвинулись.
+    // Re-baseline 5 (проход 17, режим объёма): путь цикла судил «на курсе» по
+    // НЕПУСТОМУ списку препаратов (`onCourse = peds.length > 0`), поэтому при
+    // дозах AAS 500 без списка строил натуральные цели и капы 40/15, тогда как
+    // generic-путь для той же фармы уже был курсом. Теперь режим — одно правило
+    // (`bb-ped-profile.volumeRegimeOf`): дозы курса дают course → цели/капы
+    // 60/16 и MRV-кривая дозы. Факт W1: 178 прямых сетов < бюджета 224,
+    // новых MRV-переливов нет (ошибки валидатора те же 16 × session_exercise_cap
+    // — его собственный дефолт 10 упражнений, было и до прохода).
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 10, biceps: 11, calves: 8, chest: 14, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 11, quads: 15, shoulders: 0, traps: 6, triceps: 9,
+      abs: 12, back: 18, biceps: 14, calves: 13, chest: 24, delt_front: 2, delt_mid: 2, delt_rear: 10, forearms: 12, glutes: 8, hamstrings: 17, quads: 23, shoulders: 0, traps: 12, triceps: 13,
     });
   });
 
@@ -192,8 +200,13 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // на упражнение ≤ кап, сессии ≤ лимитов (валидатор зелёный).
     // Re-baseline 5 (итерация Z): снимок был снят до post-finalize расширения
     // целей — хамс в плане 12 сетов (кап 22, валидатор без ошибок), а не 10.
+    // Re-baseline 6 (проход 17, режим объёма): та же причина, что у циклового
+    // пути — дозы AAS 500 без списка препаратов теперь дают режим course
+    // (раньше библиотечный путь строил enhanced-натурал 40/15). Факт W1:
+    // 178 прямых сетов < бюджета 224; новых MRV-переливов нет (2 прежних
+    // session_exercise_cap остались).
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 9, biceps: 12, calves: 8, chest: 13, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 7, glutes: 8, hamstrings: 12, quads: 20, shoulders: 0, traps: 6, triceps: 8,
+      abs: 15, back: 22, biceps: 10, calves: 15, chest: 18, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 12, glutes: 8, hamstrings: 15, quads: 28, shoulders: 0, traps: 15, triceps: 5,
     });
   });
 

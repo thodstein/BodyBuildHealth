@@ -8,6 +8,7 @@ import { getExercisesByGroup } from '../../core/exercise-catalog';
 import type { UserProgram, BBProgramBody } from '../user-program/user-program.types';
 import { buildBBPlan, type BBBuilderInput, type BBPlan, type BBGoal } from '../bb/bb-builder.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from '../bb/bb-ped-adaptation.engine';
+import { volumeRegimeOf } from '../bb/bb-ped-profile';
 import { selectBestBBSplit } from '../bb/bb-selector.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { Injury } from '../manual-plan-builder';
@@ -38,6 +39,10 @@ export interface AutoDraftOptions {
   excludedExercises?: string[];
   workMax?: Record<string, number>;
   onCourse?: boolean;
+  /** Проход 17: классы препаратов и дозы — режим объёма (пептиды ≠ курс)
+   *  решает общее правило `bb-ped-profile`, а не булев флаг вызывающего. */
+  peds?: string[];
+  pedDoses?: Record<string, number>;
   courseIntensity?: string;
   injuries?: { muscle: string; from?: string; to?: string; exclude?: boolean; volumePct?: number; weightPct?: number; repsCap?: number }[];
   /**
@@ -162,6 +167,10 @@ function defaultWorkMax(): Record<string, number> {
 export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
   const raw = (BB_GOALS_CANON as readonly string[]).includes(opts.goal as any) ? opts.goal : 'hypertrophy';
   const goal = toBBGoal(raw) as BBGoal;
+  // Проход 17: режим — одно правило (пептиды MGF/IGF-1 не «курс»). Раньше
+  // autodraft передавал в билдер только флаг onCourse, и пептиды/дозы терялись.
+  const volumeRegime = volumeRegimeOf({ peds: opts.peds, pedDoses: opts.pedDoses, onCourse: opts.onCourse });
+  const onCourse = volumeRegime === 'course';
   const patternId = opts.splitPattern ?? (
     (() => {
       try {
@@ -170,7 +179,7 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
           level: opts.level,
           daysPerWeek: opts.daysPerWeek,
           weakPoints: opts.weakPoints,
-          mode: opts.onCourse ? 'on_course' : 'natural',
+          mode: onCourse ? 'on_course' : 'natural',
           sex: opts.sex,
           focusGroup: opts.focusGroup,
         });
@@ -215,11 +224,17 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     eccentricMult: opts.eccentricMult,
     calorieSurplus: opts.calorieSurplus,
     proteinPerKg: opts.proteinPerKg,
+    // Проход 17: билдер получает классы препаратов и явный режим — сам решает тир.
+    peds: opts.peds,
+    pedDoses: opts.pedDoses,
+    onCourse: opts.onCourse,
   };
   let pedAdapt: PEDAdaptation | undefined;
-  if (opts.onCourse) {
-    const peds: PED[] = ['AAS' as PED];
-    pedAdapt = adaptForPEDs(peds, defaultWorkMax(), undefined, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
+  // PED-адаптация строится из РЕАЛЬНЫХ препаратов; флаг onCourse без списка
+  // сохраняет прежний контракт «AAS по умолчанию».
+  const pedsForAdapt = (opts.peds && opts.peds.length > 0 ? opts.peds : (onCourse ? ['AAS'] : [])) as PED[];
+  if (pedsForAdapt.length > 0) {
+    pedAdapt = adaptForPEDs(pedsForAdapt, defaultWorkMax(), opts.pedDoses, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
   }
   try {
     const plan = buildBBPlan(input, pedAdapt);

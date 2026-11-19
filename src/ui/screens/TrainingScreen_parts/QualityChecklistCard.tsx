@@ -7,7 +7,7 @@ import { CARD, BTN, BTN_GHOST, DIM, DIM_STRONG, ACCENT } from './training-ui';
 import { newId } from '../../../engines/user-program/user-program.types';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor';
-import { loadTrainingProfile } from './training-profile';
+import { loadTrainingProfile, explicitOnCourseFor } from './training-profile';
 import { GROUP_RU } from './program-types';
 import { applyPhaseModulation } from '../../../engines/manual-constructor';
 import { resizeTrainingSessions } from './program-editor-logic';
@@ -36,7 +36,7 @@ export const QualityChecklistCard: React.FC<Props> = ({ program, onChange, showT
     return false;
   })();
   const daysMismatch = dir === 'bb' && program.bb ? (program.bb.weeks[0]?.sessions.length ?? 0) !== days : false;
-  const q = (() => { try { return computePlanQualityFor(program, program.meta.level, { onCourse: tprofile?.onCourse ?? false, courseIntensity: tprofile?.courseIntensity ?? 'moderate', labMult: labMrv }); } catch { return null; } })();
+  const q = (() => { try { return computePlanQualityFor(program, program.meta.level, { onCourse: explicitOnCourseFor(tprofile), peds: tprofile?.bbPeds, pedDoses: tprofile?.pedDoses, courseIntensity: tprofile?.courseIntensity ?? 'moderate', labMult: labMrv }); } catch { return null; } })();
   const volumeOk = q ? q.perMuscle.every(m => m.status === 'ok' || m.status === 'high') : false;
   const volumeIssues = q ? q.perMuscle.filter(m => m.status === 'low' || m.status === 'over').slice(0, 3) : [];
   const hasDeload = (() => {

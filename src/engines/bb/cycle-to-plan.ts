@@ -20,7 +20,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
-import { onCourseOf } from './bb-ped-profile';
+import { volumeRegimeOf, type VolumeRegime } from './bb-ped-profile';
 import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import { recommendPEDMethodology } from './bb-ped-methodology.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
@@ -223,9 +223,11 @@ function buildCycleVolumeTargets(
      *  цель считалась плоским ×2.0 и превышала честный кап (chest 56 > MRV 50,
      *  calves 52 > 47) — цель становилась недостижимой. */
     doseAwareMrv?: number;
+    /** Проход 17: режим объёма (пептиды/курс/натурал) — выше флага onCourse. */
+    volumeRegime?: VolumeRegime;
   },
 ): Record<string, BBVolumeTarget> {
-  const regimeMult = computeMrvMult({ onCourse: opts.onCourse, peds: opts.peds, courseIntensity: opts.courseIntensity, doseAwareMrv: opts.doseAwareMrv });
+  const regimeMult = computeMrvMult({ onCourse: opts.onCourse, peds: opts.peds, courseIntensity: opts.courseIntensity, doseAwareMrv: opts.doseAwareMrv, volumeRegime: opts.volumeRegime });
   const goal = opts.volumeGoal || 'mav';
   const g = (opts.goal || 'mass').toLowerCase();
   const goalMult = g === 'cut' ? 0.72 : g === 'recomp' ? 0.92 : g === 'maintenance' ? 0.80 : g === 'mass' ? 1.05 : g === 'strength_mass' ? 1.03 : 1;
@@ -247,7 +249,7 @@ function buildCycleVolumeTargets(
     const weeklyAnchor = weeklyCapFor({
       muscle: m, level: lvl, trainingYears: opts.trainingYears,
       onCourse: opts.onCourse, courseIntensity: opts.courseIntensity,
-      doseAwareMrv: opts.doseAwareMrv,
+      doseAwareMrv: opts.doseAwareMrv, volumeRegime: opts.volumeRegime,
     });
     const perSess = perSessionMuscleCap({
       level: lvl, trainingYears: opts.trainingYears, onCourse: opts.onCourse, muscle: m,
@@ -1256,7 +1258,12 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     favoriteExercises = [], excludedExercises = [], avoidAxialLoad = false,
     volumeGoal = 'mav', level = 'advanced', equipment = [],
   } = input;
-  const onCourse = input.onCourse ?? peds.length > 0;
+  // Проход 17: режим объёма — общее правило (`bb-ped-profile`), а не «список непуст».
+  // Пептиды (MGF/IGF-1) — свой тир: кривая MRV ×1.13–1.24 и капы по уровню, а не
+  // курс 52/15. Раньше IGF1-соло в цикловом пути получал натуральный объём, а в
+  // сборке — курсовой: два пути описывали разных атлетов.
+  const volumeRegime: VolumeRegime = volumeRegimeOf({ peds, pedDoses, onCourse: input.onCourse });
+  const onCourse = volumeRegime === 'course';
   const mode = input.mode || 'adapt';
   const weakPoints = mode === 'faithful' ? [] : (input.weakPoints || []);
   const focusGroup = mode === 'faithful' ? '' : (input.focusGroup || '');
@@ -1769,6 +1776,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const cycleVolumeTargets = mode === 'adapt'
     ? buildCycleVolumeTargets(allLandmarks as any, {
         level, trainingYears: input.trainingYears, onCourse, peds, courseIntensity,
+        volumeRegime,
         goal: input.goal, volumeGoal: input.volumeGoal, labMrvMultiplier: input.labMrvMultiplier,
         trainingVolumeMode: (input as any).trainingVolumeMode, muscleFrequency,
         doseAwareMrv: pedAdapt.combinedMrvMultiplier,
@@ -1787,8 +1795,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     specializationSchedule: specSchedule,
     priorityMuscles: [...new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets), ...(focusGroup ? [focusGroup] : [])])],
     mrvMultiplier: mrvMult,
-    maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxWorkingSets,
-    maxExercises: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxExercises,
+    maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, pedDoses, courseIntensity, volumeRegime }).maxWorkingSets,
+    maxExercises: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, pedDoses, courseIntensity, volumeRegime }).maxExercises,
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
     mobilityRestrictions: input.mobilityRestrictions,
     volumeScheme: cycleVolumeScheme,
@@ -1828,6 +1836,12 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     preserveSource: mode === 'faithful',
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
+    // Проход 17: режим (пептиды/курс) — финализатор масштабирует MRV той же кривой,
+    // иначе IGF1-цели ×1.24 срезались натуральным weeklyCapFor.
+    volumeRegime,
+    // Явный флаг режима — в контекст финализатора (quality-weekly читает его
+    // как «факт сборки»; без него фазовый off терялся при повторной оценке).
+    onCourse,
     supersetMode: (input as any).supersetMode,
     volumeScheme: cycleVolumeScheme,
     fst7Seven: cycleFst7Seven,
@@ -1845,7 +1859,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     raiseBackCapToOwnerCanon(expandCaps, { level, trainingYears: input.trainingYears, onCourse, courseIntensity: input.courseIntensity });
     expandPlanToTargets(finalized, cycleVolumeTargets, {
       level, trainingYears: input.trainingYears, onCourse, caps: expandCaps,
-      maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, courseIntensity }).maxWorkingSets,
+      maxWorkingSets: centralizedSessionLimits({ level, trainingYears: input.trainingYears, peds, pedDoses, courseIntensity, volumeRegime }).maxWorkingSets,
     });
   }
   (finalized as any).trainingVolumeMode = (input as any).trainingVolumeMode || 'standard';
@@ -2076,6 +2090,9 @@ export interface ProgramToBBPlanOpts {
   equipment?: string[];
   peds?: PED[];
   pedDoses?: Record<string, number>;
+  /** Проход 17: явный режим фармы (true — курс, false — фаза off). Не задан —
+   *  режим выводится из peds/pedDoses общим правилом `bb-ped-profile`. */
+  onCourse?: boolean;
   courseIntensity?: CourseIntensity;
   level?: string;
   trainingYears?: number;
@@ -3008,13 +3025,18 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Строгий A/B (adapt-only; faithful дословно — флаг игнится).
   if (mode === 'adapt' && opts.abPatternRotation) stashAbAvoidForWeekSessions(finalPlan.weeks);
 
+  // Проход 17: режим объёма — общее правило (`bb-ped-profile`): пептиды (MGF/IGF-1)
+  // — свой тир (кривая MRV ×1.13–1.24, капы по уровню), а не «список непуст».
+  const programRegime: VolumeRegime = volumeRegimeOf({ peds: opts.peds, pedDoses: opts.pedDoses, onCourse: opts.onCourse });
+  const programOnCourse = programRegime === 'course';
   const programSessionLimits = centralizedSessionLimits({
-    level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, peds: opts.peds, courseIntensity: opts.courseIntensity,
+    level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears,
+    peds: opts.peds, pedDoses: opts.pedDoses, courseIntensity: opts.courseIntensity,
     // Аудит 2026-09 (методики должны применяться): объёмный режим и курс влияют
     // на лимиты сессии и в program-пути (раньше — NO-OP поле).
     trainingVolumeMode: opts.trainingVolumeMode,
-    // Ядро P3-2: «на курсе» — дозо-зависимый PED-профиль, а не непустой список (креатин).
-    onCourse: onCourseOf({ peds: opts.peds }),
+    // Ядро P3-2 + проход 17: режим — дозо-зависимый профиль (пептиды ≠ курс).
+    volumeRegime: programRegime,
   });
   // Единый passthrough методик program-пути (аудит 2026-09):
   //  • volumeScheme: FST-7 7-in-1 только enhanced без joint-guard (паритет с generic);
@@ -3035,7 +3057,6 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     return 'fst7';
   })();
   const programFst7Seven = programVolumeScheme === 'fst7' && mode === 'adapt';
-  const programOnCourse = (opts.peds?.length || 0) > 0;
   // Частота МЫШЦЫ = число СЕССИЙ/нед (не «число недель»): спина в PPL = 2, не 1.
   // Берём максимум по неделям (делод-недели не урезают частоту).
   const sessionFreq: Record<string, number> = {};
@@ -3052,7 +3073,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const programVolumeTargets = mode === 'adapt'
     ? buildCycleVolumeTargets(allLandmarks as any, {
         level: levelForLandmarks, trainingYears: opts.trainingYears, onCourse: programOnCourse,
-        peds: opts.peds, courseIntensity: opts.courseIntensity,
+        peds: opts.peds, courseIntensity: opts.courseIntensity, volumeRegime: programRegime,
         goal: opts.goal, volumeGoal: opts.volumeGoal, labMrvMultiplier: (opts as any).labMrvMultiplier,
         trainingVolumeMode: opts.trainingVolumeMode, muscleFrequency: sessionFreq,
         doseAwareMrv: pedAdapt.combinedMrvMultiplier,
@@ -3113,6 +3134,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     autoIntensityTechniques: opts.intTechnique !== 'none',
     rotationMode: (opts as any).rotationMode,
     onCourse: programOnCourse,
+    // Проход 17: режим целиком (пептиды ≠ курс) — финализатор масштабирует
+    // weeklyCapFor/MRV-гарды той же кривой, что и сборка.
+    volumeRegime: programRegime,
     dcWidowmaker: dcGateProgram,
   });
   // M3 (аудит BB-AUTO-EXHAUSTIVE §8.3): недельный MRV-кап program-пути —
@@ -3121,7 +3145,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // ни недельного капа: cycle-08 beginner давал hamstrings effective 18 при
   // MRV 12, glutes 17.6 при 12 (валидатор — overflow на каждой неделе).
   if (mode === 'adapt') {
-    const onCourseProgram = (opts.peds?.length || 0) > 0;
+    // Проход 17: тот же режим, что у капов/целей (пептиды — не курс).
+    const onCourseProgram = programOnCourse;
     const mrvByMuscle: Record<string, number> = {};
     for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number } | undefined>)) {
       const mrv = lmRaw?.mrv;

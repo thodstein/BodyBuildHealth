@@ -285,6 +285,21 @@ export function saveTrainingProfile(p: TrainingProfile): void {
   } catch { /* silent */ }
 }
 
+/**
+ * Проход 17: явный флаг «на курсе» для движков объёма.
+ *
+ * Список препаратов сильнее профильного флага: он и решает тир (MGF/IGF-1 —
+ * пептиды, не курс). Флаг `true` работает как «курс без списка» — унаследованный
+ * авто-пересчёт `onCourse = peds.length > 0` не должен возвращать IGF1 в курс.
+ * Дефолт профиля — `false`, поэтому `false` здесь НЕ означает «фаза off»: фазу
+ * off выражает пустой список препаратов (и прямой `onCourse:false` в движке).
+ */
+export function explicitOnCourseFor(prof: { onCourse?: boolean; bbPeds?: string[] } | null | undefined): boolean | undefined {
+  if (!prof) return undefined;
+  if (Array.isArray(prof.bbPeds) && prof.bbPeds.length > 0) return undefined;
+  return prof.onCourse === true ? true : undefined;
+}
+
 /** Хук: [profile, update]. update(patch) сливает patch и сохраняет. */
 export function useTrainingProfile(): [TrainingProfile, (patch: Partial<TrainingProfile>) => void] {
   const [profile, setProfile] = useState<TrainingProfile>(() => loadTrainingProfile());

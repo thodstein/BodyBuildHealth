@@ -141,6 +141,12 @@ export function replanBBMesoFromFact(
     sex: (snap.sex || (plan as any).sex || ctx.sex
       || (/^female_/i.test(String(patternId)) ? 'female' : undefined)) as BBBuilderInput['sex'],
     pedDoses,
+    // Проход 17: та же фарма и режим, что при сборке — иначе реплан остатка
+    // переводил IGF1-план в курс (или наоборот).
+    peds: Array.isArray(snap.peds)
+      ? snap.peds
+      : (Array.isArray((plan as any).pedAdaptation?.activePEDs) ? (plan as any).pedAdaptation.activePEDs : undefined),
+    onCourse: typeof snap.onCourse === 'boolean' ? snap.onCourse : undefined,
     intensityTechnique: snap.intensityTechnique as BBBuilderInput['intensityTechnique'],
     autoRegResult: snap.autoRegResult,
     volumeWave: snap.volumeWave,

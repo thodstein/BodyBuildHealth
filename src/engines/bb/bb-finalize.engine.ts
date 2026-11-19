@@ -1,4 +1,5 @@
 import type { BBPlan } from './bb-builder.engine';
+import type { VolumeRegime } from './bb-ped-profile';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, isCompoundEx, shouldInterleave, MUSCLE_RU_SHORT, type SessionMethodology } from './bb-session-order.engine';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass, prescribedSessionCap, weeklyCapFor, perSessionMuscleCap, sessionMuscleExerciseCap, distributeSetsByRole } from './bb-volume.engine';
@@ -257,6 +258,7 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
   const canonWeeklyBack = weeklyCapFor({
     muscle: 'back', level: options.level, trainingYears: options.trainingYears,
     onCourse: options.onCourse, courseIntensity: options.courseIntensity, doseAwareMrv: options.doseAwareMrv,
+    volumeRegime: options.volumeRegime,
   });
   const canonSessSets = Math.max(years >= 6 ? 22 : 18, Math.round(canonWeeklyBack / 2));
   const targetExercises = isFullBody ? 3 : Math.max(years >= 6 ? 6 : 5, sessionMuscleExerciseCap(canonSessSets));
@@ -1948,6 +1950,7 @@ function bbWeekOverflowsMrv(week: any, plan: any, options: BBFinalizeOptions): b
       onCourse: options.onCourse,
       courseIntensity: (options as any).courseIntensity,
       doseAwareMrv: (options as any).doseAwareMrv,
+      volumeRegime: options.volumeRegime,
     });
     if (cap > 0 && ((x as any).effectiveSets || 0) > cap * BB_MRV_TOLERANCE + 1e-6) return true;
   }
@@ -3712,6 +3715,10 @@ export interface BBFinalizeOptions {
   /** На курсе: per-exercise капы BIG (8-10), иначе legacy 5/8.
    *  Билдер прокидывает свой onCourse; прямые вызовы без флага — без изменений. */
   onCourse?: boolean;
+  /** Проход 17: режим объёма (пептиды/курс/натурал). Пептиды (MGF/IGF-1)
+   *  масштабируют MRV своей дозо-кривой (×1.13–1.24), но капы остаются по
+   *  уровню; «на курсе» — прежние BIG-капы. */
+  volumeRegime?: VolumeRegime;
   /** Формула ПЕД для канона объёма: doseAwareMrv (тяжесть курса и объём
    *  препаратов из adaptForPEDs). Без него канон спины считался 42/нед →
    *  21/сессию вместо 60/нед → 30/сессию. */
@@ -4098,6 +4105,7 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
         const anchorTarget = weeklyCapFor({
           muscle, level: options.level, trainingYears: options.trainingYears,
           onCourse: options.onCourse, courseIntensity: options.courseIntensity, doseAwareMrv: options.doseAwareMrv,
+          volumeRegime: options.volumeRegime,
         });
         const mrvCapForMuscle = Number((plan as any).mrvByMuscle?.[muscle]) || 0;
         const weeklyTargetRaw = Math.max(vTarget, anchorTarget);
@@ -5604,7 +5612,7 @@ export function stampBBPlanFinalizeSignature(plan: BBPlan): void {
 
 function bbFinalizeOptionsFingerprint(options: any): string {
   const pick = [
-    'level', 'trainingYears', 'onCourse', 'doseAwareMrv', 'courseIntensity',
+    'level', 'trainingYears', 'onCourse', 'volumeRegime', 'doseAwareMrv', 'courseIntensity',
     'maxWorkingSets', 'maxExercises', 'priorityMuscles', 'specializationSchedule',
     'mrvMultiplier', 'gradedMuscles', 'mobilityRestrictions', 'autoTaper', 'sex',
     'patternId', 'trainingVolumeMode', 'autoIntensityTechniques', 'ensureMinimumVolume',
@@ -5652,6 +5660,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
       level: options.level ?? priorCtx.level,
       trainingYears: options.trainingYears ?? priorCtx.trainingYears,
       onCourse: options.onCourse ?? priorCtx.onCourse,
+      volumeRegime: options.volumeRegime ?? priorCtx.volumeRegime,
       doseAwareMrv: options.doseAwareMrv ?? priorCtx.doseAwareMrv,
       courseIntensity: (options as any).courseIntensity ?? priorCtx.courseIntensity,
       maxWorkingSets: options.maxWorkingSets ?? priorCtx.maxWorkingSets,
@@ -5697,6 +5706,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     level: options.level,
     trainingYears: options.trainingYears,
     onCourse: options.onCourse,
+    volumeRegime: options.volumeRegime,
     doseAwareMrv: options.doseAwareMrv,
     courseIntensity: (options as any).courseIntensity,
     maxWorkingSets: options.maxWorkingSets,

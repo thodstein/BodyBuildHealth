@@ -8,7 +8,7 @@ import { GROUP_RU } from '../program-types';
 import type { UserBlock } from '../../../../engines/user-program/user-program.types';
 import { newId } from '../../../../engines/user-program/user-program.types';
 import { computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../../engines/manual-constructor';
-import { loadTrainingProfile } from '../training-profile';
+import { loadTrainingProfile, explicitOnCourseFor } from '../training-profile';
 import type { PanelProps } from './shared';
 import { ruCount, RU_SETS } from '../../../../engines/ru-plural';
 
@@ -17,7 +17,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
   const prof = loadTrainingProfile();
   let q: ReturnType<typeof computePlanQualityFor> | null = null;
   try {
-    q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+    q = computePlanQualityFor(program, program.meta.level, { onCourse: explicitOnCourseFor(prof), peds: prof.bbPeds, pedDoses: prof.pedDoses, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
   } catch { return null; }
   if (!q || q.perMuscle.length === 0) return null;
 

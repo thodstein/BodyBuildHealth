@@ -138,6 +138,35 @@ describe('convertCycleToBBPlan: PED integration', () => {
     expect(plan).toBeDefined();
     expect(plan.weeks.length).toBeGreaterThan(0);
   });
+
+  it('проход 17: IGF1-соло — пептидный тир (капы уровня), AAS — курс', () => {
+    const igf = convertCycleToBBPlan({
+      cycle: CYCLE_01, workMax: WM, peds: ['IGF1'], pedDoses: { IGF1: 80 },
+      level: 'advanced', trainingYears: 5, equipment: EQ, mode: 'adapt',
+    } as any);
+    const aas = convertCycleToBBPlan({
+      cycle: CYCLE_01, workMax: WM, peds: ['AAS'], pedDoses: { AAS: 500 },
+      level: 'advanced', trainingYears: 5, equipment: EQ, mode: 'adapt',
+    } as any);
+    expect(igf.buildContext?.volumeRegime).toBe('peptides');
+    expect(igf.buildContext?.onCourse).toBe(false);
+    expect((igf as any).maxWorkingSets).toBe(40);
+    expect(aas.buildContext?.volumeRegime).toBe('course');
+    expect(aas.buildContext?.onCourse).toBe(true);
+    expect((aas as any).maxWorkingSets).toBe(52);
+    // Неделя пептида не раздувается до курсовой.
+    expect(totalSetsForPlan(igf)).toBeLessThan(totalSetsForPlan(aas));
+  });
+
+  it('проход 17: явный onCourse:false гасит и цикловой путь (фаза off)', () => {
+    const plan = convertCycleToBBPlan({
+      cycle: CYCLE_01, workMax: WM, peds: ['AAS'], pedDoses: { AAS: 500 },
+      onCourse: false, level: 'advanced', trainingYears: 5, equipment: EQ, mode: 'adapt',
+    } as any);
+    expect(plan.buildContext?.volumeRegime).toBe('natural');
+    expect(plan.buildContext?.onCourse).toBe(false);
+    expect((plan as any).maxWorkingSets).toBe(40);
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -253,6 +282,22 @@ describe('programToBBPlan: PED integration', () => {
         equipment: EQ, peds: [], pedDoses: {}, mode: 'faithful',
       } as any);
       expect(totalSetsForMuscle(faithful, 'chest')).toBe(totalSetsForMuscle(noPed, 'chest'));
+    });
+
+    it('проход 17: IGF1-соло в программном пути — капы уровня, AAS — курс', () => {
+      const igf = programToBBPlan(prog, {
+        workMax: WM, weakPoints: [], injuries: [], level: 'advanced', trainingYears: 5,
+        equipment: EQ, peds: ['IGF1'], pedDoses: { IGF1: 80 }, mode: 'adapt',
+      } as any);
+      const aas = programToBBPlan(prog, {
+        workMax: WM, weakPoints: [], injuries: [], level: 'advanced', trainingYears: 5,
+        equipment: EQ, peds: ['AAS'], pedDoses: { AAS: 500 }, mode: 'adapt',
+      } as any);
+      expect(igf.buildContext?.volumeRegime).toBe('peptides');
+      expect(igf.buildContext?.onCourse).toBe(false);
+      expect((igf as any).maxWorkingSets).toBe(40);
+      expect(aas.buildContext?.volumeRegime).toBe('course');
+      expect((aas as any).maxWorkingSets).toBe(52);
     });
   }
 });

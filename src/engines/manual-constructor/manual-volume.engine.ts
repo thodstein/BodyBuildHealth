@@ -108,6 +108,10 @@ export function analyzeManualVolume(
   level: string,
   opts?: {
     onCourse?: boolean;
+    /** Проход 17: классы препаратов и дозы — режим объёма общий (`bb-ped-profile`),
+     *  иначе пептидный план судится натуральным бюджетом 112. */
+    peds?: string[];
+    pedDoses?: Record<string, number>;
     courseIntensity?: string;
     recoveryScore?: number;
     calorieSurplus?: number;
@@ -121,6 +125,8 @@ export function analyzeManualVolume(
   const weeksSrc: UserWeek[] = program.bb?.weeks ?? program.arm?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? [];
   const weeklyBudget = computeBBWeeklyBudget({
     onCourse: opts?.onCourse,
+    peds: opts?.peds,
+    pedDoses: opts?.pedDoses,
     courseIntensity: opts?.courseIntensity,
     recoveryScore: opts?.recoveryScore ?? 80,
     calorieSurplus: opts?.calorieSurplus,
@@ -129,6 +135,8 @@ export function analyzeManualVolume(
   });
   const sessionLimits = sessionLimitsFor({
     onCourse: opts?.onCourse,
+    peds: opts?.peds,
+    pedDoses: opts?.pedDoses,
     courseIntensity: opts?.courseIntensity,
     recoveryScore: opts?.recoveryScore ?? 80,
     calorieSurplus: opts?.calorieSurplus,

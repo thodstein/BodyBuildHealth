@@ -252,6 +252,46 @@ const COURSE_INTENSITY_MULT: Record<CourseIntensity, number> = {
   heavy: 1.08,
 };
 
+/**
+ * Потолок пептидного множителя объёма (MGF/IGF-1).
+ * Кривые этих препаратов заканчиваются на ×1.15/×1.25, с убывающей отдачей и
+ * интенсивностью — практический максимум стека MGF+IGF-1 ≈ ×1.35. Потолок
+ * защищает от случайного «курсового» значения в этом тире.
+ */
+export const PEPTIDE_MRV_CEILING = 1.4;
+
+/**
+ * Дозо-зависимый множитель объёма ТОЛЬКО для пептидов (MGF/IGF-1) — та же
+ * кривая и убывающая отдача (×0.85 на препарат), что в `adaptForPEDs`, но без
+ * AAS/GH/инсулина. Нужен бюджету/MRV: IGF1-соло не должен получать курс-тир
+ * (×2.0), но и не должен оставаться натуралом — его кривая ×1.13–1.24.
+ */
+export function peptideMrvMultOf(
+  peds: string[] = [],
+  doses?: Record<string, number>,
+  courseIntensity?: string,
+): number {
+  const d = doses || {};
+  const has = (re: RegExp) => peds.some((p) => re.test(String(p)));
+  const intensity: CourseIntensity = courseIntensity === 'mild' || courseIntensity === 'heavy'
+    ? courseIntensity
+    : 'moderate';
+  let mult = 1;
+  for (const ped of ['MGF', 'IGF1'] as PED[]) {
+    const nameHit = ped === 'MGF' ? has(/^mgf$/i) : has(/^igf/i);
+    const raw = ped === 'IGF1' ? d['IGF1'] ?? d['IGF'] : d[ped];
+    const dose = parseDose(raw);
+    if (!nameHit && !(dose > 0)) continue;
+    // Без дозы — база препарата (как в adaptForPEDs), с дозой — интерполяция кривой.
+    const base = dose > 0
+      ? interpolateDose(ped, dose)
+      : { mrv: PED_EFFECTS[ped].mrvMultiplier };
+    mult += (base.mrv - 1) * 0.85;
+  }
+  if (mult > 1) mult *= COURSE_INTENSITY_MULT[intensity];
+  return Math.min(mult, PEPTIDE_MRV_CEILING);
+}
+
 export interface PEDAdaptation {
   activePEDs: PED[];
   pedDoses: Record<string, number>;

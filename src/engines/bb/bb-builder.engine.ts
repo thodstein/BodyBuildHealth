@@ -32,6 +32,7 @@ import { findPatternAlternative, cooldownBlockedNames as cooldownBlockedForMuscl
 import { S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
+import { volumeRegimeOf, type VolumeRegime } from './bb-ped-profile';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection, applyRegressedMuscleRelief } from './bb-progression-feedback.engine';
@@ -230,6 +231,13 @@ export interface BBBuilderInput {
   /** Дозы PED (мг/нед или МЕ/день или мкг). Ключи: 'AAS','insulin','MGF','IGF1','GH'.
    *  Dose-aware: 250 мг ААС ≠ 2000 мг ААС по влиянию на MRV. */
   pedDoses?: Record<string, number>;
+  /** Активные PED по классам ('AAS'|'insulin'|'MGF'|'IGF1'|'GH') — вход правила
+   *  режима объёма (`bb-ped-profile.volumeRegimeOf`): курс — AAS/GH/инсулин,
+   *  пептиды (MGF/IGF-1) — отдельный тир со своей дозо-кривой. Раньше списка не
+   *  было, и билдер считал курсом любую положительную дозу. */
+  peds?: string[];
+  /** Явный режим фармы: true — курс, false — фаза off (гасит и профиль, и пептиды). */
+  onCourse?: boolean;
   /** Интенсивность курса — дополнительный MRV boost (mild 1.0 / moderate 1.04 / heavy 1.08). */
   courseIntensity?: CourseIntensity;
   /** Доступное оборудование (штанга/гантели/блок/машина/гири/свой вес) — фильтр отбора упражнений. */
@@ -614,6 +622,9 @@ export interface BBPlan {
     level?: string;
     trainingYears?: number;
     onCourse?: boolean;
+    /** Проход 17: режим объёма (пептиды/курс/натурал) — revalidate масштабирует
+     *  MRV по той же кривой, что сборка. */
+    volumeRegime?: VolumeRegime;
     doseAwareMrv?: number;
     courseIntensity?: string;
     maxWorkingSets?: number;
@@ -694,6 +705,10 @@ export interface BBPlan {
     /** Полный контракт replan: всё, что влияет на пересборку остатка. */
     sex?: 'male' | 'female';
     pedDoses?: Record<string, number>;
+    /** Проход 17: классы препаратов и явный режим — replan обязан сохранять
+     *  «пептиды/натурал/курс», иначе пересборка остатка меняла тир объёма. */
+    peds?: string[];
+    onCourse?: boolean;
     intensityTechnique?: string;
     autoIntensityTechniques?: boolean;
     autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number; deload?: boolean };
@@ -2124,6 +2139,9 @@ export interface BuildSessionParams {
   rirEscalation?: number;
   /** Цель мезоцикла — goal-aware отбор/порядок (не меняет объёмную модель). */
   goal?: BBGoal;
+  /** Проход 17: явный режим объёма (пептиды MGF/IGF-1 — свой тир со своей
+   *  дозо-кривой, а не курс ×2). Приоритетнее пересчёта по списку PED. */
+  volumeRegime?: VolumeRegime;
 }
 
 function buildSession(
@@ -2183,6 +2201,7 @@ function buildSession(
   mrvRotByMuscle: Record<string, number> = {},
   rirEscalation: number = 0,
   goal?: BBGoal,
+  volumeRegime?: VolumeRegime,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2254,7 +2273,19 @@ function buildSession(
   const levelMult = levelMultMap[level] ?? 1.0;
   // Экзотика (гиря/олимп/стронгмен/мобилити) — только для advanced/enhanced; каноника по умолчанию.
   const allowExotic = level === 'advanced' || level === 'enhanced';
-  const dayRegimeMult = computeMrvMult({ onCourse: !!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0), courseIntensity: pedAdapt?.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier });
+  // Проход 17: множитель дня — по режиму (пептиды ×1.13–1.24, а не курс ×2).
+  // `volumeRegime` из сборки приоритетнее: явная off-фаза с PED-профилем тоже
+  // обязана считаться натуральной.
+  const effectiveRegime: VolumeRegime = volumeRegime
+    ?? volumeRegimeOf({ peds: pedAdapt?.activePEDs, pedDoses, onCourse: onCourse ? true : undefined });
+  const dayRegimeMult = computeMrvMult({
+    volumeRegime: effectiveRegime,
+    onCourse,
+    peds: pedAdapt?.activePEDs,
+    pedDoses,
+    courseIntensity: pedAdapt?.courseIntensity,
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+  });
   const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * dayRegimeMult * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
@@ -2358,7 +2389,7 @@ function buildSession(
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt, isFemale);
     // 3.1 — вынесенный слой volume: high-volume минимумы + indirect overlap.
     // onCourse пробрасываем для BIG-капа (PED+стаж), иначе курс душился до натурала.
-    sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || ''), onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3 });
+    sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || ''), onCourse: onCourse || (effectiveRegime !== 'natural' && (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3) });
     const specVol = specializationEmphasisFactor(muscle, specRes);
     if (specVol !== 1) sets = Math.round(sets * specVol);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают).
@@ -2379,7 +2410,7 @@ function buildSession(
     // perSessionMuscleCap (level/стаж/PED). Раньше хардкод 5 убивал enhanced 18-22.
     // Объём сверх капа добивается упражнениями/частотой, а не бесконечными сетами.
     {
-      const sessCap = perSessionMuscleCap({ level, trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle });
+      const sessCap = perSessionMuscleCap({ level, trainingYears, onCourse: onCourse || (effectiveRegime !== 'natural' && (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3), muscle });
       if (sets > sessCap) sets = sessCap;
     }
     // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D).
@@ -3456,7 +3487,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
     p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {}, p.rirEscalation ?? 0,
-    p.goal,
+    p.goal, p.volumeRegime,
   );
 }
 
@@ -3661,11 +3692,23 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const torsoProfile = torsoVolumeProfile(level, input.trainingYears);
   // Единый множитель режима (ПЕД/курс): натурал ×1.0, на курсе ×2.0 на главные мышцы.
   // Заменяет стэкинг backProfile×legProfile×torsoProfile (×2.2/1.8/1.6) + pedAdapt.
-  const onCourse = (!!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0))
-    || Object.values(input.pedDoses || {}).some(d => {
-      const v = typeof d === 'string' ? parseFloat(String(d).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) : Number(d);
-      return Number.isFinite(v) && v > 0;
-    });
+  // Проход 17: режим — ОДНО правило (`bb-ped-profile`), а не «любая доза». Раньше
+  // любая положительная доза делала атлета «на курсе»: IGF-1 80 мкг получал
+  // бюджет ×2 и капы 52/15 при дозо-кривой ×1.24. Пептиды — отдельный тир.
+  const volumeRegime: VolumeRegime = volumeRegimeOf({
+    peds: input.peds,
+    pedDoses: input.pedDoses,
+    // Совместимость: явно переданная PED-адаптация без флагов входа — прежний
+    // сигнал «на курсе» (старые вызовы `buildBBPlan(input, pedAdapt)`).
+    onCourse: input.onCourse ?? (
+      input.peds == null && input.pedDoses == null && pedAdapt?.activePEDs?.length ? true : undefined
+    ),
+  });
+  // Фаза off: явный `onCourse:false` — это натурал, включая PED-механизмы
+  // (minSetsArms, budgetCap 0.70, pedArmBoost). Иначе остатки адаптации
+  // добавляли 3 сета к натуральному плану и «off» не был натуралом.
+  if (volumeRegime === 'natural' && input.onCourse === false) pedAdapt = undefined;
+  const onCourse = volumeRegime === 'course';
   // Решение владельца 2026-11: ЖЕНСКАЯ glute-специализация (18–20 ПРЯМЫХ на
   // пике) получает scoped-кап 24 вместо глобального якоря 18. Только advanced/
   // enhanced и только glute-шаблоны — мужские планы и обычные сплиты не растут.
@@ -3677,7 +3720,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // риск двойного масштабирования: лёгкий курс больше не получает caps ×2.0 при
   // landmarks ×1.3).
   const regimeMult = computeMrvMult({
-    onCourse,
+    volumeRegime,
+    peds: input.peds,
+    pedDoses: input.pedDoses,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
   });
@@ -3696,14 +3741,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // реальные потолки: per-muscle mrvByMuscle + sessionLimitsFor (ниже).
   // Имя переименовано, чтобы не читалось как жёсткий бюджет.
   const weeklyBudgetEstimate = Math.round(computeBBWeeklyBudget({
-    onCourse,
+    volumeRegime,
+    peds: input.peds,
+    pedDoses: input.pedDoses,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
   }) * recoveryMultOverride);
   const sessLimits = sessionLimitsFor({
-    onCourse,
+    volumeRegime,
+    peds: input.peds,
+    pedDoses: input.pedDoses,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
@@ -4180,7 +4229,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const freqOfMuscle = (m: string) => Math.max(1, muscleSessionCount[collapseKey(m)] || muscleSessionCount[m] || 1);
       const mrvRotByMuscle: Record<string, number> = {};
       for (const m of sessMuscles) {
-        const sessCapM = perSessionMuscleCap({ level, trainingYears: input.trainingYears, onCourse: onCourse || (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3, muscle: m });
+        const sessCapM = perSessionMuscleCap({ level, trainingYears: input.trainingYears, onCourse: onCourse || (volumeRegime !== 'natural' && (pedAdapt?.combinedMrvMultiplier ?? 1) >= 1.3), muscle: m });
         // Аудит 2026-09 (реализм сессии): per-muscle потолок применяется ко ВСЕМ
         // мышцам, а не только к «малым» (формула <12). Раньше крупная мышца
         // забирала в одну сессию 20+ сетов → Upper-день на 18-20 упражнений.
@@ -4205,7 +4254,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0, goal: input.goal });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0, goal: input.goal, volumeRegime });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -5431,6 +5480,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // фарм-дозы, техники, авторегуляцию и стартовую неделю.
       sex: input.sex,
       pedDoses: input.pedDoses,
+      peds: input.peds,
+      onCourse: input.onCourse,
       intensityTechnique: input.intensityTechnique,
       autoIntensityTechniques: input.intensityTechnique !== 'none',
       autoRegResult: input.autoRegResult,
@@ -5506,6 +5557,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     trainingYears: input.trainingYears,
     // onCourse для BIG per-exercise капов финализатора (иначе курс душится до 5)
     onCourse,
+    // Проход 17: режим (пептиды/курс) — финализатор масштабирует MRV по той же
+    // кривой, что сборка; капы остаются уровневые у пептидов.
+    volumeRegime,
     // Формула ПЕД в финализаторе: без doseAwareMrv канон спины считался
     // 42/нед (21/сессию) вместо 60/нед (30/сессию) — тяжесть курса и объём
     // препаратов не доезжали до аллокации объёма.

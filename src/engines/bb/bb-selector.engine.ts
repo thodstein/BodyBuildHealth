@@ -440,9 +440,11 @@ export function splitSessionBudget(p: SplitPattern, input: Pick<BBSelectorInput,
       level: input.level,
       trainingYears: years,
       peds: input.peds,
+      pedDoses: input.pedDoses,
       // «На курсе» — явный режим или реальный PED-профиль, а не любой PED в
-      // списке: креатин не делает атлета курсовым (ядро P3-2).
-      onCourse: input.mode === 'on_course' || highVolumeDemandOf(input),
+      // списке: креатин не делает атлета курсовым (ядро P3-2). Проход 17:
+      // пептиды (MGF/IGF-1) — свой тир; основной тир по уровню/профилю прежний.
+      onCourse: (input.mode === 'on_course' || highVolumeDemandOf(input)) ? true : undefined,
     } as any, { id: p.id });
   } catch { /* дефолт */ }
   let maxGroups = 0;

@@ -8,8 +8,15 @@ export type ArmPattern = 'biceps_lengthened' | 'biceps_shortened' | 'biceps_hamm
  * neutral/hammer, underhand и pull-up дают разные линии локтя/профили нагрузки.
  * Возвращает null для НЕ-вертикальных упражнений — вызывать только после
  * classifyBackExercise подтвердил pattern === 'vertical_pull'. */
+/** Блочный тренажёр — не синоним вертикальной тяги: «разгибания на трицепс /
+ *  сгибания на бицепс в верхнем блоке» это руки, а не спина. Без исключения
+ *  такие имена попадали в vertical_pull/cable_vertical и ломали учёт паттернов
+ *  спины (ремонт «одна вертикальная тяга» видел лишнюю тягу в трицепсе). */
+const NOT_BACK_CABLE = /разгибан.*трицепс|трицепс.*разгибан|сгибан.*бицепс|бицепс.*сгибан|pushdown|triceps.*extension/i;
+
 export function verticalPullProfile(name: string): string | null {
   const n = String(name || '').toLowerCase();
+  if (NOT_BACK_CABLE.test(n)) return null;
   if (!/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун/i.test(n)) return null;
   if (/широк|wide|широким|за голов/i.test(n)) return 'wide';
   if (/хаммер|hammer|нейтрал|neutral|parallel|параллел|узк.*нейтр|v.?рукоят/i.test(n)) return 'neutral_hammer';
@@ -23,6 +30,8 @@ export function classifyBackExercise(name: string): { pattern: BackPattern; subg
   const n = String(name || '').toLowerCase();
   // «Скручивания в верхнем блоке» — пресс, не вертикальная тяга (не back).
   if (/скручиван|crunch/i.test(n)) return { pattern: 'other', subgroup: 'upper_back' };
+  // Руки в верхнем блоке — тоже не вертикальная тяга (см. NOT_BACK_CABLE).
+  if (NOT_BACK_CABLE.test(n)) return { pattern: 'other', subgroup: 'upper_back' };
   if (/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical/i.test(n)) return { pattern: 'vertical_pull', subgroup: 'back_width' };
   if (/пуловер|прям.*рук|straight.?arm/i.test(n)) return { pattern: 'lat_isolation', subgroup: 'back_width' };
   if (/тяга.*одной|one.?arm|single.?arm|одноруч|гантел.*наклон/i.test(n)) return { pattern: 'unilateral_row', subgroup: 'back_thickness' };
