@@ -59,7 +59,7 @@ export interface BBPlanSnapshotOptions {
 }
 
 export const VALIDATION_LINE_PREFIX = '⚠ Валидация:';
-const ROTATION_LINE_PREFIX = '⚠ Ротация:';
+export const ROTATION_LINE_PREFIX = '⚠ Ротация:';
 const BACK_SUMMARY_PREFIX = '🧩 Спина по паттернам:';
 const ARM_SUMMARY_PREFIX = '💪 Руки по паттернам:';
 const BACK_ISSUE_PREFIX = '⚠ Качество спины:';
@@ -129,6 +129,76 @@ export function validationRationaleLines(
   return lines;
 }
 
+/** Строки ротации для rationale: важность → предел → честная строка «…и ещё N».
+ *  Аудит 2026-11 (продолжение P3-7): тот же дефект, что у валидации, — здесь тоже
+ *  стоял `slice(0, 20)` в порядке выдачи анализатора, поэтому в плане с 25+
+ *  замечаниями пользователь видел 20 локальных повторов угла изоляции и не видел
+ *  ни одного «основное движение сменилось внутри фазы». Полный список остаётся в
+ *  отчёте качества, в rationale — приоритетные и честный счётчик скрытого. */
+export const ROTATION_RATIONALE_LIMIT = 20;
+
+/** Важность замечаний ротации: смена базы внутри фазы мешает прогрессу сильнее
+ *  всего; «нет ротации весь план» — методическое замечание ко всему плану;
+ *  локальный повтор угла изоляции — самое частное. */
+const ROTATION_PRIORITY: Record<string, number> = {
+  primary_changed: 0,
+  no_accessory_rotation: 1,
+  accessory_repeated: 2,
+};
+
+export function rotationIssuePriority(issue: any): number {
+  const known = ROTATION_PRIORITY[String(issue?.code || '')];
+  return known == null ? 3 : known;
+}
+
+export function rotationRationaleLines(
+  issues: readonly any[] | undefined,
+  prefix: string,
+  options: { limit?: number; hiddenHint?: string } = {},
+): string[] {
+  const limit = options.limit ?? ROTATION_RATIONALE_LIMIT;
+  const seen = new Set<string>();
+  const pool = (issues || []).filter((issue: any) => {
+    const key = `${issue?.code || ''}|${issue?.message || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const ordered = pool
+    .map((issue, index) => ({ issue, index }))
+    .sort((a, b) => rotationIssuePriority(a.issue) - rotationIssuePriority(b.issue) || a.index - b.index)
+    .map((entry) => entry.issue);
+  const lines = ordered.slice(0, Math.max(0, limit)).map((issue: any) => `${prefix} ${issue.message}`);
+  const hidden = ordered.length - lines.length;
+  if (hidden > 0) {
+    lines.push(`${prefix} …и ещё ${ruCount(hidden, RU_WARNINGS)} — ${options.hiddenHint || 'полный список в отчёте качества'}.`);
+  }
+  return lines;
+}
+
+/** Итоговые строки ротации для rationale: сохраняем уже показанные финализатором
+ *  «primary_changed» (только если они всё ещё актуальны) и добираем остальные
+ *  по важности в пределах общего лимита 20. Одна точка правды для снимка и тестов. */
+export function rotationRationaleFor(
+  issues: readonly any[] | undefined,
+  prevLines: readonly string[] | undefined,
+): string[] {
+  const list = (issues || []) as any[];
+  const message = (issue: any) => `${ROTATION_LINE_PREFIX} ${issue.message}`;
+  // «primary_changed» сохраняем, только если финализатор уже решил его
+  // показать (reorder=false); остальные строки — по фактическому составу.
+  const keptPrimary = (prevLines || []).filter((line) =>
+    list.some((issue) => issue.code === 'primary_changed' && message(issue) === line));
+  // Предел 20 общий на все строки ротации: сколько заняли оставленные
+  // «primary_changed», столько снимаем у остальных, чтобы список не разрастался.
+  const fresh = rotationRationaleLines(
+    list.filter((issue) => issue.code !== 'primary_changed'),
+    ROTATION_LINE_PREFIX,
+    { limit: Math.max(0, ROTATION_RATIONALE_LIMIT - keptPrimary.length) },
+  );
+  return [...new Set([...keptPrimary, ...fresh])];
+}
+
 /** Сумма сетов по movement-паттернам для выбранных мышц (как в финализаторе). */
 function patternSummary(weeks: any[], muscles: string[]): string {
   const acc: Record<string, number> = {};
@@ -181,18 +251,9 @@ export function refreshBBPlanSnapshots(plan: any, opts: BBPlanSnapshotOptions = 
   plan.rotationReport = analyzeBBRotation(plan);
   if (opts.refreshRotationRationale) {
     const issues = ((plan.rotationReport.issues || []) as any[]);
-    const message = (issue: any) => `${ROTATION_LINE_PREFIX} ${issue.message}`;
     const prev = (Array.isArray(plan.rationale) ? plan.rationale : [])
       .filter((line: string) => String(line).startsWith(ROTATION_LINE_PREFIX));
-    // «primary_changed» сохраняем, только если финализатор уже решил его
-    // показать (reorder=false); остальные строки — по фактическому составу.
-    const keptPrimary = prev.filter((line: string) =>
-      issues.some((issue) => issue.code === 'primary_changed' && message(issue) === line));
-    const fresh = issues
-      .filter((issue) => issue.code !== 'primary_changed')
-      .slice(0, 20)
-      .map(message);
-    const lines = [...new Set([...keptPrimary, ...fresh])];
+    const lines = rotationRationaleFor(issues, prev);
     plan.rationale = (Array.isArray(plan.rationale) ? plan.rationale : [])
       .filter((line: string) => !String(line).startsWith(ROTATION_LINE_PREFIX))
       .concat(lines);

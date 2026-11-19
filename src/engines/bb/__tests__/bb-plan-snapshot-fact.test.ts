@@ -14,7 +14,7 @@
  */
 import { buildBBPlan, WEAK_TO_MUSCLE } from '../bb-builder.engine';
 import { finalizeBBPlan, prioritizeBackSessions } from '../bb-finalize.engine';
-import { refreshBBPlanSnapshots } from '../bb-plan-snapshot.engine';
+import { ERROR_LINE_PREFIX, ROTATION_LINE_PREFIX, refreshBBPlanSnapshots, rotationRationaleFor, validationRationaleLines } from '../bb-plan-snapshot.engine';
 import { validateBBPlan } from '../bb-validator.engine';
 import { FREQUENCY_DRIFT_PREFIX, FREQUENCY_LINE_PREFIX } from '../bb-frequency';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
@@ -181,11 +181,13 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
       const freshRotation = analyzeBBRotation(plan);
       expect(plan.rotationReport, `${where}: rotationReport`).toEqual(freshRotation);
       expect(plan.report.rotationWarnings, `${where}: счётчик ротации в отчёте`).toBe(freshRotation.issues.length);
-      const freshRotationLines = new Set(freshRotation.issues.map((i: any) => `⚠ Ротация: ${i.message}`));
-      const staleRotation = (plan.rationale || [])
-        .filter((line: string) => String(line).startsWith('⚠ Ротация:'))
-        .filter((line: string) => !freshRotationLines.has(String(line)));
-      expect(staleRotation, `${where}: rationale описывает снятую ротацию`).toEqual([]);
+      // P3-7: строки ротации — важность → предел 20 → «…и ещё N»; проверяем
+      // неподвижную точку пересборки по факту (снятая строка → расхождение).
+      const rotationLines = ((plan.rationale || []) as string[]).filter((line: string) => String(line).startsWith(ROTATION_LINE_PREFIX));
+      expect(
+        rotationLines,
+        `${where}: строки ротации = факт (важность, предел 20, «ещё N»)`,
+      ).toEqual(rotationRationaleFor(freshRotation.issues, rotationLines));
 
       // Паттерны спины/рук и их качество — факт финального состава, а не
       // середина финализатора (замер до правки: спина 14/17, руки 9/17,
@@ -225,10 +227,8 @@ describe('bb: снимки после правок (revalidate-путь)', () =>
         rationale.filter((line: string) => line.startsWith('🦿 Суставы:')),
         `${where}: строка суставов`,
       ).toEqual(jointIssues.length ? [`🦿 Суставы: ${jointIssues.join(' ')}`] : []);
-      const freshErrors = ((plan.validation?.issues || []) as any[])
-        .filter((issue: any) => issue.level === 'error')
-        .slice(0, 20)
-        .map((issue: any) => `🚫 Валидация: ${issue.message}`);
+      // P3-7: ошибки — та же функция, что у снимка (важность, предел 20, «ещё N»).
+      const freshErrors = validationRationaleLines(((plan.validation?.issues || []) as any[]), ERROR_LINE_PREFIX, { level: 'error' });
       expect(
         rationale.filter((line: string) => line.startsWith('🚫 Валидация:')),
         `${where}: строки ошибок валидации`,

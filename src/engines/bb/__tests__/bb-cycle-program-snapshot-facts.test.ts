@@ -7,7 +7,7 @@ import { validateBBPlan } from '../bb-validator.engine';
 import { estimateBBSessionCost } from '../bb-fatigue.engine';
 import { buildBBExpandedSummary } from '../bb-summary.engine';
 import { analyzeBBRotation } from '../bb-rotation.engine';
-import { ERROR_LINE_PREFIX, VALIDATION_LINE_PREFIX, validationRationaleLines } from '../bb-plan-snapshot.engine';
+import { ERROR_LINE_PREFIX, ROTATION_LINE_PREFIX, VALIDATION_LINE_PREFIX, rotationRationaleFor, validationRationaleLines } from '../bb-plan-snapshot.engine';
 import { reconcileSchemeComments } from '../bb-scheme-comment-reconcile';
 import { backQualityIssues, armQualityIssues } from '../bb-back-quality.engine';
 import { analyzePlanStress } from '../bb-injury-prevention.engine';
@@ -76,10 +76,15 @@ function expectSnapshotsMatchFacts(plan: any, label: string) {
   const freshRotation = analyzeBBRotation(plan);
   expect(plan.rotationReport, `${label}: rotationReport`).toEqual(freshRotation);
   expect(plan.report.rotationWarnings, `${label}: счётчик ротации в отчёте`).toBe(freshRotation.issues.length);
-  const freshRotationLines = new Set(freshRotation.issues.map((i: any) => `⚠ Ротация: ${i.message}`));
-  const staleRotation = ((plan.rationale || []) as string[])
-    .filter(line => String(line).startsWith('⚠ Ротация:') && !freshRotationLines.has(line));
-  expect(staleRotation, `${label}: rationale описывает снятую ротацию`).toEqual([]);
+  // P3-7 (аудит 2026-11, продолжение): строки ротации — тоже обещание факта:
+  // важность → предел 20 → «…и ещё N». Проверяем неподвижную точку: пересборка
+  // по фактическому анализу (с учётом оставленных финализатором «primary_changed»)
+  // обязана совпасть с rationale. Снятая строка или неполный список ломают равенство.
+  const rotationLines = ((plan.rationale || []) as string[]).filter(line => String(line).startsWith(ROTATION_LINE_PREFIX));
+  expect(
+    rotationLines,
+    `${label}: строки ротации = факт (важность, предел 20, «ещё N»)`,
+  ).toEqual(rotationRationaleFor(freshRotation.issues, rotationLines));
 
   const rationale = ((plan.rationale || []) as string[]).map(String);
   const patternSummaryOf = (muscles: string[]) => {

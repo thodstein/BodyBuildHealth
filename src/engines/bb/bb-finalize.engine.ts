@@ -35,7 +35,7 @@ import { computeVolumeLandmarks, getVolumeLandmarks } from '../volume-landmarks.
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { ruCount, ruAdjCount, RU_SETS, RU_EXERCISES, RU_ADJ_SECONDARY } from '../ru-plural';
 import { calibratedLandmarksFor, type MEVCalibration } from './bb-mev-calibration.engine';
-import { refreshBBPlanSnapshots, validationRationaleLines, VALIDATION_LINE_PREFIX, ERROR_LINE_PREFIX } from './bb-plan-snapshot.engine';
+import { refreshBBPlanSnapshots, validationRationaleLines, rotationRationaleLines, VALIDATION_LINE_PREFIX, ERROR_LINE_PREFIX, ROTATION_LINE_PREFIX } from './bb-plan-snapshot.engine';
 import { buildExerciseInstructions } from './bb-exercise-instructions.engine';
 import { applyTaperToFinalWeeks, isDeloadLikeWeek } from './bb-autocoach.engine';
 import { annotateBackExercise, verticalPullProfile, classifyLegExercise, annotateArmExercise, classifyArmExercise, classifyBackExercise } from './bb-back-quality.engine';
@@ -6483,10 +6483,12 @@ for (const week of next.weeks) {
   }
   const rotation = analyzeBBRotation(next);
   next.rotationReport = rotation;
-  const rotationWarnings = rotation.issues
-    .filter(issue => issue.code !== 'primary_changed' || options.reorder === false)
-    .slice(0, 20)
-    .map(issue => `⚠ Ротация: ${issue.message}`);
+  // Предел 20 прежний, но без молчаливого обреза: сначала смена базы внутри фазы,
+  // затем «нет ротации весь план», затем локальные повторы; скрытое суммируется.
+  const rotationWarnings = rotationRationaleLines(
+    rotation.issues.filter(issue => issue.code !== 'primary_changed' || options.reorder === false),
+    ROTATION_LINE_PREFIX,
+  );
   if (rotationWarnings.length) next.rationale = [...next.rationale, ...rotationWarnings];
   // PPL: полные правила по ТЗ (трапы/задняя дельта/бицепс/трицепс/икры/грудь/спина/ноги).
   if (!options.preserveSource && isPPLPattern(options, next)) {
