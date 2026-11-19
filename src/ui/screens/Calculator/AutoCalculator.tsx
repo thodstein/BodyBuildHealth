@@ -16,6 +16,7 @@ import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
 import { currentLabSlice } from '../../../engines/support-plan/lab-slice';
 import { ruMarker, labBoundNotes } from './Calc.lab';
+import { unusedLabFields } from './Calc.lab-coverage';
 import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
@@ -66,6 +67,15 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const boundNotes = useMemo(() => {
     const slice = currentLabSlice(state.labs);
     return labBoundNotes(slice);
+  }, [state.labs]);
+  /**
+   * Проход 140: поле заполнено, но расчёт его не читает (нет шкалы ступеней, правила
+   * советов, вклада в риск и вывода в анкету). Показываем именно это, а не «норму»:
+   * человек должен знать, что на эту строку в советах опираться нельзя.
+   */
+  const unusedFields = useMemo(() => {
+    const slice = currentLabSlice(state.labs);
+    return unusedLabFields(slice);
   }, [state.labs]);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
@@ -761,6 +771,28 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
             {boundNotes.map(n => n.text).join(' · ')} — прочитано как само число, точного значения
             в бланке нет. Если лаборатория даёт точное — впишите его.
+          </div>
+        </div>
+      )}
+
+      {/* Проход 140: поле сохранено, но расчёт его не читает. «Нет записи» и
+          «записано, но не прочитано» на экране неотличимы, а «нет шкалы» не значит
+          «в норме» — поэтому называем такие поля вслух, с причиной. */}
+      {unusedFields.length > 0 && (
+        <div data-lab-unused style={{ ...GLASS, padding: '6px 10px', marginBottom: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 2 }}>
+            ℹ️ Сохранено, но в расчёт не входит — {unusedFields.length}
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
+            {unusedFields.map(f => (
+              <div key={f.key} data-lab-unused-field={f.key}>
+                • {ruMarker(f.marker)} — {f.reason}
+              </div>
+            ))}
+            <div style={{ marginTop: 2 }}>
+              Это не «в норме»: приложение не умеет судить об этих показателях по своей
+              шкале. Решение по ним — за врачом.
+            </div>
           </div>
         </div>
       )}

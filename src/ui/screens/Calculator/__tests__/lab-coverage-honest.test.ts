@@ -1,0 +1,117 @@
+/**
+ * lab-coverage-honest.test.ts — проход 140: карта «поле заполнено, но расчёт его
+ * не читает» не врёт.
+ *
+ * Проверка не читает таблицу и не верит комментариям: для каждого из 88 полей
+ * `FULL_PANELS` она заполняет **только это поле** и смотрит, меняется ли хоть один
+ * контур:
+ *  - риск-модель (`calculateTzSpecRisk` — органы/механизмы/итог; доля
+ *    «проверено анализами» исключена: она растёт от одного факта заполнения);
+ *  - мост механизмов (`getActivatedTzMechs`);
+ *  - ступени и советы (`computeTierAdjustments`);
+ *  - шкала ступеней (`getLabEntry`) и справочная граница (`labSeverityCut`);
+ *  - авто-вывод анкеты (`deriveStateFromLabs`).
+ *
+ * Если ни один контур не шевельнулся — поле обязано быть в `LAB_FIELD_UNUSED_REASON`
+ * (и наоборот). Так таблица не может «протухнуть»: как только поле начинают
+ * читать, гард падает и требует убрать пометку «не входит в расчёт».
+ */
+import { describe, it, expect } from 'vitest';
+import { labSliceToValues } from '../../../../engines/support-plan/mapper-ctx';
+import { buildTzInput } from '../../../../engines/support-plan/engine-helpers';
+import { getActivatedTzMechs } from '../../../../engines/tz-bridge-marker';
+import { computeTierAdjustments } from '../../../../data/lab-tier-recommendations';
+import { getLabEntry } from '../../../../data/lab-tier-ranges';
+import { labSeverityCut } from '../../../../engines/tz-mapper-engine';
+import { calculateTzSpecRisk } from '../../../../engines/risk-engine-tz-spec';
+import { labMarkerCanon } from '../../../../engines/support-plan/lab-marker-name';
+import { deriveStateFromLabs } from '../Calc.labs-derived';
+import { FULL_PANELS } from '../Calc.lab';
+import { DEFAULT_STATE } from '../Calc.types';
+import { LAB_FIELD_UNUSED_REASON, unusedLabFields } from '../Calc.lab-coverage';
+
+const stateWith = (slice: any) => ({
+  ...DEFAULT_STATE,
+  profile: { ...DEFAULT_STATE.profile, sex: 'male' as const, age: 30 },
+  pharma: { ...DEFAULT_STATE.pharma, aas: [{ id: 'test_e', doseMgWeek: 500, weeks: 12 }] as any },
+  labs: { preCourse: null, midCourse: null, postPCT: null, fullPanel: slice },
+} as any);
+
+/** Подпись риск-результата без «доли проверенных анализами». */
+function riskSignature(r: any): string {
+  const { overallVerification, explanation, ...rest } = r;
+  return JSON.stringify(rest);
+}
+
+/** Меняется ли хоть один контур, если заполнить только это поле. */
+function fieldIsRead(panel: string, marker: string): boolean {
+  const slice = { date: '', [panel]: { [marker]: '5' } };
+  const canon = labMarkerCanon(marker, panel);
+
+  const tz = buildTzInput(stateWith(slice), []);
+  const baseTz = buildTzInput(stateWith({ date: '' }), []);
+  if (!tz || !baseTz) throw new Error('buildTzInput вернул null — курс-заглушка не собрался');
+  if (riskSignature(calculateTzSpecRisk(tz)) !== riskSignature(calculateTzSpecRisk(baseTz))) return true;
+
+  const planLabs = labSliceToValues(slice as any, 'male');
+  if (getActivatedTzMechs(planLabs as any).length > 0) return true;
+
+  const adj = computeTierAdjustments(planLabs, 'male');
+  if (adj.alerts.length + adj.addSubs.length + adj.nutrition.length + adj.tierSummary.length > 0) return true;
+
+  // Шкала и справочная граница — «поле известно модели» даже если при значении 5
+  // ступень нулевая (например, Lp(a) 5 мг/дл — норма, но шкала есть).
+  if (getLabEntry(canon)) return true;
+  if (labSeverityCut(canon) !== null) return true;
+
+  if (deriveStateFromLabs(slice as any, 'male').derivedFields.length > 0) return true;
+
+  return false;
+}
+
+describe('проход 140: карта «не входит в расчёт» совпадает с измерением', () => {
+  const fields = FULL_PANELS.flatMap(p => p.markers.map(m => ({ panel: p.key as string, marker: m })));
+
+  it('форма по-прежнему 88 полей — иначе список надо пересматривать', () => {
+    expect(fields).toHaveLength(88);
+  });
+
+  it('каждое поле либо читается, либо названо в таблице', () => {
+    const measuredUnused: string[] = [];
+    for (const f of fields) {
+      if (!fieldIsRead(f.panel, f.marker)) measuredUnused.push(`${f.panel}|${f.marker}`);
+    }
+    const tableKeys = Object.keys(LAB_FIELD_UNUSED_REASON).sort();
+    expect(measuredUnused.sort()).toEqual(tableKeys);
+  });
+
+  it('в таблице нет полей, которых нет в форме, и у каждой строки есть причина', () => {
+    const formKeys = new Set(fields.map(f => `${f.panel}|${f.marker}`));
+    for (const [key, reason] of Object.entries(LAB_FIELD_UNUSED_REASON)) {
+      expect(formKeys.has(key), `нет такого поля формы: ${key}`).toBe(true);
+      expect(reason.trim().length, `пустая причина у ${key}`).toBeGreaterThan(3);
+    }
+  });
+
+  it('баннер считает только заполненные поля и не называет прочитанные', () => {
+    const filled = {
+      date: '2026-10-01',
+      panelHematology: { Neutrophils: '4.2', HCT: '46' },
+      panelTumor: { CEA: '1.1' },
+      panelUrinalysis: { Nitrite: 'отр.' },
+    } as any;
+    const rows = unusedLabFields(filled);
+    expect(rows.map(r => r.key).sort()).toEqual([
+      'panelHematology|Neutrophils',
+      'panelTumor|CEA',
+      'panelUrinalysis|Nitrite',
+    ]);
+    // Прочитанное поле не попадает в список, даже если заполнено.
+    expect(rows.some(r => r.marker === 'HCT')).toBe(false);
+  });
+
+  it('пустой бланк — пустой список (не «всё не читается»)', () => {
+    expect(unusedLabFields(null)).toHaveLength(0);
+    expect(unusedLabFields({ date: '' } as any)).toHaveLength(0);
+  });
+});
