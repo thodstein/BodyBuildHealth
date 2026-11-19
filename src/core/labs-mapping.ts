@@ -680,6 +680,19 @@ export function interpretRatio(ratio: number | null): string {
   return 'Сильно выше нормы';
 }
 
+/**
+ * Подпись «доля от нормы» для предпросмотра импорта.
+ *
+ * Проход 144: у обрезанного числа доля обрезана так же — «>1000» при верхней
+ * границе 400 это «не меньше 250%», а не 250%. При границе подписи нет: рядом
+ * уже стоит значение со знаком, и точный процент рядом с ним читался бы как
+ * измерение.
+ */
+export function ratioPercentLabel(ratio: number | null | undefined, bound?: '<' | '>'): string {
+  if (ratio == null || bound) return '';
+  return ` (${Math.round(ratio * 100)}%)`;
+}
+
 export function interpretScale(score: number): string {
   if (score < 0.2) return 'Отлично';
   if (score < 0.4) return 'Хорошо';

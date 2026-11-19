@@ -27,12 +27,13 @@ import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import LabsCatalogTab from './LabsScreen_parts/LabsCatalogTab';
+import { LabCompareLabel } from './LabsScreen_parts/LabCompareLabel';
 import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { describeOcrFailure, processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
-import { normalizedRatio, normalizeLabMeasurement } from '../../core/labs-mapping';
+import { normalizedRatio, normalizeLabMeasurement, ratioPercentLabel } from '../../core/labs-mapping';
 import { labValueLabel } from '../../core/lab-value-label';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
@@ -2437,15 +2438,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     const confidencePct = Math.round(confidence * 100);
                     const confidenceColor = confidencePct >= 90 ? '#22c55e' : confidencePct >= 70 ? '#eab308' : '#ef4444';
                     const dynamicRatio = normalizedRatio(lab.code, lab.value, lab.unit, profileAge, profileSex as 'male' | 'female');
-                    const ratioLabel = dynamicRatio != null ? ` (${Math.round(dynamicRatio * 100)}%)` : '';
+                    // Проход 144: процент от нормы у обрезанного числа — тоже не
+                    // измерение («>1000» при верхней 400 — «не меньше 250%»), поэтому
+                    // при границе он не печатается.
+                    const ratioLabel = ratioPercentLabel(dynamicRatio, lab.bound);
                     const existing = labs.find(l => l.code.toUpperCase() === lab.code.toUpperCase());
-                    const compareLabel = existing ? (() => {
-                      const delta = lab.value - existing.value;
-                      const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
-                      const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
-                      const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : '#fff';
-                      return <span style={{ fontSize:11, color, fontWeight:700, marginLeft:6, whiteSpace:'nowrap' }}>{arrow} {labValueLabel(existing.value, existing.bound)} → {labValueLabel(lab.value, lab.bound)} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
-                    })() : null;
+                    // Проход 144: «было → стало» считает разность по общему правилу
+                    // (core/lab-bound): у обрезанных чисел ни стрелки, ни процента.
+                    const compareLabel = existing ? <LabCompareLabel existing={existing} next={lab} /> : null;
                     return (
                       <React.Fragment key={lab.code}>
                         <button onClick={() => toggleLabSelection(lab.code)} aria-pressed={isSelected} style={{

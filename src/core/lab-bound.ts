@@ -13,6 +13,10 @@
  * отклонения), повторное сохранение панели (знак терялся вместе с записью).
  * Один модуль — одно толкование знака, чтобы импорт, дневник и выгрузка не
  * спорили друг с другом.
+ *
+ * Проход 144: сюда же переехало «можно ли печатать разность» — «>800 → >1000»
+ * это не «+200», поэтому ни стрелка, ни процент по обрезанным числам не
+ * считаются (экраны «было → стало»).
  */
 
 /** Знак границы, как он напечатан в бланке. */
@@ -84,4 +88,34 @@ export function keptBound(
 ): LabBound | undefined {
   if (!existing?.bound) return undefined;
   return Math.abs(existing.value - value) < 1e-9 ? existing.bound : undefined;
+}
+
+/**
+ * Можно ли печатать разность двух записей.
+ *
+ * Проход 144: разность доказывается только у двух точных чисел. «>800 → >1000»
+ * значит «стало не меньше 1000», а не «+200»: нижняя граница прошлой записи
+ * ничего не говорит о её истинном значении. Одна граница с любой стороны — уже
+ * не разность, а неизвестность.
+ */
+export function boundsComparable(a?: LabBound, b?: LabBound): boolean {
+  return !a && !b;
+}
+
+/**
+ * Направление и процент изменения между двумя записями — для экранов
+ * («было → стало»).
+ *
+ * При границе не печатается ни стрелка, ни процент: сторона и величина не
+ * доказаны. Нулевое прошлое значение процента не даёт (делить не на что), но
+ * направление остаётся.
+ */
+export function labDelta(
+  existing: { value: number; bound?: LabBound },
+  next: { value: number; bound?: LabBound },
+): { arrow: '↑' | '↓' | '→' | ''; pct: number | null } {
+  if (!boundsComparable(existing.bound, next.bound)) return { arrow: '', pct: null };
+  const delta = next.value - existing.value;
+  const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
+  return { arrow: delta > 0 ? '↑' : delta < 0 ? '↓' : '→', pct };
 }
