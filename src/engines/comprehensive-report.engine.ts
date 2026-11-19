@@ -64,6 +64,15 @@ export interface ReportMetric {
   deltaPct?: number | null;
   trend?: 'up' | 'down' | 'stable' | 'new' | 'no_data';
   status?: 'normal' | 'warning' | 'critical' | 'info';
+  /**
+   * Проход 154: почему вердикта по норме нет.
+   *
+   * `'bound'` — число обрезано границей, и она не доказывает сторону («СРБ <0.5»
+   * при норме 0–5). `'no_norm'` — нормы для маркера нет вовсе. Раньше статус
+   * просто отсутствовал, а HTML печатал серое «—»: в отчёте для врача запись
+   * выглядела как «смотреть нечего», а не как «вердикта нет».
+   */
+  unproven?: 'bound' | 'no_norm';
   sparkline?: number[];
   note?: string;
 }
@@ -170,26 +179,37 @@ export function assignStatus(metric: ReportMetric): void {
     return;
   }
   const cur = typeof metric.current === 'number' ? metric.current : parseFloat(String(metric.current));
-  if (!isNaN(cur) && metric.refLow != null && metric.refHigh != null) {
+  const low = metric.refLow ?? undefined;
+  const high = metric.refHigh ?? undefined;
+  if (!isNaN(cur) && (low !== undefined || high !== undefined)) {
     // Проход 143: у обрезанного числа сторона берётся из знака. «>5» при норме
     // 30–400 — не «в норме» и не «ниже нормы»: истинное значение может быть
     // любым. «>400» при верхней 400 — уже высокое (сравнение нестрогое).
     const side = metric.bound
-      ? boundProvesSide(metric.bound, cur, metric.refLow, metric.refHigh)
+      ? boundProvesSide(metric.bound, cur, low, high)
       : undefined;
+    // Проход 154: норма бывает односторонней (у общего холестерина есть только
+    // верх). Раньше такой маркер вовсе не получал вердикта — точное 4.5 при
+    // верхней 5.2 печаталось серым «—», будто анализ не читался.
+    const outOfRange = (low !== undefined && cur < low) || (high !== undefined && cur > high);
+    const farOut = (low !== undefined && cur < low * 0.7) || (high !== undefined && cur > high * 1.3);
     if (metric.bound) {
       if (side) {
-        metric.status = (cur < metric.refLow * 0.7 || cur > metric.refHigh * 1.3) ? 'critical' : 'warning';
+        metric.status = farOut ? 'critical' : 'warning';
       }
       // Нет доказанной стороны — сравнение числа с нормой не наш вердикт.
-    } else if (cur < metric.refLow || cur > metric.refHigh) {
-      metric.status = (cur < metric.refLow * 0.7 || cur > metric.refHigh * 1.3) ? 'critical' : 'warning';
+    } else if (outOfRange) {
+      metric.status = farOut ? 'critical' : 'warning';
     } else {
       metric.status = 'normal';
     }
   }
   if (metric.status == null && metric.deltaPct != null) {
     metric.status = Math.abs(metric.deltaPct) > 20 ? 'warning' : 'normal';
+  }
+  // Проход 154: молчаливого «—» больше нет — запись без вердикта называет себя.
+  if (metric.status == null && Number.isFinite(cur)) {
+    metric.unproven = metric.bound ? 'bound' : 'no_norm';
   }
 }
 

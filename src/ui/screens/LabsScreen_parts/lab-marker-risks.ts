@@ -31,12 +31,28 @@ export interface MarkerDeviation {
   system: string;
 }
 
+/** Запись без вердикта: почему сторона не доказана (проход 154). */
+export interface MarkerUnknown {
+  code: string;
+  value: number;
+  bound?: LabBound;
+  /** `bound` — граница не доказывает сторону; `no_norm` — нормы маркера нет. */
+  reason: 'bound' | 'no_norm';
+}
+
 export interface MarkerRiskSummary {
   markerDeviations: MarkerDeviation[];
   /** Сколько маркеров доказанно в норме. */
   normalCount: number;
   /** Сколько маркеров без вывода: обрезано или норма неизвестна. */
   unknownCount: number;
+  /**
+   * Проход 154: сами записи без вывода (не только счётчик) — чтобы тексты,
+   * копия и CSV могли назвать код и причину, а не печатать «—» без объяснения.
+   */
+  unknown: MarkerUnknown[];
+  /** Коды маркеров, доказанно попавших в норму (для табличных выгрузок). */
+  normalCodes: string[];
 }
 
 interface MarkerInput {
@@ -57,6 +73,8 @@ export function computeMarkerDeviations(
   sex: 'male' | 'female',
 ): MarkerRiskSummary {
   const markerDeviations: MarkerDeviation[] = [];
+  const unknown: MarkerUnknown[] = [];
+  const normalCodes: string[] = [];
   let normalCount = 0;
   let unknownCount = 0;
 
@@ -64,7 +82,7 @@ export function computeMarkerDeviations(
     // P0 fix: HbA1c кейс — HBA1C vs HbA1c
     const ref = (UCUM_MAP as any)[lab.code] || (UCUM_MAP as any)[lab.code.toUpperCase()] || (UCUM_MAP as any)[lab.code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === String(lab.code).toLowerCase())?.[1] as any);
     // Проход 147: маркер без нормы не «в норме» — норма неизвестна.
-    if (!ref) { unknownCount += 1; continue; }
+    if (!ref) { unknownCount += 1; unknown.push({ code: lab.code, value: lab.value, bound: lab.bound, reason: 'no_norm' }); continue; }
     const coeff = ref.coeff || 1;
     // Проход 93: если единица бланка известна, число и диапазон бланка приводятся
     // к единице приложения одним множителем (`normalizeLabMeasurement`): HGB
@@ -84,8 +102,9 @@ export function computeMarkerDeviations(
     // уходит в «без вывода», а не в «норму».
     const side = boundProvesSide(lab.bound, norm, lln, uln);
     if (!side) {
-      if (lab.bound || uln === undefined || lln === undefined) unknownCount += 1;
-      else normalCount += 1;
+      if (lab.bound) { unknownCount += 1; unknown.push({ code: lab.code, value: lab.value, bound: lab.bound, reason: 'bound' }); }
+      else if (uln === undefined || lln === undefined) { unknownCount += 1; unknown.push({ code: lab.code, value: lab.value, reason: 'no_norm' }); }
+      else { normalCount += 1; normalCodes.push(lab.code); }
       continue;
     }
     // Процент считается только у точного числа: у обрезанного он был бы
@@ -93,7 +112,7 @@ export function computeMarkerDeviations(
     let deviation: number | null = null;
     if (!lab.bound) {
       deviation = side === 'high' ? (norm - uln) / uln : -((lln - norm) / lln);
-      if (Math.abs(deviation) <= 0.01) { normalCount += 1; continue; }
+      if (Math.abs(deviation) <= 0.01) { normalCount += 1; normalCodes.push(lab.code); continue; }
     }
     let sys = 'other';
     for (const [s, codes] of Object.entries(LABS_SYSTEM_GROUPS)) {
@@ -116,5 +135,5 @@ export function computeMarkerDeviations(
     return Math.abs(b.deviation) - Math.abs(a.deviation);
   });
 
-  return { markerDeviations, normalCount, unknownCount };
+  return { markerDeviations, normalCount, unknownCount, unknown, normalCodes };
 }

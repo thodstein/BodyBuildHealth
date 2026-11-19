@@ -75,3 +75,28 @@ describe('проход 147: порядок и неизвестные марке�
     expect(r.unknownCount).toBe(1);
   });
 });
+
+describe('проход 154: без вывода называется записью, а не счётчиком', () => {
+  it('«<500» при верхней 300 — в списке unknown с причиной «bound»', () => {
+    const r = computeMarkerDeviations([ferritin(500, { bound: '<' })], 'male');
+    expect(r.unknown).toEqual([{ code: 'FERRITIN', value: 500, bound: '<', reason: 'bound' }]);
+    expect(r.unknown).toHaveLength(r.unknownCount);
+  });
+
+  it('маркер без нормы — причина «no_norm»', () => {
+    const r = computeMarkerDeviations([{ code: 'ZZZ_UNKNOWN', value: 1 }], 'male');
+    expect(r.unknown).toEqual([{ code: 'ZZZ_UNKNOWN', value: 1, bound: undefined, reason: 'no_norm' }]);
+  });
+
+  it('доказанная норма попадает в normalCodes', () => {
+    const r = computeMarkerDeviations([ferritin(200)], 'male');
+    expect(r.normalCodes).toEqual(['FERRITIN']);
+    expect(r.unknown).toEqual([]);
+  });
+
+  it('доказанное отклонение в unknown не попадает', () => {
+    const r = computeMarkerDeviations([ferritin(1000, { bound: '>' })], 'male');
+    expect(r.unknown).toEqual([]);
+    expect(r.normalCodes).toEqual([]);
+  });
+});

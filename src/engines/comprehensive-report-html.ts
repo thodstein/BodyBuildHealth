@@ -5,7 +5,12 @@ import type { LabBound } from '../core/lab-bound';
 export function generateComprehensiveReportHTML(report: ComprehensiveReport): string {
   const { meta, sections, support, userNotes, recommendations, photos, trends } = report;
 
-  const statusBadge = (status?: string) => {
+  const statusBadge = (status?: string, unproven?: 'bound' | 'no_norm') => {
+    // Проход 154: запись без вердикта называется, а не тонет в сером «—».
+    if (unproven) {
+      const text = unproven === 'bound' ? 'БЕЗ ВЫВОДА' : 'НЕТ НОРМЫ';
+      return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#64748b1a;color:#64748b;border:1px solid #64748b44;">${text}</span>`;
+    }
     if (!status || status === 'info') return '<span style="color:#94a3b8;font-size:10px;">—</span>';
     const map: Record<string, string> = { normal: 'НОРМА', warning: 'ВНИМАНИЕ', critical: 'КРИТИЧНО', info: 'ИНФО' };
     const colorMap: Record<string, string> = { normal: '#22c55e', warning: '#f59e0b', critical: '#ef4444', info: '#94a3b8' };
@@ -45,13 +50,24 @@ export function generateComprehensiveReportHTML(report: ComprehensiveReport): st
   };
 
   const sectionsHTML = sections.map(section => {
+    const unprovenBound = section.metrics.filter(m => m.unproven === 'bound').length;
+    const unprovenNorm = section.metrics.filter(m => m.unproven === 'no_norm').length;
+    const unprovenTotal = unprovenBound + unprovenNorm;
+    // Проход 154: «запись без вывода» не исчезает из отчёта — под таблицей
+    // печатается счётчик с причиной, иначе «—» в статусе читается как «норма».
+    const unprovenNote = unprovenTotal > 0
+      ? `<div data-lab-unproven="${unprovenTotal}" style="font-size:9pt;color:#64748b;margin-top:4pt;">Без вывода: ${[
+          unprovenBound > 0 ? `${unprovenBound} — граница бланка не доказывает сторону` : '',
+          unprovenNorm > 0 ? `${unprovenNorm} — норма для маркера не найдена` : '',
+        ].filter(Boolean).join('; ')}</div>`
+      : '';
     const metricsHTML = section.metrics.map(m => `
       <tr>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;">${m.label}</td>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${formatLabVal(m.prev, m.prevBound)}</td>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;font-weight:600;">${formatLabVal(m.current, m.bound)}${deltaArrow(m)}</td>
         <td style="padding:4px 8px;border:1px solid #ddd;font-size:10pt;text-align:center;">${deltaStr(m)}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;text-align:center;">${statusBadge(m.status)}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;text-align:center;">${statusBadge(m.status, m.unproven)}</td>
       </tr>
     `).join('');
 
@@ -70,6 +86,7 @@ export function generateComprehensiveReportHTML(report: ComprehensiveReport): st
           </thead>
           <tbody>${metricsHTML}</tbody>
         </table>
+        ${unprovenNote}
       </div>
     `;
   }).join('');

@@ -472,8 +472,8 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     // Проход 147: список отклонений считает отдельный модуль — одно правило
     // стороны на всё приложение (`boundProvesSide`), процент только у точных
     // чисел, «без вывода» отдельным счётчиком.
-    const { markerDeviations, normalCount, unknownCount } = computeMarkerDeviations(currentLabs, profileSex as 'male' | 'female');
-    return { overallNet, systemBreakdown, markerDeviations, normalCount, unknownCount };
+    const { markerDeviations, normalCount, unknownCount, unknown, normalCodes } = computeMarkerDeviations(currentLabs, profileSex as 'male' | 'female');
+    return { overallNet, systemBreakdown, markerDeviations, normalCount, unknownCount, unknown, normalCodes };
   }, [hasLabs, labs, currentLabs, profileSex]);
 
   const labIndexDetails = useMemo(() => {
@@ -730,6 +730,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
   const deviationCount = labRisks?.markerDeviations?.length ?? 0;
+  // Проход 154: вердикт для копии/CSV/архива считается по тем же записям, что
+  // печатаются (весь склад, а не текущий срез), и тем же единственным модулем
+  // отклонений — своей копии правила здесь нет.
+  const reportVerdicts = useMemo(() => {
+    const summary = computeMarkerDeviations((labs || []) as any, profileSex as 'male' | 'female');
+    const map = new Map<string, string>();
+    for (const d of summary.markerDeviations) map.set(d.code.toLowerCase(), d.side === 'high' ? 'выше нормы' : 'ниже нормы');
+    for (const u of summary.unknown) map.set(u.code.toLowerCase(), 'без вывода');
+    for (const code of summary.normalCodes) map.set(code.toLowerCase(), 'в норме');
+    return { map, unprovenCount: summary.unknownCount, deviationCount: summary.markerDeviations.length };
+  }, [labs, profileSex]);
+  const labVerdict = (code: string): string => reportVerdicts.map.get(String(code).toLowerCase()) ?? '';
 
   const sysColors: Record<string, string> = {
     hepatic: '#22c55e', renal: '#3b82f6', endocrine: '#a855f7',
@@ -1358,9 +1370,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   const r = {
                     id: Date.now().toString(),
                     date: localIsoDate(),
-                    labs: (labs || []).map((l: any) => ({ code: l.code, name: l.name || l.code, value: l.value, unit: l.unit, date: l.date })),
+                    // Проход 154: знак границы едет в архив — иначе сохранённый
+                    // отчёт печатал «1000» вместо «>1000» (точное измерение,
+                    // которого в бланке не было).
+                    labs: (labs || []).map((l: any) => ({ code: l.code, name: l.name || l.code, value: l.value, unit: l.unit, date: l.date, bound: l.bound, verdict: labVerdict(l.code) })),
                     totalMarkers: labs.length,
-                    abnormalCount: deviationCount,
+                    abnormalCount: reportVerdicts.deviationCount,
+                    unprovenCount: reportVerdicts.unprovenCount,
                     timestamp: Date.now(),
                     trends: {
                       summary: report.summary,
@@ -1382,7 +1398,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <span style={{ fontSize:14, fontWeight:800, color:LABS_ACCENT }}>✅ Отчёт сгенерирован</span>
                     <span style={{ fontSize:11, color:'#fff' }}>{new Date().toLocaleString()}</span>
                   </div>
-                  <div style={{ fontSize:12, color:'#fff' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
+                  <div style={{ fontSize:12, color:'#fff' }}><b>Маркеров:</b> {labs.length} ({reportVerdicts.deviationCount} с откл.{reportVerdicts.unprovenCount > 0 ? `, ${reportVerdicts.unprovenCount} без вывода` : ''})</div>
                   <div style={{ maxHeight:200, overflowY:'auto', marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                     {labs.map((l:any,i:number) => (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(140,190,255,0.10)', fontSize:12, color:'#fff', minHeight:44 }}>
@@ -1393,11 +1409,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
                   <div style={{ display:'flex', gap:8, marginTop:10, flexWrap:'wrap' }}>
                     <button onClick={() => {
-                      const txt = `Анализы ${localIsoDate()} · ${ruCount(labs.length, RU_MARKERS)} (${deviationCount} с откл.)\n` + labs.map((l: any) => `${l.name || l.code}: ${labValueLabel(l.value, l.bound)} ${l.unit || ''} (${l.date || ''})`).join('\n');
+                      const txt = `Анализы ${localIsoDate()} · ${ruCount(labs.length, RU_MARKERS)} (${reportVerdicts.deviationCount} с откл.${reportVerdicts.unprovenCount > 0 ? `, ${reportVerdicts.unprovenCount} без вывода` : ''})\n` + labs.map((l: any) => {
+                        const verdict = labVerdict(l.code);
+                        return `${l.name || l.code}: ${labValueLabel(l.value, l.bound)} ${l.unit || ''} (${l.date || ''})${verdict ? ` — ${verdict}` : ''}`;
+                      }).join('\n');
                       void copyOrShareText(txt, 'Анализы').then(o => flashShare(shareOutcomeLabel(o)));
                     }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.30)', color:'#fff' }}>📋 Копия / Share</button>
                     <button onClick={() => {
-                      const csv = 'code;name;value;unit;date\n' + labs.map((l: any) => `${l.code};${(l.name || l.code).replace(/;/g, ',')};${labValueLabel(l.value, l.bound)};${l.unit || ''};${l.date || ''}`).join('\n');
+                      const csv = 'code;name;value;unit;date;verdict\n' + labs.map((l: any) => `${l.code};${(l.name || l.code).replace(/;/g, ',')};${labValueLabel(l.value, l.bound)};${l.unit || ''};${l.date || ''};${labVerdict(l.code)}`).join('\n');
                       void saveCsvApk(`labs-${localIsoDate()}.csv`, csv).then(o => flashShare(shareOutcomeLabel(o)));
                     }} style={{ flex:1, minHeight:44, padding:'10px 14px', borderRadius:12, cursor:'pointer', fontWeight:800, fontSize:12, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff' }}>📥 CSV</button>
                   </div>
@@ -1411,7 +1430,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:14, padding:'12px 12px', marginBottom:8, background: selectedArchivedLabReport?.id === r.id ? 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)' : 'linear-gradient(180deg, rgba(21,38,66,0.60), rgba(12,23,40,0.60))', border:'1px solid rgba(140,190,255,0.12)', borderLeft:`3px solid ${LABS_ACCENT}`, fontSize:12, cursor:'pointer', minHeight:52 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                         <span style={{ color:LABS_ACCENT, fontWeight:800, fontSize:13 }}>{r.date}</span>
-                        <span style={{ color:'#fff', fontSize:12 }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
+                        <span style={{ color:'#fff', fontSize:12 }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.{r.unprovenCount ? ` · ${r.unprovenCount} без вывода` : ''}</span>
                       </div>
                       {selectedArchivedLabReport?.id === r.id && (
                         <div style={{ marginTop:8, padding:10, background:'rgba(0,0,0,0.20)', borderRadius:10 }}>
@@ -1419,7 +1438,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           {(r.labs||[]).map((l:any, i:number) => (
                             <div key={i} style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:12, padding:'4px 0', color:'#fff' }}>
                               <span>{l.name || l.code}</span>
-                              <span style={{ fontWeight:700 }}>{labValueLabel(l.value, l.bound)} {l.unit}</span>
+                              <span style={{ fontWeight:700 }}>{labValueLabel(l.value, l.bound)} {l.unit}{l.verdict ? ` · ${l.verdict}` : ''}</span>
                             </div>
                           ))}
                           {r.trends && (
