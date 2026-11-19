@@ -1,7 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback } from 'react';
 import type { CalculatorState, CalculatorResult, LabSlice, LabFlagOverride } from '../../../engines/support-plan';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
-import { calculateSupportTZ, hydrateState, flagLevelRu } from '../../../engines/support-plan';
+import { calculateSupportTZ, hydrateState, flagLevelRu, labFieldNumber } from '../../../engines/support-plan';
 import { PHARMA_DB, PHARMA_CLASSES } from '../../../core/pharma-database';
 import { getProfile } from '../../../core/profile-manager';
 import { GLASS, BADGE, DEFAULT_STATE, normalizeCalculatorState } from './Calc.types';
@@ -16,7 +16,7 @@ import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
 import { currentLabSlice } from '../../../engines/support-plan/lab-slice';
 import { ruMarker, labBoundNotes } from './Calc.lab';
-import { unusedLabFields } from './Calc.lab-coverage';
+import { unusedLabFields, labUnreadNotes } from './Calc.lab-coverage';
 import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
@@ -47,10 +47,12 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         // Проход 128: сказать «единица не указана» мало — надо назвать число, с которым
         // движок реально работает. Догадка по величине могла его пересчитать, и тогда
         // «500» в бланке превратилось в 136 пг/мл без всякого следа на экране.
-        const raw = Number(String(markers[marker]).replace(',', '.'));
+        // Проход 141: число берём тем же правилом, что и движок, — иначе «>1000» или
+        // «1 000» превращались здесь в NaN, и подсказка молчала о прочитанном значении.
+        const raw = labFieldNumber(markers[marker]);
         const canon = LAB_READ_UNIT[marker] || '';
-        const read = Number.isFinite(raw) ? readLabValue(marker, raw, undefined, sex).value : undefined;
-        const text = read !== undefined && read !== raw && canon
+        const read = raw !== undefined ? readLabValue(marker, raw, undefined, sex).value : undefined;
+        const text = read !== undefined && raw !== undefined && read !== raw && canon
           ? `${ruMarker(marker)} ${raw} → ${read} ${canon}`
           : `${ruMarker(marker)}${canon ? ` · ${canon}` : ''}`;
         out.push({ marker, text });
@@ -76,6 +78,15 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const unusedFields = useMemo(() => {
     const slice = currentLabSlice(state.labs);
     return unusedLabFields(slice);
+  }, [state.labs]);
+  /**
+   * Проход 141: поле читается моделью, но из записи не вышло числа. Это опаснее
+   * пустого поля: человек видит заполненную ячейку и считает, что показатель учтён,
+   * а расчёт его не видит вовсе («повышен», «1+» в белке мочи).
+   */
+  const unreadFields = useMemo(() => {
+    const slice = currentLabSlice(state.labs);
+    return labUnreadNotes(slice);
   }, [state.labs]);
   const [fillStatus, setFillStatus] = useState('');
   const [labDerivedFields, setLabDerivedFields] = useState<string[]>([]);
@@ -757,6 +768,27 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
           <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
             {unitMissing.map(u => u.text).join(' · ')} — прочитано по величине. Выберите единицу
             в бланке анализов, иначе вердикт может быть противоположным (пг/мл против пмоль/л).
+          </div>
+        </div>
+      )}
+
+      {/* Проход 141: запись есть, но числа в ней нет. Пустое поле и поле с «повышен»
+          расчёт видит одинаково — никак, — а человек видит заполненную ячейку. */}
+      {unreadFields.length > 0 && (
+        <div data-lab-unread style={{ ...GLASS, padding: '6px 10px', marginBottom: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 2 }}>
+            ⚠ Запись без числа — {unreadFields.length}
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.35 }}>
+            {unreadFields.map(f => (
+              <div key={f.key} data-lab-unread-field={f.key}>
+                • {ruMarker(f.marker)} «{f.text}» — {f.hint}
+              </div>
+            ))}
+            <div style={{ marginTop: 2 }}>
+              Для расчёта такое поле — незаполненное (это не «в норме»). Впишите число,
+              и показатель начнёт учитываться.
+            </div>
           </div>
         </div>
       )}

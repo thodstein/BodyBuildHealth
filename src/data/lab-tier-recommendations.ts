@@ -51,24 +51,34 @@ export interface TierAdjustmentResult {
   tierSummary: { marker: string; value: number; tier: Tier; label: string; unit: string }[];
 }
 
+/**
+ * Содержание одного шага правила (tier 1/2/3).
+ *
+ * Проход 141: шкала бывает двусторонней (`direction:'both'`: ферритин, тромбоциты,
+ * калий, МНО…), а текст правила почти всегда написан для одной стороны. Тогда
+ * `tier1`/`tier2`/`tier3` — это основная сторона (та, для которой правило писалось),
+ * а `low`/`high` — явное содержание для другой. Без явного блока другая сторона
+ * получает основное содержание: ферритин 500 (перегрузка) получал «железо 30 мг»,
+ * а тромбоциты 120 (тромбоцитопения) — «натокиназа 200 мг + чеснок».
+ */
+interface TierStepContent {
+  add?: Array<[string, string, string?]>;          // [id, reason, dose]
+  titrate?: Array<[string, number, string]>;       // [id, factor, reason]
+  nutrition?: Array<[string, string]>;             // [action, target]
+  note?: string;
+  alerts?: string[];
+  stopCourse?: boolean;
+  /** Содержание для НИЗКОЙ стороны двусторонней шкалы. */
+  low?: TierStepContent;
+  /** Содержание для ВЫСОКОЙ стороны двусторонней шкалы. */
+  high?: TierStepContent;
+}
+
 interface TierRule {
   marker: string;
-  tier1?: {
-    add?: Array<[string, string, string?]>;        // [id, reason, dose]
-    titrate?: Array<[string, number, string]>;     // [id, factor, reason]
-    nutrition?: Array<[string, string]>;           // [action, target]
-  };
-  tier2?: {
-    add?: Array<[string, string, string?]>;
-    titrate?: Array<[string, number, string]>;
-    nutrition?: Array<[string, string]>;
-    note?: string;
-  };
-  tier3?: {
-    alerts: string[];
-    stopCourse?: boolean;
-    nutrition?: Array<[string, string]>;
-  };
+  tier1?: TierStepContent;
+  tier2?: TierStepContent;
+  tier3?: TierStepContent;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -112,7 +122,10 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'HEMOGLOBIN', tier1: { nutrition: [['Вода', '40+ мл/кг'], ['STOP iron', 'ZERO']] }, tier2: { add: [['serrapeptase', 'Serrapeptase 20 мг'], ['nattokinase', 'Nattokinase 200 мг']], nutrition: [['Кровопускание', '300-450 мл'], ['STOP iron', 'ZERO']] }, tier3: { alerts: ['⛔ Гемоглобин = {value} g/L — полицитемия. Кровопускание + STOP AAS.'], stopCourse: true } },
 
-  { marker: 'PLT', tier1: { nutrition: [['Omega-3', '↑3 г']] }, tier2: { add: [['garlic', 'Чеснок 1200 мг — ↓ aggregation'], ['omega3', 'Омега-3 4 г'], ['nattokinase', 'Nattokinase 200 мг']], nutrition: [['STOP smoking', 'ZERO']] }, tier3: { alerts: ['Тромбоциты = {value}×10⁹/L — тромбоцитоз. Кардиолог/гематолог.'] } },
+  // Проход 141: шкала двусторонняя (норма 150–350, экстренно низко — <100), а правило
+  // написано для высокой стороны. Раньше тромбоциты 120 («лечение» по низкой стороне)
+  // получали чеснок + омега-3 + натокиназу — антиагреганты при тромбоцитопении.
+  { marker: 'PLT', tier1: { nutrition: [['Omega-3', '↑3 г']], low: { nutrition: [['Не антиагреганты', 'при тромбоцитопении омега-3/чеснок/натокиназа не добавляются'], ['Контроль', 'повторить ОАК через 2–4 недели']] } }, tier2: { add: [['garlic', 'Чеснок 1200 мг — ↓ aggregation'], ['omega3', 'Омега-3 4 г'], ['nattokinase', 'Nattokinase 200 мг']], nutrition: [['STOP smoking', 'ZERO']], low: { nutrition: [['Не антиагреганты', 'чеснок/омега-3/натокиназа при низких тромбоцитах не добавляются'], ['Врач', 'гематолог: причина тромбоцитопении (вирус, лекарства, алкоголь)']] } }, tier3: { alerts: ['Тромбоциты = {value}×10⁹/L — тромбоцитоз. Кардиолог/гематолог.'], low: { alerts: ['Тромбоциты = {value}×10⁹/L — тромбоцитопения. Риск кровотечения: гематолог/ER. Антиагреганты не добавлять.'] } } },
 
   // ─── ГОРМОНАЛЬНЫЕ ───
   { marker: 'E2', tier1: { titrate: [['anastrozole', 1.5, 'Anastrozole 0.25-0.5 мг 1р/нед, контроль через 14 дней (♂ цель 20-40 пг/мл; ♀ — не подавлять)']], nutrition: [['Контроль E2', 'Повторить через 14 дней']] }, tier2: { titrate: [['anastrozole', 2.0, 'Anastrozole 0.25-0.5 мг 2р/нед макс. (шаг +0.25 мг; 1 мг/день НЕ применять)']], nutrition: [['Срочно сдать E2', 'Повтор через 14 дней']] }, tier3: { alerts: ['⛔ Эстрадиол = {value} pg/mL — риск гинекомастии. AI титрацией (макс. 0.5 мг 2р/нед) + короткая связка с SERM (tamoxifen 20 мг) 2-4 нед при острой гинекомастии. Срочно к врачу.'] } },
@@ -138,7 +151,9 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'CRP', tier1: { add: [['curcumin', 'Curcumin 500 мг + Piperine — ↓ NF-κB'], ['berberine', 'Берберин 1000 мг — AMPK + ↓ цитокины']], nutrition: [['↑ рыба', '3×/нед'], ['↑ полифенолы', 'ягоды/куркума']] }, tier2: { titrate: [['curcumin', 2.0, 'Curcumin ↑1000 мг'], ['berberine', 1.5, 'Берберин ↑1500 мг']], add: [['omega3', 'Омакор (очищенный ЭПК) 2-4 г — только при ТГ/аритмии']], nutrition: [['STOP alcohol', 'ZERO'], ['Sleep', '8+ ч']] }, tier3: { alerts: ['СРБ = {value} mg/L — выраженное воспаление. Врач. Исключить инфекцию/сепсис.'] } },
 
-  { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']] }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']] }, tier3: { alerts: ['Ферритин = {value} ng/mL — избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо.'] } },
+  // Проход 141: шкала двусторонняя (норма 30–400), а тиры 1–2 написаны для низкой
+  // стороны. Ферритин 500 (перегрузка) получал «железо 30 мг», 700 — «железо 60 мг».
+  { marker: 'FERRITIN', tier1: { add: [['iron_bisglycinate', 'Iron bisglycinate 30 мг'], ['vitamin_c', 'VitC 500 мг (↑ всасывание железа ×3)']], nutrition: [['Вместе с мясом', 'Heme-iron'], ['STOP tea/coffee', '1 час до/после еды']], high: { nutrition: [['Не железо', 'железо и высокие дозы VitC не добавляем'], ['Врач', 'гематолог: причина перегрузки (гемохроматоз, трансфузии, приём железа)']] } }, tier2: { titrate: [['iron_bisglycinate', 2.0, 'Iron ↑60 мг']], add: [['vitamin_c', 'VitC 1000 мг']], nutrition: [['Врач', 'Гастро/гематолог']], high: { nutrition: [['Не железо', 'железо не добавляем'], ['Контроль', 'ферритин + насыщение трансферрина (TSAT), повтор через 4–6 недель'], ['Врач', 'гематолог — перегрузка железом']] } }, tier3: { alerts: ['Ферритин = {value} ng/mL — избыток железа. Гематолог (исключить гемохроматоз); НЕ назначать железо.'], low: { alerts: ['Ферритин = {value} ng/mL — глубокий дефицит железа (запасов нет). Врач-гематолог/гастроэнтеролог: искать источник кровопотери; железо — по назначению врача.'] } } },
 
   // ─── ВИТАМИНЫ/МИНЕРАЛЫ ───
   { marker: 'VITAMIN_D', tier1: { titrate: [['vitamin_d3', 2.0, 'D3 ↑10000 МЕ (база 2000)'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '15 мин/день']] }, tier2: { titrate: [['vitamin_d3', 4.0, 'D3 ↑20000 МЕ'], ['vitamin_k2', 2.0, 'K2 ↑200 мкг']], nutrition: [['Солнце', '20 мин/день']] }, tier3: { alerts: ['D3 = {value} ng/mL — тяжёлый дефицит. Врач. Высокие дозы под контролем.'] } },
@@ -193,7 +208,9 @@ const TIER_RULES: TierRule[] = [
 
   { marker: 'IRON', tier1: { nutrition: [['Красное мясо', 'Heme-iron'], ['Витамин C', '500 мг с едой']] }, tier2: { add: [['iron_bisglycinate', 'Железо бисглицинат 30 мг'], ['vitamin_c', 'Витамин C 500 мг']] }, tier3: { alerts: ['Железо = {value} — тяжёлый дефицит. Гематолог.'] } },
 
-  { marker: 'CALCIUM', tier1: { nutrition: [['Молочные', '500 мг Ca с едой'], ['Витамин D', 'Проверить D3']] }, tier2: { add: [['vitamin_d3', 'D3 2000 МЕ'], ['vitamin_k2', 'K2 200 мкг']] }, tier3: { alerts: ['Кальций = {value} — нарушение кальциевого обмена. Врач.'] } },
+  // Проход 141: высокий кальций (2.6–3.0) получал «молочные + витамин D3 + K2» — то же,
+  // что и низкий. Высокая сторона теперь говорит своё.
+  { marker: 'CALCIUM', tier1: { nutrition: [['Молочные', '500 мг Ca с едой'], ['Витамин D', 'Проверить D3']], high: { nutrition: [['Не витамин D', 'при высоком кальции D3 не повышаем'], ['Контроль', 'кальций + ПТГ повтор через 2–4 недели']] } }, tier2: { add: [['vitamin_d3', 'D3 2000 МЕ'], ['vitamin_k2', 'K2 200 мкг']], high: { nutrition: [['Не витамин D/K', 'добавки D3/K2 при гиперкальциемии не добавляются'], ['Врач', 'эндокринолог: ПТГ, исключить гиперпаратиреоз'], ['Вода', 'достаточный питьевой режим']] } }, tier3: { alerts: ['Кальций = {value} — нарушение кальциевого обмена. Врач.'] } },
 
   { marker: 'PHOSPHORUS', tier1: { nutrition: [['Контроль', 'Повтор через 4 нед']] }, tier2: { nutrition: [['Врач', 'Нефролог/эндокринолог']] }, tier3: { alerts: ['Фосфор = {value} ммоль/л — нарушение. Врач.'] } },
 
@@ -437,50 +454,64 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
       continue;
     }
 
-    if (tier === 1 && rule.tier1) {
-      if (rule.tier1.add) {
-        for (const [id, reason, dose] of rule.tier1.add) {
+    // Проход 141: шаг правила выбирается по стороне двусторонней шкалы. Основное
+    // содержание — для стороны, для которой правило писалось; `low`/`high` — явное
+    // исключение для другой стороны. Нет исключения — всё как раньше, поэтому
+    // односторонние шкалы (печень, липиды, витамины) не меняются.
+    const lowSide = !!tdef && (tdef.direction === 'low' || (tdef.direction === 'both' && !isHighSide));
+    const stepFor = (step: TierStepContent | undefined): TierStepContent | undefined => {
+      if (!step) return undefined;
+      const alt = lowSide ? step.low : step.high;
+      return alt ?? step;
+    };
+
+    const step1 = stepFor(rule.tier1);
+    if (tier === 1 && step1) {
+      if (step1.add) {
+        for (const [id, reason, dose] of step1.add) {
           addSubs.push({ id, reason, dose, tier, marker });
         }
       }
-      if (rule.tier1.titrate) {
-        for (const [id, factor, reason] of rule.tier1.titrate) {
+      if (step1.titrate) {
+        for (const [id, factor, reason] of step1.titrate) {
           titrations.push({ id, factor, reason, tier, marker });
         }
       }
-      if (rule.tier1.nutrition) {
-        for (const [action, target] of rule.tier1.nutrition) {
+      if (step1.nutrition) {
+        for (const [action, target] of step1.nutrition) {
           nutrition.push({ action, target, marker, tier });
         }
       }
     }
 
-    if (tier === 2 && rule.tier2) {
-      if (rule.tier2.add) {
-        for (const [id, reason, dose] of rule.tier2.add) {
+    const step2 = stepFor(rule.tier2);
+    if (tier === 2 && step2) {
+      if (step2.add) {
+        for (const [id, reason, dose] of step2.add) {
           addSubs.push({ id, reason, dose, tier, marker });
         }
       }
-      if (rule.tier2.titrate) {
-        for (const [id, factor, reason] of rule.tier2.titrate) {
+      if (step2.titrate) {
+        for (const [id, factor, reason] of step2.titrate) {
           titrations.push({ id, factor, reason, tier, marker });
         }
       }
-      if (rule.tier2.nutrition) {
-        for (const [action, target] of rule.tier2.nutrition) {
+      if (step2.nutrition) {
+        for (const [action, target] of step2.nutrition) {
           nutrition.push({ action, target, marker, tier });
         }
       }
     }
 
-    if (tier === 3 && rule.tier3) {
-      for (const alertTemplate of rule.tier3.alerts) {
+    const step3 = stepFor(rule.tier3);
+    if (tier === 3 && step3) {
+      for (const alertTemplate of step3.alerts ?? []) {
         const message = alertTemplate.replace('{value}', String(value));
-        alerts.push({ marker, value, tier, message, stopCourse: rule.tier3.stopCourse ?? false });
+        alerts.push({ marker, value, tier, message, stopCourse: step3.stopCourse ?? false });
       }
-      if (rule.tier3.stopCourse) stopCourse = true;
-      if (rule.tier3.nutrition) {
-        for (const [action, target] of rule.tier3.nutrition) {
+      if (step3.stopCourse) stopCourse = true;
+      if (step3.nutrition) {
+        for (const [action, target] of step3.nutrition) {
           nutrition.push({ action, target, marker, tier });
         }
       }

@@ -14,14 +14,37 @@
  *
  * Проход 136: функция одна и та же для риск-модели (`extractLabValues`) и для
  * плана поддержки (`labSliceToValues`) — раньше правило жило копией в каждом.
+ *
+ * Проход 141: бланк печатает тысячи с пробелом — «Ферритин 1 000», «Тромбоциты
+ * 250 000». `parseFloat` обрывается на первом пробеле, и ферритин 1 000 читался
+ * как 1 (то есть как тяжёлый дефицит железа), а не как перегрузка. Разделитель
+ * тысяч теперь часть числа: группа из трёх цифр после пробела — это разряды, а не
+ * хвост строки. «5 5» (две группы по одной цифре) остаётся прежним чтением: это
+ * не число с разрядами, и угадывать за человека нельзя.
  */
+
+/** Неразрывные пробелы тоже встречаются в бланках (NBSP, узкий NBSP). */
+const THOUSANDS = /^(\d{1,3})((?:[ \u00A0\u202F]\d{3})+(?:[.,]\d+)?)(.*)$/;
+
 export function labFieldNumber(val: unknown): number | undefined {
   if (val === undefined || val === null || val === '') return undefined;
-  if (typeof val === 'string' && val.includes('+')) return undefined;
-  if (typeof val === 'string' && /^[<>≤≥]/.test(val.trim())) {
-    const bound = parseFloat(val.trim().replace(/^[<>≤≥]\s*/, '').replace(',', '.'));
-    return isNaN(bound) ? undefined : bound;
+  if (typeof val === 'number') return isNaN(val) ? undefined : val;
+  const raw = String(val).trim();
+  if (!raw) return undefined;
+  // Полоска «1+», «++» — не концентрация (проход 130), даже если рядом есть цифра.
+  if (raw.includes('+')) return undefined;
+
+  // Граница «>1000» читается как её число (проход 131), знак при этом отбрасывается.
+  const boundMatch = raw.match(/^[<>≤≥]\s*(.+)$/);
+  const body = boundMatch ? boundMatch[1] : raw;
+
+  // Разряды: пока в остатке стоят группы по три цифры — это одно число.
+  let normal = body;
+  const grouped = body.match(THOUSANDS);
+  if (grouped && !/^\d/.test(grouped[3])) {
+    normal = grouped[1] + grouped[2].replace(/[ \u00A0\u202F]/g, '') + grouped[3];
   }
-  const n = typeof val === 'string' ? parseFloat(val.replace(',', '.')) : Number(val);
+
+  const n = parseFloat(normal.replace(',', '.'));
   return isNaN(n) ? undefined : n;
 }

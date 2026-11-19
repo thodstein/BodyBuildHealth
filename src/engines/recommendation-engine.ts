@@ -1,6 +1,7 @@
 import { ruAdjCount, ruCount, ruFracCount, RU_ADJ_CRITICAL_M, RU_ADJ_ELITE, RU_ADJ_HIGH, RU_RECOMMENDATIONS, RU_RISKS, RU_SUPPLEMENTS, RU_SYNERGY_POINTS } from './ru-plural';
 import type { CalculatorState, CalculatorResult, LabSlice } from './support-plan/types';
 import { TZ_AUTO_BLACKLIST, sameClassIds } from './support-plan/shared-constants';
+import { labFieldNumber } from './support-plan/lab-field-number';
 import { PHARMA_DB } from '../core/pharma-database';
 import { MECHANISM_TO_SUPPORT, ORGAN_TO_SUPPORT, SYSTEM_TO_SUPPORT, CATEGORY_TO_SUPPORT, DRUG_PD_EFFECT_TO_SUPPORT, getSupportEntry, findByMechanisms, findByLabMarker, findByCategoryAndMech, findByOrganAndMech, SUPPORT_CATALOG_DATA, ALL_SUPPORT_IDS, filterByCoverageLevel, getEntryTier, getSynergyScore, getConflictScore, scoreCombination, COVERAGE_TIER_MAP, getBoostSubstances } from '../data/support-index';
 import { normalizeMechanisms } from './biostack-mechanism-normalizer';
@@ -58,8 +59,10 @@ function readV(fp: LabSlice | null | undefined, panel: keyof LabSlice, key: stri
   if (!fp) return null;
   const pv = fp[panel] as Record<string, string> | undefined;
   if (!pv) return null;
-  const raw = parseFloat(pv[key]);
-  if (isNaN(raw)) return null;
+  // Проход 141: число из поля — общим правилом (`labFieldNumber`), а не своим
+  // `parseFloat`: он не читал «>40» (значение пропадало) и обрывался на «1 000».
+  const raw = labFieldNumber(pv[key]);
+  if (raw === undefined) return null;
   // Проход 106: единица из бланка главнее догадки по величине (панель → маркер →
   // единица). Нет единицы — прежний пересчёт, но у женщины эстрадиол без единицы
   // больше не делится: её 500 пг/мл реальны, а деление прятало высокий E2.

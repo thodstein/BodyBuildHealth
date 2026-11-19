@@ -23,7 +23,9 @@ import { checkInteractions } from '../../data/drug-interactions';
 import { resolvePlanDose } from './substances';
 import { resolvePlan } from '../tz-mapper-engine';
 import type { SupportLevel } from '../tz-bridge-mechanism';
-import { buildMapperCtx } from './mapper-ctx';
+import { buildMapperCtx, labSliceToValues } from './mapper-ctx';
+import { currentLabSlice } from './lab-slice';
+import { labFieldNumber } from './lab-field-number';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, HCT_STEPS,
   CREATININE_FLAG_STEP,
@@ -68,9 +70,12 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     for (const b of blacklist) { used.add(b); usedCanon.add(canonId(b)); }
     // Каберголин — только lab-gated. Не позволяем breadth/targeted подбору
     // автоматически протащить его в план при отсутствии подтверждённого PRL.
-    const prlRaw = state.labs?.fullPanel?.panelSex?.Prolactin;
-    const prlValue = prlRaw != null ? Number.parseFloat(String(prlRaw)) : NaN;
-    const hasConfirmedPrl = Number.isFinite(prlValue) && prlValue > 25;
+    // Проход 141: пролактин читается тем же путём, что и весь план (текущий бланк,
+    // единица бланка, правило чтения числа). Раньше брался только `fullPanel` и
+    // `parseFloat`: пролактин, сданный в середине курса, «не подтверждал» каберголин,
+    // а 300 мМЕ/л (14 нг/мл) читались как 300 нг/мл — то есть как «подтверждён».
+    const prlValue = labSliceToValues(currentLabSlice(state.labs), state.profile?.sex)['PROLACTIN'];
+    const hasConfirmedPrl = prlValue !== undefined && prlValue > 25;
     if (!hasConfirmedPrl && !state.pharma.hasCaber) {
       used.add('cabergoline');
       usedCanon.add(canonId('cabergoline'));
@@ -129,9 +134,8 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
          'fluoxymesterone','halotestin','oxymetholone','anadrol','turinabol',
          'oral_turinabol','methyltestosterone','cheque_drops']
            .some(x => (a.id||'').toLowerCase().includes(x)));
-      const prlRaw = state.labs?.fullPanel?.panelSex?.Prolactin;
-      const prl = prlRaw != null ? Number.parseFloat(String(prlRaw)) : NaN;
-      if ((hasTren || hasNandrolone || hasBoldenone) && (!Number.isFinite(prl) || prl <= 25)) {
+      // Проход 141: пролактин — из того же чтения, что и gate каберголина выше.
+      if ((hasTren || hasNandrolone || hasBoldenone) && (prlValue === undefined || prlValue <= 25)) {
         protocolWarnings.push('⚠ КАБЕРГОЛИН НЕ НАЗНАЧЕН: для 19-nor нужен PRL, повторное подтверждение/макропролактин и обязательное назначение врача. Не принимать профилактически.');
       }
 
@@ -364,8 +368,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
         for (const lc of labChecks) {
           const pv = fp[lc.panel] as Record<string, string> | undefined;
           if (!pv) continue;
-          const raw = parseFloat(pv[lc.key]);
-          if (isNaN(raw)) continue;
+          // Проход 141: поле читается тем же правилом, что и в остальном расчёте.
+          const raw = labFieldNumber(pv[lc.key]);
+          if (raw === undefined) continue;
           const triggered = lc.higherIsWorse ? raw > lc.threshold : raw < lc.threshold;
           if (!triggered) continue;
           const sev: SeverityLevel = lc.higherIsWorse
@@ -1070,15 +1075,18 @@ export function hydrateState(): Partial<CalculatorState> {
   }
 
   // ── Авто-вывод state-полей из анализов (если карточки убраны из UI) ──
-  // Беpём midCourse slice (наиболее актуальный) и выводим hepatobiliary/cardio/urinary
-  const labSlice = result.labs?.midCourse || result.labs?.preCourse || result.labs?.fullPanel as any;
+  // Проход 141: бланк выбирает одно правило на всё приложение (проход 136 —
+  // `currentLabSlice`). Здесь стоял свой порядок (midCourse → preCourse → fullPanel),
+  // то есть второй ответ на вопрос «какой бланк главный».
+  const labSlice = currentLabSlice(result.labs) as any;
   if (labSlice) {
     try {
       const getV = (panel: string, key: string): number | null => {
         const pv = (labSlice as any)[panel] as Record<string, string> | undefined;
         if (!pv) return null;
-        const v = parseFloat(pv[key]);
-        return isNaN(v) ? null : v;
+        // Проход 141: третья копия `parseFloat` вместо общего правила чтения поля.
+        const v = labFieldNumber(pv[key]);
+        return v === undefined ? null : v;
       };
       const alt = getV('panelBiochem', 'ALT');
       const ast = getV('panelBiochem', 'AST');

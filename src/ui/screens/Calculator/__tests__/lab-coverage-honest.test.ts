@@ -26,9 +26,9 @@ import { labSeverityCut } from '../../../../engines/tz-mapper-engine';
 import { calculateTzSpecRisk } from '../../../../engines/risk-engine-tz-spec';
 import { labMarkerCanon } from '../../../../engines/support-plan/lab-marker-name';
 import { deriveStateFromLabs } from '../Calc.labs-derived';
-import { FULL_PANELS } from '../Calc.lab';
+import { FULL_PANELS, labBoundNotes } from '../Calc.lab';
 import { DEFAULT_STATE } from '../Calc.types';
-import { LAB_FIELD_UNUSED_REASON, unusedLabFields } from '../Calc.lab-coverage';
+import { LAB_FIELD_UNUSED_REASON, unusedLabFields, labUnreadNotes } from '../Calc.lab-coverage';
 
 const stateWith = (slice: any) => ({
   ...DEFAULT_STATE,
@@ -113,5 +113,39 @@ describe('проход 140: карта «не входит в расчёт» с�
   it('пустой бланк — пустой список (не «всё не читается»)', () => {
     expect(unusedLabFields(null)).toHaveLength(0);
     expect(unusedLabFields({ date: '' } as any)).toHaveLength(0);
+  });
+});
+
+describe('проход 141: запись без числа называет себя', () => {
+  it('текст в числовом поле — пометка с причиной', () => {
+    const rows = labUnreadNotes({ date: '', panelBiochem: { ALT: 'повышен' } } as any);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe('panelBiochem|ALT');
+    expect(rows[0].text).toBe('повышен');
+    expect(rows[0].hint).toMatch(/не число/);
+  });
+
+  it('полоска белка мочи — не концентрация, а «1+»', () => {
+    const rows = labUnreadNotes({ date: '', panelUrinalysis: { Protein: '1+' } } as any);
+    expect(rows.map(r => r.key)).toEqual(['panelUrinalysis|Protein']);
+    expect(rows[0].hint).toMatch(/полоска/);
+  });
+
+  it('«отр.» в моче не задваивается: причина уже в списке прохода 140', () => {
+    const slice = { date: '', panelUrinalysis: { Nitrite: 'отр.' } } as any;
+    expect(unusedLabFields(slice).map(r => r.marker)).toEqual(['Nitrite']);
+    expect(labUnreadNotes(slice)).toHaveLength(0);
+  });
+
+  it('граница и число — не «запись без числа», и баннер печатает число движка', () => {
+    const slice = { date: '', panelIron: { Ferritin: '>1 000' }, panelBiochem: { ALT: '45' } } as any;
+    expect(labUnreadNotes(slice)).toHaveLength(0);
+    // Проход 141: «>1 000» — это 1000 и для движка, и для баннера (раньше баннер печатал 1).
+    expect(labBoundNotes(slice)[0].text).toMatch(/→ 1000$/);
+  });
+
+  it('пустое поле — без пометок', () => {
+    expect(labUnreadNotes(null)).toHaveLength(0);
+    expect(labUnreadNotes({ date: '', panelBiochem: { ALT: '' } } as any)).toHaveLength(0);
   });
 });

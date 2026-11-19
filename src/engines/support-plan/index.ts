@@ -225,5 +225,7 @@ export { SYNERGY_ID_LABELS, SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYSTEM_LABEL
 export { canonId, SUB_ALIAS, TZ_AUTO_BLACKLIST, sameClassIds } from './shared-constants';
 // Проход 136: какое поле бланка считается текущим — одно правило на все контуры.
 export { currentLabSlice } from './lab-slice';
+// Проход 141: число из поля бланка — одно правило чтения (граница, полоска, разряды).
+export { labFieldNumber } from './lab-field-number';
 export type { CalculatorState, CalculatorResult, PlanResult, PlanSubstance, PlanMechanism, StackRecommendation, RiskSystemId, PowerLevel, SynergyId, SystemRisk, MechanismDetail, LabDelta, ScheduleItem, TimeBlock, LabSlice, TimelineWeekData, LabPanelData, UserProfileData, NeuroStatusData, PharmaStackData, AASEntry, GoalsData, HepatobiliaryData, UrinaryData, CardiovascularData, ODAData, NutritionData, ContraindicationsData, ExperienceJournal, EpicrisisData, ToxicLoadData, DentalData, GeneticData, GIData, PsychData, InjectionData, Sex, CoursePhase, SynergyRecommendation, LabFlagOverride } from './types';
 export { buildSynergyComment, buildMonitoring, buildSpecialInstructions, buildConflicts, buildCautions, buildLabFindings, calcStackSynergyScore, suggestSynergyAdditions, flagLevelRu } from './display';

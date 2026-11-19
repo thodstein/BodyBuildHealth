@@ -14,8 +14,13 @@
  * (риск-модель, мост механизмов, ступени/советы, справочная граница ступеней,
  * авто-вывод анкеты), либо было перечислено здесь. Как только поле начинают
  * читать — гард падает и требует убрать его из таблицы.
+ *
+ * Проход 141: у той же честности есть вторая половина — поле читается, человек в
+ * него вписал, а числа из записи не вышло («повышен», «1+», «1 000» до исправления
+ * правила чтения). Такие записи называет `labUnreadNotes`.
  */
 import type { LabSlice } from '../../../engines/support-plan';
+import { labFieldNumber } from '../../../engines/support-plan';
 
 /**
  * Ключ — `панель|подпись поля`, значение — причина, которую видит человек.
@@ -78,6 +83,61 @@ export function unusedLabFields(slice?: LabSlice | null): UnusedLabField[] {
     const val = (slice as any)?.[panel]?.[marker];
     if (val === undefined || val === null || String(val).trim() === '') continue;
     out.push({ key, panel, marker, reason });
+  }
+  return out;
+}
+
+/**
+ * Поле, в котором лежит запись, но числа из неё не получается.
+ *
+ * Проход 141: баннер прохода 140 называет поля, у которых нет шкалы. Но есть
+ * другая, более обидная дыра: поле читается моделью, человек в него что-то вписал
+ * — и число не распозналось. АЛТ «повышен», ферритин «1 000» (до исправления
+ * читался как 1), белок мочи «1+» — все они выглядят заполненными, а расчёт их не
+ * видит. Молчание читается как «в норме», поэтому такие записи называем вслух.
+ */
+export interface UnreadLabField {
+  /** `панель|подпись поля`. */
+  key: string;
+  panel: string;
+  marker: string;
+  /** Ровно то, что стоит в поле. */
+  text: string;
+  /** Почему число не получилось — человеческими словами. */
+  hint: string;
+}
+
+/** Причина, по которой текст не стал числом (чем короче, тем лучше). */
+function unreadHint(text: string): string {
+  const t = text.trim().toLowerCase();
+  if (/^[-–—]$/.test(t)) return 'прочерк в бланке — значения нет';
+  if (/^\++$|^\d*\s*\+$/.test(t)) return 'полоска («1+») не переводится в концентрацию';
+  if (/^(след|trace)/i.test(t)) return '«следы» — не концентрация, числом не читается';
+  if (/^не\s*(обн|найден|опред)/i.test(t) || /^отр/.test(t) || /^neg/i.test(t)) return '«отрицательно» — это не ноль и не число';
+  if (/^полож|^posit/i.test(t)) return '«положительно» — это не число, нужна концентрация';
+  return 'в поле не число — запись сохранена, но расчёт её не видит';
+}
+
+/**
+ * Заполненные поля, которые читаются моделью, но чьё значение не число. Поля из
+ * `LAB_FIELD_UNUSED_REASON` не повторяем: у них своя причина (нет шкалы вообще), и
+ * две пометки на одну строку только путали бы.
+ */
+export function labUnreadNotes(slice?: LabSlice | null): UnreadLabField[] {
+  if (!slice) return [];
+  const out: UnreadLabField[] = [];
+  for (const panel of Object.keys(slice)) {
+    if (panel === 'units' || panel === 'date') continue;
+    const markers = (slice as any)[panel] as Record<string, string> | undefined;
+    if (!markers || typeof markers !== 'object') continue;
+    for (const [marker, raw] of Object.entries(markers)) {
+      const key = `${panel}|${marker}`;
+      if (LAB_FIELD_UNUSED_REASON[key]) continue;
+      const text = String(raw ?? '').trim();
+      if (!text) continue;
+      if (labFieldNumber(text) !== undefined) continue;
+      out.push({ key, panel, marker, text, hint: unreadHint(text) });
+    }
   }
   return out;
 }

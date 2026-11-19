@@ -6,6 +6,7 @@ import {
   CREATININE_ULN, CREATININE_FLAG_STEP,
 } from '../../../engines/lab-norms.engine';
 import { LAB_UNIT_CHOICES, labUnitKey } from '../../../core/constants';
+import { labFieldNumber } from '../../../engines/support-plan';
 import { normalizeLabMeasurement, resolveLabMarker } from '../../../core/labs-mapping';
 import { FULL_PANELS } from './Calc.lab';
 import { MARKER_TO_UCUM } from './Calc.lab-units';
@@ -383,8 +384,12 @@ export function deriveStateFromLabs(fp: LabSlice, sex?: 'male' | 'female', prev?
   const getV = (panel: keyof LabSlice, key: string): number | null => {
     const pv = fp[panel] as Record<string, string> | undefined;
     if (!pv) return null;
-    const v = parseFloat(pv[key]);
-    return isNaN(v) ? null : v;
+    // Проход 141: здесь был свой `parseFloat`, то есть третье правило чтения поля.
+    // Он не понимал «>40» (АЛТ «>40» не включал авто-вывод в анкете, хотя риск-модель
+    // читала 40) и обрывался на разрядах («1 000» → 1). Правило теперь одно —
+    // `labFieldNumber`, то же, что у плана поддержки и у риск-модели.
+    const v = labFieldNumber(pv[key]);
+    return v === undefined ? null : v;
   };
   const getS = (panel: keyof LabSlice, key: string): string => {
     const pv = fp[panel] as Record<string, string> | undefined;

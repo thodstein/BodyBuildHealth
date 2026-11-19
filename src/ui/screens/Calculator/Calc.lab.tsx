@@ -1,5 +1,6 @@
 import React from 'react';
 import type { LabSlice } from '../../../engines/support-plan';
+import { labFieldNumber } from '../../../engines/support-plan';
 import { LAB_UNIT_CHOICES } from '../../../core/constants';
 import { LAB_MARKER_MAP } from '../../../data/lab-marker-map';
 import { markerReadUnit, ruUnit } from './Calc.lab-units';
@@ -101,10 +102,13 @@ export function labBoundNotes(slice?: LabSlice | null): { marker: string; text: 
     for (const [marker, raw] of Object.entries(markers)) {
       const text = String(raw ?? '').trim();
       if (!/^[<>≤≥]/.test(text)) continue;
-      const value = parseFloat(text.replace(/^[<>≤≥]\s*/, '').replace(',', '.'));
+      // Проход 141: число в скобках печатает то же правило чтения, что и движок
+      // (`labFieldNumber`). Раньше здесь был свой `parseFloat`, и «>1 000» движок
+      // читал как 1000, а баннер показывал 1 — два числа на одну запись.
+      const value = labFieldNumber(text);
       out.push({
         marker,
-        text: Number.isFinite(value) ? `${ruMarker(marker)} «${text}» → ${value}` : `${ruMarker(marker)} «${text}»`,
+        text: value !== undefined ? `${ruMarker(marker)} «${text}» → ${value}` : `${ruMarker(marker)} «${text}»`,
       });
     }
   }
