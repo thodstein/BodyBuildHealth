@@ -28,6 +28,7 @@ import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
 import { LabsOverview } from './LabsScreen_parts/LabsOverview';
 import LabsCatalogTab from './LabsScreen_parts/LabsCatalogTab';
 import { LabCompareLabel } from './LabsScreen_parts/LabCompareLabel';
+import { trendPointStyle, trendSparklineDash } from './LabsScreen_parts/lab-trend-visuals';
 import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { describeOcrFailure, processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
 import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
@@ -1688,13 +1689,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                             const color = palette[report.trends.indexOf(trend) % palette.length];
                             return (
                               <g key={trend.code}>
-                                <polyline fill="none" stroke={color} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" opacity="0.9" />
+                                {/* Проход 146: линия через обрезанную точку условна — пунктир. */}
+                                <polyline fill="none" stroke={color} strokeWidth="2" points={points} vectorEffect="non-scaling-stroke" opacity="0.9" strokeDasharray={trendSparklineDash(trend.points.map(p => p.bound))} />
                                  {trend.points.map((p, i) => {
                                    const dateIdx = dates.indexOf(p.date);
                                    const x = dateIdx * xStep;
                                    const y = h - ((p.value - min) / range) * (h - 4) - 2;
+                                   // Проход 146: обрезанная точка — пунктирное кольцо, а
+                                   // не залитая точка измерения (см. lab-trend-visuals).
                                    return (
-                                     <circle key={i} cx={x} cy={y} r="4" fill={color} stroke="rgba(0,0,0,0.4)" strokeWidth="1"
+                                     <circle key={i} cx={x} cy={y} r="4" {...trendPointStyle(p.bound, color)}
                                         onMouseEnter={() => setHoveredTrendPoint({ code: trend.code, date: p.date, value: p.value, bound: p.bound, x: pad.left + x, y: pad.top + y })}
                                         onMouseLeave={() => setHoveredTrendPoint(null)}
                                        style={{ cursor: 'pointer' }}
@@ -2581,7 +2585,8 @@ function TrendRow({ trend }: { trend: LabTrend }) {
       <span style={{ fontSize:16, minWidth:24, textAlign:'center', color }}>{icon}</span>
       {pts.length >= 2 && (
         <svg width={sparkW} height={sparkH} viewBox={`0 0 ${sparkW} ${sparkH}`} style={{ flexShrink:0, opacity:0.9 }}>
-          <polyline fill="none" stroke={color} strokeWidth="2" points={sparkPath} vectorEffect="non-scaling-stroke" />
+          {/* Проход 146: если в истории есть граница, линия условная — пунктир. */}
+          <polyline fill="none" stroke={color} strokeWidth="2" points={sparkPath} vectorEffect="non-scaling-stroke" strokeDasharray={trendSparklineDash(pts.map(p => p.bound))} />
         </svg>
       )}
       <div style={{ flex:1, minWidth:0 }}>
