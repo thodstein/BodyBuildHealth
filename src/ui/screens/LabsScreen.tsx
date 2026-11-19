@@ -219,7 +219,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [trendFilter, setTrendFilter] = useState<'all' | 'significant' | 'critical' | 'worsened' | 'improved'>('all');
   const [trendSystemFilter, setTrendSystemFilter] = useState('all');
   const [visibleTrends, setVisibleTrends] = useState<Set<string>>(new Set());
-  const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{ code: string; date: string; value: number; x: number; y: number } | null>(null);
+  const [hoveredTrendPoint, setHoveredTrendPoint] = useState<{ code: string; date: string; value: number; bound?: '<' | '>'; x: number; y: number } | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -1629,7 +1629,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div style={{ fontSize:11, fontWeight:700, color:'#f97316', marginBottom:6 }}>💊 Рекомендации по коррекции</div>
                   {recommendations.map(({ trend, corrections }) => (
                     <div key={trend.code} style={{ padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.16)', fontSize:11, color:'#fff', marginBottom:6, lineHeight:1.5 }}>
-                      <b>{trend.name}</b> {trend.direction === 'up' ? '↑' : '↓'} {trend.absoluteChange?.toFixed(1)} — поддержать: {corrections.join(', ')}
+                      <b>{trend.name}</b> {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '≈'} {trend.absoluteChange?.toFixed(1)} — поддержать: {corrections.join(', ')}
                     </div>
                   ))}
                 </div>
@@ -1695,7 +1695,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                                    const y = h - ((p.value - min) / range) * (h - 4) - 2;
                                    return (
                                      <circle key={i} cx={x} cy={y} r="4" fill={color} stroke="rgba(0,0,0,0.4)" strokeWidth="1"
-                                        onMouseEnter={() => setHoveredTrendPoint({ code: trend.code, date: p.date, value: p.value, x: pad.left + x, y: pad.top + y })}
+                                        onMouseEnter={() => setHoveredTrendPoint({ code: trend.code, date: p.date, value: p.value, bound: p.bound, x: pad.left + x, y: pad.top + y })}
                                         onMouseLeave={() => setHoveredTrendPoint(null)}
                                        style={{ cursor: 'pointer' }}
                                      />
@@ -1719,7 +1719,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                        fontSize:12, fontWeight:700, pointerEvents:'none', zIndex:1000,
                        border:'1px solid rgba(255,255,255,0.15)',
                      }}>
-                        {hoveredTrendPoint.date.slice(5)}: {hoveredTrendPoint.value.toFixed(1)}
+                        {hoveredTrendPoint.date.slice(5)}: {labValueLabel(hoveredTrendPoint.value, hoveredTrendPoint.bound)}
                      </div>
                    )}
                  </div>
@@ -2553,7 +2553,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
 function TrendRow({ trend }: { trend: LabTrend }) {
   const color = getTrendColor(trend.significance);
-  const icon = getTrendIcon(trend.direction, trend.significance);
+  // Проход 145: у пары с границей направление не доказано — не «→» (стабильно),
+  // а «≈»: значения печатаются со знаком, вывод о направлении не заявляется.
+  const bounded = Boolean(trend.currentBound || trend.previousBound);
+  const icon = bounded && trend.significance === 'normal'
+    ? '≈'
+    : getTrendIcon(trend.direction, trend.significance);
   const sparkW = 64;
   const sparkH = 24;
   const pts = trend.points;
@@ -2582,9 +2587,9 @@ function TrendRow({ trend }: { trend: LabTrend }) {
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontWeight:800, fontSize:13, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{trend.name}</div>
         <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>
-          {trend.previousDate && <span>{trend.previousDate.slice(5)}: {trend.previousValue}</span>}
+          {trend.previousDate && <span>{trend.previousDate.slice(5)}: {labValueLabel(trend.previousValue, trend.previousBound)}</span>}
           {trend.previousDate && <span> → </span>}
-          <span>{trend.currentDate.slice(5)}: {trend.currentValue} {trend.unit}</span>
+          <span>{trend.currentDate.slice(5)}: {labValueLabel(trend.currentValue, trend.currentBound)} {trend.unit}</span>
           {trend.absoluteChange !== null && (
             <span style={{ marginLeft:6, color, fontWeight:800 }}>
               {trend.absoluteChange > 0 ? '+' : ''}{trend.absoluteChange.toFixed(1)}

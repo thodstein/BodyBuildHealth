@@ -1,11 +1,15 @@
 import type { LabPoint } from '../core/types';
 import { UCUM_MAP } from '../core/constants';
 import { ruCount, ruAdjCount, RU_MARKERS } from './ru-plural';
+import { boundsComparable, boundProvesSide, type LabBound } from '../core/lab-bound';
+import { labValueLabel } from '../core/lab-value-label';
 
 export interface LabTrendPoint {
   date: string;
   value: number;
   unit: string;
+  /** Проход 145: «>1000» в точке графика — знак, а не потеря. */
+  bound?: LabBound;
 }
 
 export interface LabTrend {
@@ -21,8 +25,15 @@ export interface LabTrend {
   significance: 'normal' | 'watch' | 'significant' | 'critical';
   previousDate: string | null;
   currentDate: string;
+  /** Проход 145: знак границы текущей и прошлой записи. */
+  currentBound?: LabBound;
+  previousBound?: LabBound;
   refLow?: number;
   refHigh?: number;
+  /**
+   * Проход 145: `true` — отклонение доказано, `false` — норма доказана,
+   * `undefined` — не доказано ни то, ни другое (обрезанное число, нет нормы).
+   */
   currentAbnormal?: boolean;
   previousAbnormal?: boolean;
   predictedValue?: number;
@@ -35,6 +46,25 @@ export interface LabTrendReport {
   worsened: LabTrend[];
   newMarkers: LabTrend[];
   summary: string;
+}
+
+/**
+ * Вердикт «вне нормы» по одной записи — трёхзначный.
+ *
+ * Нет верхней границы — судить не о чем (`undefined`). Есть граница бланка —
+ * `true` только если сторона доказана (`boundProvesSide`), иначе `undefined`:
+ * «>5» при верхней границе 300 не говорит, в норме значение или нет. Раньше
+ * здесь стоял просто boolean, и обрезанное число попадало в «норму».
+ */
+function trendAbnormal(
+  value: number,
+  bound: LabBound | undefined,
+  refLow: number | undefined,
+  refHigh: number | undefined,
+): boolean | undefined {
+  if (refHigh === undefined) return undefined;
+  if (bound) return boundProvesSide(bound, value, refLow, refHigh) ? true : undefined;
+  return value > refHigh || (refLow !== undefined && value < refLow);
 }
 
 export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
@@ -67,44 +97,49 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
     const refLow = (current as any).refLow ?? info?.lln;
     const refHigh = (current as any).refHigh ?? info?.uln;
 
-    const currentAbnormal = refHigh !== undefined
-      ? current.value > refHigh || (refLow !== undefined && current.value < refLow)
+    // Проход 145: вердикт «вне нормы» — трёхзначный, как в дневнике. Обрезанное
+    // число доказывает только свою сторону (`boundProvesSide`), а «>5» при
+    // верхней границе 300 не доказывает ничего.
+    const currentAbnormal = trendAbnormal(current.value, current.bound, refLow, refHigh);
+    const previousAbnormal = previous
+      ? trendAbnormal(previous.value, previous.bound, refLow, refHigh)
       : undefined;
 
-    const previousAbnormal = previous && refHigh !== undefined
-      ? previous.value > refHigh || (refLow !== undefined && previous.value < refLow)
-      : undefined;
-
-    const absoluteChange = previous != null ? current.value - previous.value : null;
-    const percentChange = previous != null && previous.value !== 0
-      ? ((current.value - previous.value) / Math.abs(previous.value)) * 100
+    // Разность и процент двух точных чисел; при любой границе их нет.
+    const comparable = previous != null && boundsComparable(current.bound, previous.bound);
+    const absoluteChange = comparable ? current.value - previous!.value : null;
+    const percentChange = comparable && previous!.value !== 0
+      ? ((current.value - previous!.value) / Math.abs(previous!.value)) * 100
       : null;
 
     let direction: LabTrend['direction'] = 'unknown';
-    if (previous != null) {
+    if (comparable) {
       if (Math.abs(absoluteChange!) < 0.01) direction = 'stable';
       else if (absoluteChange! > 0) direction = 'up';
       else direction = 'down';
     }
 
+    // Значимость — только по доказанным переходам. Неизвестная сторона не
+    // считается ни нормой, ни отклонением: молчим (`normal`), а не заявляем.
     let significance: LabTrend['significance'] = 'normal';
     if (previous != null && refHigh !== undefined) {
-      const changePct = percentChange != null ? Math.abs(percentChange) : 0;
-      if (currentAbnormal && !previousAbnormal) {
-        significance = changePct > 30 ? 'critical' : 'significant';
-      } else if (!currentAbnormal && previousAbnormal) {
-        significance = changePct > 30 ? 'significant' : 'watch';
-      } else if (currentAbnormal && previousAbnormal) {
-        significance = changePct > 20 ? 'significant' : 'watch';
-      } else {
-        significance = changePct > 50 ? 'watch' : 'normal';
+      const changePct = percentChange != null ? Math.abs(percentChange) : null;
+      const over = (limit: number) => changePct != null && changePct > limit;
+      if (currentAbnormal === true && previousAbnormal === false) {
+        significance = over(30) ? 'critical' : 'significant';
+      } else if (currentAbnormal === false && previousAbnormal === true) {
+        significance = over(30) ? 'significant' : 'watch';
+      } else if (currentAbnormal === true && previousAbnormal === true) {
+        significance = over(20) ? 'significant' : 'watch';
+      } else if (currentAbnormal === false && previousAbnormal === false) {
+        significance = over(50) ? 'watch' : 'normal';
       }
     }
 
     const trend: LabTrend = {
       code,
       name: current.name || info?.name || code,
-      points: sorted.map(p => ({ date: p.date, value: p.value, unit: p.unit || info?.prefUnit || '' })),
+      points: sorted.map(p => ({ date: p.date, value: p.value, unit: p.unit || info?.prefUnit || '', bound: p.bound })),
       previousValue: previous?.value ?? null,
       currentValue: current.value,
       unit: current.unit || info?.prefUnit || '',
@@ -114,11 +149,15 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
       significance,
       previousDate: previous?.date ?? null,
       currentDate: current.date,
+      currentBound: current.bound,
+      previousBound: previous?.bound,
       refLow,
       refHigh,
       currentAbnormal,
       previousAbnormal,
-      ...(sorted.length >= 3 ? predictNextValue(sorted.map(p => ({ date: p.date, value: p.value }))) : {}),
+      // Проход 145: прогноз по обрезанным точкам — догадка о догадке, поэтому
+      // при любой границе в истории предсказание не строится.
+      ...(sorted.length >= 3 && sorted.every(p => !p.bound) ? predictNextValue(sorted.map(p => ({ date: p.date, value: p.value }))) : {}),
     };
 
     trends.push(trend);
@@ -132,19 +171,19 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
       if (direction === 'down') {
         if (lowerIsBetter) improved.push(trend);
         else if (currentAbnormal === false && previousAbnormal === true) improved.push(trend);
-        else if (significance === 'critical' && !currentAbnormal) improved.push(trend);
+        else if (significance === 'critical' && currentAbnormal === false) improved.push(trend);
       } else if (direction === 'up') {
         if (lowerIsBetter) worsened.push(trend);
-        else if (currentAbnormal && !previousAbnormal) worsened.push(trend);
-        else if (significance === 'critical' && currentAbnormal) worsened.push(trend);
+        else if (currentAbnormal === true && previousAbnormal === false) worsened.push(trend);
+        else if (significance === 'critical' && currentAbnormal === true) worsened.push(trend);
       } else if (significance === 'critical') {
-        if (currentAbnormal) worsened.push(trend);
-        else improved.push(trend);
+        if (currentAbnormal === true) worsened.push(trend);
+        else if (currentAbnormal === false) improved.push(trend);
       }
       // фолбэк: если значимый тренд не попал ни в одну ветку, считаем по направлению к норме
       if (!improved.includes(trend) && !worsened.includes(trend) && !newMarkers.includes(trend)) {
-        if (direction === 'up' && currentAbnormal) worsened.push(trend);
-        else if (direction === 'down' && currentAbnormal === false && previousAbnormal) improved.push(trend);
+        if (direction === 'up' && currentAbnormal === true) worsened.push(trend);
+        else if (direction === 'down' && currentAbnormal === false && previousAbnormal === true) improved.push(trend);
         else if (direction === 'up') worsened.push(trend);
         else if (direction === 'down') improved.push(trend);
       }
@@ -193,20 +232,20 @@ export function getTrendInsights(trends: LabTrend[]): string[] {
   const isWorsened = (t: LabTrend) => {
     if (t.significance !== 'significant' && t.significance !== 'critical') return false;
     const lower = lowerIsBetter.has(t.code);
-    if (t.direction === 'up') return lower ? !!t.currentAbnormal : !t.currentAbnormal;
-    if (t.direction === 'down') return lower ? !t.currentAbnormal && !!t.previousAbnormal : !!t.currentAbnormal;
+    if (t.direction === 'up') return lower ? t.currentAbnormal === true : t.currentAbnormal === false;
+    if (t.direction === 'down') return lower ? t.currentAbnormal === false && t.previousAbnormal === true : t.currentAbnormal === true;
     return false;
   };
   const isImproved = (t: LabTrend) => {
     if (t.significance !== 'significant' && t.significance !== 'critical') return false;
     const lower = lowerIsBetter.has(t.code);
-    if (t.direction === 'down') return lower ? !t.currentAbnormal || !t.previousAbnormal : !!t.currentAbnormal;
-    if (t.direction === 'up') return lower ? false : !t.currentAbnormal && !!t.previousAbnormal;
+    if (t.direction === 'down') return lower ? t.currentAbnormal === false || t.previousAbnormal === false : t.currentAbnormal === true;
+    if (t.direction === 'up') return lower ? false : t.currentAbnormal === false && t.previousAbnormal === true;
     return false;
   };
   const worsenedSignificant = trends.filter(isWorsened);
   const improvedSignificant = trends.filter(isImproved);
-  const newAbnormal = trends.filter(t => t.currentAbnormal && !t.previousAbnormal);
+  const newAbnormal = trends.filter(t => t.currentAbnormal === true && t.previousAbnormal === false);
 
   if (worsenedSignificant.length > 0) {
     const names = worsenedSignificant.slice(0, 3).map(t => t.name).join(', ');
@@ -221,7 +260,11 @@ export function getTrendInsights(trends: LabTrend[]): string[] {
     insights.push(`🚨 Новые отклонения: ${names} — обратитесь к врачу.`);
   }
   if (insights.length === 0 && trends.length > 0) {
-    insights.push('📊 Стабильное состояние — без значимых изменений.');
+    // Проход 145: «стабильное состояние» — утверждение. Если в истории есть
+    // обрезанные значения, значимость изменения не доказана, и говорить нечего.
+    insights.push(trends.some(t => t.currentBound || t.previousBound)
+      ? '📊 Обрезанные значения: значимость изменений не доказана.'
+      : '📊 Стабильное состояние — без значимых изменений.');
   }
   return insights;
 }
@@ -266,9 +309,9 @@ export function exportTrendsToCSV(report: LabTrendReport): string {
       escape(t.code),
       escape(t.name),
       escape(t.previousDate),
-      escape(t.previousValue),
+      escape(t.previousValue == null ? '' : labValueLabel(t.previousValue, t.previousBound)),
       escape(t.currentDate),
-      escape(t.currentValue),
+      escape(labValueLabel(t.currentValue, t.currentBound)),
       escape(t.unit),
       escape(t.absoluteChange),
       escape(t.percentChange),
