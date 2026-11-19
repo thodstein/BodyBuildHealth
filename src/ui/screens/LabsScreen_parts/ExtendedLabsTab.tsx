@@ -9,6 +9,9 @@ import { keptBound, boundProvesSide } from '../../../core/lab-bound';
 // Проход 155: ручной ввод читает число тем же правилом, что и расчёт, и сохраняет
 // знак границы — свой `parseFloat` молча выбрасывал «1+», «>1000» и «5,5».
 import { labFieldEntry, labFieldUnreadReason } from '../../../engines/support-plan/lab-field-number';
+// Проход 157: дата бланка выбирается человеком (см. `lab-entry-date`), а не берётся
+// из момента сохранения — иначе анализ месячной давности становился «сегодняшним».
+import { labEntryDate, todayLabDate } from './lab-entry-date';
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
 const PANELS: { id: string; icon: string; label: string; codes: string[] }[] = [
@@ -69,6 +72,8 @@ export default function ExtendedLabsTab({
   const [saved, setSaved] = useState(false);
   /** Проход 155: поля, которые не станут записью, — с причиной, а не молча. */
   const [skipped, setSkipped] = useState<{ name: string; text: string; reason: string }[]>([]);
+  /** Проход 157: дата бланка (по умолчанию — сегодня), а не дата сохранения. */
+  const [entryDate, setEntryDate] = useState(todayLabDate);
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     PANELS.forEach(p => { init[p.id] = true; });
@@ -146,7 +151,7 @@ export default function ExtendedLabsTab({
           name: info?.name || code,
           value: entry.value,
           unit: info?.prefUnit || '',
-          date: new Date().toISOString().split('T')[0],
+          date: labEntryDate(entryDate),
           phase: selectedPhase,
           // Проход 142: число не меняли — знак границы принадлежит тому же
           // результату («>1000» не должен стать просто 1000 при пересохранении).
@@ -164,7 +169,7 @@ export default function ExtendedLabsTab({
       console.error('Save failed', e);
     }
     setSaving(false);
-  }, [values, selectedPhase, labs, existingCodes]);
+  }, [values, selectedPhase, labs, existingCodes, entryDate]);
 
   const filledCount = useMemo(() => {
     return Object.values(values).filter(v => v.trim() !== '').length;
@@ -210,10 +215,25 @@ export default function ExtendedLabsTab({
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{ fontSize: 10, color: '#fff' }}>
           {filledCount} / {Object.keys(UCUM_MAP).length} заполнено
         </span>
+        {/* Проход 157: дата бланка, а не дата сохранения. */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#fff' }}>
+          Дата бланка
+          <input
+            type="date"
+            aria-label="Дата бланка"
+            data-lab-entry-date="1"
+            value={entryDate}
+            onChange={e => setEntryDate(e.target.value)}
+            style={{
+              padding: '6px 8px', background: 'rgba(0,0,0,0.30)', border: '1px solid rgba(140,190,255,0.16)',
+              borderRadius: 8, color: '#fff', fontSize: 11, minHeight: 36, boxSizing: 'border-box',
+            }}
+          />
+        </label>
         <button onClick={handleSave} disabled={saving || filledCount === 0} style={{
           padding: '8px 16px', borderRadius: 10, border: 'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
           background: saved ? '#22c55e' : filledCount > 0 ? 'var(--accent)' : 'rgba(21,38,66,0.60)',

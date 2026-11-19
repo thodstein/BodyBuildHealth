@@ -39,6 +39,8 @@ import { labValueLabel } from '../../core/lab-value-label';
 // Проход 155: ручной ввод значения — тем же чтением, что и расчёт (`labFieldEntry`:
 // число + знак границы), иначе «>1000» либо отвергался, либо становился точным 1000.
 import { labFieldEntry, labFieldUnreadReason } from '../../engines/support-plan/lab-field-number';
+// Проход 157: дата по умолчанию — местная дата бланка, а не UTC-срез момента ввода.
+import { todayLabDate } from './LabsScreen_parts/lab-entry-date';
 import { computeMarkerDeviations, type MarkerRiskSummary } from './LabsScreen_parts/lab-marker-risks';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
@@ -217,7 +219,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [inputCode, setInputCode] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [inputUnit, setInputUnit] = useState('');
-  const [inputDate, setInputDate] = useState(new Date().toISOString().split('T')[0]);
+  const [inputDate, setInputDate] = useState(todayLabDate);
   const [tick, setTick] = useState(0);
   const [catalogView, setCatalogView] = useState<'catalog' | 'schedule' | 'problems'>('catalog');
   const [journalSubView, setJournalSubView] = useState<'diary' | 'reports' | 'archive'>('diary');

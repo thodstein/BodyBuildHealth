@@ -10,6 +10,10 @@ import { keptBound, boundProvesSide } from '../../../core/lab-bound';
 // знак границы. Свой `parseFloat` здесь выбрасывал «1+», «>1000» и «5,5» молча.
 import { labFieldEntry, labFieldUnreadReason } from '../../../engines/support-plan/lab-field-number';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
+// Проход 157: дату бланка выбирает человек. Раньше запись получала дату ввода
+// (`new Date()`), и анализ месячной давности вставал в «сегодня» — дата главнее
+// порядка хранения и решает, какой бланк текущий (проходы 136/151).
+import { labEntryDate, todayLabDate } from './lab-entry-date';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 
@@ -195,6 +199,8 @@ export default function LabsCatalogTab({
    * с причиной, как в форме калькулятора.
    */
   const [skipped, setSkipped] = useState<{ name: string; text: string; reason: string }[]>([]);
+  /** Проход 157: дата бланка (по умолчанию — сегодня), а не дата сохранения. */
+  const [entryDate, setEntryDate] = useState(todayLabDate);
   const [openSystems, setOpenSystems] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     systemOrder.forEach(s => { init[s] = true; });
@@ -329,7 +335,7 @@ export default function LabsCatalogTab({
           name: info?.name || code,
           value: entry.value,
           unit: info?.prefUnit || '',
-          date: new Date().toISOString().split('T')[0],
+          date: labEntryDate(entryDate),
           phase: selectedPhase,
           // Проход 142: число не меняли — знак границы принадлежит тому же
           // результату («>1000» не должен стать просто 1000 при пересохранении).
@@ -347,7 +353,7 @@ export default function LabsCatalogTab({
       console.error('Save failed', e);
     }
     setSaving(false);
-  }, [values, selectedPhase, labs, existingCodes]);
+  }, [values, selectedPhase, labs, existingCodes, entryDate]);
 
   const filledCount = useMemo(() => {
     return Object.values(values).filter(v => v.trim() !== '').length;
@@ -550,6 +556,25 @@ export default function LabsCatalogTab({
         }}>
           {saving ? '⏳' : saved ? '✓ Сохранено' : `💾 ${filledCount}`}
         </button>
+      </div>
+
+      {/* Проход 157: дата бланка, а не дата сохранения. Она главнее порядка
+          хранения и решает, какой бланк текущий, поэтому анализ месячной давности
+          не должен получать сегодняшнюю дату. */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+        <span style={{ fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap' }}>Дата бланка</span>
+        <input
+          type="date"
+          aria-label="Дата бланка"
+          data-lab-entry-date="1"
+          value={entryDate}
+          onChange={e => setEntryDate(e.target.value)}
+          style={{
+            flex:1, minHeight:44, padding:'10px 12px', background:'rgba(21,38,66,0.60)',
+            border:'1px solid rgba(140,190,255,0.14)', borderRadius:14, color:'#fff',
+            fontSize:13, boxSizing:'border-box', outline:'none',
+          }}
+        />
       </div>
 
       {/* Проход 155: «Сохранено» больше не значит «всё сохранено». Поле, из которого
