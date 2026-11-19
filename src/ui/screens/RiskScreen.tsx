@@ -1,7 +1,7 @@
 import { localIsoDate } from '../../core/local-date';
 import React, { useState, useMemo, useEffect } from 'react';
 import { HeroImg } from '../HeroImg';
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE, UCUM_MAP } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, SUBSYSTEM_MAP, SUBSYSTEM_PARENT, DRUG_THRESHOLDS, SUPPORT_BASE_COVERAGE } from '../../core/constants';
 import { PHARMA_DB } from '../../core/pharma-database';
 import { SYSTEM_INFO, SYSTEM_INFO_ALL, MECHANISM_INFO, SYSTEM_ORGANS } from '../../core/risk-info';
 import type { RiskResult, MechanismCell, LabPoint, CourseEntry } from '../../core/types';
@@ -29,8 +29,8 @@ import { analyzeWithCompliance, type ComplianceReport, getComplianceStatus } fro
 import { analyzeLabDrugCorrelation, type LabDrugAlert } from '../../engines/lab-pharma-correlation.engine';
 import { femaleDrugThresholdView, assessFemaleAas, type FemaleDrugThresholdRow } from '../../engines/female-aas-risk';
 import { interpretLabs, computeHOMA_IR, type LabCompositeResult } from '../../engines/lab-analysis.engine';
-import { getLabNorm } from '../../engines/lab-norms.engine';
-import { normalizeLabMeasurement } from '../../core/labs-mapping';
+import { labValueLabel } from '../../core/lab-value-label';
+import { computeMarkerDeviations } from './LabsScreen_parts/lab-marker-risks';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
 import { validateDiagnostics, getDiagnosticSummary } from '../../engines/diagnostics.engine';
 import { readRiskBridge, type RiskBridgeData } from '../../engines/risk-bridge';
@@ -1808,16 +1808,6 @@ export const LabsRisksTab: React.FC = () => {
   const profileSex: 'male' | 'female' = linked.profile?.settings?.personal?.sex === 'female' ? 'female' : 'male';
   const [riskSections, setRiskSections] = useState<Record<string,boolean>>({ pharma:true, indices:true, systems:true, markers:true });
 
-  // NOTE: объявлено ДО labRisks — useMemo-фабрика выполняется синхронно при
-  // рендере, позже в коде константа уходила бы в TDZ (ReferenceError глотался
-  // try/catch → labRisks всегда null при реальных анализах).
-  const LAB_SYSTEM_GROUPS: Record<string,string[]> = {
-    hepatic:['ALT','AST','GGT','ALP','BILIRUBIN_TOTAL','BIL','ALB'], renal:['CREATININE','BUN','EGFR','PROTEIN_TOTAL','TP','UA','UACR'],
-    endocrine:['TSH','FT3','FT4','TESTOSTERONE','TT','E2','ESTRADIOL','PRL','PROLACTIN','CORTISOL','LH','FSH','SHBG','IGF1'],
-    hematologic:['HGB','HCT','PLT','WBC','FERRITIN'], cardio:['LDL','HDL','TG','CRP','HOMOCYSTEINE'],
-    metabolic:['GLU','GLUCOSE','HBA1C','INSULIN','INS','HOMA','VITD'], reproductive:['PSA','INHB','AMH'], neuro:['HOMOCYSTEINE'], other:[]
-  };
-
   const sysLabels: Record<string,string> = {
     cardio:'Сердечно-сосудистая', hepatic:'Печень', renal:'Почки', neuro:'Нервная',
     endocrine:'Эндокринная', hematologic:'Кровь', reproductive:'Репродуктивная', musculoskeletal:'Мышечная', metabolic:'Метаболизм', other:'Прочее'
@@ -1853,41 +1843,29 @@ export const LabsRisksTab: React.FC = () => {
   const labRisks = useMemo(() => {
     if (!hasLabs) return null;
     try {
-    const contribs = calculateRiskFromAnalyses(labs, profileSex) as any;
-    const sb: Record<string,{raw:number;net:number}> = {};
-    for (const sys of ALL_RISK_SYSTEMS) {
-      const c = contribs.systemContributions?.[sys] || 0;
-      sb[sys] = { raw: c, net: c };
-    }
-    const devs: { code:string; name:string; value:number; uln:number; lln:number; deviation:number; system:string }[] = [];
-    for (const lab of labs) {
-      const ref = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
-      if (!ref?.uln || !ref?.lln) continue;
-      const coeff = ref.coeff || 1;
-      // Проход 93: единица бланка главнее коэффициента (HGB 150 г/л не становится
-      // 1500); без единицы — прежний `coeff`.
-      const hasUnit = !!String(lab.unit || '').trim();
-      const normalized = hasUnit ? normalizeLabMeasurement(lab.code, lab.value, String(lab.unit)) : null;
-      const factor = normalized && lab.value ? normalized.value / lab.value : coeff;
-      const norm = lab.value * factor;
-      // Проход 92: бланк главнее, затем ВГН пола (♀ HCT 48, АЛТ/АСТ/ГГТ 31,
-      // креатинин 97, мочевая кислота 350), и только потом общий ряд UCUM.
-      const normPair = getLabNorm(lab.code, profileSex);
-      const uln = lab.refHigh !== undefined ? lab.refHigh * factor : (normPair?.uln ?? ref.uln);
-      const lln = lab.refLow !== undefined ? lab.refLow * factor : (normPair?.lln ?? ref.lln);
-      let deviation = 0;
-      if (norm > uln) deviation = (norm - uln) / uln;
-      else if (norm < lln) deviation = -((lln - norm) / lln);
-      if (Math.abs(deviation) > 0.01) {
-        let sys = 'other';
-        for (const [s, codes] of Object.entries(LAB_SYSTEM_GROUPS)) {
-          if (codes.includes(lab.code.toUpperCase())) { sys = s; break; }
-        }
-        devs.push({ code: lab.code, name: ref.name || lab.code, value: lab.value, uln, lln, deviation: Math.round(deviation*100), system: sys });
+      const contribs = calculateRiskFromAnalyses(labs, profileSex) as any;
+      const sb: Record<string,{raw:number;net:number}> = {};
+      for (const sys of ALL_RISK_SYSTEMS) {
+        const c = contribs.systemContributions?.[sys] || 0;
+        sb[sys] = { raw: c, net: c };
       }
-    }
-    devs.sort((a,b) => Math.abs(b.deviation)-Math.abs(a.deviation));
-    return { systemBreakdown: sb, markerDeviations: devs, deviationCount: devs.length };
+      // Проход 152: список отклонений — тот же модуль, что на экране «Анализы»
+      // (`computeMarkerDeviations`), а не своя копия правила. Сторону доказывает
+      // `boundProvesSide`, процент считается только у точных чисел, обрезанное и
+      // маркер без нормы — «без вывода» отдельным счётчиком, а не «в норме».
+      // Раньше «HDL >0.5» (предел метода) давал полный процент отклонения.
+      const summary = computeMarkerDeviations(labs as any, profileSex);
+      return {
+        systemBreakdown: sb,
+        markerDeviations: summary.markerDeviations,
+        deviationCount: summary.markerDeviations.length,
+        unknownCount: summary.unknownCount,
+        normalCount: summary.normalCount,
+        // Расчёт риска по системам тоже называет неподтверждённые записи
+        // (`boundUnproven`): «Все системы в норме» по «ЛВП >0.5» — вывод из
+        // записи, которая сторону не доказывает.
+        unprovenCount: (contribs.boundUnproven || []).length,
+      };
     } catch { return null; }
   }, [hasLabs, labs, profileSex]);
 
@@ -1927,18 +1905,24 @@ export const LabsRisksTab: React.FC = () => {
             <span style={{fontSize:12,fontWeight:800,minWidth:64,color:'#fff'}}>{sysLabels[sys]||sys}</span>
             <div style={{flex:1,height:8,background:'rgba(255,255,255,0.08)',borderRadius:999,overflow:'hidden'}}><div style={{width:`${Math.min(100,val.net)}%`,height:'100%',background:lc.bar,borderRadius:999,transition:'width 0.4s ease'}}/></div>
             <span style={{fontSize:13,fontWeight:800,color:lc.text,minWidth:40,textAlign:'right'}}>{Math.round(val.net)}%</span></div>})}</div> :
-          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Все системы в норме':'Нет данных анализов — отображаются базовые значения'}</div>},
+          <div data-risk-systems-normal={hasLabs && labRisks && labRisks.unprovenCount>0 ? 'no' : undefined} style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?(labRisks&&labRisks.unprovenCount>0?`Отклонений по системам нет, но ${labRisks.unprovenCount} записей без вывода — сторона границы не доказана`:'Все системы в норме'):'Нет данных анализов — отображаются базовые значения'}</div>},
         {key:'markers',icon:'flask' as NativeIconName,title:'Маркеры с отклонениями',
-         body: labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
-          const isHigh=m.deviation>0; const absDev=Math.abs(m.deviation);
-          const dl=absDev<=20?'low':absDev<=50?'medium':absDev<=100?'high':'critical';
+         body: <div>{labRisks && labRisks.deviationCount>0 ? <div style={{display:'grid',gap:3}}>{labRisks.markerDeviations.map(m=>{
+          // Проход 152: сторона — из `side` (доказана числом или границей), процент
+          // есть только у точного числа: у «HDL >0.5» величина неизвестна, поэтому
+          // стрелка без процента, а не полный процент от обрезанного числа.
+          const isHigh=m.side==='high';
+          const absDev=m.deviation==null?null:Math.abs(m.deviation);
+          const dl=absDev==null?'high':absDev<=20?'low':absDev<=50?'medium':absDev<=100?'high':'critical';
           const dc={low:{bg:'rgba(34,197,94,0.06)',text:'#22c55e'},medium:{bg:'rgba(234,179,8,0.06)',text:'#eab308'},high:{bg:'rgba(249,115,22,0.06)',text:'#f97316'},critical:{bg:'rgba(239,68,68,0.06)',text:'#ef4444'}}[dl];
-          return <div key={m.code+m.value} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'10px',borderRadius:12,background:dc.bg,border:`1px solid ${dc.bg.replace('0.06','0.14')}`}}>
+          return <div key={m.code+m.value+(m.bound||'')} data-risk-marker={m.code} data-risk-marker-bound={m.bound?'yes':undefined} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'10px',borderRadius:12,background:dc.bg,border:`1px solid ${dc.bg.replace('0.06','0.14')}`}}>
             <span style={{fontSize:11,color:'#fff',fontWeight:700,minWidth:52}}>{sysLabels[m.system]||m.system}</span>
             <span style={{fontSize:13,fontWeight:800,flex:1,minWidth:0,color:'#fff'}}>{m.name}</span>
             <span style={{fontSize:11,color:'#fff'}}>{m.lln}–{m.uln}</span>
-            <span style={{fontSize:13,fontWeight:800,color:dc.text}}>{m.value} <span style={{fontSize:11,padding:'3px 8px',borderRadius:999,fontWeight:800,background:dc.text+'26',color:'#fff', border:`1px solid ${dc.text}44`}}>{isHigh?'↑':'↓'}{absDev}%</span></span></div>})}</div> :
-          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Все маркеры в норме':'Нет данных анализов — добавьте анализы для просмотра отклонений'}</div>},
+            <span style={{fontSize:13,fontWeight:800,color:dc.text}}>{labValueLabel(m.value, m.bound)} <span style={{fontSize:11,padding:'3px 8px',borderRadius:999,fontWeight:800,background:dc.text+'26',color:'#fff', border:`1px solid ${dc.text}44`}}>{isHigh?'↑':'↓'}{absDev==null?'':absDev+'%'}</span></span></div>})}</div> :
+          <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?(labRisks&&labRisks.unknownCount>0?'Отклонений не найдено, но есть записи без вывода':'Все маркеры в норме'):'Нет данных анализов — добавьте анализы для просмотра отклонений'}</div>}
+          {labRisks && labRisks.unknownCount>0 && <div data-risk-unproven={labRisks.unknownCount} style={{fontSize:11,color:'#fff',textAlign:'center',paddingBottom:8}}>Без вывода: {labRisks.unknownCount} — граница не доказывает сторону или норма неизвестна</div>}
+        </div>},
       ].map(b => (
         <div key={b.key} className="card risk-labs-card" style={{ padding: 0, overflow: 'hidden', marginBottom: 10, borderRadius:18, background:'rgba(20,22,30,0.55)', border:'1px solid rgba(255,255,255,0.09)' }}>
           <button onClick={() => setRiskSections(s => ({...s, [b.key]: !s[b.key]}))} style={{

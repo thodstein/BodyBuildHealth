@@ -3,6 +3,7 @@ import type { LabPoint, RiskResult } from '../core/types';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../core/constants';
 import { getLabNorm } from './lab-norms.engine';
 import { normalizeLabMeasurement } from '../core/labs-mapping';
+import { boundProvesSide, type LabBound } from '../core/lab-bound';
 
 interface RiskSystemContribution {
   [key: string]: number;
@@ -11,6 +12,12 @@ interface RiskSystemContribution {
 interface RiskCalculationResult {
   systemContributions: RiskSystemContribution;
   totalRisk: number;
+  /**
+   * Записи с границей, которая не доказывает сторону (проход 152): «HDL >0.5»
+   * при нижней границе 0.9 не говорит, низкий он или нормальный. Такие записи не
+   * дают вклада в риск и не исчезают молча — их называет этот список.
+   */
+  boundUnproven?: { code: string; value: number; bound: LabBound }[];
 }
 
 /**
@@ -41,6 +48,8 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
   ALL_RISK_SYSTEMS.forEach(system => {
     systemContributions[system] = 0;
   });
+  /** Записи, у которых граница бланка не доказывает сторону (проход 152). */
+  const boundUnproven: { code: string; value: number; bound: LabBound }[] = [];
 
   // Map each lab code to its contribution to risk systems
   // Format: [labCode]: { [system]: weight }
@@ -229,15 +238,26 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
     // Calculate deviation from normal range
     // For normal markers: high → risk, low → risk
     // For inverse markers: low → risk, high → risk (but ULN-side ignored if protective)
+    //
+    // Проход 152: сторону отклонения доказывает либо точное число, либо граница
+    // (`boundProvesSide` — то же правило, что у дневника, трендов и отчёта).
+    // «HDL >0.5» при нижней 0.9 не говорит, низкий он или нормальный: раньше
+    // запись давала полный кардио-риск, будто HDL измерен как 0.5. Хуже —
+    // «СРБ <5» при верхней 3 в обратную сторону было безопасно только случайно.
+    const side = boundProvesSide(lab.bound, norm, lln, uln);
+    if (lab.bound && !side) {
+      boundUnproven.push({ code, value: norm, bound: lab.bound });
+      return;
+    }
     let deviation = 0;
     if (!isInverse) {
       // Normal direction: above ULN = risk
-      if (norm > uln) {
+      if (side === 'high' && norm > uln) {
         deviation = (norm - uln) / uln;
       }
     } else {
       // Inverse direction: below LLN = risk (above ULN = protective → 0)
-      if (norm < lln) {
+      if (side === 'low' && norm < lln) {
         deviation = (lln - norm) / lln;
       }
     }
@@ -307,6 +327,7 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
   // Otherwise return RiskCalculationResult format
   return {
     systemContributions,
-    totalRisk: Math.min(100, Math.max(0, totalRisk))
+    totalRisk: Math.min(100, Math.max(0, totalRisk)),
+    boundUnproven,
   };
 }

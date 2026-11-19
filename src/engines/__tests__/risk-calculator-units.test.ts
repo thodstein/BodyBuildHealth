@@ -64,6 +64,9 @@ describe('проход 93: единица бланка в рисках по ан
     expect(labs).toContain('const factor = normalized && lab.value ? normalized.value / lab.value : coeff;');
 
     const risk = readFileSync(resolve(process.cwd(), 'src/ui/screens/RiskScreen.tsx'), 'utf8');
-    expect(risk).toContain('const factor = normalized && lab.value ? normalized.value / lab.value : coeff;');
+    // Проход 152: у экрана «Риск» больше нет своей копии множителя — список
+    // отклонений целиком считает общий модуль (тот же, что в «Анализах»).
+    expect(risk).toContain('computeMarkerDeviations(labs as any, profileSex)');
+    expect(risk).not.toContain('const factor = normalized && lab.value');
   });
 });

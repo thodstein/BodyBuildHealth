@@ -81,6 +81,11 @@ describe('проход 92: ВГН пола в рисках по анализам
     const risk = readFileSync(resolve(process.cwd(), 'src/ui/screens/RiskScreen.tsx'), 'utf8');
     expect(risk).toContain('calculateRiskFromAnalyses(labData, profileSex)');
     expect(risk).toContain('calculateRiskFromAnalyses(result, linked.labs, profileSex)');
-    expect(risk).toContain('getLabNorm(lab.code, profileSex)');
+    // Проход 152: у экрана «Риск» больше нет своей копии нормы — список отклонений
+    // считает общий модуль, куда пол приходит вместе с `sex`.
+    expect(risk).toContain('computeMarkerDeviations(labs as any, profileSex)');
+    expect(risk).not.toContain('getLabNorm(lab.code, profileSex)');
+    const markerRisks = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen_parts/lab-marker-risks.ts'), 'utf8');
+    expect(markerRisks).toContain('getLabNorm(lab.code, sex)');
   });
 });
