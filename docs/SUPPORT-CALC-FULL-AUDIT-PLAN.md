@@ -2246,7 +2246,7 @@ P2 — вкладка «Анализы»: отображение и индика
 
 **Гарды.** `lab-trend-bound` (новый, 9): точные пары считаются как раньше (рост в норме → норма; выход из нормы → critical и «ухудшения»); «>1000» после 200 — `currentAbnormal true`, направление/разность пустые, значимость `significant`, не в «ухудшениях», но в «Новых отклонениях»; «>5» — сторона не доказана, `normal`, подсказка про обрезанные значения; граница у прошлой записи снимает разность; точки несут `bound`; прогноз по точным точкам есть, при одной обрезанной — нет; CSV содержит `>1000` и `unknown`.
 
-**Прогон.** `lab-trend-bound` — 9 зелёных; `lab-trend`, `lab-trend-fix`, `lab-trend-insights`, `labs-risk-native`, `labs-risk-visual`, `LabsScreen_parts/__tests__` — 8 файлов, 58 зелёных; `tsc` чистый; `verify:apk-design` OK.
+**Прогон.** `lab-trend-bound` — 9 зелёных; `lab-trend`, `lab-trend-fix`, `lab-trend-insights`, `labs-risk-native`, `labs-risk-visual`, `LabsScreen_parts/__tests__` — 8 файлов, 58 зелёных; `src/engines` целиком — 988 файлов, 981 зелёный / 4 пропущено и 14 683 теста зелёных (красные — чужие: `diary-mmc-checkin-integration`, `bb-back-quality.integration`, `bb-zero-state-snapshots` из WIP bb/пищевого контура); `tsc` чистый; `verify:apk-design` OK.
 
 **Осталось.** Спарклайн в `TrendRow` рисует обрезанную точку как обычную (знак виден только в строке и в подписи большого графика) — отдельный проход, если понадобится маркер на самой линии.
 
