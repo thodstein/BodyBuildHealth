@@ -2284,7 +2284,7 @@ P2 — вкладка «Анализы»: отображение и индика
 
 **Гарды.** `lab-marker-risks` (новый, 8): 600 при 30–300 — 100% и `high`; 200 — норма; «>1000» — сторона доказана, `deviation: null`; «>5» — без вывода; «<20» — `low` без процента; «<500» — без вывода; сортировка (ALT 200% раньше обрезанного FERRITIN); неизвестный код — без вывода. `labs-marker-risks-ui` (новый, DOM, 3): «>1000» — «>1000 вне нормы» без «%» и `data-lab-marker-percent="none"`; «>5» + нормальный ALT — «В норме: 1 · без вывода: 1», не «Все маркеры в норме»; всё в норме — прежний текст.
 
-**Прогон.** Новые гарды — 11 зелёных; `labs-risk-native`, `labs-risk-visual`, `LabsScreen_parts/__tests__`, `labs-marker-risks-ui`, `labs-diary-delete`, `labs-phase-diary-sync`, `lab-bound-sides` — 10 файлов, 59 зелёных; `tsc` чистый; `verify:apk-design` OK.
+**Прогон.** Новые гарды — 11 зелёных; `labs-risk-native`, `labs-risk-visual`, `LabsScreen_parts/__tests__`, `labs-marker-risks-ui`, `labs-diary-delete`, `labs-phase-diary-sync`, `lab-bound-sides` — 10 файлов, 59 зелёных; `tsc` — в моих файлах ошибок нет (две ошибки `MUSCLE_EX_CAP` в `src/engines/bb/bb-builder.engine.ts` — чужой WIP, к проходу не относятся); `verify:apk-design` OK.
 
 ### Осознанные отклонения
 - Кураторская база + производный fallback вместо ручного переписывания 12k-строчного каталога. Деривация консервативна и всегда помечена `q='C'` — «правдоподобно», а не «доказано».
