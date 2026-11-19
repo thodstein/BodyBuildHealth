@@ -110,7 +110,7 @@ describe('источник: единица применяется на обои�
   const helpers = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
 
   it('интерпретация читает E2 через e2PgPerMl', () => {
-    expect(analysis).toContain("if (upper === 'ESTRADIOL') return e2PgPerMl(lab.value, lab.unit);");
+    expect(analysis).toContain("if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };");
   });
 
   it('плоский список анализов читает E2 через e2PgPerMl', () => {

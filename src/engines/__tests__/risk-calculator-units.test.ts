@@ -58,7 +58,9 @@ describe('проход 93: единица бланка в рисках по ан
     const engine = readFileSync(resolve(process.cwd(), 'src/engines/risk-calculator-v2.engine.ts'), 'utf8');
     expect(engine).toContain('normalizeLabMeasurement(code, value, String(unit)).value');
 
-    const labs = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen.tsx'), 'utf8');
+    // Проход 147: список отклонений маркеров переехал в
+    // `LabsScreen_parts/lab-marker-risks.ts` — множитель от единицы строится там.
+    const labs = readFileSync(resolve(process.cwd(), 'src/ui/screens/LabsScreen_parts/lab-marker-risks.ts'), 'utf8');
     expect(labs).toContain('const factor = normalized && lab.value ? normalized.value / lab.value : coeff;');
 
     const risk = readFileSync(resolve(process.cwd(), 'src/ui/screens/RiskScreen.tsx'), 'utf8');

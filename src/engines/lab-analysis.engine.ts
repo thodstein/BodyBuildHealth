@@ -1,6 +1,7 @@
 // Lab Analysis Engine — interprets lab values into mechanisms, organs, systems, risks
 import type { LabPoint } from '../core/types';
 import { convertToUnit } from '../core/labs-mapping';
+import { boundProvesSide, boundsComparable, type LabBound } from '../core/lab-bound';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl,
@@ -26,6 +27,13 @@ export interface LabCompositeResult {
   kidneyStress: number;
   hormoneScore: number;
   interpretations: LabInterpretation[];
+  /**
+   * Маркеры, у которых в бланке стоит граница, а сторону она не доказывает
+   * (проход 150): «СРБ <5» при верхней 3 не говорит ни «выше», ни «в норме».
+   * Такие записи не превращаются в вывод и не исчезают молча — их называет этот
+   * список (экран маркеров считает их «без вывода» своим счётчиком, проход 147).
+   */
+  boundUnproven?: { code: string; value: number; bound: LabBound }[];
 }
 
 export type RiskModelType = 'standard' | 'lab_weighted' | 'mechanism_driven' | 'pharma_integrated';
@@ -164,7 +172,14 @@ const LAB_CODE_ALIASES: Record<string, string[]> = {
   APO_A1: ['APOA1'],
 };
 
-function findLab(labs: LabPoint[], code: string): number | null {
+/**
+ * Значение маркера вместе со знаком границы из бланка (проход 150).
+ *
+ * Возвращает `null`, если записи нет. Знак едет рядом с числом: без него
+ * «СРБ <5» не отличается от «СРБ 5», и движок делал вывод о стороне, которую
+ * бланк не доказал.
+ */
+function findLabPoint(labs: LabPoint[], code: string): { value: number; bound?: LabBound } | null {
   const upper = code.toUpperCase();
   const lab = labs.find(l => {
     const lc = l.code?.toUpperCase() || '';
@@ -181,9 +196,54 @@ function findLab(labs: LabPoint[], code: string): number | null {
   // пролактин «15 нг/мл» — как 15 мЕд/л. Проход 84: если единицу разобрать не
   // удалось, у E2 остаётся честный перевод пмоль/л.
   const converted = convertToUnit(code, lab.value, lab.unit || '', REFERENCE_RANGES[code]?.unit || '');
-  if (converted !== null) return converted;
-  if (upper === 'ESTRADIOL') return e2PgPerMl(lab.value, lab.unit);
-  return lab.value;
+  // Пересчёт единицы — умножение на положительный коэффициент: знак границы
+  // при этом не меняется, поэтому он переносится как есть.
+  if (converted !== null) return { value: converted, bound: lab.bound };
+  if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };
+  return { value: lab.value, bound: lab.bound };
+}
+
+function findLab(labs: LabPoint[], code: string): number | null {
+  return findLabPoint(labs, code)?.value ?? null;
+}
+
+/**
+ * Число, пригодное для вывода (проход 150).
+ *
+ * Точное число — как есть. С границей — только если граница доказывает сторону,
+ * которая для этого маркера означает «плохо» (`bad`): «ALT >1000» доказывает
+ * высокое, «HDL <0.5» — низкое, а «СРБ <5» при верхней 3 не доказывает ничего и
+ * считается отсутствующим измерением, а не точным числом.
+ */
+function usable(
+  read: { value: number; bound?: LabBound } | null,
+  low: number | undefined,
+  high: number | undefined,
+  bad: 'high' | 'low' | 'both' = 'high',
+): number | null {
+  if (!read) return null;
+  if (!read.bound) return read.value;
+  const side = boundProvesSide(read.bound, read.value, low, high);
+  if (!side) return null;
+  if (bad === 'both') return read.value;
+  return side === bad ? read.value : null;
+}
+
+/**
+ * Число маркера для составного индекса (проход 150).
+ *
+ * Точное — как есть. С границей — только если доказана «плохая» сторона
+ * (`usable`), иначе маркер считается неизмеренным и берётся прежнее значение по
+ * умолчанию: индекс не должен ни расти, ни падать от обрезанного числа.
+ */
+function metric(labs: LabPoint[], code: string, fallback: number, bad: 'high' | 'low' | 'both' = 'high'): number {
+  const ref = REFERENCE_RANGES[code];
+  return usable(findLabPoint(labs, code), ref?.low, ref?.high, bad) ?? fallback;
+}
+
+/** Число без границы: «>N» не даёт ни отношения, ни вывода о стороне. */
+function exactOnly(read: { value: number; bound?: LabBound } | null): number | null {
+  return read && !read.bound ? read.value : null;
 }
 
 export function computeHOMA_IR(glucose: number, insulin: number): number {
@@ -194,10 +254,12 @@ export function computeHOMA_IR(glucose: number, insulin: number): number {
 export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?: CycleState | null): LabCompositeResult {
   const fem = sex === 'female';
   const interpretations: LabInterpretation[] = [];
+  const boundUnproven: { code: string; value: number; bound: LabBound }[] = [];
 
   for (const [code, ref] of Object.entries(REFERENCE_RANGES)) {
-    const value = findLab(labs, code);
-    if (value === null) continue;
+    const read = findLabPoint(labs, code);
+    if (read === null) continue;
+    const value = read.value;
 
     // ♀ — женские границы того же маркера (без sex — прежний мужской ряд).
     const r = fem ? { ...ref, ...(FEMALE_REFERENCE_OVERRIDES[code] || {}) } : ref;
@@ -223,24 +285,34 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     }
 
     let status: LabInterpretation['status'] = 'normal';
-    // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой)
-    if (value < bounds.low) status = 'low';
-    else if (value > bounds.criticalHigh) status = 'critical_high';
-    else if (value > bounds.high) status = 'high';
+    // Проход 150: сторону отклонения доказывает либо точное число, либо граница
+    // (`boundProvesSide` — то же правило, что у дневника, трендов и отчёта).
+    // «СРБ <5» при верхней границе 3 не говорит ни «выше», ни «в норме»: вывода
+    // нет, запись попадает в `boundUnproven`, а не в «системное воспаление».
+    const proven = boundProvesSide(read.bound, value, bounds.low, bounds.high);
+    if (!proven) {
+      if (read.bound) boundUnproven.push({ code, value, bound: read.bound });
+      continue;
+    }
+    status = proven;
+    // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой).
+    // Проход 150: «>N» при N ≥ критической границы доказывает критическое, а
+    // точное число — строгим сравнением, как раньше.
+    if (proven === 'high' && (value > bounds.criticalHigh || (read.bound === '>' && value >= bounds.criticalHigh))) {
+      status = 'critical_high';
+    }
 
-    if (status !== 'normal') {
-      // Проход 82: женщине высокий ЛГ/ФСГ не приписываем мужской механизм
-      // «подавление оси» и риск «низкий тестостерон». Высокий гонадотропин у неё
-      // — не подавление, а пик овуляции / СПКЯ / перименопауза, и разбирается он
-      // фазой (строка результата уже фазово-честная) и клиникой, а не этой
-      // механикой. Низкий гонадотропин остаётся: подавление оси на курсе — ровно
-      // то, что этот механизм и должен ловить.
-      const maleFramedHigh = fem && (code === 'LH' || code === 'FSH') && status !== 'low';
-      const mapped = LAB_MECHANISM_MAP[code];
-      if (mapped && !maleFramedHigh) {
-        const riskPct = status === 'critical_high' ? 40 : status === 'high' ? 25 : 15;
-        interpretations.push({ code, value, status, ...mapped, riskPercent: riskPct });
-      }
+    // Проход 82: женщине высокий ЛГ/ФСГ не приписываем мужской механизм
+    // «подавление оси» и риск «низкий тестостерон». Высокий гонадотропин у неё
+    // — не подавление, а пик овуляции / СПКЯ / перименопауза, и разбирается он
+    // фазой (строка результата уже фазово-честная) и клиникой, а не этой
+    // механикой. Низкий гонадотропин остаётся: подавление оси на курсе — ровно
+    // то, что этот механизм и должен ловить.
+    const maleFramedHigh = fem && (code === 'LH' || code === 'FSH') && status !== 'low';
+    const mapped = LAB_MECHANISM_MAP[code];
+    if (mapped && !maleFramedHigh) {
+      const riskPct = status === 'critical_high' ? 40 : status === 'high' ? 25 : 15;
+      interpretations.push({ code, value, status, ...mapped, riskPercent: riskPct });
     }
   }
 
@@ -253,7 +325,9 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
   // тело не сформировалось). В фолликулярную низкий прогестерон — норма, а без
   // дня цикла судить нельзя вовсе, поэтому фазы нет — молчим.
   if (fem && cycle?.phase === 'luteal') {
-    const prog = findLab(labs, 'PROGESTERONE');
+    // Проход 150: обрезанный прогестерон («<5») не доказывает ановуляцию —
+    // отношение/сравнение с коридором требует точного числа.
+    const prog = exactOnly(findLabPoint(labs, 'PROGESTERONE'));
     const band = phaseHormoneBand('PROG', 'luteal');
     if (prog !== null && band && prog < band.low) {
       interpretations.push({
@@ -276,8 +350,10 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
   // коридора (10 МЕ/л) на базовой линии — снижение овариального резерва. Оба
   // порога — те же, что в панелях либидо и фертильности, не новые числа.
   if (fem && (cycle?.phase === 'follicular' || cycle?.phase === 'menstrual')) {
-    const lh = findLab(labs, 'LH');
-    const fsh = findLab(labs, 'FSH');
+    // Проход 150: ЛГ/ФСГ берутся только точными — отношение «>N»/«<N» не
+    // считается, иначе «ЛГ >10» превращалось в «СПКЯ» без числа.
+    const lh = exactOnly(findLabPoint(labs, 'LH'));
+    const fsh = exactOnly(findLabPoint(labs, 'FSH'));
     const fshBand = phaseHormoneBand('FSH', 'follicular');
     const lhBaseHigh = fshBand ? fshBand.high : null;
     if (lhBaseHigh !== null) {
@@ -310,38 +386,52 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
 
   const glucose = findLab(labs, 'GLUCOSE') ?? 0;
   const insulin = findLab(labs, 'INSULIN') ?? 0;
-  const homaIR = glucose > 0 && insulin > 0 ? computeHOMA_IR(glucose, insulin) : null;
+  // Проход 150: HOMA-IR — только по двум точным числам. Граница любой половины
+  // («глюкоза >20») делает HOMA неизвестным, а не нижней оценкой.
+  const glucoseRead = findLabPoint(labs, 'GLUCOSE');
+  const insulinRead = findLabPoint(labs, 'INSULIN');
+  const homaIR =
+    boundsComparable(glucoseRead?.bound, insulinRead?.bound) && glucose > 0 && insulin > 0
+      ? computeHOMA_IR(glucose, insulin)
+      : null;
 
   // Индекс печени — в долях ВГН пациента (♀ 31, ♂ 40): раньше всегда делили на
   // мужские 40, и её АЛТ 35 давал заниженный «стресс печени». Пустые значения по
   // умолчанию держат индекс на прежнем уровне (75) у обоих полов.
   const lftBase = fem ? LFT_ULN.ALT.female : LFT_ULN.ALT.male;
   const defaultLft = Math.round(30 * (lftBase / 40));
-  const alt = findLab(labs, 'ALT') ?? defaultLft;
-  const ast = findLab(labs, 'AST') ?? defaultLft;
-  const ggt = findLab(labs, 'GGT') ?? defaultLft;
+  const alt = metric(labs, 'ALT', defaultLft);
+  const ast = metric(labs, 'AST', defaultLft);
+  const ggt = metric(labs, 'GGT', defaultLft);
   const liverStress = Math.round(((alt + ast + ggt) / 3 / lftBase) * 100);
 
-  const ldl = findLab(labs, 'LDL') ?? 2.5;
-  const hdl = findLab(labs, 'HDL') ?? 1.3;
-  const tg = findLab(labs, 'TRIGLYCERIDES') ?? 1.2;
-  const apob = findLab(labs, 'APOB') ?? 0.8;
+  // Проход 150: для HDL «плохо» — низкое, для остальных липидов — высокое.
+  const ldl = metric(labs, 'LDL', 2.5);
+  const hdl = metric(labs, 'HDL', 1.3, 'low');
+  const tg = metric(labs, 'TRIGLYCERIDES', 1.2);
+  const apob = metric(labs, 'APOB', 0.8);
   const cardioRisk = Math.round(((ldl + apob * 3 + tg / 2) / (hdl || 1)) * 10);
 
-  const crp = findLab(labs, 'CRP') ?? 1.5;
-  const ferritin = findLab(labs, 'FERRITIN') ?? 100;
+  const crp = metric(labs, 'CRP', 1.5);
+  const ferritin = metric(labs, 'FERRITIN', 100);
   const inflammation = Math.round(crp + (ferritin / 100));
 
   // Индекс почек — от ВГН креатинина пациента (♀ 97, ♂ 110), а не от 110 для всех.
   const crBase = fem ? CREATININE_ULN.female : CREATININE_ULN.male;
-  const creatinine = findLab(labs, 'CREATININE') ?? Math.round(90 * (crBase / 110));
-  const urea = findLab(labs, 'UREA') ?? 5;
+  const creatinine = metric(labs, 'CREATININE', Math.round(90 * (crBase / 110)));
+  const urea = metric(labs, 'UREA', 5);
   const kidneyStress = Math.round(((creatinine / crBase) * 60 + (urea / 8.3) * 40));
 
-  const testTotal = findLab(labs, 'TESTOSTERONE_TOTAL');
-  const testFree = findLab(labs, 'TESTOSTERONE_FREE');
-  const e2 = findLab(labs, 'ESTRADIOL');
-  const prolactin = findLab(labs, 'PROLACTIN');
+  // Гормоны штрафуются за обе стороны, поэтому доказанная граница годится в любую
+  // сторону; недоказанная — как отсутствие записи (штрафа нет, вывода нет).
+  const refTT = REFERENCE_RANGES.TESTOSTERONE_TOTAL;
+  const refFT = REFERENCE_RANGES.TESTOSTERONE_FREE;
+  const refE2 = REFERENCE_RANGES.ESTRADIOL;
+  const refPrl = REFERENCE_RANGES.PROLACTIN;
+  const testTotal = usable(findLabPoint(labs, 'TESTOSTERONE_TOTAL'), refTT.low, refTT.high, 'both');
+  const testFree = usable(findLabPoint(labs, 'TESTOSTERONE_FREE'), refFT.low, refFT.high, 'both');
+  const e2 = usable(findLabPoint(labs, 'ESTRADIOL'), refE2.low, refE2.high, 'both');
+  const prolactin = usable(findLabPoint(labs, 'PROLACTIN'), refPrl.low, refPrl.high, 'high');
   let hormoneScore = 0;
   // ♀ Низкий тестостерон — не дефицит (у неё нормы другие), штраф только мужчинам.
   if (!fem && testTotal !== null && testTotal < 15) hormoneScore += 30;
@@ -379,7 +469,7 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
 
   hormoneScore = Math.min(100, hormoneScore);
 
-  return { homaIR, liverStress, cardioRisk, inflammation, kidneyStress, hormoneScore, interpretations };
+  return { homaIR, liverStress, cardioRisk, inflammation, kidneyStress, hormoneScore, interpretations, boundUnproven };
 }
 
 export function computeRiskByModel(
