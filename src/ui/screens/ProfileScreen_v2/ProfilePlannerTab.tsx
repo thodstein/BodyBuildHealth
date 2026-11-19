@@ -5,6 +5,12 @@
  * отметкой «сделано», привязка к атлету, блок «просрочено» и быстрые кнопки
  * «сегодня/завтра».
  *
+ * Плюс авто-события (coach-agenda.engine): тренировки, инъекции, приём БАДов,
+ * приёмы пищи, закупки продуктов/БАДов/фармы и контрольные анализы приезжают в
+ * календарь сами. Человек сам решает, какие источники показывать. Такие
+ * события — только чтение: они не превращаются в задачи, не отмечаются здесь и
+ * не меняют чужие дневники.
+ *
  * Чего сознательно НЕТ, чтобы не обещать лишнего:
  *  • повторяющихся серий (без честного механизма повторов лучше не делать вид);
  *  • напоминаний и пушей — планёр их не отправляет;
@@ -14,7 +20,7 @@
  * Даты — только через канон core/local-date: `toISOString()` в UTC+10 вечером
  * даёт вчера и уводит задачу на сутки.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { NativeIcon } from '../../native/NativeIcons';
 import { colors, withAlpha } from './ui';
 import { localIsoDate, shiftIsoDate } from '../../../core/local-date';
@@ -50,6 +56,16 @@ import {
   type CoachTaskList,
   type CoachTaskPriority,
 } from '../../../engines/coach/coach-planner.engine';
+import {
+  AGENDA_SOURCES,
+  agendaSourceMeta,
+  collectAgenda,
+  countAgendaByDate,
+  countAgendaBySource,
+  readAgendaSources,
+  writeAgendaSources,
+  type AgendaSourceId,
+} from '../../../engines/coach/coach-agenda.engine';
 
 const BLUE = '#60a5fa';
 
@@ -139,6 +155,25 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
   });
   const [error, setError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Что подтягивать из приложения: выбор живёт отдельно от задач и не меняет
+  // чужие дневники. Данные читаются заново при возврате вкладки/фокусе.
+  const [sources, setSources] = useState<AgendaSourceId[]>(() => readAgendaSources(ls()));
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1);
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') bump();
+    };
+    window.addEventListener('focus', bump);
+    window.addEventListener('storage', bump);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', bump);
+      window.removeEventListener('storage', bump);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const nameOf = (id: string | null): string =>
     id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
@@ -163,6 +198,38 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
   const listCounts = useMemo(() => countTasksByList(store), [store]);
   const overdue = useMemo(() => overdueCoachTasks(store, today), [store, today]);
   const doneCount = dayTasks.filter(t => t.done).length;
+
+  // Авто-события из других разделов. Только чтение: планёр их не отмечает и
+  // не копирует в задачи. Диапазон — вся видимая сетка, чтобы точки в
+  // календаре были честными и для соседних месяцев.
+  const agenda = useMemo(() => {
+    const flat = grid.flat();
+    const first = flat[0]?.iso ?? selected;
+    const last = flat[flat.length - 1]?.iso ?? selected;
+    // Диапазон сетки + выбранный день: при листании месяца выбранный день
+    // может оказаться вне сетки, и его события не должны пропадать.
+    const from = first < selected ? first : selected;
+    const to = last > selected ? last : selected;
+    return collectAgenda(ls(), { from, to, today, sources });
+    // refreshTick — осознанная зависимость: другие модули пишут в свои ключи,
+    // поэтому перечитываем при возврате на вкладку, а не по таймеру.
+  }, [grid, today, sources, refreshTick, selected]);
+  const agendaCounts = useMemo(() => countAgendaByDate(agenda), [agenda]);
+  const agendaInGrid = useMemo(() => {
+    const flat = grid.flat();
+    const first = flat[0]?.iso ?? selected;
+    const last = flat[flat.length - 1]?.iso ?? selected;
+    return agenda.filter(ev => ev.date >= first && ev.date <= last);
+  }, [agenda, grid, selected]);
+  const sourceCounts = useMemo(() => countAgendaBySource(agenda), [agenda]);
+  const dayAgenda = useMemo(() => agenda.filter(ev => ev.date === selected), [agenda, selected]);
+
+  const toggleSource = (id: AgendaSourceId) => {
+    const next = sources.includes(id) ? sources.filter(s => s !== id) : [...sources, id];
+    setSources(writeAgendaSources(ls(), next));
+  };
+
+  const enableAllSources = () => setSources(writeAgendaSources(ls(), AGENDA_SOURCES.map(s => s.id)));
 
   const add = () => {
     const res = addCoachTask(store, {
@@ -241,6 +308,7 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
             </div>
             <div style={{ fontSize: 11, color: colors.textSubtle }}>
               {store.items.length} задач всего · {overdue.length} просрочено
+              {agendaInGrid.length > 0 ? ` · ${agendaInGrid.length} событий` : ''}
             </div>
           </div>
           <button
@@ -267,17 +335,20 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
             <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
               {week.map(cell => {
                 const count = counts[cell.iso] ?? 0;
+                const autoCount = agendaCounts[cell.iso] ?? 0;
+                const total = count + autoCount;
                 const isSelected = cell.iso === selected;
                 return (
                   <button
                     key={cell.iso}
                     type="button"
                     onClick={() => selectIso(cell.iso)}
-                    aria-label={`${cell.iso}${count ? `, задач: ${count}` : ''}`}
+                    aria-label={`${cell.iso}${count ? `, задач: ${count}` : ''}${autoCount ? `, событий: ${autoCount}` : ''}`}
                     aria-pressed={isSelected}
                     data-planner="cell"
                     data-date={cell.iso}
                     data-count={count}
+                    data-auto-count={autoCount}
                     data-in-month={cell.inMonth}
                     data-selected={isSelected}
                     style={{
@@ -317,12 +388,18 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                       {cell.day}
                     </span>
                     <span style={{ display: 'flex', gap: 2, height: 5 }}>
-                      {count > 0 &&
-                        Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+                      {total > 0 &&
+                        Array.from({ length: Math.min(total, 3) }).map((_, i) => (
                           <span
                             key={i}
                             aria-hidden="true"
-                            style={{ width: 4, height: 4, borderRadius: '50%', background: count > 3 ? '#f59e0b' : BLUE }}
+                            style={{
+                              width: 4,
+                              height: 4,
+                              borderRadius: '50%',
+                              // Свои задачи — синие/янтарные, события из разделов — лиловые.
+                              background: i < Math.min(count, 3) ? (count > 3 ? '#f59e0b' : BLUE) : '#a78bfa',
+                            }}
                           />
                         ))}
                     </span>
@@ -390,18 +467,87 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
         />
       </div>
 
+      {/* Что подтягивать из приложения */}
+      <div style={cardStyle} data-planner="sources">
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Подтягивать в планёр</div>
+          <div style={{ fontSize: 11, color: colors.textSubtle }}>
+            {sources.length}/{AGENDA_SOURCES.length} включено
+          </div>
+        </div>
+        <div style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 4, lineHeight: 1.5 }}>
+          События из разделов появляются в календаре сами и перечитываются при возврате на
+          вкладку. Отмечаются они в своём разделе — планёр их не меняет.
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+          {AGENDA_SOURCES.map(src => {
+            const active = sources.includes(src.id);
+            return (
+              <button
+                key={src.id}
+                type="button"
+                onClick={() => toggleSource(src.id)}
+                aria-pressed={active}
+                title={src.hint}
+                data-planner="source-chip"
+                data-source={src.id}
+                data-active={active}
+                style={{
+                  minHeight: 36,
+                  padding: '6px 11px',
+                  borderRadius: 999,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  border: `1px solid ${active ? withAlpha(src.color, '99') : 'rgba(255,255,255,0.12)'}`,
+                  background: active ? withAlpha(src.color, '26') : 'rgba(255,255,255,0.03)',
+                  color: active ? '#fff' : colors.textMuted,
+                  opacity: active ? 1 : 0.72,
+                }}
+              >
+                <span aria-hidden="true">{src.icon}</span>
+                {src.label}
+                <span style={{ opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}>{sourceCounts[src.id]}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setRefreshTick(t => t + 1)}
+            data-planner="source-refresh"
+            style={{ ...btn('ghost'), fontSize: 12 }}
+          >
+            Обновить
+          </button>
+          {sources.length < AGENDA_SOURCES.length && (
+            <button type="button" onClick={enableAllSources} data-planner="source-all" style={{ ...btn('ghost'), fontSize: 12 }}>
+              Включить всё
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Задачи дня + добавление */}
       <div style={cardStyle} data-planner="day">
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>{fmtHuman(selected)}</div>
           <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
             {doneCount}/{dayTasks.length} сделано
+            {dayAgenda.length > 0 ? ` · ${dayAgenda.length} из приложения` : ''}
           </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-          {dayTasks.length === 0 && (
+          {dayTasks.length === 0 && dayAgenda.length === 0 && (
             <div style={{ fontSize: 12, color: colors.textMuted }}>На этот день задач нет.</div>
+          )}
+          {dayTasks.length === 0 && dayAgenda.length > 0 && (
+            <div style={{ fontSize: 12, color: colors.textMuted }}>Своих задач нет — ниже события из приложения.</div>
           )}
           {dayTasks.map(t => (
             <div
@@ -545,6 +691,87 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
           ))}
         </div>
 
+        {dayAgenda.length > 0 && (
+          <div
+            data-planner="auto"
+            style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
+                Из приложения · {dayAgenda.length}
+              </div>
+              <div style={{ fontSize: 10.5, color: colors.textSubtle }}>только просмотр</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {dayAgenda.map(ev => {
+                const meta = agendaSourceMeta(ev.source);
+                return (
+                  <div
+                    key={ev.id}
+                    data-planner="auto-item"
+                    data-source={ev.source}
+                    data-done={ev.done}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 9,
+                      padding: '9px 11px',
+                      borderRadius: 11,
+                      border: `1px solid ${withAlpha(meta.color, '33')}`,
+                      background: ev.done ? 'rgba(255,255,255,0.02)' : withAlpha(meta.color, '14'),
+                      opacity: ev.done ? 0.62 : 1,
+                      boxShadow: `inset 3px 0 0 ${meta.color}`,
+                    }}
+                  >
+                    <span aria-hidden="true" style={{ fontSize: 13, lineHeight: '18px' }}>
+                      {meta.icon}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: '#fff',
+                          wordBreak: 'break-word',
+                          textDecoration: ev.done ? 'line-through' : undefined,
+                        }}
+                      >
+                        {ev.time && (
+                          <span style={{ color: meta.color, fontVariantNumeric: 'tabular-nums', marginRight: 7 }}>
+                            {ev.time}
+                          </span>
+                        )}
+                        {ev.title}
+                      </div>
+                      {ev.detail && (
+                        <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 3, lineHeight: 1.45 }}>
+                          {ev.detail}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      data-planner="auto-badge"
+                      style={{
+                        flexShrink: 0,
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        color: meta.color,
+                        background: withAlpha(meta.color, '1f'),
+                        border: `1px solid ${withAlpha(meta.color, '3d')}`,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {meta.short}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div
           style={{
             marginTop: 12,
@@ -679,8 +906,8 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
           <NativeIcon name="clock" size={13} />
         </span>
         <span>
-          Планёр — это ваш распорядок: он не меняет тренировочный план и не отправляет
-          уведомления сам по себе.
+          Планёр — это ваш распорядок: события из разделов подтягиваются только на
+          просмотр, планёр не меняет чужие планы и не отправляет уведомления.
         </span>
       </div>
     </div>

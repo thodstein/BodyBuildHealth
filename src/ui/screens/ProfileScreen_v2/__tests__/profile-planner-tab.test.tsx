@@ -3,7 +3,8 @@
  *
  * Проверяем: задача добавляется в выбранный день (локальная дата), отмечается
  * выполненной, переключение месяцев работает, просроченное не исчезает и не
- * переносится само, пустая задача не создаётся с объяснением.
+ * переносится само, пустая задача не создаётся с объяснением. Плюс авто-события
+ * из разделов: приходят на просмотр и выключаются выбором источника.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
@@ -23,6 +24,7 @@ import {
   shiftCoachMonth,
   writeCoachPlanner,
 } from '../../../../engines/coach/coach-planner.engine';
+import { AGENDA_SOURCES, readAgendaSources } from '../../../../engines/coach/coach-agenda.engine';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -181,5 +183,70 @@ describe('пришли из карточки атлета', () => {
     seedAthlete();
     const { container } = render(<ProfilePlannerTab initialAthleteId="ghost" />);
     expect((container.querySelector('[data-planner="athlete"]') as HTMLSelectElement).value).toBe('');
+  });
+});
+
+describe('авто-события из приложения', () => {
+  // День недели «сегодня» в той же нумерации, что и расписание инъекций.
+  const todayDow = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
+  const seedInjection = () => {
+    localStorage.setItem(
+      'he_injection_schedule',
+      JSON.stringify([{ id: 'inj1', substance: 'Test E', dose: '250', daysOfWeek: [todayDow], active: true }]),
+    );
+  };
+  const autoItems = (c: HTMLElement): NodeListOf<HTMLElement> => c.querySelectorAll('[data-planner="auto-item"]');
+
+  it('показывает выбор источников и по умолчанию включает все', () => {
+    const { container } = render(<ProfilePlannerTab />);
+    const chips = container.querySelectorAll('[data-planner="source-chip"]');
+    expect(chips.length).toBe(AGENDA_SOURCES.length);
+    for (const chip of Array.from(chips)) expect(chip.getAttribute('data-active')).toBe('true');
+    expect(readAgendaSources(localStorage)).toEqual(AGENDA_SOURCES.map(s => s.id));
+  });
+
+  it('инъекция из своего раздела попадает в день — только на просмотр', () => {
+    seedInjection();
+    const { container } = render(<ProfilePlannerTab />);
+    const row = container.querySelector('[data-planner="auto-item"][data-source="injections"]') as HTMLElement;
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain('Test E');
+    // В авто-строке нет кнопок: планёр её не отмечает, не переносит и не удаляет.
+    expect(row.querySelectorAll('button')).toHaveLength(0);
+    // И в задачи она не превратилась.
+    expect(items(container)).toHaveLength(0);
+    expect(readCoachPlanner(localStorage).items).toHaveLength(0);
+  });
+
+  it('факт из своего раздела виден как выполненный', () => {
+    seedInjection();
+    localStorage.setItem('he_injection_diary', JSON.stringify([{ date: today, substance: 'Test E' }]));
+    const { container } = render(<ProfilePlannerTab />);
+    const row = container.querySelector('[data-planner="auto-item"][data-source="injections"]') as HTMLElement;
+    expect(row.getAttribute('data-done')).toBe('true');
+  });
+
+  it('выключенный источник исчезает из дня и из точек календаря', () => {
+    seedInjection();
+    const { container } = render(<ProfilePlannerTab />);
+    const cell = container.querySelector(`[data-planner="cell"][data-date="${today}"]`) as HTMLElement;
+    expect(Number(cell.getAttribute('data-auto-count'))).toBeGreaterThan(0);
+    expect(autoItems(container).length).toBeGreaterThan(0);
+
+    fireEvent.click(container.querySelector('[data-planner="source-chip"][data-source="injections"]') as HTMLElement);
+    expect(readAgendaSources(localStorage)).not.toContain('injections');
+    expect(autoItems(container)).toHaveLength(0);
+    const after = container.querySelector(`[data-planner="cell"][data-date="${today}"]`) as HTMLElement;
+    expect(after.getAttribute('data-auto-count')).toBe('0');
+  });
+
+  it('«Включить всё» возвращает все источники', () => {
+    seedInjection();
+    const { container } = render(<ProfilePlannerTab />);
+    fireEvent.click(container.querySelector('[data-planner="source-chip"][data-source="labs"]') as HTMLElement);
+    expect(container.querySelector('[data-planner="source-all"]')).not.toBeNull();
+    fireEvent.click(container.querySelector('[data-planner="source-all"]') as HTMLElement);
+    expect(readAgendaSources(localStorage)).toEqual(AGENDA_SOURCES.map(s => s.id));
+    expect(container.querySelector('[data-planner="source-all"]')).toBeNull();
   });
 });
