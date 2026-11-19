@@ -77,22 +77,27 @@ export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
   if (deltas.length === 0) return <div className="calc-labdelta" style={{ ...GLASS, padding: 12, textAlign: 'center', fontSize: 9, color: 'var(--text-dim)' }}>Нет данных</div>;
   const critical = deltas.filter(d => d.trend === 'critical');
   const worsening = deltas.filter(d => d.trend === 'worsening');
+  const unproven = deltas.filter(d => d.trend === 'unproven');
   // Проход 137: значения показаны в каноне (той же единице, что и направление стрелки),
   // поэтому единица печатается в подсказке строки. `changed` — «изменился, но шкалы,
   // которая говорит, хуже это или лучше, в приложении нет»: не зелёный и не жёлтый.
+  // Проход 156: `unproven` — в бланке граница, и записи не доказывают ни сторону, ни
+  // величину («>1000 → 2000»). Такой тренд не попадает ни в «критические», ни в
+  // «ухудшение» и не рисуется зелёной галочкой.
   const trendMark = (t: LabDelta['trend']) =>
-    t === 'critical' ? '❗' : t === 'worsening' ? '⚠' : t === 'changed' ? '⇄' : '✓';
+    t === 'critical' ? '❗' : t === 'worsening' ? '⚠' : t === 'changed' ? '⇄' : t === 'unproven' ? '?' : '✓';
   const trendColor = (t: LabDelta['trend']) =>
-    t === 'critical' ? '#ef4444' : t === 'worsening' ? '#fbbf24' : t === 'changed' ? 'var(--text-dim)' : '#22c55e';
+    t === 'critical' ? '#ef4444' : t === 'worsening' ? '#fbbf24' : t === 'changed' ? 'var(--text-dim)' : t === 'unproven' ? '#94a3b8' : '#22c55e';
   // Проход 139: в анализе мочи те же подписи, что в крови («Glucose»). Без пометки
   // две строки с одним именем выглядели одной находкой, а ключ списка совпадал.
   const name = (d: LabDelta) => d.panel === 'panelUrinalysis' ? `${d.marker} (моча)` : d.marker;
   return <div className="calc-labdelta">
     {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(name).join(', ')}</span></div>}
     {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(name).join(', ')}</span></div>}
+    {unproven.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8' }}>? Без вывода (в бланке граница): {unproven.map(name).join(', ')}</span></div>}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
       {deltas.slice(0, 16).map(d =>
-        <div key={`${d.panel || ''}|${d.marker}`} title={d.unit ? `${name(d)}, ${d.unit}` : name(d)} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
+        <div key={`${d.panel || ''}|${d.marker}`} data-lab-delta-trend={d.trend} title={`${d.unit ? `${name(d)}, ${d.unit}` : name(d)}${d.trend === 'unproven' ? ' — в бланке граница: ни сторона, ни величина не доказаны' : ''}`} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
           <span style={{ fontWeight: 600, color: 'var(--text)', width: 60 }}>{name(d)}</span>
           <span style={{ color: 'var(--text-dim)' }}>{d.sliceValues.map(v => v ?? '—').join('→')}</span>
           <span style={{ marginLeft: 'auto', color: trendColor(d.trend) }}>{trendMark(d.trend)}</span>

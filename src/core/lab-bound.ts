@@ -103,6 +103,40 @@ export function boundsComparable(a?: LabBound, b?: LabBound): boolean {
 }
 
 /**
+ * Направление изменения, которое доказывают две записи с границами.
+ *
+ * Проход 156: динамика калькулятора сравнивала числа, стоящие за границей, как
+ * точные измерения — «>1000 → 2000» называлось «ухудшением», хотя «>1000» может
+ * быть и 5000. Запись здесь — интервал: «>N» — `[N, +∞)`, «<N» — `(−∞, N]`,
+ * точное число — точка. Направление доказано, только если интервалы не
+ * пересекаются:
+ *  - «>1000 → 300» — вниз (прошлое больше 1000, нынешнее ровно 300);
+ *  - «<0.5 → 3» — вверх (прошлое меньше 0.5, нынешнее ровно 3);
+ *  - «>1000 → 2000» — ничего: прошлое может быть и 2000, и 100000.
+ *
+ * @returns `'up'` / `'down'` — доказано; `undefined` — записи не позволяют судить.
+ */
+export function boundsOrder(
+  a: { value: number; bound?: LabBound },
+  b: { value: number; bound?: LabBound },
+): 'up' | 'down' | undefined {
+  // Интервал записи: граница «>» тянется вверх, «<» — вниз, точное число — точка.
+  const lo = (x: { value: number; bound?: LabBound }) =>
+    x.bound === '>' ? x.value : x.bound === '<' ? -Infinity : x.value;
+  const hi = (x: { value: number; bound?: LabBound }) =>
+    x.bound === '<' ? x.value : x.bound === '>' ? Infinity : x.value;
+
+  if (!a.bound && !b.bound) {
+    if (b.value > a.value) return 'up';
+    if (b.value < a.value) return 'down';
+    return undefined;
+  }
+  if (hi(a) <= lo(b)) return 'up';
+  if (hi(b) <= lo(a)) return 'down';
+  return undefined;
+}
+
+/**
  * Направление и процент изменения между двумя записями — для экранов
  * («было → стало»).
  *

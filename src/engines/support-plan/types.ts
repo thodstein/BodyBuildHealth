@@ -403,7 +403,23 @@ export interface ScheduleItem { substanceId: string; name: string; dose: string;
 // ─── Lab Deltas ───
 // Проход 139: `panel` — из какой панели бланка строка. Без него «Glucose» крови и
 // мочи были бы одной строкой и одним React-ключом в карточке.
-export interface LabDelta { marker: string; panel?: string; sliceValues: (string|undefined)[]; trend: 'stable'|'improving'|'worsening'|'critical'|'changed'; unit?: string; }
+export interface LabDelta {
+  marker: string;
+  panel?: string;
+  /** Значения по бланкам в каноне, со знаком границы бланка («>1000») — проход 156. */
+  sliceValues: (string | undefined)[];
+  /**
+   * Динамика, которую доказывают записи.
+   *
+   * `stable` — сравнение не показало изменения (или сравнивать нечего: одна точка).
+   * `improving` / `worsening` — сторона доказана; `critical` — ещё и величина (нужны
+   * два точных числа). `changed` — записи доказывают изменение, но шкалы, которая
+   * говорит «хуже или лучше», нет. `unproven` — в бланке граница, и ни сторона, ни
+   * величина не доказаны: «>1000 → 2000» (проход 156).
+   */
+  trend: 'stable' | 'improving' | 'worsening' | 'critical' | 'changed' | 'unproven';
+  unit?: string;
+}
 
 // ─── Synergy_ID Groups ───
 export type SynergyId =

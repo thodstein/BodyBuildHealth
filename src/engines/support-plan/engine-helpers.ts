@@ -30,9 +30,14 @@ import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
 import { currentLabSlice } from './lab-slice';
-import { labFieldNumber as num } from './lab-field-number';
+import { labFieldNumber as num, labFieldEntry } from './lab-field-number';
 import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
 import { getLabEntry } from '../../data/lab-tier-ranges';
+// Проход 156: динамика сравнивает только то, что записи доказывают. Знак границы
+// едет в строку вместе с числом (`labFieldEntry`), направление доказывает
+// `boundsOrder`, а разность/процент — только два точных числа (`boundsComparable`).
+import { boundsComparable, boundsOrder, type LabBound } from '../../core/lab-bound';
+import { labValueLabel } from '../../core/lab-value-label';
 
 //  НУТРИЦИОЛОГИЧЕСКИЕ ФУНКЦИИ (body-weight dosing, depletion, UL, t½)
 // ═══════════════════════════════════════════════════════════════
@@ -980,6 +985,11 @@ export function getBlacklist(state: CalculatorState): string[] {
  *
  * Проход 139: имя берётся с панелью (у мочи свои каноны), и строка несёт панель —
  * иначе глюкоза мочи и глюкоза крови были одной строкой динамики.
+ *
+ * Проход 156: граница бланка — часть записи. «>1000 → 2000» больше не «ухудшение»:
+ * прошлое значение неизвестно (может быть 5000), поэтому сторона берётся из
+ * `boundsOrder` (пересекаются ли интервалы), а разность и «критическое» — только
+ * у двух точных чисел (`boundsComparable`). Не доказано — `unproven`, а не «стабильно».
  */
 export function calcLabDeltas(state: CalculatorState): LabDelta[] {
   const slices = [state.labs.preCourse, state.labs.midCourse, state.labs.postPCT];
@@ -989,8 +999,9 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
     label: string;
     panel: string;
     canon: string;
-    raw: (string | undefined)[];
     num: (number | undefined)[];
+    /** Знак границы бланка («>1000» → `'>'`) — часть записи, а не украшение. */
+    bound: (LabBound | undefined)[];
   }
   const rows = new Map<string, Row>();
 
@@ -1006,14 +1017,17 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
         const canon = labMarkerCanon(label, pk);
         let row = rows.get(canon);
         if (!row) {
-          row = { label, panel: pk, canon, raw: [undefined, undefined, undefined], num: [undefined, undefined, undefined] };
+          row = { label, panel: pk, canon, num: [undefined, undefined, undefined], bound: [undefined, undefined, undefined] };
           rows.set(canon, row);
         }
-        row.raw[i] = String(raw);
-        const n = num(raw);
-        row.num[i] = n === undefined
+        // Проход 156: число и знак — из одного чтения (`labFieldEntry`), как и в
+        // ручном вводе. Свой разбор знака здесь читал «>1000» одним путём, а
+        // расчёт другим, и они могли разойтись.
+        const field = labFieldEntry(raw);
+        row.bound[i] = field?.bound;
+        row.num[i] = field === undefined
           ? undefined
-          : readLabValue(label, n, slice.units?.[pk]?.[label], sex).value;
+          : readLabValue(label, field.value, slice.units?.[pk]?.[label], sex).value;
       }
     }
   });
@@ -1028,39 +1042,78 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
     let trend: LabDelta['trend'] = 'stable';
 
     if (defined.length >= 2) {
-      const first = row.num[defined[0]]!;
-      const last = row.num[defined[defined.length - 1]]!;
-      const bothNormal = !!entry
-        && first >= entry.normal[0] && first <= entry.normal[1]
-        && last >= entry.normal[0] && last <= entry.normal[1];
+      const firstI = defined[0];
+      const lastI = defined[defined.length - 1];
+      const first = row.num[firstI]!;
+      const last = row.num[lastI]!;
+      const firstBound = row.bound[firstI];
+      const lastBound = row.bound[lastI];
+      // Проход 156: сторону изменения доказывают обе записи (`boundsOrder`), а
+      // величину — только два точных числа (`boundsComparable`). «>1000 → 2000»
+      // — не «+1000»: прошлое могло быть и 5000.
+      const order = boundsOrder({ value: first, bound: firstBound }, { value: last, bound: lastBound });
+      const dist = (v: number) => (v < entry!.normal[0] ? entry!.normal[0] - v
+        : v > entry!.normal[1] ? v - entry!.normal[1] : 0);
+      // Минимальное и максимальное расстояние до нормы, которое запись доказывает:
+      // «>1000» при норме до 400 — не меньше 600, но может быть и сколько угодно.
+      const minDist = (v: number, bound?: LabBound) => {
+        if (!entry) return 0;
+        if (bound === '>') return Math.max(0, v - entry.normal[1]);
+        if (bound === '<') return Math.max(0, entry.normal[0] - v);
+        return dist(v);
+      };
+      const maxDist = (v: number, bound?: LabBound) => {
+        if (!entry) return 0;
+        return bound ? Number.POSITIVE_INFINITY : dist(v);
+      };
 
-      if (!bothNormal) {
-        const pct = first === 0 ? null : ((last - first) / Math.abs(first)) * 100;
-        const dir = entry?.direction;
-        const dist = (v: number) => (v < entry!.normal[0] ? entry!.normal[0] - v
-          : v > entry!.normal[1] ? v - entry!.normal[1] : 0);
+      if (boundsComparable(firstBound, lastBound)) {
+        const bothNormal = !!entry
+          && first >= entry.normal[0] && first <= entry.normal[1]
+          && last >= entry.normal[0] && last <= entry.normal[1];
+
+        if (!bothNormal) {
+          const pct = first === 0 ? null : ((last - first) / Math.abs(first)) * 100;
+          const dir = entry?.direction;
+          let worse: boolean | null = null;
+          if (dir === 'high') worse = last > first;
+          else if (dir === 'low') worse = last < first;
+          else if (dir === 'both' && entry) worse = dist(last) > dist(first);
+
+          // При первом значении 0 процент не определён: изменение видно, но «критическим»
+          // его не называем (это была бы выдуманная величина), максимум — ухудшение.
+          const magnitude = pct === null ? (last === first ? 0 : 20) : Math.abs(pct);
+          if (worse === null) trend = magnitude >= 20 ? 'changed' : 'stable';
+          else if (worse) trend = magnitude >= 50 ? 'critical' : magnitude >= 20 ? 'worsening' : 'stable';
+          else trend = magnitude >= 20 ? 'improving' : 'stable';
+        }
+      } else if (!entry) {
+        // Шкалы нет — направление можно утверждать только как «изменился», и лишь
+        // когда его доказывают сами записи. Иначе — «не доказано».
+        trend = order ? 'changed' : 'unproven';
+      } else {
+        const dir = entry.direction;
         let worse: boolean | null = null;
-        if (dir === 'high') worse = last > first;
-        else if (dir === 'low') worse = last < first;
-        else if (dir === 'both' && entry) worse = dist(last) > dist(first);
-
-        // При первом значении 0 процент не определён: изменение видно, но «критическим»
-        // его не называем (это была бы выдуманная величина), максимум — ухудшение.
-        const magnitude = pct === null ? (last === first ? 0 : 20) : Math.abs(pct);
-        if (worse === null) trend = magnitude >= 20 ? 'changed' : 'stable';
-        else if (worse) trend = magnitude >= 50 ? 'critical' : magnitude >= 20 ? 'worsening' : 'stable';
-        else trend = magnitude >= 20 ? 'improving' : 'stable';
+        if (dir === 'high') worse = order === 'up' ? true : order === 'down' ? false : null;
+        else if (dir === 'low') worse = order === 'down' ? true : order === 'up' ? false : null;
+        else {
+          // Весь интервал нынешней записи ближе к норме — улучшение доказано; весь
+          // интервал прошлой ближе — ухудшение. Пересечение — доказательства нет.
+          worse = maxDist(last, lastBound) < minDist(first, firstBound) ? false
+            : minDist(last, lastBound) > maxDist(first, firstBound) ? true
+              : null;
+        }
+        // Величина не доказана — «критическим» изменение не называем.
+        if (worse === null) trend = order ? 'changed' : 'unproven';
+        else trend = worse ? 'worsening' : 'improving';
       }
     }
 
     // В карточке показываем числа в каноне (в той же единице, что и стрелка), а знак
     // границы («>1000») сохраняем: выдать «≥» за точное значение нельзя.
-    const shown = row.num.map((v, i) => {
-      if (v === undefined) return undefined;
-      const raw = (row.raw[i] || '').trim();
-      const bound = /^[<>≤≥]/.test(raw) ? raw[0].replace('≤', '<').replace('≥', '>') : '';
-      return `${bound}${Math.round(v * 100) / 100}`;
-    });
+    const shown = row.num.map((v, i) => (
+      v === undefined ? undefined : labValueLabel(Math.round(v * 100) / 100, row.bound[i])
+    ));
 
     res.push({
       marker: row.label,
