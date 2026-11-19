@@ -20,7 +20,7 @@
  * правила чтения). Такие записи называет `labUnreadNotes`.
  */
 import type { LabSlice } from '../../../engines/support-plan';
-import { labFieldNumber } from '../../../engines/support-plan';
+import { labFieldNumber, labFieldUnreadReason } from '../../../engines/support-plan';
 
 /**
  * Ключ — `панель|подпись поля`, значение — причина, которую видит человек.
@@ -107,16 +107,8 @@ export interface UnreadLabField {
   hint: string;
 }
 
-/** Причина, по которой текст не стал числом (чем короче, тем лучше). */
-function unreadHint(text: string): string {
-  const t = text.trim().toLowerCase();
-  if (/^[-–—]$/.test(t)) return 'прочерк в бланке — значения нет';
-  if (/^\++$|^\d*\s*\+$/.test(t)) return 'полоска («1+») не переводится в концентрацию';
-  if (/^(след|trace)/i.test(t)) return '«следы» — не концентрация, числом не читается';
-  if (/^не\s*(обн|найден|опред)/i.test(t) || /^отр/.test(t) || /^neg/i.test(t)) return '«отрицательно» — это не ноль и не число';
-  if (/^полож|^posit/i.test(t)) return '«положительно» — это не число, нужна концентрация';
-  return 'в поле не число — запись сохранена, но расчёт её не видит';
-}
+// Проход 155: таблица причин одна на форму и на экран «Анализы» — она живёт в
+// движке (`labFieldUnreadReason`), здесь остаётся только применение.
 
 /**
  * Заполненные поля, которые читаются моделью, но чьё значение не число. Поля из
@@ -136,7 +128,7 @@ export function labUnreadNotes(slice?: LabSlice | null): UnreadLabField[] {
       const text = String(raw ?? '').trim();
       if (!text) continue;
       if (labFieldNumber(text) !== undefined) continue;
-      out.push({ key, panel, marker, text, hint: unreadHint(text) });
+      out.push({ key, panel, marker, text, hint: labFieldUnreadReason(text) });
     }
   }
   return out;

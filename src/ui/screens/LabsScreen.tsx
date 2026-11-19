@@ -36,6 +36,9 @@ import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
 import { normalizedRatio, normalizeLabMeasurement, ratioPercentLabel } from '../../core/labs-mapping';
 import { labValueLabel } from '../../core/lab-value-label';
+// Проход 155: ручной ввод значения — тем же чтением, что и расчёт (`labFieldEntry`:
+// число + знак границы), иначе «>1000» либо отвергался, либо становился точным 1000.
+import { labFieldEntry, labFieldUnreadReason } from '../../engines/support-plan/lab-field-number';
 import { computeMarkerDeviations, type MarkerRiskSummary } from './LabsScreen_parts/lab-marker-risks';
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
@@ -565,8 +568,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   }, [noLabsSystems]);
 
   const addLab = useCallback(async () => {
-    const val = parseFloat(inputValue);
-    if (!inputCode || isNaN(val)) { setAddError('Введите код и значение'); return; }
+    if (!inputCode.trim()) { setAddError('Введите код маркера'); return; }
+    const text = inputValue.trim();
+    if (!text) { setAddError('Введите значение'); return; }
+    // Проход 155: значение читается тем же правилом, что и расчёт, и знак границы
+    // («>1000») сохраняется. Раньше здесь стоял `parseFloat`: бланк «за пределами
+    // метода» либо отвергался с «Введите код и значение» (значение есть!), либо
+    // становился точным измерением 1000 — и тренд считал по нему разность.
+    const entry = labFieldEntry(text);
+    if (!entry) { setAddError(`Значение не прочитано: ${labFieldUnreadReason(text)}`); return; }
+    const val = entry.value;
     const info = UCUM_MAP[inputCode.toUpperCase()];
     const lab: LabPoint = {
       id: uid(),
@@ -576,6 +587,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       unit: inputUnit || info?.prefUnit || '',
       date: inputDate,
       phase: selectedPhase,
+      bound: entry.bound,
     };
     try {
       await db.init();
@@ -2541,7 +2553,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Значение</label>
-                <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} placeholder="40" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
+                <input type="text" inputMode="decimal" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} placeholder="40 или >1000" style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                 <label style={{ fontSize:12, color:'#fff', fontWeight:700 }}>Единица</label>

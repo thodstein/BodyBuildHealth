@@ -5,7 +5,10 @@ import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 import { getLabNorm, FEMALE_LABS_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
-import { keptBound } from '../../../core/lab-bound';
+import { keptBound, boundProvesSide } from '../../../core/lab-bound';
+// Проход 155: ручной ввод читает число тем же правилом, что и расчёт, и сохраняет
+// знак границы. Свой `parseFloat` здесь выбрасывал «1+», «>1000» и «5,5» молча.
+import { labFieldEntry, labFieldUnreadReason } from '../../../engines/support-plan/lab-field-number';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
@@ -185,6 +188,13 @@ export default function LabsCatalogTab({
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  /**
+   * Проход 155: поля, из которых не вышло числа. Раньше цикл сохранения делал
+   * `continue`, кнопка показывала «Сохранено», а записи не было: человек видел
+   * зелёную галочку и считал, что анализ сохранён. Теперь такие поля называются
+   * с причиной, как в форме калькулятора.
+   */
+  const [skipped, setSkipped] = useState<{ name: string; text: string; reason: string }[]>([]);
   const [openSystems, setOpenSystems] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     systemOrder.forEach(s => { init[s] = true; });
@@ -291,6 +301,7 @@ export default function LabsCatalogTab({
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaved(false);
+    const skippedRows: { name: string; text: string; reason: string }[] = [];
     try {
       await db.init();
       let count = 0;
@@ -299,25 +310,37 @@ export default function LabsCatalogTab({
         await db.put('labs_log', { ...lab, archived: true });
       }
       for (const [code, valStr] of Object.entries(values)) {
-        const val = parseFloat(valStr);
-        if (!valStr || isNaN(val)) continue;
+        if (!String(valStr ?? '').trim()) continue;
+        // Проход 155: число и знак границы — из одного чтения (`labFieldEntry`).
+        // Свой `parseFloat` терял знак и читал «1 000» как 1, «5,5» как 5.
+        const entry = labFieldEntry(valStr);
+        if (!entry) {
+          skippedRows.push({
+            name: UCUM_MAP[code.toUpperCase()]?.name || code,
+            text: String(valStr).trim(),
+            reason: labFieldUnreadReason(valStr),
+          });
+          continue;
+        }
         const info = UCUM_MAP[code.toUpperCase()];
         const lab: LabPoint = {
           id: uid(),
           code: code.toUpperCase(),
           name: info?.name || code,
-          value: val,
+          value: entry.value,
           unit: info?.prefUnit || '',
           date: new Date().toISOString().split('T')[0],
           phase: selectedPhase,
           // Проход 142: число не меняли — знак границы принадлежит тому же
           // результату («>1000» не должен стать просто 1000 при пересохранении).
-          bound: keptBound(existingCodes[code.toUpperCase()], val),
+          // Проход 155: вписанный знак («>1000» в поле) главнее сохранённого ранее.
+          bound: entry.bound ?? keptBound(existingCodes[code.toUpperCase()], entry.value),
         };
         await db.put('labs_log', lab);
         count++;
       }
       if (count > 0) notifyDataChange();
+      setSkipped(skippedRows);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
@@ -529,6 +552,25 @@ export default function LabsCatalogTab({
         </button>
       </div>
 
+      {/* Проход 155: «Сохранено» больше не значит «всё сохранено». Поле, из которого
+          не вышло числа, называлось молча пропущенным — человек видел зелёную
+          галочку и считал, что анализ записан. */}
+      {skipped.length > 0 && (
+        <div data-lab-save-skipped={skipped.length} style={{ ...LABS_CARD_FLAT, padding:'10px 12px', marginBottom:10, borderLeft:'3px solid #f59e0b' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#fbbf24', marginBottom:4 }}>
+            ⚠ Не сохранено — {skipped.length}: в записи нет числа
+          </div>
+          <div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>
+            {skipped.map(s => (
+              <div key={s.name + s.text} data-lab-save-skipped-field={s.name}>
+                • {s.name} «{s.text}» — {s.reason}
+              </div>
+            ))}
+            <div style={{ marginTop:4 }}>Впишите число или его границу («&gt;1000», «&lt;0.5»), и поле станет записью.</div>
+          </div>
+        </div>
+      )}
+
       {/* System filter chips — TOP APK 44px, белый текст */}
       <div className="labs-filter-row" style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', padding:'2px 2px 6px' }}>
         <button onClick={() => { setFilterSys('all'); }} style={{
@@ -585,14 +627,25 @@ export default function LabsCatalogTab({
                     const info = UCUM_MAP[upper];
                     const existing = existingCodes[upper];
                     const val = values[upper] ?? '';
-                    const numVal = parseFloat(val);
-                    const hasVal = val.trim() !== '' && !isNaN(numVal);
+                    // Проход 155: поле читается тем же правилом, что и расчёт. Знак
+                    // границы («>1000») — часть записи, поэтому сторону стрелки
+                    // доказывает `boundProvesSide`, а не сравнение обрезанного числа:
+                    // «>5» при норме 30–300 не «ниже нормы», а «без вывода».
+                    const typed = labFieldEntry(val);
+                    const numVal = typed?.value ?? 0;
+                    const hasVal = !!typed;
+                    const side = typed ? boundProvesSide(typed.bound, typed.value, entry.lln, entry.uln) : undefined;
+                    const rowColor = hasVal
+                      ? (typed!.bound
+                        ? (side === 'high' ? '#ef4444' : side === 'low' ? '#f97316' : '#94a3b8')
+                        : deviationColor(numVal, { uln: entry.uln, lln: entry.lln }))
+                      : '';
                     return (
                       <div key={entry.code} style={{
                         display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14, minHeight:64,
                         background: hasVal? 'rgba(var(--labs-accent-rgb, 0,230,138),0.10)' : existing? 'rgba(59,130,246,0.10)' : 'rgba(255,255,255,0.03)',
                         border:`1px solid ${hasVal? 'rgba(var(--labs-accent-rgb, 0,230,138),0.22)' : existing? 'rgba(59,130,246,0.20)' : 'rgba(140,190,255,0.12)'}`,
-                        borderLeft:`3px solid ${hasVal? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : sysColors[sys]}`,
+                        borderLeft:`3px solid ${hasVal? rowColor : sysColors[sys]}`,
                         cursor:'pointer', transition:'transform 0.12s',
                       }} onClick={() => setDetailEntry(entry)}>
                         {/* Code chip */}
@@ -619,21 +672,21 @@ export default function LabsCatalogTab({
                             onChange={e => { e.stopPropagation(); handleValueChange(upper, e.target.value); }}
                             onClick={e => e.stopPropagation()}
                             placeholder={existing ? labValueLabel(existing.value, existing.bound) : '—'}
-                            type="number"
-                            step="any"
+                            type="text"
+                            inputMode="decimal"
                             aria-label={entry.name}
                             style={{
                               width:60, padding:'10px 8px', background:'rgba(0,0,0,0.30)', minHeight:44,
-                              border:`1px solid ${hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : 'rgba(140,190,255,0.16)'}`,
-                              borderRadius:10, color: hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : '#fff',
+                              border:`1px solid ${hasVal ? rowColor : 'rgba(140,190,255,0.16)'}`,
+                              borderRadius:10, color: hasVal ? rowColor : '#fff',
                               fontSize:13, fontWeight:800, textAlign:'right',
                             }}
                           />
                           <span style={{ fontSize:10, color:'#fff', width:28, textAlign:'left', fontWeight:700 }}>
                             {entry.unit}
                           </span>
-                          <span data-lab-bound={existing?.bound ? 'yes' : undefined} style={{ fontSize:12, width:32, textAlign:'center', fontWeight:800, color: hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : '#fff' }}>
-                            {hasVal ? (numVal > entry.uln ? '▲' : numVal < entry.lln ? '▼' : '✓') : existing ? (existing.bound ?? '📋') : '—'}
+                          <span data-lab-bound={existing?.bound ? 'yes' : undefined} style={{ fontSize:12, width:32, textAlign:'center', fontWeight:800, color: hasVal ? rowColor : '#fff' }}>
+                            {hasVal ? (typed!.bound ? (side === 'high' ? '▲' : side === 'low' ? '▼' : typed!.bound) : (numVal > entry.uln ? '▲' : numVal < entry.lln ? '▼' : '✓')) : existing ? (existing.bound ?? '📋') : '—'}
                           </span>
                         </div>
                       </div>
@@ -658,8 +711,13 @@ export default function LabsCatalogTab({
         const upper = detailEntry.code.toUpperCase();
         const existing = existingCodes[upper];
         const val = values[upper] ?? '';
-        const numVal = parseFloat(val);
-        const hasVal = val.trim() !== '' && !isNaN(numVal);
+        // Проход 155: та же запись (число + знак), что и в строке каталога.
+        const typed = labFieldEntry(val);
+        const hasVal = !!typed;
+        const side = typed ? boundProvesSide(typed.bound, typed.value, detailEntry.lln, detailEntry.uln) : undefined;
+        const rowColor = hasVal
+          ? (side === 'high' ? '#ef4444' : side === 'low' ? '#f97316' : typed!.bound ? '#94a3b8' : 'var(--accent)')
+          : '';
         return (
           <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.70)', display:'flex', alignItems:'flex-end', justifyContent:'center', padding:'12px 12px calc(var(--nav-height, 76px)*2 + max(env(safe-area-inset-bottom, 0px), 28px) + 40px)' }} onClick={() => setDetailEntry(null)}>
             <div style={{ width:'100%', maxWidth:560, zIndex:201, background:'linear-gradient(180deg, rgba(21,38,66,0.96), rgba(12,23,40,0.96))', border:'1px solid rgba(140,190,255,0.16)', borderRadius:'22px', padding:'0 18px calc(18px + env(safe-area-inset-bottom,0px))', boxShadow:'0 24px 64px rgba(0,0,0,0.60)', maxHeight:'80vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
@@ -708,11 +766,11 @@ export default function LabsCatalogTab({
                   value={val}
                   onChange={e => handleValueChange(upper, e.target.value)}
                   placeholder={existing ? labValueLabel(existing.value, existing.bound) : ''}
-                  type="number" step="any" aria-label={detailEntry.name}
+                  type="text" inputMode="decimal" aria-label={detailEntry.name}
                   style={{
                     flex:1, minWidth:100, padding:'10px 12px', background:'rgba(0,0,0,0.30)', minHeight:48,
-                    border:`1px solid ${hasVal ? deviationColor(numVal, {uln:detailEntry.uln,lln:detailEntry.lln}) : 'rgba(140,190,255,0.16)'}`,
-                    borderRadius:12, color: hasVal ? deviationColor(numVal, {uln:detailEntry.uln,lln:detailEntry.lln}) : '#fff',
+                    border:`1px solid ${hasVal ? rowColor : 'rgba(140,190,255,0.16)'}`,
+                    borderRadius:12, color: hasVal ? rowColor : '#fff',
                     fontSize:14, fontWeight:800, textAlign:'right', boxSizing:'border-box',
                   }}
                 />
@@ -720,9 +778,9 @@ export default function LabsCatalogTab({
                 {hasVal && (
                   <span style={{
                     fontSize:12, fontWeight:800, flexShrink:0,
-                    color: numVal > detailEntry.uln ? '#ef4444' : numVal < detailEntry.lln ? '#f97316' : 'var(--accent)',
+                    color: rowColor,
                   }}>
-                    {numVal > detailEntry.uln ? '↑ Выше нормы' : numVal < detailEntry.lln ? '↓ Ниже нормы' : '✓ В норме'}
+                    {side === 'high' ? '↑ Выше нормы' : side === 'low' ? '↓ Ниже нормы' : typed!.bound ? `≈ Без вывода («${typed!.bound}${typed!.value}»)` : '✓ В норме'}
                   </span>
                 )}
               </div>

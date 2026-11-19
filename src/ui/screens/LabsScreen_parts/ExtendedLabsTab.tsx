@@ -5,7 +5,10 @@ import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
-import { keptBound } from '../../../core/lab-bound';
+import { keptBound, boundProvesSide } from '../../../core/lab-bound';
+// Проход 155: ручной ввод читает число тем же правилом, что и расчёт, и сохраняет
+// знак границы — свой `parseFloat` молча выбрасывал «1+», «>1000» и «5,5».
+import { labFieldEntry, labFieldUnreadReason } from '../../../engines/support-plan/lab-field-number';
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
 const PANELS: { id: string; icon: string; label: string; codes: string[] }[] = [
@@ -47,12 +50,6 @@ function getUniquePanelCodes(panelCodes: string[]): string[] {
   });
 }
 
-function deviationColor(value: number, info: { uln: number; lln: number }): string {
-  if (value > info.uln) return '#ef4444';
-  if (value < info.lln) return '#f97316';
-  return 'var(--accent)';
-}
-
 export default function ExtendedLabsTab({
   labs,
   selectedPhase,
@@ -70,6 +67,8 @@ export default function ExtendedLabsTab({
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  /** Проход 155: поля, которые не станут записью, — с причиной, а не молча. */
+  const [skipped, setSkipped] = useState<{ name: string; text: string; reason: string }[]>([]);
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     PANELS.forEach(p => { init[p.id] = true; });
@@ -119,6 +118,7 @@ export default function ExtendedLabsTab({
   const handleSave = useCallback(async () => {
     setSaving(true);
     setSaved(false);
+    const skippedRows: { name: string; text: string; reason: string }[] = [];
     try {
       await db.init();
       let count = 0;
@@ -127,25 +127,37 @@ export default function ExtendedLabsTab({
         await db.put('labs_log', { ...lab, archived: true });
       }
       for (const [code, valStr] of Object.entries(values)) {
-        const val = parseFloat(valStr);
-        if (!valStr || isNaN(val)) continue;
+        if (!String(valStr ?? '').trim()) continue;
+        // Проход 155: число и знак границы — из одного чтения (`labFieldEntry`).
+        // Свой `parseFloat` терял знак и читал «1 000» как 1, «5,5» как 5.
+        const entry = labFieldEntry(valStr);
+        if (!entry) {
+          skippedRows.push({
+            name: UCUM_MAP[code.toUpperCase()]?.name || code,
+            text: String(valStr).trim(),
+            reason: labFieldUnreadReason(valStr),
+          });
+          continue;
+        }
         const info = UCUM_MAP[code.toUpperCase()];
         const lab: LabPoint = {
           id: uid(),
           code: code.toUpperCase(),
           name: info?.name || code,
-          value: val,
+          value: entry.value,
           unit: info?.prefUnit || '',
           date: new Date().toISOString().split('T')[0],
           phase: selectedPhase,
           // Проход 142: число не меняли — знак границы принадлежит тому же
           // результату («>1000» не должен стать просто 1000 при пересохранении).
-          bound: keptBound(existingCodes[code.toUpperCase()], val),
+          // Проход 155: вписанный знак («>1000» в поле) главнее сохранённого ранее.
+          bound: entry.bound ?? keptBound(existingCodes[code.toUpperCase()], entry.value),
         };
         await db.put('labs_log', lab);
         count++;
       }
       if (count > 0) notifyDataChange();
+      setSkipped(skippedRows);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
@@ -212,6 +224,18 @@ export default function ExtendedLabsTab({
         </button>
       </div>
 
+      {/* Проход 155: «Сохранено» больше не значит «всё сохранено» — поле без числа
+          раньше выбрасывалось молча. */}
+      {skipped.length > 0 && (
+        <div data-lab-save-skipped={skipped.length} style={{ marginBottom:10, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:11, color:'#fff', lineHeight:1.5 }}>
+          <div style={{ fontWeight:800, color:'#fbbf24', marginBottom:4 }}>⚠ Не сохранено — {skipped.length}: в записи нет числа</div>
+          {skipped.map(s => (
+            <div key={s.name + s.text} data-lab-save-skipped-field={s.name}>• {s.name} «{s.text}» — {s.reason}</div>
+          ))}
+          <div style={{ marginTop:4 }}>Впишите число или его границу («&gt;1000», «&lt;0.5»), и поле станет записью.</div>
+        </div>
+      )}
+
       {PANELS.map(panel => {
         const uniqueCodes = getUniquePanelCodes(panel.codes);
         if (uniqueCodes.length === 0) return null;
@@ -240,8 +264,15 @@ export default function ExtendedLabsTab({
                     const norm = getLabNorm(code, sex) ?? { lln: info.lln, uln: info.uln, unit: info.prefUnit, female: false };
                     const existing = existingCodes[code];
                     const val = values[code] ?? '';
-                    const numVal = parseFloat(val);
-                    const hasVal = val.trim() !== '' && !isNaN(numVal);
+                    // Проход 155: число и знак границы — из одного чтения. Сторону
+                    // доказывает `boundProvesSide`, а не сравнение обрезанного числа:
+                    // «>5» при норме 30–300 — не «ниже нормы», а «без вывода».
+                    const typed = labFieldEntry(val);
+                    const hasVal = !!typed;
+                    const side = typed ? boundProvesSide(typed.bound, typed.value, norm.lln, norm.uln) : undefined;
+                    const rowColor = hasVal
+                      ? (side === 'high' ? '#ef4444' : side === 'low' ? '#f97316' : typed!.bound ? '#94a3b8' : 'var(--accent)')
+                      : '#fff';
                     return (
                       <div key={code} style={{
                         display:'flex', alignItems:'center', gap:6, padding:'10px 10px', borderRadius:12, minHeight:48,
@@ -255,11 +286,11 @@ export default function ExtendedLabsTab({
                           value={val}
                           onChange={e => handleValueChange(code, e.target.value)}
                           placeholder={existing ? labValueLabel(existing.value, existing.bound) : '—'}
-                          type="number"
-                          step="any" aria-label={info.name}
+                          type="text"
+                          inputMode="decimal" aria-label={info.name}
                           style={{
                             width:64, padding:'8px 8px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', minHeight:40,
-                            borderRadius:10, color: hasVal ? deviationColor(numVal, norm) : '#fff',
+                            borderRadius:10, color: rowColor,
                             fontSize:12, fontWeight:700, textAlign:'right',
                           }}
                         />
@@ -274,10 +305,17 @@ export default function ExtendedLabsTab({
                         )}
                         {hasVal && (
                           <span style={{ fontSize:10, padding:'3px 7px', borderRadius:999, fontWeight:800,
-                            background: numVal > norm.uln ? 'rgba(239,68,68,0.15)' : numVal < norm.lln ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.15)',
-                            color: numVal > norm.uln ? '#ef4444' : numVal < norm.lln ? '#f97316' : 'var(--accent)',
+                            background: side === 'high' ? 'rgba(239,68,68,0.15)' : side === 'low' ? 'rgba(249,115,22,0.15)' : typed!.bound ? 'rgba(148,163,184,0.18)' : 'rgba(0,230,138,0.15)',
+                            color: rowColor,
                           }}>
-                            {numVal > norm.uln ? '↑' : numVal < norm.lln ? '↓' : '✓'}
+                            {side === 'high' ? '↑' : side === 'low' ? '↓' : typed!.bound ?? '✓'}
+                          </span>
+                        )}
+                        {/* Проход 155: в поле стоит текст, из которого числа нет — строка
+                            выглядела незаполненной, а запись при сохранении исчезала. */}
+                        {!hasVal && val.trim() !== '' && (
+                          <span data-lab-unread-inline={code} style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(245,158,11,0.15)', color:'#fbbf24', fontWeight:700 }}>
+                            не число
                           </span>
                         )}
                       </div>

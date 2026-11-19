@@ -4,6 +4,12 @@ import type { LabPoint } from '../../core/types';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { activeSpaceRecord } from '../../core/data-space';
+import { boundProvesSide } from '../../core/lab-bound';
+import { labValueLabel } from '../../core/lab-value-label';
+// Проход 155: значение из поля читает то же правило, что и расчёт (`labFieldEntry`:
+// число + знак границы). Прежний `parseFloat(value) || 0` писал в склад ноль при
+// каждом очищенном поле — «ноль» как измерение, которого человек не вводил.
+import { labFieldEntry } from '../../engines/support-plan/lab-field-number';
 import {
   autoCloseLabOrdersFromImport,
   readCoachLabOrders,
@@ -96,7 +102,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
   const [searchQ, setSearchQ] = useState('');
   const [labValues, setLabValues] = useState<Record<string, string>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'unread'>('idle');
   const [allLabs, setAllLabs] = useState<LabPoint[]>([]);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -117,7 +123,9 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
           .filter(e => e.patientId === pid)
           .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
           .forEach(e => {
-            if (e.value !== undefined && !vals[e.code]) vals[e.code] = String(e.value);
+            // Проход 155: предзаполнение несёт знак границы («>1000»), иначе
+            // пересохранение панели превращало обрезанное число в точное.
+            if (e.value !== undefined && !vals[e.code]) vals[e.code] = labValueLabel(e.value, e.bound);
           });
         setLabValues(prev => {
           const merged = { ...prev };
@@ -145,6 +153,13 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
   const setValue = useCallback((code: string, value: string) => {
     setLabValues(prev => ({ ...prev, [code]: value }));
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    // Проход 155: пустое поле — не запись, «1+»/«отр.» — не число. Раньше
+    // `parseFloat(value) || 0` записывал 0, и очищенная строка становилась
+    // измерением «ноль» (ферритин 0 = тяжёлый дефицит из ничего).
+    const text = String(value ?? '').trim();
+    if (!text) { setSaveStatus('idle'); return; }
+    const entry = labFieldEntry(text);
+    if (!entry) { setSaveStatus('unread'); return; }
     setSaveStatus('saving');
     saveTimerRef.current = setTimeout(async () => {
       try {
@@ -154,11 +169,14 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
           id: crypto.randomUUID(),
           code,
           name: ucum?.name || code,
-          value: parseFloat(value) || 0,
+          value: entry.value,
           unit: ucum?.prefUnit || '',
           date: new Date().toISOString().split('T')[0],
           phase: selectedPhase,
           patientId: profile.id || 'current-user',
+          // Проход 155: знак границы едет вместе с числом; без него «>1000»
+          // в складе выглядел точным измерением.
+          ...(entry.bound ? { bound: entry.bound } : {}),
         } as LabPoint);
         setSaveStatus('saved');
         void closeAssignedLabOrders();
@@ -212,18 +230,28 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
 
   const getStatusColor = (code: string, val: string): string | null => {
     if (!val) return null;
-    const n = parseFloat(val);
-    if (isNaN(n)) return null;
+    // Проход 155: точка статуса тоже читает поле одним правилом. Обрезанное
+    // число («>1000») красится по доказанной стороне (`boundProvesSide`), а если
+    // граница сторону не доказывает — серым, а не «в норме».
+    const entry = labFieldEntry(val);
+    if (!entry) return null;
+    const n = entry.value;
     const ucum = UCUM_MAP[code];
     if (!ucum) {
       const sperm = SPERM_MARKERS[code];
       if (!sperm) return null;
       const r = parseFloat(sperm.range.replace(/[≥<>=]/g, ''));
       if (isNaN(r)) return null;
+      if (entry.bound) return '#94a3b8';
       if (code === 'SPERM_MAR' || code === 'SPERM_LEUK' || code === 'SPERM_DFI') {
         return n > r ? '#ef4444' : '#22c55e';
       }
       return n < r ? '#ef4444' : '#22c55e';
+    }
+    if (entry.bound) {
+      const side = boundProvesSide(entry.bound, n, ucum.lln, ucum.uln);
+      if (!side) return '#94a3b8';
+      return side === 'high' ? '#ef4444' : '#f59e0b';
     }
     if (n < ucum.lln) return '#f59e0b';
     if (n > ucum.uln) return '#ef4444';
@@ -267,6 +295,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
             )}
             {saveStatus === 'saving' && <span style={{ color:'#f59e0b' }}>💾</span>}
             {saveStatus === 'saved' && <span style={{ color:'#22c55e' }}>✓ сохранено</span>}
+            {saveStatus === 'unread' && <span data-lab-unread-status style={{ color:'#fbbf24' }}>⚠ не число — не сохранено</span>}
           </div>
           {requiredInPhase > 0 && (
             <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', marginTop:4, overflow:'hidden' }}>
@@ -339,7 +368,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
 
                         {/* Input */}
                         <div style={{ width:70, flexShrink:0, position:'relative' }}>
-                          <input type="number" step="0.01" value={m.val} onChange={e => setValue(m.code, e.target.value)}
+                          <input type="text" inputMode="decimal" value={m.val} onChange={e => setValue(m.code, e.target.value)}
                             placeholder="—"
                             style={{
                               ...inputStyle,
