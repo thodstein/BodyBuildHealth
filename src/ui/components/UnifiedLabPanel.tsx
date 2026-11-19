@@ -5,6 +5,8 @@ import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
 import { activeSpaceRecord } from '../../core/data-space';
 import { boundProvesSide } from '../../core/lab-bound';
+// Проход 159: дата записи — местный календарь (UTC-срез вечером давал соседний день).
+import { localIsoDate } from '../../core/local-date';
 import { labValueLabel } from '../../core/lab-value-label';
 // Проход 155: значение из поля читает то же правило, что и расчёт (`labFieldEntry`:
 // число + знак границы). Прежний `parseFloat(value) || 0` писал в склад ноль при
@@ -171,7 +173,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
           name: ucum?.name || code,
           value: entry.value,
           unit: ucum?.prefUnit || '',
-          date: new Date().toISOString().split('T')[0],
+          date: localIsoDate(),
           phase: selectedPhase,
           patientId: profile.id || 'current-user',
           // Проход 155: знак границы едет вместе с числом; без него «>1000»

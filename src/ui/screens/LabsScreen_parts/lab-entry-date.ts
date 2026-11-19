@@ -9,15 +9,15 @@
  * это соседний день, а не дата на календаре человека.
  *
  * Одно правило на все поверхности ручного ввода: дату выбирает человек, пустая
- * означает «сегодня».
+ * означает «сегодня». Само «сегодня» считается каноном `core/local-date`
+ * (проход 159): до него здесь была вторая копия того же форматирования.
  */
+
+import { localIsoDate } from '../../../core/local-date';
 
 /** Сегодняшняя дата в местном времени — как её видит человек в календаре. */
 export function todayLabDate(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return localIsoDate(now);
 }
 
 /**

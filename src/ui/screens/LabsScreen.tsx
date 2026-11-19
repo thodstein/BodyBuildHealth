@@ -376,7 +376,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           name: info?.name || code,
           value: val,
           unit: info?.prefUnit || '',
-          date: new Date().toISOString().split('T')[0],
+          date: localIsoDate(),
           phase: selectedPhase,
         };
         await db.put('labs_log', lab);
@@ -461,7 +461,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   // «Все маркеры в норме» не выдавало её за норму.
   const labRisks = useMemo<({ overallNet: number; systemBreakdown: Record<string, { raw: number; net: number }> } & MarkerRiskSummary) | null>(() => {
     if (!hasLabs) return null;
-    const labData = currentLabs.map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
+    const labData = currentLabs.map(l => ({ ...l, date: l.date || localIsoDate() }));
     const contribs = calculateRiskFromAnalyses(labData, profileSex as 'male' | 'female') as any;
     const systemBreakdown: Record<string, { raw: number; net: number }> = {};
     let maxNet = 0;

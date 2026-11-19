@@ -321,6 +321,12 @@
   бланка, а не момент сохранения (проход 157): `LabsScreen_parts/lab-entry-date`
   (`todayLabDate`, `labEntryDate`) — местная дата, пустая означает «сегодня»;
   каталог и расширенная панель спрашивают её полем `data-lab-entry-date`.
+  Само «сегодня» — канон `core/local-date` (проход 159): `todayLabDate` только
+  оборачивает `localIsoDate`; пакетный ввод, подстановка даты записи без даты и
+  `UnifiedLabPanel` пишут `localIsoDate()`, а не UTC-срез. История нетто-риска
+  (`RiskScreen_parts/risk-history`) тоже хранит местный день и одну точку на день;
+  гард `labs-risk-date-canon` ловит обе формы date-only —
+  `.toISOString().slice(0, 10)` и `.toISOString().split('T')[0]`.
 - Какой бланк считается текущим — одно правило на всё приложение (проход 136):
   `support-plan/lab-slice.ts` (`currentLabSlice`): полный → середина курса → до
   курса. Его читают `buildMapperCtx`, `extractLabValues`, уведомления, баннер

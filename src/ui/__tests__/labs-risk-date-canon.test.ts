@@ -15,15 +15,26 @@
  * этих мест (сдвиг окна на сутки и вчерашняя дата в имени файла не меняют
  * решение пользователя, в отличие от контура дневников, где расходились ключи
  * записей). Поэтому здесь source-guard, проверенный мутацией: возврат любого
- * date-only вызова в этих двух файлах роняет тест. Поведенческие локи на записи
+ * date-only вызова в этих файлах роняет тест. Поведенческие локи на записи
  * дневников и окнах анализов живут в date-canon-census / report-date-canon /
  * training-calendar-local-dates / diary-date-canon.
+ *
+ * Проход 159: та же форма «сегодня», записанная вторым способом —
+ * `toISOString().split('T')[0]` — цензом не ловилась (он считает только `.slice(0, 10)`).
+ * На экране «Риск» из-за неё утренний день не попадал в историю, а в каталоге
+ * анализов дата записи уезжала на вчера. Гард теперь знает обе формы.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ФАЙЛЫ = ['src/ui/screens/LabsScreen.tsx', 'src/ui/screens/RiskScreen.tsx'];
+const ФАЙЛЫ = [
+  'src/ui/screens/LabsScreen.tsx',
+  'src/ui/screens/RiskScreen.tsx',
+  'src/ui/components/UnifiedLabPanel.tsx',
+];
+/** Обе формы date-only: `.slice(0, 10)` и `.split('T')[0]`. */
+const DATE_ONLY = /\.toISOString\(\)\s*(?:\.slice\(\s*0\s*,\s*10\s*\)|\.split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\])/g;
 const КОД_ФАЙЛА = (rel: string) => {
   const src = readFileSync(join(process.cwd(), rel), 'utf8');
   // Комментарии не считаются: ценз их снимает, и гард должен вести себя так же.
@@ -31,15 +42,15 @@ const КОД_ФАЙЛА = (rel: string) => {
 };
 
 describe('лаборатория и риски: канон дат', () => {
-  it('в LabsScreen и RiskScreen нет date-only вызовов', () => {
+  it('в лаборатории и рисках нет date-only вызовов (обе формы)', () => {
     for (const rel of ФАЙЛЫ) {
       const { код } = КОД_ФАЙЛА(rel);
-      const остатки = код.match(/\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/g) || [];
+      const остатки = код.match(DATE_ONLY) || [];
       expect(остатки, `${rel}: вернулись date-only вызовы`).toEqual([]);
     }
   });
 
-  it('оба экрана берут даты из core/local-date', () => {
+  it('поверхности берут даты из core/local-date', () => {
     for (const rel of ФАЙЛЫ) {
       const { src } = КОД_ФАЙЛА(rel);
       expect(src, `${rel}: нет импорта канона`).toMatch(/import\s*\{[^}]*localIsoDate[^}]*\}\s*from\s*'\.\.\/\.\.\/core\/local-date'/);

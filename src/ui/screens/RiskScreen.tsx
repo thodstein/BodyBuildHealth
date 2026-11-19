@@ -13,6 +13,8 @@ import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { getGlobalNoLabs, getNoLabsSystems } from './LabsScreen';
 import { RiskOverview } from './RiskScreen_parts/RiskOverview';
+// Проход 159: история риска — модуль с локальной датой дня (одна точка на день).
+import { loadRiskHistory, saveRiskHistory, riskHistoryDate } from './RiskScreen_parts/risk-history';
 
 import { RiskDetails } from './RiskScreen_parts/RiskDetails';
 import { V7RiskDisplay } from './RiskScreen_parts/V7RiskDisplay';
@@ -59,17 +61,6 @@ const RiskHeroStats: React.FC<{ net: number | null; raw: number | null }> = ({ n
     </div>
   );
 };
-
-const RISK_HISTORY_KEY = 'risk_history';
-const MAX_HISTORY = 12;
-
-function loadRiskHistory(): { date: string; overallRaw: number; overallNet: number }[] {
-  try { const raw = localStorage.getItem(RISK_HISTORY_KEY); if (!raw) return []; return JSON.parse(raw); } catch { return []; }
-}
-
-function saveRiskHistory(entry: { date: string; overallRaw: number; overallNet: number }) {
-  try { const history = loadRiskHistory(); history.push(entry); localStorage.setItem(RISK_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY))); } catch {}
-}
 
 const TAB_LABELS: Record<string, string> = {
   overview: '📊 Обзор',
@@ -297,7 +288,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   // Compute lab risk contributions
   const labRiskContributions = useMemo(() => {
     if (!hasLabs) return null;
-    const labData = (linked?.labs || []).map(l => ({ ...l, date: l.date || new Date().toISOString().split('T')[0] }));
+    const labData = (linked?.labs || []).map(l => ({ ...l, date: l.date || localIsoDate() }));
     return calculateRiskFromAnalyses(labData, profileSex);
   }, [hasLabs, linked.labs, profileSex]);
 
@@ -458,11 +449,11 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
 
   useEffect(() => {
     if (riskResult) {
-      const today = new Date().toISOString().split('T')[0];
-      const existing = loadRiskHistory();
-      if (!existing.some(h => h.date === today)) {
-        saveRiskHistory({ date: today, overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
-      }
+      const today = riskHistoryDate();
+      // Проход 159: точка дня — ПОСЛЕДНИЙ расчёт, а не первый. Раньше день
+      // записывался один раз и больше не обновлялся: человек удалял анализ или
+      // закрывал курс, а «Динамика» показывала риск, посчитанный утром до этого.
+      saveRiskHistory({ date: today, overallRaw: riskResult.overallRaw, overallNet: riskResult.overallNet });
     }
   }, [tick, riskResult]);
 
