@@ -401,7 +401,9 @@ export type TimeBlock = 'morning' | 'afternoon' | 'evening';
 export interface ScheduleItem { substanceId: string; name: string; dose: string; timeBlock: TimeBlock; instructions: string; synergyGroup?: SynergyId; }
 
 // ─── Lab Deltas ───
-export interface LabDelta { marker: string; sliceValues: (string|undefined)[]; trend: 'stable'|'improving'|'worsening'|'critical'|'changed'; unit?: string; }
+// Проход 139: `panel` — из какой панели бланка строка. Без него «Glucose» крови и
+// мочи были бы одной строкой и одним React-ключом в карточке.
+export interface LabDelta { marker: string; panel?: string; sliceValues: (string|undefined)[]; trend: 'stable'|'improving'|'worsening'|'critical'|'changed'; unit?: string; }
 
 // ─── Synergy_ID Groups ───
 export type SynergyId =

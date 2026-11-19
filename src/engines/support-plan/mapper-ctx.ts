@@ -32,6 +32,8 @@ import { assessPedRisk } from '../ped-risk-matrix';
  * что и риск-модель (`readLabValue`): единица из бланка главнее, без единицы —
  * прежняя догадка по величине. У маркеров без выбора единицы число не меняется.
  * Имя маркера переводится одной таблицей (`labMarkerCanon`), проход 136.
+ * Проход 139: у мочи свои имена — канон выбирается с панелью, иначе глюкоза
+ * мочи затирала глюкозу крови (см. `lab-marker-name`).
  */
 export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): Record<string, number> {
   if (!fp) return {};
@@ -44,7 +46,7 @@ export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): 
       if (!val) continue;
       const num = labFieldNumber(val);
       if (num === undefined) continue;
-      out[labMarkerCanon(marker)] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
+      out[labMarkerCanon(marker, pk)] = readLabValue(marker, num, units?.[pk]?.[marker], sex).value;
     }
   }
   return out;

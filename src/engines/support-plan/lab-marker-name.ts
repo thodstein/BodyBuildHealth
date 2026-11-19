@@ -8,6 +8,9 @@
  * ждут канон (`TESTOSTERONE`, `VITAMIN_D`). Таблица перевода живёт здесь одна:
  * раньше она была приватной копией в `mapper-ctx`, и любой другой путь получал
  * имена полей вместо канона.
+ *
+ * Проход 139: подпись поля сама по себе ещё не однозначна — «Glucose» есть и в
+ * крови, и в моче. Для мочи канон выбирается по панели (`LAB_PANEL_RENAME`).
  */
 
 /** Панели бланка — в том порядке, как они идут в форме. */
@@ -30,7 +33,37 @@ export const LAB_MARKER_RENAME: Record<string, string> = {
   'PSA total': 'PSA_TOTAL', 'PSA free': 'PSA_FREE', 'CA-125': 'CA_125', 'Lp(a)': 'LP_A',
 };
 
-/** Имя маркера в каноне словарей. */
-export function labMarkerCanon(marker: string): string {
+/**
+ * Подписи полей, которые совпадают со «кровяными», но значат другой анализ.
+ *
+ * Проход 139: в общем анализе мочи есть `Glucose`, `Ketones`, `Leukocytes`,
+ * `Nitrite`, `pH` — и все они механически получали канон крови (`GLUCOSE`,
+ * `KETONES`, …). Одна и та же карта `labSliceToValues` кормит мост механизмов
+ * и ступени, поэтому глюкоза мочи 2.8 перезаписывала глюкозу крови и выдавала
+ * «⛔ тяжёлая гипогликемия/кетоацидоз, ОТМЕНИТЬ GH и инсулин» из данных мочи;
+ * лейкоциты мочи 10 становились лейкоцитами крови. Теперь у мочи свои имена
+ * (`URINE_*`), как в каталоге приоритетов (`lab-priority-map`), а белок мочи
+ * остаётся `PROTEIN_URINE` — это его канон с прохода 130.
+ */
+export const LAB_PANEL_RENAME: Record<string, Record<string, string>> = {
+  panelUrinalysis: {
+    'pH': 'URINE_PH',
+    'Protein': 'PROTEIN_URINE',
+    'Glucose': 'URINE_GLUCOSE',
+    'Ketones': 'URINE_KETONES',
+    'Leukocytes': 'URINE_LEUKOCYTES',
+    'Nitrite': 'URINE_NITRITE',
+  },
+};
+
+/**
+ * Имя маркера в каноне словарей.
+ *
+ * `panel` нужен только там, где одна подпись значит разные анализы в разных
+ * панелях (моча); без панели поведение прежнее.
+ */
+export function labMarkerCanon(marker: string, panel?: string): string {
+  const byPanel = panel ? LAB_PANEL_RENAME[panel]?.[marker] : undefined;
+  if (byPanel) return byPanel;
   return LAB_MARKER_RENAME[marker] || marker.toUpperCase().replace(/\s+/g, '_');
 }

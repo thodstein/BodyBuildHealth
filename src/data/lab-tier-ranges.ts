@@ -248,6 +248,10 @@ export const TIER_MARKER_ALIAS: Record<string, string> = {
   ANTI_TPO: 'TPO_AB',
   IL_6: 'IL6',
   PLATELETS: 'PLT',
+  // Проход 139: канон моста (`labMarkerCanon`) даёт `APOB`, а шкала называется
+  // `APO_B` — без этого ApoB 1.5 г/л молчал (ни ступени, ни совета), хотя правило
+  // в `TIER_RULES` для него есть.
+  APOB: 'APO_B',
 };
 
 /** Имя маркёра в словаре лестниц (`LAB_TIERS`/`TIER_RULES`). */

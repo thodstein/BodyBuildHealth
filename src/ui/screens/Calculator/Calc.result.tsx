@@ -84,13 +84,16 @@ export function LabDeltaView({ deltas }: { deltas: LabDelta[] }) {
     t === 'critical' ? '❗' : t === 'worsening' ? '⚠' : t === 'changed' ? '⇄' : '✓';
   const trendColor = (t: LabDelta['trend']) =>
     t === 'critical' ? '#ef4444' : t === 'worsening' ? '#fbbf24' : t === 'changed' ? 'var(--text-dim)' : '#22c55e';
+  // Проход 139: в анализе мочи те же подписи, что в крови («Glucose»). Без пометки
+  // две строки с одним именем выглядели одной находкой, а ключ списка совпадал.
+  const name = (d: LabDelta) => d.panel === 'panelUrinalysis' ? `${d.marker} (моча)` : d.marker;
   return <div className="calc-labdelta">
-    {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(d => d.marker).join(', ')}</span></div>}
-    {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(d => d.marker).join(', ')}</span></div>}
+    {critical.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444' }}>⚠ Критические: {critical.map(name).join(', ')}</span></div>}
+    {worsening.length > 0 && <div style={{ marginBottom: 4 }}><span style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24' }}>⚠ Ухудшение: {worsening.map(name).join(', ')}</span></div>}
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
       {deltas.slice(0, 16).map(d =>
-        <div key={d.marker} title={d.unit ? `${d.marker}, ${d.unit}` : d.marker} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
-          <span style={{ fontWeight: 600, color: 'var(--text)', width: 60 }}>{d.marker}</span>
+        <div key={`${d.panel || ''}|${d.marker}`} title={d.unit ? `${name(d)}, ${d.unit}` : name(d)} style={{ ...GLASS, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 7 }}>
+          <span style={{ fontWeight: 600, color: 'var(--text)', width: 60 }}>{name(d)}</span>
           <span style={{ color: 'var(--text-dim)' }}>{d.sliceValues.map(v => v ?? '—').join('→')}</span>
           <span style={{ marginLeft: 'auto', color: trendColor(d.trend) }}>{trendMark(d.trend)}</span>
         </div>

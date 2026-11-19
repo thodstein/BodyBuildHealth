@@ -66,9 +66,12 @@ describe('проход 135: единицы бланка в MapperCtx', () => {
 
   it('белок мочи 300 мг/л — это 0.3 г/л, ступень «внимание», а не «экстренно»', () => {
     const labs = labSliceToValues(slice('panelUrinalysis', { Protein: '300' }, { Protein: 'мг/л' }));
-    expect(labs['PROTEIN']).toBeCloseTo(0.3, 3);
+    // Проход 139: у мочи свой канон (`PROTEIN_URINE`), старый ключ `PROTEIN` — тот же
+    // канон по `TIER_MARKER_ALIAS`, но карта плана больше не смешивает панели.
+    expect(labs['PROTEIN_URINE']).toBeCloseTo(0.3, 3);
+    expect(labs['PROTEIN']).toBeUndefined();
     expect(deriveTier('PROTEIN_URINE', 300)).toBe(3);
-    expect(deriveTier('PROTEIN_URINE', labs['PROTEIN']!)).toBe(1);
+    expect(deriveTier('PROTEIN_URINE', labs['PROTEIN_URINE']!)).toBe(1);
   });
 
   it('без единицы — прежняя догадка по величине, а не сырое число', () => {
@@ -85,7 +88,7 @@ describe('проход 135: единицы бланка в MapperCtx', () => {
     const labs = labSliceToValues(slice('panelSex', { 'Total T': '>1000' }, { 'Total T': 'нг/дл' }));
     expect(labs['TESTOSTERONE']).toBeCloseTo(34.7, 1);
     const strip = labSliceToValues(slice('panelUrinalysis', { Protein: '1+' }));
-    expect(strip['PROTEIN']).toBeUndefined();
+    expect(strip['PROTEIN_URINE']).toBeUndefined();
   });
 
   it('у маркеров без выбора единицы число не меняется', () => {

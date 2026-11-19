@@ -977,6 +977,9 @@ export function getBlacklist(state: CalculatorState): string[] {
  * Если шкалы у маркера нет, динамика честно называется «изменился» (`changed`), а
  * не «ухудшение»; при первом значении 0 процент не вычисляется — тогда изменение
  * тоже не эскалируется до критического.
+ *
+ * Проход 139: имя берётся с панелью (у мочи свои каноны), и строка несёт панель —
+ * иначе глюкоза мочи и глюкоза крови были одной строкой динамики.
  */
 export function calcLabDeltas(state: CalculatorState): LabDelta[] {
   const slices = [state.labs.preCourse, state.labs.midCourse, state.labs.postPCT];
@@ -984,6 +987,7 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
 
   interface Row {
     label: string;
+    panel: string;
     canon: string;
     raw: (string | undefined)[];
     num: (number | undefined)[];
@@ -997,10 +1001,12 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
       if (!panel) continue;
       for (const [label, raw] of Object.entries(panel)) {
         if (raw === undefined || raw === null || raw === '') continue;
-        const canon = labMarkerCanon(label);
+        // Проход 139: канон с панелью — иначе глюкоза мочи и глюкоза крови
+        // становились одной строкой динамики.
+        const canon = labMarkerCanon(label, pk);
         let row = rows.get(canon);
         if (!row) {
-          row = { label, canon, raw: [undefined, undefined, undefined], num: [undefined, undefined, undefined] };
+          row = { label, panel: pk, canon, raw: [undefined, undefined, undefined], num: [undefined, undefined, undefined] };
           rows.set(canon, row);
         }
         row.raw[i] = String(raw);
@@ -1058,6 +1064,7 @@ export function calcLabDeltas(state: CalculatorState): LabDelta[] {
 
     res.push({
       marker: row.label,
+      panel: row.panel,
       sliceValues: shown,
       unit: entry?.unit || undefined,
       trend,
