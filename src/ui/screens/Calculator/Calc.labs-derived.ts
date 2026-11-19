@@ -233,6 +233,52 @@ function putMarkerUnit(slice: LabSlice, panel: string, marker: string, unit?: st
   bucket[marker] = key;
 }
 
+/**
+ * Проход 151: по одному маркеру — самая свежая запись.
+ *
+ * `labPointsToSlice` перебирал список в том порядке, в каком записи вернула база,
+ * и последняя по порядку перекрывала предыдущие. Порядок хранения — не
+ * клинический факт: анализ, введённый вчера за прошлый месяц, «побеждал» свежий
+ * бланк, и форма считала риск по старому числу. Здесь главнее дата: у маркера
+ * остаётся запись с позднейшей датой, запись без даты — самая старая (при равных
+ * датах главнее записанная позже). Архивная запись (удалённая из Лаборатории) в
+ * форму не возвращается — иначе удалённый анализ «воскресал» в калькуляторе.
+ */
+export function latestLabPoints(input: any[]): any[] {
+  if (!Array.isArray(input)) return [];
+  const best = new Map<string, { row: any; date: string; index: number }>();
+  input.forEach((row, index) => {
+    if (!row || typeof row !== 'object' || row.archived) return;
+    const code = String(row.code || row.name || row.marker || '').trim();
+    if (!code) return;
+    const value = row.value != null && row.value !== '' ? row.value : row.valueStr;
+    if (value == null || value === '') return;
+    // Ключ — имя маркера бланка: `GLU` и `Glucose` — один и тот же анализ, и
+    // сравнивать их даты надо как один маркер, а не как две строки.
+    const key = sliceMarkerFor(code) || code.toUpperCase();
+    const date = String(row.date || '');
+    const prev = best.get(key);
+    if (!prev || date > prev.date || (date === prev.date && index > prev.index)) {
+      best.set(key, { row, date, index });
+    }
+  });
+  return Array.from(best.values()).sort((a, b) => a.index - b.index).map(v => v.row);
+}
+
+/** Сколько маркеров реально записано в срез (строки базы ≠ распознанные анализы). */
+export function countSliceMarkers(slice: LabSlice | null): number {
+  if (!slice) return 0;
+  let n = 0;
+  for (const [panel, markers] of Object.entries(slice)) {
+    if (panel === 'units' || panel === 'date') continue;
+    if (!markers || typeof markers !== 'object') continue;
+    for (const v of Object.values(markers as Record<string, unknown>)) {
+      if (v != null && v !== '') n++;
+    }
+  }
+  return n;
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  Конвертация из LabPoint[] → LabSlice
 //  Принимает: LabPoint[], массив {code,value,unit,date}, LabDiaryEntry[]
@@ -282,12 +328,16 @@ export function labPointsToSlice(input: any): LabSlice | null {
 
   // ── Case 1: массив LabPoint [{code, value, unit, ...}] ──
   if (Array.isArray(input)) {
-    for (const lp of input) {
-      if (!lp || typeof lp !== 'object') continue;
+    // Проход 151: у маркера побеждает самая свежая запись (`latestLabPoints`), а
+    // дата среза — самая поздняя из прочитанных. Раньше дата бралась у первой
+    // строки массива, поэтому бланк со смешанными датами подписывался старой.
+    for (const lp of latestLabPoints(input)) {
       const code = String(lp.code || lp.name || lp.marker || '').trim();
       if (!code) continue;
-      if (put(code, lp.value, lp.unit, lp.valueStr)) count++;
-      if (lp.date && !slice.date) slice.date = String(lp.date);
+      if (!put(code, lp.value, lp.unit, lp.valueStr)) continue;
+      count++;
+      const date = String(lp.date || '');
+      if (date > slice.date) slice.date = date;
     }
   }
   // ── Case 2: LabDiaryEntry {markers: [{code, value, unit, ...}]} ──

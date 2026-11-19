@@ -309,7 +309,12 @@ export interface AutoCalculatorProps {
   embedded?: boolean;
   courseWeek?: number;
   courseLinked?: AutoCalculatorCourseEntry[];
-  labsLinked?: LabSlice | null;
+  /**
+   * Анализы для формы — либо готовый срез, либо строки склада (`db.labs_log`,
+   * `LabPoint[]`). Проход 151: `SupportScreen` передаёт именно массив строк, а тип
+   * обещал срез, поэтому «это срез или строки» решалось в рантайме.
+   */
+  labsLinked?: LabSlice | import('../../../core/types').LabPoint[] | null;
   onOpenManualPicker?: () => void;
   onOpenLabs?: () => void;
   planResult?: import('../../../engines/support-plan').PlanResult;

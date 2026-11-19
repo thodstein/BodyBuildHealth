@@ -10,7 +10,7 @@ import { Card, PopupPEDInput, PopupNumber } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
 import { RiskTimelineChart } from '../SupportScreen_parts/RiskTimelineChart';
 import { MechanismView } from './Calc.result';
-import { deriveStateFromLabs, labPointsToSlice } from './Calc.labs-derived';
+import { deriveStateFromLabs, labPointsToSlice, countSliceMarkers } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
@@ -212,27 +212,60 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
   const update = <K extends keyof CalculatorState>(key: K, val: CalculatorState[K]) => setState(s => ({ ...s, [key]: val }));
 
   // ── Опция «📥 Анализы из дневника»: авто-подстановка свежих анализов (opt-in) ──
-  // Если в дневнике лаборатории запись ДАТИРОВАНА ПОЗЖЕ текущего fullPanel —
-  // подставляем её автоматически (тот же конвертер labPointsToSlice, что у ручной кнопки).
+  // Если в Лаборатории есть запись ДАТИРОВАННАЯ ПОЗЖЕ текущего fullPanel —
+  // подставляем её автоматически (тот же конвертер labPointsToSlice, что у ручной
+  // кнопки). Проход 151: читаем оба места, где живут анализы, — склад `labs_log`
+  // (главный источник, кнопка «из анализов» брала его) и зеркало `he_lab_diary`
+  // (его пишет вкладка «Дневник»); раньше опция смотрела только в зеркало, и
+  // анализы, введённые на вкладке «Анализы», автоматически не подставлялись.
+  // Побеждает более поздняя дата; архивные записи не берутся.
   const diaryPullRef = React.useRef<string>('');
   React.useEffect(() => {
     if (!state.options?.diaryLabs) { diaryPullRef.current = ''; return; }
-    try {
-      const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
-      if (!Array.isArray(hist) || hist.length === 0) return;
-      const last = hist[hist.length - 1];
-      const lastDate = String(last?.date || '');
-      if (!lastDate || !last?.markers || !Array.isArray(last.markers)) return;
-      if (lastDate === diaryPullRef.current) return; // эту запись уже подтягивали
+    let cancelled = false;
+    void (async () => {
+      let found: { date: string; slice: LabSlice; source: 'Лаборатории' | 'дневника' } | null = null;
+
+      // 1. Склад анализов (IndexedDB). Ошибка чтения — не повод молчать: ниже
+      //    остаётся зеркало дневника.
+      try {
+        await db.init();
+        const pid = getProfile()?.id || 'current-user';
+        const rows = (await db.getAll<any>('labs_log'))
+          .filter((l: any) => l && !l.archived && (l.patientId === pid || !l.patientId));
+        const slice = rows.length > 0 ? labPointsToSlice(rows) : null;
+        if (slice) found = { date: String(slice.date || ''), slice, source: 'Лаборатории' };
+      } catch { /* IndexedDB недоступен — пробуем зеркало */ }
+
+      // 2. Зеркало дневника (localStorage). Дневник отсортирован по дате, но
+      //    берём не «последний элемент», а запись с позднейшей датой.
+      try {
+        const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
+        if (Array.isArray(hist)) {
+          let last: any = null;
+          for (const e of hist) {
+            if (!e || !Array.isArray(e.markers)) continue;
+            if (!last || String(e.date || '') > String(last.date || '')) last = e;
+          }
+          const lastDate = String(last?.date || '');
+          if (last && lastDate && (!found || lastDate > found.date)) {
+            const slice = labPointsToSlice(last.markers);
+            if (slice) found = { date: lastDate, slice: { ...slice, date: lastDate }, source: 'дневника' };
+          }
+        }
+      } catch { /* нет дневника — тихо */ }
+
+      if (cancelled || !found || !found.date) return;
+      if (found.date === diaryPullRef.current) return; // эту запись уже подтягивали
       const cur = state.labs.fullPanel;
-      if (cur?.date && String(cur.date) >= lastDate) { diaryPullRef.current = lastDate; return; }
-      const slice = labPointsToSlice(last.markers);
-      if (!slice) return;
-      diaryPullRef.current = lastDate;
-      update('labs', { ...state.labs, fullPanel: { ...slice, date: lastDate } });
-      setFillStatus(`📥 Анализы от ${lastDate.split('-').reverse().join('.')} подставлены из дневника`);
+      if (cur?.date && String(cur.date) >= found.date) { diaryPullRef.current = found.date; return; }
+      diaryPullRef.current = found.date;
+      update('labs', { ...state.labs, fullPanel: found.slice });
+      const shown = found.date.split('-').reverse().join('.');
+      setFillStatus(`📥 Анализы от ${shown} подставлены из ${found.source}`);
       setTimeout(() => setFillStatus(''), 2500);
-    } catch { /* нет дневника — тихо */ }
+    })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.options?.diaryLabs, state.labs.fullPanel?.date]);
 
@@ -300,22 +333,41 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         const profile = getProfile();
         const pid = profile?.id || 'current-user';
         const allLabs = await db.getAll<any>('labs_log');
-        const userLabs = allLabs.filter((l: any) => l.patientId === pid || !l.patientId);
+        // Проход 151: архивная запись (удалённая из Лаборатории) в форму не идёт —
+        // иначе удалённый анализ продолжал считать риск.
+        const userLabs = allLabs.filter((l: any) => l && !l.archived && (l.patientId === pid || !l.patientId));
         if (userLabs.length > 0) src = userLabs;
       } catch { /* IndexedDB недоступен — пробуем дальше */ }
 
-      // ── 2. Пропс labsLinked (если передан полный массив) ──
+      // ── 2. Пропс labsLinked: готовый срез бланка или строки анализов ──
       if (src.length === 0 && labsLinked) {
+        const asAny = labsLinked as any;
+        // Проход 151: раньше срез (панели формы) оборачивался в массив и
+        // отбрасывался проверкой `l.code` — переданный срез молча не применялся.
+        if (!Array.isArray(labsLinked) && !asAny.code && (asAny.panelBiochem || asAny.panelSex || asAny.panelHematology)) {
+          const slice = labsLinked as LabSlice;
+          update('labs', { ...state.labs, fullPanel: slice });
+          const markers = countSliceMarkers(slice);
+          const when = slice.date ? ` · бланк от ${slice.date.split('-').reverse().join('.')}` : '';
+          setFillStatus(`✅ Анализы загружены (${ruCount(markers, RU_MARKERS)}${when})`);
+          setTimeout(() => setFillStatus(''), 2000);
+          return;
+        }
         const ll = Array.isArray(labsLinked) ? labsLinked : [labsLinked];
         if (ll.length > 0 && ll.some((l: any) => l.code && l.value != null)) src = ll;
       }
 
-      // ── 3. localStorage he_lab_diary (дневник) ──
+      // ── 3. localStorage he_lab_diary (зеркало дневника Лаборатории) ──
       if (src.length === 0) {
         try {
           const hist = JSON.parse(localStorage.getItem('he_lab_diary') || '[]');
           if (Array.isArray(hist) && hist.length > 0) {
-            const last = hist[hist.length - 1];
+            // Проход 151: главнее дата, а не позиция в массиве.
+            let last: any = null;
+            for (const e of hist) {
+              if (!e) continue;
+              if (!last || String(e.date || '') > String(last.date || '')) last = e;
+            }
             if (last?.markers && Array.isArray(last.markers)) src = last.markers;
             else if (last) src = [last];
           }
@@ -335,7 +387,12 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         return;
       }
       update('labs', { ...state.labs, fullPanel: slice });
-      setFillStatus(`✅ Анализы загружены (${ruCount(src.length, RU_MARKERS)} из Лабскрин)`);
+      // Проход 151: считаем маркеры, которые реально легли в форму, а не строки
+      // базы. Раньше «загружено (12)» означало 12 строк labs_log, даже если
+      // знакомыми оказались три.
+      const markers = countSliceMarkers(slice);
+      const when = slice.date ? ` · бланк от ${slice.date.split('-').reverse().join('.')}` : '';
+      setFillStatus(`✅ Анализы загружены (${ruCount(markers, RU_MARKERS)}${when})`);
       setTimeout(() => setFillStatus(''), 2000);
     } catch {
       setFillStatus('❌ Ошибка загрузки анализов');

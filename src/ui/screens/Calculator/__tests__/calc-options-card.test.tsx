@@ -12,6 +12,7 @@ import { join } from 'path';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { AutoCalculator } from '../AutoCalculator';
 import { DEFAULT_STATE, normalizeCalculatorState } from '../Calc.types';
+import { db } from '../../../../core/db';
 
 const courseLinked = [
   { id: '1', substanceId: 'test_enan', doseValue: 250, doseUnit: 'mg', frequency: '2x/wk', startWeek: 1, endWeek: 12 },
@@ -87,6 +88,58 @@ describe('📥 diaryLabs: авто-подстановка свежих анал�
       const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
       expect(saved?.options?.dietAware).toBe(true);
     }, { timeout: 6000 });
+  });
+});
+
+describe('📥 diaryLabs: склад Лаборатории (labs_log) — главный источник (проход 151)', () => {
+  const seed = async () => {
+    localStorage.clear();
+    localStorage.setItem('he_autocalc_state', JSON.stringify({
+      ...DEFAULT_STATE,
+      labs: { ...DEFAULT_STATE.labs, fullPanel: { date: '2026-01-01', panelBiochem: { ALT: '40' } } },
+      options: { diaryLabs: true },
+    }));
+    await db.init();
+    for (const r of await db.getAll<any>('labs_log')) await db.delete('labs_log', r.id);
+    // Свежий бланк, старая запись (введена позже) и архивная — в форме должны
+    // остаться свежий ALT и GLU, а удалённый CRP вернуться не должен.
+    await db.put('labs_log', { id: 'l1', code: 'GLU', name: 'Глюкоза', value: 5.4, unit: 'mmol/L', date: '2026-09-20', patientId: 'current-user' });
+    await db.put('labs_log', { id: 'l2', code: 'ALT', name: 'АЛТ', value: 180, unit: 'U/L', date: '2026-09-20', patientId: 'current-user' });
+    await db.put('labs_log', { id: 'l3', code: 'ALT', name: 'АЛТ', value: 25, unit: 'U/L', date: '2026-01-05', patientId: 'current-user' });
+    await db.put('labs_log', { id: 'l4', code: 'CRP', name: 'СРБ', value: 9, unit: 'мг/л', date: '2026-01-05', patientId: 'current-user', archived: true });
+  };
+
+  it('авто-подстановка читает склад, а не только зеркало дневника', async () => {
+    await seed();
+    mount();
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+      expect(saved?.labs?.fullPanel?.date).toBe('2026-09-20');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.ALT).toBe('180');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.Glucose).toBe('5.4');
+      // Архивная запись не воскресает.
+      expect(saved?.labs?.fullPanel?.panelBiochem?.CRP).toBeUndefined();
+    }, { timeout: 10000 });
+    await waitFor(() => {
+      expect(screen.getAllByText(/из Лаборатории/).length).toBeGreaterThan(0);
+    }, { timeout: 10000 });
+  });
+
+  it('кнопка «Анализы»: свежая запись маркера главнее порядка строк, счёт — маркеры', async () => {
+    await seed();
+    const { container } = mount();
+    const btn = Array.from(container.querySelectorAll('button')).find((b) => (b.textContent || '').includes('из лаборатории'));
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn!);
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.ALT).toBe('180');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.CRP).toBeUndefined();
+    }, { timeout: 10000 });
+    // Два распознанных маркера, а не три строки склада (архивная не в счёт).
+    await waitFor(() => {
+      expect(screen.getAllByText(/Анализы загружены \(2/).length).toBeGreaterThan(0);
+    }, { timeout: 10000 });
   });
 });
 
