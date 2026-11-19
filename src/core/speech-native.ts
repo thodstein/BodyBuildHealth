@@ -76,7 +76,15 @@ export function nativeSpeechCaps(): Promise<NativeSpeechCaps> {
     if (!p) return NO_CAPS;
     try {
       const c = await p.capabilities();
-      return { dictation: c?.recognition === true, speak: c?.synthesis === true };
+      const caps: NativeSpeechCaps = {
+        dictation: c?.recognition === true,
+        speak: c?.synthesis === true,
+      };
+      // Оба «нет» — не приговор на всю сессию: нативный движок TTS поднимается
+      // асинхронно, и первый ответ мог прийти до его готовности. Положительный
+      // ответ кэшируем, отрицательный — проверяем заново.
+      if (!caps.dictation && !caps.speak) capsPromise = null;
+      return caps;
     } catch {
       return NO_CAPS;
     }

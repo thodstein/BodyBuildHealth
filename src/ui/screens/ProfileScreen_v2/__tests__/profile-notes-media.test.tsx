@@ -190,6 +190,55 @@ describe('голос: честные границы платформы', () => {
     );
   });
 
+  it('«Стоп диктовку» гасит состояние сразу, не дожидаясь движка', async () => {
+    class FakeRecognition {
+      lang = '';
+      continuous = false;
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {}
+      stop() {
+        /* onend намеренно не шлём: нативная остановка тоже может его не прислать */
+      }
+    }
+    vi.stubGlobal('webkitSpeechRecognition', FakeRecognition);
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    const btn = () => container.querySelector('[data-notes="dictate"]') as HTMLElement;
+    fireEvent.click(btn());
+    await waitFor(() => expect(btn().getAttribute('data-dictation')).toBe('listening'));
+    fireEvent.click(btn());
+    await waitFor(() => expect(btn().getAttribute('data-dictation')).toBe('idle'));
+    expect(container.querySelector('[data-notes="voice-error"]')).toBeNull();
+  });
+
+  it('отказ в микрофоне объясняется, а не подменяется «недоступно»', async () => {
+    class Denied {
+      lang = '';
+      continuous = false;
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        const err = new Error('denied');
+        (err as { name?: string }).name = 'NotAllowedError';
+        throw err;
+      }
+      stop() {}
+    }
+    vi.stubGlobal('webkitSpeechRecognition', Denied);
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.click(container.querySelector('[data-notes="dictate"]') as HTMLElement);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="voice-error"]')?.textContent).toContain('Микрофон запрещён'),
+    );
+    expect(container.querySelector('[data-notes="voice-error"]')?.textContent).not.toContain('не подключено');
+  });
+
   it('без микрофона «Записать голос» предлагает диктофон системы', () => {
     const { container } = render(<ProfileNotesTab />);
     openNew(container);

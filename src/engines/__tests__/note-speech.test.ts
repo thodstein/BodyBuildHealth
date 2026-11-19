@@ -52,11 +52,13 @@ vi.mock('@capacitor/core', () => ({
 }));
 
 import {
+  nativeDictationError,
   speakTextBest,
   speechSupport,
   speechSupportSync,
   startDictation,
   stopAllSpeech,
+  webDictationError,
 } from '../note-speech';
 import { __resetNativeSpeechForTests } from '../../core/speech-native';
 
@@ -200,5 +202,79 @@ describe('выбор движка', () => {
     emit('recognitionError', { code: 'no-permission' });
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('Микрофон');
+  });
+});
+
+describe('причина отказа называется словами, а не «недоступно»', () => {
+  it('web: у каждого кода ошибки свой текст', () => {
+    expect(webDictationError({ error: 'not-allowed' })).toContain('Микрофон запрещён');
+    expect(webDictationError({ error: 'network' })).toContain('интернет');
+    expect(webDictationError({ error: 'no-speech' })).toContain('Ничего не расслышал');
+    expect(webDictationError({ error: 'audio-capture' })).toContain('занят');
+    // Неизвестный код — общий текст, но не пустая строка.
+    expect(webDictationError({})).toContain('Распознавание прервалось');
+  });
+
+  it('нативный движок: коды SpeechRecognizer переводятся', () => {
+    expect(nativeDictationError('error-7')).toContain('Ничего не расслышал');
+    expect(nativeDictationError('error-6')).toContain('Ничего не расслышал');
+    expect(nativeDictationError('error-2')).toContain('интернет');
+    expect(nativeDictationError('error-8')).toContain('занят');
+    expect(nativeDictationError('no-permission')).toContain('Микрофон');
+    expect(nativeDictationError('not-available')).toContain('нет русского движка');
+    expect(nativeDictationError('error-42')).toContain('Распознавание прервалось');
+  });
+
+  it('код движка доходит до UI через onError', async () => {
+    h.native = true;
+    h.recognition = true;
+    __resetNativeSpeechForTests();
+    const errors: string[] = [];
+    await startDictation({
+      onText: () => {},
+      onError: message => errors.push(message),
+      onEnd: () => {},
+    });
+    emit('recognitionError', { code: 'error-7' });
+    expect(errors).toEqual([nativeDictationError('error-7')]);
+  });
+
+  it('отрицательный ответ движка не приговор на всю сессию', async () => {
+    h.native = true;
+    h.recognition = false;
+    h.synthesis = false;
+    __resetNativeSpeechForTests();
+    expect((await speechSupport()).dictation).toBe('none');
+    // Сервис объявился позже (так бывает: TTS/распознавание поднимаются
+    // асинхронно) — второй запрос обязан это увидеть, а не жить на кэше.
+    h.recognition = true;
+    expect((await speechSupport()).dictation).toBe('native');
+  });
+
+  it('web-движок бросил на старте — причина названа, сессии нет', async () => {
+    class Denied {
+      lang = '';
+      continuous = false;
+      interimResults = false;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        const err = new Error('denied');
+        (err as { name?: string }).name = 'NotAllowedError';
+        throw err;
+      }
+      stop() {}
+    }
+    vi.stubGlobal('webkitSpeechRecognition', Denied);
+    const errors: string[] = [];
+    const session = await startDictation({
+      onText: () => {},
+      onError: message => errors.push(message),
+      onEnd: () => {},
+    });
+    expect(session).toBeNull();
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('Микрофон запрещён');
   });
 });

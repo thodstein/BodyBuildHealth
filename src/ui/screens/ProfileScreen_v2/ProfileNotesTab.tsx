@@ -711,12 +711,20 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const toggleDictation = () => {
     setVoiceError(null);
     if (dictation === 'listening') {
+      // Гасим состояние сразу, а не ждём recognitionEnd: нативная остановка
+      // может не прислать событие (мы снимаем подписки) — и «Слушаю» залипло бы.
       dictationRef.current?.stop();
+      dictationRef.current = null;
+      setInterim('');
+      setDictation('idle');
       return;
     }
     if (dictationStartingRef.current) return;
     dictationStartingRef.current = true;
     void (async () => {
+      // Причина отказа может прийти из движка ДО возврата null — тогда не
+      // затираем её общим «не подключено».
+      let reported = false;
       const session = await startDictation({
         lang: 'ru-RU',
         onText: (text, final) => {
@@ -735,6 +743,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           });
         },
         onError: message => {
+          reported = true;
           setDictation('error');
           setVoiceError(message);
         },
@@ -746,10 +755,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       });
       dictationStartingRef.current = false;
       if (!session) {
-        setDictation('error');
-        setVoiceError(
-          'Речь в текст здесь недоступна: распознавание речи не подключено. Голос всё равно можно записать и приложить к заметке.',
-        );
+        if (!reported) {
+          setDictation('error');
+          setVoiceError(
+            'Речь в текст здесь недоступна: распознавание речи не подключено — нет ни системного движка, ни поддержки в браузере. Голос можно записать и приложить к заметке.',
+          );
+        }
         return;
       }
       dictationRef.current = session;

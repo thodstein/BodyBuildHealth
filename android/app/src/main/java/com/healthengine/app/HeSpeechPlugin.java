@@ -52,6 +52,19 @@ public class HeSpeechPlugin extends Plugin {
     private int capsToken = 0;
     private final Handler main = new Handler(Looper.getMainLooper());
 
+    /* ── Состояние диктовки ────────────────────────────────────────────── */
+    // Android-распознаватель одноразовый: после паузы или распознанной фразы
+    // он завершается. Пока человек не нажал «Стоп», перезапускаем его сами —
+    // иначе «Слушаю» тихо превращалось бы в «ничего не происходит».
+    private volatile boolean continuous = false;
+    private Intent lastIntent;
+    private Listener listener;
+    private boolean heardSomething = false;
+    private int silentRounds = 0;
+    private volatile boolean stopping = false;
+    /** Три пустых круга подряд — движок молчит; честно выходим, не крутимся вечно. */
+    private static final int MAX_SILENT_ROUNDS = 3;
+
     /* ── Возможности платформы ─────────────────────────────────────────── */
 
     @PluginMethod
@@ -129,7 +142,8 @@ public class HeSpeechPlugin extends Plugin {
                     }
                     stopListeningInternal();
                     recognizer = SpeechRecognizer.createSpeechRecognizer(getContext());
-                    recognizer.setRecognitionListener(new Listener());
+                    listener = new Listener();
+                    recognizer.setRecognitionListener(listener);
 
                     Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
                     intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -137,12 +151,20 @@ public class HeSpeechPlugin extends Plugin {
                     intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
                     intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
                     intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+
+                    lastIntent = intent;
+                    continuous = true;
+                    stopping = false;
+                    heardSomething = false;
+                    silentRounds = 0;
                     recognizer.startListening(intent);
 
                     JSObject ret = new JSObject();
                     ret.put("started", true);
                     call.resolve(ret);
                 } catch (Exception e) {
+                    continuous = false;
+                    lastIntent = null;
                     rejectStart(call, "start-failed");
                 }
             }
@@ -160,7 +182,23 @@ public class HeSpeechPlugin extends Plugin {
         });
     }
 
+    /**
+     * Завершить слушание и выбросить распознаватель.
+     *
+     * `cancel()` присылает `onError(ERROR_CLIENT)` — это наша же остановка, а не
+     * сбой. Поэтому слушатель помечается мёртвым: ни ошибка отмены, ни поздние
+     * события старого экземпляра наружу не уходят (иначе «Стоп» показывал бы
+     * красную ошибку, а новая сессия получала бы чужие события).
+     */
     private void stopListeningInternal() {
+        continuous = false;
+        lastIntent = null;
+        silentRounds = 0;
+        heardSomething = false;
+        if (listener != null) {
+            listener.dead = true;
+            listener = null;
+        }
         if (recognizer == null) return;
         try {
             recognizer.stopListening();
@@ -170,6 +208,32 @@ public class HeSpeechPlugin extends Plugin {
         } finally {
             recognizer = null;
         }
+    }
+
+    /**
+     * Перезапуск слушания после паузы или распознанной фразы: системный
+     * распознаватель одноразовый, а диктовка в UI — «пока не нажали Стоп».
+     * false — перезапустить нечем (сессия уже закрыта).
+     */
+    private boolean restartListening(long delayMs) {
+        if (recognizer == null || lastIntent == null) return false;
+        heardSomething = false;
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!continuous || recognizer == null || lastIntent == null) return;
+                try {
+                    recognizer.startListening(lastIntent);
+                } catch (Exception e) {
+                    JSObject data = new JSObject();
+                    data.put("code", "start-failed");
+                    notifyListeners("recognitionError", data);
+                    stopListeningInternal();
+                    notifyListeners("recognitionEnd", new JSObject());
+                }
+            }
+        }, delayMs);
+        return true;
     }
 
     private void emitResult(Bundle bundle, boolean isFinal) {
@@ -185,12 +249,16 @@ public class HeSpeechPlugin extends Plugin {
     }
 
     private class Listener implements RecognitionListener {
+        /** Экземпляр отменён/уничтожен: его события больше не наши. */
+        volatile boolean dead = false;
+
         @Override
         public void onReadyForSpeech(Bundle params) {
         }
 
         @Override
         public void onBeginningOfSpeech() {
+            heardSomething = true;
         }
 
         @Override
@@ -207,6 +275,19 @@ public class HeSpeechPlugin extends Plugin {
 
         @Override
         public void onError(int error) {
+            if (dead) return;
+            // Пауза или тишина — не конец диктовки: перезапускаем, пока человек не
+            // нажал «Стоп». Три пустых круга подряд — движок просто молчит.
+            if (continuous
+                    && (error == SpeechRecognizer.ERROR_NO_MATCH
+                        || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
+                if (heardSomething) {
+                    silentRounds = 0;
+                } else {
+                    silentRounds += 1;
+                }
+                if (silentRounds < MAX_SILENT_ROUNDS && restartListening(250)) return;
+            }
             String code;
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                 code = "no-permission";
@@ -226,13 +307,18 @@ public class HeSpeechPlugin extends Plugin {
 
         @Override
         public void onResults(Bundle results) {
+            if (dead) return;
             emitResult(results, true);
+            // Одна фраза — не конец диктовки: продолжаем, пока сессия открыта.
+            if (continuous && restartListening(200)) return;
             stopListeningInternal();
             notifyListeners("recognitionEnd", new JSObject());
         }
 
         @Override
         public void onPartialResults(Bundle partialResults) {
+            if (dead) return;
+            heardSomething = true;
             emitResult(partialResults, false);
         }
 
