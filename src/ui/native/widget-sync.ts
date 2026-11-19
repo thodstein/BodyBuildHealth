@@ -42,6 +42,7 @@ import {
   type QueuedItem,
   type WorkoutWidgetExercise,
   type WorkoutWidgetSnapshot,
+  type NutritionPeriodStats,
 } from '../../core/widget-bridge';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
 import {
@@ -241,37 +242,58 @@ function collectTargets(): { kcal: number; protein: number; fats: number; carbs:
   }
 }
 
-function collectNutrition(): {
-  kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
-  targetKcal: number; targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
-} {
-  const targets = collectTargets();
-  const today = todayLocalISO();
+/** Границы периода для аналитики: неделя — Пн..Вс, месяц — 1..последнее число. */
+function periodBounds(period: 'week' | 'month', today: string): { from: string; to: string } {
+  try {
+    if (period === 'week') {
+      const from = addDaysIso(today, -mondayIndex(today));
+      return { from, to: addDaysIso(from, 6) };
+    }
+    const [y, m] = today.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const mm = `${m}`.padStart(2, '0');
+    return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${`${lastDay}`.padStart(2, '0')}` };
+  } catch {
+    return { from: today, to: today };
+  }
+}
+
+/** Сумма по дневнику еды + воде за диапазон дат (YYYY-MM-DD включительно). */
+function sumPeriod(
+  diary: Record<string, any>,
+  waterLog: { date: string; amountMl: number }[],
+  from: string,
+  to: string,
+): { kcal: number; protein: number; fat: number; carbs: number; waterMl: number; days: number; waterDays: number } {
   let kcal = 0;
   let protein = 0;
   let fat = 0;
   let carbs = 0;
-  try {
-    const diary = readDiaryV2();
-    const day = diary[today];
-    if (day?.meals) {
-      for (const items of Object.values(day.meals)) {
-        for (const it of items || []) {
-          kcal += it.kcal || 0;
-          protein += it.p || 0;
-          fat += it.f || 0;
-          carbs += it.c || 0;
-        }
+  let days = 0;
+  for (const [date, day] of Object.entries(diary || {})) {
+    if (date < from || date > to) continue;
+    const meals = (day as any)?.meals;
+    if (!meals || typeof meals !== 'object') continue;
+    let dayItems = 0;
+    for (const items of Object.values(meals)) {
+      for (const it of (items as any[]) || []) {
+        kcal += Number(it?.kcal) || 0;
+        protein += Number(it?.p) || 0;
+        fat += Number(it?.f) || 0;
+        carbs += Number(it?.c) || 0;
+        dayItems += 1;
       }
     }
-  } catch {
-    /* пустой дневник */
+    if (dayItems > 0) days += 1;
   }
   let waterMl = 0;
-  try {
-    waterMl = loadWaterLog().find((w) => w.date === today)?.amountMl ?? 0;
-  } catch {
-    /* ignore */
+  let waterDays = 0;
+  for (const w of waterLog || []) {
+    const date = String(w?.date ?? '');
+    if (date < from || date > to) continue;
+    const amount = Math.max(0, Number(w?.amountMl) || 0);
+    if (amount > 0) waterDays += 1;
+    waterMl += amount;
   }
   return {
     kcal: Math.round(kcal),
@@ -279,11 +301,53 @@ function collectNutrition(): {
     fat: Math.round(fat),
     carbs: Math.round(carbs),
     waterMl,
+    days,
+    waterDays,
+  };
+}
+
+export function collectNutrition(): {
+  kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
+  targetKcal: number; targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+  periods: {
+    day: NutritionPeriodStats;
+    week: NutritionPeriodStats;
+    month: NutritionPeriodStats;
+  };
+} {
+  const targets = collectTargets();
+  const today = todayLocalISO();
+  let diary: Record<string, any> = {};
+  try {
+    diary = readDiaryV2() as unknown as Record<string, any>;
+  } catch {
+    /* пустой дневник */
+  }
+  let waterLog: { date: string; amountMl: number }[] = [];
+  try {
+    waterLog = loadWaterLog() as unknown as { date: string; amountMl: number }[];
+  } catch {
+    /* нет журнала воды */
+  }
+
+  const day = sumPeriod(diary, waterLog, today, today);
+  const weekRange = periodBounds('week', today);
+  const monthRange = periodBounds('month', today);
+  const week = sumPeriod(diary, waterLog, weekRange.from, weekRange.to);
+  const month = sumPeriod(diary, waterLog, monthRange.from, monthRange.to);
+
+  return {
+    kcal: day.kcal,
+    protein: day.protein,
+    fat: day.fat,
+    carbs: day.carbs,
+    waterMl: day.waterMl,
     targetKcal: targets.kcal,
     targetProtein: targets.protein,
     targetFat: targets.fats,
     targetCarbs: targets.carbs,
     waterTargetMl: targets.waterMl,
+    periods: { day, week, month },
   };
 }
 
@@ -944,7 +1008,8 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           p: Math.max(0, Math.round(it.p ?? 0)),
           f: Math.max(0, Math.round(it.f ?? 0)),
           c: Math.max(0, Math.round(it.c ?? 0)),
-          qty: 100,
+          // Порция из нативного редактора (по умолчанию 100 г, как в дневнике).
+          qty: Math.max(1, Math.round(Number(it.qty) || 0)) || 100,
         });
         writeDiaryV2({ ...diary, [date]: { meals: { ...day.meals, [meal]: list } } });
         foods += 1;
@@ -1132,6 +1197,7 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       targetCarbs: n.targetCarbs,
       waterMl: n.waterMl,
       waterTargetMl: n.waterTargetMl,
+      periods: n.periods,
     }).catch(() => false),
     syncCalendarWidget(cal).catch(() => false),
     syncNotesWidget(nt).catch(() => false),

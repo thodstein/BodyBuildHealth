@@ -11,7 +11,7 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
-export type WidgetKind = 'training' | 'workout' | 'timer' | 'compliance' | 'nutrition' | 'water' | 'calendar' | 'notes';
+export type WidgetKind = 'training' | 'workout' | 'timer' | 'compliance' | 'nutrition' | 'nutrition_panel' | 'water' | 'calendar' | 'notes';
 export type WidgetTarget =
   | 'training'
   | 'training_run'
@@ -34,6 +34,8 @@ export interface QueuedItem {
   f?: number;
   c?: number;
   meal?: string;
+  /** Порция, г (необязательно; по умолчанию 100 — как в дневнике). */
+  qty?: number;
   /* --- Подход из виджета «Проведение» (type='set_add') --- */
   /** Упражнение, к которому относится подход (имя из плана/живой сессии). */
   exerciseName?: string;
@@ -69,6 +71,25 @@ export interface TimerState {
 }
 
 /**
+ * Агрегат питания за период (день / неделя / месяц) для виджета аналитики.
+ *
+ * `days` — сколько дней периода реально содержат записи еды: это знаменатель
+ * среднего «в день». Пустые дни не разбавляют среднее нулями, иначе неделя с
+ * одной записью показывала бы «средне 300 ккал» вместо честного «один день».
+ */
+export interface NutritionPeriodStats {
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  waterMl: number;
+  /** Дней с записями еды в периоде. */
+  days: number;
+  /** Дней с записью воды в периоде. */
+  waterDays: number;
+}
+
+/**
  * Снапшот дня для homescreen-виджета «Питание» (как сводка FatSecret):
  * остаток калорий, Б/Ж/У и вода — факт и цель.
  */
@@ -83,6 +104,15 @@ export interface NutritionWidgetSnapshot {
   targetCarbs: number;
   waterMl: number;
   waterTargetMl: number;
+  /**
+   * Готовые агрегаты за день/неделю/месяц: нативный виджет переключает период
+   * (и настраивает halves двойного виджета) без обращения к WebView.
+   */
+  periods?: {
+    day: NutritionPeriodStats;
+    week: NutritionPeriodStats;
+    month: NutritionPeriodStats;
+  };
 }
 
 /** Задача для виджета «Календарь» (агенда дня, как в TickTick). */
@@ -198,7 +228,7 @@ interface WidgetBridgeNative {
   syncNotes(o: NotesWidgetSnapshot): Promise<{ ok: boolean }>;
   syncWorkout(o: WorkoutWidgetSnapshot): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
-  queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string }): Promise<{ ok: boolean; queue: number }>;
+  queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string; qty?: number }): Promise<{ ok: boolean; queue: number }>;
   queueTaskToggle(o: { id: string; done: boolean }): Promise<{ ok: boolean; queue: number }>;
   drainQueue(): Promise<{ items: string; count: number }>;
   queueSize(): Promise<{ queue: number }>;
@@ -407,17 +437,41 @@ export async function syncComplianceWidget(input: {
   return false;
 }
 
+/** Приведение агрегата периода: только неотрицательные целые. */
+function clampPeriodStats(stats?: NutritionPeriodStats): NutritionPeriodStats {
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  return {
+    kcal: num(stats?.kcal),
+    protein: num(stats?.protein),
+    fat: num(stats?.fat),
+    carbs: num(stats?.carbs),
+    waterMl: num(stats?.waterMl),
+    days: num(stats?.days),
+    waterDays: num(stats?.waterDays),
+  };
+}
+
 export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promise<boolean> {
+  const payload: NutritionWidgetSnapshot = {
+    ...input,
+    periods: input.periods
+      ? {
+          day: clampPeriodStats(input.periods.day),
+          week: clampPeriodStats(input.periods.week),
+          month: clampPeriodStats(input.periods.month),
+        }
+      : undefined,
+  };
   const p = plugin();
   if (p) {
     try {
-      await p.syncNutrition(input);
+      await p.syncNutrition(payload);
       return true;
     } catch {
       /* fallback ниже */
     }
   }
-  fbSnapshot('nutrition', { ...input, updatedAt: Date.now() });
+  fbSnapshot('nutrition', { ...payload, updatedAt: Date.now() });
   return false;
 }
 
@@ -508,6 +562,8 @@ export async function queueFood(input: {
   f: number;
   c: number;
   meal: string;
+  /** Порция, г: необязательна, дневник подставит 100 по умолчанию. */
+  qty?: number;
 }): Promise<number> {
   const item: QueuedItem = {
     type: 'food',
@@ -517,6 +573,7 @@ export async function queueFood(input: {
     f: Math.max(0, Math.round(input.f) || 0),
     c: Math.max(0, Math.round(input.c) || 0),
     meal: String(input.meal || 'snack').slice(0, 32),
+    qty: Math.max(0, Math.min(5000, Math.round(Number(input.qty) || 0))),
     ts: Date.now(),
   };
   const p = plugin();
@@ -529,6 +586,7 @@ export async function queueFood(input: {
         f: item.f ?? 0,
         c: item.c ?? 0,
         meal: item.meal ?? 'snack',
+        qty: item.qty ?? 0,
       });
       return typeof r.queue === 'number' ? r.queue : 0;
     } catch {

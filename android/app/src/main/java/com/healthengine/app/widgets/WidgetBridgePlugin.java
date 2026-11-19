@@ -123,6 +123,28 @@ public class WidgetBridgePlugin extends Plugin {
             obj.put("targetCarbs", call.getInt("targetCarbs", 0));
             obj.put("waterMl", call.getInt("waterMl", 0));
             obj.put("waterTargetMl", call.getInt("waterTargetMl", 0));
+            // Агрегаты за день/неделю/месяц: считает JS (collectNutrition), виджет
+            // только переключает период. Ключи жёстко нормализуем — RemoteViews
+            // читает их напрямую, мусор из моста ему нельзя.
+            JSObject periodsRaw = call.getObject("periods");
+            if (periodsRaw != null) {
+                JSONObject periods = new JSONObject(periodsRaw.toString());
+                JSONObject clean = new JSONObject();
+                for (String key : new String[]{"day", "week", "month"}) {
+                    JSONObject p = periods.optJSONObject(key);
+                    if (p == null) continue;
+                    JSONObject stats = new JSONObject();
+                    stats.put("kcal", clampInt(p.optInt("kcal", 0)));
+                    stats.put("protein", clampInt(p.optInt("protein", 0)));
+                    stats.put("fat", clampInt(p.optInt("fat", 0)));
+                    stats.put("carbs", clampInt(p.optInt("carbs", 0)));
+                    stats.put("waterMl", clampInt(p.optInt("waterMl", 0)));
+                    stats.put("days", clampInt(p.optInt("days", 0)));
+                    stats.put("waterDays", clampInt(p.optInt("waterDays", 0)));
+                    clean.put(key, stats);
+                }
+                if (clean.length() > 0) obj.put("periods", clean);
+            }
             obj.put("queue", WidgetStore.queueSize(ctx));
             obj.put("updatedAt", System.currentTimeMillis());
             WidgetStore.putJson(ctx, WidgetStore.KEY_NUTRITION, obj);
@@ -133,6 +155,10 @@ public class WidgetBridgePlugin extends Plugin {
         } catch (Exception e) {
             call.reject("syncNutrition failed");
         }
+    }
+
+    private static int clampInt(int value) {
+        return Math.max(0, Math.min(10_000_000, value));
     }
 
     @PluginMethod
@@ -247,6 +273,8 @@ public class WidgetBridgePlugin extends Plugin {
             item.put("f", call.getInt("f", 0));
             item.put("c", call.getInt("c", 0));
             item.put("meal", call.getString("meal", "snack"));
+            int qty = call.getInt("qty", 0);
+            if (qty > 0) item.put("qty", Math.min(5000, qty));
             item.put("ts", System.currentTimeMillis());
             int size = WidgetStore.enqueue(ctx, item);
             NutritionWidgetProvider.updateAll(ctx);
@@ -513,6 +541,7 @@ public class WidgetBridgePlugin extends Plugin {
         if ("timer".equals(kind)) return TimerWidgetProvider.class;
         if ("compliance".equals(kind)) return ComplianceWidgetProvider.class;
         if ("nutrition".equals(kind)) return NutritionWidgetProvider.class;
+        if ("nutrition_panel".equals(kind)) return NutritionPanelWidgetProvider.class;
         if ("water".equals(kind)) return WaterQuickWidgetProvider.class;
         if ("calendar".equals(kind)) return CalendarWidgetProvider.class;
         if ("notes".equals(kind)) return NotesWidgetProvider.class;
@@ -523,6 +552,7 @@ public class WidgetBridgePlugin extends Plugin {
         if ("training".equals(kind) || "timer".equals(kind)) return WidgetStore.TARGET_TRAINING;
         if ("workout".equals(kind)) return WidgetStore.TARGET_TRAINING_RUN;
         if ("nutrition".equals(kind)) return WidgetStore.TARGET_NUTRITION;
+        if ("nutrition_panel".equals(kind)) return WidgetStore.TARGET_NUTRITION;
         if ("water".equals(kind)) return WidgetStore.TARGET_NUTRITION;
         if ("compliance".equals(kind)) return WidgetStore.TARGET_SUPPORT;
         if ("calendar".equals(kind)) return WidgetStore.TARGET_CALENDAR;

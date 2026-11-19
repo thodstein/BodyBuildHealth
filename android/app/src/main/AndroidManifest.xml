@@ -141,10 +141,24 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.healthengine.app.action.WIDGET_WATER" />
+                <action android:name="com.healthengine.app.action.WIDGET_NUT_PERIOD" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_nutrition_info" />
+        </receiver>
+        <receiver
+            android:name=".widgets.NutritionPanelWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_nutrition_panel_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.healthengine.app.action.WIDGET_NUT_PANEL_PERIOD" />
+                <action android:name="com.healthengine.app.action.WIDGET_NUT_PANEL_METRIC" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_nutrition_panel_info" />
         </receiver>
         <receiver
             android:name=".widgets.QuickSetWidgetProvider"

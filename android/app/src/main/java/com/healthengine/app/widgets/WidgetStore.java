@@ -36,6 +36,12 @@ public final class WidgetStore {
     /** Per-widget фильтр типов событий: all / task / training / supp / pharma. */
     public static final String KEY_CAL_FILTER_PREFIX = "calendar_filter_";
 
+    /** Per-widget период аналитики питания: day / week / month. */
+    public static final String KEY_NUT_PERIOD_PREFIX = "nutrition_period_";
+    /** Двойной виджет аналитики: метрика и период каждой половины (part = 1|2). */
+    public static final String KEY_NP_METRIC_PREFIX = "nutrition_panel_metric_";
+    public static final String KEY_NP_PERIOD_PREFIX = "nutrition_panel_period_";
+
     /** Intent action: открыть приложение из виджета. */
     public static final String ACTION_OPEN = "com.healthengine.app.action.WIDGET_OPEN";
     public static final String EXTRA_TARGET = "target";
@@ -165,6 +171,62 @@ public final class WidgetStore {
                 .remove(KEY_CAL_ANCHOR_PREFIX + widgetId)
                 .remove(KEY_CAL_FILTER_PREFIX + widgetId)
                 .apply();
+    }
+
+    // ---- Питание: период дня/недели/месяца и половины двойного виджета ----
+
+    public static String getNutritionPeriod(Context ctx, int widgetId) {
+        return normalizePeriod(prefs(ctx).getString(KEY_NUT_PERIOD_PREFIX + widgetId, "day"));
+    }
+
+    public static void setNutritionPeriod(Context ctx, int widgetId, String period) {
+        prefs(ctx).edit().putString(KEY_NUT_PERIOD_PREFIX + widgetId, normalizePeriod(period)).apply();
+    }
+
+    /** Метрика половины двойного виджета: kcal / protein / fat / carbs / water. */
+    public static String getPanelMetric(Context ctx, int widgetId, int part) {
+        String def = part == 2 ? "protein" : "kcal";
+        return normalizeMetric(prefs(ctx).getString(KEY_NP_METRIC_PREFIX + widgetId + "_" + part, def));
+    }
+
+    public static void setPanelMetric(Context ctx, int widgetId, int part, String metric) {
+        prefs(ctx).edit()
+                .putString(KEY_NP_METRIC_PREFIX + widgetId + "_" + part, normalizeMetric(metric))
+                .apply();
+    }
+
+    public static String getPanelPeriod(Context ctx, int widgetId, int part) {
+        String def = part == 2 ? "week" : "day";
+        return normalizePeriod(prefs(ctx).getString(KEY_NP_PERIOD_PREFIX + widgetId + "_" + part, def));
+    }
+
+    public static void setPanelPeriod(Context ctx, int widgetId, int part, String period) {
+        prefs(ctx).edit()
+                .putString(KEY_NP_PERIOD_PREFIX + widgetId + "_" + part, normalizePeriod(period))
+                .apply();
+    }
+
+    public static String normalizePeriod(String value) {
+        if ("week".equals(value) || "month".equals(value)) return value;
+        return "day";
+    }
+
+    public static String normalizeMetric(String value) {
+        if ("protein".equals(value) || "fat".equals(value) || "carbs".equals(value)
+                || "water".equals(value)) {
+            return value;
+        }
+        return "kcal";
+    }
+
+    public static void clearNutritionState(Context ctx, int widgetId) {
+        SharedPreferences.Editor e = prefs(ctx).edit()
+                .remove(KEY_NUT_PERIOD_PREFIX + widgetId);
+        for (int part = 1; part <= 2; part++) {
+            e.remove(KEY_NP_METRIC_PREFIX + widgetId + "_" + part);
+            e.remove(KEY_NP_PERIOD_PREFIX + widgetId + "_" + part);
+        }
+        e.apply();
     }
 
     // ---- Прозрачность фона виджетов ----

@@ -1,0 +1,364 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Двойной виджет аналитики питания: две независимые половины.
+    В каждой — своя метрика (тап по названию переключает: ккал → белки → жиры →
+    углеводы → вода) и свой период (чипы «Д · Н · М»). Метрика и период хранятся
+    per-widget в WidgetStore, поэтому половины друг друга не трогают.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wp_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:paddingLeft="10dp"
+    android:paddingRight="10dp"
+    android:paddingTop="7dp"
+    android:paddingBottom="7dp"
+    android:contentDescription="@string/widget_nutrition_panel_desc">
+
+    <!-- ======================= половина 1 ======================= -->
+    <LinearLayout
+        android:id="@+id/wp1_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/wp1_metric"
+                android:layout_width="0dp"
+                android:layout_height="22dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:text="Ккал ▸"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp1_p_day"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip_on"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Д"
+                android:textColor="#07111F"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp1_p_week"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Н"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp1_p_month"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="М"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/wp1_value"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp1_pct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="0%"
+                android:textColor="#8FA3C4"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/wp1_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="#8FA3C4"
+            android:textSize="9sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="4dp">
+
+            <ProgressBar
+                android:id="@+id/wp1_bar_kcal"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_kcal" />
+
+            <ProgressBar
+                android:id="@+id/wp1_bar_protein"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_protein"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp1_bar_fat"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_fat"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp1_bar_carbs"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_carbs"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp1_bar_water"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_water"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="#1FFFFFFF" />
+
+    <!-- ======================= половина 2 ======================= -->
+    <LinearLayout
+        android:id="@+id/wp2_root"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/wp2_metric"
+                android:layout_width="0dp"
+                android:layout_height="22dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_chip"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp"
+                android:text="БЖУ ▸"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp2_p_day"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Д"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp2_p_week"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip_on"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="Н"
+                android:textColor="#07111F"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp2_p_month"
+                android:layout_width="30dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/widget_chip"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="М"
+                android:textColor="#E2ECFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/wp2_value"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/wp2_pct"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="0%"
+                android:textColor="#8FA3C4"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/wp2_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text=""
+            android:textColor="#8FA3C4"
+            android:textSize="9sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="4dp">
+
+            <ProgressBar
+                android:id="@+id/wp2_bar_kcal"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_kcal" />
+
+            <ProgressBar
+                android:id="@+id/wp2_bar_protein"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_protein"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp2_bar_fat"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_fat"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp2_bar_carbs"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_carbs"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/wp2_bar_water"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/widget_bar_water"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

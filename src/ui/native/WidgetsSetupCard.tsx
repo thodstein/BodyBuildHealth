@@ -20,7 +20,8 @@ const WIDGETS_RU: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'training', icon: 'dumbbell', name: 'Тренировка', desc: 'Последняя сессия и переход в план в один тап' },
   { kind: 'timer', icon: 'clock', name: 'Таймер отдыха', desc: 'Пресеты 0:30–3:00, старт/пауза без открытия приложения' },
   { kind: 'compliance', icon: 'chart', name: 'Комплаенс', desc: 'Процент выполнения плана за неделю' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'Аналитика КБЖУ кругами: ＋ Еда, скан и фото с рабочего стола' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Питание', desc: 'КБЖУ кругами за день, неделю и месяц: ＋ Еда, скан и фото с рабочего стола' },
+  { kind: 'nutrition_panel', icon: 'chart', name: 'Аналитика питания', desc: 'Две половины: в каждой своя метрика (ккал / Б / Ж / У / вода) и свой период' },
   { kind: 'water', icon: 'droplet', name: 'Вода', desc: 'Прогресс воды дня и +250 мл в один тап' },
   { kind: 'calendar', icon: 'clock', name: 'Календарь', desc: 'День / неделя / месяц и новая задача прямо с рабочего стола' },
   { kind: 'notes', icon: 'notebook', name: 'Заметки', desc: 'Закреплённые и свежие заметки; новая заметка — без открытия приложения' },
@@ -31,7 +32,8 @@ const WIDGETS_EN: { kind: WidgetKind; icon: NativeIconName; name: string; desc: 
   { kind: 'training', icon: 'dumbbell', name: 'Workout', desc: 'Last session and one-tap jump to the plan' },
   { kind: 'timer', icon: 'clock', name: 'Rest timer', desc: 'Presets 0:30–3:00, start/pause without opening the app' },
   { kind: 'compliance', icon: 'chart', name: 'Compliance', desc: 'Weekly plan completion percent' },
-  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'KBJU rings analytics: + Food, scan and photo from the home screen' },
+  { kind: 'nutrition', icon: 'bowl', name: 'Nutrition', desc: 'KBJU rings for day, week and month: + Food, scan and photo from the home screen' },
+  { kind: 'nutrition_panel', icon: 'chart', name: 'Nutrition analytics', desc: 'Two halves: each with its own metric (kcal / P / F / C / water) and period' },
   { kind: 'water', icon: 'droplet', name: 'Water', desc: 'Daily water progress and +250 ml in one tap' },
   { kind: 'calendar', icon: 'clock', name: 'Calendar', desc: 'Day / week / month and a new task right from the home screen' },
   { kind: 'notes', icon: 'notebook', name: 'Notes', desc: 'Pinned and recent notes; add a note without opening the app' },
@@ -60,7 +62,7 @@ function strings() {
       reasons: PIN_REASON_EN,
       cardLabel: 'Home screen widgets',
       title: 'Home screen widgets',
-      sub: 'APK only · 8 widgets · work without opening the app',
+      sub: 'APK only · 9 widgets · work without opening the app',
       pin: (name: string) => `Pin the ${name} widget`,
       pinCta: '📌 To home',
       refreshBusy: 'Updating…',
@@ -85,7 +87,7 @@ function strings() {
           <br />
           2. Choose “Widgets”
           <br />
-          3. Find “Health Engine” (HE · Workout run / Workout / Timer / Compliance / Nutrition / Water / Calendar / Notes)
+          3. Find “Health Engine” (HE · Workout run / Workout / Timer / Compliance / Nutrition / Nutrition analytics / Water / Calendar / Notes)
           <br />
           4. Drag the widget onto the screen
           <br />
@@ -100,7 +102,7 @@ function strings() {
     reasons: PIN_REASON_RU,
     cardLabel: 'Виджеты рабочего стола',
     title: 'Виджеты на рабочий стол',
-    sub: 'Только APK · 8 виджетов · работают без открытия приложения',
+    sub: 'Только APK · 9 виджетов · работают без открытия приложения',
     pin: (name: string) => `Закрепить виджет ${name}`,
     pinCta: '📌 На стол',
     refreshBusy: 'Обновление…',
@@ -125,7 +127,7 @@ function strings() {
         <br />
         2. Выберите «Виджеты»
         <br />
-        3. Найдите «Health Engine» (HE · Проведение / Тренировка / Таймер / Комплаенс / Питание / Вода / Календарь / Заметки)
+        3. Найдите «Health Engine» (HE · Проведение / Тренировка / Таймер / Комплаенс / Питание / Аналитика питания / Вода / Календарь / Заметки)
         <br />
         4. Перетащите виджет на стол
         <br />

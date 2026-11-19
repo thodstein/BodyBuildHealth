@@ -262,6 +262,44 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Порция в граммах: дневник показывает вес, ккал/Б/Ж/У уже на порцию -->
+        <LinearLayout
+            android:id="@+id/qa_qty_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:includeFontPadding="false"
+                android:text="Порция, г"
+                android:textColor="#8FA3C4"
+                android:textSize="10sp" />
+
+            <EditText
+                android:id="@+id/qa_qty"
+                android:layout_width="96dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_input_bg"
+                android:gravity="center"
+                android:hint="100"
+                android:imeOptions="actionDone"
+                android:inputType="number"
+                android:maxLength="4"
+                android:minHeight="38dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:singleLine="true"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#607492"
+                android:textSize="13sp" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/qa_meal_label"
             android:layout_width="match_parent"

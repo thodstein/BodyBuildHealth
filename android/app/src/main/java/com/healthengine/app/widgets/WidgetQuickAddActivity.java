@@ -85,6 +85,7 @@ public class WidgetQuickAddActivity extends Activity {
     private EditText proteinEt;
     private EditText fatEt;
     private EditText carbsEt;
+    private EditText qtyEt;
     private EditText weightEt;
     private EditText repsEt;
     private EditText rirEt;
@@ -143,6 +144,7 @@ public class WidgetQuickAddActivity extends Activity {
         proteinEt = findViewById(R.id.qa_p);
         fatEt = findViewById(R.id.qa_f);
         carbsEt = findViewById(R.id.qa_c);
+        qtyEt = findViewById(R.id.qa_qty);
         dateLabel = findViewById(R.id.qa_date_label);
         dateToday = findViewById(R.id.qa_date_today);
         dateTomorrow = findViewById(R.id.qa_date_tomorrow);
@@ -170,6 +172,7 @@ public class WidgetQuickAddActivity extends Activity {
         View priorityRow = findViewById(R.id.qa_priority_row);
         View checklistLabel = findViewById(R.id.qa_checklist_label);
         View foodRow = findViewById(R.id.qa_food_row);
+        View qtyRow = findViewById(R.id.qa_qty_row);
         View mealLabel = findViewById(R.id.qa_meal_label);
         View mealRow = findViewById(R.id.qa_meal_row);
         View setRow = findViewById(R.id.qa_set_row);
@@ -192,6 +195,7 @@ public class WidgetQuickAddActivity extends Activity {
             timeView.setVisibility(View.GONE);
             priorityRow.setVisibility(View.GONE);
             foodRow.setVisibility(View.VISIBLE);
+            qtyRow.setVisibility(View.VISIBLE);
             mealLabel.setVisibility(View.VISIBLE);
             mealRow.setVisibility(View.VISIBLE);
             dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
@@ -363,7 +367,8 @@ public class WidgetQuickAddActivity extends Activity {
     }
 
     /** Еда из виджета «Питание»: запись в очередь `type=food` + оптимистичные круги. */
-    private boolean saveFood(String name, long now) throws Exception {        int kcal = parseQty(kcalEt, 5000);
+    private boolean saveFood(String name, long now) throws Exception {
+        int kcal = parseQty(kcalEt, 5000);
         if (kcal <= 0) {
             showError("Укажите калорийность порции");
             return false;
@@ -371,6 +376,9 @@ public class WidgetQuickAddActivity extends Activity {
         int p = parseQty(proteinEt, 500);
         int f = parseQty(fatEt, 500);
         int c = parseQty(carbsEt, 500);
+        // Пустая порция = 100 г: дневник без веса показывает «100 г» по умолчанию.
+        int qty = parseQty(qtyEt, 5000);
+        if (qty <= 0) qty = 100;
         JSONObject item = new JSONObject();
         item.put("type", "food");
         item.put("name", name);
@@ -378,6 +386,7 @@ public class WidgetQuickAddActivity extends Activity {
         item.put("p", p);
         item.put("f", f);
         item.put("c", c);
+        item.put("qty", qty);
         item.put("meal", meal);
         item.put("ts", now);
         WidgetStore.enqueue(this, item);

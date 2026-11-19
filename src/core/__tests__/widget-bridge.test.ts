@@ -33,6 +33,8 @@ import {
   applyWidgetQueue,
   normalizeMealKey,
   collectWorkout,
+  collectNutrition,
+  addDaysIso,
   resolveWorkoutPlan,
   formatPlanLine,
   trainingWeekdays,
@@ -542,5 +544,92 @@ describe('календарь: тренировки, БАДы, фарма и де
     expect(task).toBeTruthy();
     expect(task!.kind).toBe('task');
     expect(task!.title).toBe('Позвонить врачу');
+  });
+});
+
+describe('аналитика питания: день, неделя, месяц', () => {
+  it('30. еда из виджета несёт порцию и приём пищи', async () => {
+    await queueFood({ name: 'Овсянка', kcal: 350, p: 12, f: 8, c: 55, meal: 'Завтрак', qty: 250 });
+    await queueFood({ name: 'Гигантская порция', kcal: 900, p: 1, f: 1, c: 1, meal: 'lunch', qty: 99999 });
+    const items = await drainWidgetQueue();
+    expect(items[0].qty).toBe(250);
+    expect(items[0].meal).toBe('Завтрак');
+    // Порция ограничена 5 кг — как и в дневнике.
+    expect(items[1].qty).toBe(5000);
+  });
+
+  it('31. syncNutritionWidget держит периоды и обрезает отрицательные значения', async () => {
+    const ok = await syncNutritionWidget({
+      kcal: 100,
+      targetKcal: 2000,
+      protein: 10,
+      fat: 5,
+      carbs: 20,
+      targetProtein: 100,
+      targetFat: 60,
+      targetCarbs: 200,
+      waterMl: 300,
+      waterTargetMl: 2000,
+      periods: {
+        day: { kcal: 100, protein: 10, fat: 5, carbs: 20, waterMl: 300, days: 1, waterDays: 1 },
+        week: { kcal: -50, protein: 70, fat: -1, carbs: 120, waterMl: -10, days: 2, waterDays: 1 },
+        month: { kcal: 1200, protein: 70, fat: 40, carbs: 120, waterMl: 900, days: 3, waterDays: 3 },
+      },
+    });
+    // Вне native — фолбэк-снапшот, но контракт периодов тот же.
+    expect(ok).toBe(false);
+    const snap = readFallbackSnapshot('nutrition') as {
+      periods: Record<string, { kcal: number; fat: number; waterMl: number; days: number }>;
+    };
+    expect(snap.periods.week.kcal).toBe(0);
+    expect(snap.periods.week.fat).toBe(0);
+    expect(snap.periods.week.waterMl).toBe(0);
+    expect(snap.periods.month.days).toBe(3);
+  });
+
+  it('32. collectNutrition: неделя с Пн и месяц включают записи периода', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const { addWater } = await import('../../engines/nutrition-tracker.engine');
+
+    const today = localIsoDate();
+    const [y, m, d] = today.split('-').map(Number);
+    const mondayIdx = (new Date(y, m - 1, d).getDay() + 6) % 7; // 0 = Пн
+    const monday = addDaysIso(today, -mondayIdx);
+    const otherDay = mondayIdx === 0 ? null : monday;
+
+    // Запись в понедельник текущей недели + сегодня (дальше от недели не уходим).
+    const entryKcal: Record<string, number> = {};
+    entryKcal[today] = 620;
+    if (otherDay && otherDay !== today) entryKcal[otherDay] = 500;
+
+    const meals: Record<string, { meals: Record<string, any[]> }> = {};
+    for (const [date, kcal] of Object.entries(entryKcal)) {
+      meals[date] = {
+        meals: { lunch: [{ name: 'Блюдо', kcal, p: 30, f: 10, c: 50, qty: 150 }] },
+      };
+    }
+    writeDiaryV2(meals as any);
+    addWater(400);
+
+    const sum = (from: string, to: string) =>
+      Object.entries(entryKcal)
+        .filter(([date]) => date >= from && date <= to)
+        .reduce((acc, [, kcal]) => acc + kcal, 0);
+    const count = (from: string, to: string) =>
+      Object.keys(entryKcal).filter((date) => date >= from && date <= to).length;
+
+    const monthFirst = `${y}-${`${m}`.padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m, 0).getDate();
+    const monthLast = `${y}-${`${m}`.padStart(2, '0')}-${`${lastDay}`.padStart(2, '0')}`;
+    const weekLast = addDaysIso(monday, 6);
+
+    const n = collectNutrition();
+    expect(n.periods.day.kcal).toBe(entryKcal[today]);
+    expect(n.periods.day.waterMl).toBe(400);
+    expect(n.periods.week.kcal).toBe(sum(monday, weekLast));
+    expect(n.periods.week.days).toBe(count(monday, weekLast));
+    expect(n.periods.month.kcal).toBe(sum(monthFirst, monthLast));
+    expect(n.periods.month.days).toBe(count(monthFirst, monthLast));
+    expect(n.periods.month.days).toBeGreaterThanOrEqual(n.periods.week.days);
   });
 });
