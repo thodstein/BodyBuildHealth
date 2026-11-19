@@ -14,7 +14,9 @@
  *     порциями не считаются — у них нет порога в каноне `MIN_MEANINGFUL_G`;
  *  2. все четыре оси (ккал, Б, Ж, У) — ≤3 %;
  *  3. `starchDoubleStats().small === 0` — ни одного «второго гарнира в малом виде»;
- *  4. граммы целые (обещание «ни одного дробного грамма» в плане).
+ *  4. граммы целые (обещание «ни одного дробного грамма» в плане);
+ *  5. **приём не вырезается** (§8.115) — ни одного слота с нулём позиций и ни одной ноты
+ *     «Приёмов N вместо M»: слот, который выбрал пользователь, остаётся в плане.
  *
  * Замер после §8.114 (эта сетка, фактический прогон):
  *  • авто: 168/168 дней собраны, обрезков **0** (v4.2: 2; до стадий — 135 в 82 днях),
@@ -22,6 +24,7 @@
  *    он стоял в базе и до стадий);
  *  • ручной: 168/168, обрезков **0** (v4.2: 4), вне канона **0**;
  *  • `smallSum` **0** в обоих путях; дробных граммов нет.
+ *  • §8.115: пустых приёмов **0**, нот «Приёмов N вместо M» **0** — в обоих путях.
  *
  * Историю §8.112 (гигиена порций, замена «порошок → творог») см. в аудите
  * docs/NUTRITION-PLANNER-QUALITY-AUDIT-2026-10.md. Три остатка v4.2 (овсянка 20 г в завтраке,
@@ -82,6 +85,8 @@ type Row = {
   worstWhy: string;
   small: number;
   fractional: string[];
+  emptyMeals: string[];
+  dropNote: string[];
 };
 
 const buildGrid = (manual: boolean): Row[] => {
@@ -129,6 +134,12 @@ const buildGrid = (manual: boolean): Row[] => {
             key, crumbs, fractional,
             worst: worstAxis[1], worstWhy: worstAxis[0],
             small: starchDoubleStats((plan.meals || []) as any[]).small,
+            emptyMeals: (plan.meals || [])
+              .filter((m: any) => (m.items || []).length === 0)
+              .map((m: any) => `${key} ${String(m.type)}`),
+            dropNote: (plan.notes || [])
+              .filter((n: any) => /Приёмов \d+ вместо/.test(String(n)))
+              .map((n: any) => `${key} ${String(n)}`),
           });
           i++;
         }
@@ -189,6 +200,11 @@ describe('§8.112 гигиена порций: обрезков нет И кан
   it('граммы целые', () => {
     expect(AUTO.flatMap((r) => r.fractional).slice(0, 12).join('; ')).toBe('');
   });
+
+  it('§8.115 приём не вырезается: пустых приёмов нет и ноты «Приёмов N вместо M» нет', () => {
+    const bad = [...AUTO.flatMap((r) => r.emptyMeals), ...AUTO.flatMap((r) => r.dropNote)];
+    expect(bad.join('; ')).toBe('');
+  });
 });
 
 describe('§8.112 гигиена порций: обрезков нет И канон 3% держится (ручной путь)', () => {
@@ -213,5 +229,10 @@ describe('§8.112 гигиена порций: обрезков нет И кан
 
   it('граммы целые', () => {
     expect(MANUAL.flatMap((r) => r.fractional).slice(0, 12).join('; ')).toBe('');
+  });
+
+  it('§8.115 приём не вырезается: пустых приёмов нет и ноты «Приёмов N вместо M» нет', () => {
+    const bad = [...MANUAL.flatMap((r) => r.emptyMeals), ...MANUAL.flatMap((r) => r.dropNote)];
+    expect(bad.join('; ')).toBe('');
   });
 });

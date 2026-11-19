@@ -19714,13 +19714,83 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         else notes.push(..._fresh64);
       }
     }
-    // §8.113 (финальная страховка): пустая тарелка в план не выходит. Поздние стадии
-    // (перенос углеводов из окон, посадка, чистка peri-углей) могут забрать последние
-    // пункты приёма, у которого бюджет белка нулевой, — лучше меньше приёмов, чем пустой слот.
+    // §8.115 «приём не вырезается»: слот, который пользователь попросил, обязан остаться в плане.
+    // Поздние пассы (перенос углеводов из окон, посадка блюд, чистка peri-углей, ремонт
+    // §8.114/§8.114b) забирают у приёма последнюю позицию — и слот ИСЧЕЗАЛ из плана
+    // («Приёмов 6 вместо 7», замер: 45/6/T/maint/manual, «Перекус 2» с бюджетом Б12/У14/Ж5).
+    // Пустая тарелка — это не «меньше, но крупнее», это пропавший приём. Реанимация —
+    // ПЕРЕНОС уже стоящей в дне позиции (итоги дня не меняются ни на грамм), а не новая еда:
+    // у донора, который перекормлен относительно СВОЕЙ цели, забирается гибкий углеводный
+    // носитель, и донор, и приём-получатель остаются не ниже пола своей роли.
+    {
+      const _kcal115 = (m: any) => Number(m?.totals?.kcal) || 0;
+      const _tgt115 = (m: any) => (m?.target
+        ? 4 * (Number(m.target.p) || 0) + 9 * (Number(m.target.f) || 0) + 4 * (Number(m.target.c) || 0)
+        : 0);
+      const _rel115 = (v: number, t: number) => (t > 0 ? (Math.abs(v - t) / t) * 100 : 0);
+      const _tok115 = String((input as any).kbjuMode || '') === 'manual' || (input as any).manualTargetsLocked
+        ? 2 : PLANNER_CONVERGENCE_PCT;
+      const _dayTgt115 = { kcal: 0, p: 0, f: 0, c: 0 };
+      for (const _mt of meals) {
+        const _t: any = (_mt as any).target || {};
+        _dayTgt115.p += Number(_t.p) || 0; _dayTgt115.f += Number(_t.f) || 0;
+        _dayTgt115.c += Number(_t.c) || 0;
+      }
+      _dayTgt115.kcal = 4 * _dayTgt115.p + 9 * _dayTgt115.f + 4 * _dayTgt115.c;
+      const _dev115 = () => Math.max(
+        _rel115(Number(totals.kcal) || 0, _dayTgt115.kcal),
+        _rel115(Number(totals.p) || 0, _dayTgt115.p),
+        _rel115(Number(totals.f) || 0, _dayTgt115.f),
+        _rel115(Number(totals.c) || 0, _dayTgt115.c),
+      );
+      for (const _m115 of meals) {
+        if ((_m115.items || []).length > 0) continue;
+        const _need115 = Math.max(120, Math.round(_tgt115(_m115) * 0.5));
+        // Кандидаты — ЦЕЛЫЕ законные позиции (не меньше пола роли) у приёмов, которые
+        // перекормлены относительно СВОЕЙ цели. Дробление не годится: у донора после
+        // переноса обязана остаться полноценная порция, а у получателя не должно появиться
+        // «30 г риса» вместо еды.
+        const _cands115: Array<{ d: any; it: any; idx: number; over: number; gap: number }> = [];
+        for (const _d115 of meals) {
+          if (_d115 === _m115 || (_d115.items || []).length < 2) continue;
+          const _over115 = _kcal115(_d115) - _tgt115(_d115);
+          if (_over115 <= 30) continue;
+          (_d115.items || []).forEach((x: any, _i115: number) => {
+            if (x._fixedGrams) return;
+            const _role115 = String(x?.role || '');
+            if (_role115 !== 'carb_slow' && _role115 !== 'carb_fast') return;
+            const _fl115 = Math.max(20, Number(MIN_MEANINGFUL_G[_role115] || 20));
+            if ((Number(x.amount) || 0) < _fl115) return;
+            _cands115.push({
+              d: _d115, it: x, idx: _i115, over: _over115,
+              gap: Math.abs((Number(x.kcal) || 0) - Math.min(_need115, _over115)),
+            });
+          });
+        }
+        _cands115.sort((a, b) => (b.over - a.over) || (a.gap - b.gap));
+        for (const _c115 of _cands115) {
+          const _snapDev115 = _dev115();
+          _c115.d.items.splice(_c115.idx, 1);
+          _m115.items = [...(_m115.items || []), _c115.it];
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+          // Приёмка: день не стал хуже (перенос целой позиции итоги дня сохраняет) — тогда
+          // приём получил законную еду, а донор разгрузился к своей цели.
+          if (_dev115() <= Math.max(_snapDev115, _tok115) + 0.15) break;
+          _m115.items = (_m115.items || []).filter((x: any) => x !== _c115.it);
+          _c115.d.items.splice(_c115.idx, 0, _c115.it);
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+        }
+      }
+    }
+    // §8.115 (финальная страховка): если реанимация не нашла донора, пустая тарелка в план
+    // всё равно не выходит — но это именно аварийный выход, а не рабочий режим (замок
+    // planner-portion-hygiene-8112 требует, чтобы на сетке 336 дней он не срабатывал).
     {
       const _keptMeals = meals.filter(m => (m.items || []).length > 0);
       if (_keptMeals.length < meals.length) {
-        notes.push(`🍽️ Приёмов ${_keptMeals.length} вместо ${meals.length}: слоты без белка и углеводов не строятся (§8.113 «меньше, но крупнее»).`);
+        notes.push(`🍽️ Приёмов ${_keptMeals.length} вместо ${meals.length}: у слота не осталось ни одной позиции и не нашлось донора для переноса — слот не выводится, чтобы не показывать пустую тарелку.`);
         meals.splice(0, meals.length, ..._keptMeals);
         recalcDayTotals(meals, totals);
       }
