@@ -1,6 +1,7 @@
 import { LabPoint } from '../core/types';
 import { resolveLabMarker } from '../core/labs-mapping';
 import { UCUM_MAP } from '../core/constants';
+import { boundProvesSide } from '../core/lab-bound';
 import { db } from '../core/db';
 export { UCUM_MAP };
 
@@ -315,5 +316,28 @@ export function receiveHL7v2Message(messageId: string): Promise<string> {
  */
 export function toHL7v2OBX(point: LabPoint & { patientId?: string }): string {
    const obsId = point.id ?? Math.random().toString(36).substr(2, 9);
-   return `OBX|1|NM|${point.code}^${point.name}||${point.value}${point.unit ? `^${point.unit}` : ''}||||||F|||${obsId}`;
+   // Проход 142: граница бланка не теряется в выгрузке.
+   //  - «>1000» — не измерение: в NM знак не выразить, поэтому при границе тип
+   //    значения ST, а знак стоит перед числом. Иначе получатель видит 1000 и
+   //    не знает, что это «не меньше 1000»;
+   //  - единица едет в своём поле OBX-6 (раньше приклеивалась к значению через
+   //    «^», а OBX-6 оставался пустым);
+   //  - флаг отклонения (OBX-8) — только доказанная сторона: «>5» при верхней
+   //    границе 400 — не «H» и не «N», флаг остаётся пустым. «N» по обрезанному
+   //    числу был бы выдумкой («isAbnormal: false» значит «не доказано», а не
+   //    «в норме»).
+   const bound = point.bound === '<' || point.bound === '>' ? point.bound : undefined;
+   const value = `${bound ?? ''}${point.value}`;
+   const valueType = bound ? 'ST' : 'NM';
+   const reference = point.refLow === undefined && point.refHigh === undefined
+     ? ''
+     : `${point.refLow ?? ''}-${point.refHigh ?? ''}`;
+   const side = boundProvesSide(bound, point.value, point.refLow, point.refHigh);
+   const flag = side === 'high' ? 'H'
+     : side === 'low' ? 'L'
+     : bound ? ''
+     : point.isAbnormal === true ? 'A'
+     : point.isAbnormal === false ? 'N'
+     : '';
+   return `OBX|1|${valueType}|${point.code}^${point.name}||${value}|${point.unit || ''}|${reference}|${flag}|||F|||${obsId}`;
 }

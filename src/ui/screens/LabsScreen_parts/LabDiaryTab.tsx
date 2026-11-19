@@ -10,6 +10,8 @@ import {
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { labValueLabel } from '../../../core/lab-value-label';
+import { boundProvesSide } from '../../../core/lab-bound';
 import { ruCount, RU_DAYS, RU_MARKERS, RU_ENTRIES, RU_ANOMALIES } from '../../../engines/ru-plural';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
@@ -17,18 +19,6 @@ import { notifyDataChange } from '../../../core/data-link';
 const GLASS: React.CSSProperties = {
   ...LABS_CARD,
   background: 'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)',
-};
-
-const normColor = (v: number, lln?: number, uln?: number): string => {
-  if (lln !== undefined && v < lln) return '#f59e0b';
-  if (uln !== undefined && v > uln) return '#ef4444';
-  return '#00e68a';
-};
-
-const normBg = (v: number, lln?: number, uln?: number): string => {
-  if (lln !== undefined && v < lln) return 'rgba(245,158,11,0.08)';
-  if (uln !== undefined && v > uln) return 'rgba(239,68,68,0.08)';
-  return 'rgba(0,230,138,0.06)';
 };
 
 export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }> = ({ labs, sex }) => {
@@ -72,6 +62,8 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
     return {
       labels: data.labels.slice(start),
       values: data.values.slice(start),
+      bounds: data.bounds.slice(start),
+      inRange: data.inRange.slice(start),
       unit: data.unit,
       lln: data.lln,
       uln: data.uln,
@@ -307,21 +299,24 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                 {chartData.values.map((v, i) => {
                   const maxVal = Math.max(...chartData.values, chartData.uln || 0, chartData.lln || 0, 1);
                   const h = Math.max(3, (v / maxVal) * 72);
-                  const inRange = (chartData.lln === undefined || v >= chartData.lln) && (chartData.uln === undefined || v <= chartData.uln);
+                  // Проход 142: вердикт берём у дневника, а не сравниваем обрезанное
+                  // число с нормой — «undefined» значит «сторона не доказана».
+                  const inRange = chartData.inRange[i];
+                  const tone = inRange === true ? '#00e68a' : inRange === false ? '#ef4444' : '#94a3b8';
                   return (
-                    <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <div key={i} data-range={inRange === true ? 'in' : inRange === false ? 'out' : 'unknown'} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                       <div style={{
                         width: '100%', borderRadius: '4px 4px 0 0',
                         height: h,
-                        background: inRange ? '#00e68a' : '#ef4444',
+                        background: tone,
                         opacity: 0.85,
                         position: 'relative',
                       }}>
                         <span style={{
                           position:'absolute', top:-16, left:'50%', transform:'translateX(-50%)',
-                          fontSize:10, color: inRange ? '#00e68a' : '#ef4444', fontWeight:800, whiteSpace:'nowrap',
+                          fontSize:10, color: tone, fontWeight:800, whiteSpace:'nowrap',
                         }}>
-                          {v}
+                          {labValueLabel(v, chartData.bounds[i])}
                         </span>
                       </div>
                       <div style={{ fontSize:10, color:'#fff', writingMode:'vertical-lr' as any, fontWeight:700 }}>
@@ -366,12 +361,15 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
             </div>
           ) : (
             abnormalMarkers.map((m, i) => {
-              const isHigh = m.uln !== undefined && m.value > m.uln;
+              // Проход 142: сторону называет то же правило, что решало «в норме»
+              // (в карточку попадают только доказанные отклонения) — «>400» при
+              // верхней границе 400 низким не подписывается.
+              const isHigh = boundProvesSide(m.bound, m.value, m.lln, m.uln) === 'high';
               const accent = isHigh ? '#ef4444' : '#f59e0b';
               return (
                 <div key={`${m.date}-${m.code}`} style={{
                   padding:'12px 12px', borderRadius:14, minHeight:64,
-                  background: normBg(m.value, m.lln, m.uln),
+                  background: isHigh ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
                   border: '1px solid ' + (isHigh ? 'rgba(239,68,68,0.30)' : 'rgba(245,158,11,0.30)'),
                   borderLeft: `3px solid ${accent}`,
                 }}>
@@ -383,8 +381,8 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                       </div>
                     </div>
                     <div style={{ textAlign:'right', flexShrink:0 }}>
-                      <div style={{ fontSize:18, fontWeight:900, color: normColor(m.value, m.lln, m.uln), fontVariantNumeric:'tabular-nums' }}>
-                        {m.value} <span style={{ fontSize:10, fontWeight:700 }}>{m.unit}</span>
+                      <div style={{ fontSize:18, fontWeight:900, color: isHigh ? '#ef4444' : '#f59e0b', fontVariantNumeric:'tabular-nums' }}>
+                        {labValueLabel(m.value, m.bound)} <span style={{ fontSize:10, fontWeight:700 }}>{m.unit}</span>
                       </div>
                       <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>
                         {m.lln !== undefined ? `норма: ${m.lln}` : ''}{m.lln !== undefined && m.uln !== undefined ? '-' : ''}{m.uln !== undefined ? `${m.uln}` : ''}
@@ -438,13 +436,13 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                 {/* Markers chips */}
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                   {day.markers.slice(0, 10).map(m => (
-                    <span key={m.code} style={{
+                    <span key={m.code} data-range={m.inRange === true ? 'in' : m.inRange === false ? 'out' : 'unknown'} style={{
                       padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700,
-                      background: m.inRange ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.10)',
-                      color: m.inRange ? '#00e68a' : '#ef4444',
-                      border:'1px solid ' + (m.inRange ? 'rgba(0,230,138,0.18)' : 'rgba(239,68,68,0.20)'),
+                      background: m.inRange === false ? 'rgba(239,68,68,0.10)' : m.inRange === true ? 'rgba(0,230,138,0.08)' : 'rgba(148,163,184,0.12)',
+                      color: m.inRange === false ? '#ef4444' : m.inRange === true ? '#00e68a' : '#cbd5e1',
+                      border:'1px solid ' + (m.inRange === false ? 'rgba(239,68,68,0.20)' : m.inRange === true ? 'rgba(0,230,138,0.18)' : 'rgba(148,163,184,0.24)'),
                     }}>
-                      {m.name} {m.value}{m.unit}
+                      {m.name} {labValueLabel(m.value, m.bound)}{m.unit}
                     </span>
                   ))}
                   {day.markers.length > 10 && (

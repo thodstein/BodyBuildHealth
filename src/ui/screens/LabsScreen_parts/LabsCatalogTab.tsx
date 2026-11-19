@@ -4,6 +4,8 @@ import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 import { getLabNorm, FEMALE_LABS_NOTE } from '../../../engines/lab-norms.engine';
+import { labValueLabel } from '../../../core/lab-value-label';
+import { keptBound } from '../../../core/lab-bound';
 import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge, labsWithAlpha } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
@@ -266,7 +268,10 @@ export default function LabsCatalogTab({
     for (const entry of catalogEntries) {
       const upper = entry.code.toUpperCase();
       const existing = existingCodes[upper];
-      if (existing) {
+      // Проход 142: значение с границей в поле не переносим — «>1000» в
+      // числовом поле станет 1000 и потеряет знак. Запись показывается рядом
+      // (placeholder/подпись), а поле остаётся пустым, пока человек не впишет своё.
+      if (existing && !existing.bound) {
         prefill[upper] = String(existing.value);
       }
     }
@@ -305,6 +310,9 @@ export default function LabsCatalogTab({
           unit: info?.prefUnit || '',
           date: new Date().toISOString().split('T')[0],
           phase: selectedPhase,
+          // Проход 142: число не меняли — знак границы принадлежит тому же
+          // результату («>1000» не должен стать просто 1000 при пересохранении).
+          bound: keptBound(existingCodes[code.toUpperCase()], val),
         };
         await db.put('labs_log', lab);
         count++;
@@ -316,7 +324,7 @@ export default function LabsCatalogTab({
       console.error('Save failed', e);
     }
     setSaving(false);
-  }, [values, selectedPhase, labs]);
+  }, [values, selectedPhase, labs, existingCodes]);
 
   const filledCount = useMemo(() => {
     return Object.values(values).filter(v => v.trim() !== '').length;
@@ -610,7 +618,7 @@ export default function LabsCatalogTab({
                             value={val}
                             onChange={e => { e.stopPropagation(); handleValueChange(upper, e.target.value); }}
                             onClick={e => e.stopPropagation()}
-                            placeholder={existing ? String(existing.value) : '—'}
+                            placeholder={existing ? labValueLabel(existing.value, existing.bound) : '—'}
                             type="number"
                             step="any"
                             aria-label={entry.name}
@@ -624,8 +632,8 @@ export default function LabsCatalogTab({
                           <span style={{ fontSize:10, color:'#fff', width:28, textAlign:'left', fontWeight:700 }}>
                             {entry.unit}
                           </span>
-                          <span style={{ fontSize:12, width:32, textAlign:'center', fontWeight:800, color: hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : '#fff' }}>
-                            {hasVal ? (numVal > entry.uln ? '▲' : numVal < entry.lln ? '▼' : '✓') : existing ? '📋' : '—'}
+                          <span data-lab-bound={existing?.bound ? 'yes' : undefined} style={{ fontSize:12, width:32, textAlign:'center', fontWeight:800, color: hasVal ? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : '#fff' }}>
+                            {hasVal ? (numVal > entry.uln ? '▲' : numVal < entry.lln ? '▼' : '✓') : existing ? (existing.bound ?? '📋') : '—'}
                           </span>
                         </div>
                       </div>
@@ -699,7 +707,7 @@ export default function LabsCatalogTab({
                 <input
                   value={val}
                   onChange={e => handleValueChange(upper, e.target.value)}
-                  placeholder={existing ? String(existing.value) : ''}
+                  placeholder={existing ? labValueLabel(existing.value, existing.bound) : ''}
                   type="number" step="any" aria-label={detailEntry.name}
                   style={{
                     flex:1, minWidth:100, padding:'10px 12px', background:'rgba(0,0,0,0.30)', minHeight:48,
@@ -721,7 +729,7 @@ export default function LabsCatalogTab({
 
               {existing && (
                 <div style={{ padding:'10px 12px', background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.20)', borderRadius:12, marginBottom:10 }}>
-                  <span style={{ fontSize:12, color:'#fff', fontWeight:600 }}>Текущее значение в фазе: <b>{existing.value} {existing.unit}</b></span>
+                  <span style={{ fontSize:12, color:'#fff', fontWeight:600 }}>Текущее значение в фазе: <b>{labValueLabel(existing.value, existing.bound)} {existing.unit}</b></span>
                 </div>
               )}
 

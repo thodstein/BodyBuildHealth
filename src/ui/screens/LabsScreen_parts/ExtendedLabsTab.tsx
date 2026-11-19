@@ -4,6 +4,8 @@ import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { labValueLabel } from '../../../core/lab-value-label';
+import { keptBound } from '../../../core/lab-bound';
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
 const PANELS: { id: string; icon: string; label: string; codes: string[] }[] = [
@@ -93,7 +95,10 @@ export default function ExtendedLabsTab({
       for (const code of panel.codes) {
         const upper = code.toUpperCase();
         const existing = existingCodes[upper];
-        if (existing) {
+        // Проход 142: значение с границей в поле не переносим — «>1000» в
+        // числовом поле станет 1000 и потеряет знак. Запись показывается рядом
+        // (чип/placeholder), а поле остаётся пустым, пока человек не впишет своё.
+        if (existing && !existing.bound) {
           prefill[upper] = String(existing.value);
         }
       }
@@ -133,6 +138,9 @@ export default function ExtendedLabsTab({
           unit: info?.prefUnit || '',
           date: new Date().toISOString().split('T')[0],
           phase: selectedPhase,
+          // Проход 142: число не меняли — знак границы принадлежит тому же
+          // результату («>1000» не должен стать просто 1000 при пересохранении).
+          bound: keptBound(existingCodes[code.toUpperCase()], val),
         };
         await db.put('labs_log', lab);
         count++;
@@ -144,7 +152,7 @@ export default function ExtendedLabsTab({
       console.error('Save failed', e);
     }
     setSaving(false);
-  }, [values, selectedPhase, labs]);
+  }, [values, selectedPhase, labs, existingCodes]);
 
   const filledCount = useMemo(() => {
     return Object.values(values).filter(v => v.trim() !== '').length;
@@ -246,7 +254,7 @@ export default function ExtendedLabsTab({
                         <input
                           value={val}
                           onChange={e => handleValueChange(code, e.target.value)}
-                          placeholder={existing ? String(existing.value) : '—'}
+                          placeholder={existing ? labValueLabel(existing.value, existing.bound) : '—'}
                           type="number"
                           step="any" aria-label={info.name}
                           style={{
@@ -260,8 +268,8 @@ export default function ExtendedLabsTab({
                           {norm.lln}–{norm.uln}{norm.female ? ' ♀' : ''}
                         </span>
                         {existing && !hasVal && (
-                          <span style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontWeight:700 }}>
-                            {existing.value} {info.prefUnit}
+                          <span data-lab-bound={existing.bound ? 'yes' : undefined} style={{ fontSize:10, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.15)', color:'#3b82f6', fontWeight:700 }}>
+                            {labValueLabel(existing.value, existing.bound)} {info.prefUnit}
                           </span>
                         )}
                         {hasVal && (

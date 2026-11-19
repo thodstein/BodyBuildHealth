@@ -1,6 +1,7 @@
 import { parseLabText as parseLabTextFromPdf, parseLabFile, ocrScannedPdf, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
 import { parseNutritionText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
-import { parseLabText as parseLabTextProviderAware, detectProvider, boundMakesConclusionUnsafe } from './lab-auto-parser';
+import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
+import { boundMakesConclusionUnsafe } from './lab-bound';
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
 import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';

@@ -1,5 +1,8 @@
 import { resolveLabMarker, normalizedRatio } from './labs-mapping';
 import { UCUM_MAP } from './constants';
+// Проход 142: толкование знака границы живёт в core/lab-bound — его же читают
+// дневник анализов и HL7-выгрузка.
+import { boundMakesConclusionUnsafe } from './lab-bound';
 
 export interface ParsedLabResult {
   marker: string;
@@ -99,26 +102,6 @@ function parseBoundValue(raw: string): { value: number; bound?: '<' | '>' } | nu
   const value = parseLabNumber(text.replace(/^(<=|>=|[<>≤≥])\s*/, ''));
   if (!Number.isFinite(value) || value <= 0) return null;
   return { value, bound: boundFromRaw(text) };
-}
-
-/**
- * Что можно утверждать про отклонение, если в бланке стоит граница.
- *
- * «>1000» значит «не меньше 1000»: заключение «ниже нормы» доказать нельзя —
- * значение может быть и выше. «<0.5» зеркально: нельзя утверждать «выше нормы».
- * Обратные выводы остаются: «>1000» при верхней границе 400 — точно высокое,
- * «<0.5» при нижней границе 3 — точно низкое.
- */
-export function boundMakesConclusionUnsafe(
-  bound: '<' | '>' | undefined,
-  value: number,
-  low: number | undefined,
-  high: number | undefined,
-): boolean {
-  if (!bound) return false;
-  const belowLow = low !== undefined && value < low;
-  const aboveHigh = high !== undefined && value > high;
-  return bound === '>' ? belowLow : aboveHigh;
 }
 
 /**

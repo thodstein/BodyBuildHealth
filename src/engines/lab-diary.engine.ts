@@ -8,12 +8,15 @@
 // Дата записи анализа и окна «за N дней» — по локальному канону (core/local-date):
 // в вечернее время UTC+3…+12 UTC-ключ уезжал на «вчера» и попадал не в ту выборку.
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+// Проход 142: знак границы бланка («>1000») и вывод о стороне отклонения —
+// по общему правилу core/lab-bound, а не по сравнению числа с нормой.
+import { boundProvesSide, type LabBound } from '../core/lab-bound';
 
 export interface LabDiaryEntry {
   date: string;           // YYYY-MM-DD
   markers: LabDiaryMarker[];
   totalMarkers: number;
-  abnormalCount: number;  // количество маркеров вне нормы
+  abnormalCount: number;  // количество маркеров вне нормы (только доказанных)
   note?: string;
 }
 
@@ -24,7 +27,41 @@ export interface LabDiaryMarker {
   unit: string;
   lln?: number;
   uln?: number;
-  inRange: boolean;
+  /**
+   * Проход 142: знак границы бланка. Дневник получал только число, поэтому
+   * «>1000» на графике и в карточке выглядел точным измерением.
+   */
+  bound?: LabBound;
+  /**
+   * В норме?
+   *
+   * `true` — в норме доказано, `false` — отклонение доказано, `undefined` —
+   * не доказано ни то, ни другое: нормы нет в реестре (или в бланке не было
+   * референса), либо число обрезано границей («>5» при верхней границе 400:
+   * истинное значение может быть и в норме, и выше неё). Раньше поле было
+   * boolean, и оба случая выглядели как «в норме» — зелёным.
+   */
+  inRange?: boolean;
+}
+
+/**
+ * Вердикт «в норме» по записи бланка.
+ *
+ * Нет ни одной границы нормы — судить не о чем. Есть граница бланка — «в норме»
+ * не доказывается вовсе (открытая сторона ничем не ограничена), а отклонение
+ * доказывается только в сторону, которую граница подтверждает
+ * (`boundProvesSide`).
+ */
+function diaryRangeVerdict(
+  value: number,
+  lln: number | undefined,
+  uln: number | undefined,
+  bound: LabBound | undefined,
+): boolean | undefined {
+  if (lln === undefined && uln === undefined) return undefined;
+  if (boundProvesSide(bound, value, lln, uln)) return false;
+  if (bound) return undefined;
+  return (lln === undefined || value >= lln) && (uln === undefined || value <= uln);
 }
 
 export interface LabDiaryStats {
@@ -88,29 +125,40 @@ export function getLabDiaryStats(diary: LabDiaryEntry[]): LabDiaryStats {
 }
 
 /** Получить историю по одному маркеру */
-export function getMarkerHistory(diary: LabDiaryEntry[], code: string): { date: string; value: number; inRange: boolean; unit: string }[] {
-  const result: { date: string; value: number; inRange: boolean; unit: string }[] = [];
+export function getMarkerHistory(diary: LabDiaryEntry[], code: string): { date: string; value: number; bound?: LabBound; inRange?: boolean; unit: string }[] {
+  const result: { date: string; value: number; bound?: LabBound; inRange?: boolean; unit: string }[] = [];
   for (const day of diary) {
     const marker = day.markers.find(m => m.code === code);
     if (marker) {
-      result.push({ date: day.date, value: marker.value, inRange: marker.inRange, unit: marker.unit });
+      // Проход 142: точка графика — это значение вместе со знаком и вердиктом,
+      // а не одно число: иначе «>1000» рисуется как 1000.
+      result.push({ date: day.date, value: marker.value, bound: marker.bound, inRange: marker.inRange, unit: marker.unit });
     }
   }
   return result;
 }
 
-/** Получить данные для графика по маркеру */
-export function getMarkerChartData(diary: LabDiaryEntry[], code: string): { labels: string[]; values: number[]; unit: string; lln?: number; uln?: number } {
+/**
+ * Получить данные для графика по маркеру.
+ *
+ * `bounds` и `inRange` выровнены с `values` по индексу: график печатает знак
+ * границы у точки и красит столбик в нейтральный цвет, когда сторона не
+ * доказана.
+ */
+export function getMarkerChartData(diary: LabDiaryEntry[], code: string): { labels: string[]; values: number[]; bounds: Array<LabBound | undefined>; inRange: Array<boolean | undefined>; unit: string; lln?: number; uln?: number } {
   const history = getMarkerHistory(diary, code);
   const last = diary.flatMap(d => d.markers).find(m => m.code === code);
   return {
     labels: history.map(h => h.date),
     values: history.map(h => h.value),
+    bounds: history.map(h => h.bound),
+    inRange: history.map(h => h.inRange),
     unit: last?.unit || '',
     lln: last?.lln,
     uln: last?.uln,
   };
 }
+
 
 /** Получить частоту сдачи анализов по дням за период */
 export function getLabFrequency(diary: LabDiaryEntry[], days: number = 30): { date: string; count: number }[] {
@@ -141,14 +189,16 @@ export function getTopTestedMarkers(diary: LabDiaryEntry[], limit: number = 15):
 }
 
 /** Получить аномальные маркеры (вне нормы) за последние N дней */
-export function getRecentAbnormalMarkers(diary: LabDiaryEntry[], days: number = 90): { date: string; code: string; name: string; value: number; unit: string; lln?: number; uln?: number }[] {
+export function getRecentAbnormalMarkers(diary: LabDiaryEntry[], days: number = 90): { date: string; code: string; name: string; value: number; bound?: LabBound; unit: string; lln?: number; uln?: number }[] {
   const cutoff = localIsoDateOffset(-days);
-  const result: { date: string; code: string; name: string; value: number; unit: string; lln?: number; uln?: number }[] = [];
+  const result: { date: string; code: string; name: string; value: number; bound?: LabBound; unit: string; lln?: number; uln?: number }[] = [];
   for (const day of diary) {
     if (day.date < cutoff) continue;
     for (const m of day.markers) {
-      if (!m.inRange) {
-        result.push({ date: day.date, code: m.code, name: m.name, value: m.value, unit: m.unit, lln: m.lln, uln: m.uln });
+      // Проход 142: только доказанное отклонение. Обрезанное «>5» при верхней
+      // границе 400 в аномалии не попадает — сторону граница не доказала.
+      if (m.inRange === false) {
+        result.push({ date: day.date, code: m.code, name: m.name, value: m.value, bound: m.bound, unit: m.unit, lln: m.lln, uln: m.uln });
       }
     }
   }
@@ -170,7 +220,7 @@ export function getLabDiarySummary(diary: LabDiaryEntry[], days: number = 30): {
 }
 
 /** Импортировать результаты из IndexedDB LabPoint[] в дневник */
-export function importLabsToDiary(labs: { id: string; code: string; name: string; value: number; unit: string; date: string }[], markerNorms: Record<string, { uln?: number; lln?: number }>): void {
+export function importLabsToDiary(labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[], markerNorms: Record<string, { uln?: number; lln?: number }>): void {
   if (!labs || labs.length === 0) return;
 
   // группируем по датам
@@ -182,11 +232,12 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
     }
     const day = byDate.get(lab.date)!;
     const norm = markerNorms[lab.code] || {};
-    const inRange = (norm.lln === undefined || lab.value >= norm.lln) && (norm.uln === undefined || lab.value <= norm.uln);
+    // Проход 142: вердикт «в норме» — только если он доказан (см. diaryRangeVerdict).
+    const inRange = diaryRangeVerdict(lab.value, norm.lln, norm.uln, lab.bound);
     const marker: LabDiaryMarker = {
       code: lab.code, name: lab.name || lab.code,
       value: lab.value, unit: lab.unit || '',
-      lln: norm.lln, uln: norm.uln, inRange,
+      lln: norm.lln, uln: norm.uln, bound: lab.bound, inRange,
     };
     // P0 fix: дедуп по коду на одну дату — последняя запись побеждает (иначе ×2 маркера и ×2 аномалии)
     const existingIdx = day.markers.findIndex(m => m.code === lab.code);
@@ -198,7 +249,7 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
   const diary = getLabDiary();
   for (const [, day] of byDate) {
     day.totalMarkers = day.markers.length;
-    day.abnormalCount = day.markers.filter(m => !m.inRange).length;
+    day.abnormalCount = day.markers.filter(m => m.inRange === false).length;
     const idx = diary.findIndex(e => e.date === day.date);
     if (idx >= 0) {
       diary[idx] = day;
