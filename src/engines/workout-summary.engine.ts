@@ -14,6 +14,7 @@
  */
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
 import { epley1RM } from './e1rm';
+import { getVolumeLandmarks, checkVolumeStatus, type VolumeStatus } from './volume-landmarks.engine';
 import type { WorkoutLog, StrengthLogEntry } from '../core/types';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -217,6 +218,7 @@ export function resolveExerciseMeta(ex: { exerciseId?: string; exerciseName?: st
 
 export const REPORT_BLOCKS = [
   { id: 'totals', label: 'Общее' },
+  { id: 'insights', label: 'Выводы' },
   { id: 'volume', label: 'Объём' },
   { id: 'muscles', label: 'Мышцы' },
   { id: 'exercises', label: 'Упражнения' },
@@ -458,10 +460,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
         exBestWeight = Math.max(exBestWeight, weight);
         exBestReps = Math.max(exBestReps, reps);
         maxLoad = Math.max(maxLoad, weight);
-        const rir = num((st as any)?.rir);
-        if (rir > 0) { exRirSum += rir; exRirN += 1; }
-        const rpe = num((st as any)?.rpe);
-        if (rpe > 0) { exRpeSum += rpe; exRpeN += 1; }
+        const rirRaw = (st as any)?.rir;
+        if (rirRaw != null && Number.isFinite(Number(rirRaw))) { exRirSum += Number(rirRaw); exRirN += 1; }
+        const rpeRaw = (st as any)?.rpe;
+        if (rpeRaw != null && Number.isFinite(Number(rpeRaw))) { exRpeSum += Number(rpeRaw); exRpeN += 1; }
         if (weight > 0 && reps > 0) {
           const e1 = epley1RM(weight, reps);
           if (e1 > exBestE1RM) exBestE1RM = e1;
@@ -671,3 +673,168 @@ export function formatSummaryPeriod(summary: WorkoutSummary): string {
   if (summary.dateFrom === summary.dateTo) return fmt(summary.dateFrom);
   return `${fmt(summary.dateFrom)} — ${fmt(summary.dateTo)}`;
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Выводы: короткие автоматические наблюдения по сводке
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface SummaryInsight {
+  id: string;
+  tone: 'good' | 'warn' | 'info';
+  icon: string;
+  title: string;
+  detail: string;
+}
+
+const PUSH_PATTERNS = ['horizontal_push', 'vertical_push', 'incline_push', 'dip_push', 'decline_push'];
+const PULL_PATTERNS = ['horizontal_pull', 'vertical_pull'];
+const KNEE_PATTERNS = ['squat', 'lunge', 'glute_squat'];
+
+const signedPct = (pct: number): string => `${pct > 0 ? '+' : ''}${pct}%`;
+
+/**
+ * Выводы по сводке: баланс жимы/тяги и колено/таз, динамика тоннажа,
+ * отстающие мышцы, плотность, RIR и рекорды. Правила молчат, если данных мало —
+ * лучше пусто, чем выдуманный совет.
+ */
+export function buildWorkoutInsights(s: WorkoutSummary): SummaryInsight[] {
+  const out: SummaryInsight[] = [];
+  if (!s || !s.workouts) return out;
+
+  const setsBy = (ids: string[]) => (s.patterns || [])
+    .filter(p => ids.includes(p.pattern))
+    .reduce((acc, p) => acc + p.sets, 0);
+
+  const pushSets = setsBy(PUSH_PATTERNS);
+  const pullSets = setsBy(PULL_PATTERNS);
+  if (pushSets + pullSets >= 6) {
+    const balance = pullSets > 0 ? pushSets / pullSets : 99;
+    if (balance >= 1.35) {
+      out.push({ id: 'pushpull', tone: 'warn', icon: '↔', title: `Жимы перевешивают: ${pushSets} / ${pullSets} подходов`, detail: 'Добавьте горизонтальную или вертикальную тягу — иначе страдают плечи и осанка.' });
+    } else if (balance <= 0.7) {
+      out.push({ id: 'pushpull', tone: 'warn', icon: '↔', title: `Тяги перевешивают: ${pushSets} / ${pullSets} подходов`, detail: 'Добавьте жимовые подходы, чтобы грудь и дельты не отставали.' });
+    } else {
+      out.push({ id: 'pushpull', tone: 'good', icon: '✓', title: `Баланс жимы/тяги ${pushSets} / ${pullSets}`, detail: 'Плечевой пояс нагружается равномерно — хорошая база для прогресса.' });
+    }
+  }
+
+  const kneeSets = setsBy(KNEE_PATTERNS);
+  const hingeSets = setsBy(['hinge']);
+  if (kneeSets + hingeSets >= 6) {
+    const balance = hingeSets > 0 ? kneeSets / hingeSets : 99;
+    if (balance >= 1.8) {
+      out.push({ id: 'kneehip', tone: 'warn', icon: '🦵', title: `Колено доминирует над тазом: ${kneeSets} / ${hingeSets}`, detail: 'Добавьте румынскую тягу или сгибания ног — бицепс бедра и ягодицы недогружены.' });
+    } else if (balance <= 0.5) {
+      out.push({ id: 'kneehip', tone: 'warn', icon: '🦵', title: `Таз доминирует над коленом: ${kneeSets} / ${hingeSets}`, detail: 'Добавьте приседания или жим ногами — квадрицепс получает мало объёма.' });
+    } else {
+      out.push({ id: 'kneehip', tone: 'good', icon: '🦵', title: `Баланс колено/таз ${kneeSets} / ${hingeSets}`, detail: 'Нижняя часть тела нагружается без перекосов.' });
+    }
+  }
+
+  if (s.weeks.length >= 2) {
+    const last = s.weeks[s.weeks.length - 1];
+    const prev = s.weeks[s.weeks.length - 2];
+    if (prev.tonnageKg > 0 && last.tonnageKg > 0) {
+      const pct = Math.round(((last.tonnageKg - prev.tonnageKg) / prev.tonnageKg) * 100);
+      if (pct >= 15) {
+        out.push({ id: 'trend', tone: 'info', icon: '📈', title: `Тоннаж недели ${signedPct(pct)} к прошлой`, detail: 'Резкий скачок объёма — следите за восстановлением и техникой.' });
+      } else if (pct <= -15) {
+        out.push({ id: 'trend', tone: 'warn', icon: '📉', title: `Тоннаж недели ${signedPct(pct)} к прошлой`, detail: 'Объём заметно просел: проверьте пропуски или запланируйте разгрузку.' });
+      } else {
+        out.push({ id: 'trend', tone: 'good', icon: '📊', title: `Тоннаж недели ${signedPct(pct)} к прошлой`, detail: 'Объём держится стабильно — хороший темп для прогрессии.' });
+      }
+    }
+  }
+
+  if (s.workouts >= 3) {
+    const low = s.muscles
+      .filter(m => m.muscle !== 'other' && m.sets > 0 && m.setsPerSession < 4)
+      .slice(0, 3);
+    if (low.length > 0) {
+      out.push({ id: 'lagging', tone: 'info', icon: '🎯', title: `Мало подходов: ${low.map(m => m.label).join(', ')}`, detail: 'Меньше 4 подходов на тренировку — добавьте 2–4 подхода, если эта мышца в приоритете.' });
+    }
+  }
+
+  if (s.totals.durationMin >= 20 && s.totals.tonnageKg > 0) {
+    const density = s.totals.densityKgPerMin;
+    if (density > 0 && density < 8) {
+      out.push({ id: 'density', tone: 'info', icon: '⏱', title: `Плотность ${density} кг/мин`, detail: 'Много простоя: сократите отдых или объедините упражнения в суперсет.' });
+    } else if (density >= 25) {
+      out.push({ id: 'density', tone: 'good', icon: '⚡', title: `Высокая плотность: ${density} кг/мин`, detail: 'Тренировка насыщенная — следите, чтобы отдыха хватало на целевые повторы.' });
+    }
+  }
+
+  const rir = s.totals.avgRIR;
+  if (rir != null) {
+    if (rir < 1) {
+      out.push({ id: 'rir', tone: 'warn', icon: '🔥', title: `Средний RIR ${rir}`, detail: 'Почти все подходы в отказ — копится усталость. Оставьте 1–2 повтора в запасе.' });
+    } else if (rir > 4) {
+      out.push({ id: 'rir', tone: 'info', icon: '🫧', title: `Средний RIR ${rir}`, detail: 'Запас велик: можно поднять вес или добавить повтор для стимула.' });
+    }
+  }
+
+  if (s.totals.prs > 0) {
+    out.push({ id: 'prs', tone: 'good', icon: '🏆', title: `Рекордов: ${s.totals.prs}`, detail: 'Расчётный 1RM вырос — прогрессия идёт.' });
+  }
+
+  return out.slice(0, 6);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Ориентиры объёма (MEV/MAV/MRV) для мышц отчёта
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Ключи канонического движка ориентиров для наших мышц. */
+const LANDMARK_KEY: Partial<Record<MuscleKey, string>> = {
+  chest: 'chest',
+  back: 'back',
+  shoulders: 'shoulders',
+  biceps: 'biceps',
+  triceps: 'triceps',
+  arms: 'arms',
+  quads: 'quads',
+  hamstrings: 'hamstrings',
+  glutes: 'glutes',
+  calves: 'calves',
+  legs: 'legs',
+  core: 'abs',
+  forearms: 'forearms',
+  traps: 'traps',
+};
+
+export interface MuscleLandmarkInfo {
+  /** Средние подходы в неделю за период отчёта. */
+  weeklySets: number;
+  mev: number;
+  mav: number;
+  mrv: number;
+  status: VolumeStatus;
+}
+
+/** Сколько недель покрывает отчёт (только недели с тренировками). */
+export function summaryWeeksCount(s: WorkoutSummary): number {
+  return Math.max(1, (s.weeks || []).length);
+}
+
+/** Ориентиры MEV/MAV/MRV для мышцы отчёта с учётом уровня. */
+export function muscleLandmarksFor(muscle: MuscleKey, weeklySets: number, level: string): MuscleLandmarkInfo | null {
+  const key = LANDMARK_KEY[muscle];
+  if (!key) return null;
+  const lm = getVolumeLandmarks(level || 'intermediate', key);
+  if (!lm) return null;
+  return { weeklySets, mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status: checkVolumeStatus(weeklySets, lm) };
+}
+
+export const VOLUME_STATUS_LABEL: Record<VolumeStatus, string> = {
+  below_mev: 'ниже MEV',
+  optimal: 'в норме',
+  approaching_mrv: 'близко к MRV',
+  exceeding_mrv: 'выше MRV',
+};
+
+export const VOLUME_STATUS_COLOR: Record<VolumeStatus, string> = {
+  below_mev: '#60a5fa',
+  optimal: '#22c55e',
+  approaching_mrv: '#f59e0b',
+  exceeding_mrv: '#ef4444',
+};

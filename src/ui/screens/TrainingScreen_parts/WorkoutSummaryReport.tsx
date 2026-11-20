@@ -14,8 +14,13 @@ import React from 'react';
 import type { WorkoutLog } from '../../../core/types';
 import {
   buildWorkoutSummary,
+  buildWorkoutInsights,
   formatSummaryPeriod,
+  muscleLandmarksFor,
+  summaryWeeksCount,
   MUSCLE_COLORS,
+  VOLUME_STATUS_COLOR,
+  VOLUME_STATUS_LABEL,
   ALL_REPORT_BLOCKS,
   REPORT_BLOCKS,
   type ReportBlockId,
@@ -34,6 +39,12 @@ const CARD: React.CSSProperties = {
 
 const fmtInt = (n: number) => Math.round(n || 0).toLocaleString('ru-RU');
 const fmtTon = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)} т` : `${fmtInt(kg)} кг`);
+const LEVEL_RU: Record<string, string> = {
+  beginner: 'новичок',
+  intermediate: 'средний',
+  advanced: 'продвинутый',
+  enhanced: 'PED-уровень',
+};
 const fmtDate = (iso: string) => {
   const d = new Date(`${String(iso || '').slice(0, 10)}T00:00:00`);
   return Number.isNaN(d.getTime())
@@ -145,12 +156,31 @@ const Bar: React.FC<{ pct: number; color: string; height?: number }> = ({ pct, c
   </div>
 );
 
+/** Шкала MEV→MAV→MRV с отметкой фактических подходов в неделю. */
+const LandmarkBar: React.FC<{ sets: number; mev: number; mav: number; mrv: number }> = ({ sets, mev, mav, mrv }) => {
+  const max = Math.max(mrv * 1.15, sets, 1);
+  const pct = (v: number) => Math.max(0, Math.min(100, (v / max) * 100));
+  const markerColor = sets < mev ? '#60a5fa' : sets <= mav ? '#22c55e' : sets <= mrv ? '#f59e0b' : '#ef4444';
+  return (
+    <div style={{ position: 'relative', height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginTop: 3 }}>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+        <div style={{ width: `${pct(mev)}%`, background: 'rgba(59,130,246,0.45)' }} />
+        <div style={{ width: `${Math.max(0, pct(mav) - pct(mev))}%`, background: 'rgba(34,197,94,0.45)' }} />
+        <div style={{ width: `${Math.max(0, pct(mrv) - pct(mav))}%`, background: 'rgba(245,158,11,0.45)' }} />
+      </div>
+      <div style={{ position: 'absolute', top: -1, bottom: -1, left: `calc(${pct(sets)}% - 1px)`, width: 2, background: markerColor, boxShadow: `0 0 4px ${markerColor}` }} />
+    </div>
+  );
+};
+
 /* ─── Тело отчёта (без выбора блоков) ─── */
 export const WorkoutSummaryBody: React.FC<{
   summary: WorkoutSummary;
   blocks: ReportBlockId[];
   compact?: boolean;
-}> = ({ summary, blocks, compact }) => {
+  /** Уровень спортсмена — для ориентиров MEV/MAV/MRV. */
+  level?: string;
+}> = ({ summary, blocks, compact, level = 'intermediate' }) => {
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -163,6 +193,8 @@ export const WorkoutSummaryBody: React.FC<{
   const bestE1RM = summary.exercises.reduce((m, e) => Math.max(m, e.bestE1RM), 0);
   const topExercise = summary.exercises[0] || null;
   const topMuscle = summary.muscles[0] || null;
+  const insights = buildWorkoutInsights(summary);
+  const weeksCount = summaryWeeksCount(summary);
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
   const maxWeekTonnage = Math.max(1, ...summary.weeks.map(w => w.tonnageKg));
@@ -205,6 +237,27 @@ export const WorkoutSummaryBody: React.FC<{
         </div>
       )}
 
+      {/* ── ВЫВОДЫ ── */}
+      {has('insights') && insights.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🧠" title="Выводы" hint="что важно в этой тренировке или периоде" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {insights.map((ins, i) => {
+              const color = ins.tone === 'good' ? '#22c55e' : ins.tone === 'warn' ? '#f59e0b' : '#60a5fa';
+              return (
+                <div key={`${ins.id}_${i}`} style={{ display: 'flex', gap: 7, padding: '6px 8px', borderRadius: 9, background: `${color}12`, border: `1px solid ${color}33` }}>
+                  <span style={{ fontSize: 13, lineHeight: 1.1, flexShrink: 0 }}>{ins.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color }}>{ins.title}</div>
+                    <div style={{ fontSize: 9.5, color: '#fff', opacity: 0.82, lineHeight: 1.35, marginTop: 1 }}>{ins.detail}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── ОБЪЁМ ── */}
       {has('volume') && summary.muscles.length > 0 && (
         <div style={CARD}>
@@ -228,9 +281,12 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── МЫШЦЫ ── */}
       {has('muscles') && summary.muscles.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="💪" title="По мышцам" hint="подходы · тоннаж · доля" />
+          <SectionTitle icon="💪" title="По мышцам" hint="подходы · тоннаж · доля · ориентир MEV/MAV/MRV" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {summary.muscles.map(m => (
+            {summary.muscles.map(m => {
+              const weekly = Math.round(m.sets / weeksCount);
+              const lm = muscleLandmarksFor(m.muscle, weekly, level);
+              return (
               <div key={m.muscle} style={{ position: 'relative', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.tonnageKg / maxMuscleTonnage) * 100}%`, background: m.color, opacity: 0.14 }} />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
@@ -241,8 +297,20 @@ export const WorkoutSummaryBody: React.FC<{
                   <span style={{ color: m.color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>{fmtTon(m.tonnageKg)}</span>
                   <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{m.sharePct}%</span>
                 </div>
+                {lm && (
+                  <div style={{ position: 'relative', marginTop: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 8.5, color: '#fff', opacity: 0.8 }}>
+                      <span>
+                        ≈ <b style={{ color: VOLUME_STATUS_COLOR[lm.status] }}>{lm.weeklySets}</b> подх/нед · {VOLUME_STATUS_LABEL[lm.status]}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap' }}>MEV {lm.mev} · MAV {lm.mav} · MRV {lm.mrv}</span>
+                    </div>
+                    <LandmarkBar sets={lm.weeklySets} mev={lm.mev} mav={lm.mav} mrv={lm.mrv} />
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -365,7 +433,9 @@ export const WorkoutSummaryReport: React.FC<{
   defaultBlocks?: ReportBlockId[];
   compact?: boolean;
   showSelector?: boolean;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true }) => {
+  /** Уровень спортсмена — для ориентиров MEV/MAV/MRV. */
+  level?: string;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -389,6 +459,11 @@ export const WorkoutSummaryReport: React.FC<{
             </div>
           </div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {level && (
+              <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>
+                {LEVEL_RU[level] || level}
+              </span>
+            )}
             <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}>
               {summary.totals.uniqueExercises} упр.
             </span>
@@ -403,7 +478,7 @@ export const WorkoutSummaryReport: React.FC<{
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} />
     </div>
   );
 };

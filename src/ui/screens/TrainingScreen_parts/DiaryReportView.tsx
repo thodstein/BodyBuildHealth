@@ -11,6 +11,7 @@ import { localIsoDate } from '../../../core/local-date';
 import type { WorkoutLog } from '../../../core/types';
 import {
   buildWorkoutSummary,
+  buildWorkoutInsights,
   filterWorkoutsByRange,
   monthRange,
   weekRangeFor,
@@ -206,6 +207,12 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push('Движения:');
       summary.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${fmtTon(p.tonnageKg)}`));
     }
+    const insights = buildWorkoutInsights(summary);
+    if (insights.length) {
+      lines.push('');
+      lines.push('Выводы:');
+      insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
+    }
     void navigator.clipboard?.writeText(lines.join('\n')).then(() => {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
@@ -328,6 +335,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         workouts={selected}
         title="Сводный отчёт"
         storageKey="he_workout_report_blocks"
+        level={hub.level}
       />
     </div>
   );

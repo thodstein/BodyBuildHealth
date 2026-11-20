@@ -42,6 +42,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('По тренировкам');
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');
+    expect(html).toContain('подх/нед');
+    expect(html).toContain('MEV ');
   });
 
   it('уважает выбор блоков (только «Общее»)', () => {
@@ -58,9 +60,15 @@ describe('WorkoutSummaryReport', () => {
 
   it('ReportBlockPicker рендерит чекбоксы всех блоков', () => {
     const html = renderToStaticMarkup(<ReportBlockPicker value={['totals']} onChange={() => {}} />);
-    ['Общее', 'Объём', 'Мышцы', 'Упражнения', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
+    ['Общее', 'Выводы', 'Объём', 'Мышцы', 'Упражнения', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
       expect(html).toContain(label);
     });
+  });
+
+  it('блок выводов показывает наблюдения по периоду', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['insights']} />);
+    expect(html).toContain('Выводы');
+    expect(html).toContain('Тоннаж недели');
   });
 });
 

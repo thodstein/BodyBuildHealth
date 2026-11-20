@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildWorkoutSummary,
+  buildWorkoutInsights,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
+  muscleLandmarksFor,
   resolveExerciseMeta,
   sessionToWorkoutLog,
+  summaryWeeksCount,
   weekRangeFor,
   ALL_REPORT_BLOCKS,
 } from '../workout-summary.engine';
@@ -157,5 +160,69 @@ describe('workout-summary: диапазоны и адаптер сессии', (
     expect(formatSummaryPeriod(s)).toBe('10.11.2026');
     expect(ALL_REPORT_BLOCKS).toContain('muscles');
     expect(ALL_REPORT_BLOCKS).toContain('movement');
+    expect(ALL_REPORT_BLOCKS).toContain('insights');
+  });
+});
+
+describe('workout-summary: выводы', () => {
+  it('ловит перекос жимы/тяги', () => {
+    const push = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 4 }]);
+    const pull = mkWorkout('2026-11-11', [{ name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 2 }]);
+    const ins = buildWorkoutInsights(buildWorkoutSummary([push, pull]));
+    const balance = ins.find(x => x.id === 'pushpull');
+    expect(balance?.tone).toBe('warn');
+    expect(balance?.title).toMatch(/Жимы перевешивают/);
+  });
+
+  it('хвалит сбалансированные жимы и тяги', () => {
+    const push = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
+    const pull = mkWorkout('2026-11-11', [{ name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 3 }]);
+    const ins = buildWorkoutInsights(buildWorkoutSummary([push, pull]));
+    expect(ins.find(x => x.id === 'pushpull')?.tone).toBe('good');
+  });
+
+  it('видит провал тоннажа между неделями', () => {
+    const heavy = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 8, sets: 3 }]);
+    const light = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 5, sets: 1 }]);
+    const ins = buildWorkoutInsights(buildWorkoutSummary([heavy, light]));
+    const trend = ins.find(x => x.id === 'trend');
+    expect(trend?.tone).toBe('warn');
+    expect(trend?.title).toMatch(/Тоннаж недели -/);
+  });
+
+  it('предупреждает о работе в отказ (RIR 0)', () => {
+    const hard = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 0 }]);
+    const summary = buildWorkoutSummary([hard]);
+    expect(summary.totals.avgRIR).toBe(0);
+    const ins = buildWorkoutInsights(summary);
+    expect(ins.some(x => x.id === 'rir' && x.tone === 'warn')).toBe(true);
+  });
+
+  it('на пустой сводке молчит', () => {
+    expect(buildWorkoutInsights(buildWorkoutSummary([]))).toEqual([]);
+  });
+});
+
+describe('workout-summary: ориентиры объёма', () => {
+  it('MEV/MAV/MRV берутся из канонического движка по уровню', () => {
+    const lm = muscleLandmarksFor('chest', 12, 'intermediate');
+    expect(lm).toEqual({ weeklySets: 12, mev: 8, mav: 14, mrv: 20, status: 'optimal' });
+    expect(muscleLandmarksFor('chest', 5, 'intermediate')?.status).toBe('below_mev');
+    expect(muscleLandmarksFor('chest', 22, 'intermediate')?.status).toBe('exceeding_mrv');
+  });
+
+  it('нет ориентиров для неканонических мышц', () => {
+    expect(muscleLandmarksFor('other', 10, 'intermediate')).toBeNull();
+    expect(muscleLandmarksFor('fullbody', 10, 'beginner')).toBeNull();
+  });
+
+  it('summaryWeeksCount считает недели с тренировками', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8 }]),
+      mkWorkout('2026-11-03', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8 }]),
+    ]);
+    expect(summaryWeeksCount(s)).toBe(2);
+    expect(summaryWeeksCount(buildWorkoutSummary([]))).toBe(1);
   });
 });

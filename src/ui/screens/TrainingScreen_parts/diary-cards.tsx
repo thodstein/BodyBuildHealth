@@ -30,7 +30,9 @@ export const WorkoutWeekCard: React.FC<{
   onCancelDelete?: () => void;
   /** Тренд лучшего e1RM по последним сессиям (для спарклайна в шапке недели). */
   e1rmSeries?: number[];
-}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete, e1rmSeries }) => {
+  /** Уровень спортсмена — для ориентиров объёма в отчёте по тренировке. */
+  level?: string;
+}> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete, e1rmSeries, level }) => {
   // Отчёт по конкретной тренировке прямо в истории (чекбоксы блоков — внутри).
   const [reportFor, setReportFor] = useState<string | null>(null);
   const previousByExercise = new Map<string, number>();
@@ -160,7 +162,8 @@ export const WorkoutWeekCard: React.FC<{
                 workouts={[workout]}
                 title="Отчёт по тренировке"
                 storageKey="he_workout_report_blocks"
-                defaultBlocks={['totals', 'muscles', 'exercises']}
+                defaultBlocks={['totals', 'insights', 'muscles', 'exercises']}
+                level={level}
                 compact
               />
             </div>

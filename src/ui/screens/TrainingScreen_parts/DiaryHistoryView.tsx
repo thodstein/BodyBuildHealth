@@ -881,6 +881,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               workouts={workouts}
               prevWorkouts={wi < visibleHistory.length - 1 ? visibleHistory[wi + 1][1] : undefined}
               e1rmSeries={bestE1rmSeriesForWeek(workouts)}
+              level={hub.level}
               expanded={historyExpanded === '__all__' || historyExpanded === week}
               onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
               onEdit={handleEditWorkout}
