@@ -8,6 +8,9 @@ import { type DiaryItem, type FoodItemLike } from '../../types';
 import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-guards';
 import { touchFavorite } from '../food-favorites';
 import { useLabelScan } from './useLabelScan';
+import { buildRecipeDiaryEntry, recipeMicros, scaleDiaryRecipeMeta } from '../recipe-to-diary';
+import { clampItemGrams } from '../portion-limits';
+import type { Recipe } from '../../../../../engines/nutrition-periodization.engine';
 import type { CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 
 export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, saveDiary, showToast, bumpRefresh, setShowBarcode }: {
@@ -56,6 +59,17 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     } catch {}
   }, [bumpRefresh]);
 
+  /**
+   * Рецепт → очередь дневника. Одна позиция «блюдо целиком» с составом:
+   * название, общее КБЖУ и КБЖУ каждого продукта (recipe.components).
+   */
+  const addRecipeToQueue = useCallback((recipe: Recipe, servings = 1, custom = false) => {
+    const entry = buildRecipeDiaryEntry(recipe, { servings, custom });
+    setParsedItems(prev => [...prev, entry]);
+    bumpRefresh();
+    showToast(`🍲 ${entry.name} → очередь (${entry.recipe?.components.length || 0} прод.)`);
+  }, [bumpRefresh, showToast]);
+
   /** Продукт, распознанный с упаковки, — в очередь дневника (100 г). */
   const addCustomEntryToQueue = useCallback((entry: CustomFoodEntry) => {
     const micros: Record<string, number> = {};
@@ -97,7 +111,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     const mt = mealType || 'Перекус';
     if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
     (data[selectedDate].meals[mt] as any).push({
-      name: food.name, qty: `${grams} г`,
+      name: food.name, qty: grams,
       kcal: Math.round((food.kcal || 0) * factor),
       p: Math.round((food.protein || 0) * factor * 10) / 10,
       f: Math.round((food.fat || 0) * factor * 10) / 10,
@@ -256,11 +270,26 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         ? FOOD_DB.find(f => f.id === item.foodId)
         : FOOD_DB.find(f => f.name.toLowerCase() === (item.name || '').toLowerCase());
       if (food?.bb_quality_score != null) qualityScore = food.bb_quality_score;
+      // Рецепт: сохраняем состав; если в очереди поменяли общий вес —
+      // продукты пересчитываются пропорционально, чтобы итог и раскладка сходились.
+      const recipeMeta = item.recipe
+        ? scaleDiaryRecipeMeta(
+            { ...item.recipe, name: item.name, totalWeight: item.recipe.totalWeight },
+            item.recipe.totalWeight > 0 ? q / item.recipe.totalWeight : 1,
+          )
+        : undefined;
+      // У блюда нет foodId — витамины/минералы берём из состава (иначе целый
+      // приём выпадает из отчёта). Состав уже пересчитан на итоговый вес.
+      const recipeMicrosValue = recipeMeta ? recipeMicros(recipeMeta.components) : undefined;
       data[selectedDate].meals[mt].push({
-        name: item.name, qty: `${q} г`, kcal: Math.round(item.kcal * q / 100),
+      // qty — число граммов (как у полей типа DiaryMealItem.qty). Строки «250 г»
+      // остаются только в старых записях: читатели понимают оба формата.
+        name: item.name, qty: q, kcal: Math.round(item.kcal * q / 100),
         p: Math.round((item.p * q / 100) * 10) / 10, f: Math.round((item.f * q / 100) * 10) / 10, c: Math.round((item.c * q / 100) * 10) / 10,
-        category: item.category, foodId: item.foodId, barcode: item.barcode, micros: item.micros,
+        category: item.category, foodId: item.foodId, barcode: item.barcode,
+        micros: recipeMicrosValue ?? item.micros,
         qualityScore,
+        ...(recipeMeta ? { recipe: recipeMeta } : {}),
       });
     });
     saveDiary(data);
@@ -299,7 +328,20 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   }, [customFoodName, customFoodKcal, customFoodP, customFoodF, customFoodC, showToast]);
 
   const updateParsedItemQty = useCallback((idx: number, qty: number) => {
-    setParsedItems(prev => prev.map((x, j) => j === idx ? { ...x, qty: Math.max(10, Math.min(1000, qty)) } : x));
+    setParsedItems(prev => prev.map((x, j) => {
+      if (j !== idx) return x;
+      const next = clampItemGrams(qty);
+      const prevQty = Number(x.qty) || 0;
+      // Микронутриенты в очереди — на текущий вес позиции (так их считает
+      // fillMissingMicros). Меняя граммовку, пересчитываем и их, иначе итог
+      // по витаминам расходится с КБЖУ. У рецепта микро берутся из состава.
+      const micros = x.micros && !x.recipe && prevQty > 0 && next !== prevQty
+        ? Object.fromEntries(Object.entries(x.micros).map(([key, value]) => [
+            key, Math.round(Number(value) * next / prevQty * 100) / 100,
+          ]))
+        : x.micros;
+      return { ...x, qty: next, micros };
+    }));
   }, []);
 
   const extractQty = useCallback((item: any): number => {
@@ -313,10 +355,18 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   }, []);
 
   const addPresetItems = useCallback((items: any[]) => {
-    // Items in presets are stored per 100g; queue expects per-100 values + qty in grams
+    // Items in presets are stored per 100g; queue expects per-100 values + qty in grams.
+    // Состав рецепта и микронутриенты переносим как есть: иначе блюдо из набора
+    // приходит одной строкой без продуктов и выпадает из отчёта по витаминам.
+    const presetQty = (qty: any): number => {
+      if (typeof qty === 'number' && Number.isFinite(qty)) return clampItemGrams(qty);
+      const match = String(qty ?? '').match(/(\d+(?:[.,]\d+)?)/);
+      return clampItemGrams(match ? Number(match[1].replace(',', '.')) : 100);
+    };
     setParsedItems(prev => [...prev, ...items.map((it: any) => ({
+      ...it,
       name: it.name, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0,
-      qty: it.qty || 100, category: it.category, foodId: it.foodId,
+      qty: presetQty(it.qty),
     }))]);
     showToast(`📦 Набор "${items.length} поз." → очередь`);
   }, [showToast]);
@@ -326,7 +376,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     showCustomFood, setShowCustomFood,
     customFoodName, setCustomFoodName, customFoodKcal, setCustomFoodKcal, customFoodP, setCustomFoodP,
     customFoodF, setCustomFoodF, customFoodC, setCustomFoodC,
-    addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
+    addFoodFromDB, addRecipeToQueue, handleDirectAdd, handleBarcodeProduct,
     fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
     addCustomFood, updateParsedItemQty, extractQty, addPresetItems,
     ...labelScan,

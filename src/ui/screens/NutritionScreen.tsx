@@ -10,6 +10,8 @@ import { searchByName as searchOFF, productToFoodItem } from '../../engines/open
 import { localIsoDate, parseLocalIsoDate } from '../../core/local-date';
 import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
 import { addFavorite, removeFavorite, resolveFavorites, type FavFood } from './NutritionScreen_parts/diary/food-favorites';
+import { readUserRecipes } from './NutritionScreen_parts/diary/user-recipes';
+import { buildRecipeDiaryEntry, customRecipeToRecipe, recipeMicros } from './NutritionScreen_parts/diary/recipe-to-diary';
 import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
 import { IndividualPlan, NutritionPlanScope, PlanReportTab, NutritionPeriodizationTab } from './NutritionScreen_parts/IndividualPlan';
 import { OrganLoadCalculator } from './NutritionScreen_parts/IndividualPlan/OrganLoadCalculator';
@@ -1214,9 +1216,38 @@ const FavoritesTab: React.FC = () => {
   const [favTab, setFavTab] = useState<'products'|'recipes'|'plans'|'stacks'>('products');
   const [favs, setFavs] = useState<FavFood[]>(() => resolveFavorites());
   const removeFav = (id: string) => { removeFavorite(id); setFavs(prev => prev.filter(f => f.id !== id)); };
-  const [myRecipes] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_recipes') || '[]'); } catch { return []; } });
+  // Рецепты из обеих баз (Кухня + планировщик): раньше вкладка показывала только
+  // `he_recipes`, поэтому рецепт, созданный в планировщике, сюда не попадал.
+  // Перечитываем при переключении вкладки — рецепт могли создать только что.
+  const myRecipes = useMemo<any[]>(() => readUserRecipes(), [favTab]);
   const [savedPlans] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_my_plans') || '[]'); } catch { return []; } });
   const [savedStacks] = useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('he_finder_saved_stacks') || '[]'); } catch { return []; } });
+  // Быстрый путь из «Избранного» в дневник: блюдо целиком (состав + микро),
+  // а не одна строка с итогом. Приём берём из рецепта, по умолчанию — обед.
+  const addFavoriteRecipeToDiary = (raw: any) => {
+    try {
+      const entry = buildRecipeDiaryEntry(customRecipeToRecipe(raw), { custom: true });
+      const weight = Math.max(10, Math.round(Number(entry.qty) || 100));
+      const factor = weight / 100;
+      const meal = raw?.meal === 'breakfast' ? 'Завтрак'
+        : raw?.meal === 'dinner' ? 'Ужин'
+        : raw?.meal === 'snack' ? 'Перекус'
+        : raw?.meal === 'lunch' ? 'Обед'
+        : 'Приём пищи';
+      addMealEntryV2(localIsoDate(), meal, {
+        name: entry.name,
+        qty: weight,
+        kcal: Math.round((entry.kcal || 0) * factor),
+        p: Math.round((entry.p || 0) * factor * 10) / 10,
+        f: Math.round((entry.f || 0) * factor * 10) / 10,
+        c: Math.round((entry.c || 0) * factor * 10) / 10,
+        category: 'other',
+        micros: recipeMicros(entry.recipe?.components || []),
+        recipe: entry.recipe,
+      });
+      try { (window as any).showToast?.(`🍲 ${entry.name} → Дневник (${meal})`); } catch { /* экран без тост-хоста */ }
+    } catch { /* рецепт без состава — молча не ломаем экран */ }
+  };
   const catLabels: Record<string, string> = { protein:'🥩 Мясо', dairy:'🥛 Молочка', carb:'🍚 Крупы', grain:'🌾 Зерно', fat:'🧈 Жиры', veg_fruit:'🥦 Овощи', fast_food:'🍔 Фастфуд', supplement:'💊 Добавки', other:'📦 Прочее' };
   const groups: Record<string, FavFood[]> = {};
   favs.forEach(f => { const g = (f.category && catLabels[f.category]) || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
@@ -1251,9 +1282,14 @@ const FavoritesTab: React.FC = () => {
       {favTab === 'recipes' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>🍳 Сохранённые рецепты ({myRecipes.length})</div>
       {myRecipes.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>Нет рецептов. Создайте в 🍳 Рецепты.</div> : myRecipes.slice(0,50).map((r,i) => (
-        <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4 }}>
-          <div style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{r.name || 'Рецепт'}</div>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>Ккал: {r.kcal || '—'} • Б{r.protein||0} Ж{r.fat||0} У{r.carbs||0}</div>
+        <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'linear-gradient(135deg, #202023 0%, #1e1e22 100%)', border:'1px solid rgba(255,255,255,0.04)', marginBottom:4, display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:11, fontWeight:600, color:'#fff', overflowWrap:'anywhere' }}>{r.name || 'Рецепт'}</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>Ккал: {r.kcal || '—'} • Б{r.protein||0} Ж{r.fat||0} У{r.carbs||0}{r.ingredients?.length ? ` • ${r.ingredients.length} прод.` : ''}</div>
+          </div>
+          <button type="button" onClick={() => addFavoriteRecipeToDiary(r)} aria-label={`Добавить рецепт ${r.name || 'Рецепт'} в дневник`}
+            style={{ flexShrink:0, minHeight:44, padding:'0 12px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:800,
+              border:'1px solid rgba(0,230,138,0.28)', background:'rgba(0,230,138,0.10)', color:'#00e68a', whiteSpace:'nowrap' }}>＋ В дневник</button>
         </div>
       ))}
     </div>}

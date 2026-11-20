@@ -110,7 +110,7 @@ export function mergePlanDayIntoDiary(
       const planTag = `plan:${dateStr}:${label}:${foodKey}:${grams}`;
       if (bucket.some((e: any) => e && e.planTag === planTag)) { skipped++; continue; }
       bucket.push({
-        name: it.name, qty: `${grams} г`, kcal: Math.round(it.kcal || 0),
+        name: it.name, qty: Number(grams) || 100, kcal: Math.round(it.kcal || 0),
         p: Math.round((it.p || 0) * 10) / 10, f: Math.round((it.f || 0) * 10) / 10, c: Math.round((it.c || 0) * 10) / 10,
         category: it.category, foodId: it.id || it.foodId, micros: it.micros,
         planTag,

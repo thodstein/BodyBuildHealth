@@ -1,3 +1,30 @@
+/** Ингредиент рецепта, сохранённый в записи дневника (КБЖУ на указанную порцию). */
+export interface DiaryRecipeComponent {
+  name: string;
+  /** Граммы/миллилитры продукта в записи. */
+  qty: number;
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+  foodId?: string;
+}
+
+/**
+ * Паспорт рецепта внутри приёма пищи. Нужен, чтобы в дневнике у одной записи
+ * «Борщ» был виден полный состав с КБЖУ каждого продукта, а не только итог.
+ */
+export interface DiaryRecipeMeta {
+  name: string;
+  /** Сколько порций рецепта съедено (1 = одна порция). */
+  servings: number;
+  /** Суммарный вес записи в граммах (сумма компонентов). */
+  totalWeight: number;
+  components: DiaryRecipeComponent[];
+  /** Рецепт из «Моих рецептов» (Кухня), а не из встроенной базы. */
+  custom?: boolean;
+}
+
 export interface DiaryMealItem {
   name: string;
   kcal: number;
@@ -17,6 +44,8 @@ export interface DiaryMealItem {
   barcode?: string;
   /** Источник значения КБЖУ: снимок с упаковки/каталога/вручную. */
   source?: string;
+  /** Полный состав, если в приём добавлен рецепт (а не одиночный продукт). */
+  recipe?: DiaryRecipeMeta;
 }
 
 export function aggregateDiaryMicros(day: DiaryDay | undefined): Record<string, number> {

@@ -8,6 +8,8 @@ import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
 import { ModernHero, ModernPill, modernCardBg } from './nutrition-modern-kit';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 import { readDiaryV2 } from './diary-storage-v2';
+import { readUserRecipes } from './diary/user-recipes';
+import { componentsFromIngredientLines } from './diary/recipe-to-diary';
 import { localIsoDate } from '../../../core/local-date';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap' | 'targeting';
@@ -365,7 +367,8 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         return;
       }
       if (source === 'recipe') {
-        const recipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
+        // Обе базы: Кухня (`he_recipes`) и конструктор планировщика (`he_user_recipes`).
+        const recipes = readUserRecipes();
         if (recipes.length === 0) { showToast('Нет рецептов'); return; }
         setSourcePicker({ source: 'recipe', title: '📝 Выберите рецепт', items: recipes.map((r: any) => ({ id: r.id, name: r.name, label: `${r.kcal || 0} ккал · Б${r.protein || 0} Ж${r.fat || 0} У${r.carbs || 0}` })) });
         return;
@@ -394,15 +397,15 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         if (meal) { setMealProducts(prev => [...prev, ...meal.products]); showToast(`✅ Загружен «${meal.name}»`); }
       }
       if (sourcePicker.source === 'recipe') {
-        const allRecipes = JSON.parse(localStorage.getItem('he_recipes') || '[]');
+        const allRecipes = readUserRecipes();
         const recipe = allRecipes.find((r: any) => r.id === id);
         if (recipe) {
-          const mapped: MealProduct[] = [];
-          (recipe.ingredients || []).forEach((ing: string) => {
-            const q = ing.toLowerCase().trim();
-            const found = FOOD_DB.find(f => f.name.toLowerCase() === q) || FOOD_DB.find(f => f.name.toLowerCase().includes(q) || q.includes(f.name.toLowerCase()));
-            if (found) mapped.push({ foodId: found.id, weightGrams: 100 });
-          });
+          // Разбираем «Курица 200 г» через общий парсер: раньше строка целиком
+          // искалась в FOOD_DB и почти никогда не совпадала, а найденному
+          // продукту всегда ставили 100 г.
+          const mapped: MealProduct[] = componentsFromIngredientLines(recipe.ingredients || [])
+            .filter(component => component.foodId)
+            .map(component => ({ foodId: component.foodId as string, weightGrams: component.qty }));
           if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`✅ Добавлено ${mapped.length} продуктов из «${recipe.name}»`); }
           else showToast('Не удалось сопоставить ингредиенты с базой');
         }

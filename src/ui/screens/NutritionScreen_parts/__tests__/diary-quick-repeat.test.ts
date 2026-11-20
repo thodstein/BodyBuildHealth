@@ -47,6 +47,15 @@ describe('repeatItemKey', () => {
       repeatItemKey({ name: 'Яйца', qty: '150 г' }),
     );
   });
+
+  it('число граммов и старая строка «100 г» — одна порция', () => {
+    expect(repeatItemKey({ name: 'Яйца', qty: 100 })).toBe(
+      repeatItemKey({ name: 'Яйца', qty: '100 г' }),
+    );
+    expect(repeatItemKey({ name: 'Яйца', qty: 100 })).not.toBe(
+      repeatItemKey({ name: 'Яйца', qty: '2 шт' }),
+    );
+  });
 });
 
 describe('mergeMealsFromPrevious', () => {

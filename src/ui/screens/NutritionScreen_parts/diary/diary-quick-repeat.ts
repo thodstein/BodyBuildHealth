@@ -26,9 +26,14 @@ export function previousDateKey(date: string): string {
 /** Ключ сравнения порции: имя + количество (+ foodId, если он есть). */
 export function repeatItemKey(item: any): string {
   if (!item || typeof item !== 'object') return '';
+  // Число граммов и старое «250 г» — одна и та же порция: без нормализации
+  // «как вчера» продублировало бы позицию после перехода на число.
+  const qty = typeof item.qty === 'number' && Number.isFinite(item.qty)
+    ? `${Math.round(item.qty)}г`
+    : String(item.qty ?? '').trim().toLowerCase().replace(/\s+/g, '');
   return [
     String(item.name || '').trim().toLowerCase(),
-    String(item.qty || '').trim().toLowerCase(),
+    qty,
     String(item.foodId ?? ''),
   ].join('|');
 }

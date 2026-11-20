@@ -1,5 +1,6 @@
 import React from 'react';
 import { type DiaryItem } from '../types';
+import { RecipeComponentsList } from './RecipeComponentsList';
 
 interface MealCardProps {
   mealName: string;
@@ -24,6 +25,8 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
     if (n.includes('трениров')) return { bg:'rgba(236,72,153,0.07)', border:'rgba(236,72,153,0.15)', color:'#ec4899', dot:'#ec4899' };
     return { bg:'rgba(0,230,138,0.06)', border:'rgba(0,230,138,0.1)', color:'#00e68a', dot:'#00e68a' };
   })();
+  /** Рецепт в карточке раскрывается: название, продукты и КБЖУ каждого. */
+  const [expandedRecipes, setExpandedRecipes] = React.useState<Record<number, boolean>>({});
 
   return (
     <div className="nut-mealcard nd-mealcard" style={{
@@ -55,21 +58,31 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
       </div>
       
       <div className="nd-mealitems" style={{ padding: '4px 8px 8px' }}>
-        {items.map((item: any, idx: number) => (
-          <div key={idx} className="nd-mealitem" style={{
+        {items.map((item: any, idx: number) => {
+          const components = Array.isArray(item.recipe?.components) ? item.recipe.components : [];
+          const hasRecipe = components.length > 0;
+          const isRecipeOpen = !!expandedRecipes[idx];
+          return (
+          <div key={idx} className="nd-mealitem-wrap">
+          <div className="nd-mealitem" style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             padding: '8px 6px', fontSize: 12, color: 'rgba(255,255,255,0.8)',
             borderBottom: '1px solid rgba(255,255,255,0.03)', minHeight: 52,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, flexWrap: 'wrap' }}>
                 {/* Названия из сетей длинные — переносим целиком, а не режем «…» */}
                 <span style={{ fontWeight: 500, whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{item.name}</span>
+                {hasRecipe && (
+                  <span style={{ fontSize: 8, color: '#fbbf24', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '1px 5px', borderRadius: 4 }}>🍲 рецепт</span>
+                )}
                 {typeof item.confidence === 'number' && item.confidence < 0.5 && (
                   <span style={{ fontSize: 8, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '1px 5px', borderRadius: 4 }}>⚠</span>
                 )}
               </div>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{item.qty || '100 г'}</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                {typeof item.qty === 'number' ? `${Math.round(item.qty)} г` : (item.qty || '100 г')}
+              </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
@@ -87,7 +100,22 @@ export const MealCard: React.FC<MealCardProps> = ({ mealName, items, onEditItem,
               </button>
             </div>
           </div>
-        ))}
+          {hasRecipe && (
+            <div style={{ padding: '0 6px 6px' }}>
+              <button type="button" onClick={() => setExpandedRecipes(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                aria-expanded={isRecipeOpen} aria-label={`Состав рецепта ${item.name}`}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 9px', borderRadius: 9, cursor: 'pointer', minHeight: 44,
+                  background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.16)', color: '#fbbf24', fontSize: 10, fontWeight: 700, textAlign: 'left' }}>
+                <span>{isRecipeOpen ? '▼' : '▶'}</span>
+                <span>Состав: {components.length} прод. · {Math.round(components.reduce((s: number, c: any) => s + (c.kcal || 0), 0))} ккал</span>
+                <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>КБЖУ по продуктам</span>
+              </button>
+              {isRecipeOpen && <RecipeComponentsList components={components} compact title="Продукты рецепта" />}
+            </div>
+          )}
+          </div>
+          );
+        })}
       </div>
       
       <div className="nd-mealfoot" style={{ display: 'flex', gap: 6, padding: '0 8px 8px' }}>

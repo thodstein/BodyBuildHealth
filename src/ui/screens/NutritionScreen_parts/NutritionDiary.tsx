@@ -26,6 +26,7 @@ import { DayMealsList } from './diary/DayMealsList';
 import { QualityInsights } from './diary/QualityInsights';
 import { WeekView } from './diary/WeekView';
 import { FrequentFoodsPanel } from './diary/FrequentFoodsPanel';
+import { clampItemGrams } from './diary/portion-limits';
 
 export type { FoodItemLike } from './types';
 
@@ -62,7 +63,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showCustomFood, setShowCustomFood,
     customFoodName, setCustomFoodName, customFoodKcal, setCustomFoodKcal, customFoodP, setCustomFoodP,
     customFoodF, setCustomFoodF, customFoodC, setCustomFoodC,
-    addFoodFromDB, handleDirectAdd, handleBarcodeProduct,
+    addFoodFromDB, addRecipeToQueue, handleDirectAdd, handleBarcodeProduct,
     fillQueuedMicros, handleOcrFileUpload, handleOCR, saveItemsToDiary,
     addCustomFood, updateParsedItemQty, extractQty, addPresetItems,
     labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
@@ -90,6 +91,12 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   };
 
   // Состояние поиска/очереди/дня/пресетов — см. diary/hooks/* (разрез без смены поведения)
+
+  // Запись дневника хранит КБЖУ на ВСЮ порцию (не на 100 г), поэтому превью
+  // правки считаем от текущего веса записи. Раньше делили на 100 и показывали
+  // КБЖУ в разы больше реального — особенно заметно на рецептах (400–800 г).
+  const editSavedQty = editItem ? extractQty(editItem.item) : 100;
+  const editFactor = editSavedQty > 0 ? editQty / editSavedQty : 1;
 
   const ocrFileRef = useRef<HTMLInputElement>(null);
   const ocrCameraRef = useRef<HTMLInputElement>(null);
@@ -190,8 +197,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     const day = diaryData[selectedDate];
     if (!day?.meals) { showToast('❌ День пуст — нечего печатать'); return; }
     const esc = (s:string)=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    // qty в новых записях — число граммов, в старых — строка «250 г».
+    const qtyLabel = (q: any) => typeof q === 'number' ? `${Math.round(q)} г` : String(q || '');
     const rows = Object.entries(day.meals).flatMap(([meal, items]:any)=>
-      (items as any[]).map((it:any)=>`<tr><td>${esc(meal)}</td><td>${esc(it.name)}</td><td>${esc(it.qty||'')}</td><td>${it.kcal||0}</td><td>${it.p||0}</td><td>${it.f||0}</td><td>${it.c||0}</td></tr>` )
+      (items as any[]).map((it:any)=>`<tr><td>${esc(meal)}</td><td>${esc(it.name)}</td><td>${esc(qtyLabel(it.qty))}</td><td>${it.kcal||0}</td><td>${it.p||0}</td><td>${it.f||0}</td><td>${it.c||0}</td></tr>` )
     ).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Дневник ${selectedDate}</title><style>body{font-family:system-ui;padding:20px;color:#111}h2{margin:0 0 10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px;font-size:12px;text-align:left}th{background:#f5f5f5}tfoot td{font-weight:700;background:#f9f9f9}</style></head><body><h2>🍽 Дневник ${selectedDate} — ${Math.round(dayTotals.kcal)} ккал (Б${Math.round(dayTotals.p)} Ж${Math.round(dayTotals.f)} У${Math.round(dayTotals.c)})</h2><table><tr><th>Приём</th><th>Продукт</th><th>Кол-во</th><th>Ккал</th><th>Б</th><th>Ж</th><th>У</th></tr>${rows}<tr><td colspan="3"><b>Итого</b></td><td><b>${Math.round(dayTotals.kcal)}</b></td><td><b>${Math.round(dayTotals.p)}</b></td><td><b>${Math.round(dayTotals.f)}</b></td><td><b>${Math.round(dayTotals.c)}</b></td></tr></table><p style="font-size:10px;color:#666;margin-top:10px">Печать из BodyBuildHealth • ${new Date().toLocaleDateString('ru-RU')}</p></body></html>`;
     const w = window.open('', '_blank', 'width=800,height=900'); if(!w) return; w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch{} }, 300);
@@ -282,7 +291,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         <AddFoodPanel
           foodSearch={foodSearch} onFoodSearchChange={setFoodSearch} debouncedSearch={debouncedSearch}
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
-          allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onDirectAdd={handleDirectAdd}
+          allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onAddRecipe={addRecipeToQueue} onDirectAdd={handleDirectAdd}
           onFavoritesChanged={bumpRefresh}
           customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
            onShowBarcode={() => setShowBarcode(true)} onCloseBarcode={() => setShowBarcode(false)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
@@ -318,7 +327,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                 return {
                   ...item,
                   name: food.name,
-                  qty: qty + ' г',
+                  qty,
                   qtyGrams: qty,
                   kcal: Math.round(food.kcal * mult),
                   p: Math.round(food.protein * mult * 10) / 10,
@@ -491,12 +500,12 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 2, letterSpacing: -0.3 }}>✎ {editItem.item.name}</div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 12 }}>Изменить количество</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <button onClick={() => setEditQty(Math.max(10, editQty - 10))} aria-label="Уменьшить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <button onClick={() => setEditQty(clampItemGrams(editQty - 10))} aria-label="Уменьшить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <input type="number" value={editQty} onChange={e => { const raw = parseFloat(e.target.value); setEditQty(Number.isFinite(raw) && raw >= 10 ? Math.round(raw) : 10); }} aria-label="Количество, грамм" style={{ width: 80, padding: '8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 20, fontWeight: 700, textAlign: 'center', outline: 'none' }} />
+                <input type="number" value={editQty} onChange={e => { const raw = parseFloat(e.target.value); setEditQty(Number.isFinite(raw) ? clampItemGrams(Math.round(raw)) : 10); }} aria-label="Количество, грамм" style={{ width: 80, padding: '8px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 20, fontWeight: 700, textAlign: 'center', outline: 'none' }} />
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>грамм</div>
               </div>
-              <button onClick={() => setEditQty(Math.min(1000, editQty + 10))} aria-label="Увеличить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              <button onClick={() => setEditQty(clampItemGrams(editQty + 10))} aria-label="Увеличить количество" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#fff', cursor: 'pointer', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
             </div>
             <div style={{ display: 'flex', gap: 5, justifyContent: 'center', marginBottom: 10 }}>
               {[50, 100, 150, 200, 300].map(v => (
@@ -506,10 +515,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
               ))}
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginBottom: 12, textAlign: 'center' }}>
-              → <span style={{ color: '#00e68a', fontWeight: 700 }}>{Math.round(editQty * (editItem.item.kcal || 0) / 100)} ккал</span> · 
-              <span style={{ color: '#60a5fa' }}> {Math.round(((editItem.item.p || 0) * editQty / 100) * 10) / 10}г Б</span> · 
-              <span style={{ color: '#fbbf24' }}> {Math.round(((editItem.item.f || 0) * editQty / 100) * 10) / 10}г Ж</span> · 
-              <span style={{ color: '#fb923c' }}> {Math.round(((editItem.item.c || 0) * editQty / 100) * 10) / 10}г У</span>
+              → <span style={{ color: '#00e68a', fontWeight: 700 }}>{Math.round((editItem.item.kcal || 0) * editFactor)} ккал</span> · 
+              <span style={{ color: '#60a5fa' }}> {Math.round((editItem.item.p || 0) * editFactor * 10) / 10}г Б</span> · 
+              <span style={{ color: '#fbbf24' }}> {Math.round((editItem.item.f || 0) * editFactor * 10) / 10}г Ж</span> · 
+              <span style={{ color: '#fb923c' }}> {Math.round((editItem.item.c || 0) * editFactor * 10) / 10}г У</span>
             </div>
             <button onClick={saveEdit} aria-label="Сохранить изменения" style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 13, minHeight: 48, boxShadow: '0 4px 20px rgba(0,230,138,0.2)' }}>
               ✓ Сохранить

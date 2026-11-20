@@ -28,6 +28,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
+import { createUserRecipe, recipeKey } from "../diary/user-recipes";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
 import { avgKcalPerDay } from "./planner-average";
@@ -1769,10 +1770,26 @@ const doImportPlan = (raw: string): boolean => {
                 // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
                 if (!Number.isFinite(newRecipe.kcal) || newRecipe.kcal <= 0) { setErrorMsg('Укажите калорийность рецепта больше 0'); return; }
                 if (!newRecipe.name.trim()) { setErrorMsg('Укажите название рецепта'); return; }
-                const recipe = { ...newRecipe, ingredients: newRecipe.ingredients.split('\n').filter(Boolean), instructions: newRecipe.instructions.split('\n').filter(Boolean), tags: newRecipe.tags.split(',').map((t: string) => t.trim()).filter(Boolean), userCreated: true };
-                const updated = [...userRecipes, recipe];
-                setUserRecipes(updated);
-                try { localStorage.setItem('he_user_recipes', JSON.stringify(updated)); } catch {}
+                // Общее хранилище: рецепт из планировщика сразу виден в Кухне,
+                // выборе рецепта для дневника и в «Избранном».
+                const saved = createUserRecipe({
+                  name: newRecipe.name,
+                  ingredients: newRecipe.ingredients,
+                  instructions: newRecipe.instructions,
+                  kcal: Number(newRecipe.kcal),
+                  protein: Number(newRecipe.protein),
+                  fat: Number(newRecipe.fat),
+                  carbs: Number(newRecipe.carbs),
+                  meal: newRecipe.meal,
+                  prepTimeMin: Number(newRecipe.prepTime),
+                  tags: newRecipe.tags,
+                });
+                // Локальное состояние планировщика — в его формате (prepTime);
+                // одноимённый старый рецепт заменяем, как и в хранилище.
+                setUserRecipes([
+                  ...userRecipes.filter((r: any) => recipeKey(String(r?.name || '')) !== recipeKey(saved.name)),
+                  { ...saved, prepTime: saved.prepTimeMin ?? 10, userCreated: true },
+                ]);
                 setShowRecipeCreator(false);
                 setNewRecipe({ name: '', meal: 'lunch', prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
               }} style={{ width:'100%', padding:'13px', borderRadius:14, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:15, fontWeight:700, letterSpacing:0.2 }}>✓ Сохранить рецепт</button>

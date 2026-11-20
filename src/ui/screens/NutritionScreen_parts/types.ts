@@ -1,3 +1,5 @@
+import type { DiaryRecipeMeta } from './diary-storage';
+
 export interface DiaryItem {
   name: string;
   kcal: number;
@@ -15,6 +17,8 @@ export interface DiaryItem {
   micros?: Record<string, number>;
   confidence?: number;
   qtyGrams?: number;
+  /** Состав рецепта: название блюда + продукты с КБЖУ каждого. */
+  recipe?: DiaryRecipeMeta;
 }
 
 export type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };

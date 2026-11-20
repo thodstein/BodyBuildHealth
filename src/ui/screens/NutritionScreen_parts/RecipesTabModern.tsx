@@ -1,6 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { getRecipes, calculateUserRecipeUsefulness } from '../../../engines/nutrition-periodization.engine';
 import { addToCart as addToCartUtil } from '../../../core/nutrition-utils';
+import { readDiaryV2, writeDiaryV2 } from './diary-storage-v2';
+import { buildRecipeDiaryEntry, customRecipeToRecipe, recipeMicros } from './diary/recipe-to-diary';
+import { RecipeCreateModal } from './diary/RecipeCreateModal';
+import {
+  readUserRecipes,
+  deleteUserRecipe,
+  readFavoriteRecipeNames,
+  toggleRecipeFavorite,
+  removeRecipeFavorite,
+  recipeKey,
+  type UserRecipeRecord,
+} from './diary/user-recipes';
+import { localIsoDate } from '../../../core/local-date';
 
 const cardBg: React.CSSProperties = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const inputStyle: React.CSSProperties = { width:'100%', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', outline:'none' };
@@ -19,17 +32,13 @@ export const RecipesTabModern: React.FC = () => {
   const [planPicker, setPlanPicker] = useState<{name:string, idx:number}|null>(null);
   const [toast, setToast] = useState<string|null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
-  const [recName, setRecName] = useState('');
-  const [recIngredients, setRecIngredients] = useState('');
-  const [recInstructions, setRecInstructions] = useState('');
-  const [recKcal, setRecKcal] = useState(0);
-  const [recProtein, setRecProtein] = useState(0);
-  const [recFat, setRecFat] = useState(0);
-  const [recCarbs, setRecCarbs] = useState(0);
-  const [myRecipes, setMyRecipes] = useState<any[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_recipes') || '[]'); } catch { return []; }
-  });
+  const [myRecipes, setMyRecipes] = useState<UserRecipeRecord[]>(() => readUserRecipes());
+  const [favoriteRecipes, setFavoriteRecipes] = useState<string[]>(() => readFavoriteRecipeNames());
   const [myRecExpanded, setMyRecExpanded] = useState(false);
+  // Удаление в два тапа: рецепт уходит из обеих баз, отменить это нельзя.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  // ⭐ Избранное — то же хранилище, что у планировщика и выбора рецепта в дневнике.
+  const [onlyFavorite, setOnlyFavorite] = useState(false);
 
   const recipes = useMemo(() => getRecipes(), []);
   const stats = useMemo(() => {
@@ -64,6 +73,10 @@ export const RecipesTabModern: React.FC = () => {
     if (proteinMin > 0) filtered = filtered.filter(r => r.protein >= proteinMin);
     if (kcalRange[0] > 0 || kcalRange[1] < 1000) filtered = filtered.filter(r => r.kcal >= kcalRange[0] && r.kcal <= kcalRange[1]);
     if (timeMax < 60) filtered = filtered.filter(r => r.prepTimeMin <= timeMax);
+    if (onlyFavorite) {
+      const favoriteKeys = new Set(favoriteRecipes.map(name => recipeKey(name)));
+      filtered = filtered.filter(r => favoriteKeys.has(recipeKey(r.name)));
+    }
     // sort
     filtered.sort((a, b) => {
       if (sortBy === 'usefulness') return (b.usefulness || 0) - (a.usefulness || 0);
@@ -73,11 +86,11 @@ export const RecipesTabModern: React.FC = () => {
       return 0;
     });
     return filtered;
-  }, [recipes, recMeal, recGoal, recSearch, sortBy, proteinMin, kcalRange, timeMax]);
+  }, [recipes, recMeal, recGoal, recSearch, sortBy, proteinMin, kcalRange, timeMax, onlyFavorite, favoriteRecipes]);
 
   const pill = (active: boolean, onClick: () => void, children: React.ReactNode, accent?: string) => (
     <button onClick={onClick} style={{
-      padding:'6px 12px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight: active ? 700 : 500, letterSpacing:0.1, whiteSpace:'nowrap', transition:'all 0.15s',
+      padding:'8px 12px', minHeight:44, borderRadius:999, fontSize:11, cursor:'pointer', fontWeight: active ? 700 : 500, letterSpacing:0.1, whiteSpace:'nowrap', transition:'all 0.15s',
       border: active ? `1px solid ${accent||'#00e68a'}` : '1px solid rgba(255,255,255,0.07)',
       background: active ? (accent ? `${accent}18` : 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))') : '#202023',
       color: active ? (accent||'#00e68a') : 'rgba(255,255,255,0.75)',
@@ -109,19 +122,72 @@ export const RecipesTabModern: React.FC = () => {
   };
   const usefulnessColor = (u: number) => u >= 7.5 ? '#22c55e' : u >= 5 ? '#f59e0b' : '#ef4444';
 
-  const saveRecipe = () => {
-    if (!recName.trim()) return;
-    const newRecipe = { id: Date.now().toString(), name: recName.trim(), ingredients: recIngredients.split('\n').filter(s => s.trim()), instructions: recInstructions, kcal: recKcal, protein: recProtein, fat: recFat, carbs: recCarbs };
-    const updated = [...myRecipes, newRecipe];
-    setMyRecipes(updated);
-    try { localStorage.setItem('he_recipes', JSON.stringify(updated)); } catch {}
-    setRecName(''); setRecIngredients(''); setRecInstructions(''); setRecKcal(0); setRecProtein(0); setRecFat(0); setRecCarbs(0);
-    setShowRecipeModal(false);
+  const toggleFavorite = (name: string) => {
+    toggleRecipeFavorite(name);
+    setFavoriteRecipes(readFavoriteRecipeNames());
   };
-  const deleteMyRecipe = (id: string) => {
-    const updated = myRecipes.filter((r: any) => r.id !== id);
-    setMyRecipes(updated);
-    try { localStorage.setItem('he_recipes', JSON.stringify(updated)); } catch {}
+  const isFavorite = (name: string) => favoriteRecipes.some(favorite => recipeKey(favorite) === recipeKey(name));
+  const visibleMyRecipes = onlyFavorite ? myRecipes.filter(r => isFavorite(r.name)) : myRecipes;
+  // Подсветку «Точно?» гасим сами, если пользователь передумал и ушёл дальше.
+  useEffect(() => {
+    if (!pendingDeleteId) return;
+    const timer = setTimeout(() => setPendingDeleteId(null), 4000);
+    return () => clearTimeout(timer);
+  }, [pendingDeleteId]);
+
+  const deleteMyRecipe = (recipe: UserRecipeRecord) => {
+    // Первый тап — вопрос, второй — удаление (рецепт уходит из обеих баз).
+    if (pendingDeleteId !== recipe.id) { setPendingDeleteId(recipe.id); return; }
+    setPendingDeleteId(null);
+    setMyRecipes(deleteUserRecipe(recipe));
+    // Однокоренной рецепт из базы (то же название) не трогаем: звезда остаётся
+    // у него. Иначе «Избранное» держало бы счётчик для удалённого блюда.
+    const key = recipeKey(recipe.name);
+    if (!recipes.some(r => recipeKey(r.name) === key)) {
+      removeRecipeFavorite(recipe.name);
+      setFavoriteRecipes(readFavoriteRecipeNames());
+    }
+    setToast(`🗑 «${recipe.name}» удалён`);
+    setTimeout(() => setToast(null), 2200);
+  };
+
+  /**
+   * Добавляет рецепт в дневник одной записью: название блюда, общее КБЖУ и
+   * состав (КБЖУ каждого продукта). Работает и для базы, и для «Моих рецептов».
+   */
+  const addRecipeToDiary = (raw: any, custom = false, servings = 1) => {
+    try {
+      const recipe = custom ? customRecipeToRecipe(raw) : raw;
+      const entry = buildRecipeDiaryEntry(recipe as any, { servings, custom });
+      const weight = Math.max(10, Math.round(Number(entry.qty) || 100));
+      const date = localIsoDate();
+      const data = readDiaryV2();
+      if (!data[date]) data[date] = { meals: {} };
+      const meal = raw?.meal === 'breakfast' ? 'Завтрак'
+        : raw?.meal === 'lunch' ? 'Обед'
+        : raw?.meal === 'dinner' ? 'Ужин'
+        : raw?.meal === 'snack' ? 'Перекус'
+        : 'Приём пищи';
+      if (!data[date].meals[meal]) data[date].meals[meal] = [];
+      const factor = weight / 100;
+      data[date].meals[meal].push({
+        name: entry.name,
+        qty: weight,
+        kcal: Math.round((entry.kcal || 0) * factor),
+        p: Math.round((entry.p || 0) * factor * 10) / 10,
+        f: Math.round((entry.f || 0) * factor * 10) / 10,
+        c: Math.round((entry.c || 0) * factor * 10) / 10,
+        category: 'other',
+        // У блюда нет foodId — витамины/минералы считаем по продуктам состава.
+        micros: recipeMicros(entry.recipe?.components || []),
+        recipe: entry.recipe,
+      });
+      writeDiaryV2(data);
+      setToast(`✅ ${entry.name} → Дневник (${meal}) · ${entry.recipe?.components.length || 0} прод.`);
+    } catch {
+      setToast('❌ Не удалось добавить рецепт в дневник');
+    }
+    setTimeout(() => setToast(null), 2600);
   };
 
   return (
@@ -140,7 +206,7 @@ export const RecipesTabModern: React.FC = () => {
               Готовый cookbook для бодибилдинга — все <b style={{color:'#fff'}}>236</b> с привязкой к FOOD_DB и полезностью. Фильтры по цели, быстрый поиск, сортировка.
             </div>
           </div>
-          <button onClick={() => setShowRecipeModal(true)} style={{ padding:'9px 14px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:750, border:'1px solid rgba(0,230,138,0.3)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.25)', whiteSpace:'nowrap' }}>＋ Рецепт</button>
+          <button onClick={() => setShowRecipeModal(true)} style={{ padding:'9px 14px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:750, border:'1px solid rgba(0,230,138,0.3)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.25)', whiteSpace:'nowrap', minHeight:44 }}>＋ Рецепт</button>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:12 }}>
           {[
@@ -164,26 +230,43 @@ export const RecipesTabModern: React.FC = () => {
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ width:26, height:26, borderRadius:8, background:'rgba(167,139,250,0.14)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>📝</span>
               <span style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Мои рецепты</span>
-              <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:999, background:'rgba(167,139,250,0.14)', color:'#a78bfa' }}>{myRecipes.length}</span>
+              <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:999, background:'rgba(167,139,250,0.14)', color:'#a78bfa' }}>{visibleMyRecipes.length}</span>
             </div>
-            <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{myRecExpanded ? '▲' : '▼'}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <button type="button" onClick={e => { e.stopPropagation(); setShowRecipeModal(true); }}
+                aria-label="Создать свой рецепт" title="Создать свой рецепт"
+                style={{ minHeight:44, padding:'0 10px', borderRadius:8, border:'1px solid rgba(0,230,138,0.28)', background:'rgba(0,230,138,0.10)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>＋ Создать</button>
+              <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{myRecExpanded ? '▲' : '▼'}</span>
+            </div>
           </div>
           {myRecExpanded && (
             <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:6, maxHeight:260, overflowY:'auto' }}>
-              {myRecipes.map((r: any) => {
+              {visibleMyRecipes.length === 0 && (
+                <div style={{ padding:'10px 4px', fontSize:10, color:'rgba(255,255,255,0.55)' }}>
+                  Среди своих рецептов пока нет избранных — отметь ☆, или создай новый.
+                </div>
+              )}
+              {visibleMyRecipes.map((r: UserRecipeRecord) => {
                 const us = calculateUserRecipeUsefulness(r);
                 const uc = usefulnessColor(us);
+                const favorite = isFavorite(r.name);
                 return (
                   <div key={r.id} style={{ padding:'8px 10px', borderRadius:12, background:'#202023', border:'1px solid rgba(167,139,250,0.10)', display:'flex', alignItems:'center', gap:8 }}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{r.name}</span>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:'#fff', overflowWrap:'anywhere' }}>{r.name}</span>
                         <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:999, background:uc+'18', color:uc, border:`1px solid ${uc}30` }}>💚 {us}</span>
+                        {favorite && <span style={{ fontSize:9, color:'#fbbf24' }}>★</span>}
                       </div>
                       <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', marginTop:2 }}>{r.kcal} ккал · Б{r.protein} Ж{r.fat} У{r.carbs}</div>
                       {r.ingredients?.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginTop:4 }}>{r.ingredients.slice(0,4).map((ing: string, j: number) => <span key={j} style={{ padding:'2px 6px', borderRadius:999, fontSize:8, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.65)', border:'1px solid rgba(255,255,255,0.06)' }}>{ing}</span>)} {r.ingredients.length>4 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)' }}>+{r.ingredients.length-4}</span>}</div>}
                     </div>
-                    <button onClick={() => deleteMyRecipe(r.id)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(239,68,68,0.15)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:12 }}>✕</button>
+                    <button onClick={() => toggleFavorite(r.name)} aria-label={favorite ? `Убрать из избранного: ${r.name}` : `В избранное: ${r.name}`} aria-pressed={favorite}
+                      style={{ width:44, height:44, flexShrink:0, borderRadius:10, border:favorite ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)', background:favorite ? 'rgba(251,191,36,0.14)' : 'rgba(255,255,255,0.03)', color:favorite ? '#fbbf24' : 'rgba(255,255,255,0.45)', cursor:'pointer', fontSize:16 }}>{favorite ? '★' : '☆'}</button>
+                    <button onClick={() => addRecipeToDiary(r, true)} aria-label={`Добавить рецепт ${r.name} в дневник`} title="В дневник (с продуктами и КБЖУ)"
+                      style={{ padding:'0 10px', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.10)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>＋ В дневник</button>
+                    <button onClick={() => deleteMyRecipe(r)} aria-label={pendingDeleteId === r.id ? `Подтвердить удаление рецепта ${r.name}` : `Удалить рецепт ${r.name}`}
+                      style={{ minWidth:44, minHeight:44, flexShrink:0, padding: pendingDeleteId === r.id ? '0 10px' : 0, borderRadius:10, border:'1px solid rgba(239,68,68,0.15)', background:pendingDeleteId === r.id ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize: pendingDeleteId === r.id ? 10 : 14, fontWeight:700 }}>{pendingDeleteId === r.id ? 'Точно?' : '✕'}</button>
                   </div>
                 );
               })}
@@ -226,21 +309,28 @@ export const RecipesTabModern: React.FC = () => {
         </div>
 
         <div style={{ marginTop:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          {pill(onlyFavorite, () => setOnlyFavorite(v => !v), `⭐ Избранное${favoriteRecipes.length ? ` (${favoriteRecipes.length})` : ''}`, '#fbbf24')}
+          <span style={{ fontSize:9, color:'rgba(255,255,255,0.42)', lineHeight:1.35 }}>
+            ☆ на карточке — в избранное. Тот же список виден в дневнике и в планировщике.
+          </span>
+        </div>
+
+        <div style={{ marginTop:10, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase' }}>Сортировка</span>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={{ padding:'6px 10px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:11, outline:'none' }}>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} style={{ padding:'6px 10px', minHeight:44, borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:11, outline:'none' }}>
               <option value="usefulness">💚 По полезности</option>
               <option value="protein">🥩 По белку</option>
               <option value="kcal">🔥 По калориям</option>
               <option value="prep">⏱ По времени</option>
             </select>
           </div>
-          <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ padding:'6px 10px', borderRadius:8, background: showAdvanced ? 'rgba(0,230,138,0.12)' : '#202023', border: showAdvanced ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)', color: showAdvanced ? '#00e68a' : 'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{showAdvanced ? '▲ Скрыть' : '⚙️ Фильтр по БЖУ'}</button>
+          <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ padding:'6px 10px', minHeight:44, borderRadius:8, background: showAdvanced ? 'rgba(0,230,138,0.12)' : '#202023', border: showAdvanced ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)', color: showAdvanced ? '#00e68a' : 'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{showAdvanced ? '▲ Скрыть' : '⚙️ Фильтр по БЖУ'}</button>
           <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{filteredSorted.length} рецептов</span>
             <div style={{ display:'flex', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.07)' }}>
-              <button onClick={() => setViewMode('grid')} style={{ padding:'6px 9px', background: viewMode==='grid' ? 'rgba(0,230,138,0.14)' : '#202023', color: viewMode==='grid' ? '#00e68a' : 'rgba(255,255,255,0.5)', border:'none', cursor:'pointer', fontSize:11 }}>▦</button>
-              <button onClick={() => setViewMode('list')} style={{ padding:'6px 9px', background: viewMode==='list' ? 'rgba(0,230,138,0.14)' : '#202023', color: viewMode==='list' ? '#00e68a' : 'rgba(255,255,255,0.5)', border:'none', cursor:'pointer', fontSize:11, borderLeft:'1px solid rgba(255,255,255,0.07)' }}>☰</button>
+              <button onClick={() => setViewMode('grid')} aria-label="Плитка" aria-pressed={viewMode==='grid'} style={{ minWidth:44, minHeight:44, padding:'6px 9px', background: viewMode==='grid' ? 'rgba(0,230,138,0.14)' : '#202023', color: viewMode==='grid' ? '#00e68a' : 'rgba(255,255,255,0.5)', border:'none', cursor:'pointer', fontSize:11 }}>▦</button>
+              <button onClick={() => setViewMode('list')} aria-label="Список" aria-pressed={viewMode==='list'} style={{ minWidth:44, minHeight:44, padding:'6px 9px', background: viewMode==='list' ? 'rgba(0,230,138,0.14)' : '#202023', color: viewMode==='list' ? '#00e68a' : 'rgba(255,255,255,0.5)', border:'none', cursor:'pointer', fontSize:11, borderLeft:'1px solid rgba(255,255,255,0.07)' }}>☰</button>
             </div>
           </div>
         </div>
@@ -249,19 +339,19 @@ export const RecipesTabModern: React.FC = () => {
             <div>
               <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Белок ≥</div>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                {[0,30,40,50].map(v => <button key={v} onClick={()=>setProteinMin(v)} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: proteinMin===v?700:500, cursor:'pointer', border: proteinMin===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: proteinMin===v?'rgba(0,230,138,0.12)':'#202023', color: proteinMin===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===0?'Любой':v+'г'}</button>)}
+                {[0,30,40,50].map(v => <button key={v} onClick={()=>setProteinMin(v)} style={{ padding:'5px 8px', minHeight:44, borderRadius:8, fontSize:10, fontWeight: proteinMin===v?700:500, cursor:'pointer', border: proteinMin===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: proteinMin===v?'rgba(0,230,138,0.12)':'#202023', color: proteinMin===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===0?'Любой':v+'г'}</button>)}
               </div>
             </div>
             <div>
               <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Ккал</div>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                {([[0,1000,'Все'],[0,400,'≤400'],[400,600,'400-600'],[600,1000,'600+']] as [number, number, string][]).map(([a,b,l])=> <button key={l} onClick={()=>setKcalRange([a,b])} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: kcalRange[0]===a && kcalRange[1]===b?700:500, cursor:'pointer', border: kcalRange[0]===a && kcalRange[1]===b?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: kcalRange[0]===a && kcalRange[1]===b?'rgba(0,230,138,0.12)':'#202023', color: kcalRange[0]===a && kcalRange[1]===b?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
+                {([[0,1000,'Все'],[0,400,'≤400'],[400,600,'400-600'],[600,1000,'600+']] as [number, number, string][]).map(([a,b,l])=> <button key={l} onClick={()=>setKcalRange([a,b])} style={{ padding:'5px 8px', minHeight:44, borderRadius:8, fontSize:10, fontWeight: kcalRange[0]===a && kcalRange[1]===b?700:500, cursor:'pointer', border: kcalRange[0]===a && kcalRange[1]===b?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: kcalRange[0]===a && kcalRange[1]===b?'rgba(0,230,138,0.12)':'#202023', color: kcalRange[0]===a && kcalRange[1]===b?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
               </div>
             </div>
             <div>
               <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Время ≤</div>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                {[60,15,30,45].map(v => <button key={v} onClick={()=>setTimeMax(v)} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: timeMax===v?700:500, cursor:'pointer', border: timeMax===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: timeMax===v?'rgba(0,230,138,0.12)':'#202023', color: timeMax===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===60?'Любое':v+'м'}</button>)}
+                {[60,15,30,45].map(v => <button key={v} onClick={()=>setTimeMax(v)} style={{ padding:'5px 8px', minHeight:44, borderRadius:8, fontSize:10, fontWeight: timeMax===v?700:500, cursor:'pointer', border: timeMax===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: timeMax===v?'rgba(0,230,138,0.12)':'#202023', color: timeMax===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===60?'Любое':v+'м'}</button>)}
               </div>
             </div>
           </div>
@@ -334,6 +424,14 @@ export const RecipesTabModern: React.FC = () => {
                   {r.batchFriendly && <span style={{ fontSize:7, fontWeight:700, padding:'3px 6px', borderRadius:999, background:'rgba(249,115,22,0.12)', color:'#f97316', border:'1px solid rgba(249,115,22,0.18)' }}>🍱</span>}
                 </div>
                 <div style={{ position:'absolute', top:8, right:8, display:'flex', gap:4, alignItems:'center' }}>
+                  {(() => { const favorite = isFavorite(r.name); return (
+                    <button type="button" onClick={() => toggleFavorite(r.name)} aria-label={favorite ? `Убрать из избранного: ${r.name}` : `В избранное: ${r.name}`} aria-pressed={favorite}
+                      style={{ width:40, height:40, borderRadius:999, cursor:'pointer', fontSize:16, lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center',
+                        border: favorite ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.14)',
+                        background: favorite ? 'rgba(251,191,36,0.20)' : 'rgba(0,0,0,0.30)', color: favorite ? '#fbbf24' : 'rgba(255,255,255,0.65)' }}>
+                      {favorite ? '★' : '☆'}
+                    </button>
+                  ); })()}
                   {flavorIcon(r.flavorProfile) && <span style={{ fontSize:9, padding:'3px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{flavorIcon(r.flavorProfile)}</span>}
                   {isBB && <span style={{ fontSize:7, fontWeight:800, padding:'3px 6px', borderRadius:999, background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', color:'#fff' }}>BB</span>}
                 </div>
@@ -396,9 +494,11 @@ export const RecipesTabModern: React.FC = () => {
                 {!isExpanded && r.ingredients.length>3 && <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', alignSelf:'center' }}>+{r.ingredients.length-3}</span>}
               </div>}
 
-              <div style={{ display:'flex', gap:6, marginTop:'auto' }}>
-                <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(255,255,255,0.04)' : '#18181b', color:'rgba(255,255,255,0.75)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{isExpanded ? '▲ Свернуть' : '▼ Подробнее'}</button>
-                <button onClick={() => setPlanPicker({name: r.name, idx: i})} style={{ padding:'8px 10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700 }}>📋 В план</button>
+              <div style={{ display:'flex', gap:6, marginTop:'auto', flexWrap:'wrap' }}>
+                <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ flex:'1 1 96px', padding:'8px 10px', minHeight:44, borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(255,255,255,0.04)' : '#18181b', color:'rgba(255,255,255,0.75)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{isExpanded ? '▲ Свернуть' : '▼ Подробнее'}</button>
+                <button onClick={() => setPlanPicker({name: r.name, idx: i})} style={{ padding:'8px 10px', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700 }}>📋 В план</button>
+                <button onClick={() => addRecipeToDiary(r, false)} aria-label={`Добавить рецепт ${r.name} в дневник`} title="Добавить блюдо целиком: название, КБЖУ и продукты"
+                  style={{ padding:'8px 10px', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap' }}>＋ В дневник</button>
               </div>
 
               {isExpanded && r.instructions && (
@@ -419,12 +519,14 @@ export const RecipesTabModern: React.FC = () => {
           );
         })}
       </div>
-      {filteredSorted.length === 0 && (
+      {filteredSorted.length === 0 && visibleMyRecipes.length === 0 && (
         <div style={{ ...cardBg, padding:24, textAlign:'center' as const }}>
-          <div style={{ fontSize:28, marginBottom:6 }}>🔍</div>
-          <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>Ничего не нашлось</div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>Попробуй сбросить фильтры или изменить запрос</div>
-          <button onClick={() => { setRecSearch(''); setRecMeal('all'); setRecGoal('all'); }} style={{ marginTop:10, padding:'8px 12px', borderRadius:10, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>Сбросить фильтры</button>
+          <div style={{ fontSize:28, marginBottom:6 }}>{onlyFavorite ? '⭐' : '🔍'}</div>
+          <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{onlyFavorite ? 'В избранном пока пусто' : 'Ничего не нашлось'}</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>
+            {onlyFavorite ? 'Отметь рецепт звёздочкой ☆ — он попадёт сюда, в дневник и в подбор планировщика' : 'Попробуй сбросить фильтры или изменить запрос'}
+          </div>
+          <button onClick={() => { setRecSearch(''); setRecMeal('all'); setRecGoal('all'); setOnlyFavorite(false); }} style={{ marginTop:10, padding:'8px 12px', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>{onlyFavorite ? 'Показать все рецепты' : 'Сбросить фильтры'}</button>
         </div>
       )}
       {filteredSorted.length > 120 && <div style={{ textAlign:'center', padding:8, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Показано 120 из {filteredSorted.length} — уточни поиск</div>}
@@ -455,40 +557,17 @@ export const RecipesTabModern: React.FC = () => {
       )}
       {toast && <div className="recipes-toast" style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:300, padding:'10px 16px', borderRadius:12, background:'#202023', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontSize:11, fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>{toast}</div>}
 
-      {/* Create modal */}
-      {showRecipeModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', backdropFilter:'blur(8px)' }} onClick={() => setShowRecipeModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:440, maxHeight:'86vh', overflowY:'auto', padding:16, borderRadius:18, background:'#18181b', border:'1px solid rgba(0,230,138,0.14)', boxShadow:'0 20px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
-              <span style={{ width:32, height:32, borderRadius:10, background:'linear-gradient(135deg,#00e68a,#00c8a0)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>🍳</span>
-              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Создать рецепт</div>
-              <button onClick={() => setShowRecipeModal(false)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
-            </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <div><div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:4, letterSpacing:0.4, textTransform:'uppercase' }}>Название</div><input value={recName} onChange={e => setRecName(e.target.value)} placeholder="Например: Овсяноблин Power" style={inputStyle} /></div>
-              <div><div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:4, letterSpacing:0.4, textTransform:'uppercase' }}>Ингредиенты (по одному на строку)</div><textarea value={recIngredients} onChange={e => setRecIngredients(e.target.value)} placeholder={"Яйца 2 шт\nОвсянка 30 г\nТворог 50 г"} style={{ ...inputStyle, resize:'vertical', minHeight:72, fontSize:11 }} rows={3} /></div>
-              <div><div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:4, letterSpacing:0.4, textTransform:'uppercase' }}>Приготовление</div><textarea value={recInstructions} onChange={e => setRecInstructions(e.target.value)} placeholder="Коротко шаги..." style={{ ...inputStyle, resize:'vertical', minHeight:60, fontSize:11 }} rows={3} /></div>
-              <div>
-                <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.6)', marginBottom:6, letterSpacing:0.4, textTransform:'uppercase' }}>КБЖУ на порцию</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
-                  {[
-                    { l:'Ккал', v: recKcal, s: setRecKcal, c:'#00e68a' },
-                    { l:'Белки', v: recProtein, s: setRecProtein, c:'#60a5fa' },
-                    { l:'Жиры', v: recFat, s: setRecFat, c:'#fbbf24' },
-                    { l:'Углеводы', v: recCarbs, s: setRecCarbs, c:'#fb923c' },
-                  ].map(m => (
-                    <div key={m.l} style={{ textAlign:'center', background:'#202023', borderRadius:12, padding:'8px 4px', border:`1px solid ${m.c}18` }}>
-                      <input type="number" value={m.v || ''} onChange={e => m.s(+e.target.value || 0)} placeholder="0" style={{ width:'100%', padding:'6px 2px', borderRadius:8, fontSize:13, fontWeight:800, textAlign:'center', background:'#18181b', border:`1px solid ${m.c}20`, color:m.c, outline:'none', boxSizing:'border-box' }} />
-                      <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', marginTop:4, letterSpacing:0.4, textTransform:'uppercase' }}>{m.l}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <button onClick={saveRecipe} style={{ width:'100%', padding:'12px', borderRadius:12, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:12, fontWeight:800, boxShadow:'0 6px 16px rgba(0,230,138,0.25)' }}>✓ Сохранить рецепт</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Create modal — общий для Кухни и дневника компонент */}
+      <RecipeCreateModal
+        open={showRecipeModal}
+        onClose={() => setShowRecipeModal(false)}
+        onSaved={(recipe) => {
+          setMyRecipes(readUserRecipes());
+          setMyRecExpanded(true);
+          setToast(`✅ Рецепт «${recipe.name}» создан`);
+          setTimeout(() => setToast(null), 2400);
+        }}
+      />
     </div>
   );
 };

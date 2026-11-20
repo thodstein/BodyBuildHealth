@@ -38,6 +38,10 @@ export function useDiaryPresets({ diaryData, selectedDate, saveDiary, showToast,
         c: Math.round((i.c || 0) * factor * 10) / 10,
         qty,
         category: i.category, foodId: i.foodId,
+        // Состав рецепта и микронутриенты — часть позиции: без них набор из
+        // дневника терял раскладку блюда по продуктам и витамины.
+        ...(i.recipe ? { recipe: i.recipe } : {}),
+        ...(i.micros ? { micros: i.micros } : {}),
       };
     });
     const preset = { name, items: presetItems };

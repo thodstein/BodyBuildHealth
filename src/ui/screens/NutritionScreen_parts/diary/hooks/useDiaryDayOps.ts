@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { fillMissingMicros, quantityToGrams } from '../../../../../engines/nutrition-ocr-parser';
 import { mergeMealsFromPrevious, previousDateKey } from '../diary-quick-repeat';
+import { scaleDiaryRecipeMeta } from '../recipe-to-diary';
 
 export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, safeSet }: {
   diaryData: Record<string, any>;
@@ -44,8 +45,11 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
 
   const openEdit = useCallback((meal: string, idx: number, item: any) => {
     setEditItem({ meal, idx, item });
-    const match = item.qty?.match(/(\d+)/);
-    setEditQty(match ? +match[1] : 100);
+    // qty бывает и строкой «100 г» (продукты), и числом (рецепт из «Кухни»).
+    const match = typeof item.qty === 'number'
+      ? String(Math.round(item.qty))
+      : String(item.qty ?? '').match(/(\d+(?:[.,]\d+)?)/)?.[1];
+    setEditQty(match ? Number.parseFloat(match.replace(',', '.')) : 100);
   }, []);
 
   const saveEdit = useCallback(() => {
@@ -62,9 +66,10 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
       const factor = 10 ** decimals;
       return Math.round(per100(value) * editQty / 100 * factor) / factor;
     };
+    const recipeMeta = scaleDiaryRecipeMeta(current.recipe, savedQty > 0 ? editQty / savedQty : 1);
     items[editItem.idx] = {
       ...current,
-      qty: `${editQty} г`,
+      qty: editQty,
       kcal: Math.round(portion(current.kcal, 0)),
       p: portion(current.p),
       f: portion(current.f),
@@ -72,6 +77,7 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
       micros: current.micros
         ? Object.fromEntries(Object.entries(current.micros).map(([key, value]) => [key, portion(Number(value), 2)]))
         : current.micros,
+      ...(recipeMeta ? { recipe: recipeMeta } : {}),
     };
     data[selectedDate] = { ...day, meals: { ...day.meals, [editItem.meal]: items } };
     saveDiary(data);
@@ -168,7 +174,7 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
         const label = m.label || 'Приём пищи';
         if (!data[selectedDate].meals[label]) data[selectedDate].meals[label] = [];
         (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
-          data[selectedDate].meals[label].push({ name: it.name, qty: `${it.amount || 100} г`, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: it.micros });
+          data[selectedDate].meals[label].push({ name: it.name, qty: Number(it.amount) || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: it.micros });
         });
       });
       saveDiary(data);

@@ -5,6 +5,7 @@ import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore, findFoodById, findF
 import { PHARMA_DB } from "../../../../core/pharma-database";
 import { updateProfile, getProfile } from "../../../../core/profile-manager";
 import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
+import { recipeKey, readUserRecipes } from "../diary/user-recipes";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams } from "../../../../engines/kbju-food-match.engine";
 import type { NutritionReport } from "../../../../engines/nutrition-report.engine";
@@ -1626,7 +1627,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [draggedItem, setDraggedItem] = useState<any>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [undoStack, setUndoStack] = useState<any[]>([]);
-   const [userRecipes, setUserRecipes] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_user_recipes') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
+   const [userRecipes, setUserRecipes] = useState<any[]>(() => {
+     // Обе базы (Кухня + планировщик): рецепт, созданный в Кухне, сразу
+     // участвует в подборе плана, а не только после создания в планировщике.
+     // Старые рецепты планировщика хранят `prepTime`, движок читает `prepTimeMin`.
+     return readUserRecipes().map(recipe => ({
+       ...recipe,
+       prepTime: recipe.prepTimeMin ?? 10,
+       prepTimeMin: recipe.prepTimeMin ?? 10,
+       userCreated: true,
+     }));
+   });
   const [showRecipeCreator, setShowRecipeCreator] = useState(false);
   const [showAddDrug, setShowAddDrug] = useState(false);
   const [showDrugTypePicker, setShowDrugTypePicker] = useState(false);
@@ -1702,7 +1713,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    useEffect(() => { try { localStorage.setItem('he_nutrition_supps', JSON.stringify(takenSupplements)); } catch {} }, [takenSupplements]);
    // FIX save-buttons: пользовательские рецепты читались из he_user_recipes, но НИКОГДА
    // не сохранялись — созданный рецепт пропадал при перезагрузке.
-   useEffect(() => { try { safeWriteJSON('he_user_recipes', userRecipes); } catch {} }, [userRecipes]);
+   // Единое хранилище: Кухня/дневник пишут в оба ключа, а состояние здесь может
+   // быть старше localStorage (рецепт создан на другом экране). Поэтому при
+   // сохранении мержим по названию, а не затираем список целиком.
+   useEffect(() => {
+     try {
+       const raw = JSON.parse(localStorage.getItem('he_user_recipes') || '[]');
+       const merged = new Map<string, any>();
+       for (const recipe of (Array.isArray(raw) ? raw : [])) {
+         const key = recipeKey(String(recipe?.name || ''));
+         if (key) merged.set(key, recipe);
+       }
+       for (const recipe of userRecipes) {
+         const key = recipeKey(String(recipe?.name || ''));
+         if (key) merged.set(key, recipe);
+       }
+       safeWriteJSON('he_user_recipes', [...merged.values()]);
+     } catch {}
+   }, [userRecipes]);
 
   // FIX: персистентность ручных целей КБЖУ и режима
   useEffect(() => { try { if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) localStorage.setItem('he_manual_g_per_kg', JSON.stringify(manualGPerKg)); else localStorage.removeItem('he_manual_g_per_kg'); } catch {} }, [manualGPerKg]);

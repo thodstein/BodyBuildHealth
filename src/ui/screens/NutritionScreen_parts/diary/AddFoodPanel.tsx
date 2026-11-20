@@ -11,8 +11,11 @@ import { readDiaryV2 } from '../diary-storage-v2';
 import { LabelNutritionPanel, type LabelDraftView } from './LabelNutritionPanel';
 import { PortionSheet } from './PortionSheet';
 import { AddToBaseModal, type BaseFoodInitial } from './AddToBaseModal';
+import { RecipePickerPanel } from './RecipePickerPanel';
+import { RecipeComponentsList } from './RecipeComponentsList';
 import { customFoodToFoodItem } from '../../../../engines/meal-custom-food';
 import { useCustomFoods } from './hooks/useCustomFoods';
+import { clampItemGrams } from './portion-limits';
 import { readFavIds, toggleFavorite } from './food-favorites';
 
 interface AddFoodPanelProps {
@@ -24,6 +27,8 @@ interface AddFoodPanelProps {
   onMealTypeChange: (v: string) => void;
   allMealTypes: string[];
   onAddFoodFromDB: (food: FoodItemLike, qty?: number) => void;
+  /** Рецепт из базы/«Моих рецептов» → очередь (блюдо целиком с составом). */
+  onAddRecipe?: (recipe: import('../../../../engines/nutrition-periodization.engine').Recipe, servings?: number, custom?: boolean) => void;
   onDirectAdd?: (food: FoodItemLike, qty?: number) => void;
   customMealInput: string;
   onCustomMealInputChange: (value: string) => void;
@@ -100,7 +105,7 @@ const isBarcodeQuery = (q: string) => /^\d{8,14}$/.test((q || '').trim());
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct,
+  allMealTypes, onAddFoodFromDB, onAddRecipe, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct,
   labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
   onOpenLabelScan, onCloseLabelScan, onLabelCamera, onLabelGallery, onLabelFieldChange, onLabelSaveToBase, onLabelAddToDiary, onLabelBarcodeScan,
   onOcrFile,
@@ -242,8 +247,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       </button>
     );
   };
+  // Кол-во в очереди — число граммов, но старый набор мог сохранить «250 г».
+  const queueQty = (qty: any): number => {
+    if (typeof qty === 'number' && Number.isFinite(qty)) return qty;
+    const match = String(qty ?? '').match(/(\d+(?:[.,]\d+)?)/);
+    return match ? Number(match[1].replace(',', '.')) || 100 : 100;
+  };
   const queueKcal = parsedItems.reduce(
-    (sum, it) => sum + Math.round(((it.kcal || 0) * (it.qty || 100)) / 100), 0,
+    (sum, it) => sum + Math.round(((it.kcal || 0) * queueQty(it.qty)) / 100), 0,
   );
 
   const foodSearchResults = useMemo(() => {
@@ -291,6 +302,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string').slice(0, 5) : []; } catch { return []; } });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [recipeOpen, setRecipeOpen] = useState(false);
+  const [recipeQuery, setRecipeQuery] = useState('');
   const [customMealOpen, setCustomMealOpen] = useState(false);
   /**
    * Карточка сырого текста: раскрыта, когда распознавать больше нечего
@@ -430,7 +443,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const startEdit = (idx: number, item: any) => {
     setEditingIdx(idx);
     setEditName(item.name || '');
-    setEditQty(item.qty || 100);
+    // qty в старых записях — строка «250 г», в новых — число граммов.
+    const rawQty = typeof item.qty === 'number'
+      ? item.qty
+      : Number(String(item.qty ?? '').match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(',', '.'));
+    setEditQty(Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 100);
     setEditKcal(Math.round(item.kcal || 0));
     setEditP(Math.round((item.p || 0) * 10) / 10);
     setEditF(Math.round((item.f || 0) * 10) / 10);
@@ -661,6 +678,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.3, overflowWrap: 'anywhere', cursor: isLowConf ? 'pointer' : 'default', textDecoration: isLowConf ? 'underline dotted' : 'none' }} onClick={() => isLowConf && startEdit(i, item)}>{item.name}</span>
+                          {item.recipe && (
+                            <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6 }}>
+                              🍲 рецепт · {item.recipe.components?.length || 0} прод.
+                            </span>
+                          )}
                           {isLowConf && (
                             <span onClick={() => startEdit(i, item)} style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6, cursor: 'pointer' }}>⚠ проверьте</span>
                           )}
@@ -682,7 +704,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                       </div>
                       <div className="nd-qtyrow" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#18181b', borderRadius: 10, padding: '2px 4px' }}>
-                          <button onClick={() => onUpdateParsedItemQty(i, Math.max(10, q - 10))} aria-label="Уменьшить"
+                          <button onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q - 10))} aria-label="Уменьшить"
                             className="nd-qtybtn"
                             style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
                               color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -694,7 +716,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                               color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: 0 }}>
                             {q}г
                           </button>
-                          <button onClick={() => onUpdateParsedItemQty(i, Math.min(1000, q + 10))} aria-label="Увеличить"
+                          <button onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q + 10))} aria-label="Увеличить"
                             className="nd-qtybtn"
                             style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
                               color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -719,6 +741,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                         <span style={{ color: '#fbbf24' }}>Ж {f}г</span>
                         <span style={{ color: '#fb923c' }}>У {c}г</span>
                       </div>
+                      {item.recipe?.components?.length > 0 && (
+                        <RecipeComponentsList
+                          components={item.recipe.components}
+                          scale={item.recipe.totalWeight > 0 ? q / item.recipe.totalWeight : 1}
+                          title={`Продукты рецепта${item.recipe.servings && item.recipe.servings !== 1 ? ` · ×${item.recipe.servings}` : ''}`}
+                        />
+                      )}
                     </>
                   )}
                 </div>
@@ -973,6 +1002,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               </div>
             )}
 
+            {/* Рецепт по тому же запросу: «борщ» ищется и среди блюд, а не
+                только среди отдельных продуктов. */}
+            {query.length >= 2 && (
+              <button type="button" onClick={() => { setRecipeQuery(query); setRecipeOpen(true); }} aria-label="Искать рецепт"
+                className="nd-recipe-search-link"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', minHeight: 48,
+                  background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#fbbf24', fontSize: 12, fontWeight: 700 }}>
+                🍲 Искать рецепт «{query}» — с продуктами и КБЖУ
+              </button>
+            )}
+
             {/* Как в MyFitnessPal/FatSecret: из выдачи всегда можно уйти в свою базу. */}
             {!showEmpty && (
               <button type="button" onClick={() => openBase({ name: query })} aria-label="Добавить свой продукт в базу" className="nd-base-link"
@@ -1024,6 +1064,20 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               </button>
             </div>
 
+            {/* Рецепт — такой же способ внести еду, как продукт: в дневник
+                уходят название блюда и КБЖУ каждого продукта, а не только итог. */}
+            <button type="button" onClick={() => { setRecipeQuery(''); setRecipeOpen(true); }} aria-label="Добавить рецепт в дневник" className="nd-recipe-cta"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+                background: 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(234,88,12,0.06))',
+                border: '1px solid rgba(245,158,11,0.32)', color: '#fff', textAlign: 'left', minHeight: 62 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(245,158,11,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍲</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Добавить рецепт</span>
+                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Блюдо целиком: продукты и КБЖУ каждого · база и «Мои рецепты»</span>
+              </span>
+              <span style={{ color: '#fbbf24', fontSize: 16, flexShrink: 0 }}>→</span>
+            </button>
+
             {/* Главная точка входа в «свою базу»: не спрятана в разделе Кухня. */}
             <button type="button" onClick={() => openBase()} aria-label="Открыть добавление продукта в базу" className="nd-base-cta"
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
@@ -1060,7 +1114,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>История:</span>
                 {history.map(h => (
-                  <button key={h} onClick={() => onFoodSearchChange(h)} className="nd-hist" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 11, minHeight: 40, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer' }}>{h}</button>
+                  <button key={h} onClick={() => onFoodSearchChange(h)} className="nd-hist" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 11, minHeight: 44, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer' }}>{h}</button>
                 ))}
                 <button onClick={() => { setHistory([]); try { localStorage.removeItem('he_search_history'); } catch {} }} aria-label="Очистить историю" style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
               </div>
@@ -1080,7 +1134,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                     { id: 'last', label: '🆕 Последние', count: lastAdded.length },
                     { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
                   ].map(tab => (
-                    <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: '1 1 auto', padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)' }}>
+                    <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: '1 1 auto', padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)' }}>
                       {tab.label}
                       {tab.count > 0 && <span style={{ background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)', color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.65)', padding: '1px 5px', borderRadius: 999, fontSize: 9, fontWeight: 700 }}>{tab.count}</span>}
                     </button>
@@ -1151,7 +1205,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                             <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{it.name}</div>
                             <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                               <span style={{ color: '#00e68a', fontWeight: 700 }}>{it.kcal} ккал</span>
-                              <span>{it.qty || '100г'}</span>
+                              <span>{typeof it.qty === 'number' ? `${Math.round(it.qty)} г` : (it.qty || '100 г')}</span>
                             </div>
                           </div>
                           <button onClick={() => queueFood({ id: it.foodId || it.name, name: it.name, kcal: it.kcal, protein: it.p || 0, fat: it.f || 0, carbs: it.c || 0, category: it.category } as any)} aria-label="Добавить последнее" className="nd-lastadd" style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>＋</button>
@@ -1302,6 +1356,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </button>
         </div>
       )}
+      {/* Выбор рецепта: блюдо целиком с продуктами и КБЖУ каждого */}
+      <RecipePickerPanel
+        open={recipeOpen}
+        onClose={() => setRecipeOpen(false)}
+        mealType={mealType}
+        initialQuery={recipeQuery}
+        onAdd={(recipe, servings, custom) => {
+          onAddRecipe?.(recipe, servings, custom);
+          setRecipeOpen(false);
+        }}
+      />
     </div>
   );
 };
