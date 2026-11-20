@@ -52,6 +52,27 @@ export const MIN_MEANINGFUL_G: Record<string, number> = {
 };
 
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * §8.124: ось «овощ» считает НАСТОЯЩИЙ овощ, а не роль `veg`.
+ *
+ * Дефект (документированный §8.88): продукт с ролью `veg`, который овощем не является
+ * (порционный белок в овощном слоте — «рыба как овощ»), приносил дню балл оси. Правило —
+ * по природе: `veg` + плотность белка < 12 г/100 г.
+ *
+ * Замер 600 дней (10 профилей × 3–7 приёмов × тр/отд × авто/руч × variety low/med/high)
+ * снял ВТОРУЮ гипотезу — «микро-посыпка даёт балл»: среди позиций с ролью `veg` флаги
+ * `_microClosure`/`_microGap`/`_fixedGrams` стоят только на настоящем овоще (морковь 80 г
+ * как закрытие дефицита VitA), 30 дней из 600. Поэтому флаги НЕ исключаются: исключение
+ * убирало из оси реальные 80 г моркови (день с 200 г овощей показывал 160 → 80 баллов).
+ */
+export const isRealVegItem = (it: any): boolean => {
+  if (String(it?.role) !== 'veg') return false;
+  const amount = Number(it.amount) || 0;
+  if (amount <= 0) return false;
+  // Плотность белка — по самой позиции (модуль намеренно без импортов и без FOOD_DB).
+  return ((Number(it.p) || 0) / amount) * 100 < 12;
+};
 const typeOf = (m: any) => String(m?.type || '');
 const isWindowMeal = (m: any) => ['preworkout', 'postworkout', 'intra'].includes(typeOf(m));
 const isMainMeal = (m: any) => !isWindowMeal(m) && typeOf(m) !== 'presleep';
@@ -90,7 +111,7 @@ export function scoreDayQuality(meals: any[], input: QualityScoringInput): Quali
       ids.add(String(it.id));
       if (NON_PORTION_ROLES.has(String(it.role))) continue;
       items++;
-      if (String(it.role) === 'veg') vegG += Number(it.amount) || 0;
+      if (isRealVegItem(it)) vegG += Number(it.amount) || 0;
       const min = MIN_MEANINGFUL_G[String(it.role)];
       if (!min || (Number(it.amount) || 0) >= min) meaningful++;
       else if (FAT_ROLES.has(String(it.role))) meaningful += 0.5;

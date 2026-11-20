@@ -26,7 +26,7 @@
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
 import { analyzeMicroCoverage, sumMicros, RDA_BASE, getMicroTargets, lowCountForScore, SUPPLEMENT_ADDRESSED, type MicroCoverageEntry } from "./planner-micro-coverage";
-import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G } from "./planner-quality-score";
+import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G, isRealVegItem } from "./planner-quality-score";
 import { getMicroFromFood } from "./planner-micro-reader";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
@@ -419,6 +419,30 @@ export function mergeDuplicateItems(meals: any[]): number {
 /** §8.108: семейства, которые считаются «гарниром» (крахмальным носителем приёма). */
 const STARCH_FAMILY_SET: ReadonlySet<string> = new Set(['oats', 'rice', 'buckwheat', 'pasta', 'potato', 'other_grain', 'bread']);
 /**
+ * §8.124 (долг B18): «гарнир — это зерно», а не только те id, что знает ротация.
+ *
+ * `stapleFamilyOf` возвращает null для крупяных продуктов, которых нет в её регэкспах
+ * (`corn_flakes`, `grain_red_rice`, `grain_rice_flour`), поэтому свёртка §8.108 и счётчик
+ * двойников их не видели: снек `30 г кукурузных хлопьев + 30 г риса` (p500/3–5/отд, оба
+ * контура) считался одним носителем, хотя это два мелких гарнира на одной тарелке.
+ * Здесь семейство для целей свёртки: явное семейство ротации ИЛИ имя крупяного продукта
+ * (тот же принцип, по которому `RICE_BUCKET_IDS` уже содержит `corn_flakes`).
+ */
+const starchFamilyOfItem = (it: any): string | null => {
+  const id = String(it?.id || '');
+  const fam = stapleFamilyOf(id);
+  if (fam) return fam;
+  if (/corn_flake|cornmeal|corn_grits|polenta/.test(id)) return 'other_grain';
+  if (/red_rice|brown_rice|black_rice|rice_flour/.test(id)) return 'rice';
+  if (/quinoa|millet|barley|bulgur|teff|amaranth|spelt|kamut|einkorn|freekeh|sorghum/.test(id)) return 'other_grain';
+  return null;
+};
+/** Крахмальный носитель приёма по §8.108/§8.124 (роль + зерновое семейство + есть углеводы). */
+const isStarchCarrierItem = (it: any): boolean => !!it
+  && (it.role === 'carb_slow' || it.role === 'carb_fast')
+  && STARCH_FAMILY_SET.has(starchFamilyOfItem(it) || '')
+  && (Number(it.c) || 0) > 0;
+/**
  * §8.112: продуктовый предел «ведра» для рисовых гарниров — та же константа, что у замка
  * §8.96 («сайды не превращаются в ведро»): рис/рисовая каша/кукурузные хлопья ≤ 450 г.
  * Используется доводчиком, гигиеной порций и закрывателем рецептурного дня.
@@ -469,9 +493,7 @@ export function consolidateStarchCarrier(
     it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
   };
   const starchesOf = (m: any): any[] => (m?.items || []).filter((it: any) =>
-    it && (it.role === 'carb_slow' || it.role === 'carb_fast')
-    && STARCH_FAMILY_SET.has(stapleFamilyOf(it.id) || '')
-    && (it.c || 0) > 0 && !it._fixedGrams && !inRecipe(m, it));
+    isStarchCarrierItem(it) && !it._fixedGrams && !inRecipe(m, it));
 
   let fixed = 0;
   let removed = 0;
@@ -550,10 +572,7 @@ export function starchDoubleStats(meals: any[], opts?: { smallG?: number; smallC
   let meals2 = 0;
   let small = 0;
   for (const m of meals || []) {
-    const st = (m?.items || []).filter((it: any) =>
-      it && (it.role === 'carb_slow' || it.role === 'carb_fast')
-      && STARCH_FAMILY_SET.has(stapleFamilyOf(it.id) || '')
-      && (it.c || 0) > 0);
+    const st = (m?.items || []).filter((it: any) => isStarchCarrierItem(it));
     if (st.length < 2) continue;
     meals2++;
     const secs = [...st].sort((a: any, b: any) => (b.c || 0) - (a.c || 0)).slice(1);
@@ -5309,14 +5328,18 @@ const solidOf122 = (m: any): number => ((m.items || []) as any[])
 const bucketsOf122 = (plan: DayPlanV2): number =>
   (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solidOf122(m) > 500).length;
 
-/** Настоящий овощ по §8.88: роль `veg`, не микро-посыпка и не белковый продукт в слоте. */
-const isRealVeg122 = (x: any): boolean => {
-  if (String(x?.role) !== 'veg') return false;
-  if (x._microClosure || x._microGap || x._fixedGrams) return false;
-  const fd: any = FOOD_DB.find((f: any) => String(f.id) === String(x.id));
-  if (!fd) return false;
-  return (Number(fd.protein) || 0) / 100 < 0.12;
-};
+/**
+ * §8.124: настоящий овощ — по ПРИРОДЕ продукта (`isRealVegItem`: роль `veg` + плотность
+ * белка < 12 г/100 г), а не по флагу микро-закрытия.
+ *
+ * Замер 480 дней (10 профилей × {3,5,7} приёмов × budget low/high × quality cheap/full ×
+ * вегетарианский/обычный × авто/руч): единственная позиция `veg` с флагами
+ * `_microClosure`/`_microGap`/`_fixedGrams` — морковь 80 г (закрытие дефицита VitA), 24 дня.
+ * Прежняя редакция исключала её из овоща дня, то есть день с 200 г овощей считался днём
+ * с 120 г и получал добор. Позиций-белка в роли `veg` (§8.88) в замере 0 — правило природы
+ * их всё равно отсекает (плотность белка).
+ */
+const isRealVeg122 = (x: any): boolean => isRealVegItem(x);
 
 const vegGramsOf122 = (plan: DayPlanV2): number => (plan.meals || [])
   .flatMap((m: any) => (m.items || []).filter((x: any) => isRealVeg122(x)))
