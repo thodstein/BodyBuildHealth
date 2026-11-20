@@ -30,6 +30,10 @@
  * ВАЖНО: это не диагноз. Движок не назначает лечение и не заменяет врача.
  */
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+// Проход 166: СКФ по креатинину — один расчёт на приложение (`lab-norms`).
+// Здесь жила третья копия CKD-EPI 2021; цистатиновые варианты остаются местными,
+// потому что общего расчёта по цистатину C в репозитории нет.
+import { ckdEpi2021 as ckdEpi2021Shared } from './lab-norms.engine';
 
 export type PkSex = 'male' | 'female';
 export type PkTraining = 'sedentary' | 'recreational' | 'resistance' | 'athlete';
@@ -412,22 +416,14 @@ const ruDate = (iso: string): string => {
   return m ? `${m[3]}.${m[2]}.${m[1]}` : iso;
 };
 
-/** CKD-EPI 2021 (race-free). Креатинин — мкмоль/л, результат — мл/мин/1.73 м². */
+/**
+ * CKD-EPI 2021 (race-free). Креатинин — мкмоль/л, результат — мл/мин/1.73 м².
+ *
+ * Проход 166: тело формулы удалено — считается в `lab-norms.ckdEpi2021`, чтобы
+ * панель «Белок и почки» и риск-модель не могли разойтись в СКФ на одном бланке.
+ */
 export function ckdEpi2021(creatinineUmolL: number, age: number, sex: PkSex): number {
-  if (!Number.isFinite(creatinineUmolL) || creatinineUmolL <= 0 || !Number.isFinite(age) || age <= 0) {
-    return NaN;
-  }
-  const scr = creatinineUmolL / 88.4;
-  const kappa = sex === 'female' ? 0.7 : 0.9;
-  const alpha = sex === 'female' ? -0.241 : -0.302;
-  const femaleFactor = sex === 'female' ? 1.012 : 1;
-  return (
-    142 *
-    Math.pow(Math.min(scr / kappa, 1), alpha) *
-    Math.pow(Math.max(scr / kappa, 1), -1.2) *
-    Math.pow(0.9938, age) *
-    femaleFactor
-  );
+  return ckdEpi2021Shared(creatinineUmolL, age, sex);
 }
 
 /** CKD-EPI 2021 по цистатину C (race-free). Цистатин C — мг/л. */
