@@ -250,6 +250,10 @@ export const WorkoutSummaryBody: React.FC<{
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
   const maxWeekTonnage = Math.max(1, ...summary.weeks.map(w => w.tonnageKg));
+  // Ориентиры MEV/MAV/MRV — недельные. Если в отчёте одна тренировка, «+5/нед»
+  // обещать нельзя: неизвестно, единственная ли она за неделю. Тогда совет
+  // теряет «/нед», а строка мышцы честно говорит про недельные ориентиры.
+  const perWeek = summary.workouts > 1;
   // Ориентиры считаем один раз: они нужны и фильтру, и сводке статусов.
   const muscleRows = summary.muscles.map(m => {
     const weekly = Math.round(m.sets / weeksCount);
@@ -416,7 +420,7 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── МЫШЦЫ ── */}
       {has('muscles') && summary.muscles.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="💪" title="По мышцам" hint="подходы · тоннаж · доля · ориентир MEV/MAV/MRV" />
+          <SectionTitle icon="💪" title="По мышцам" hint={perWeek ? 'подходы · тоннаж · доля · ориентир MEV/MAV/MRV' : 'за сессию · ориентиры MEV/MAV/MRV недельные'} />
           {muscleRows.some(r => r.lm) && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
               {(['below_mev', 'optimal', 'approaching_mrv', 'exceeding_mrv'] as const).map(st => {
@@ -442,7 +446,7 @@ export const WorkoutSummaryBody: React.FC<{
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {shownMuscleRows.map(({ m, lm }) => {
-              const adv = volumeAdvice(lm);
+              const adv = volumeAdvice(lm, perWeek);
               return (
               <div key={m.muscle} style={{ position: 'relative', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.tonnageKg / maxMuscleTonnage) * 100}%`, background: m.color, opacity: 0.14 }} />
@@ -458,7 +462,16 @@ export const WorkoutSummaryBody: React.FC<{
                   <div style={{ position: 'relative', marginTop: 4 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 8.5, color: '#fff', opacity: 0.8 }}>
                       <span>
-                        ≈ <b style={{ color: VOLUME_STATUS_COLOR[lm.status] }}>{lm.weeklySets}</b> подх/нед · {VOLUME_STATUS_LABEL[lm.status]}
+                        {perWeek ? (
+                          <>
+                            ≈ <b style={{ color: VOLUME_STATUS_COLOR[lm.status] }}>{lm.weeklySets}</b> подх/нед
+                          </>
+                        ) : (
+                          <span title="MEV/MAV/MRV — недельные ориентиры. Объём одной сессии сравним с ними, только если мышца тренируется раз в неделю.">
+                            <b style={{ color: VOLUME_STATUS_COLOR[lm.status] }}>{lm.weeklySets}</b> подх за сессию
+                          </span>
+                        )}
+                        {' · '}{VOLUME_STATUS_LABEL[lm.status]}
                         {m.weeklyTrendPct != null && m.weeklyTrendPct !== 0 && (
                           <span style={{ marginLeft: 5, color: m.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
                             {m.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(m.weeklyTrendPct)}%

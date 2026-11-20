@@ -590,4 +590,12 @@ describe('workout-summary: что делать с объёмом мышцы', ()
     expect(volumeAdvice(null)).toBeNull();
     expect(volumeAdvice(lm(NaN, 8, 14, 20, 'optimal'))).toBeNull();
   });
+
+  it('по одной тренировке не обещает «/нед»', () => {
+    const below = volumeAdvice(lm(4, 8, 14, 20, 'below_mev'), false);
+    expect(below).toEqual(expect.objectContaining({ delta: 4, chip: '+4 до MEV' }));
+    expect(below!.hint).toContain('Показана одна тренировка');
+    expect(volumeAdvice(lm(24, 8, 14, 20, 'exceeding_mrv'), false)?.chip).toBe('−4');
+    expect(volumeAdvice(lm(12, 8, 14, 20, 'optimal'), false)?.chip).toBe('запас +8 до MRV');
+  });
 });

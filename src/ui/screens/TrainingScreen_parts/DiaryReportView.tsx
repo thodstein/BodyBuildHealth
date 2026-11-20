@@ -191,12 +191,14 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     lines.push('');
     lines.push('По мышцам:');
     const weeksCount = Math.max(1, summary.weeks.length);
+    const perWeek = summary.totals.sessions > 1;
+    const weeklyUnit = perWeek ? 'подх/нед' : 'подх за сессию';
     summary.muscles.forEach(m => {
       const weekly = Math.round(m.sets / weeksCount);
       const trend = m.weeklyTrendPct != null ? ` (${m.weeklyTrendPct > 0 ? '+' : ''}${m.weeklyTrendPct}% к первой неделе)` : '';
       // Совет по объёму — та же правка, что видна на экране: +5/нед до MEV.
-      const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, hub.level));
-      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} подх/нед${trend}${adv ? ` · ${adv.chip}` : ''} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
+      const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, hub.level), perWeek);
+      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
     });
     lines.push('');
     lines.push('По упражнениям:');

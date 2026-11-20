@@ -1261,26 +1261,34 @@ export interface VolumeAdvice {
 
 /**
  * Что делать с объёмом мышцы: числа MEV/MAV/MRV сами по себе не подсказывают
- * действие. Возвращает одну конкретную правку — сколько подходов в неделю
- * добавить или убрать и зачем.
+ * действие. Возвращает одну конкретную правку — сколько подходов добавить или
+ * убрать и зачем.
+ *
+ * `perWeek = false` — отчёт по одной тренировке: ориентиры недельные, поэтому
+ * обещать «+6/нед» по одному занятию нельзя, только «+6 до MEV».
  */
-export function volumeAdvice(lm: MuscleLandmarkInfo | null): VolumeAdvice | null {
+export function volumeAdvice(lm: MuscleLandmarkInfo | null, perWeek = true): VolumeAdvice | null {
   if (!lm || !Number.isFinite(lm.weeklySets)) return null;
   const sets = Math.round(lm.weeklySets);
+  const unit = perWeek ? '/нед' : '';
   if (lm.status === 'below_mev') {
     const delta = Math.max(1, Math.round(lm.mev - sets));
     return {
       delta,
-      chip: `+${delta}/нед до MEV`,
-      hint: `До минимального эффективного объёма не хватает ${delta} подходов в неделю.`,
+      chip: `+${delta}${unit} до MEV`,
+      hint: perWeek
+        ? `До минимального эффективного объёма не хватает ${delta} подходов в неделю.`
+        : `До минимального эффективного объёма не хватает ${delta} подходов в неделю. Показана одна тренировка — если мышца тренируется чаще, недельный объём выше.`,
     };
   }
   if (lm.status === 'exceeding_mrv') {
     const over = Math.max(1, Math.round(sets - lm.mrv));
     return {
       delta: -over,
-      chip: `−${over}/нед`,
-      hint: `На ${over} подходов в неделю выше предела восстановления — уберите их или запланируйте разгрузку.`,
+      chip: `−${over}${unit}`,
+      hint: perWeek
+        ? `На ${over} подходов в неделю выше предела восстановления — уберите их или запланируйте разгрузку.`
+        : `На ${over} подходов выше недельного предела восстановления, если это единственная тренировка мышцы за неделю.`,
     };
   }
   const delta = Math.max(0, Math.round(lm.mrv - sets));

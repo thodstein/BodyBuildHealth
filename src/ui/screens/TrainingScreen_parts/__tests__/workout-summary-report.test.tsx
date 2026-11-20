@@ -54,6 +54,14 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('+6/нед до MEV');
   });
 
+  it('в отчёте за одну тренировку не обещает «/нед»', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['muscles']} />);
+    expect(html).toContain('подх за сессию');
+    expect(html).toContain('ориентиры MEV/MAV/MRV недельные');
+    expect(html).toContain('до MEV');
+    expect(html).not.toContain('/нед до MEV');
+  });
+
   it('уважает выбор блоков (только «Общее»)', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['totals']} />);
     expect(html).toContain('Общие показатели');
@@ -245,7 +253,7 @@ describe('Дневник → Отчёт', () => {
     expect(html).toContain('Неделя');
   });
 
-  it('копируемый отчёт несёт недельный объём и правку по MEV', async () => {
+  it('копируемый отчёт честен: одна сессия без «/нед», весь период с «/нед»', async () => {
     const writes: string[] = [];
     const orig = (navigator as any).clipboard;
     Object.defineProperty(navigator, 'clipboard', {
@@ -256,15 +264,26 @@ describe('Дневник → Отчёт', () => {
     const stubDiary = new Proxy({}, {
       get: () => () => Promise.resolve([]),
     }) as unknown as StrengthDiary;
+    const copyBtn = () => screen.getByRole('button', { name: /Скопировано|Копировать отчёт/ });
     try {
       render(<TrainingDiaryHub {...baseProps} diary={stubDiary} initialMode="summary" />);
-      fireEvent.click(screen.getByText(/Копировать отчёт/));
+
+      fireEvent.click(copyBtn());
       await Promise.resolve();
-      const txt = writes.join('\n');
-      expect(txt).toContain('По мышцам:');
-      expect(txt).toContain('подх/нед');
-      expect(txt).toContain('+6/нед до MEV');
-      expect(txt).toContain('Грудь');
+      const one = writes.join('\n');
+      expect(one).toContain('По мышцам:');
+      expect(one).toContain('подх за сессию');
+      expect(one).toContain('до MEV');
+      expect(one).not.toContain('/нед до MEV');
+      expect(one).toContain('Грудь');
+
+      fireEvent.click(screen.getByText(/Всё время/));
+      fireEvent.click(copyBtn());
+      await Promise.resolve();
+      const all = writes.slice(1).join('\n');
+      expect(all).toContain('подх/нед');
+      expect(all).toMatch(/\+[1-9]\d*\/нед до MEV/);
+      expect(all).toContain('Грудь');
     } finally {
       Object.defineProperty(navigator, 'clipboard', { value: orig, configurable: true });
     }
