@@ -208,7 +208,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push('Движения:');
       summary.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${fmtTon(p.tonnageKg)}`));
     }
-    const insights = buildWorkoutInsights(summary);
+    const insights = buildWorkoutInsights(summary, hub.level);
     if (insights.length) {
       lines.push('');
       lines.push('Выводы:');

@@ -725,10 +725,10 @@ const signedPct = (pct: number): string => `${pct > 0 ? '+' : ''}${pct}%`;
 
 /**
  * Выводы по сводке: баланс жимы/тяги и колено/таз, динамика тоннажа,
- * отстающие мышцы, плотность, RIR и рекорды. Правила молчат, если данных мало —
- * лучше пусто, чем выдуманный совет.
+ * выход за MEV/MRV по мышцам, плотность, RIR и рекорды. Правила молчат,
+ * если данных мало — лучше пусто, чем выдуманный совет.
  */
-export function buildWorkoutInsights(s: WorkoutSummary): SummaryInsight[] {
+export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate'): SummaryInsight[] {
   const out: SummaryInsight[] = [];
   if (!s || !s.workouts) return out;
 
@@ -778,11 +778,30 @@ export function buildWorkoutInsights(s: WorkoutSummary): SummaryInsight[] {
   }
 
   if (s.workouts >= 3) {
-    const low = s.muscles
-      .filter(m => m.muscle !== 'other' && m.sets > 0 && m.setsPerSession < 4)
-      .slice(0, 3);
-    if (low.length > 0) {
-      out.push({ id: 'lagging', tone: 'info', icon: '🎯', title: `Мало подходов: ${low.map(m => m.label).join(', ')}`, detail: 'Меньше 4 подходов на тренировку — добавьте 2–4 подхода, если эта мышца в приоритете.' });
+    const weeks = summaryWeeksCount(s);
+    const under: string[] = [];
+    const over: string[] = [];
+    for (const m of s.muscles) {
+      if (m.muscle === 'other' || m.sets <= 0) continue;
+      const weekly = Math.round(m.sets / weeks);
+      const lm = muscleLandmarksFor(m.muscle, weekly, level);
+      if (!lm) continue;
+      if (lm.status === 'below_mev') under.push(`${m.label} (${weekly} из ${lm.mev})`);
+      else if (lm.status === 'exceeding_mrv') over.push(`${m.label} (${weekly} при MRV ${lm.mrv})`);
+    }
+    if (under.length > 0) {
+      out.push({
+        id: 'under-mev', tone: 'info', icon: '🎯',
+        title: `Ниже MEV: ${under.slice(0, 3).join(', ')}`,
+        detail: 'Подходов в неделю меньше минимального объёма для роста — добавьте 2–4 подхода, если мышца в приоритете.',
+      });
+    }
+    if (over.length > 0) {
+      out.push({
+        id: 'over-mrv', tone: 'warn', icon: '🚧',
+        title: `Выше MRV: ${over.slice(0, 3).join(', ')}`,
+        detail: 'Объём за пределом восстановления — распределите подходы или запланируйте разгрузку.',
+      });
     }
   }
 
@@ -808,7 +827,7 @@ export function buildWorkoutInsights(s: WorkoutSummary): SummaryInsight[] {
     out.push({ id: 'prs', tone: 'good', icon: '🏆', title: `Рекордов: ${s.totals.prs}`, detail: 'Расчётный 1RM вырос — прогрессия идёт.' });
   }
 
-  return out.slice(0, 6);
+  return out.slice(0, 7);
 }
 
 // ───────────────────────────────────────────────────────────────────────────

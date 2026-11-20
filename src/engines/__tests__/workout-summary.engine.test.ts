@@ -202,6 +202,27 @@ describe('workout-summary: выводы', () => {
   it('на пустой сводке молчит', () => {
     expect(buildWorkoutInsights(buildWorkoutSummary([]))).toEqual([]);
   });
+
+  it('видит мышцы ниже MEV по недельному объёму', () => {
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map(d =>
+      mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    );
+    const ins = buildWorkoutInsights(buildWorkoutSummary(weeks), 'intermediate');
+    const under = ins.find(x => x.id === 'under-mev');
+    expect(under?.title).toMatch(/Ниже MEV/);
+    expect(under?.title).toMatch(/Грудь/);
+  });
+
+  it('видит мышцы выше MRV', () => {
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map(d =>
+      mkWorkout(d, [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 12 },
+        { name: 'Жим гантелей лёжа', id: 'bench_db', weight: 30, reps: 10, sets: 13 },
+      ]),
+    );
+    const ins = buildWorkoutInsights(buildWorkoutSummary(weeks), 'intermediate');
+    expect(ins.find(x => x.id === 'over-mrv')?.tone).toBe('warn');
+  });
 });
 
 describe('workout-summary: ориентиры объёма', () => {
