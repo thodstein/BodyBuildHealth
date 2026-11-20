@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { WorkoutSummaryReport, ReportBlockPicker } from '../WorkoutSummaryReport';
+import { resolveExerciseMeta } from '../../../../engines/workout-summary.engine';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
 import type { StrengthDiary } from '../../../engines/strength-diary.engine';
@@ -79,6 +80,9 @@ describe('WorkoutSummaryReport', () => {
     expect(text).toContain('план 3 → факт 2 (-1)');
     expect(text).toContain('пропущено: Тяга штанги в наклоне');
     expect(text).toContain('не по плану: Приседания со штангой');
+    // План → факт свёрнут по движениям: жим недобрал, тяга не сделана.
+    expect(text).toContain(`${resolveExerciseMeta({ name: 'Жим штанги лёжа' }).patternLabel}3 → 2`);
+    expect(text).toContain(`${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel}1 → 0`);
   });
 
   it('недобор плана виден в выводах', () => {

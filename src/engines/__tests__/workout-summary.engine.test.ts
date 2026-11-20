@@ -714,6 +714,35 @@ describe('workout-summary: план против факта', () => {
     expect(gap!.detail).toContain('пропущено: Тяга штанги в наклоне');
   });
 
+  it('сворачивает план по движениям', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }, { weight: 100, reps: 5 }] },
+      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }] },
+    ], actual());
+    // Факт: жим 2 подх, присед 1 подх, тяги не было.
+    const bench = resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern;
+    const squat = resolveExerciseMeta({ name: 'Приседания со штангой' }).pattern;
+    const row = resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).pattern;
+    expect(pva.patterns.find(p => p.pattern === bench)).toMatchObject({ plannedSets: 3, actualSets: 2, setsDelta: -1, setsPct: 66.7 });
+    expect(pva.patterns.find(p => p.pattern === squat)).toMatchObject({ plannedSets: 2, actualSets: 1, setsDelta: -1, setsPct: 50 });
+    // Движение в плане без факта: доля 0%, а не null — план был.
+    expect(pva.patterns.find(p => p.pattern === row)).toMatchObject({ plannedSets: 2, actualSets: 0, setsPct: 0 });
+    // Сортировка: сначала то, что планировали больше.
+    expect(pva.patterns[0].pattern).toBe(bench);
+  });
+
+  it('лишнее упражнение даёт движение «не по плану» с null-долей', () => {
+    const squat = resolveExerciseMeta({ name: 'Приседания со штангой' }).pattern;
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+    ], actual());
+    const row = pva.patterns.find(p => p.pattern === squat)!;
+    expect(row).toMatchObject({ plannedSets: 0, actualSets: 1, setsDelta: 1, setsPct: null });
+    // Сортировка: сначала то, что планировали больше.
+    expect(pva.patterns[0].pattern).toBe(resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern);
+  });
+
   it('выполненный план вывод не создаёт', () => {
     const summary = actual();
     const pva = comparePlanVsActual([
@@ -761,6 +790,8 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('План: 4 подх · факт: 6 подх (150%)');
     expect(txt).toContain('Жим штанги лёжа: план 4 → факт 3 (не добито)');
     expect(txt).toContain('Тяга верхнего блока: план 0 → факт 3 (не по плану)');
+    expect(txt).toContain('  По движениям:');
+    expect(txt).toContain(': 0 → 3 подх (не по плану)');
     expect(txt).toContain('Подходы:');
     expect(txt).toContain('80×8@2');
   });

@@ -1363,8 +1363,21 @@ export interface PlanVsActualRow {
   status: PlanRowStatus;
 }
 
+export interface PlanPatternRow {
+  pattern: string;
+  label: string;
+  plannedSets: number;
+  actualSets: number;
+  /** Факт минус план по подходам этого движения. */
+  setsDelta: number;
+  /** Доля от плана, % (null — движения не было в плане). */
+  setsPct: number | null;
+}
+
 export interface PlanVsActual {
   rows: PlanVsActualRow[];
+  /** План → факт, свёрнутый по движениям (паттернам). */
+  patterns: PlanPatternRow[];
   plannedSets: number;
   actualSets: number;
   plannedTonnageKg: number;
@@ -1468,12 +1481,34 @@ export function comparePlanVsActual(
     });
   });
 
+  // Свод по движениям: 3 подхода жима лёжа и 2 жима гантелей — это один
+  // «горизонтальный жим», и недобор по нему виден сразу, без чтения строк.
+  const byPattern = new Map<string, { label: string; planned: number; actual: number }>();
+  rows.forEach(r => {
+    const meta = resolveExerciseMeta({ name: r.name });
+    const acc = byPattern.get(meta.pattern) || { label: meta.patternLabel, planned: 0, actual: 0 };
+    acc.planned += r.plannedSets;
+    acc.actual += r.actualSets;
+    byPattern.set(meta.pattern, acc);
+  });
+  const patterns: PlanPatternRow[] = Array.from(byPattern.entries())
+    .map(([pattern, v]) => ({
+      pattern,
+      label: v.label,
+      plannedSets: v.planned,
+      actualSets: v.actual,
+      setsDelta: v.actual - v.planned,
+      setsPct: pctOf(v.actual, v.planned),
+    }))
+    .sort((a, b) => b.plannedSets - a.plannedSets || b.actualSets - a.actualSets);
+
   const plannedSets = rows.reduce((s, r) => s + r.plannedSets, 0);
   const actualSets = rows.reduce((s, r) => s + r.actualSets, 0);
   const plannedTonnageKg = rows.reduce((s, r) => s + r.plannedTonnageKg, 0);
   const actualTonnageKg = rows.reduce((s, r) => s + r.actualTonnageKg, 0);
   return {
     rows,
+    patterns,
     plannedSets,
     actualSets,
     plannedTonnageKg,
@@ -1572,6 +1607,13 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       const tone = r.status === 'unplanned' ? 'не по плану' : r.status === 'skipped' ? 'пропущено' : r.status === 'over' ? 'сверх плана' : 'не добито';
       lines.push(`  ${r.name}: план ${r.plannedSets} → факт ${r.actualSets} (${tone})`);
     });
+    const movedPatterns = pva.patterns.filter(p => p.setsDelta !== 0).slice(0, 5);
+    if (movedPatterns.length) {
+      lines.push('  По движениям:');
+      movedPatterns.forEach(p => lines.push(
+        `    ${p.label}: ${p.plannedSets} → ${p.actualSets} подх${p.setsPct != null ? ` (${p.setsPct}%)` : ' (не по плану)'}`,
+      ));
+    }
   }
 
   const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan);
