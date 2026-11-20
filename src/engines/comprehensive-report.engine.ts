@@ -14,7 +14,7 @@ import { analyzeMeasurements, loadMeasurements } from './log-analytics-progressi
 import { getExerciseById } from '../core/exercise-catalog';
 import { readRiskBridge } from './risk-bridge';
 import {
-  getLabNorm, LFT_ULN, GGT_ULN, CREATININE_ULN, UA_ULN, FEMALE_HORMONE_ULN, FEMALE_HORMONE_BANDS,
+  getLabNorm, LFT_ULN, UA_ULN, FEMALE_HORMONE_ULN, FEMALE_HORMONE_BANDS,
   HCT_THRESHOLDS, HGB_THRESHOLDS, LFT_STAGE_ULN, E2_PG_TO_PMOL, PRL_NG_TO_MIU,
 } from './lab-norms.engine';
 import { cycleState, phaseHormoneBand, phaseUnionBand, type CycleState, type PhaseHormone } from './female-cycle-phase.engine';
@@ -301,6 +301,33 @@ function femalePhaseRefs(marker: PhaseHormone, cycle: CycleState | null): { refL
 }
 
 /**
+ * Единица отчёта и единица резолвера — одна и та же шкала.
+ *
+ * Проход 165: отчёт печатает свою подпись единицы («µmol/L», «10⁹/L»,
+ * «µIU/mL»), а резолвер — UCUM-канон («umol/L», «10^9/L», «mIU/L»). Сравнивать
+ * строки как есть нельзя: одна и та же шкала записана по-разному. Приводим к
+ * ключу без регистра, значков и разделителей; активность mIU/L и µIU/mL — одна
+ * величина (1:1), поэтому они тоже равны.
+ */
+function sameUnit(reportUnit: string, resolverUnit: string): boolean {
+  const canon = (u: string) => String(u || '')
+    .toLowerCase()
+    .replace(/[µμ]/g, 'u')
+    .replace(/⁹/g, '9')
+    .replace(/\^/g, '')
+    .replace(/\s/g, '');
+  const a = canon(reportUnit);
+  const b = canon(resolverUnit);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // Единицы активности: mIU/L ≡ µIU/mL (обе — 10⁻³ МЕ на литр).
+  const act = (u: string) => (u === 'miu/l' || u === 'uiu/ml' ? 'uitre' : u);
+  // D-димер: мг/л и мкг/мл — одна концентрация (1 мг/л = 1 мкг/мл).
+  const mass = (u: string) => (u === 'mg/l' ? 'ugtre' : u === 'ug/ml' ? 'ugtre' : u);
+  return act(a) === act(b) || mass(a) === mass(b);
+}
+
+/**
  * Референсы отчёта по полу (проход 76) — из единственного резолвера норм.
  *
  * До него `gatherLabs` держала собственную таблицу (АЛТ/АСТ 40, ГГТ 60,
@@ -314,29 +341,22 @@ function femalePhaseRefs(marker: PhaseHormone, cycle: CycleState | null): { refL
  * объединением («лютеиновая 70–500 пг/мл» вместо «по фазе»). Нет даты — прежнее
  * объединение фаз.
  *
- * `null` — маркера нет в резолвере (электролиты, липиды, СРБ, Д-димер):
- * у них остаются прежние числа из таблицы.
+ * Проход 165: остальные маркеры больше не читают свою таблицу рядом с
+ * резолвером — норма берётся из `getLabNorm` (глюкоза 3.9–5.6 вместо 3.5–5.5,
+ * лейкоциты 4–9 вместо 4–10, Т4 свободный 10–19 вместо 10–22, ЛПВП 0.9–1.5
+ * вместо 1.0–2.5, инсулин 3–17 вместо 2.6–24.9, мочевина до 7.1 вместо 8.3).
+ * Число резолвера берётся только когда его единица — та же шкала, что подпись
+ * отчёта; иначе остаётся число таблицы (`null`), потому что мужские строки
+ * гормонов в отчёте записаны в других единицах (TT нмоль/л, E2 пмоль/л).
  */
-function sexRefs(code: string, sex: ReportSex, cycle: CycleState | null): { refLow?: number; refHigh?: number } | null {
+function sexRefs(
+  code: string,
+  sex: ReportSex,
+  cycle: CycleState | null,
+  markerCode?: string,
+  unit?: string,
+): { refLow?: number; refHigh?: number } | null {
   switch (code) {
-    case 'АЛТ':
-      return { refLow: 0, refHigh: LFT_ULN.ALT[sex] };
-    case 'АСТ':
-      return { refLow: 0, refHigh: LFT_ULN.AST[sex] };
-    case 'ГГТ':
-      return { refLow: 0, refHigh: GGT_ULN[sex] };
-    case 'Креатинин': {
-      const n = getLabNorm('CREATININE', sex);
-      return { refLow: n?.lln, refHigh: CREATININE_ULN[sex] };
-    }
-    case 'Гемоглобин': {
-      const n = getLabNorm('HGB', sex);
-      return { refLow: n?.lln, refHigh: n?.uln };
-    }
-    case 'Гематокрит': {
-      const n = getLabNorm('HCT', sex);
-      return { refLow: n?.lln, refHigh: n?.uln };
-    }
     case 'Пролактин': {
       // В резолвере PRL — в нг/мл (2–15), отчёт — в мМЕ/л: единицы разные.
       // Женская норма — из бэндов приложения (они уже в мМЕ/л), мужская — из
@@ -369,70 +389,70 @@ function sexRefs(code: string, sex: ReportSex, cycle: CycleState | null): { refL
       return sex === 'female' ? femalePhaseRefs('LH', cycle) : null;
     case 'ФСГ':
       return sex === 'female' ? femalePhaseRefs('FSH', cycle) : null;
-    // Мочевая кислота: ♂ 200–420 / ♀ 150–350 (женский протокол). Женщина с 380
-    // мкмоль/л читала «норма» по общему верху 420.
-    case 'Мочевая кислота': {
-      const n = getLabNorm('UA', sex);
-      return { refLow: n?.lln, refHigh: UA_ULN[sex] };
+    // Мочевая кислота: ♂ 200–420 / ♀ 150–350 (женский протокол) — из резолвера
+    // по полу, как и остальные маркеры ниже.
+    default: {
+      if (!markerCode) return null;
+      const n = getLabNorm(markerCode, sex);
+      if (!n || !sameUnit(unit ?? '', n.unit)) return null;
+      return { refLow: n.lln, refHigh: n.uln };
     }
-    default:
-      return null;
   }
 }
 
 function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', cycle: CycleState | null = null): ReportSection {
   const diary = getLabDiary();
 
-  const groups: Array<{ title: string; markers: Array<{ code: string; name: string; refLow?: number; refHigh?: number; unit: string }> }> = [
+  const groups: Array<{ title: string; markers: Array<{ code: string; marker: string; name: string; refLow?: number; refHigh?: number; unit: string }> }> = [
     { title: 'Печень', markers: [
-      { code: 'АЛТ', name: 'АЛТ', refLow: 0, refHigh: 40, unit: 'U/L' },
-      { code: 'АСТ', name: 'АСТ', refLow: 0, refHigh: 40, unit: 'U/L' },
-      { code: 'ГГТ', name: 'ГГТ', refLow: 0, refHigh: 60, unit: 'U/L' },
-      { code: 'Билирубин общий', name: 'Билирубин общий', refLow: 3, refHigh: 21, unit: 'µmol/L' },
+      { code: 'АЛТ', marker: 'ALT', name: 'АЛТ', refLow: 0, refHigh: 40, unit: 'U/L' },
+      { code: 'АСТ', marker: 'AST', name: 'АСТ', refLow: 0, refHigh: 40, unit: 'U/L' },
+      { code: 'ГГТ', marker: 'GGT', name: 'ГГТ', refLow: 0, refHigh: 60, unit: 'U/L' },
+      { code: 'Билирубин общий', marker: 'BIL', name: 'Билирубин общий', refLow: 3, refHigh: 21, unit: 'µmol/L' },
     ]},
     { title: 'Почки', markers: [
-      { code: 'Креатинин', name: 'Креатинин', refLow: 60, refHigh: 110, unit: 'µmol/L' },
-      { code: 'Мочевина', name: 'Мочевина', refLow: 2.5, refHigh: 8.3, unit: 'mmol/L' },
-      { code: 'СКФ', name: 'СКФ (GFR)', refLow: 90, refHigh: 120, unit: 'ml/min' },
+      { code: 'Креатинин', marker: 'CREATININE', name: 'Креатинин', refLow: 60, refHigh: 110, unit: 'µmol/L' },
+      { code: 'Мочевина', marker: 'UREA', name: 'Мочевина', refLow: 2.5, refHigh: 8.3, unit: 'mmol/L' },
+      { code: 'СКФ', marker: 'EGFR', name: 'СКФ (GFR)', refLow: 90, refHigh: 120, unit: 'ml/min' },
     ]},
     { title: 'Липиды', markers: [
-      { code: 'Холестерин общий', name: 'Холестерин общий', refHigh: 5.2, unit: 'mmol/L' },
-      { code: 'ЛПНП', name: 'ЛПНП', refLow: 0, refHigh: 3.0, unit: 'mmol/L' },
-      { code: 'ЛПВП', name: 'ЛПВП', refLow: 1.0, refHigh: 2.5, unit: 'mmol/L' },
-      { code: 'Триглицериды', name: 'Триглицериды', refLow: 0.3, refHigh: 1.7, unit: 'mmol/L' },
+      { code: 'Холестерин общий', marker: 'CHOL', name: 'Холестерин общий', refHigh: 5.2, unit: 'mmol/L' },
+      { code: 'ЛПНП', marker: 'LDL', name: 'ЛПНП', refLow: 0, refHigh: 3.0, unit: 'mmol/L' },
+      { code: 'ЛПВП', marker: 'HDL', name: 'ЛПВП', refLow: 1.0, refHigh: 2.5, unit: 'mmol/L' },
+      { code: 'Триглицериды', marker: 'TG', name: 'Триглицериды', refLow: 0.3, refHigh: 1.7, unit: 'mmol/L' },
     ]},
     { title: 'Гормоны', markers: [
-      { code: 'Тестостерон', name: 'Тестостерон', refLow: 10, refHigh: 35, unit: 'nmol/L' },
-      { code: 'Эстрадиол', name: 'Эстрадиол', refLow: 40, refHigh: 160, unit: 'pmol/L' },
-      { code: 'Пролактин', name: 'Пролактин', refLow: 80, refHigh: 400, unit: 'mIU/L' },
-      { code: 'ЛГ', name: 'ЛГ', refLow: 1.5, refHigh: 9.3, unit: 'IU/L' },
-      { code: 'ФСГ', name: 'ФСГ', refLow: 1.4, refHigh: 18.1, unit: 'IU/L' },
-      { code: 'ТТГ', name: 'ТТГ', refLow: 0.4, refHigh: 4.0, unit: 'mIU/L' },
-      { code: 'Свободный T4', name: 'Свободный T4', refLow: 10, refHigh: 22, unit: 'pmol/L' },
+      { code: 'Тестостерон', marker: 'TT', name: 'Тестостерон', refLow: 10, refHigh: 35, unit: 'nmol/L' },
+      { code: 'Эстрадиол', marker: 'E2', name: 'Эстрадиол', refLow: 40, refHigh: 160, unit: 'pmol/L' },
+      { code: 'Пролактин', marker: 'PRL', name: 'Пролактин', refLow: 80, refHigh: 400, unit: 'mIU/L' },
+      { code: 'ЛГ', marker: 'LH', name: 'ЛГ', refLow: 1.5, refHigh: 9.3, unit: 'IU/L' },
+      { code: 'ФСГ', marker: 'FSH', name: 'ФСГ', refLow: 1.4, refHigh: 18.1, unit: 'IU/L' },
+      { code: 'ТТГ', marker: 'TSH', name: 'ТТГ', refLow: 0.4, refHigh: 4.0, unit: 'mIU/L' },
+      { code: 'Свободный T4', marker: 'FT4', name: 'Свободный T4', refLow: 10, refHigh: 22, unit: 'pmol/L' },
     ]},
     { title: 'Кровь', markers: [
-      { code: 'Гемоглобин', name: 'Гемоглобин', refLow: 120, refHigh: 160, unit: 'g/L' },
-      { code: 'Гематокрит', name: 'Гематокрит', refLow: 36, refHigh: 50, unit: '%' },
-      { code: 'Лейкоциты', name: 'Лейкоциты', refLow: 4, refHigh: 10, unit: '10⁹/L' },
-      { code: 'Тромбоциты', name: 'Тромбоциты', refLow: 150, refHigh: 400, unit: '10⁹/L' },
+      { code: 'Гемоглобин', marker: 'HGB', name: 'Гемоглобин', refLow: 120, refHigh: 160, unit: 'g/L' },
+      { code: 'Гематокрит', marker: 'HCT', name: 'Гематокрит', refLow: 36, refHigh: 50, unit: '%' },
+      { code: 'Лейкоциты', marker: 'WBC', name: 'Лейкоциты', refLow: 4, refHigh: 10, unit: '10⁹/L' },
+      { code: 'Тромбоциты', marker: 'PLT', name: 'Тромбоциты', refLow: 150, refHigh: 400, unit: '10⁹/L' },
     ]},
     { title: 'Воспаление', markers: [
-      { code: 'СРБ', name: 'СРБ', refLow: 0, refHigh: 5, unit: 'mg/L' },
+      { code: 'СРБ', marker: 'CRP', name: 'СРБ', refLow: 0, refHigh: 5, unit: 'mg/L' },
     ]},
     { title: 'Метаболизм', markers: [
-      { code: 'Глюкоза', name: 'Глюкоза', refLow: 3.5, refHigh: 5.5, unit: 'mmol/L' },
-      { code: 'Инсулин', name: 'Инсулин', refLow: 2.6, refHigh: 24.9, unit: 'µIU/mL' },
-      { code: 'Мочевая кислота', name: 'Мочевая кислота', refLow: 210, refHigh: 420, unit: 'µmol/L' },
+      { code: 'Глюкоза', marker: 'GLU', name: 'Глюкоза', refLow: 3.5, refHigh: 5.5, unit: 'mmol/L' },
+      { code: 'Инсулин', marker: 'INS', name: 'Инсулин', refLow: 2.6, refHigh: 24.9, unit: 'mIU/L' },
+      { code: 'Мочевая кислота', marker: 'UA', name: 'Мочевая кислота', refLow: 210, refHigh: 420, unit: 'µmol/L' },
     ]},
     { title: 'Электролиты', markers: [
-      { code: 'Натрий', name: 'Натрий', refLow: 136, refHigh: 145, unit: 'mmol/L' },
-      { code: 'Калий', name: 'Калий', refLow: 3.5, refHigh: 5.1, unit: 'mmol/L' },
-      { code: 'Магний', name: 'Магний', refLow: 0.66, refHigh: 1.07, unit: 'mmol/L' },
-      { code: 'Кальций', name: 'Кальций', refLow: 2.1, refHigh: 2.55, unit: 'mmol/L' },
+      { code: 'Натрий', marker: 'NA', name: 'Натрий', refLow: 136, refHigh: 145, unit: 'mmol/L' },
+      { code: 'Калий', marker: 'K', name: 'Калий', refLow: 3.5, refHigh: 5.1, unit: 'mmol/L' },
+      { code: 'Магний', marker: 'MG', name: 'Магний', refLow: 0.66, refHigh: 1.07, unit: 'mmol/L' },
+      { code: 'Кальций', marker: 'CA', name: 'Кальций', refLow: 2.1, refHigh: 2.55, unit: 'mmol/L' },
     ]},
     { title: 'Свертываемость', markers: [
-      { code: 'Д-Димер', name: 'Д-Димер', refLow: 0, refHigh: 0.5, unit: 'mg/L' },
-      { code: 'Фибриноген', name: 'Фибриноген', refLow: 2, refHigh: 4, unit: 'g/L' },
+      { code: 'Д-Димер', marker: 'D_DIMER', name: 'Д-Димер', refLow: 0, refHigh: 0.5, unit: 'mg/L' },
+      { code: 'Фибриноген', marker: 'FIBRINOGEN', name: 'Фибриноген', refLow: 2, refHigh: 4, unit: 'g/L' },
     ]},
   ];
 
@@ -457,8 +477,10 @@ function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', c
       const compared = bound || prevBound
         ? { delta: null, deltaPct: null, trend: 'no_data' as const }
         : computeDelta(prevVal, current);
-      // Проход 76/77: числа референса — из резолвера по полу и фазе цикла.
-      const refs = sexRefs(marker.code, sex, cycle);
+      // Проход 76/77/165: числа референса — из резолвера по полу, фазе цикла и
+      // единице колонки; таблица группы — только запасной вариант для строк,
+      // которые записаны в других единицах (TT нмоль/л, E2 пмоль/л).
+      const refs = sexRefs(marker.code, sex, cycle, marker.marker, marker.unit);
 
       const m: ReportMetric = {
         label: marker.name, unit: marker.unit, prev: prevVal, current: current ?? 'Нет данных',

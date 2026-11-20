@@ -207,6 +207,69 @@ describe('сводный отчёт: пороги рекомендаций по 
   });
 });
 
+/**
+ * Проход 165: таблица `gatherLabs` была четвёртым реестром чисел — рядом с
+ * `UCUM_MAP`, резолвером и карточками. Маркеры, у которых подпись отчёта и
+ * единица резолвера — одна шкала, обязаны брать числа резолвера; строки в
+ * других единицах (TT нмоль/л, E2 пмоль/л) остаются как были.
+ */
+describe('сводный отчёт: референс — из резолвера, а не своя таблица', () => {
+  const NORM_LABS: Record<string, Array<{ date: string; value: number }>> = {
+    'Глюкоза': [{ date: '2026-11-10', value: 5.0 }],
+    'Лейкоциты': [{ date: '2026-11-10', value: 5.0 }],
+    'Свободный T4': [{ date: '2026-11-10', value: 15 }],
+    'ЛПВП': [{ date: '2026-11-10', value: 1.2 }],
+    'Инсулин': [{ date: '2026-11-10', value: 8 }],
+    'Мочевина': [{ date: '2026-11-10', value: 5 }],
+    'СРБ': [{ date: '2026-11-10', value: 2 }],
+    'Билирубин общий': [{ date: '2026-11-10', value: 10 }],
+    'ГГТ': [{ date: '2026-11-10', value: 30 }],
+    'АЛТ': [{ date: '2026-11-10', value: 20 }],
+    'Тестостерон': [{ date: '2026-11-10', value: 20 }],
+    'Эстрадиол': [{ date: '2026-11-10', value: 100 }],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.labs = NORM_LABS;
+    localStorage.removeItem('he_support_plan_result');
+    localStorage.removeItem('he_risk_bridge');
+  });
+
+  it('числа совпадают с `getLabNorm` (глюкоза, лейкоциты, Т4св, ЛПВП, инсулин, мочевина)', async () => {
+    const { labOf } = await reportFor('male');
+    for (const [label, code] of [
+      ['Глюкоза', 'GLU'], ['Лейкоциты', 'WBC'], ['Свободный T4', 'FT4'],
+      ['ЛПВП', 'HDL'], ['Инсулин', 'INS'], ['Мочевина', 'UREA'],
+    ] as const) {
+      const n = getLabNorm(code, 'male')!;
+      expect({ label, low: labOf(label).refLow, high: labOf(label).refHigh })
+        .toEqual({ label, low: n.lln, high: n.uln });
+    }
+  });
+
+  it('СРБ, билирубин, ГГТ и нижняя граница АЛТ — тоже резолвер', async () => {
+    const { labOf } = await reportFor('male');
+    expect(labOf('СРБ').refLow).toBe(getLabNorm('CRP', 'male')!.lln);
+    expect(labOf('Билирубин общий').refHigh).toBe(getLabNorm('BIL', 'male')!.uln);
+    expect(labOf('ГГТ').refHigh).toBe(getLabNorm('GGT', 'male')!.uln);
+    expect(labOf('АЛТ').refLow).toBe(getLabNorm('ALT', 'male')!.lln);
+  });
+
+  it('строки в других единицах остаются прежними (TT 10–35 нмоль/л, E2 40–160 пмоль/л)', async () => {
+    const { labOf } = await reportFor('male');
+    expect([labOf('Тестостерон').refLow, labOf('Тестостерон').refHigh]).toEqual([10, 35]);
+    expect([labOf('Эстрадиол').refLow, labOf('Эстрадиол').refHigh]).toEqual([40, 160]);
+  });
+
+  it('холестерин общий: верх из резолвера, нижняя граница резолвера — 0', async () => {
+    const { labOf } = await reportFor('male');
+    const n = getLabNorm('CHOL', 'male')!;
+    expect(labOf('Холестерин общий').refHigh).toBe(n.uln);
+    expect(labOf('Холестерин общий').refLow).toBe(n.lln);
+  });
+});
+
 describe('сводный отчёт: фазовая модель E2/ЛГ/ФСГ по дню цикла (проход 77)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
