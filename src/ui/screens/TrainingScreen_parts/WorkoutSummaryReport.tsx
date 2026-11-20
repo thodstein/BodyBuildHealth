@@ -244,7 +244,7 @@ export const WorkoutSummaryBody: React.FC<{
   const bestE1RM = summary.exercises.reduce((m, e) => Math.max(m, e.bestE1RM), 0);
   const topExercise = summary.exercises[0] || null;
   const topMuscle = summary.muscles[0] || null;
-  const insights = buildWorkoutInsights(summary, level);
+  const insights = buildWorkoutInsights(summary, level, comparison);
   const weeksCount = summaryWeeksCount(summary);
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
@@ -685,14 +685,15 @@ export const WorkoutSummaryReport: React.FC<{
     () => (selected.includes('sets') ? buildSetDetails(workouts) : []),
     [workouts, selected],
   );
+  // Сравнение считаем всегда, когда есть прошлый период: от него зависит не
+  // только блок «Сравнение», но и вывод про разгрузку в «Выводах».
   const comparison = React.useMemo(
     () => {
-      if (!selected.includes('compare')) return null;
       const list = (Array.isArray(previousWorkouts) ? previousWorkouts : []).filter(Boolean);
       if (list.length === 0) return null;
       return compareWorkoutSummaries(summary, buildWorkoutSummary(list));
     },
-    [selected, summary, previousWorkouts],
+    [summary, previousWorkouts],
   );
 
   return (

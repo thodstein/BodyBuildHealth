@@ -166,6 +166,32 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('→ 0%');
   });
 
+  it('вывод о разгрузке виден, когда объём упал к прошлому периоду', () => {
+    const withSets = (date: string, bench: number, squat: number): WorkoutLog => {
+      const w = mkWorkout(date);
+      const [b, s] = w.exercises as StrengthLogEntry[];
+      return {
+        ...w,
+        exercises: [
+          { ...b, sets: Array.from({ length: bench }, () => ({ weight: 80, reps: 8, rir: 2, rpe: 7 })) },
+          { ...s, sets: Array.from({ length: squat }, () => ({ weight: 100, reps: 5, rir: 2, rpe: 7 })) },
+        ] as StrengthLogEntry[],
+      };
+    };
+    const previous = [withSets('2026-11-02', 6, 6), withSets('2026-11-04', 6, 6)];
+    const current = [withSets('2026-11-09', 3, 3), withSets('2026-11-11', 3, 3)];
+    render(
+      <WorkoutSummaryReport
+        workouts={current}
+        blocks={['insights']}
+        previousWorkouts={previous}
+        previousLabel="прошлой неделей"
+      />,
+    );
+    expect(screen.getByText(/Похоже на разгрузку/)).toBeTruthy();
+    expect(screen.getByText(/просели 2 мышц/)).toBeTruthy();
+  });
+
   it('длинный список подходов раскрывается целиком', () => {
     const many: WorkoutLog[] = Array.from({ length: 45 }, (_, i) => {
       const d = new Date(Date.UTC(2026, 7, 1 + i));

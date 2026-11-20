@@ -359,6 +359,60 @@ describe('workout-summary: недельная динамика и интенси
     ]);
     expect(buildWorkoutInsights(s).some(i => i.id === 'mev-streak')).toBe(false);
   });
+
+  it('узнаёт разгрузку по сравнению с прошлым периодом', () => {
+    const previous = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 6 },
+      ]),
+      mkWorkout('2026-11-04', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 6 },
+      ]),
+    ]);
+    const current = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 },
+      ]),
+      mkWorkout('2026-11-11', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 },
+      ]),
+    ]);
+    const cmp = compareWorkoutSummaries(current, previous);
+    const deload = buildWorkoutInsights(current, 'intermediate', cmp).find(i => i.id === 'deload');
+    expect(deload).toBeTruthy();
+    expect(deload!.title).toContain('-50%');
+    expect(deload!.title).toContain('2 мышц');
+    expect(deload!.detail).toContain('Грудь');
+  });
+
+  it('не называет разгрузкой падение объёма у одной мышцы', () => {
+    const previous = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 6 },
+      ]),
+    ]);
+    const current = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 6 },
+      ]),
+    ]);
+    const cmp = compareWorkoutSummaries(current, previous);
+    expect(buildWorkoutInsights(current, 'intermediate', cmp).some(i => i.id === 'deload')).toBe(false);
+  });
+
+  it('без сравнения разгрузку не выдумывает', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    expect(buildWorkoutInsights(s).some(i => i.id === 'deload')).toBe(false);
+    expect(buildWorkoutInsights(s, 'intermediate', compareWorkoutSummaries(s, null)).some(i => i.id === 'deload')).toBe(false);
+  });
 });
 
 describe('workout-summary: прогрессия упражнений', () => {

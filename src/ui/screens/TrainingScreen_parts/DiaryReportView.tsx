@@ -202,23 +202,23 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push('Движения:');
       summary.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${fmtTon(p.tonnageKg)}`));
     }
-    const insights = buildWorkoutInsights(summary, hub.level);
+    const cmp = previousWorkouts.length > 0
+      ? compareWorkoutSummaries(summary, buildWorkoutSummary(previousWorkouts))
+      : null;
+    const insights = buildWorkoutInsights(summary, hub.level, cmp);
     if (insights.length) {
       lines.push('');
       lines.push('Выводы:');
       insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
     }
-    if (previousWorkouts.length > 0) {
-      const cmp = compareWorkoutSummaries(summary, buildWorkoutSummary(previousWorkouts));
-      if (!cmp.empty) {
-        const fmtDelta = (d: { delta: number; pct: number | null }) =>
-          `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
-        lines.push('');
-        lines.push(`Сравнение с ${previousLabel}:`);
-        lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
-        lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
-        lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
-      }
+    if (cmp && !cmp.empty) {
+      const fmtDelta = (d: { delta: number; pct: number | null }) =>
+        `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
+      lines.push('');
+      lines.push(`Сравнение с ${previousLabel}:`);
+      lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
+      lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
+      lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
     }
     if (summary.totals.weightlessSets > 0) {
       lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${summary.totals.weightlessSets} подх.`);

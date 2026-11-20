@@ -939,7 +939,7 @@ const signedPct = (pct: number): string => `${pct > 0 ? '+' : ''}${pct}%`;
  * выход за MEV/MRV по мышцам, плотность, RIR и рекорды. Правила молчат,
  * если данных мало — лучше пусто, чем выдуманный совет.
  */
-export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate'): SummaryInsight[] {
+export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', comparison?: SummaryComparison | null): SummaryInsight[] {
   const out: SummaryInsight[] = [];
   if (!s || !s.workouts) return out;
 
@@ -1090,6 +1090,28 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate'):
         icon: up ? '📈' : '📉',
         title: `${moved.label}: ${signedPct(moved.weeklyTrendPct)} подходов по неделям`,
         detail: `Было ${active[0]} → стало ${active[active.length - 1]} в неделю. ${up ? 'Объём растёт — проверьте, успевает ли мышца восстанавливаться.' : 'Объём снижается — нормально для разгрузки, но не для прогресса.'}`,
+      });
+    }
+  }
+
+  // Сравнение с прошлым равным периодом: объём упал не у одной мышцы, а у
+  // большинства — это либо плановая разгрузка, либо потерянные подходы.
+  if (comparison && !comparison.empty && comparison.metrics.sets.pct != null) {
+    const setsPct = comparison.metrics.sets.pct;
+    const tonnagePct = comparison.metrics.tonnage.pct;
+    const dropped = (comparison.muscles || [])
+      .filter(m => m.sets.previous >= 4 && m.sets.pct != null && m.sets.pct <= -20);
+    if (setsPct <= -20 && (tonnagePct == null || tonnagePct <= -20) && dropped.length >= 2) {
+      const worst = dropped
+        .slice()
+        .sort((a, b) => (a.sets.pct as number) - (b.sets.pct as number))
+        .slice(0, 3);
+      out.push({
+        id: 'deload',
+        tone: 'info',
+        icon: '🌙',
+        title: `Похоже на разгрузку: подходов ${signedPct(setsPct)}, просели ${dropped.length} мышц`,
+        detail: `${worst.map(m => `${m.label} ${signedPct(m.sets.pct as number)}`).join(', ')}. Если разгрузка плановая — так и надо; если нет, проверьте пропущенные подходы и урезанное время.`,
       });
     }
   }
