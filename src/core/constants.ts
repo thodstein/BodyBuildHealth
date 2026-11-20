@@ -466,6 +466,27 @@ export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: strin
   Copper: { amount: 0.9, unit: 'mg' }, Chromium: { amount: 35, unit: 'mcg' }
 } as const;
 
+// ── Один анализ — один набор чисел (проход 177) ──
+//
+// У части анализов в каталоге два написания кода: короткое (`K`, `NA`, `CA`,
+// `DBIL`, `HOMA`) и полное (`POTASSIUM`, `SODIUM`, `CALCIUM`, `DIRECT_BIL`,
+// `HOMAIR`). Это не два анализа: бланк один, норма одна. Но числа были
+// записаны дважды, и правка нормы в одном месте оставляла второе написание с
+// прежним числом — тот самый дефект «одна норма, два ответа».
+//
+// Числа живут здесь один раз, строки каталога их разделяют (`...RANGE_K`).
+// Двойники, у которых числа ОСТАЛИСЬ разными, выравнивать молча нельзя:
+// магний 1.1 против 1.0, фосфор 1.5 против 1.45, общий белок 60–80 против
+// 65–85, мочевая кислота низ 200 против 150 (плюс прогестерон, у которого
+// разные единицы) — это клинические решения, перечень в
+// `docs/LAB-NORMS-SINGLE-SOURCE.md` §4 и в гарде
+// `src/core/__tests__/ucum-same-name-single-range.test.ts`.
+const RANGE_K = { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5 } as const;
+const RANGE_NA = { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135 } as const;
+const RANGE_CA = { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1 } as const;
+const RANGE_DBIL = { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0 } as const;
+const RANGE_HOMA = { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0 } as const;
+
 // НОВЫЕ: Лабораторные маркеры (расширено до 30+)
 export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: number; lln: number; name: string }> & Record<string, any> = {
   'ALT': { prefUnit: 'U/L', coeff: 1, uln: 40, lln: 7, name: 'АЛТ' },
@@ -483,7 +504,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'HbA1c':{ prefUnit: '%', coeff: 1, uln: 5.7, lln: 4.0, name: 'Гликированный Hb' },
   'GLU': { prefUnit: 'mmol/L', coeff: 1, uln: 5.6, lln: 3.9, name: 'Глюкоза' },
   'INS': { prefUnit: 'mIU/L', coeff: 1, uln: 17, lln: 3, name: 'Инсулин' },
-  'HOMA':{ prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
+  'HOMA':{ ...RANGE_HOMA, name: 'HOMA-IR' },
   'LDL': { prefUnit: 'mmol/L', coeff: 1, uln: 3.0, lln: 1.0, name: 'ЛПНП' },
   'HDL': { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.9, name: 'ЛПВП' },
   'CHOL': { prefUnit: 'mmol/L', coeff: 1, uln: 5.2, lln: 0, name: 'Холестерин общий' },
@@ -507,11 +528,11 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'ALB':  { prefUnit: 'g/L', coeff: 1, uln: 50, lln: 35, name: 'Альбумин' },
   'TP':   { prefUnit: 'g/L', coeff: 1, uln: 80, lln: 60, name: 'Общий белок' },
   'BIL':  { prefUnit: 'umol/L', coeff: 1, uln: 17.1, lln: 3.4, name: 'Билирубин общий' },
-  'DBIL': { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0, name: 'Билирубин прямой' },
+  'DBIL': { ...RANGE_DBIL, name: 'Билирубин прямой' },
   'ALP':  { prefUnit: 'U/L', coeff: 1, uln: 130, lln: 40, name: 'Щёлочная фосфатаза' },
-  'K':    { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5, name: 'Калий' },
-  'NA':   { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135, name: 'Натрий' },
-  'CA':   { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1, name: 'Кальций' },
+  'K':    { ...RANGE_K, name: 'Калий' },
+  'NA':   { ...RANGE_NA, name: 'Натрий' },
+  'CA':   { ...RANGE_CA, name: 'Кальций' },
   'P':    { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.8, name: 'Фосфор' },
   'MG':   { prefUnit: 'mmol/L', coeff: 1, uln: 1.1, lln: 0.7, name: 'Магний' },
   'B12':  { prefUnit: 'pg/mL', coeff: 1, uln: 900, lln: 200, name: 'Витамин B12' },
@@ -526,7 +547,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'BNP': { prefUnit: 'pg/mL', coeff: 1, uln: 100, lln: 0, name: 'BNP' },
   'INR': { prefUnit: '', coeff: 1, uln: 1.2, lln: 0.8, name: 'МНО' },
   'APTT': { prefUnit: 'sec', coeff: 1, uln: 40, lln: 25, name: 'АЧТВ' },
-  'HOMAIR': { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0, name: 'HOMA-IR' },
+  'HOMAIR': { ...RANGE_HOMA, name: 'HOMA-IR' },
   'EGFR': { prefUnit: 'mL/min', coeff: 1, uln: 120, lln: 60, name: 'СКФ' },
   'UACR': { prefUnit: 'mg/g', coeff: 1, uln: 30, lln: 0, name: 'Альбумин/креатинин мочи' },
   // Проход 130: канон протеинурии — г/л. В репозитории жили два канона одного
@@ -591,10 +612,10 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'IGFBP3': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 2, name: 'ИФР-СБ3' },
   'GH': { prefUnit: 'ng/mL', coeff: 1, uln: 5, lln: 0.5, name: 'Гормон роста' },
   'INHIBIN_B': { prefUnit: 'pg/mL', coeff: 1, uln: 300, lln: 80, name: 'Ингибин B' },
-  'SODIUM': { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135, name: 'Натрий' },
-  'POTASSIUM': { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5, name: 'Калий' },
+  'SODIUM': { ...RANGE_NA, name: 'Натрий' },
+  'POTASSIUM': { ...RANGE_K, name: 'Калий' },
   'CHLORIDE': { prefUnit: 'mmol/L', coeff: 1, uln: 108, lln: 98, name: 'Хлор' },
-  'CALCIUM': { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1, name: 'Кальций' },
+  'CALCIUM': { ...RANGE_CA, name: 'Кальций' },
   'PHOSPHORUS': { prefUnit: 'mmol/L', coeff: 1, uln: 1.45, lln: 0.8, name: 'Фосфор' },
   'MAGNESIUM': { prefUnit: 'mmol/L', coeff: 1, uln: 1.0, lln: 0.7, name: 'Магний' },
   'COPPER': { prefUnit: 'umol/L', coeff: 1, uln: 30, lln: 10, name: 'Медь' },
@@ -607,7 +628,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'FRUCTOSAMINE': { prefUnit: 'umol/L', coeff: 1, uln: 285, lln: 205, name: 'Фруктозамин' },
   'CHOLINESTERASE': { prefUnit: 'U/L', coeff: 1, uln: 12000, lln: 5000, name: 'Холинэстераза' },
   'BILE_ACIDS': { prefUnit: 'umol/L', coeff: 1, uln: 10, lln: 0, name: 'Желчные кислоты' },
-  'DIRECT_BIL': { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0, name: 'Билирубин прямой' },
+  'DIRECT_BIL': { ...RANGE_DBIL, name: 'Билирубин прямой' },
   'TOTAL_PROTEIN': { prefUnit: 'g/L', coeff: 1, uln: 85, lln: 65, name: 'Общий белок' },
   'GLOBULIN': { prefUnit: 'g/L', coeff: 1, uln: 35, lln: 20, name: 'Глобулин' },
   'A_G_RATIO': { prefUnit: '', coeff: 1, uln: 2.0, lln: 1.1, name: 'А/Г коэффициент' },
