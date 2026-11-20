@@ -69,5 +69,18 @@ describe('RiskSpecMethod: единица бланка на экране риск
     // «втрое выше нормы 17».
     expect(container.textContent).toContain('INS: 10');
     expect(container.textContent).not.toContain('INS: 60');
+    // Проход 183: число подписано единицей расчёта, а не показано «голым».
+    expect(container.textContent).toContain('INS: 10 mIU/L');
+  });
+
+  it('индекс без единицы печатается без приписки', () => {
+    linked.current.labs = [
+      { code: 'HOMA', name: 'HOMA-IR', value: 2.4 },
+    ];
+    const { container } = render(<RiskSpecMethod />);
+    openInputs(container);
+    expect(container.textContent).toContain('HOMA: 2.4');
+    // Единицы у индекса нет и выдумывать её нельзя.
+    expect(container.textContent).not.toContain('HOMA: 2.4 ');
   });
 });

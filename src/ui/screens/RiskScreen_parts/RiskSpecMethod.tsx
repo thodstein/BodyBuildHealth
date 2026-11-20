@@ -653,11 +653,18 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
               </div>
               {labCount > 0 && !forceNoLabs && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {Object.entries(displayLabs).slice(0, 16).map(([code, val]) => (
-                    <span key={code} style={{ ...GlassChip, fontSize: 12, fontWeight:700, padding:'6px 10px', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)', color: '#fff' }}>
-                      {code}: {val}
-                    </span>
-                  ))}
+                  {Object.entries(displayLabs).slice(0, 16).map(([code, val]) => {
+                    // Проход 183: число без единицы читается неверно — HCT 45 и 0.45,
+                    // E2 45 пг/мл и 45 пмоль/л — разные клинические факты. Число показано
+                    // в единице расчёта, её и печатаем (`flatLabUnit`); у индексов без
+                    // единицы (HOMA-IR, INR) приписки нет.
+                    const unit = flatLabUnit(code);
+                    return (
+                      <span key={code} style={{ ...GlassChip, fontSize: 12, fontWeight:700, padding:'6px 10px', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)', color: '#fff' }}>
+                        {code}: {val}{unit ? ` ${unit}` : ''}
+                      </span>
+                    );
+                  })}
                   {Object.keys(displayLabs).length > 16 && (
                     <span style={{ fontSize: 12, color: '#fff', padding: '6px 0' }}>
                       +{Object.keys(displayLabs).length - 16} ещё
