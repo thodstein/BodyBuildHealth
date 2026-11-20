@@ -13,6 +13,8 @@ import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN,
 } from '../engines/lab-norms.engine';
+import { ucumInfo } from '../core/constants';
+import { unitsIncommensurable } from '../core/labs-mapping';
 
 export type Tier = 0 | 1 | 2 | 3;
 
@@ -288,6 +290,55 @@ export const TIER_MARKER_ALIAS: Record<string, string> = {
   // в `TIER_RULES` для него есть.
   APOB: 'APO_B',
 };
+
+/**
+ * Код склада → строка порогов (проход 180).
+ *
+ * `labSliceToValues` отдаёт коды склада/UCUM (`UA`, `GLU`, `TG`, `K`), а строки
+ * `LAB_TIERS` названы клиническими именами (`URIC_ACID`, `GLUCOSE`,
+ * `TRIGLYCERIDES`, `POTASSIUM`). Пока таблицы не было, `tierMarkerKey` знал
+ * только подписи формы и повторы, поэтому анализ из бланка молча не получал ни
+ * ступени, ни совета: мочевая кислота 500 мкмоль/л давала `deriveTier` = 0, и
+ * `computeTierAdjustments` не печатал ни строки.
+ *
+ * Запись добавляется только при ДОКАЗАННОМ равенстве единиц: единица каталога
+ * (`UCUM_MAP[code].prefUnit`) и единица строки обязаны быть одной величины
+ * (`unitsIncommensurable`). Два двойника этому не отвечают и сюда не внесены —
+ * числа их шкал пришлось бы толковать в чужой единице, а клинического
+ * источника на выбор единицы нет (`docs/LAB-NORMS-SINGLE-SOURCE.md`):
+ *   `CK_MB` — каталог в `ng/mL` (масса), строка в `U/L` (активность);
+ *   `FT` — каталог в `pg/mL` (масса), строка `FREE_TESTOSTERONE` в `nmol/L`.
+ */
+export const STORAGE_TIER_ALIAS: Record<string, string> = {
+  UA: 'URIC_ACID',
+  BIL: 'BILIRUBIN',
+  GLU: 'GLUCOSE',
+  TG: 'TRIGLYCERIDES',
+  CHOL: 'CHOLESTEROL_TOTAL',
+  K: 'POTASSIUM',
+  NA: 'SODIUM',
+  CA: 'CALCIUM',
+  MG: 'MAGNESIUM',
+  P: 'PHOSPHORUS',
+  VITD: 'VITAMIN_D',
+  HOMA: 'HOMAIR',
+  // `TROPONIN` в каталоге — тропонин I (`UCUM_MAP` 0.04 нг/мл, как у строки).
+  TROPONIN: 'TROPONIN_I',
+};
+
+// Ошибка на загрузке модуля, а не молчаливая ступень в чужой единице.
+for (const [code, row] of Object.entries(STORAGE_TIER_ALIAS)) {
+  const info = ucumInfo(code);
+  if (!info) throw new Error(`STORAGE_TIER_ALIAS: в UCUM_MAP нет записи ${code}`);
+  const tier = LAB_TIERS[row];
+  if (!tier) throw new Error(`STORAGE_TIER_ALIAS: в LAB_TIERS нет строки ${row} (код ${code})`);
+  if (unitsIncommensurable(info.prefUnit, tier.unit)) {
+    throw new Error(
+      `STORAGE_TIER_ALIAS: ${code} (${info.prefUnit}) и ${row} (${tier.unit}) — разные величины`,
+    );
+  }
+  TIER_MARKER_ALIAS[code] = row;
+}
 
 /** Имя маркёра в словаре лестниц (`LAB_TIERS`/`TIER_RULES`). */
 export function tierMarkerKey(marker: string): string {

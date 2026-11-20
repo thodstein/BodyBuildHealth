@@ -1274,7 +1274,10 @@ function extractLabValues(
   // panelCardiac: CK, CK-MB, Troponin
   if (num(card.CK) !== undefined) v['CK'] = num(card.CK)!;
   if (num(card['CK-MB']) !== undefined) v['CKMB'] = num(card['CK-MB'])!;
-  if (num(card['Troponin I']) !== undefined) v['TROP'] = num(card['Troponin I'])!;
+  // Проход 180: тропонин пишется кодом склада (`TROPONIN`), как в `UCUM_MAP`,
+  // мосте механизмов и лестницах. Раньше значение уходило в ключ `TROP`,
+  // которого не читал ни один контур: анализ вводился и молча исчезал.
+  if (num(card['Troponin I']) !== undefined) v['TROPONIN'] = num(card['Troponin I'])!;
 
   // panelInflammatory: IL-6, TNF-alpha
   if (num(infl['IL-6']) !== undefined) v['IL6'] = num(infl['IL-6'])!;
