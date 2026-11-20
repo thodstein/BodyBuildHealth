@@ -385,6 +385,31 @@ export const WorkoutSummaryBody: React.FC<{
           })()}
 
           {(() => {
+            const rows = comparison.patterns.filter(p => p.sets.delta !== 0).slice(0, compact ? 3 : 5);
+            if (rows.length === 0) return null;
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Подходы по движениям</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {rows.map(p => {
+                    const color = p.sets.delta > 0 ? '#22c55e' : '#ef4444';
+                    return (
+                      <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 2, background: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
+                        <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
+                        <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 46, textAlign: 'right' }}>{p.sets.previous} → {p.sets.current}</span>
+                        <span style={{ color, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>
+                          {`${p.sets.delta > 0 ? '+' : ''}${p.sets.delta} подх.`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {(() => {
             const rows = comparison.exercises.filter(e => e.e1rm.delta !== 0).slice(0, compact ? 4 : 6);
             if (rows.length === 0) return null;
             return (

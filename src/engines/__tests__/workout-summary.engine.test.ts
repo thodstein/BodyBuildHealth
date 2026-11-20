@@ -540,6 +540,16 @@ describe('workout-summary: рекорды и подходы без веса', ()
     expect(s.prs[0]).toMatchObject({ weight: 100, reps: 3, e1rm: 110, deltaPct: 4.8 });
   });
 
+  it('вывод о рекордах называет упражнение и новый e1RM', () => {
+    const s = buildWorkoutSummary([
+      wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])]),
+      wrap('2026-11-09', [mkEx('2026-11-09', 'Жим штанги лёжа', 'bench_bar', [{ weight: 100, reps: 3 }])]),
+    ]);
+    const prs = buildWorkoutInsights(s).find(i => i.id === 'prs');
+    expect(prs?.title).toBe('Рекордов: 1');
+    expect(prs?.detail).toContain('Жим штанги лёжа 110 кг');
+  });
+
   it('подходы без веса считаются, но не дают тоннажа', () => {
     const s = buildWorkoutSummary([
       wrap('2026-11-02', [

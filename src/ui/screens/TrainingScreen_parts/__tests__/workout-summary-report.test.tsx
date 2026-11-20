@@ -191,6 +191,21 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('без изменений');
   });
 
+  it('в сравнении видны и движения, а не только мышцы', () => {
+    const base = mkWorkout('2026-11-03');
+    const prevOnlyBench = { ...base, exercises: base.exercises.slice(0, 1) };
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-10')]}
+        blocks={['compare']}
+        previousWorkouts={[prevOnlyBench]}
+        previousLabel="прошлой тренировкой"
+      />,
+    );
+    expect(html).toContain('Подходы по движениям');
+    expect(html).toContain('+1 подх.');
+  });
+
   it('без предыдущего периода блок сравнения молчит', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['compare']} />);
     expect(html).not.toContain('Сравнение периодов');
@@ -324,6 +339,51 @@ describe('Дневник → Отчёт', () => {
       expect(all).toContain('подх/нед');
       expect(all).toMatch(/\+[1-9]\d*\/нед до MEV/);
       expect(all).toContain('Грудь');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { value: orig, configurable: true });
+    }
+  });
+
+  it('копируемый отчёт сравнивает движения с прошлой тренировкой', async () => {
+    const writes: string[] = [];
+    const orig = (navigator as any).clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (s: string) => { writes.push(s); return Promise.resolve(); } },
+      configurable: true,
+    });
+    const stubDiary = new Proxy({}, {
+      get: () => () => Promise.resolve([]),
+    }) as unknown as StrengthDiary;
+    const base = mkWorkout('2026-11-03');
+    // Последняя тренировка — только жим, но тяжелее: в прошлой был ещё и присед.
+    const benchOnly: WorkoutLog = {
+      ...base, id: 'w_bench', date: '2026-11-10',
+      exercises: [{
+        ...base.exercises[0],
+        id: '2026-11-10_bench',
+        date: '2026-11-10',
+        sets: [{ weight: 90, reps: 8, rir: 2, rpe: 7 }, { weight: 90, reps: 8, rir: 1, rpe: 8 }],
+        totalVolume: 1440,
+        estimated1RM: 114,
+      }] as StrengthLogEntry[],
+    };
+    try {
+      render(
+        <TrainingDiaryHub
+          {...baseProps}
+          diary={stubDiary}
+          historyWorkouts={[benchOnly, base]}
+          initialMode="summary"
+        />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Скопировано|Копировать отчёт/ }));
+      await Promise.resolve();
+      const txt = writes.join('\n');
+      expect(txt).toContain('Мышцы:');
+      expect(txt).toContain('Движения:');
+      expect(txt).toMatch(/→ 0 подх\. \(-1\)/);
+      expect(txt).toContain('e1RM по упражнениям:');
+      expect(txt).toContain('Жим штанги лёжа: 101 → 114 кг (+13)');
     } finally {
       Object.defineProperty(navigator, 'clipboard', { value: orig, configurable: true });
     }

@@ -225,6 +225,34 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
       lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
       lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
+      const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+      const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
+      if (movedMuscles.length) {
+        lines.push('  Мышцы:');
+        movedMuscles.forEach(m => {
+          lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`);
+        });
+      }
+      const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
+      if (movedPatterns.length) {
+        lines.push('  Движения:');
+        movedPatterns.forEach(p => {
+          lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`);
+        });
+      }
+      const movedE1rm = cmp.exercises
+        .filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0)
+        .slice(0, 5);
+      if (movedE1rm.length) {
+        lines.push('  e1RM по упражнениям:');
+        movedE1rm.forEach(e => {
+          lines.push(
+            e.e1rm.previous > 0
+              ? `    ${e.name}: ${e.e1rm.previous} → ${e.e1rm.current} кг (${signed(e.e1rm.delta)})`
+              : `    ${e.name}: новое · ${e.e1rm.current} кг`,
+          );
+        });
+      }
     }
     if (summary.totals.weightlessSets > 0) {
       lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${summary.totals.weightlessSets} подх.`);

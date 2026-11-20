@@ -1137,7 +1137,15 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
   }
 
   if (s.totals.prs > 0) {
-    out.push({ id: 'prs', tone: 'good', icon: '🏆', title: `Рекордов: ${s.totals.prs}`, detail: 'Расчётный 1RM вырос — прогрессия идёт.' });
+    // Не только «сколько рекордов», но и в чём: имя упражнения и новый e1RM.
+    const named = (s.prs || []).slice(0, 3).map(p => `${p.exercise} ${Math.round(p.e1rm)} кг`);
+    out.push({
+      id: 'prs',
+      tone: 'good',
+      icon: '🏆',
+      title: `Рекордов: ${s.totals.prs}`,
+      detail: `${named.length ? `${named.join(', ')}. ` : ''}Расчётный 1RM вырос — прогрессия идёт.`,
+    });
   }
 
   return out.slice(0, 7);
