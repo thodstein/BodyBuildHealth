@@ -76,7 +76,7 @@ export const WorkoutWeekCard: React.FC<{
           )}
         </div>
       </div>
-      {expanded && workouts.map(workout => (
+      {expanded && workouts.map((workout, wi) => (
         <div key={workout.id} className="ww-session" style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <span style={{ fontSize: 11, fontWeight: 600 }}>{new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })} · <span style={{ color: '#fff' }}>{workout.split || 'Тренировка'}</span>
@@ -162,8 +162,13 @@ export const WorkoutWeekCard: React.FC<{
                 workouts={[workout]}
                 title="Отчёт по тренировке"
                 storageKey="he_workout_report_blocks"
-                defaultBlocks={['totals', 'insights', 'muscles', 'exercises']}
+                defaultBlocks={['totals', 'compare', 'insights', 'muscles', 'exercises']}
                 level={level}
+                previousWorkouts={(() => {
+                  const prev = workouts[wi + 1] || (prevWorkouts && prevWorkouts[0]);
+                  return prev ? [prev] : [];
+                })()}
+                previousLabel="прошлой тренировкой"
                 compact
               />
             </div>

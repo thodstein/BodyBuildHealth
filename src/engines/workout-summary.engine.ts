@@ -219,6 +219,7 @@ export function resolveExerciseMeta(ex: { exerciseId?: string; exerciseName?: st
 export const REPORT_BLOCKS = [
   { id: 'totals', label: 'Общее' },
   { id: 'insights', label: 'Выводы' },
+  { id: 'compare', label: 'Сравнение' },
   { id: 'volume', label: 'Объём' },
   { id: 'muscles', label: 'Мышцы' },
   { id: 'exercises', label: 'Упражнения' },
@@ -250,6 +251,8 @@ export interface SummaryExercise {
   avgRPE: number | null;
   sharePct: number;
   sessions: number;
+  /** Подходы без внешнего веса (свой вес, резинка) — в тоннаж не входят. */
+  weightlessSets: number;
   /** Лучший e1RM по последним (до 12) тренировкам периода — для спарклайна. */
   e1rmSeries: number[];
   /** Прирост e1RM от первой к последней точке серии, % (null — меньше двух точек). */
@@ -327,6 +330,8 @@ export interface WorkoutSummaryTotals {
   prs: number;
   /** Уникальных дней с тренировкой (для «несколько тренировок»). */
   trainingDays: number;
+  /** Подходы без внешнего веса (свой вес) — тоннаж по ним не считается. */
+  weightlessSets: number;
 }
 
 export interface WorkoutSummary {
@@ -409,6 +414,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
     e1rmSeries: number[];
     /** Метка последней тренировки в серии — чтобы не дублировать одну и ту же. */
     seriesStamp: string;
+    /** Подходы без внешнего веса (свой вес). */
+    wlSets: number;
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string> }>();
@@ -458,6 +465,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       let exRirN = 0;
       let exRpeSum = 0;
       let exRpeN = 0;
+      let exWl = 0;
+      // Лучший подход по e1RM — именно он идёт в рекорд (вес и повторы из одного сета).
+      let exBestSetWeight = 0;
+      let exBestSetReps = 0;
 
       for (const st of setsArr) {
         const weight = setWeight(st);
@@ -466,6 +477,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
         exSets += 1;
         exReps += reps;
         exTonnage += weight * reps;
+        if (weight <= 0) exWl += 1;
         exBestWeight = Math.max(exBestWeight, weight);
         exBestReps = Math.max(exBestReps, reps);
         maxLoad = Math.max(maxLoad, weight);
@@ -475,19 +487,30 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
         if (rpeRaw != null && Number.isFinite(Number(rpeRaw))) { exRpeSum += Number(rpeRaw); exRpeN += 1; }
         if (weight > 0 && reps > 0) {
           const e1 = epley1RM(weight, reps);
-          if (e1 > exBestE1RM) exBestE1RM = e1;
-          const prev = bestBefore.get(name) || 0;
-          if (e1 > prev + 0.01) {
-            sPRs += 1;
-            prs.push({
-              exercise: name, weight, reps,
-              e1rm: Math.round(e1),
-              date,
-              deltaPct: prev > 0 ? Math.round(((e1 - prev) / prev) * 1000) / 10 : null,
-            });
-            bestBefore.set(name, e1);
+          if (e1 > exBestE1RM) {
+            exBestE1RM = e1;
+            exBestSetWeight = weight;
+            exBestSetReps = reps;
           }
         }
+      }
+
+      // Рекорд — рост над лучшим e1RM до этой сессии. Первая сессия периода —
+      // базовая точка, а не рекорд: иначе «рекордами» становится всё подряд.
+      if (exBestE1RM > 0) {
+        const prevBest = bestBefore.get(name) || 0;
+        if (prevBest > 0 && exBestE1RM > prevBest + 0.01) {
+          sPRs += 1;
+          prs.push({
+            exercise: name,
+            weight: exBestSetWeight,
+            reps: exBestSetReps,
+            e1rm: Math.round(exBestE1RM),
+            date,
+            deltaPct: Math.round(((exBestE1RM - prevBest) / prevBest) * 1000) / 10,
+          });
+        }
+        if (exBestE1RM > prevBest) bestBefore.set(name, exBestE1RM);
       }
 
       if (exSets === 0) continue;
@@ -506,6 +529,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
         rirSum: 0, rirN: 0, rpeSum: 0, rpeN: 0, sessions: new Set<string>(),
         e1rmSeries: [],
         seriesStamp: '',
+        wlSets: 0,
       };
       prev.sets += exSets;
       prev.reps += exReps;
@@ -526,6 +550,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       }
       prev.rirSum += exRirSum; prev.rirN += exRirN;
       prev.rpeSum += exRpeSum; prev.rpeN += exRpeN;
+      prev.wlSets += exWl;
       prev.sessions.add(w.id || date);
       exMap.set(key, prev);
 
@@ -585,6 +610,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       avgRPE: e.rpeN > 0 ? Math.round((e.rpeSum / e.rpeN) * 10) / 10 : null,
       sharePct: totalTonnage > 0 ? Math.round((e.tonnageKg / totalTonnage) * 1000) / 10 : 0,
       sessions: e.sessions.size,
+      weightlessSets: e.wlSets,
       e1rmSeries: e.e1rmSeries.slice(-12),
       progressPct: (() => {
         const s = e.e1rmSeries.slice(-12);
@@ -648,6 +674,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       avgRPE: totalRpeN > 0 ? Math.round((totalRpe / totalRpeN) * 10) / 10 : null,
       prs: prs.length,
       trainingDays: days.size,
+      weightlessSets: exercisesOut.reduce((a, e) => a + e.weightlessSets, 0),
     },
     exercises: exercisesOut,
     muscles: musclesOut,
@@ -703,6 +730,120 @@ export function formatSummaryPeriod(summary: WorkoutSummary): string {
   };
   if (summary.dateFrom === summary.dateTo) return fmt(summary.dateFrom);
   return `${fmt(summary.dateFrom)} — ${fmt(summary.dateTo)}`;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Сравнение с предыдущим периодом
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface MetricDelta {
+  current: number;
+  previous: number;
+  delta: number;
+  /** Изменение в %, null — сравнивать не с чем. */
+  pct: number | null;
+}
+
+export interface SummaryComparison {
+  /** true — предыдущий период пуст, дельт нет. */
+  empty: boolean;
+  metrics: {
+    sessions: MetricDelta;
+    sets: MetricDelta;
+    reps: MetricDelta;
+    tonnage: MetricDelta;
+    duration: MetricDelta;
+    density: MetricDelta;
+    prs: MetricDelta;
+  };
+  muscles: Array<{ muscle: MuscleKey; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
+  patterns: Array<{ pattern: string; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
+  exercises: Array<{ name: string; e1rm: MetricDelta; tonnage: MetricDelta }>;
+}
+
+const mkDelta = (current: number, previous: number): MetricDelta => {
+  const delta = Math.round((current - previous) * 10) / 10;
+  return { current, previous, delta, pct: previous > 0 ? Math.round((delta / previous) * 1000) / 10 : null };
+};
+
+/**
+ * Сравнение двух сводок (текущий период vs предыдущий равный). Считает дельты
+ * по объёму и движениям: тоннаж, подходы, повторы, плотность, рекорды, а также
+ * по мышцам, паттернам и e1RM упражнений. Мышцы/упражнения, которых не было в
+ * предыдущем периоде, показываются как новые (pct = null).
+ */
+export function compareWorkoutSummaries(current: WorkoutSummary, previous?: WorkoutSummary | null): SummaryComparison {
+  const empty = !previous || previous.workouts === 0;
+  const cur = current?.totals;
+  const prev = previous?.totals;
+
+  const metrics = {
+    sessions: mkDelta(cur?.sessions || 0, prev?.sessions || 0),
+    sets: mkDelta(cur?.sets || 0, prev?.sets || 0),
+    reps: mkDelta(cur?.reps || 0, prev?.reps || 0),
+    tonnage: mkDelta(cur?.tonnageKg || 0, prev?.tonnageKg || 0),
+    duration: mkDelta(cur?.durationMin || 0, prev?.durationMin || 0),
+    density: mkDelta(cur?.densityKgPerMin || 0, prev?.densityKgPerMin || 0),
+    prs: mkDelta(cur?.prs || 0, prev?.prs || 0),
+  };
+
+  const prevMuscles = new Map<MuscleKey, SummaryMuscle>((previous?.muscles || []).map(m => [m.muscle, m]));
+  const muscleKeys = new Set<MuscleKey>([
+    ...(current?.muscles || []).map(m => m.muscle),
+    ...(previous?.muscles || []).map(m => m.muscle),
+  ]);
+  const muscles = Array.from(muscleKeys)
+    .map(muscle => {
+      const c = (current?.muscles || []).find(m => m.muscle === muscle);
+      const p = prevMuscles.get(muscle);
+      return {
+        muscle,
+        label: MUSCLE_LABELS[muscle] || muscle,
+        sets: mkDelta(c?.sets || 0, p?.sets || 0),
+        tonnage: mkDelta(c?.tonnageKg || 0, p?.tonnageKg || 0),
+      };
+    })
+    .filter(m => m.sets.current > 0 || m.sets.previous > 0)
+    .sort((a, b) => (b.sets.current + b.sets.previous) - (a.sets.current + a.sets.previous));
+
+  const prevPatterns = new Map<string, SummaryPattern>((previous?.patterns || []).map(p => [p.pattern, p]));
+  const patternKeys = new Set<string>([
+    ...(current?.patterns || []).map(p => p.pattern),
+    ...(previous?.patterns || []).map(p => p.pattern),
+  ]);
+  const patterns = Array.from(patternKeys)
+    .map(pattern => {
+      const c = (current?.patterns || []).find(p => p.pattern === pattern);
+      const p = prevPatterns.get(pattern);
+      return {
+        pattern,
+        label: PATTERN_LABELS[pattern] || PATTERN_LABELS.other,
+        sets: mkDelta(c?.sets || 0, p?.sets || 0),
+        tonnage: mkDelta(c?.tonnageKg || 0, p?.tonnageKg || 0),
+      };
+    })
+    .filter(p => p.sets.current > 0 || p.sets.previous > 0)
+    .sort((a, b) => (b.sets.current + b.sets.previous) - (a.sets.current + a.sets.previous));
+
+  const prevExercises = new Map<string, SummaryExercise>((previous?.exercises || []).map(e => [e.name, e]));
+  const exerciseNames = new Set<string>([
+    ...(current?.exercises || []).map(e => e.name),
+    ...(previous?.exercises || []).map(e => e.name),
+  ]);
+  const exercises = Array.from(exerciseNames)
+    .map(name => {
+      const c = (current?.exercises || []).find(e => e.name === name);
+      const p = prevExercises.get(name);
+      return {
+        name,
+        e1rm: mkDelta(c?.bestE1RM || 0, p?.bestE1RM || 0),
+        tonnage: mkDelta(c?.tonnageKg || 0, p?.tonnageKg || 0),
+      };
+    })
+    .filter(e => e.e1rm.current > 0 || e.e1rm.previous > 0)
+    .sort((a, b) => (b.e1rm.current + b.e1rm.previous) - (a.e1rm.current + a.e1rm.previous));
+
+  return { empty, metrics, muscles, patterns, exercises };
 }
 
 // ───────────────────────────────────────────────────────────────────────────

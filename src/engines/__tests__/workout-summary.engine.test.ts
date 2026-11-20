@@ -3,6 +3,7 @@ import {
   buildWorkoutSummary,
   buildWorkoutInsights,
   buildSetDetails,
+  compareWorkoutSummaries,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -313,5 +314,109 @@ describe('workout-summary: прогрессия упражнений', () => {
     const ex = buildWorkoutSummary([w]).exercises[0];
     expect(ex.e1rmSeries).toEqual([]);
     expect(ex.progressPct).toBeNull();
+  });
+});
+
+describe('workout-summary: сравнение периодов', () => {
+  const previous = buildWorkoutSummary([
+    mkWorkout('2026-11-02', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3 },
+    ]),
+  ]);
+  const current = buildWorkoutSummary([
+    mkWorkout('2026-11-09', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 3 },
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
+    ]),
+  ]);
+
+  it('считает дельты объёма и движений', () => {
+    const c = compareWorkoutSummaries(current, previous);
+    expect(c.empty).toBe(false);
+    expect(c.metrics.sets).toEqual({ current: 5, previous: 6, delta: -1, pct: -16.7 });
+    expect(c.metrics.reps).toEqual({ current: 34, previous: 54, delta: -20, pct: -37 });
+    expect(c.metrics.tonnage).toEqual({ current: 3160, previous: 3720, delta: -560, pct: -15.1 });
+    expect(c.metrics.sessions).toEqual({ current: 1, previous: 1, delta: 0, pct: 0 });
+  });
+
+  it('видит пропавшие и новые мышцы', () => {
+    const c = compareWorkoutSummaries(current, previous);
+    const byMuscle = new Map(c.muscles.map(m => [m.muscle, m]));
+    expect(byMuscle.get('chest')?.sets.delta).toBe(0);
+    expect(byMuscle.get('chest')?.tonnage).toEqual({ current: 2160, previous: 1920, delta: 240, pct: 12.5 });
+    expect(byMuscle.get('back')?.sets).toEqual({ current: 0, previous: 3, delta: -3, pct: -100 });
+    expect(byMuscle.get('quads')?.sets).toEqual({ current: 2, previous: 0, delta: 2, pct: null });
+  });
+
+  it('сравнивает лучший e1RM по упражнениям', () => {
+    const c = compareWorkoutSummaries(current, previous);
+    const bench = c.exercises.find(e => e.name === 'Жим штанги лёжа');
+    expect(bench?.e1rm).toEqual({ current: 114, previous: 101, delta: 13, pct: 12.9 });
+    const squat = c.exercises.find(e => e.name === 'Приседания со штангой');
+    expect(squat?.e1rm).toEqual({ current: 117, previous: 0, delta: 117, pct: null });
+  });
+
+  it('без предыдущего периода помечает сравнение пустым', () => {
+    const c = compareWorkoutSummaries(current, null);
+    expect(c.empty).toBe(true);
+    expect(c.metrics.tonnage).toEqual({ current: 3160, previous: 0, delta: 3160, pct: null });
+    expect(c.muscles.every(m => m.sets.previous === 0)).toBe(true);
+  });
+});
+
+describe('workout-summary: рекорды и подходы без веса', () => {
+  const mkEx = (date: string, name: string, id: string, sets: Array<{ weight: number; reps: number }>): StrengthLogEntry => ({
+    id: `${date}_${id}`,
+    date,
+    exerciseId: id,
+    exerciseName: name,
+    isCompound: true,
+    weekNumber: 1,
+    sets: sets.map(s => ({ weight: s.weight, reps: s.reps, rir: 2, rpe: 7 })),
+    totalVolume: sets.reduce((a, s) => a + s.weight * s.reps, 0),
+    estimated1RM: 0,
+  });
+  const wrap = (date: string, exercises: StrengthLogEntry[]): WorkoutLog => ({
+    id: `w_${date}`,
+    date,
+    duration: 60,
+    exercises,
+    overallRPE: 7,
+    recoveryBefore: 4,
+    split: 'FullBody',
+  });
+
+  it('первая тренировка периода — база, а не рекорд', () => {
+    const s = buildWorkoutSummary([
+      wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 80, reps: 8 }])]),
+    ]);
+    expect(s.prs).toHaveLength(0);
+    expect(s.totals.prs).toBe(0);
+  });
+
+  it('один рекорд на упражнение за тренировку, вес и повторы из одного подхода', () => {
+    const s = buildWorkoutSummary([
+      wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])]),
+      wrap('2026-11-09', [mkEx('2026-11-09', 'Жим штанги лёжа', 'bench_bar', [
+        { weight: 100, reps: 3 }, { weight: 70, reps: 12 }, { weight: 60, reps: 15 },
+      ])]),
+    ]);
+    expect(s.prs).toHaveLength(1);
+    expect(s.prs[0]).toMatchObject({ weight: 100, reps: 3, e1rm: 110, deltaPct: 4.8 });
+  });
+
+  it('подходы без веса считаются, но не дают тоннажа', () => {
+    const s = buildWorkoutSummary([
+      wrap('2026-11-02', [
+        mkEx('2026-11-02', 'Подтягивания', 'pullup', [{ weight: 0, reps: 10 }, { weight: 0, reps: 8 }]),
+        mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }]),
+      ]),
+    ]);
+    expect(s.totals.weightlessSets).toBe(2);
+    expect(s.totals.tonnageKg).toBe(1280);
+    expect(s.totals.sets).toBe(4);
+    expect(s.exercises.find(e => e.name === 'Подтягивания')?.weightlessSets).toBe(2);
+    expect(s.exercises.find(e => e.name === 'Подтягивания')?.tonnageKg).toBe(0);
   });
 });

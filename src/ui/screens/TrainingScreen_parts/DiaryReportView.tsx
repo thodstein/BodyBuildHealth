@@ -13,11 +13,11 @@ import {
   buildWorkoutSummary,
   buildWorkoutInsights,
   buildSetDetails,
+  compareWorkoutSummaries,
   filterWorkoutsByRange,
   monthRange,
   weekRangeFor,
   formatSummaryPeriod,
-  type WorkoutSummary,
 } from '../../../engines/workout-summary.engine';
 import { WorkoutSummaryReport } from './WorkoutSummaryReport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -52,38 +52,6 @@ function workoutLabel(w: WorkoutLog): string {
   const exs = Array.isArray(w.exercises) ? w.exercises : [];
   return `${fmtDay(String(w.date || ''))} · ${w.split || 'Тренировка'} · ${fmtTon(exs.reduce((s, e) => s + (Number(e?.totalVolume) || 0), 0))}`;
 }
-
-/** Сравнение с предыдущим равным периодом (неделя/месяц) или прошлой тренировкой. */
-const ComparisonStrip: React.FC<{ current: WorkoutSummary; previous: WorkoutSummary; label: string }> = ({ current, previous, label }) => {
-  if (previous.workouts === 0) return null;
-  const rows = [
-    { label: 'Тренировок', cur: current.totals.sessions, prev: previous.totals.sessions, unit: '' },
-    { label: 'Подходов', cur: current.totals.sets, prev: previous.totals.sets, unit: '' },
-    { label: 'Повторов', cur: current.totals.reps, prev: previous.totals.reps, unit: '' },
-    { label: 'Тоннаж', cur: current.totals.tonnageKg, prev: previous.totals.tonnageKg, unit: 'кг' },
-  ];
-  return (
-    <div style={{ ...style.card, border: '1px solid rgba(96,165,250,0.18)' }}>
-      <div style={{ ...style.label, marginBottom: 6 }}>↔ Сравнение с {label}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(70px, 1fr))', gap: 6 }}>
-        {rows.map(r => {
-          const delta = r.cur - r.prev;
-          const pct = r.prev > 0 ? Math.round((delta / r.prev) * 100) : null;
-          const color = delta > 0 ? '#22c55e' : delta < 0 ? '#ef4444' : '#fff';
-          return (
-            <div key={r.label} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '5px 7px' }}>
-              <div style={{ fontSize: 8, color: '#fff', opacity: 0.8 }}>{r.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{fmtInt(r.cur)}{r.unit ? ` ${r.unit}` : ''}</div>
-              <div style={{ fontSize: 9, color, fontVariantNumeric: 'tabular-nums' }}>
-                {delta > 0 ? '+' : ''}{fmtInt(delta)}{pct != null ? ` (${pct > 0 ? '+' : ''}${pct}%)` : ''}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
 
 export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   const workouts = React.useMemo<WorkoutLog[]>(
@@ -149,36 +117,41 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
 
   const summary = React.useMemo(() => buildWorkoutSummary(selected), [selected]);
 
-  const previous = React.useMemo<WorkoutSummary | null>(() => {
-    if (selected.length === 0) return null;
+  const previousWorkouts = React.useMemo<WorkoutLog[]>(() => {
+    if (selected.length === 0) return [];
     if (scope === 'session') {
       const idx = workouts.findIndex(w => w.id === selected[0]?.id);
       const prev = idx >= 0 ? workouts[idx + 1] : null;
-      return prev ? buildWorkoutSummary([prev]) : null;
+      return prev ? [prev] : [];
     }
     if (scope === 'week' && range.from) {
-      const from = shiftIso(range.from, -7);
-      const to = shiftIso(range.to, -7);
-      const list = filterWorkoutsByRange(workouts, from, to);
-      return list.length > 0 ? buildWorkoutSummary(list) : null;
+      return filterWorkoutsByRange(workouts, shiftIso(range.from, -7), shiftIso(range.to, -7));
     }
     if (scope === 'month' && range.from) {
       const d = new Date(`${range.from}T00:00:00`);
       d.setMonth(d.getMonth() - 1);
       const prevYm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const r = monthRange(prevYm);
-      const list = filterWorkoutsByRange(workouts, r.from, r.to);
-      return list.length > 0 ? buildWorkoutSummary(list) : null;
+      return filterWorkoutsByRange(workouts, r.from, r.to);
     }
     if (scope === 'multi' && pickedIds.length > 0) {
       // предыдущие N тренировок до самой ранней выбранной
       const dates = selected.map(w => String(w.date || '').slice(0, 10)).sort();
       const earliest = dates[0];
-      const before = workouts.filter(w => String(w.date || '').slice(0, 10) < earliest).slice(0, Math.max(1, selected.length));
-      return before.length > 0 ? buildWorkoutSummary(before) : null;
+      return workouts
+        .filter(w => String(w.date || '').slice(0, 10) < earliest)
+        .slice(0, Math.max(1, selected.length));
     }
-    return null;
+    return [];
   }, [scope, workouts, selected, pickedIds.length, range]);
+
+  const previousLabel = scope === 'session'
+    ? 'прошлой тренировкой'
+    : scope === 'week'
+      ? 'прошлой неделей'
+      : scope === 'month'
+        ? 'прошлым месяцем'
+        : 'предыдущими тренировками';
 
   const visiblePickerWorkouts = React.useMemo(() => {
     const q = pickQuery.trim().toLowerCase();
@@ -214,8 +187,23 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push('Выводы:');
       insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
     }
+    if (previousWorkouts.length > 0) {
+      const cmp = compareWorkoutSummaries(summary, buildWorkoutSummary(previousWorkouts));
+      if (!cmp.empty) {
+        const fmtDelta = (d: { delta: number; pct: number | null }) =>
+          `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
+        lines.push('');
+        lines.push(`Сравнение с ${previousLabel}:`);
+        lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
+        lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
+        lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
+      }
+    }
+    if (summary.totals.weightlessSets > 0) {
+      lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${summary.totals.weightlessSets} подх.`);
+    }
     if (summary.workouts <= 3) {
-      const perSet = buildSetDetails(workouts);
+      const perSet = buildSetDetails(selected);
       if (perSet.length) {
         lines.push('');
         lines.push('Подходы:');
@@ -344,13 +332,13 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         )}
       </div>
 
-      {previous && <ComparisonStrip current={summary} previous={previous} label={scope === 'session' ? 'прошлой тренировкой' : scope === 'week' ? 'прошлой неделей' : scope === 'month' ? 'прошлым месяцем' : 'предыдущими тренировками'} />}
-
       <WorkoutSummaryReport
         workouts={selected}
         title="Сводный отчёт"
         storageKey="he_workout_report_blocks"
         level={hub.level}
+        previousWorkouts={previousWorkouts}
+        previousLabel={previousLabel}
       />
     </div>
   );

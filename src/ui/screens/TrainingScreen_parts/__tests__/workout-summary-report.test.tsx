@@ -53,6 +53,20 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('По мышцам');
   });
 
+  it('подходы без веса не попадают в тоннаж, но видны в отчёте', () => {
+    const pullupWorkout: WorkoutLog = {
+      ...mkWorkout('2026-11-12'),
+      exercises: [{
+        id: '2026-11-12_pullup', date: '2026-11-12', exerciseId: 'pullup', exerciseName: 'Подтягивания',
+        isCompound: true, weekNumber: 1,
+        sets: [{ weight: 0, reps: 10, rir: 2, rpe: 7 }, { weight: 0, reps: 8, rir: 1, rpe: 8 }],
+        totalVolume: 0, estimated1RM: 0,
+      }] as StrengthLogEntry[],
+    };
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[pullupWorkout]} blocks={['totals']} />);
+    expect(html).toContain('2 подх. без веса');
+  });
+
   it('пустая история даёт честное пустое состояние', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[]} />);
     expect(html).toContain('Нет данных для отчёта');
@@ -60,9 +74,28 @@ describe('WorkoutSummaryReport', () => {
 
   it('ReportBlockPicker рендерит чекбоксы всех блоков', () => {
     const html = renderToStaticMarkup(<ReportBlockPicker value={['totals']} onChange={() => {}} />);
-    ['Общее', 'Выводы', 'Объём', 'Мышцы', 'Упражнения', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
+    ['Общее', 'Выводы', 'Сравнение', 'Объём', 'Мышцы', 'Упражнения', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
       expect(html).toContain(label);
     });
+  });
+
+  it('блок сравнения показывает дельты к прошлому периоду', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-10', 'FullBody')]}
+        blocks={['compare']}
+        previousWorkouts={[mkWorkout('2026-11-03', 'FullBody')]}
+        previousLabel="прошлой неделей"
+      />,
+    );
+    expect(html).toContain('Сравнение периодов');
+    expect(html).toContain('прошлой неделей');
+    expect(html).toContain('без изменений');
+  });
+
+  it('без предыдущего периода блок сравнения молчит', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['compare']} />);
+    expect(html).not.toContain('Сравнение периодов');
   });
 
   it('блок «Подходы» показывает каждый подход с весом, повторами и RIR', () => {
@@ -115,6 +148,7 @@ describe('Дневник → Отчёт', () => {
     expect(html).toContain('Месяц');
     expect(html).toContain('Всё время');
     expect(html).toContain('Сводный отчёт');
+    expect(html).toContain('Сравнение периодов');
   });
 
   it('legacy-режим «reports» открывает новый отчёт, а не инструменты', () => {

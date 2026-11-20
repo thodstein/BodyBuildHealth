@@ -16,6 +16,7 @@ import {
   buildWorkoutSummary,
   buildWorkoutInsights,
   buildSetDetails,
+  compareWorkoutSummaries,
   formatSummaryPeriod,
   muscleLandmarksFor,
   summaryWeeksCount,
@@ -26,6 +27,8 @@ import {
   REPORT_BLOCKS,
   type ReportBlockId,
   type SetDetailSession,
+  type SummaryComparison,
+  type MetricDelta,
   type WorkoutSummary,
 } from '../../../engines/workout-summary.engine';
 
@@ -192,6 +195,23 @@ const Sparkline: React.FC<{ values: number[]; color?: string; width?: number; he
   );
 };
 
+/** Плитка дельты: текущее значение и изменение к прошлому периоду. */
+const DeltaChip: React.FC<{ label: string; d: MetricDelta; unit?: string }> = ({ label, d, unit }) => {
+  const color = d.delta === 0 ? 'rgba(255,255,255,0.7)' : d.delta > 0 ? '#22c55e' : '#ef4444';
+  const text = d.delta === 0
+    ? '= без изменений'
+    : `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ' · нет базы'}`;
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 9, padding: '6px 8px' }}>
+      <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.75 }}>{label}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
+        {fmtInt(d.current)}{unit ? ` ${unit}` : ''}
+      </div>
+      <div style={{ fontSize: 9, color, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{text}</div>
+    </div>
+  );
+};
+
 /* ─── Тело отчёта (без выбора блоков) ─── */
 export const WorkoutSummaryBody: React.FC<{
   summary: WorkoutSummary;
@@ -201,7 +221,11 @@ export const WorkoutSummaryBody: React.FC<{
   level?: string;
   /** Подходы «как есть» для блока «Подходы». */
   details?: SetDetailSession[];
-}> = ({ summary, blocks, compact, level = 'intermediate', details }) => {
+  /** Сравнение с предыдущим периодом (null — сравнивать не с чем). */
+  comparison?: SummaryComparison | null;
+  /** Подпись предыдущего периода: «прошлой неделей» и т.п. */
+  previousLabel?: string;
+}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel }) => {
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -236,7 +260,7 @@ export const WorkoutSummaryBody: React.FC<{
             <Tile label="Средний вес" value={t.avgLoadKg > 0 ? `${t.avgLoadKg} кг` : '—'} sub={t.maxLoadKg > 0 ? `макс ${t.maxLoadKg} кг` : undefined} />
             <Tile label="Лучший e1RM" value={bestE1RM > 0 ? `${fmtInt(bestE1RM)} кг` : '—'} sub={t.avgRIR != null ? `ср. RIR ${t.avgRIR}` : undefined} color="#f472b6" />
           </div>
-          {(topMuscle || t.prs > 0) && (
+          {(topMuscle || t.prs > 0 || t.weightlessSets > 0) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
               {topMuscle && (
                 <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', color: ACCENT }}>
@@ -251,6 +275,14 @@ export const WorkoutSummaryBody: React.FC<{
               {t.avgRPE != null && (
                 <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(96,165,250,0.10)', border: '1px solid rgba(96,165,250,0.22)', color: '#60a5fa' }}>
                   RPE в среднем {t.avgRPE}
+                </span>
+              )}
+              {t.weightlessSets > 0 && (
+                <span
+                  title="Подходы со своим весом (подтягивания, отжимания, планка) не дают внешней нагрузки, поэтому в тоннаж не входят"
+                  style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.28)', color: '#cbd5e1' }}
+                >
+                  ⚖️ {t.weightlessSets} подх. без веса — вне тоннажа
                 </span>
               )}
             </div>
@@ -276,6 +308,71 @@ export const WorkoutSummaryBody: React.FC<{
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ── СРАВНЕНИЕ ── */}
+      {has('compare') && comparison && !comparison.empty && (
+        <div style={CARD}>
+          <SectionTitle icon="↔" title="Сравнение периодов" hint={`с ${previousLabel || 'предыдущим равным периодом'}`} />
+          <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(92px, 1fr))', gap: 6 }}>
+            <DeltaChip label="Тоннаж, кг" d={comparison.metrics.tonnage} />
+            <DeltaChip label="Подходы" d={comparison.metrics.sets} />
+            <DeltaChip label="Повторы" d={comparison.metrics.reps} />
+            <DeltaChip label="Тренировки" d={comparison.metrics.sessions} />
+            {comparison.metrics.density.previous > 0 && <DeltaChip label="Плотность, кг/мин" d={comparison.metrics.density} />}
+          </div>
+
+          {(() => {
+            const rows = comparison.muscles.filter(m => m.sets.delta !== 0).slice(0, compact ? 4 : 8);
+            if (rows.length === 0) return null;
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Подходы по мышцам</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {rows.map(m => {
+                    const color = m.sets.delta > 0 ? '#22c55e' : '#ef4444';
+                    return (
+                      <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: 2, background: MUSCLE_COLORS[m.muscle] || ACCENT, flexShrink: 0 }} />
+                        <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                        <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 46, textAlign: 'right' }}>{m.sets.previous} → {m.sets.current}</span>
+                        <span style={{ color, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>
+                          {`${m.sets.delta > 0 ? '+' : ''}${m.sets.delta} подх.`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {(() => {
+            const rows = comparison.exercises.filter(e => e.e1rm.delta !== 0).slice(0, compact ? 4 : 6);
+            if (rows.length === 0) return null;
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Лучший e1RM по упражнениям, кг</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {rows.map(e => {
+                    const color = e.e1rm.delta > 0 ? '#22c55e' : '#ef4444';
+                    return (
+                      <div key={e.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                        <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                        <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right' }}>
+                          {e.e1rm.previous > 0 ? `${e.e1rm.previous} → ${e.e1rm.current}` : `новое · ${e.e1rm.current}`}
+                        </span>
+                        <span style={{ color: e.e1rm.previous > 0 ? color : '#60a5fa', fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>
+                          {e.e1rm.previous > 0 ? `${e.e1rm.delta > 0 ? '+' : ''}${e.e1rm.delta} кг` : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -506,7 +603,11 @@ export const WorkoutSummaryReport: React.FC<{
   showSelector?: boolean;
   /** Уровень спортсмена — для ориентиров MEV/MAV/MRV. */
   level?: string;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level }) => {
+  /** Тренировки предыдущего равного периода — для блока «Сравнение». */
+  previousWorkouts?: WorkoutLog[];
+  /** Как назвать предыдущий период: «прошлой неделей», «прошлым месяцем». */
+  previousLabel?: string;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -520,6 +621,15 @@ export const WorkoutSummaryReport: React.FC<{
   const details = React.useMemo(
     () => (selected.includes('sets') ? buildSetDetails(workouts) : []),
     [workouts, selected],
+  );
+  const comparison = React.useMemo(
+    () => {
+      if (!selected.includes('compare')) return null;
+      const list = (Array.isArray(previousWorkouts) ? previousWorkouts : []).filter(Boolean);
+      if (list.length === 0) return null;
+      return compareWorkoutSummaries(summary, buildWorkoutSummary(list));
+    },
+    [selected, summary, previousWorkouts],
   );
 
   return (
@@ -553,7 +663,7 @@ export const WorkoutSummaryReport: React.FC<{
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} />
     </div>
   );
 };
