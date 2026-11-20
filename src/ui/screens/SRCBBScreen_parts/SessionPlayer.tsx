@@ -39,7 +39,8 @@ import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-read
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
 import { WorkoutSummaryReport } from '../TrainingScreen_parts/WorkoutSummaryReport';
-import { sessionToWorkoutLog } from '../../../engines/workout-summary.engine';
+import { sessionToWorkoutLog, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL } from '../../../engines/workout-summary.engine';
+import { getVolumeLandmarks, checkVolumeStatus, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
@@ -1737,32 +1738,48 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                </div>
 );
             })()}
-            {/* Volume Landmarks (MEV/MAV/MRV) per muscle — инлайн в сессии */}
+            {/* Объём: план/факт за сессию + недельный ориентир из канонического движка */}
             {(() => {
-              const muscleSets: Record<string, number> = {};
-              day?.exercises?.forEach(ex => {
-                ex.targetSets.forEach(t => { muscleSets[ex.muscleGroup] = (muscleSets[ex.muscleGroup] || 0) + 1; });
+              const muscleSets: Record<string, { plan: number; done: number }> = {};
+              day?.exercises?.forEach((ex, ei) => {
+                const g = String(ex.muscleGroup || '').trim();
+                if (!g) return;
+                const acc = muscleSets[g] || { plan: 0, done: 0 };
+                ex.targetSets.forEach((_, si) => {
+                  acc.plan += 1;
+                  if (actual[keyFor(ei, si)]) acc.done += 1;
+                });
+                muscleSets[g] = acc;
               });
               const muscles = Object.keys(muscleSets);
               if (muscles.length === 0) return null;
+              // Сколько тренировочных дней в неделю — чтобы честно оценить недельный объём.
+              const trainingDays = Math.max(1, (Array.isArray(days) ? days : [])
+                .filter(d => Array.isArray(d?.exercises) && d.exercises.length > 0).length);
               return (
                 <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 6 }}>Volume Landmarks (MEV/MAV/MRV)</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', letterSpacing: 0.3, textTransform: 'uppercase' }}>Объём: сессия и ориентир недели</span>
+                    <span style={{ fontSize: 8.5, color: '#fff', opacity: 0.6 }}>≈{trainingDays} трен./нед · MEV/MAV/MRV по уровню</span>
+                  </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {muscles.map(m => {
-                      const sets = muscleSets[m];
-                      const mev = Math.max(4, Math.round(sets * 0.4));
-                      const mav = Math.max(6, Math.round(sets * 0.7));
-                      const mrv = Math.max(10, Math.round(sets * 1.2));
-                      let status = 'low', color = '#60a5fa';
-                      if (sets >= mrv) { status = 'over'; color = '#ef4444'; }
-                      else if (sets >= mav) { status = 'high'; color = '#f59e0b'; }
-                      else if (sets >= mev) { status = 'opt'; color = '#22c55e'; }
+                      const { plan, done } = muscleSets[m];
+                      const lm = getVolumeLandmarks('intermediate', m);
+                      const weekly = plan * trainingDays;
+                      const status = lm ? checkVolumeStatus(weekly, lm) : null;
+                      const color = status ? VOLUME_STATUS_COLOR[status] : '#60a5fa';
+                      const label = MUSCLE_LABELS[m as keyof typeof MUSCLE_LABELS] || MUSCLE_LABEL_RU[m] || m;
                       return (
-                        <span key={m} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontWeight: 800 }}>{m.slice(0,4).toUpperCase()}</span>
-                          <span style={{ fontWeight: 700 }}>{sets} с.</span>
-                          <span style={{ fontSize: 8, opacity: 0.7 }}>MEV {mev}·MAV {mav}·MRV {mrv}</span>
+                        <span key={m} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontWeight: 800 }}>{label}</span>
+                          <span style={{ fontWeight: 700 }}>{done}/{plan} подх.</span>
+                          {lm && status && (
+                            <>
+                              <span style={{ fontSize: 8, opacity: 0.8 }}>≈{weekly}/нед · {VOLUME_STATUS_LABEL[status]}</span>
+                              <span style={{ fontSize: 8, opacity: 0.6 }}>MEV {lm.mev}·MAV {lm.mav}·MRV {lm.mrv}</span>
+                            </>
+                          )}
                           <span style={{ width: 6, height: 6, borderRadius: 6, background: color, boxShadow: `0 0 6px ${color}` }} />
                         </span>
                       );
