@@ -10,11 +10,12 @@ import {
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise, localIsoDate,
   saveActiveSession, loadActiveSession, clearActiveSession, summarizeActiveSession,
+  loadSessions,
   type ActiveSession, type ActiveSessionSummary,
 } from '../../../engines/workout-logger.engine';
 import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput, type WarmupMode } from '../../../engines/warmup.engine';
 import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASONS, type CooldownInput } from '../../../engines/cooldown.engine';
-import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
+import { type WarmupBlock, type CooldownBlock, type WorkoutLog } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
 import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { useNativeWakeLock } from '../../native/useWakeLock';
@@ -194,6 +195,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
   const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  // История до текущей сессии: нужна для сравнения «с прошлой» и честных
+  // рекордов в «Итоге» — сама сессия из базы исключается.
+  const doneHistory = useMemo<WorkoutLog[]>(() => {
+    if (!done) return [];
+    try {
+      return loadSessions()
+        .filter(s => s.sessionId !== done.sessionId)
+        .map(sessionToWorkoutLog);
+    } catch {
+      return [];
+    }
+  }, [done]);
   // Незавершённая сессия из автосейва — живёт между закрытиями приложения.
   const [resumeFrom, setResumeFrom] = useState<ActiveSession | null>(() => {
     try { return loadActiveSession(); } catch { return null; }
@@ -2440,7 +2453,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 title="Сводка тренировки"
                 subtitle={`${done.focus || 'Тренировка'}${done.durationMin ? ` · ${done.durationMin} мин` : ''}`}
                 storageKey="he_workout_done_blocks"
-                defaultBlocks={['totals', 'insights', 'muscles', 'exercises', 'sets', 'prs']}
+                defaultBlocks={['totals', 'compare', 'insights', 'muscles', 'exercises', 'sets', 'prs']}
+                previousWorkouts={doneHistory.slice(0, 1)}
+                previousLabel="прошлой тренировкой"
+                baselineWorkouts={doneHistory}
               />
             </div>
           )}
