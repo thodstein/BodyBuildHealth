@@ -169,6 +169,10 @@ export const WorkoutWeekCard: React.FC<{
                   return prev ? [prev] : [];
                 })()}
                 previousLabel="прошлой тренировкой"
+                baselineWorkouts={[
+                  ...workouts.slice(wi + 1),
+                  ...(prevWorkouts || []),
+                ]}
                 compact
               />
             </div>

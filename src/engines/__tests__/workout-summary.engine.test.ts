@@ -406,6 +406,16 @@ describe('workout-summary: рекорды и подходы без веса', ()
     expect(s.prs[0]).toMatchObject({ weight: 100, reps: 3, e1rm: 110, deltaPct: 4.8 });
   });
 
+  it('с внешней базой рекорд виден и на первой тренировке периода', () => {
+    const baseline = [wrap('2026-10-26', [mkEx('2026-10-26', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])])];
+    const s = buildWorkoutSummary(
+      [wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 100, reps: 3 }])])],
+      baseline,
+    );
+    expect(s.prs).toHaveLength(1);
+    expect(s.prs[0]).toMatchObject({ weight: 100, reps: 3, e1rm: 110, deltaPct: 4.8 });
+  });
+
   it('подходы без веса считаются, но не дают тоннажа', () => {
     const s = buildWorkoutSummary([
       wrap('2026-11-02', [

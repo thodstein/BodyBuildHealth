@@ -607,7 +607,9 @@ export const WorkoutSummaryReport: React.FC<{
   previousWorkouts?: WorkoutLog[];
   /** Как назвать предыдущий период: «прошлой неделей», «прошлым месяцем». */
   previousLabel?: string;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel }) => {
+  /** История до периода — база для рекордов (чтобы одиночная тренировка знала прошлые e1RM). */
+  baselineWorkouts?: WorkoutLog[];
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -617,7 +619,7 @@ export const WorkoutSummaryReport: React.FC<{
       try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
     }
   };
-  const summary = React.useMemo(() => buildWorkoutSummary(workouts), [workouts]);
+  const summary = React.useMemo(() => buildWorkoutSummary(workouts, baselineWorkouts), [workouts, baselineWorkouts]);
   const details = React.useMemo(
     () => (selected.includes('sets') ? buildSetDetails(workouts) : []),
     [workouts, selected],

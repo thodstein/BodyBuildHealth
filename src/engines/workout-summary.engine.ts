@@ -400,7 +400,7 @@ export function filterWorkoutsByRange(workouts: WorkoutLog[], from: string, to: 
  * Сводка по набору тренировок (1..N). Одна тренировка → отчёт по тренировке,
  * несколько/неделя/месяц → агрегированный отчёт по периоду.
  */
-export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
+export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: WorkoutLog[]): WorkoutSummary {
   const list = (Array.isArray(workouts) ? workouts : [])
     .filter(Boolean)
     .slice()
@@ -425,6 +425,23 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
   const prs: SummaryPR[] = [];
   // Лучший e1RM по упражнению до текущего момента — для честных PR по периоду.
   const bestBefore = new Map<string, number>();
+  // Внешняя база (история до периода): иначе одиночная тренировка не знает,
+  // что было раньше, и «рекорды» либо пропадают, либо выдумываются.
+  for (const bw of (Array.isArray(baselineWorkouts) ? baselineWorkouts : [])) {
+    const baseExercises = (Array.isArray(bw?.exercises) ? bw.exercises : []) as LooseExercise[];
+    for (const ex of baseExercises) {
+      if (!ex) continue;
+      const baseName = String(ex.exerciseName || ex.name || ex.exerciseId || '').trim();
+      if (!baseName) continue;
+      let baseBest = 0;
+      for (const st of (Array.isArray(ex.sets) ? ex.sets : []) as LooseSet[]) {
+        const w = setWeight(st);
+        const r = setReps(st);
+        if (w > 0 && r > 0) baseBest = Math.max(baseBest, epley1RM(w, r));
+      }
+      if (baseBest > 0) bestBefore.set(baseName, Math.max(bestBefore.get(baseName) || 0, baseBest));
+    }
+  }
 
   let totalSets = 0;
   let totalReps = 0;

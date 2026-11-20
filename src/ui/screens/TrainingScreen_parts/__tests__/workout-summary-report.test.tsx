@@ -53,6 +53,23 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('По мышцам');
   });
 
+  it('с историей до периода показывает рекорды даже за одну тренировку', () => {
+    const stronger: WorkoutLog = {
+      ...mkWorkout('2026-11-10'),
+      exercises: [{
+        id: '2026-11-10_bench', date: '2026-11-10', exerciseId: 'bench_bar', exerciseName: 'Жим штанги лёжа',
+        isCompound: true, weekNumber: 1,
+        sets: [{ weight: 85, reps: 8, rir: 2, rpe: 8 }],
+        totalVolume: 680, estimated1RM: 108,
+      }] as StrengthLogEntry[],
+    };
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[stronger]} blocks={['prs']} baselineWorkouts={[mkWorkout('2026-11-01')]} />);
+    expect(html).toContain('Рекорды периода');
+
+    const noBase = renderToStaticMarkup(<WorkoutSummaryReport workouts={[stronger]} blocks={['prs']} />);
+    expect(noBase).not.toContain('Рекорды периода');
+  });
+
   it('подходы без веса не попадают в тоннаж, но видны в отчёте', () => {
     const pullupWorkout: WorkoutLog = {
       ...mkWorkout('2026-11-12'),

@@ -153,6 +153,19 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         ? 'прошлым месяцем'
         : 'предыдущими тренировками';
 
+  /**
+   * База для рекордов — вся история старше периода. Без неё одиночная
+   * тренировка не знает прошлых e1RM и блок «Рекорды» всегда пустой.
+   */
+  const baselineWorkouts = React.useMemo<WorkoutLog[]>(() => {
+    if (selected.length === 0 || scope === 'all') return [];
+    const dates = selected.map(w => String(w.date || '').slice(0, 10)).filter(Boolean).sort();
+    if (dates.length === 0) return [];
+    const earliest = dates[0];
+    const ids = new Set(selected.map(w => w.id));
+    return workouts.filter(w => !ids.has(w.id) && String(w.date || '').slice(0, 10) < earliest);
+  }, [scope, workouts, selected]);
+
   const visiblePickerWorkouts = React.useMemo(() => {
     const q = pickQuery.trim().toLowerCase();
     const base = q
@@ -339,6 +352,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         level={hub.level}
         previousWorkouts={previousWorkouts}
         previousLabel={previousLabel}
+        baselineWorkouts={baselineWorkouts}
       />
     </div>
   );
