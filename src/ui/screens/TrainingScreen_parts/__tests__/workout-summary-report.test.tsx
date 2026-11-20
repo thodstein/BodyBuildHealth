@@ -189,6 +189,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('Сравнение периодов');
     expect(html).toContain('прошлой неделей');
     expect(html).toContain('без изменений');
+    expect(html).toContain('Средний RIR');
+    expect(html).toContain('Время, мин');
   });
 
   it('в сравнении видны и движения, а не только мышцы', () => {
@@ -384,6 +386,8 @@ describe('Дневник → Отчёт', () => {
       expect(txt).toMatch(/→ 0 подх\. \(-1\)/);
       expect(txt).toContain('e1RM по упражнениям:');
       expect(txt).toContain('Жим штанги лёжа: 101 → 114 кг (+13)');
+      expect(txt).toContain('Время: 60 мин');
+      expect(txt).toContain('Средний RIR:');
     } finally {
       Object.defineProperty(navigator, 'clipboard', { value: orig, configurable: true });
     }

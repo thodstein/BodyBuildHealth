@@ -225,6 +225,14 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
       lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
       lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
+      if (cmp.metrics.duration.previous > 0) {
+        lines.push(`  Время: ${fmtInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
+      }
+      if (cmp.metrics.rir) {
+        const r = cmp.metrics.rir;
+        const fmtRir = (n: number) => String(Math.round(n * 10) / 10);
+        lines.push(`  Средний RIR: ${fmtRir(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtRir(r.delta)}`);
+      }
       const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
       const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
       if (movedMuscles.length) {

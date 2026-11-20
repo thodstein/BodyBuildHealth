@@ -487,6 +487,19 @@ describe('workout-summary: сравнение периодов', () => {
     expect(c.metrics.tonnage).toEqual({ current: 3160, previous: 0, delta: 3160, pct: null });
     expect(c.muscles.every(m => m.sets.previous === 0)).toBe(true);
   });
+
+  it('сравнивает средний RIR, а без записи молчит', () => {
+    const prev = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 3 }]),
+    ]);
+    const cur = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 1 }]),
+    ]);
+    const c = compareWorkoutSummaries(cur, prev);
+    expect(c.metrics.rir).toEqual({ current: 1, previous: 3, delta: -2, pct: -66.7 });
+    expect(compareWorkoutSummaries(cur, null).metrics.rir).toBeNull();
+    expect(compareWorkoutSummaries(prev, prev).metrics.rir).toEqual({ current: 3, previous: 3, delta: 0, pct: 0 });
+  });
 });
 
 describe('workout-summary: рекорды и подходы без веса', () => {

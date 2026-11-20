@@ -826,6 +826,8 @@ export interface SummaryComparison {
     duration: MetricDelta;
     density: MetricDelta;
     prs: MetricDelta;
+    /** Средний RIR: null — в одном из периодов RIR не записан. */
+    rir: MetricDelta | null;
   };
   muscles: Array<{ muscle: MuscleKey; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
   patterns: Array<{ pattern: string; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
@@ -848,6 +850,8 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
   const cur = current?.totals;
   const prev = previous?.totals;
 
+  const curRIR = cur?.avgRIR;
+  const prevRIR = prev?.avgRIR;
   const metrics = {
     sessions: mkDelta(cur?.sessions || 0, prev?.sessions || 0),
     sets: mkDelta(cur?.sets || 0, prev?.sets || 0),
@@ -856,6 +860,8 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
     duration: mkDelta(cur?.durationMin || 0, prev?.durationMin || 0),
     density: mkDelta(cur?.densityKgPerMin || 0, prev?.densityKgPerMin || 0),
     prs: mkDelta(cur?.prs || 0, prev?.prs || 0),
+    // RIR — не объём: без записи хотя бы в одном периоде дельту не выдумываем.
+    rir: curRIR != null && prevRIR != null ? mkDelta(curRIR, prevRIR) : null,
   };
 
   const prevMuscles = new Map<MuscleKey, SummaryMuscle>((previous?.muscles || []).map(m => [m.muscle, m]));

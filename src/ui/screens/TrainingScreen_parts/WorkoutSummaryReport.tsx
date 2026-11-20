@@ -206,16 +206,19 @@ const Sparkline: React.FC<{ values: number[]; color?: string; width?: number; he
 };
 
 /** Плитка дельты: текущее значение и изменение к прошлому периоду. */
-const DeltaChip: React.FC<{ label: string; d: MetricDelta; unit?: string }> = ({ label, d, unit }) => {
-  const color = d.delta === 0 ? 'rgba(255,255,255,0.7)' : d.delta > 0 ? '#22c55e' : '#ef4444';
+const DeltaChip: React.FC<{ label: string; d: MetricDelta; unit?: string; neutral?: boolean; decimals?: boolean }> = ({ label, d, unit, neutral = false, decimals = false }) => {
+  const color = d.delta === 0 || neutral
+    ? 'rgba(255,255,255,0.7)'
+    : d.delta > 0 ? '#22c55e' : '#ef4444';
+  const fmtNum = (n: number) => (decimals ? String(Math.round(n * 10) / 10) : fmtInt(n));
   const text = d.delta === 0
     ? '= без изменений'
-    : `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ' · нет базы'}`;
+    : `${d.delta > 0 ? '+' : ''}${fmtNum(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ' · нет базы'}`;
   return (
     <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 9, padding: '6px 8px' }}>
       <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.75 }}>{label}</div>
       <div style={{ fontSize: 12.5, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>
-        {fmtInt(d.current)}{unit ? ` ${unit}` : ''}
+        {fmtNum(d.current)}{unit ? ` ${unit}` : ''}
       </div>
       <div style={{ fontSize: 9, color, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{text}</div>
     </div>
@@ -357,6 +360,8 @@ export const WorkoutSummaryBody: React.FC<{
             <DeltaChip label="Повторы" d={comparison.metrics.reps} />
             <DeltaChip label="Тренировки" d={comparison.metrics.sessions} />
             {comparison.metrics.density.previous > 0 && <DeltaChip label="Плотность, кг/мин" d={comparison.metrics.density} />}
+            {comparison.metrics.duration.previous > 0 && <DeltaChip label="Время, мин" d={comparison.metrics.duration} />}
+            {comparison.metrics.rir && <DeltaChip label="Средний RIR" d={comparison.metrics.rir} neutral decimals />}
           </div>
 
           {(() => {
