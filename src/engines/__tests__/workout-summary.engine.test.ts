@@ -4,6 +4,7 @@ import {
   buildWorkoutInsights,
   buildSetDetails,
   compareWorkoutSummaries,
+  comparePlanVsActual,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -597,5 +598,82 @@ describe('workout-summary: что делать с объёмом мышцы', ()
     expect(below!.hint).toContain('Показана одна тренировка');
     expect(volumeAdvice(lm(24, 8, 14, 20, 'exceeding_mrv'), false)?.chip).toBe('−4');
     expect(volumeAdvice(lm(12, 8, 14, 20, 'optimal'), false)?.chip).toBe('запас +8 до MRV');
+  });
+});
+
+describe('workout-summary: план против факта', () => {
+  const actual = () => buildWorkoutSummary([
+    mkWorkout('2026-11-03', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 },
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1 },
+    ]),
+  ]);
+
+  it('совпадение с планом — всё «по плану»', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+    ], actual());
+    expect(pva.rows.every(r => r.status === 'done')).toBe(true);
+    expect(pva.setsPct).toBe(100);
+    expect(pva.tonnagePct).toBe(100);
+    expect(pva.plannedSets).toBe(3);
+    expect(pva.actualSets).toBe(3);
+    expect(pva.empty).toBe(false);
+  });
+
+  it('недобор подходов — «не добито» и минус в дельте', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+    ], actual());
+    const row = pva.rows.find(r => r.name === 'Жим штанги лёжа')!;
+    expect(row.status).toBe('under');
+    expect(row.setsDelta).toBe(-1);
+    expect(row.setsPct).toBe(66.7);
+  });
+
+  it('упражнение из плана не сделано — «пропущено» и в списке', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }] },
+    ], actual());
+    expect(pva.skipped).toEqual(['Тяга штанги в наклоне']);
+    const row = pva.rows[0];
+    expect(row.status).toBe('skipped');
+    expect(row.actualSets).toBe(0);
+    expect(row.setsPct).toBe(0);
+    expect(row.actualTonnageKg).toBe(0);
+  });
+
+  it('лишнее упражнение — «не по плану», выполнение выше 100%', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+    ], actual());
+    expect(pva.unplanned).toEqual(['Приседания со штангой']);
+    expect(pva.rows.find(r => r.name === 'Приседания со штангой')?.setsPct).toBeNull();
+    expect(pva.plannedSets).toBe(2);
+    expect(pva.actualSets).toBe(3);
+    expect(pva.setsPct).toBe(150);
+  });
+
+  it('склеивает названия по регистру и ё/е', () => {
+    const pva = comparePlanVsActual([
+      { name: 'жим штанги лежа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+    ], actual());
+    expect(pva.unplanned).toEqual([]);
+    const row = pva.rows[0];
+    expect(row.status).toBe('done');
+    expect(row.name).toBe('жим штанги лежа');
+    expect(row.actualSets).toBe(2);
+    expect(pva.skipped).toEqual([]);
+  });
+
+  it('без плана молчит и не выдумывает проценты', () => {
+    const pva = comparePlanVsActual(null, actual());
+    expect(pva.empty).toBe(true);
+    expect(pva.rows.every(r => r.status === 'unplanned')).toBe(true);
+    expect(pva.setsPct).toBeNull();
+    expect(pva.tonnagePct).toBeNull();
+    expect(comparePlanVsActual([], actual()).plannedSets).toBe(0);
   });
 });

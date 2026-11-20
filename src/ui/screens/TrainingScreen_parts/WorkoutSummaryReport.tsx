@@ -20,18 +20,25 @@ import {
   formatSummaryPeriod,
   muscleLandmarksFor,
   volumeAdvice,
+  comparePlanVsActual,
   summaryWeeksCount,
   MUSCLE_COLORS,
+  PLAN_ROW_COLOR,
+  PLAN_ROW_LABEL,
   VOLUME_STATUS_COLOR,
   VOLUME_STATUS_LABEL,
   ALL_REPORT_BLOCKS,
   REPORT_BLOCKS,
+  type PlannedExerciseInput,
+  type PlanVsActual,
+  type PlanVsActualRow,
   type ReportBlockId,
   type SetDetailSession,
   type SummaryComparison,
   type MetricDelta,
   type WorkoutSummary,
 } from '../../../engines/workout-summary.engine';
+import { normalizeExerciseName } from '../../../engines/set-intensity.engine';
 
 const ACCENT = '#00e68a';
 /** Сколько тренировок в блоке «Все подходы» показывать до раскрытия. */
@@ -228,11 +235,19 @@ export const WorkoutSummaryBody: React.FC<{
   comparison?: SummaryComparison | null;
   /** Подпись предыдущего периода: «прошлой неделей» и т.п. */
   previousLabel?: string;
-}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel }) => {
+  /** План тренировки (targetSets) — строки «план → факт» в упражнениях. */
+  plan?: PlannedExerciseInput[] | null;
+}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel, plan }) => {
   const [onlyProblems, setOnlyProblems] = React.useState(false);
   // Список подходов в отчёте длинный: за неделю-месяц это десятки тренировок.
   // Показываем первые SETS_LIMIT и даём раскрыть всё — без «обрезано и всё».
   const [showAllSets, setShowAllSets] = React.useState(false);
+  // План против факта: только когда план передан (плеер знает targetSets,
+  // дневник — нет). Считаем по сводке, поэтому цифры совпадают с отчётом.
+  const planVsActual = React.useMemo<PlanVsActual | null>(
+    () => (Array.isArray(plan) && plan.length > 0 ? comparePlanVsActual(plan, summary) : null),
+    [plan, summary],
+  );
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -505,9 +520,32 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── УПРАЖНЕНИЯ ── */}
       {has('exercises') && summary.exercises.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🏋️" title="По упражнениям" hint="подходы × повторы · тоннаж · лучший вес / e1RM" />
+          <SectionTitle icon="🏋️" title="По упражнениям" hint={planVsActual && !planVsActual.empty ? 'план → факт · подходы · тоннаж · e1RM' : 'подходы × повторы · тоннаж · лучший вес / e1RM'} />
+          {planVsActual && !planVsActual.empty && (() => {
+            const donePct = planVsActual.setsPct;
+            const tone = donePct == null ? '#fff' : donePct >= 95 ? '#22c55e' : donePct >= 75 ? '#f59e0b' : '#ef4444';
+            return (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, marginBottom: 6, color: '#fff' }}>
+                <span>План: <b>{planVsActual.plannedSets}</b> подх · {fmtTon(planVsActual.plannedTonnageKg)}</span>
+                <span>Факт: <b style={{ color: tone }}>{planVsActual.actualSets}</b> подх · {fmtTon(planVsActual.actualTonnageKg)}</span>
+                {donePct != null && (
+                  <span style={{ color: tone, fontWeight: 800 }}>
+                    выполнено {donePct}% по подходам{planVsActual.tonnagePct != null ? ` · ${planVsActual.tonnagePct}% по тоннажу` : ''}
+                  </span>
+                )}
+                {planVsActual.skipped.length > 0 && (
+                  <span style={{ color: '#ef4444' }}>пропущено: {planVsActual.skipped.join(', ')}</span>
+                )}
+                {planVsActual.unplanned.length > 0 && (
+                  <span style={{ color: '#a78bfa' }}>не по плану: {planVsActual.unplanned.join(', ')}</span>
+                )}
+              </div>
+            );
+          })()}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {summary.exercises.map(e => (
+            {summary.exercises.map(e => {
+              const pvaRow = planVsActual?.rows.find(r => r.key === normalizeExerciseName(e.name));
+              return (
               <div key={`${e.name}_${e.muscle}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 5 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
                   <span style={{ flex: 1, minWidth: 60, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
@@ -534,8 +572,22 @@ export const WorkoutSummaryBody: React.FC<{
                   </div>
                   <Sparkline values={e.e1rmSeries} color={e.progressPct != null && e.progressPct < 0 ? '#ef4444' : ACCENT} />
                 </div>
+                {pvaRow && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, flexWrap: 'wrap', color: PLAN_ROW_COLOR[pvaRow.status] }}>
+                    <span style={{ fontWeight: 800 }}>{PLAN_ROW_LABEL[pvaRow.status]}</span>
+                    <span style={{ opacity: 0.92 }}>
+                      план {pvaRow.plannedSets} → факт {pvaRow.actualSets}
+                      {pvaRow.setsDelta !== 0 && ` (${pvaRow.setsDelta > 0 ? '+' : ''}${pvaRow.setsDelta})`}
+                    </span>
+                    {pvaRow.plannedTonnageKg > 0 && (
+                      <span style={{ opacity: 0.75 }}>тоннаж {fmtTon(pvaRow.plannedTonnageKg)} → {fmtTon(pvaRow.actualTonnageKg)}</span>
+                    )}
+                    {pvaRow.setsPct != null && pvaRow.status !== 'done' && <span style={{ opacity: 0.75 }}>{pvaRow.setsPct}% плана</span>}
+                  </div>
+                )}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       )}
@@ -692,7 +744,9 @@ export const WorkoutSummaryReport: React.FC<{
   previousLabel?: string;
   /** История до периода — база для рекордов (чтобы одиночная тренировка знала прошлые e1RM). */
   baselineWorkouts?: WorkoutLog[];
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts }) => {
+  /** План этих тренировок (targetSets из плеера) — для строк «план → факт». */
+  plan?: PlannedExerciseInput[] | null;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -749,7 +803,7 @@ export const WorkoutSummaryReport: React.FC<{
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} />
     </div>
   );
 };

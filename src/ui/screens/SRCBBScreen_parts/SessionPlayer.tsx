@@ -41,7 +41,7 @@ import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-read
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
 import { WorkoutSummaryReport } from '../TrainingScreen_parts/WorkoutSummaryReport';
-import { sessionToWorkoutLog, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL } from '../../../engines/workout-summary.engine';
+import { sessionToWorkoutLog, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput } from '../../../engines/workout-summary.engine';
 import { getVolumeLandmarks, checkVolumeStatus, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
@@ -196,6 +196,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
   const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  // План завершённой тренировки — снимок на момент финиша. День в плеере
+  // можно переключить, а «Итог» должен сравнивать с тем планом, что выполняли.
+  const [donePlan, setDonePlan] = useState<PlannedExerciseInput[] | null>(null);
   // История до текущей сессии: нужна для сравнения «с прошлой» и честных
   // рекордов в «Итоге» — сама сессия из базы исключается.
   const doneHistory = useMemo<WorkoutLog[]>(() => {
@@ -767,6 +770,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         });
       }
     } catch { /* ignore */ }
+    setDonePlan(day.exercises.map(ex => ({
+      name: ex.name,
+      sets: (Array.isArray(ex.targetSets) ? ex.targetSets : []).map(t => ({ weight: t.weight, reps: t.reps })),
+    })));
     setDone(finished);
     setSession(null);
 
@@ -2493,6 +2500,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 previousLabel="прошлой тренировкой"
                 baselineWorkouts={doneHistory}
                 level={profile.level}
+                plan={donePlan}
               />
             </div>
           )}

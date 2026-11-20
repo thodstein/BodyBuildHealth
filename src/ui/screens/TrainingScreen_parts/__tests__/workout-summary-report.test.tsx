@@ -62,6 +62,31 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('/нед до MEV');
   });
 
+  it('сравнивает план с фактом по каждому упражнению', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-03')]}
+        blocks={['exercises']}
+        plan={[
+          { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+          { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
+        ]}
+      />,
+    );
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    expect(text).toContain('План: 4 подх');
+    expect(text).toContain('выполнено 75% по подходам');
+    expect(text).toContain('план 3 → факт 2 (-1)');
+    expect(text).toContain('пропущено: Тяга штанги в наклоне');
+    expect(text).toContain('не по плану: Приседания со штангой');
+  });
+
+  it('без плана строк «план → факт» нет', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['exercises']} />);
+    expect(html).not.toContain('пропущено:');
+    expect(html).not.toContain('План: ');
+  });
+
   it('уважает выбор блоков (только «Общее»)', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['totals']} />);
     expect(html).toContain('Общие показатели');

@@ -15,6 +15,7 @@
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
 import { epley1RM } from './e1rm';
 import { getVolumeLandmarks, checkVolumeStatus, type VolumeStatus } from './volume-landmarks.engine';
+import { normalizeExerciseName } from './set-intensity.engine';
 import type { WorkoutLog, StrengthLogEntry } from '../core/types';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -1305,6 +1306,168 @@ export function volumeAdvice(lm: MuscleLandmarkInfo | null, perWeek = true): Vol
     hint: 'В рабочем коридоре: держите темп или постепенно растите к MAV.',
   };
 }
+
+/** План одного упражнения: название и подходы из сессии (вес/повторы). */
+export interface PlannedExerciseInput {
+  name: string;
+  sets: Array<{ weight?: number; reps?: number }>;
+}
+
+export type PlanRowStatus = 'done' | 'under' | 'over' | 'skipped' | 'unplanned';
+
+export interface PlanVsActualRow {
+  /** Нормализованное имя — ключ для склейки плана и факта. */
+  key: string;
+  name: string;
+  plannedSets: number;
+  actualSets: number;
+  plannedTonnageKg: number;
+  actualTonnageKg: number;
+  /** Факт минус план по подходам: «−2» значит два подхода не добиты. */
+  setsDelta: number;
+  /** Доля подходов от плана, % (null — упражнения не было в плане). */
+  setsPct: number | null;
+  status: PlanRowStatus;
+}
+
+export interface PlanVsActual {
+  rows: PlanVsActualRow[];
+  plannedSets: number;
+  actualSets: number;
+  plannedTonnageKg: number;
+  actualTonnageKg: number;
+  /** Выполнение плана по подходам, % (null — плана нет). */
+  setsPct: number | null;
+  /** Выполнение плана по тоннажу, % (null — плана или тоннажа нет). */
+  tonnagePct: number | null;
+  /** Планировались, но ни одного подхода не сделано. */
+  skipped: string[];
+  /** Сделаны, но в плане их не было. */
+  unplanned: string[];
+  /**
+   * Плана нет — сравнивать не с чем. Строки неплановых упражнений при этом
+   * могут быть построены, но `empty` говорит: план не передан.
+   */
+  empty: boolean;
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+const pctOf = (actual: number, planned: number): number | null =>
+  planned > 0 ? Math.round((actual / planned) * 1000) / 10 : null;
+
+/**
+ * Факт против плана по каждому упражнению. План — это подходы сессии из
+ * плеера (targetSets), факт — агрегаты уже посчитанной сводки, поэтому
+ * сравнение не зависит от того, как хранится сессия.
+ *
+ * Одноимённые упражнения склеиваются (регистр, ё/е, пунктуация), чтобы
+ * «Жим штанги лёжа» из плана совпал с «жим штанги лежа» из факта.
+ */
+export function comparePlanVsActual(
+  plan: PlannedExerciseInput[] | null | undefined,
+  summary: WorkoutSummary,
+): PlanVsActual {
+  const planned = new Map<string, { name: string; sets: number; tonnage: number }>();
+  (Array.isArray(plan) ? plan : []).forEach(ex => {
+    const name = String(ex?.name || '').trim();
+    if (!name) return;
+    const key = normalizeExerciseName(name);
+    const acc = planned.get(key) || { name, sets: 0, tonnage: 0 };
+    (Array.isArray(ex.sets) ? ex.sets : []).forEach(st => {
+      const weight = num((st as any)?.weight ?? (st as any)?.weightKg);
+      const reps = num(st?.reps);
+      if (weight <= 0 && reps <= 0) return;
+      acc.sets += 1;
+      acc.tonnage += weight > 0 ? weight * reps : 0;
+    });
+    planned.set(key, acc);
+  });
+
+  const actual = new Map<string, { name: string; sets: number; tonnage: number }>();
+  (summary?.exercises || []).forEach(ex => {
+    const key = normalizeExerciseName(ex.name);
+    const acc = actual.get(key) || { name: ex.name, sets: 0, tonnage: 0 };
+    acc.sets += ex.sets;
+    acc.tonnage += ex.tonnageKg;
+    actual.set(key, acc);
+  });
+
+  const rows: PlanVsActualRow[] = [];
+  const skipped: string[] = [];
+  const unplanned: string[] = [];
+
+  planned.forEach((p, key) => {
+    const a = actual.get(key);
+    const actualSets = a?.sets ?? 0;
+    const actualTonnage = a?.tonnage ?? 0;
+    let status: PlanRowStatus = 'done';
+    if (actualSets === 0) {
+      status = 'skipped';
+      skipped.push(p.name);
+    } else if (actualSets < p.sets) status = 'under';
+    else if (actualSets > p.sets) status = 'over';
+    rows.push({
+      key,
+      name: p.name,
+      plannedSets: p.sets,
+      actualSets,
+      plannedTonnageKg: Math.round(p.tonnage),
+      actualTonnageKg: Math.round(actualTonnage),
+      setsDelta: actualSets - p.sets,
+      setsPct: pctOf(actualSets, p.sets),
+      status,
+    });
+  });
+
+  actual.forEach((a, key) => {
+    if (planned.has(key)) return;
+    unplanned.push(a.name);
+    rows.push({
+      key,
+      name: a.name,
+      plannedSets: 0,
+      actualSets: a.sets,
+      plannedTonnageKg: 0,
+      actualTonnageKg: Math.round(a.tonnage),
+      setsDelta: a.sets,
+      setsPct: null,
+      status: 'unplanned',
+    });
+  });
+
+  const plannedSets = rows.reduce((s, r) => s + r.plannedSets, 0);
+  const actualSets = rows.reduce((s, r) => s + r.actualSets, 0);
+  const plannedTonnageKg = rows.reduce((s, r) => s + r.plannedTonnageKg, 0);
+  const actualTonnageKg = rows.reduce((s, r) => s + r.actualTonnageKg, 0);
+  return {
+    rows,
+    plannedSets,
+    actualSets,
+    plannedTonnageKg,
+    actualTonnageKg,
+    setsPct: pctOf(actualSets, plannedSets),
+    tonnagePct: pctOf(actualTonnageKg, plannedTonnageKg),
+    skipped,
+    unplanned,
+    empty: plannedSets === 0,
+  };
+}
+
+export const PLAN_ROW_LABEL: Record<PlanRowStatus, string> = {
+  done: 'по плану',
+  under: 'не добито',
+  over: 'сверх плана',
+  skipped: 'пропущено',
+  unplanned: 'не по плану',
+};
+
+export const PLAN_ROW_COLOR: Record<PlanRowStatus, string> = {
+  done: '#22c55e',
+  under: '#f59e0b',
+  over: '#60a5fa',
+  skipped: '#ef4444',
+  unplanned: '#a78bfa',
+};
 
 export const VOLUME_STATUS_LABEL: Record<VolumeStatus, string> = {
   below_mev: 'ниже MEV',
