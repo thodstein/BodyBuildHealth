@@ -3,13 +3,13 @@ import type { LabPoint } from '../../../core/types';
 import {
   getLabDiary, getLabDiaryStats, getMarkerChartData,
   getTopTestedMarkers, getRecentAbnormalMarkers,
-  getLabDiarySummary, importLabsToDiary,
+  getLabDiarySummary, syncLabsToDiary,
   addLabDiaryDay, removeLabDiaryDay,
   LabDiaryEntry, LabDiaryMarker,
 } from '../../../engines/lab-diary.engine';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 import { NativeIcon } from '../../native/NativeIcons';
-import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
+import { FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
 import { boundProvesSide } from '../../../core/lab-bound';
 // Проход 160: окно графика — местный календарь (UTC-срез вечером сдвигал окно на день).
@@ -34,16 +34,10 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
   // auto-import — P0 fix: [] deps не импортил при асинхронной загрузке labs (mount labs=[] → никогда)
   useEffect(() => {
     if (!labs || labs.length === 0) return;
-    const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
-    for (const lab of labs) {
-      const key = (lab.code || '').toUpperCase();
-      if (!markerNorms[key]) {
-        const norm = getLabNorm(key, sex);
-        markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
-      }
-    }
+    // Проход 161: нормы и запись зеркала — одно правило (`syncLabsToDiary`);
+    // его же зовёт `data-link`, чтобы отчёт видел бланки без открытия дневника.
     const before = getLabDiary();
-    importLabsToDiary(labs, markerNorms);
+    syncLabsToDiary(labs, sex);
     const updated = getLabDiary();
     // Проход 160: сравниваем содержимое, а не число дней. Правка значения или
     // маркера в пределах той же даты не меняла длину дневника, и экран до
@@ -76,15 +70,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
   }, [selectedMarker, diary, chartDays]);
 
   const handleImportNow = () => {
-    const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
-    for (const lab of labs) {
-      const key = (lab.code || '').toUpperCase();
-      if (!markerNorms[key]) {
-        const norm = getLabNorm(key, sex);
-        markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
-      }
-    }
-    importLabsToDiary(labs, markerNorms);
+    syncLabsToDiary(labs, sex);
     refresh();
   };
 

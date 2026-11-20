@@ -11,6 +11,8 @@ import { localIsoDate, localIsoDateOffset } from '../core/local-date';
 // Проход 142: знак границы бланка («>1000») и вывод о стороне отклонения —
 // по общему правилу core/lab-bound, а не по сравнению числа с нормой.
 import { boundProvesSide, type LabBound } from '../core/lab-bound';
+// Проход 161: нормы для вердикта дневника — из единственного резолвера.
+import { getLabNorm } from './lab-norms.engine';
 
 export interface LabDiaryEntry {
   date: string;           // YYYY-MM-DD
@@ -222,6 +224,7 @@ export function getLabDiarySummary(diary: LabDiaryEntry[], days: number = 30): {
 /** Импортировать результаты из IndexedDB LabPoint[] в дневник */
 export function importLabsToDiary(labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[], markerNorms: Record<string, { uln?: number; lln?: number }>): void {
   if (!labs || labs.length === 0) return;
+  const before = JSON.stringify(getLabDiary());
 
   // группируем по датам
   const byDate = new Map<string, LabDiaryEntry>();
@@ -258,5 +261,32 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
     }
   }
   diary.sort((a, b) => a.date.localeCompare(b.date));
+  // Проход 161: зеркало пишется при каждом изменении склада (его обновляет
+  // `data-link`), поэтому запись без изменений — не работа и не событие.
+  if (JSON.stringify(diary) === before) return;
   saveLabDiary(diary);
+}
+
+/**
+ * Зеркало дневника из склада — одно правило для экрана «Дневник» и `data-link`.
+ *
+ * Проход 161: раньше зеркало обновлялось только при открытии вкладки «Дневник»,
+ * хотя отчёт (`comprehensive-report.engine`) читает именно зеркало: отчёт,
+ * созданный в этой сессии, не видел бланки, введённые после последнего открытия
+ * дневника. Нормы для вердикта берутся из единственного резолвера `getLabNorm`,
+ * а не собираются каждой поверхностью отдельно.
+ */
+export function syncLabsToDiary(
+  labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[],
+  sex?: 'male' | 'female',
+): void {
+  if (!labs || labs.length === 0) return;
+  const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
+  for (const lab of labs) {
+    const key = (lab.code || '').toUpperCase();
+    if (markerNorms[key]) continue;
+    const norm = getLabNorm(key, sex);
+    markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
+  }
+  importLabsToDiary(labs, markerNorms);
 }

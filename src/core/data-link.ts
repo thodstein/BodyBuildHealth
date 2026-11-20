@@ -9,6 +9,9 @@ import { acuteChronicRatio, toDailyLoads } from '../engines/pro/training-load.en
 import { calculateRisks } from '../engines/risk.engine';
 import { calculateSupport, type SupportInput } from '../engines/support.engine';
 import { interpretLabs, type LabCompositeResult } from '../engines/lab-analysis.engine';
+// Проход 161: зеркало дневника обновляется из склада здесь, а не только на вкладке
+// «Дневник» — отчёт читает зеркало и без этого не видел новые бланки.
+import { syncLabsToDiary } from '../engines/lab-diary.engine';
 import { cycleStateFromProfile } from '../engines/female-cycle-phase.engine';
 import { readRiskBridge } from '../engines/risk-bridge';
 import type { ReadinessScores, RiskCalculationResult } from './types';
@@ -166,6 +169,13 @@ export function useDataLink(): LinkedData {
          const userLabs = (Array.isArray(allLabs) ? allLabs : []).filter(l => l && typeof l.code === 'string' && l.patientId === pid || l && typeof l.code === 'string' && !l.patientId);
          sharedLabs = { pid, items: userLabs };
          setLabs(userLabs);
+         // Проход 161: склад прочитан — зеркало дневника приводится к нему сразу.
+         // Раньше это делала только вкладка «Дневник», а отчёт и опции калькулятора
+         // читают зеркало: свежий бланк не доезжал до них до открытия дневника.
+         try {
+           const sexRaw = profile?.settings?.personal?.sex;
+           syncLabsToDiary(userLabs, sexRaw === 'female' ? 'female' : sexRaw === 'male' ? 'male' : undefined);
+         } catch {}
 
          const allCourse = await db.getAll<CourseEntry>('course_log');
           const validCourse = (Array.isArray(allCourse) ? allCourse : []).filter(c =>
