@@ -8,7 +8,7 @@
 //  computeTierAdjustments(labs) → {addSubs, titrationFactors, nutritionTips, alerts, stopCourse}
 // ════════════════════════════════════════════════════════════════════════════
 
-import { deriveTier, getTierLabel, LAB_TIERS, tierMarkerKey, type Tier } from './lab-tier-ranges';
+import { deriveTier, getTierLabel, LAB_TIERS, TIER_SAME_ANALYSIS, tierMarkerKey, type Tier } from './lab-tier-ranges';
 import { FEMALE_HORMONE_ULN, FEMALE_HORMONE_ULN_READ } from '../engines/lab-norms.engine';
 
 export interface TierAddSub {
@@ -319,6 +319,7 @@ function femaleHormoneAlert(marker: string, value: number): TierAlert | null {
       }
       return null;
     case 'TESTOSTERONE':
+    case 'TOTAL_T':
     case 'TT':
       if (value > FEMALE_HORMONE_ULN_READ.TT.criticalHigh) {
         return out(2, `Тестостерон = ${value} нг/дл — выше женской нормы 0.3–2.5 нмоль/л (порог ${FEMALE_HORMONE_ULN_READ.TT.criticalHigh} нг/дл). Вирилизация (голос, клитор, акне): гинеколог-эндокринолог.`);
@@ -380,6 +381,7 @@ function femaleHormoneSteps(marker: string, value: number): TierNutritionTip[] {
       break;
     }
     case 'TESTOSTERONE':
+    case 'TOTAL_T':
     case 'TT': {
       if (value > FEMALE_HORMONE_ULN_READ.TT.high) {
         tip(1, 'Повторить тестостерон', 'утро, 8–10 день цикла, вместе с ГСПГ');
@@ -413,7 +415,15 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
     // есть и каноническое имя — считаем его, а псевдоним пропускаем, чтобы одна
     // находка не задвоилась.
     const ruleKey = tierMarkerKey(marker);
+    // Проход 175: у второго написания своего правила может не быть (в `TIER_RULES`
+    // `HEMOGLOBIN`, `E2`, `PRL`, `TESTOSTERONE`; ступень при этом считалась и под
+    // `HGB`, `ESTRADIOL`, `PROLACTIN`, `TOTAL_T`) — совет молча пропадал.
+    const same = TIER_SAME_ANALYSIS[ruleKey];
+    const sameKey = same?.canon;
     if (ruleKey !== marker.toUpperCase() && labs[ruleKey] !== undefined) continue;
+    // Одна карта с двумя написаниями одного анализа — считаем каноническое имя.
+    // ВчСРБ — исключение (`distinct`): он идёт отдельной находкой рядом с СРБ.
+    if (sameKey && !same?.distinct && labs[sameKey] !== undefined) continue;
 
     // Проход 83: женские гормоны идут своим путём. `deriveTier` для них вернёт 0
     // (мужская лестница не применяется), поэтому тревожные бэнды женской модели
@@ -440,7 +450,8 @@ export function computeTierAdjustments(labs: Record<string, number>, sex?: 'male
     const tier = deriveTier(marker, value, sex);
     if (tier === 0) continue;
 
-    const rule = TIER_RULES.find(r => r.marker === ruleKey);
+    const rule = TIER_RULES.find(r => r.marker === ruleKey)
+      ?? (sameKey ? TIER_RULES.find(r => r.marker === sameKey) : undefined);
     if (!rule) continue;
 
     tierSummary.push({

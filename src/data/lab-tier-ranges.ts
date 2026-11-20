@@ -71,7 +71,6 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   // ─── HEMATOLOGIC ───
   HCT:              { marker:'HCT', normal:[36, HCT_THRESHOLDS.male.erythrocytosis], borderline:[HCT_THRESHOLDS.male.erythrocytosis, HCT_THRESHOLDS.male.block], treatment:[HCT_THRESHOLDS.male.block, HCT_THRESHOLDS.male.block + 6], emergencyHigh:HCT_THRESHOLDS.male.block + 6, direction:'high', unit:'%', label:'Гематокрит' },
   HEMOGLOBIN:       { marker:'HEMOGLOBIN', normal:[120, HGB_THRESHOLDS.male.upper], borderline:[HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block], treatment:[HGB_THRESHOLDS.male.block, 200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
-  HGB:              { marker:'HGB', normal:[120, HGB_THRESHOLDS.male.upper], borderline:[HGB_THRESHOLDS.male.upper, HGB_THRESHOLDS.male.block], treatment:[HGB_THRESHOLDS.male.block, 200], emergencyHigh:200, direction:'high', unit:'g/L', label:'Гемоглобин' },
   PLT:              { marker:'PLT', normal:[150,350], borderline:[350,450], treatment:[450,600], emergencyHigh:600, emergencyLow:100, direction:'both', unit:'10⁹/L', label:'Тромбоциты' },
   RBC:              { marker:'RBC', normal:[4,5.5], borderline:[5.5,6], treatment:[6,6.5], emergencyHigh:6.5, direction:'high', unit:'10¹²/L', label:'Эритроциты' },
   WBC:              { marker:'WBC', normal:[4,10], borderline:[10,12], treatment:[12,20], emergencyHigh:20, emergencyLow:3, direction:'both', unit:'10⁹/L', label:'Лейкоциты' },
@@ -88,40 +87,32 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
 
   // ─── HORMONAL ───
   E2:               { marker:'E2', normal:[20,40], borderline:[40,60], treatment:[60,100], emergencyHigh:100, direction:'high', unit:'pg/mL', label:'Эстрадиол' },
-  ESTRADIOL:        { marker:'ESTRADIOL', normal:[20,40], borderline:[40,60], treatment:[60,100], emergencyHigh:100, direction:'high', unit:'pg/mL', label:'Эстрадиол' },
   PRL:              { marker:'PRL', normal:[2,15], borderline:[15,25], treatment:[25,50], emergencyHigh:50, direction:'high', unit:'ng/mL', label:'Пролактин' },
-  PROLACTIN:        { marker:'PROLACTIN', normal:[2,15], borderline:[15,25], treatment:[25,50], emergencyHigh:50, direction:'high', unit:'ng/mL', label:'Пролактин' },
   TSH:              { marker:'TSH', normal:[0.4,4], borderline:[4,6], treatment:[6,10], emergencyHigh:10, emergencyLow:0.1, direction:'high', unit:'mU/L', label:'ТТГ' },
   CORTISOL:         { marker:'CORTISOL', normal:[100,535], borderline:[535,700], treatment:[700,1000], emergencyHigh:1000, direction:'high', unit:'nmol/L', label:'Кортизол' },
   LH:               { marker:'LH', normal:[1.7,9], borderline:[1,1.7], treatment:[0.5,1], emergencyLow:0.5, direction:'low', unit:'mU/L', label:'ЛГ' },
   FSH:              { marker:'FSH', normal:[1.5,12], borderline:[1,1.5], treatment:[0.5,1], emergencyLow:0.5, direction:'low', unit:'mU/L', label:'ФСГ' },
   TESTOSTERONE:     { marker:'TESTOSTERONE', normal:[15,50], borderline:[10,15], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'Тестостерон' },
-  TOTAL_T:          { marker:'TOTAL_T', normal:[15,50], borderline:[10,15], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'Общ. T' },
   FREE_TESTOSTERONE: { marker:'FREE_TESTOSTERONE', normal:[0.3,1.0], borderline:[0.15,0.3], treatment:[0.05,0.15], emergencyLow:0.05, direction:'low', unit:'nmol/L', label:'Своб. T' },
   DHT:              { marker:'DHT', normal:[1.0,3.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'nmol/L', label:'ДГТ' },
   DHEA_S:           { marker:'DHEA_S', normal:[200,500], borderline:[150,200], treatment:[100,150], emergencyLow:100, direction:'low', unit:'mcg/dL', label:'ДГЭА-С' },
   SHBG:             { marker:'SHBG', normal:[20,60], borderline:[60,80], treatment:[80,120], emergencyHigh:120, direction:'high', unit:'nmol/L', label:'ГСПГ' },
   PROG:             { marker:'PROG', normal:[0.3,1.5], borderline:[1.5,3], treatment:[3,10], emergencyHigh:10, direction:'high', unit:'ng/mL', label:'Прогестерон' },
-  PROGESTERONE:     { marker:'PROGESTERONE', normal:[0.3,1.5], borderline:[1.5,3], treatment:[3,10], emergencyHigh:10, direction:'high', unit:'ng/mL', label:'Прогестерон' },
   IGF1:             { marker:'IGF1', normal:[100,400], borderline:[400,500], treatment:[500,700], emergencyHigh:700, direction:'high', unit:'ng/mL', label:'ИФР-1' },
   AMH:              { marker:'AMH', normal:[1.0,5.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'ng/mL', label:'АМГ' },
 
   // ─── THYROID ───
   FT3:              { marker:'FT3', normal:[3.5,6.5], borderline:[6.5,8], treatment:[8,12], emergencyHigh:12, direction:'high', unit:'pmol/L', label:'T3 св' },
   FT4:              { marker:'FT4', normal:[9,22], borderline:[22,26], treatment:[26,35], emergencyHigh:35, direction:'high', unit:'pmol/L', label:'T4 св' },
-  T3_FREE:          { marker:'T3_FREE', normal:[3.5,6.5], borderline:[6.5,8], treatment:[8,12], emergencyHigh:12, direction:'high', unit:'pmol/L', label:'T3 св' },
-  T4_FREE:          { marker:'T4_FREE', normal:[9,22], borderline:[22,26], treatment:[26,35], emergencyHigh:35, direction:'high', unit:'pmol/L', label:'T4 св' },
   TPO_AB:           { marker:'TPO_AB', normal:[0,34], borderline:[34,100], treatment:[100,500], emergencyHigh:500, direction:'high', unit:'IU/mL', label:'АТ-ТПО' },
 
   // ─── METABOLIC ───
   GLUCOSE:          { marker:'GLUCOSE', normal:[3.9,5.6], borderline:[5.6,6.1], treatment:[6.1,11], emergencyHigh:11, emergencyLow:3.0, direction:'high', unit:'mmol/L', label:'Глюкоза' },
   HBA1C:            { marker:'HBA1C', normal:[0,5.7], borderline:[5.7,6.4], treatment:[6.4,8], emergencyHigh:8, direction:'high', unit:'%', label:'Гликированный Hb' },
   INS:              { marker:'INS', normal:[2,10], borderline:[10,15], treatment:[15,25], emergencyHigh:25, direction:'high', unit:'mcU/mL', label:'Инсулин' },
-  INSULIN:          { marker:'INSULIN', normal:[2,10], borderline:[10,15], treatment:[15,25], emergencyHigh:25, direction:'high', unit:'mcU/mL', label:'Инсулин' },
   HOMAIR:           { marker:'HOMAIR', normal:[0,2.5], borderline:[2.5,3.5], treatment:[3.5,5], emergencyHigh:5, direction:'high', unit:'', label:'HOMA-IR' },
   HOMOCYSTEINE:     { marker:'HOMOCYSTEINE', normal:[0,10], borderline:[10,15], treatment:[15,30], emergencyHigh:30, direction:'high', unit:'mcmol/L', label:'Гомоцистеин' },
   CRP:              { marker:'CRP', normal:[0,3], borderline:[3,10], treatment:[10,20], emergencyHigh:20, direction:'high', unit:'mg/L', label:'СРБ' },
-  HSCRP:            { marker:'HSCRP', normal:[0,3], borderline:[3,10], treatment:[10,20], emergencyHigh:20, direction:'high', unit:'mg/L', label:'hs-СРБ' },
   IL6:              { marker:'IL6', normal:[0,7], borderline:[7,20], treatment:[20,80], emergencyHigh:80, direction:'high', unit:'pg/mL', label:'ИЛ-6' },
   TNF_ALPHA:        { marker:'TNF_ALPHA', normal:[0,8], borderline:[8,15], treatment:[15,40], emergencyHigh:40, direction:'high', unit:'pg/mL', label:'ФНО-α' },
   FERRITIN:         { marker:'FERRITIN', normal:[30,400], borderline:[15,30,400,600], treatment:[5,15,600,1000], emergencyHigh:1000, emergencyLow:10, direction:'both', unit:'ng/mL', label:'Ферритин' },
@@ -130,7 +121,6 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   VITAMIN_D:        { marker:'VITAMIN_D', normal:[30,100], borderline:[20,30], treatment:[10,20], emergencyLow:10, direction:'low', unit:'ng/mL', label:'Витамин D' },
   B12:              { marker:'B12', normal:[200,900], borderline:[150,200], treatment:[100,150], emergencyLow:100, direction:'low', unit:'pg/mL', label:'B12' },
   FOL:              { marker:'FOL', normal:[7,50], borderline:[5,7], treatment:[3,5], emergencyLow:3, direction:'low', unit:'ng/mL', label:'Фолат' },
-  FOLATE:           { marker:'FOLATE', normal:[7,50], borderline:[5,7], treatment:[3,5], emergencyLow:3, direction:'low', unit:'ng/mL', label:'Фолат' },
   IRON:             { marker:'IRON', normal:[13,32], borderline:[10,13], treatment:[5,10], emergencyLow:5, direction:'low', unit:'mcmol/L', label:'Железо' },
   MAGNESIUM:        { marker:'MAGNESIUM', normal:[0.85,1.1], borderline:[0.7,0.85], treatment:[0.5,0.7], emergencyLow:0.5, direction:'low', unit:'mmol/L', label:'Магний' },
   ZINC:             { marker:'ZINC', normal:[11,18], borderline:[9,11], treatment:[7,9], emergencyLow:7, direction:'low', unit:'mcmol/L', label:'Цинк' },
@@ -141,6 +131,44 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   PHOSPHORUS:       { marker:'PHOSPHORUS', normal:[0.8,1.5], borderline:[0.6,0.8,1.5,1.8], treatment:[0.4,0.6,1.8,2.5], emergencyHigh:2.5, emergencyLow:0.4, direction:'both', unit:'mmol/L', label:'Фосфор' },
   VITAMIN_B6:       { marker:'VITAMIN_B6', normal:[20,100], borderline:[10,20], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'B6' },
 };
+
+/**
+ * Один анализ — одна строка порогов (проход 175).
+ *
+ * Десять анализов жили в `LAB_TIERS` **двумя** полными строками с одинаковыми
+ * числами: гемоглобин (`HEMOGLOBIN` и `HGB`), эстрадиол (`E2`/`ESTRADIOL`),
+ * пролактин (`PRL`/`PROLACTIN`), тестостерон (`TESTOSTERONE`/`TOTAL_T`),
+ * прогестерон (`PROG`/`PROGESTERONE`), свободные Т3/Т4 (`FT3`/`T3_FREE`,
+ * `FT4`/`T4_FREE`), инсулин (`INS`/`INSULIN`), фолат (`FOL`/`FOLATE`) и
+ * вчСРБ (`CRP`/`HSCRP`). Пока строк было две, правка одной оставляла вторую со
+ * старым числом: гемоглобин судился по `HGB_THRESHOLDS` только если приходил
+ * под своим именем, а подпись «hs-СРБ» могла жить со шкалой, которой больше нет.
+ *
+ * Теперь числа у второго имени нет вовсе — строка собирается из канонической.
+ * Имя остаётся своим (`marker`), поэтому подписи и поиск ступеней не меняются.
+ * Обе строки одинаковы и раньше — ответ движка тот же.
+ */
+const TIER_SAME_ANALYSIS: Record<string, { canon: string; label?: string; /** Своя строка правил: анализ идёт отдельной находкой (вчСРБ рядом с СРБ), хотя шкала общая. */ distinct?: boolean }> = {
+  HGB: { canon: 'HEMOGLOBIN' },
+  ESTRADIOL: { canon: 'E2' },
+  PROLACTIN: { canon: 'PRL' },
+  TOTAL_T: { canon: 'TESTOSTERONE' },
+  PROGESTERONE: { canon: 'PROG' },
+  T3_FREE: { canon: 'FT3' },
+  T4_FREE: { canon: 'FT4' },
+  INSULIN: { canon: 'INS' },
+  FOLATE: { canon: 'FOL' },
+  // Своей шкалы у вчСРБ нет (клинического источника тоже), поэтому он судится
+  // общей шкалой СРБ; подпись анализа при этом остаётся «hs-СРБ». Правило у него
+  // своё, и рядом с обычным СРБ он остаётся отдельной находкой — поэтому `distinct`.
+  HSCRP: { canon: 'CRP', label: 'hs-СРБ', distinct: true },
+};
+export { TIER_SAME_ANALYSIS };
+for (const [alias, { canon, label }] of Object.entries(TIER_SAME_ANALYSIS)) {
+  const row = LAB_TIERS[canon];
+  if (!row) continue;
+  LAB_TIERS[alias] = { ...row, marker: alias, ...(label ? { label } : {}) };
+}
 
 /**
  * ♀ Ступени, которые у женщины считаются от её ВГН. `deriveTier` брал мужской
@@ -182,12 +210,6 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
     treatment: [HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
     emergencyHigh: HGB_THRESHOLDS.female.block + 15,
   },
-  HEMOGLOBIN: {
-    normal: [120, HGB_THRESHOLDS.female.upper],
-    borderline: [HGB_THRESHOLDS.female.upper, HGB_THRESHOLDS.female.block],
-    treatment: [HGB_THRESHOLDS.female.block, HGB_THRESHOLDS.female.block + 15],
-    emergencyHigh: HGB_THRESHOLDS.female.block + 15,
-  },
   CREATININE: {
     normal: [44, CREATININE_ULN.female],
     borderline: [CREATININE_ULN.female, 130],
@@ -206,6 +228,10 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
   },
 };
 
+// Гемоглобин: женский ряд один и тот же под обоими именами (проход 175) — как и
+// строка порогов; копии чисел здесь больше нет.
+FEMALE_TIER_OVERRIDES.HEMOGLOBIN = FEMALE_TIER_OVERRIDES.HGB;
+
 // ════════════════════════════════════════════════════════════════════════════
 //  deriveTier — определение уровня по значению маркёра
 // ════════════════════════════════════════════════════════════════════════════
@@ -220,10 +246,19 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
  * маркеры ступень не получают вовсе: её оценка живёт в фазовой строке
  * результата и женском паспорте, а тревожные бэнды печатаются своей
  * формулировкой в `computeTierAdjustments` (`femaleHormoneAlert`).
+ *
+ * Проход 175: в наборе — КАНОНИЧЕСКИЕ имена, а проверка идёт через
+ * `TIER_SAME_ANALYSIS`. Раньше здесь перечислялись оба написания, и `TOTAL_T`
+ * и `PROLACTIN` в список забыли: женщина с тестостероном 6 нмоль/л под именем
+ * `TOTAL_T` получала мужскую лестницу с советом про hCG, а под именем
+ * `TESTOSTERONE` — ничего.
  */
-const MALE_ONLY_TIER = new Set([
-  'E2', 'ESTRADIOL', 'PROG', 'PROGESTERONE', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT',
-]);
+const MALE_ONLY_TIER = new Set(['E2', 'PROG', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT']);
+
+/** Имя анализа в словаре лестниц с учётом второго написания (проход 175). */
+function tierCanonicalKey(key: string): string {
+  return TIER_SAME_ANALYSIS[key]?.canon ?? key;
+}
 
 /**
  * Одно имя на один анализ (проход 136).
@@ -264,7 +299,7 @@ export function deriveTier(marker: string, value: number, sex?: 'male' | 'female
   const key = tierMarkerKey(marker);
   const base = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
   if (!base) return 0;
-  if (sex === 'female' && MALE_ONLY_TIER.has(key)) return 0;
+  if (sex === 'female' && MALE_ONLY_TIER.has(tierCanonicalKey(key))) return 0;
   // ♀ — женский ряд той же шкалы (ВГН и ступени от неё); мужской ряд не меняем.
   const override = sex === 'female' ? FEMALE_TIER_OVERRIDES[key] : undefined;
   const t = override ? { ...base, ...override } : base;

@@ -109,12 +109,27 @@ describe('источник: женские гормоны перечислены
     const m = src.match(/const MALE_ONLY_TIER = new Set\(\[([\s\S]*?)\]\);/);
     expect(m).not.toBeNull();
     const list = m![1].split(',').map((s) => s.trim().replace(/'/g, '')).filter(Boolean);
-    expect(list.sort()).toEqual(
-      ['DHT', 'E2', 'ESTRADIOL', 'FSH', 'LH', 'PRL', 'PROG', 'PROGESTERONE', 'TESTOSTERONE'],
-    );
+    // Проход 175: список держит канонические имена. Вторые написания
+    // (`ESTRADIOL`, `PROGESTERONE`, `TOTAL_T`, `PROLACTIN`) закрываются
+    // таблицей `TIER_SAME_ANALYSIS`, а не повтором в этом наборе.
+    expect(list.sort()).toEqual(['DHT', 'E2', 'FSH', 'LH', 'PRL', 'PROG', 'TESTOSTERONE']);
+  });
+
+  it('всякое второе имя мужского гормона ведёт к канону', () => {
+    const aliases = [...src.matchAll(/^\s{2}([A-Z0-9_]+): \{ canon: '([A-Z0-9_]+)'/gm)]
+      .map(([, alias, canon]) => [alias, canon]);
+    const maleOnly = new Set(['E2', 'PROG', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT']);
+    const covered = aliases.filter(([, canon]) => maleOnly.has(canon)).map(([alias]) => alias);
+    expect(covered).toEqual(expect.arrayContaining(['ESTRADIOL', 'PROGESTERONE', 'TOTAL_T', 'PROLACTIN']));
   });
 
   it('ступень обнуляется до выбора шкалы', () => {
-    expect(src).toContain("if (sex === 'female' && MALE_ONLY_TIER.has(key)) return 0;");
+    // Проверка читает строку кода: обнуление обязано стоять до `FEMALE_TIER_OVERRIDES`
+    // и до разбора диапазонов, иначе женщина получает мужские действия.
+    const zero = src.indexOf("MALE_ONLY_TIER.has(tierCanonicalKey(key))");
+    const scale = src.indexOf('const override = sex ===');
+    expect(zero).toBeGreaterThan(-1);
+    expect(scale).toBeGreaterThan(-1);
+    expect(zero).toBeLessThan(scale);
   });
 });
