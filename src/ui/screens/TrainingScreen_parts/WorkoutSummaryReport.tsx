@@ -1,0 +1,411 @@
+/**
+ * WorkoutSummaryReport.tsx — сводный отчёт по тренировке / периоду.
+ *
+ * Один компонент для трёх поверхностей:
+ *  • «Итог» после проведения тренировки (SessionPlayer);
+ *  • дневник → «Отчёт» (тренировка / несколько / неделя / месяц / всё);
+ *  • карточка тренировки в истории дневника.
+ *
+ * Визуал: KPI-плитки, распределение объёма по мышцам, таблицы упражнений и
+ * движений, разбивка по тренировкам, рекорды. Блоки включаются чекбоксами,
+ * выбор запоминается в localStorage (если задан storageKey).
+ */
+import React from 'react';
+import type { WorkoutLog } from '../../../core/types';
+import {
+  buildWorkoutSummary,
+  formatSummaryPeriod,
+  MUSCLE_COLORS,
+  ALL_REPORT_BLOCKS,
+  REPORT_BLOCKS,
+  type ReportBlockId,
+  type WorkoutSummary,
+} from '../../../engines/workout-summary.engine';
+
+const ACCENT = '#00e68a';
+const CARD: React.CSSProperties = {
+  padding: 12,
+  borderRadius: 14,
+  background: 'rgba(24,24,27,0.42)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(12px)' as any,
+  marginBottom: 8,
+};
+
+const fmtInt = (n: number) => Math.round(n || 0).toLocaleString('ru-RU');
+const fmtTon = (kg: number) => (kg >= 1000 ? `${(kg / 1000).toFixed(1)} т` : `${fmtInt(kg)} кг`);
+const fmtDate = (iso: string) => {
+  const d = new Date(`${String(iso || '').slice(0, 10)}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? (iso || '—')
+    : d.toLocaleDateString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit' });
+};
+
+function readBlocks(key?: string, fallback?: ReportBlockId[]): ReportBlockId[] {
+  const def = fallback && fallback.length ? fallback : ALL_REPORT_BLOCKS;
+  if (!key || typeof localStorage === 'undefined') return def;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return def;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return def;
+    const valid = parsed.filter((x: any) => (ALL_REPORT_BLOCKS as string[]).includes(x));
+    return valid.length ? valid : def;
+  } catch {
+    return def;
+  }
+}
+
+/* ─── Чекбоксы блоков отчёта ─── */
+export const ReportBlockPicker: React.FC<{
+  value: ReportBlockId[];
+  onChange: (next: ReportBlockId[]) => void;
+  compact?: boolean;
+}> = ({ value, onChange, compact }) => {
+  const has = (id: ReportBlockId) => value.includes(id);
+  const toggle = (id: ReportBlockId) => {
+    onChange(has(id) ? value.filter(x => x !== id) : ALL_REPORT_BLOCKS.filter(x => x === id || has(x)));
+  };
+  const allOn = value.length === ALL_REPORT_BLOCKS.length;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Что показать</span>
+        <button
+          type="button"
+          onClick={() => onChange(ALL_REPORT_BLOCKS.slice())}
+          style={{
+            padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 800, cursor: 'pointer',
+            border: allOn ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.14)',
+            background: allOn ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.04)',
+            color: allOn ? ACCENT : '#fff',
+          }}
+        >Показать всё</button>
+        <button
+          type="button"
+          onClick={() => onChange(['totals', 'muscles', 'exercises'])}
+          style={{ padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+        >Кратко</button>
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          style={{ padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+        >Сбросить</button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {REPORT_BLOCKS.map(b => {
+          const on = has(b.id);
+          return (
+            <button
+              key={b.id}
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              onClick={() => toggle(b.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: compact ? '3px 8px' : '5px 10px', borderRadius: 999, cursor: 'pointer',
+                border: on ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.12)',
+                background: on ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                color: on ? ACCENT : '#fff', fontSize: compact ? 10 : 11, fontWeight: 700,
+              }}
+            >
+              <span style={{
+                width: 13, height: 13, borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                border: on ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.3)',
+                background: on ? ACCENT : 'transparent', color: '#000', fontSize: 9, lineHeight: 1,
+              }}>{on ? '✓' : ''}</span>
+              {b.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const SectionTitle: React.FC<{ icon: string; title: string; hint?: string }> = ({ icon, title, hint }) => (
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+    <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{icon} {title}</span>
+    {hint && <span style={{ fontSize: 9, color: '#fff', opacity: 0.75 }}>{hint}</span>}
+  </div>
+);
+
+const Tile: React.FC<{ label: string; value: string; sub?: string; color?: string }> = ({ label, value, sub, color }) => (
+  <div style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 9px' }}>
+    <div style={{ fontSize: 9, color: '#fff', opacity: 0.85, marginBottom: 2 }}>{label}</div>
+    <div style={{ fontSize: 15, fontWeight: 800, color: color || '#fff', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 }}>{value}</div>
+    {sub && <div style={{ fontSize: 9, color: '#fff', opacity: 0.65, marginTop: 1 }}>{sub}</div>}
+  </div>
+);
+
+const Bar: React.FC<{ pct: number; color: string; height?: number }> = ({ pct, color, height }) => (
+  <div style={{ height: height || 5, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+    <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: 999 }} />
+  </div>
+);
+
+/* ─── Тело отчёта (без выбора блоков) ─── */
+export const WorkoutSummaryBody: React.FC<{
+  summary: WorkoutSummary;
+  blocks: ReportBlockId[];
+  compact?: boolean;
+}> = ({ summary, blocks, compact }) => {
+  const has = (id: ReportBlockId) => blocks.includes(id);
+  const t = summary.totals;
+  if (summary.workouts === 0) {
+    return (
+      <div style={{ ...CARD, textAlign: 'center', fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
+        Нет данных для отчёта. Запишите тренировку — сводка появится здесь.
+      </div>
+    );
+  }
+  const bestE1RM = summary.exercises.reduce((m, e) => Math.max(m, e.bestE1RM), 0);
+  const topExercise = summary.exercises[0] || null;
+  const topMuscle = summary.muscles[0] || null;
+  const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
+  const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
+  const maxWeekTonnage = Math.max(1, ...summary.weeks.map(w => w.tonnageKg));
+
+  return (
+    <>
+      {/* ── ОБЩЕЕ ── */}
+      {has('totals') && (
+        <div style={CARD}>
+          <SectionTitle icon="📊" title="Общие показатели" hint={summary.workouts > 1 ? `за ${summary.workouts} тренировок` : 'за тренировку'} />
+          <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}>
+            <Tile label="Тоннаж" value={fmtTon(t.tonnageKg)} sub={topExercise ? `топ: ${topExercise.name}` : undefined} color={ACCENT} />
+            <Tile label="Подходы" value={fmtInt(t.sets)} sub={`${t.avgSetsPerSession} / трень`} color="#60a5fa" />
+            <Tile label="Повторы" value={fmtInt(t.reps)} sub={`${t.avgRepsPerSet} за подход`} color="#a78bfa" />
+            <Tile label="Движений" value={fmtInt(t.uniqueExercises)} sub={`${t.sessions} тренировок`} color="#f59e0b" />
+            <Tile label="Время" value={t.durationMin > 0 ? `${fmtInt(t.durationMin)} мин` : '—'} sub={t.durationMin > 0 ? `ср. ${t.avgSessionMin} мин` : undefined} />
+            <Tile label="Плотность" value={t.densityKgPerMin > 0 ? `${fmtInt(t.densityKgPerMin)} кг/мин` : '—'} sub="объём ÷ время" color="#22d3ee" />
+            <Tile label="Средний вес" value={t.avgLoadKg > 0 ? `${t.avgLoadKg} кг` : '—'} sub={t.maxLoadKg > 0 ? `макс ${t.maxLoadKg} кг` : undefined} />
+            <Tile label="Лучший e1RM" value={bestE1RM > 0 ? `${fmtInt(bestE1RM)} кг` : '—'} sub={t.avgRIR != null ? `ср. RIR ${t.avgRIR}` : undefined} color="#f472b6" />
+          </div>
+          {(topMuscle || t.prs > 0) && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              {topMuscle && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', color: ACCENT }}>
+                  Приоритет объёма: {topMuscle.label} · {topMuscle.sharePct}%
+                </span>
+              )}
+              {t.prs > 0 && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b' }}>
+                  🏆 рекордов: {t.prs}
+                </span>
+              )}
+              {t.avgRPE != null && (
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(96,165,250,0.10)', border: '1px solid rgba(96,165,250,0.22)', color: '#60a5fa' }}>
+                  RPE в среднем {t.avgRPE}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ОБЪЁМ ── */}
+      {has('volume') && summary.muscles.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🧱" title="Распределение объёма" hint="тоннаж по мышцам, %" />
+          <div style={{ display: 'flex', height: 14, borderRadius: 8, overflow: 'hidden', marginBottom: 6 }}>
+            {summary.muscles.map(m => (
+              <div key={m.muscle} title={`${m.label}: ${m.sharePct}%`} style={{ width: `${Math.max(1.5, m.sharePct)}%`, background: m.color }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {summary.muscles.map(m => (
+              <span key={m.muscle} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#fff' }}>
+                <span style={{ width: 7, height: 7, borderRadius: 2, background: m.color }} />
+                {m.label} <b style={{ color: m.color }}>{m.sharePct}%</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── МЫШЦЫ ── */}
+      {has('muscles') && summary.muscles.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="💪" title="По мышцам" hint="подходы · тоннаж · доля" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {summary.muscles.map(m => (
+              <div key={m.muscle} style={{ position: 'relative', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.tonnageKg / maxMuscleTonnage) * 100}%`, background: m.color, opacity: 0.14 }} />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 2, background: m.color, flexShrink: 0 }} />
+                  <span style={{ flex: 1, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                  <span style={{ color: '#fff', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{m.sets} подх.</span>
+                  <span style={{ color: '#fff', opacity: 0.75, fontVariantNumeric: 'tabular-nums', minWidth: 36, textAlign: 'right' }}>{m.setsPerSession}/трен</span>
+                  <span style={{ color: m.color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>{fmtTon(m.tonnageKg)}</span>
+                  <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{m.sharePct}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── УПРАЖНЕНИЯ ── */}
+      {has('exercises') && summary.exercises.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🏋️" title="По упражнениям" hint="подходы × повторы · тоннаж · лучший вес / e1RM" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {summary.exercises.map(e => (
+              <div key={`${e.name}_${e.muscle}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 5 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                  <span style={{ flex: 1, minWidth: 60, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                  <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', color: '#fff', whiteSpace: 'nowrap' }}>{e.muscleLabel}</span>
+                  <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{e.sets}×{e.avgRepsPerSet}</span>
+                  <span style={{ color: ACCENT, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmtTon(e.tonnageKg)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, color: '#fff', opacity: 0.78, flexWrap: 'wrap' }}>
+                  <span>Лучший <b style={{ color: '#f59e0b' }}>{e.bestWeight > 0 ? `${e.bestWeight} кг` : '—'}</b> × {e.bestReps}</span>
+                  <span>e1RM <b style={{ color: '#fff' }}>{e.bestE1RM || '—'}</b> кг</span>
+                  <span>доля <b style={{ color: '#fff' }}>{e.sharePct}%</b></span>
+                  {e.avgRIR != null && <span>RIR <b style={{ color: '#fff' }}>{e.avgRIR}</b></span>}
+                  {e.sessions > 1 && <span>в {e.sessions} трен.</span>}
+                  <div style={{ flex: 1, minWidth: 60 }}>
+                    <Bar pct={(e.tonnageKg / maxExTonnage) * 100} color={MUSCLE_COLORS[e.muscle] || ACCENT} height={3} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ДВИЖЕНИЯ ── */}
+      {has('movement') && summary.patterns.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {summary.patterns.map(p => (
+              <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
+                <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>КПШ {p.reps}</span>
+                <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{p.sets} подх.</span>
+                <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>{fmtTon(p.tonnageKg)}</span>
+                <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.sharePct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ТРЕНИРОВКИ ── */}
+      {has('sessions') && summary.sessions.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="📅" title={summary.workouts > 1 ? 'По тренировкам' : 'Тренировка'} hint="подходы · повторы · тоннаж · плотность" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {summary.sessions.slice().reverse().map(s => (
+              <div key={s.id} style={{ padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                  <span style={{ color: '#fff', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtDate(s.date)}</span>
+                  <span style={{ flex: 1, minWidth: 50, color: '#fff', opacity: 0.88, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.split}</span>
+                  <span style={{ color: ACCENT, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmtTon(s.tonnageKg)}</span>
+                  {s.prs > 0 && <span title="Рекорды" style={{ color: '#f59e0b' }}>🏆{s.prs}</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 9, color: '#fff', opacity: 0.72, flexWrap: 'wrap' }}>
+                  <span>{s.sets} подх.</span>
+                  <span>{s.reps} повт.</span>
+                  <span>{s.exercises} упр.</span>
+                  {s.durationMin > 0 && <span>{s.durationMin} мин</span>}
+                  {s.density > 0 && <span style={{ color: '#22d3ee', opacity: 1 }}>{fmtInt(s.density)} кг/мин</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {summary.weeks.length > 1 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 4 }}>Тоннаж по неделям</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
+                {summary.weeks.slice(-10).map((w, i) => (
+                  <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · ${w.sessions} трен.`}>
+                    <div style={{ width: '100%', height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
+                    <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── РЕКОРДЫ ── */}
+      {has('prs') && summary.prs.length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🏆" title="Рекорды периода" hint="рост расчётного 1RM" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {summary.prs.map((p, i) => (
+              <div key={`${p.exercise}_${p.date}_${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.exercise}</span>
+                <span style={{ color: '#fff', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>{p.weight}кг×{p.reps}</span>
+                <span style={{ color: '#f59e0b', fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 64, textAlign: 'right' }}>e1RM {p.e1rm}</span>
+                {p.deltaPct != null && <span style={{ color: ACCENT, minWidth: 44, textAlign: 'right' }}>+{p.deltaPct}%</span>}
+                <span style={{ color: '#fff', opacity: 0.6, minWidth: 58, textAlign: 'right' }}>{fmtDate(p.date)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+/* ─── Полный отчёт с выбором блоков ─── */
+export const WorkoutSummaryReport: React.FC<{
+  workouts: WorkoutLog[];
+  title?: string;
+  subtitle?: string;
+  blocks?: ReportBlockId[];
+  onBlocksChange?: (next: ReportBlockId[]) => void;
+  storageKey?: string;
+  defaultBlocks?: ReportBlockId[];
+  compact?: boolean;
+  showSelector?: boolean;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true }) => {
+  const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
+  const selected = blocks ?? localBlocks;
+  const setSelected = (next: ReportBlockId[]) => {
+    if (blocks == null) setLocalBlocks(next);
+    onBlocksChange?.(next);
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch { /* ignore */ }
+    }
+  };
+  const summary = React.useMemo(() => buildWorkoutSummary(workouts), [workouts]);
+
+  return (
+    <div className="workout-summary-report" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(96,165,250,0.08))', border: '1px solid rgba(0,230,138,0.22)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{title || 'Сводный отчёт по тренировке'}</div>
+            <div style={{ fontSize: 10, color: '#fff', opacity: 0.9, marginTop: 2 }}>
+              {subtitle || formatSummaryPeriod(summary)}
+              {summary.workouts > 0 && <> · {summary.workouts} трен. · {fmtTon(summary.totals.tonnageKg)} · {fmtInt(summary.totals.sets)} подходов</>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff' }}>
+              {summary.totals.uniqueExercises} упр.
+            </span>
+            <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#f59e0b' }}>
+              🏆 {summary.totals.prs}
+            </span>
+          </div>
+        </div>
+        {showSelector && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} />
+          </div>
+        )}
+      </div>
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} />
+    </div>
+  );
+};
+
+export default WorkoutSummaryReport;

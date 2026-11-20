@@ -13,6 +13,7 @@ import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { diaryStyles as style, ACCENT, DIM } from './diary-tokens';
 import { ruCount, RU_APPROACHES } from '../../../engines/ru-plural';
+import { WorkoutSummaryReport } from './WorkoutSummaryReport';
 
 /* ─── WorkoutWeekCard — неделя с тренировками, дельты e1RM, edit/delete/copy ─── */
 
@@ -30,6 +31,8 @@ export const WorkoutWeekCard: React.FC<{
   /** Тренд лучшего e1RM по последним сессиям (для спарклайна в шапке недели). */
   e1rmSeries?: number[];
 }> = ({ weekLabel, workouts, prevWorkouts, expanded, onToggle, onEdit, onDelete, confirmDeleteId, onConfirmDelete, onCancelDelete, e1rmSeries }) => {
+  // Отчёт по конкретной тренировке прямо в истории (чекбоксы блоков — внутри).
+  const [reportFor, setReportFor] = useState<string | null>(null);
   const previousByExercise = new Map<string, number>();
   (prevWorkouts || []).forEach(workout => workout.exercises.forEach(exercise => {
     previousByExercise.set(exercise.exerciseId, Math.max(previousByExercise.get(exercise.exerciseId) || 0, exercise.estimated1RM || 0));
@@ -106,6 +109,13 @@ export const WorkoutWeekCard: React.FC<{
               <button onClick={e => { e.stopPropagation(); const lines: string[] = [`${new Date(workout.date).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} — ${workout.split || 'Тренировка'}`, '']; workout.exercises.forEach(ex => { lines.push(ex.exerciseName); ex.sets.forEach((s, i) => { lines.push(`  ${i+1}. ${s.weight}кг × ${s.reps}${s.rir !== undefined ? ` RIR${s.rir}` : ''}`); }); lines.push(''); }); if (workout.overallRPE) lines.push(`RPE: ${workout.overallRPE}`); if (workout.duration) lines.push(`Длительность: ${workout.duration} мин`); if (workout.notes) lines.push(`Заметки: ${workout.notes}`); navigator.clipboard?.writeText(lines.join('\n')); }} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 10, minWidth: 20 }} title="Копировать тренировку">📋</button>
             </div>
           </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+            <button
+              onClick={e => { e.stopPropagation(); setReportFor(prev => (prev === workout.id ? null : workout.id)); }}
+              title="Сводный отчёт по этой тренировке"
+              style={{ padding: '3px 9px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: reportFor === workout.id ? 'rgba(34,211,238,0.18)' : 'rgba(255,255,255,0.05)', border: reportFor === workout.id ? '1px solid rgba(34,211,238,0.5)' : '1px solid rgba(255,255,255,0.1)', color: reportFor === workout.id ? '#22d3ee' : '#fff' }}
+            >📊 {reportFor === workout.id ? 'Скрыть отчёт' : 'Отчёт по тренировке'}</button>
+          </div>
           <div className="ww-exlist" style={{ display: 'grid', gap: 4, marginTop: 4 }}>
             {workout.exercises.map(exercise => {
               const previous = previousByExercise.get(exercise.exerciseId);
@@ -142,6 +152,17 @@ export const WorkoutWeekCard: React.FC<{
               {workout.notes && (
                 <div style={{ marginTop: 3, color: '#fff', fontStyle: 'italic', lineHeight: 1.3 }}>{workout.notes}</div>
               )}
+            </div>
+          )}
+          {reportFor === workout.id && (
+            <div style={{ marginTop: 6 }}>
+              <WorkoutSummaryReport
+                workouts={[workout]}
+                title="Отчёт по тренировке"
+                storageKey="he_workout_report_blocks"
+                defaultBlocks={['totals', 'muscles', 'exercises']}
+                compact
+              />
             </div>
           )}
         </div>

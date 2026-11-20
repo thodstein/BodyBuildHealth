@@ -67,6 +67,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Кнопка возврата к записи (История — подвкладка дневника) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
             <button onClick={() => setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>← В запись</button>
+            <button onClick={() => setMode('summary')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(34,211,238,0.35)', background: 'rgba(34,211,238,0.10)', color: '#22d3ee' }}>📊 Сводный отчёт</button>
             <span style={{ fontSize: 10, color: '#fff' }}>История тренировок и сводка недели</span>
           </div>
           {/* Предупреждение о срезе истории из-за переполнения хранилища */}

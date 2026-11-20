@@ -38,6 +38,8 @@ import {
 import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-readiness-adjust.engine';
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
+import { WorkoutSummaryReport } from '../TrainingScreen_parts/WorkoutSummaryReport';
+import { sessionToWorkoutLog } from '../../../engines/workout-summary.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
@@ -2397,9 +2399,34 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
       {phase === 'done' && (
         <div style={CARD}>
-          <div style={H}>✅ Тренировка завершена</div>
-          <div style={SMALL}>{done?.date} · {done?.startTime}–{done?.endTime} · фокус: {done?.focus}</div>
+          {/* Визуальная шапка итога: кто/сколько/когда — сразу читается */}
+          <div style={{ margin: '-12px -12px 10px', padding: '12px 12px 10px', borderRadius: '14px 14px 0 0', background: 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(96,165,250,0.10))', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 34, height: 34, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.30)', fontSize: 17, flexShrink: 0 }}>🏁</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✅ Тренировка завершена</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {done?.date} · {done?.startTime}–{done?.endTime} · фокус: {done?.focus}
+              </div>
+            </div>
+            {done && done.durationMin > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.22)', color: '#fff', whiteSpace: 'nowrap' }}>{done.durationMin} мин</span>
+            )}
+          </div>
           <div style={ROW}><span>Сессий записано всего:</span><span style={{ color: ACCENT }}>{getLastSession() ? 'сохранено в дневник' : '—'}</span></div>
+
+          {/* Сводный отчёт по проведённой тренировке: общий + по упражнениям и мышцам.
+              Блоки включаются чекбоксами, выбор запоминается. */}
+          {done && (
+            <div style={{ marginTop: 8 }}>
+              <WorkoutSummaryReport
+                workouts={[sessionToWorkoutLog(done)]}
+                title="Сводка тренировки"
+                subtitle={`${done.focus || 'Тренировка'}${done.durationMin ? ` · ${done.durationMin} мин` : ''}`}
+                storageKey="he_workout_done_blocks"
+                defaultBlocks={['totals', 'muscles', 'exercises', 'prs']}
+              />
+            </div>
+          )}
 
           {/* Психология: чек-ин сессии (уверенность/активация/фокус) */}
           <MindsetCheckinCard sessionId={done?.sessionId} />

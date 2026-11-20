@@ -13,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'summary' | 'history' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -35,8 +35,8 @@ interface Props {
 
 /** Map tabs to hub modes — 6-pill diary (v3): record/history/progress/analytics_lite/rituals/tools.
  *  Legacy 11 tabs aliased → новые 6 без дублей. */
-export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining' | 'analytics_lite' | 'rituals' {
-  if (initialDiaryMode === 'reports') return 'tools';
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'summary' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining' | 'analytics_lite' | 'rituals' {
+  if (initialDiaryMode === 'reports') return 'summary';
   if (initialDiaryMode === 'diary') return 'record';
   switch (tab) {
     case 'analytics_lite': return 'analytics_lite';
@@ -53,7 +53,7 @@ export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'reco
     case 'warmup': return 'rituals';
     case 'cooldown': return 'rituals';
     case 'mytraining': return 'mytraining';
-    case 'reports':
+    case 'reports': return 'summary';
     case 'import_data': return 'tools';
     case 'diary': return 'record';
     default: return 'record';

@@ -50,6 +50,7 @@ import { WorkoutWeekCard, ProgressChartsCard, WorkoutComparisonCard, ExerciseSub
 import { DiaryAnalyticsView } from './DiaryAnalyticsView';
 import { DiaryProgressView } from './DiaryProgressView';
 import { DiaryHistoryView } from './DiaryHistoryView';
+import { DiaryReportView } from './DiaryReportView';
 import { DiaryToolsView } from './DiaryToolsView';
 import { MixDiarySection } from './MixDiarySection';
 import { MixEffectivenessCard } from './MixEffectivenessCard';
@@ -122,6 +123,7 @@ interface DiaryNavItem {
 const DIARY_NAV_ITEMS: DiaryNavItem[] = [
   { mode: 'record', label: '📓 Запись', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'linear-gradient(135deg, var(--accent), #00c853)', activeColor: '#000' },
   { mode: 'history', label: '📜 История', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'rgba(0,230,138,0.12)', activeColor: 'var(--accent)' },
+  { mode: 'summary', label: '📊 Отчёт', color: '#22d3ee', bg: 'rgba(34,211,238,0.06)', activeBg: 'rgba(34,211,238,0.14)', activeColor: '#22d3ee' },
   { mode: 'progress', label: '📏 Прогресс', color: '#34d399', bg: 'rgba(52,211,153,0.06)', activeBg: 'rgba(52,211,153,0.14)', activeColor: '#34d399' },
   { mode: 'analytics_lite', label: '📈 Анализ', color: '#60a5fa', bg: 'rgba(96,165,250,0.06)', activeBg: 'rgba(96,165,250,0.14)', activeColor: '#60a5fa' },
   { mode: 'rituals', label: '🧘 Ритуалы', color: '#f472b6', bg: 'rgba(244,114,182,0.06)', activeBg: 'rgba(244,114,182,0.14)', activeColor: '#f472b6' },
@@ -171,7 +173,7 @@ const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ 
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'summary' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -191,7 +193,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'analytics_lite' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback' | 'rituals';
+type HubMode = 'record' | 'history' | 'summary' | 'analytics' | 'analytics_lite' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback' | 'rituals';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -199,7 +201,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 }) => {
   const normalizeMode = (m: string): HubMode => {
     if (m === 'diary') return 'record';
-    if (m === 'reports' || m === 'import_data') return 'tools';
+    if (m === 'reports') return 'summary';
+    if (m === 'import_data') return 'tools';
     if (m === 'analytics') return 'analytics_lite';
     if (m === 'calendar') return 'progress';
     if (m === 'mindset' || m === 'mobility' || m === 'warmup' || m === 'cooldown' || m === 'mmc' || m === 'checkin') return 'rituals';
@@ -897,6 +900,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
           <DiaryHistoryView hub={hub} />
         </div>
+      )}
+
+      {/* ═══ MODE: SUMMARY ═══ — сводный отчёт по тренировке / периоду */}
+      {mode === 'summary' && (
+        <InfoErrorBoundary label="Отчёт">
+          <DiaryReportView hub={hub} />
+        </InfoErrorBoundary>
       )}
 
       {/* ═══ MODE: COMPETITION ═══ — сохранённые соревновательные циклы */}
