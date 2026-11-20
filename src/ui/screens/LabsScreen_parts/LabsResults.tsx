@@ -3,6 +3,9 @@ import type { LabPoint } from '../../../core/types';
 import { UCUM_MAP } from '../../../core/constants';
 import { getLabNorm, FEMALE_HORMONE_ULN, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
+// Проход 164: граница бланка («>1000») — не измерение; сторону отклонения
+// доказывает общее правило core/lab-bound.
+import { boundProvesSide, type LabBound } from '../../../core/lab-bound';
 import {
   phaseHormoneBand, phaseHormoneUnit, phaseUnionBand,
   type CycleState, type PhaseHormone,
@@ -48,12 +51,26 @@ const REF_CHIP_STYLE: React.CSSProperties = {
   padding: '2px 7px', borderRadius: 999, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
 };
 
+/**
+ * Статус по известному коридору. Проход 164: сторону доказывает
+ * `boundProvesSide`; запись с границей, которая сторону не доказала
+ * («АЛТ >20» при верхней границе 40), — «без вывода», а не «норма».
+ */
+function statusFromRef(
+  lab: LabPoint,
+  low: number | undefined,
+  high: number | undefined,
+): 'normal' | 'high' | 'low' | 'unknown' {
+  const side = boundProvesSide(lab.bound as LabBound | undefined, lab.value, low, high);
+  if (side) return side;
+  if (lab.bound) return 'unknown';
+  return 'normal';
+}
+
 function getLabStatus(lab: LabPoint, sex?: 'male' | 'female', cycle?: CycleState | null): 'normal' | 'high' | 'low' | 'unknown' {
   // Сохранённые диапазоны из бланка лаборатории приоритетнее справочных.
   if (lab.refLow !== undefined && lab.refHigh !== undefined) {
-    if (lab.value > lab.refHigh) return 'high';
-    if (lab.value < lab.refLow) return 'low';
-    return 'normal';
+    return statusFromRef(lab, lab.refLow, lab.refHigh);
   }
   // ♀ E2/ЛГ/ФСГ/прогестерон: одной нормы на весь цикл не бывает — сравниваем с
   // коридором ЕЁ фазы, а не с мужской строкой (E2 10–40 пг/мл, ЛГ 1–12,
@@ -64,21 +81,13 @@ function getLabStatus(lab: LabPoint, sex?: 'male' | 'female', cycle?: CycleState
     // Низ E2 — красная граница 30, а не низ коридора: в менструальную фазу он
     // физиологически низкий, а «<30» — уже дефицит.
     const lowCut = ph.marker === 'E2' ? FEMALE_HORMONE_ULN.E2.low : ph.low;
-    if (lab.value > ph.high) return 'high';
-    if (lab.value < lowCut) return 'low';
-    return 'normal';
+    return statusFromRef(lab, lowCut, ph.high);
   }
   const norm = getLabNorm(lab.code, sex);
-  if (norm) {
-    if (lab.value > norm.uln) return 'high';
-    if (lab.value < norm.lln) return 'low';
-    return 'normal';
-  }
+  if (norm) return statusFromRef(lab, norm.lln, norm.uln);
   const info = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
   if (!info) return 'unknown';
-  if (lab.value > info.uln) return 'high';
-  if (lab.value < info.lln) return 'low';
-  return 'normal';
+  return statusFromRef(lab, info.lln, info.uln);
 }
 
 export const LabsResults: React.FC<{
@@ -164,7 +173,8 @@ export const LabsResults: React.FC<{
                       const sysColor=sysColors[sys]||'#6b7280';
                       const isAbn=status==='high'||status==='low';
                       const statusColor=status==='high'? '#ef4444' : status==='low'? '#f97316' : status==='unknown'? '#6b7280' : LABS_ACCENT;
-                      const statusText=status==='high'? 'выше' : status==='low'? 'ниже' : status==='unknown'? '—' : 'норма';
+                      const statusText=status==='high'? 'выше' : status==='low'? 'ниже' : status==='unknown'? (lab.bound ? 'без вывода' : 'нет нормы') : 'норма';
+                      const statusIcon=status==='high'?'↗' : status==='low'?'↘' : status==='unknown'?'?' : '✓';
                       return (
                         <div key={lab.code+lab.date} style={{
                           display:'flex', alignItems:'center', gap:10, padding:'12px 12px', borderRadius:14, cursor:'default',
@@ -189,7 +199,7 @@ export const LabsResults: React.FC<{
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:92 }}>
                             <div style={{ fontWeight:900, fontSize:16, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{labValueLabel(lab.value, lab.bound)}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
-                            <div style={{ marginTop:4, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: labsWithAlpha(statusColor, '1E'), border:`1px solid ${labsWithAlpha(statusColor, '30')}`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
+                            <div style={{ marginTop:4, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: labsWithAlpha(statusColor, '1E'), border:`1px solid ${labsWithAlpha(statusColor, '30')}`, color: statusColor, display:'inline-flex', gap:3 }}>{statusIcon} {statusText}</div>
                           </div>
                         </div>
                       );

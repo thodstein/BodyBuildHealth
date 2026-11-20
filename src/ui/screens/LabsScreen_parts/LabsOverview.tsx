@@ -4,6 +4,9 @@ import { ruCount, RU_MARKERS } from '../../../engines/ru-plural';
 import { UCUM_MAP } from '../../../core/constants';
 import { getLabNorm, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
+// Проход 164: граница бланка («>1000») — не «норма». Сторону отклонения
+// доказывает общее правило, а не сравнение обрезанного числа с нормой.
+import { boundProvesSide, type LabBound } from '../../../core/lab-bound';
 import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsSectionHeader, LabsKpiCard, LabsBadge, LabsEmpty, getLabsSystem } from './LabsUI';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 
@@ -13,32 +16,39 @@ Object.entries(UCUM_MAP).forEach(([code, info]) => {
 });
 
 function getLabStatus(lab: LabPoint, sex?: 'male' | 'female'): 'normal' | 'high' | 'low' | 'unknown' {
-  if (lab.refLow !== undefined && lab.refHigh !== undefined) {
-    if (lab.value > lab.refHigh) return 'high';
-    if (lab.value < lab.refLow) return 'low';
-    return 'normal';
-  }
-  // Л8: женские нормы из единого резолвера (без sex — прежний LAB_RANGES байт-в-байт)
-  const norm = getLabNorm(lab.code, sex);
-  if (norm) {
-    if (lab.value > norm.uln) return 'high';
-    if (lab.value < norm.lln) return 'low';
-    return 'normal';
-  }
-  const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
-  if (!range) return 'unknown';
-  if (lab.value > range.max) return 'high';
-  if (lab.value < range.min) return 'low';
+  const ref = labRef(lab, sex);
+  if (!ref) return 'unknown';
+  // Проход 164: сторону доказывает `boundProvesSide`; запись с границей, которая
+  // сторону не доказала («>5» при верхней границе 400), — «без вывода», а не
+  // «в норме»: истинное значение может быть и выше нормы.
+  const side = boundProvesSide(lab.bound as LabBound | undefined, lab.value, ref.low, ref.high);
+  if (side) return side;
+  if (lab.bound) return 'unknown';
   return 'normal';
 }
 
-function getLabRefInfo(lab: LabPoint, sex?: 'male' | 'female'): string {
-  if (lab.refLow !== undefined && lab.refHigh !== undefined) return `${lab.refLow}–${lab.refHigh} ${lab.unit || ''}`;
+/** Норма записи — один порядок источников: свои поля → резолвер → каталог. */
+function labRef(
+  lab: LabPoint,
+  sex?: 'male' | 'female',
+): { low?: number; high?: number; unit: string; female: boolean } | null {
+  if (lab.refLow !== undefined || lab.refHigh !== undefined) {
+    return { low: lab.refLow, high: lab.refHigh, unit: lab.unit || '', female: false };
+  }
+  // Л8: женские нормы из единого резолвера (без sex — прежний LAB_RANGES байт-в-байт)
   const norm = getLabNorm(lab.code, sex);
-  if (norm) return `${norm.lln}–${norm.uln} ${norm.unit || lab.unit || ''}${norm.female ? ' ♀' : ''}`;
+  if (norm) return { low: norm.lln, high: norm.uln, unit: norm.unit || lab.unit || '', female: !!norm.female };
   const range = LAB_RANGES[lab.code] || LAB_RANGES[lab.code.toUpperCase()];
-  if (!range) return '';
-  return `${range.min}–${range.max} ${range.unit}`;
+  if (range) return { low: range.min, high: range.max, unit: range.unit, female: false };
+  return null;
+}
+
+function getLabRefInfo(lab: LabPoint, sex?: 'male' | 'female'): string {
+  const ref = labRef(lab, sex);
+  if (!ref) return '';
+  const low = ref.low ?? '—';
+  const high = ref.high ?? '—';
+  return `${low}–${high} ${ref.unit}${ref.female ? ' ♀' : ''}`;
 }
 
 export const LabsOverview: React.FC<{
@@ -53,6 +63,8 @@ export const LabsOverview: React.FC<{
   const highCount = labs.filter(l => getLabStatus(l, sex) === 'high').length;
   const lowCount = labs.filter(l => getLabStatus(l, sex) === 'low').length;
   const abnormalCount = highCount + lowCount;
+  // Проход 164: «без вывода» — отдельный счётчик, а не молчаливая норма.
+  const unknownCount = labs.filter(l => getLabStatus(l, sex) === 'unknown').length;
 
   const systemGroups: Record<string, LabPoint[]> = {};
   labs.forEach(lab => {
@@ -98,7 +110,7 @@ export const LabsOverview: React.FC<{
 
       {/* KPI — 4 карточки: mobile-first auto-fit, на 360px 2 колонки */}
       <div style={{ ...LABS_CARD, padding:14 }}>
-        <LabsSectionHeader icon={<NativeIcon name="file" size={16} />} title="Сводка по фазе" subtitle={`${ruCount(labs.length, RU_MARKERS)} • ${pctNormal}% в норме • ${abnormalCount} вне нормы`} right={<LabsBadge color={abnormalCount? '#ef4444' : LABS_ACCENT}>{abnormalCount? `${abnormalCount} откл.` : '✓ стабильно'}</LabsBadge>} />
+        <LabsSectionHeader icon={<NativeIcon name="file" size={16} />} title="Сводка по фазе" subtitle={`${ruCount(labs.length, RU_MARKERS)} • ${unknownCount > 0 ? `${normalCount} в норме` : `${pctNormal}% в норме`} • ${abnormalCount} вне нормы${unknownCount > 0 ? ` • ${unknownCount} без вывода` : ''}`} right={abnormalCount ? <LabsBadge color="#ef4444">{`${abnormalCount} откл.`}</LabsBadge> : unknownCount > 0 ? <LabsBadge color="#6b7280">{`без вывода: ${unknownCount}`}</LabsBadge> : <LabsBadge color={LABS_ACCENT}>✓ стабильно</LabsBadge>} />
         <div className="labs-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:8 }}>
           <LabsKpiCard icon={<NativeIcon name="flask" size={14} />} label="Всего" value={labs.length} color="#38bdf8" sub="маркеров" />
           <LabsKpiCard icon={<NativeIcon name="check" size={14} />} label="Норма" value={normalCount} color="#22c55e" sub={`${pctNormal}%`} />
@@ -110,6 +122,7 @@ export const LabsOverview: React.FC<{
             <div style={{ width:`${pctNormal}%`, background:'linear-gradient(90deg, #22c55e, #16a34a)', transition:'width 0.4s' }} />
             <div style={{ width:`${labs.length? Math.round(highCount/labs.length*100):0}%`, background:'linear-gradient(90deg, #ef4444, #dc2626)' }} />
             <div style={{ width:`${labs.length? Math.round(lowCount/labs.length*100):0}%`, background:'linear-gradient(90deg, #f97316, #ea580c)' }} />
+            {unknownCount > 0 && <div data-labs-unknown-bar style={{ width:`${Math.round(unknownCount/labs.length*100)}%`, background:'#6b7280' }} />}
           </div>
         )}
         {abnormalCount>0 && (
@@ -131,13 +144,14 @@ export const LabsOverview: React.FC<{
               const icon: NativeIconName = LABS_SYS_ICON[system] || 'file';
               const label = LABS_SYS_LABEL[system] || system;
               const sysAbn = systemLabs.filter(l=> { const s=getLabStatus(l, sex); return s==='high'||s==='low'; }).length;
+              const sysUnknown = systemLabs.filter(l => getLabStatus(l, sex) === 'unknown').length;
               return (
                 <div key={system} style={{ borderRadius:14, overflow:'hidden', border:`1px solid ${color}18`, background:'rgba(255,255,255,0.02)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 11px', background: color+'10', borderBottom:`1px solid ${color}14` }}>
                     <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: color+'18', border:`1px solid ${color}22`, color }}><NativeIcon name={icon} size={14} /></span>
                     <span style={{ fontSize:12, fontWeight:800, color:'#fff', flex:1 }}>{label}</span>
                     <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>{systemLabs.length} маркеров</span>
-                    {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
+                    {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : sysUnknown>0 ? <LabsBadge color="#6b7280" small>без вывода: {sysUnknown}</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
                   </div>
                   <div className="labs-sys-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px, 1fr))', gap:8, padding:10 }}>
                     {systemLabs.sort((a,b)=> {
@@ -147,7 +161,7 @@ export const LabsOverview: React.FC<{
                       const status = getLabStatus(lab, sex);
                       const refInfo = getLabRefInfo(lab, sex);
                       const statusColor = status==='high'? '#ef4444' : status==='low'? '#f97316' : status==='unknown'? '#6b7280' : LABS_ACCENT;
-                      const statusIcon = status==='high'?'↑': status==='low'?'↓': status==='unknown'?'•':'✓';
+                      const statusIcon = status==='high'?'↑': status==='low'?'↓': status==='unknown'?'?':'✓';
                       const isAbn = status==='high'||status==='low';
                       return (
                         <div key={lab.code+'-'+lab.date} style={{
@@ -161,7 +175,7 @@ export const LabsOverview: React.FC<{
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0 }}>
                             <div style={{ fontSize:16, fontWeight:900, color: statusColor, lineHeight:1, fontVariantNumeric:'tabular-nums' }}>{labValueLabel(lab.value, lab.bound)}<span style={{ fontSize:10, color:'#fff', marginLeft:3, fontWeight:700 }}>{lab.unit||''}</span></div>
-                            <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: statusColor+'1E', border:`1px solid ${statusColor}30`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?'—':'норма'}</div>
+                            <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:3, fontSize:10, fontWeight:800, padding:'2px 8px', borderRadius:999, background: statusColor+'1E', border:`1px solid ${statusColor}30`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?(lab.bound ? 'без вывода' : 'нет нормы'):'норма'}</div>
                           </div>
                         </div>
                       );

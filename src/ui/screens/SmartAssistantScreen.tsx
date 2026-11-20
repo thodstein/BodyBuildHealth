@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { getSmartAssistantResponse, type UserContext } from '../../engines/assistant.engine';
 import { useDataLink } from '../../core/data-link';
-import { UCUM_MAP } from '../../core/constants';
+// Проход 164: сторону отклонения в подсказках ассистента доказывает то же
+// правило, что у экрана рисков (`computeMarkerDeviations`), а не сравнение
+// числа с нормой: «>5» при верхней границе 300 — не «низкий» и не «высокий».
+import { computeMarkerDeviations } from './LabsScreen_parts/lab-marker-risks';
 
 interface GlossaryTerm {
   term: string;
@@ -86,10 +89,16 @@ export const SmartAssistantScreen: React.FC = () => {
         risks: linked.risk ? { overall: linked.risk.overallRaw, systems: linked.risk.systemBreakdown ? Object.fromEntries(Object.entries(linked.risk.systemBreakdown).map(([k, v]: [string, any]) => [k, v.raw])) : undefined } : undefined,
         readiness: linked.readiness ? { recovery: linked.readiness.recovery, fatigue: linked.readiness.fatigue, nutrition: linked.readiness.nutrition } : undefined,
         courseSubstances: linked.course?.map(c => c.substanceId),
-        labAlerts: linked.labs ? linked.labs.filter(l => {
-          const ref = UCUM_MAP[l.code.toUpperCase()];
-          return ref && (l.value > ref.uln || l.value < ref.lln);
-        }).map(l => ({ marker: l.code.toUpperCase(), status: l.value > (UCUM_MAP[l.code.toUpperCase()]?.uln ?? 9999) ? 'high' : 'low' })) : undefined,
+        labAlerts: linked.labs ? (() => {
+          const sexRaw = linked.profile?.settings?.personal?.sex;
+          const summary = computeMarkerDeviations(
+            linked.labs.map(l => ({ code: l.code, value: l.value, unit: l.unit, bound: l.bound, refLow: l.refLow, refHigh: l.refHigh })),
+            sexRaw === 'female' ? 'female' : 'male',
+          );
+          // Записи без вывода («>5» при верхней 300, маркер без нормы) не
+          // выдаются за отклонение в подсказке: их сторона не доказана.
+          return summary.markerDeviations.map(d => ({ marker: d.code.toUpperCase(), status: d.side }));
+        })() : undefined,
         goal: linked.profile?.settings?.goal ?? linked.profile?.settings?.primaryGoal,
       };
       const response = await getSmartAssistantResponse(input, ctx);
