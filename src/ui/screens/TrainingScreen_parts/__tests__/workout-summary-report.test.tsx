@@ -44,6 +44,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('Жим штанги лёжа');
     expect(html).toContain('подх/нед');
     expect(html).toContain('MEV ');
+    expect(html).toContain('Интенсивность');
+    expect(html).toContain('инт. ');
   });
 
   it('уважает выбор блоков (только «Общее»)', () => {
