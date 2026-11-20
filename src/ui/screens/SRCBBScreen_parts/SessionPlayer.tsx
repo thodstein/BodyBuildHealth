@@ -1773,18 +1773,20 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
                     <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', letterSpacing: 0.3, textTransform: 'uppercase' }}>Объём: сессия и ориентир недели</span>
-                    <span style={{ fontSize: 8.5, color: '#fff', opacity: 0.6 }}>≈{trainingDays} трен./нед · MEV/MAV/MRV по уровню</span>
+                    <span style={{ fontSize: 8.5, color: '#fff', opacity: 0.6 }}>
+                      ≈{trainingDays} трен./нед · прогноз по плану сессии · {({ beginner: 'новичок', intermediate: 'средний', advanced: 'опытный', enhanced: 'усиленный' } as Record<string, string>)[profile.level] || 'средний'} уровень
+                    </span>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {muscles.map(m => {
                       const { plan, done } = muscleSets[m];
-                      const lm = getVolumeLandmarks('intermediate', m);
+                      const lm = getVolumeLandmarks(profile.level || 'intermediate', m);
                       const weekly = plan * trainingDays;
                       const status = lm ? checkVolumeStatus(weekly, lm) : null;
                       const color = status ? VOLUME_STATUS_COLOR[status] : '#60a5fa';
                       const label = MUSCLE_LABELS[m as keyof typeof MUSCLE_LABELS] || MUSCLE_LABEL_RU[m] || m;
                       return (
-                        <span key={m} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span key={m} title={`Недельный объём — прогноз: ${plan} подх. за сессию × ${trainingDays} трен./нед. Факт за сессию: ${done}/${plan}.`} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ fontWeight: 800 }}>{label}</span>
                           <span style={{ fontWeight: 700 }}>{done}/{plan} подх.</span>
                           {lm && status && (
@@ -2457,6 +2459,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 previousWorkouts={doneHistory.slice(0, 1)}
                 previousLabel="прошлой тренировкой"
                 baselineWorkouts={doneHistory}
+                level={profile.level}
               />
             </div>
           )}
