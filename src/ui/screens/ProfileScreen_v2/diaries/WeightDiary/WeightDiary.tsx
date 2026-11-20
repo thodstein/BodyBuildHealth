@@ -3,6 +3,7 @@ import { colors } from '../../ui';
 import { NativeIcon } from '../../../../native/NativeIcons';
 import { DiaryHeader } from '../DiaryHeader';
 import { saveCsvApk, printHtmlApk } from '../../../../../core/apk-share';
+import { localIsoDate } from '../../../../../core/local-date';
 import { AddBodyMeasurementsModal } from '../../diary-modals';
 import { getWeightLog, saveWeightLog, migrateWeightLogLegacy, getWeightLogArchived, getWeightLogWithPhotos, normalizeWeightEntry, type WeightEntry } from '../../../../../engines/profile-store';
 import { migrateWeightPhotosFromLocalStorage } from '../../../../../engines/weight-photo-store';
@@ -556,7 +557,9 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     for (let w = 0; w <= 12; w++) {
       const d = new Date();
       d.setDate(d.getDate() + w * 7);
-      const iso = d.toISOString().split('T')[0];
+      // Проход 173: точка прогноза — календарный день пользователя: дата
+      // строится местным setDate, поэтому и ключом дня должна быть местная дата.
+      const iso = localIsoDate(d);
       const val = projectToDate(weightFit, iso);
       const reached = weightFit.slopePerDay > 0 ? val >= goal : weightFit.slopePerDay < 0 ? val <= goal : false;
       if (reached) { out.push({ date: iso, value: goal }); break; }
@@ -619,7 +622,8 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const daysAgo = (n: number) => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - n);
-      const iso = cutoff.toISOString().split('T')[0];
+      // Проход 173: граница «N дней назад» — местная, как и сам сдвиг.
+      const iso = localIsoDate(cutoff);
       const hit = baseRows.find(r => r.date <= iso);
       return hit ? baseLatest.weight - hit.weight : null;
     };

@@ -15,6 +15,7 @@ import { listSchemes, generateProgression } from '../../../engines/pro/progressi
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { PL_NORM_TABLES, classifyTotal, findCategory, findCategoryByLabel, classifyTotalForCategory, getNormTable, RANK_ORDER, RANK_LABELS, NORM_EXPLANATIONS, CATEGORY_EXPLANATION, type ClassificationResult, type NormTable, type Federation, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -126,7 +127,7 @@ export const ProMetricsPanel: React.FC = () => {
   const realCount = realSRPE.length;
   const tlReport = useMemo(() => {
     const today = new Date();
-    const mapped = sessions.map((s, i) => { const d = new Date(today); d.setDate(d.getDate() - (sessions.length - 1 - i)); return { date: d.toISOString().slice(0, 10), sRPE: s.sRPE, durationMin: s.duration }; });
+    const mapped = sessions.map((s, i) => { const d = new Date(today); d.setDate(d.getDate() - (sessions.length - 1 - i)); return { date: localIsoDate(d), sRPE: s.sRPE, durationMin: s.duration }; });
     return trainingLoadReport(mapped);
   }, [sessions]);
 

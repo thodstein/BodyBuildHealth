@@ -7,6 +7,7 @@ import { analyzeRecovery, shouldTrain, type RecoveryOutput } from '../../../engi
 import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation-grip-mobility.engine';
 import { DeloadProtocolCard } from '../TrainingScreen_parts/DeloadProtocolCard';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 import { useEditorToast } from '../TrainingScreen_parts/EditorToast';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
@@ -72,7 +73,7 @@ export const RecoveryPanel: React.FC = () => {
         const merged = [
           ...existing,
           ...list.filter(loc => !existing.some((e: any) => e.location === loc))
-            .map(loc => ({ id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), location: loc, type: 'muscle' as const, painLevel: 3, movementLimit: 'mild' as const, side: 'both' as const, chronic: false, date: new Date().toISOString().slice(0, 10) })),
+            .map(loc => ({ id: 'rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), location: loc, type: 'muscle' as const, painLevel: 3, movementLimit: 'mild' as const, side: 'both' as const, chronic: false, date: localIsoDate() })),
         ];
         updateSection('health', { injuries: merged });
       }

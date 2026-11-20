@@ -5,6 +5,7 @@ import { ReportSparkline } from '../../ui/components/ReportSparkline';
 import { MetricCard } from '../../ui/components/MetricCard';
 import type { ComprehensiveReport, ProgressPhoto } from '../../engines/comprehensive-report.engine';
 import { colors, glassCard, inputStyle } from '../screens/ProfileScreen_v2/ui';
+import { localIsoDate } from '../../core/local-date';
 
 const STORAGE_KEY = 'he_comprehensive_report_notes';
 const PHOTOS_KEY = 'he_progress_photos';
@@ -105,7 +106,7 @@ export const ReportsScreen: React.FC = () => {
       const reader = new FileReader();
       reader.onload = () => {
         const newPhoto: ProgressPhoto = {
-          date: new Date().toISOString().slice(0, 10),
+          date: localIsoDate(),
           dataUrl: reader.result as string,
           angle: 'other',
         };

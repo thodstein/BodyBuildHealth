@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { BPEntry } from '../../../../../core/bp-hr-data';
+import { localIsoDate } from '../../../../../core/local-date';
 
 export interface BPAlert {
   id: string;
@@ -36,7 +37,10 @@ export function useBPAlerts({ entries, medicationTaken, lastMeasurementDate }: U
 
   useEffect(() => {
     const newAlerts: BPAlert[] = [];
-    const today = new Date().toISOString().split('T')[0];
+    // Проход 173: «сегодня» — календарный день пользователя. UTC-дата местным
+    // утром (по UTC ещё вчера) не находила сегодняшнего замера, и напоминание
+    // «измерьте давление» приходило повторно.
+    const today = localIsoDate();
 
     // 1. Crisis alert (latest reading)
     if (entries.length > 0) {

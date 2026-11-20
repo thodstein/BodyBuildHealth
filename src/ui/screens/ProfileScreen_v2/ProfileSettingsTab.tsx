@@ -10,6 +10,7 @@ import { NativeIcon } from '../../native/NativeIcons';
 import { isNativeApp } from '../../../core/app-platform';
 import { ruCount, RU_ENTRIES, RU_SETTINGS } from '../../../engines/ru-plural';
 import { WidgetsSetupCard } from '../../../ui/native/WidgetsSetupCard';
+import { localIsoDate } from '../../../core/local-date';
 import { AppearanceSetupCard } from '../../../ui/native/AppearanceSetupCard';
 import { BiometrySetupCard } from '../../../ui/native/BiometrySetupCard';
 import { NativeFeaturesCard } from '../../../ui/native/NativeFeaturesCard';
@@ -63,7 +64,7 @@ export const ProfileSettingsTab: React.FC<{ onNavigate?: (screen: string) => voi
     try {
       const data = JSON.stringify(profile, null, 2);
       // АПК: <a download> в WebView не сохраняет — Documents + Share.
-      void saveTextFileApk(`profile_backup_${new Date().toISOString().slice(0, 10)}.json`, data, 'application/json;charset=utf-8').then(o => toast(shareOutcomeLabel(o)));
+      void saveTextFileApk(`profile_backup_${localIsoDate()}.json`, data, 'application/json;charset=utf-8').then(o => toast(shareOutcomeLabel(o)));
     } catch (e) {
       toast('Ошибка экспорта: ' + (e as Error).message);
     }

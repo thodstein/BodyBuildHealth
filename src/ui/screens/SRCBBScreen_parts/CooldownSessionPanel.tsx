@@ -9,10 +9,13 @@
 import React, { useState } from 'react';
 import { ACCENT, DIM } from '../TrainingScreen_parts/diary-tokens';
 import { upsertCooldownLog, latestCooldownLog, COOLDOWN_SKIP_REASONS } from '../../../engines/cooldown.engine';
+import { localIsoDate } from '../../../core/local-date';
 
 const COOLDOWN_COLOR = '#38bdf8';
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+// Проход 173: дата по умолчанию — календарный день пользователя (UTC-дата
+// местным утром записывала заминку во вчерашний день).
+const todayKey = () => localIsoDate();
 
 export const CooldownCheckinInline: React.FC<{ date: string; sessionId?: string; onSaved?: () => void }> = ({ date, sessionId, onSaved }) => {
   const last = latestCooldownLog();

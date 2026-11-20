@@ -18,6 +18,7 @@ import {
   SLOT_LABELS,
   type MobilitySlot,
 } from '../../../engines/mobility-protocol.engine';
+import { localIsoDate } from '../../../core/local-date';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -25,7 +26,8 @@ const DIM = '#fff';
 const SLOT_ICON: Record<string, string> = { daily: '🌅', pre: '🏋️', post: '🧘', rest_day: '🛌' };
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Проход 173: ключ дня рутины — календарный день пользователя.
+  return localIsoDate();
 }
 
 function CheckboxList({ items, progress, onToggle }: {

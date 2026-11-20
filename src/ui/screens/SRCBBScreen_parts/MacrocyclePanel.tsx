@@ -30,6 +30,7 @@ import { autodraftBBPlanAsync } from '../../../engines/bb/bb-build-async';
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 import { getWeightLog, type WeightEntry } from '../../../engines/profile-store';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type ACWRZone } from '../../../engines/pro/training-load.engine';
@@ -2083,7 +2084,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   })()}
                   {/* ⚖️ Чек-ин prep (D15): динамика веса из дневника к целевому */}
                   {activeBlock.phase === 'contest_prep' && (() => {
-                    const prepStartIso = (() => { const d = macroWeekStartDate(activeBlock.weekOffset); return d ? d.toISOString().slice(0, 10) : ''; })();
+                    const prepStartIso = (() => { const d = macroWeekStartDate(activeBlock.weekOffset); return d ? localIsoDate(d) : ''; })();
                     const targetW = (() => {
                       try { const s = getProfile()?.settings as any; const w = Number(s?.goals?.targetWeight); return Number.isFinite(w) && w > 30 ? w : null; } catch { return null; }
                     })();

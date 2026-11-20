@@ -18,6 +18,7 @@ import {
   KIND_LABELS, DAYTYPE_LABELS,
   type MindsetDayType,
 } from '../../../engines/mindset-protocol.engine';
+import { localIsoDate } from '../../../core/local-date';
 
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
@@ -32,7 +33,8 @@ function runtimeTrack(): string | undefined {
 }
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Проход 173: ключ дня протокола — календарный день пользователя.
+  return localIsoDate();
 }
 
 /* ═══════════ 1. Pre-session протокол дня ═══════════ */

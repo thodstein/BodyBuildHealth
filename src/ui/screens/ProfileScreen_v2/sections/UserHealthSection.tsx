@@ -7,6 +7,7 @@ import React from 'react';
 import { useSectionState } from '../hooks/useSectionState';
 import { AccordionSection, FieldRow, PopupValueEditor, BoolChip, SliderInput, GroupHeader, colors } from '../ui';
 import { NativeIcon } from '../../../native/NativeIcons';
+import { localIsoDate } from '../../../../core/local-date';
 import { ruCount, RU_ENTRIES } from '../../../../engines/ru-plural';
 import {
   CHRONIC_CONDITIONS_LIST, ALLERGEN_LIST, ORGAN_WEAKNESSES, GENETIC_POLYMORPHISMS,
@@ -280,7 +281,7 @@ export const UserHealthSection: React.FC = React.memo(function UserHealthSection
           {COMMON_INJURIES.filter(loc => !(Array.isArray(health.injuries) ? health.injuries : []).some(i => i?.location === loc)).map(loc => (
             <button
               key={loc}
-              onClick={() => updateHealth({ injuries: [...(Array.isArray(health.injuries) ? health.injuries : []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: new Date().toISOString().slice(0, 10) }] })}
+              onClick={() => updateHealth({ injuries: [...(Array.isArray(health.injuries) ? health.injuries : []), { id: 'inj_' + Date.now(), location: loc, type: 'muscle', painLevel: 3, movementLimit: 'mild', side: 'both', chronic: false, date: localIsoDate() }] })}
               className="pf-inj-add"
               style={{
                 padding: '10px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,

@@ -5,6 +5,7 @@ import { checkDrugInteractions } from '../../../engines/interactions-calculator'
 import { useDataLink } from '../../../core/data-link';
 import { PharmaScoreCard } from '../../components/PharmaScoreCard';
 import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { localIsoDate } from '../../../core/local-date';
 
 const CURRENT_KEY = 'he_pharma_report_current';
 const ARCHIVE_KEY = 'he_pharma_reports';
@@ -85,7 +86,7 @@ export const PharmaReportsTab: React.FC = () => {
   const generate = () => {
     const report: PharmaReport = {
       id: Date.now().toString(),
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       generatedAt: new Date().toISOString(),
       substances: course.map((c) => ({
         name: PHARMA_DB[c.substanceId]?.name || c.substanceId,

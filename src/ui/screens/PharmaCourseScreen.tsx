@@ -10,6 +10,7 @@ import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { NativeEmptyArt } from '../native/NativeEmpty';
 import { scheduleWeeklyReminders, cancelScheduledReminders } from '../../core/native-bridge';
 import { copyOrShareText, saveTextFileApk, shareOutcomeLabel } from '../../core/apk-share';
+import { localIsoDate } from '../../core/local-date';
 import {
   loadRemindPrefs, saveRemindPrefs, buildReminderItems, allReminderIds,
   REMINDER_DAYS_RU, type RemindPrefs,
@@ -239,7 +240,10 @@ export const PharmaCourseScreen: React.FC = () => {
   const [viewTab, setViewTab] = useState<'current' | 'schedule' | 'graph' | 'history'>('current');
   const [courseStartDate, setCourseStartDate] = useState(() => {
     const saved = localStorage.getItem('he_course_start_date');
-    return saved || new Date().toISOString().slice(0, 10);
+    // Проход 173: старт курса по умолчанию — календарный день пользователя.
+    // От него считается неделя курса, поэтому UTC-дата местным утром сдвигала
+    // весь график на неделю назад.
+    return saved || localIsoDate();
   });
   const [historyCourses, setHistoryCourses] = useState<{ name: string; date: string; entries: CourseEntry[] }[]>(() => {
     try { return JSON.parse(localStorage.getItem('he_course_history') || '[]'); } catch { return []; }
@@ -258,7 +262,7 @@ export const PharmaCourseScreen: React.FC = () => {
       return;
     }
     const payload = JSON.stringify({ exportedAt: new Date().toISOString(), entries: course }, null, 2);
-    const o = await saveTextFileApk(`course-${new Date().toISOString().slice(0, 10)}.json`, payload, 'application/json;charset=utf-8');
+    const o = await saveTextFileApk(`course-${localIsoDate()}.json`, payload, 'application/json;charset=utf-8');
     flashIo(shareOutcomeLabel(o));
   };
 
@@ -460,7 +464,9 @@ export const PharmaCourseScreen: React.FC = () => {
     if (course.length === 0) return;
     const name = prompt('Название курса (например "Массонабор 16 недель"):');
     if (!name) return;
-    const entry = { name, date: new Date().toISOString().slice(0, 10), entries: [...course] };
+    // Проход 173: снимок курса — ключ дня. UTC-дата склеивала два снимка,
+    // сделанных местным утром и вечером прошлого UTC-дня, в один день истории.
+    const entry = { name, date: localIsoDate(), entries: [...course] };
     const newHistory = [...historyCourses, entry];
     setHistoryCourses(newHistory);
     localStorage.setItem('he_course_history', JSON.stringify(newHistory));
@@ -543,7 +549,7 @@ export const PharmaCourseScreen: React.FC = () => {
 
   /** Дата (дд.мм.гг) для недели курса относительно даты старта курса. */
   const draftDateOfWeek = (week: number): string => {
-    const base = new Date(courseStartDate || new Date().toISOString().slice(0, 10));
+    const base = new Date(courseStartDate || localIsoDate());
     if (isNaN(base.getTime())) return '';
     const d = new Date(base.getTime() + Math.max(0, Math.floor(week)) * 7 * 86400000);
     try { return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }); } catch { return ''; }

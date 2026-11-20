@@ -4,6 +4,7 @@
  */
 
 import { ruCount, RU_ENTRIES } from '../../../engines/ru-plural';
+import { localIsoDate, shiftIsoDate } from '../../../core/local-date';
 
 export type DiaryEntryLike = { id?: string; date: string; fields: { label: string; value: string; unit: string }[] };
 
@@ -71,21 +72,14 @@ export const computeReliefEffectiveness = (entries: Array<{ relief?: string[]; t
   return [...groups].map(([method, values]) => ({ method, count: values.length, avgScore: values.reduce((s, v) => s + v, 0) / values.length, pctWithRelief: Math.round(values.filter(v => v <= 3).length / values.length * 100) })).sort((a, b) => b.pctWithRelief - a.pctWithRelief);
 };
 
-export const todayIso = (): string => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
+/**
+ * Проход 173: «сегодня» — канон `core/local-date`. Здесь жили ТРИ одинаковые
+ * копии локального форматирования (`todayIso`, `localDateKey`, `localIso`);
+ * имена и сигнатуры сохранены, формула теперь одна.
+ */
+export const todayIso = (): string => localIsoDate();
 
-const localDateKey = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
+const localDateKey = (d: Date): string => localIsoDate(d);
 
 /** Локальный ISO-ключ даты (YYYY-MM-DD). Экспортирован для компонентов, группирующих по неделям. */
 export const toLocalIso = (d: Date): string => localDateKey(d);
@@ -640,12 +634,13 @@ export const laggedCorrelation = (
   lagDays: number
 ): { r: number; n: number; positive: boolean; strength: 'weak' | 'moderate' | 'strong' } | null => {
   const aMap = new Map(a.map(p => [p.date, p.value]));
-  const lagMs = lagDays * 86400000;
   const xs: number[] = [];
   const ys: number[] = [];
   for (const p of b) {
-    const target = new Date(p.date).getTime() - lagMs;
-    const targetDate = new Date(target).toISOString().slice(0, 10);
+    // Проход 173: сдвиг на N дней назад — арифметика над date-only строкой
+    // (`shiftIsoDate`), а не UTC-вырез из Date. Раньше битая дата ещё и роняла
+    // корреляцию исключением `toISOString` на Invalid Date.
+    const targetDate = shiftIsoDate(p.date, -lagDays);
     const av = aMap.get(targetDate);
     if (av !== undefined && Number.isFinite(av) && Number.isFinite(p.value)) {
       xs.push(av);
@@ -720,9 +715,11 @@ export const groupCorrelationsByStrength = (corrs: CrossCorrResult[]): Record<'s
 export const dailyCompletion = (
   keys: { key: DiaryKey; hasEntry: boolean; lastDate?: string }[]
 ): { filled: number; total: number; pct: number; missing: DiaryKey[] } => {
+  // Проход 173: «сегодня» — канон календаря. Прежний второй ключ был UTC-датой
+  // (`toISOString`) и путал заполненность утром; теперь день один, и вторая
+  // проверка была бы дублем того же значения — убрана.
   const today = todayIso();
-  const isoToday = new Date().toISOString().slice(0, 10);
-  const isToday = (date?: string) => date === today || date === isoToday;
+  const isToday = (date?: string) => date === today;
   const filled = keys.filter(k => k.hasEntry && isToday(k.lastDate)).length;
   const missing = keys.filter(k => !k.hasEntry || !isToday(k.lastDate)).map(k => k.key);
   return { filled, total: keys.length, pct: keys.length > 0 ? Math.round((filled / keys.length) * 100) : 0, missing };
@@ -1161,9 +1158,8 @@ export function daysToTarget(fit: { slopePerDay: number; intercept: number; star
 
 /* ── Сводки по неделям/месяцам, темп к дате, heatmap веса ── */
 
-/** Локальный ISO (без сдвига UTC). */
-const localIso = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Локальный ISO (без сдвига UTC). Проход 173: делегирует канону. */
+const localIso = (d: Date) => localIsoDate(d);
 
 /** Понедельник недели для даты (ISO). */
 export function weekStartOf(dateISO: string): string {

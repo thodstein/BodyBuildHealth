@@ -15,6 +15,7 @@ import { generateReportText } from '../../core/export';
 import { generateMedicalReportHTML } from '../pdf-report.engine';
 import { addWeightEntry, getNutritionV2Data } from '../../core/nutrition-v2-data';
 import { buildIntelDeloadIcs } from '../pro/intelligence-export.engine';
+import { todayIso } from '../../ui/screens/ProfileScreen_v2/diary-helpers';
 
 /** Местное утро 21.11.2026 — в UTC+10 это ещё 20.11 по UTC. */
 const МЕСТНОЕ_УТРО = () => new Date(2026, 10, 21, 1, 0, 0);
@@ -54,5 +55,15 @@ describe('проход 172: «сегодня» в отчётах — местн�
     expect(ics).toBeTruthy();
     expect(ics).toContain('DTSTART:20261123');
     expect(ics).toContain('DTEND:20261130');
+  });
+});
+
+describe('проход 173: «сегодня» в профиле — местный день', () => {
+  it('todayIso (дневники профиля) даёт местную дату', () => {
+    // Прежде здесь жили три копии локального форматирования; копии удалены,
+    // сигнатура сохранена. Проба держит контракт на месте.
+    vi.useFakeTimers();
+    vi.setSystemTime(МЕСТНОЕ_УТРО());
+    expect(todayIso()).toBe('2026-11-21');
   });
 });

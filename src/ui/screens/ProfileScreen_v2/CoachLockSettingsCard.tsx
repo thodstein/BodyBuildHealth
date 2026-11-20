@@ -13,6 +13,7 @@
 import React, { useEffect, useState } from 'react';
 import { colors, withAlpha } from './ui';
 import { isBiometricAvailable } from '../../../core/native-bridge';
+import { localIsoDate } from '../../../core/local-date';
 import {
   COACH_PIN_MAX,
   COACH_PIN_MIN,
@@ -144,7 +145,8 @@ export function CoachLockSettingsCard({ settings, audit, onChange, onEvent }: Pr
         ...lines,
       ].join('\n');
       const res = await mod.saveTextFileApk(
-        `coach-audit-${new Date().toISOString().slice(0, 10)}.txt`,
+        // Проход 173: имя выгрузки — календарный день пользователя.
+        `coach-audit-${localIsoDate()}.txt`,
         text,
         'text/plain;charset=utf-8',
       );

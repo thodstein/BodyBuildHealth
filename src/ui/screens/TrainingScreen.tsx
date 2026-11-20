@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { HeroImg } from '../HeroImg';
+import { localIsoDate } from '../../core/local-date';
 import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, canReplace, getExerciseById } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
 import { generateMacrocycle, generateBlockPlan, getCurrentWeekPlan, BLOCK_SEQUENCES, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
@@ -366,7 +367,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       }
     } catch { /* нет sRPE-логов — оставляем undefined, карточка честно скажет */ }
 
-    const iso = (d: number) => new Date(d).toISOString().slice(0, 10);
+    // Проход 173: окна «7/14 дней» — календарь пользователя, а не UTC-день.
+    const iso = (d: number) => localIsoDate(new Date(d));
     const cutoff7 = iso(Date.now() - 7 * 86400000);
     const cutoff14 = iso(Date.now() - 14 * 86400000);
     let sets7 = 0;
@@ -628,7 +630,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     const ex = EXERCISE_CATALOG.find(e => e.id === logExercise);
     await diary.saveStrengthLog({
       id: `log_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: localIsoDate(),
       exerciseId: logExercise,
       exerciseName: ex?.name || logExercise,
       sets: [{ weight: logWeight, reps: logReps, rir: logRIR }],
@@ -648,11 +650,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     // Also save workout log and reload history
     await diary.saveWorkoutLog({
       id: `workout_${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
+      date: localIsoDate(),
       duration: 60,
       exercises: [{
         id: `log_${Date.now()}`,
-        date: new Date().toISOString().split('T')[0],
+        date: localIsoDate(),
         exerciseId: logExercise,
         exerciseName: ex?.name || logExercise,
         sets: [{ weight: logWeight, reps: logReps, rir: logRIR }],

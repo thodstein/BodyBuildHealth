@@ -7,6 +7,7 @@ import { ComplaintsTab } from './ComplaintsTab';
 import { SupplementComplianceCard } from './SupplementComplianceCard';
 import { readDiaryMixes } from '../../../engines/training-plan-save.engine';
 import { ruCount, RU_DAYS } from '../../../engines/ru-plural';
+import { localIsoDate } from '../../../core/local-date';
 
 const DIARY_KEY = 'he_support_diary';
 
@@ -1412,7 +1413,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                 <button data-sup-io="export-json" onClick={() => {
                   const data = JSON.stringify(entries, null, 2);
                   const blob = new Blob([data], { type: 'application/json' });
-                  void shareOrDownload(blob, `support-diary-${new Date().toISOString().slice(0,10)}.json`);
+                  void shareOrDownload(blob, `support-diary-${localIsoDate()}.json`);
                 }} style={{
                   flex: '1 1 100px', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(59,130,246,0.2)',
                   background: 'rgba(59,130,246,0.06)', color: '#3b82f6', fontWeight: 700, fontSize: 12,
@@ -1428,7 +1429,7 @@ export const SupportDiaryView: React.FC<{ s: Record<string, any>; onOpenSolver?:
                   });
                   // BOM — иначе Excel открывает кириллицу кракозябрами
                   const blob = new Blob(['\uFEFF' + header.concat(rows).join('\n')], { type: 'text/csv' });
-                  void shareOrDownload(blob, `support-diary-${new Date().toISOString().slice(0,10)}.csv`);
+                  void shareOrDownload(blob, `support-diary-${localIsoDate()}.csv`);
                 }} style={{
                   flex: '1 1 100px', padding: '10px 0', borderRadius: 12, border: '1px solid rgba(34,197,94,0.2)',
                   background: 'rgba(34,197,94,0.06)', color: '#22c55e', fontWeight: 700, fontSize: 12,

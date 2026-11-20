@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { colors } from '../../ui';
 import { ruCount, RU_ENTRIES } from '../../../../../engines/ru-plural';
+import { localIsoDate } from '../../../../../core/local-date';
 
 interface PhaseInsightsProps {
   rows: { date: string; weight: number; bodyFat?: number; muscleMass?: number }[];
@@ -153,12 +154,15 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
     };
 
     const getWeekKey = (date: string): string => {
-      const d = new Date(date);
+      // Проход 173: date-only строка разбирается как местная полночь (прежний
+      // `new Date(date)` давал полночь UTC — на отрицательном смещении день
+      // недели съезжал), и ключ недели печатается местной датой.
+      const d = new Date(date.length === 10 ? date + 'T00:00:00' : date);
       const start = new Date(d);
       start.setHours(0, 0, 0, 0);
       const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
       start.setDate(d.getDate() - dow);
-      return start.toISOString().slice(0, 10);
+      return localIsoDate(start);
     };
 
     const computeWeekStats = (entries: { date: string; weight: number; bodyFat?: number; muscleMass?: number }[], courseStart?: string, substanceMap: SubstanceWeekMap[] = []): WeekStats[] => {

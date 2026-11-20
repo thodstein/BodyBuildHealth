@@ -9,10 +9,12 @@
 import React, { useState } from 'react';
 import { ACCENT, DIM } from '../TrainingScreen_parts/diary-tokens';
 import { upsertWarmupLog, latestWarmupLog, WARMUP_SKIP_REASONS } from '../../../engines/warmup.engine';
+import { localIsoDate } from '../../../core/local-date';
 
 const WARMUP_COLOR = '#f97316';
 
-const todayKey = () => new Date().toISOString().slice(0, 10);
+// Проход 173: дата по умолчанию — календарный день пользователя.
+const todayKey = () => localIsoDate();
 
 export const WarmupCheckinInline: React.FC<{ date: string; sessionId?: string; onSaved?: () => void }> = ({ date, sessionId, onSaved }) => {
   const last = latestWarmupLog();

@@ -23,6 +23,7 @@ import {
 import { calculateTrend } from './diaries/BPDiary/bp-trend-prediction';
 import { buildDiariesExportHtml } from './diary-pdf-export';
 import { saveTextFileApk, printHtmlApk } from '../../../core/apk-share';
+import { localIsoDate } from '../../../core/local-date';
 import { DiaryCard } from './diary-ui';
 import { NativeIcon, type NativeIconName } from '../../native/NativeIcons';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
@@ -789,7 +790,7 @@ export const ProfileDiariesTab: React.FC<{
     };
     const json = JSON.stringify(payload, null, 2);
     // АПК: <a download> в WebView не сохраняет — Documents + Share.
-    void saveTextFileApk(`diaries-${new Date().toISOString().slice(0, 10)}.json`, json, 'application/json;charset=utf-8');
+    void saveTextFileApk(`diaries-${localIsoDate()}.json`, json, 'application/json;charset=utf-8');
     if ((window as any).showToast) (window as any).showToast('📦 Все дневники экспортированы в JSON');
   };
 
@@ -803,7 +804,7 @@ const exportAllDiariesPdf = () => {
       cardioLog,
     });
     // АПК: window.open().print() заблокирован в WebView — html в файл + Share.
-    void printHtmlApk(html, `diaries-${new Date().toISOString().slice(0, 10)}.html`);
+    void printHtmlApk(html, `diaries-${localIsoDate()}.html`);
   };
 
 

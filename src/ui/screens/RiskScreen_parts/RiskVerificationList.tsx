@@ -15,6 +15,7 @@ import {
 import { TZ_MECH_LABELS } from '../../../data/support-db';
 import { copyOrShareText, saveCsvApk, printHtmlApk, shareOutcomeLabel } from '../../../core/apk-share';
 import { getProfile } from '../../../core/profile-manager';
+import { localIsoDate } from '../../../core/local-date';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { padding: 16, borderRadius: 18, background: 'rgba(20,22,30,0.55)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 12px 30px rgba(0,0,0,0.20)', marginBottom: 12 };
@@ -75,13 +76,13 @@ export const RiskVerificationList: React.FC<{ labMap: Record<string, number>; re
 
   const downloadCsv = async () => {
     const csv = buildVerificationCsv(labMap || {}, effectiveSex);
-    flashShare(shareOutcomeLabel(await saveCsvApk(`verification-risks-${new Date().toISOString().slice(0, 10)}.csv`, csv)));
+    flashShare(shareOutcomeLabel(await saveCsvApk(`verification-risks-${localIsoDate()}.csv`, csv)));
   };
 
   const printPdf = async () => {
     const html = buildVerificationHtml(labMap || {}, effectiveSex);
     const text = buildVerificationText(labMap || {}, effectiveSex);
-    flashShare(shareOutcomeLabel(await printHtmlApk(html, `verification-risks-${new Date().toISOString().slice(0, 10)}.html`, text)));
+    flashShare(shareOutcomeLabel(await printHtmlApk(html, `verification-risks-${localIsoDate()}.html`, text)));
   };
 
   const overallPct = Math.round((engineOverall ?? report.overall) * 100);
