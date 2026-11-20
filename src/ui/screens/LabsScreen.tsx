@@ -1,7 +1,7 @@
 import { localIsoDate } from '../../core/local-date';
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { HeroImg } from '../HeroImg';
-import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, UCUM_MAP } from '../../core/constants';
+import { RISK_SYSTEMS, ALL_RISK_SYSTEMS, REQUIRED_LABS_PER_PHASE, ucumInfo } from '../../core/constants';
 import type { RiskResult, LabPoint } from '../../core/types';
 import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
 import { ruCount, RU_MARKERS } from '../../engines/ru-plural';
@@ -370,7 +370,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       for (const [code, valStr] of Object.entries(batchValues)) {
         const val = parseFloat(valStr);
         if (!valStr || isNaN(val)) continue;
-        const info = UCUM_MAP[code.toUpperCase()];
+        const info = ucumInfo(code);
         const lab: LabPoint = {
           id: uid(),
           code: code.toUpperCase(),
@@ -424,7 +424,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const uniqMarkers = useMemo(() => {
     const seen = new Set<string>();
     return labs.filter(l => { const k = l.code.toUpperCase(); if (seen.has(k)) return false; seen.add(k); return true; })
-      .map(l => ({ code: l.code.toUpperCase(), name: UCUM_MAP[l.code.toUpperCase()]?.name || l.name || l.code }))
+      .map(l => ({ code: l.code.toUpperCase(), name: ucumInfo(l.code)?.name || l.name || l.code }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [labs]);
 
@@ -579,7 +579,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const entry = labFieldEntry(text);
     if (!entry) { setAddError(`Значение не прочитано: ${labFieldUnreadReason(text)}`); return; }
     const val = entry.value;
-    const info = UCUM_MAP[inputCode.toUpperCase()];
+    const info = ucumInfo(inputCode);
     const lab: LabPoint = {
       id: uid(),
       code: inputCode.toUpperCase(),
@@ -974,7 +974,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div className="card" style={{ ...LABS_CARD }}>
                     <div style={{ display:'flex', gap:8, marginBottom:10, flexWrap:'wrap' }}>
                       {selCodes.map((code, i) => {
-                        const info = UCUM_MAP[code];
+                        const info = ucumInfo(code);
                         return (
                           <span key={code} style={{ display:'flex', alignItems:'center', gap:6, color:'#fff', fontSize:12, fontWeight:700, padding:'6px 10px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(140,190,255,0.10)' }}>
                             <span style={{ width:10, height:10, borderRadius:3, background:chartPalette[i % chartPalette.length], flexShrink:0 }} />
@@ -1149,7 +1149,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   </div>
                   <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                     {codes.map(code => {
-                      const info = UCUM_MAP[code.toUpperCase()];
+                      const info = ucumInfo(code);
                       const filled = batchValues[code] && batchValues[code].trim() !== '';
                       return (
                         <div key={code} style={{
@@ -1231,7 +1231,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
                 <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                   {codes.map(code => {
-                    const info = UCUM_MAP[code.toUpperCase()];
+                    const info = ucumInfo(code);
                     const isSubmitted = submittedCodes.has(code.toUpperCase());
                     const latest = currentLabs.find(l => l.code.toUpperCase() === code.toUpperCase());
                     // Л8: статус по женским границам при sex=female (без sex — UCUM 1-в-1).
@@ -1851,7 +1851,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         </div>
                         <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:8 }}>
                           {codes.map(code => {
-                            const info = UCUM_MAP[code.toUpperCase()];
+                            const info = ucumInfo(code);
                             const done = submittedCodes.has(code.toUpperCase());
                             return (
                               <span key={code} style={{
@@ -2542,7 +2542,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <button onClick={() => setShowLabInput(false)} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'0 18px 12px', WebkitOverflowScrolling:'touch' as any, minHeight:0 }}>
-            {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
+            {(() => { const info = ucumInfo(inputCode); return info ? (
               <div style={{ fontSize:12, color:'#fff', marginBottom:10, padding:'10px 12px', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.08)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.18)', borderRadius:12, lineHeight:1.5 }}>
                 {info.name} • Норма: {info.lln}–{info.uln} {info.prefUnit}
               </div>

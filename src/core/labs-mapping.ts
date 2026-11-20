@@ -1,5 +1,5 @@
 import synonyms from '../data/labs-synonyms.json';
-import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL } from './constants';
+import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL, ucumInfo, ucumKey } from './constants';
 import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
@@ -353,9 +353,9 @@ const ENZYME_CODES = new Set([
 export function normalizeLabMeasurement(code: string, value: number, unit: string): { value: number; unit: string } {
   const canonicalCode = mapToUcumCode(code);
   const canonical = canonicalCode.toUpperCase();
-  // UCUM_MAP contains a few intentionally mixed-case keys (e.g. HbA1c).
-  const info = UCUM_MAP[canonicalCode] || UCUM_MAP[canonical]
-    || Object.entries(UCUM_MAP).find(([key]) => key.toUpperCase() === canonical)?.[1];
+  // Проход 174: поиск записи каталога — одно правило (`ucumInfo`), а не три
+  // варианта регистра, продублированные в этом файле и в UI.
+  const info = ucumInfo(canonicalCode);
   if (!info || !Number.isFinite(value)) return { value, unit: unit || info?.prefUnit || '' };
   const from = unitKey(unit);
   const target = unitKey(info.prefUnit);
@@ -537,9 +537,11 @@ export function mapToUcumCode(code: string): string {
   // both a long-form key (e.g. TOTAL_PROTEIN) and its canonical short-form
   // (e.g. TP) exist as separate UCUM_MAP keys.
   const alias = CODE_ALIAS[upper];
-  if (alias && UCUM_MAP[alias]) return alias;
-  if (UCUM_MAP[upper]) return upper;
-  return code;
+  if (alias && ucumInfo(alias)) return alias;
+  // Проход 174: ключ каталога возвращается в его собственном регистре — иначе
+  // `hba1c` превращался бы в `HBA1C`, которого в каталоге нет, и анализ терял
+  // имя и единицу `%`.
+  return ucumKey(upper) ?? code;
 }
 
 /** Resolve free-text marker name to canonical UCUM code when possible. */
@@ -548,7 +550,8 @@ export function resolveLabMarker(name: string): string {
   if (!trimmed) return '';
 
   const upper = trimmed.toUpperCase();
-  if (UCUM_MAP[upper]) return upper;
+  const direct = ucumKey(upper);
+  if (direct) return direct;
 
   // OCR frequently mixes visually identical Cyrillic and Latin letters in
   // short laboratory abbreviations (e.g. АЛТ/ALT, ТТГ/TTG, СРБ/CRP).
@@ -565,7 +568,8 @@ export function resolveLabMarker(name: string): string {
     .replace(/[ГГ]/g, 'G')
     .replace(/[ХХ]/g, 'X');
   if (visualLatin === 'TTG') return 'TSH';
-  if (UCUM_MAP[visualLatin]) return visualLatin;
+  const visualKey = ucumKey(visualLatin);
+  if (visualKey) return visualKey;
 
   const fromSynonym = SYNONYM_MAP[trimmed.toLowerCase()];
   if (fromSynonym) {
@@ -631,8 +635,8 @@ function levenshtein(a: string, b: string): number {
 
 /** 0..1 position within reference range; null if unknown. */
 export function normalizedRatio(code: string, value: number, unit: string, age?: number, sex?: 'male' | 'female'): number | null {
-  // P0 fix: UCUM ключи смешанного регистра (HbA1c), code приходит upper
-  const ucum = (UCUM_MAP as any)[code] || (UCUM_MAP as any)[code.toUpperCase()] || (UCUM_MAP as any)[code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === code.toLowerCase())?.[1] as any);
+  // Проход 174: поиск записи каталога — одно правило (`ucumInfo`).
+  const ucum = ucumInfo(code);
   if (!ucum) return null;
   const norm = value * ucum.coeff;
   let lln = ucum.lln;

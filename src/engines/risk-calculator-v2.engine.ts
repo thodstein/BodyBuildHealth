@@ -1,4 +1,4 @@
-import { UCUM_MAP } from '../core/constants';
+import { ucumInfo } from '../core/constants';
 import type { LabPoint, RiskResult } from '../core/types';
 import { RISK_SYSTEMS, ALL_RISK_SYSTEMS } from '../core/constants';
 import { getLabNorm } from './lab-norms.engine';
@@ -200,8 +200,8 @@ export function calculateRiskFromAnalyses(arg1: RiskResult | LabPoint[], labsOrS
     const value = lab.value;
     const unit = lab.unit;
 
-    // Get reference ranges from UCUM_MAP
-    const reference = UCUM_MAP[code];
+    // Get reference ranges from the catalog (one lookup rule: `ucumInfo`)
+    const reference = ucumInfo(code);
     if (!reference) {
       // Skip if we don't have reference data for this marker
       return;

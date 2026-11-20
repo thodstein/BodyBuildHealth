@@ -1,5 +1,5 @@
 import { resolveLabMarker, normalizedRatio } from './labs-mapping';
-import { UCUM_MAP } from './constants';
+import { ucumInfo } from './constants';
 // Проход 142: толкование знака границы живёт в core/lab-bound — его же читают
 // дневник анализов и HL7-выгрузка.
 import { boundProvesSide } from './lab-bound';
@@ -195,7 +195,7 @@ function isUnitLikeMarkerName(raw: string, line: string): boolean {
  */
 function isResolvedMarker(marker: string, rawName: string): boolean {
   if (!marker) return false;
-  if (UCUM_MAP[marker]) return true;
+  if (ucumInfo(marker)) return true;
   return marker !== rawName.trim().toUpperCase();
 }
 
@@ -219,7 +219,7 @@ function judgeValue(
   bound: '<' | '>' | undefined,
   ref: { low?: number; high?: number },
 ): { isAbnormal?: boolean; deviation?: 'low' | 'high' } {
-  const ucum = UCUM_MAP[marker];
+  const ucum = ucumInfo(marker);
   const hasRef = ref.low !== undefined || ref.high !== undefined;
   // Явный бланк не дополняем догадкой из UCUM: его односторонняя граница —
   // это весь референс строки.

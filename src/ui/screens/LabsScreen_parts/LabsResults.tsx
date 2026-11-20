@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { LabPoint } from '../../../core/types';
-import { UCUM_MAP } from '../../../core/constants';
+import { ucumInfo } from '../../../core/constants';
 import { getLabNorm, FEMALE_HORMONE_ULN, FEMALE_LABS_TAB_NOTE } from '../../../engines/lab-norms.engine';
 import { labValueLabel } from '../../../core/lab-value-label';
 // Проход 164: граница бланка («>1000») — не измерение; сторону отклонения
@@ -85,7 +85,7 @@ function getLabStatus(lab: LabPoint, sex?: 'male' | 'female', cycle?: CycleState
   }
   const norm = getLabNorm(lab.code, sex);
   if (norm) return statusFromRef(lab, norm.lln, norm.uln);
-  const info = UCUM_MAP[lab.code] || UCUM_MAP[lab.code.toUpperCase()];
+  const info = ucumInfo(lab.code);
   if (!info) return 'unknown';
   return statusFromRef(lab, info.lln, info.uln);
 }
@@ -168,7 +168,7 @@ export const LabsResults: React.FC<{
                       const ph = lab.refLow !== undefined && lab.refHigh !== undefined
                         ? null
                         : phaseRef(lab.code, sex, cycle);
-                      const info = norm ?? (UCUM_MAP[lab.code.toUpperCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lab.code.toLowerCase())?.[1] as any));
+                      const info = norm ?? ucumInfo(lab.code);
                       const sys=getLabsSystem(lab.code)||'other';
                       const sysColor=sysColors[sys]||'#6b7280';
                       const isAbn=status==='high'||status==='low';

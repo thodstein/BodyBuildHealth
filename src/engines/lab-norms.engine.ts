@@ -8,7 +8,7 @@
  *
  * Правило проекта: без sex/male getLabNorm возвращает ровно пару UCUM_MAP (lln/uln).
  */
-import { UCUM_MAP, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL, TT_NMOL_TO_NG_DL } from '../core/constants';
+import { UCUM_MAP, ucumInfo, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL, TT_NMOL_TO_NG_DL } from '../core/constants';
 import { LAB_REFERENCES_FEMALE } from './risk-engine-v7-matrix';
 
 export interface LabNorm {
@@ -19,13 +19,9 @@ export interface LabNorm {
   female: boolean;
 }
 
-/** Достаёт запись UCUM_MAP без учёта регистра (как в LabsScreen). */
+/** Достаёт запись UCUM_MAP без учёта регистра — одно правило `ucumInfo` (проход 174). */
 function ucumEntry(code: string): { prefUnit: string; uln: number; lln: number; name: string } | undefined {
-  const raw = String(code || '').trim();
-  if (!raw) return undefined;
-  const map = UCUM_MAP as Record<string, any>;
-  return map[raw.toUpperCase()] ?? map[raw] ?? map[raw.toLowerCase()] ??
-    (Object.entries(map).find(([k]) => k.toLowerCase() === raw.toLowerCase())?.[1] as any);
+  return ucumInfo(code);
 }
 
 /**

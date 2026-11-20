@@ -3,7 +3,7 @@ import { parseNutritionText, type ParsedMeal } from '../engines/nutrition-ocr-pa
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
 import { boundProvesSide } from './lab-bound';
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
-import { UCUM_MAP } from './constants';
+import { ucumInfo } from './constants';
 import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';
 import { getLabNorm } from '../engines/lab-norms.engine';
 import { db } from './db';
@@ -227,7 +227,7 @@ function mergeParsedResults(
     // a provider unit for a table value can silently apply the wrong factor.
     const sourceUnit = source.unit || '';
     const normalized = normalizeLabMeasurement(code, source.value, sourceUnit);
-    const info = UCUM_MAP[code];
+    const info = ucumInfo(code);
     const providerNormalized = providerValue
       ? normalizeLabMeasurement(code, providerValue.value, providerValue.unit || sourceUnit).value
       : undefined;
@@ -327,8 +327,8 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
     const code = mapToUcumCode(marker.code);
     const normalized = normalizeLabMeasurement(code, marker.value, marker.unit);
     // ec50 from biomarker-regex is a statistical bound, NOT a clinical reference.
-    // Only use it as refHigh when UCUM_MAP provides no reference (rare markers).
-    const info = UCUM_MAP[code];
+    // Only use it as refHigh when the catalog provides no reference (rare markers).
+    const info = ucumInfo(code);
     const refHigh = (marker.ec50 > 0 && !info) 
       ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value 
       : undefined;
@@ -436,7 +436,10 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
     // columns or failed to recognize abbreviated unit forms.
     let unit = lab.unit;
     if (!unit) {
-      const info = UCUM_MAP[code.toUpperCase()];
+      // Проход 174: каталог ищется одним правилом (`ucumInfo`) — смешанный
+      // регистр ключа (`HbA1c`) больше не оставляет анализ без единицы, а
+      // значит и не выбрасывает его из результата распознавания.
+      const info = ucumInfo(code);
       if (info?.prefUnit) unit = info.prefUnit;
       else {
         // Fall back to the biomarker-regex UNIT_MAP defaults by canonical code.

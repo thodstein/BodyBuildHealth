@@ -1,6 +1,6 @@
 import { LabPoint } from '../core/types';
 import { resolveLabMarker } from '../core/labs-mapping';
-import { UCUM_MAP } from '../core/constants';
+import { UCUM_MAP, ucumInfo } from '../core/constants';
 import { boundProvesSide } from '../core/lab-bound';
 import { db } from '../core/db';
 export { UCUM_MAP };
@@ -105,7 +105,9 @@ interface StoredLabPoint extends LabPoint {
  * @returns Normalized value and unit, plus reference ranges if available
  */
 export function normalizeLab(code: string, value: number, unit: string, phase?: LabPhase): { norm: number; unit: string; ref?: { uln: number; lln: number } } {
-  const ucum = UCUM_MAP[code];
+  // Проход 174: каталог ищется одним правилом (`ucumInfo`): смешанный регистр
+  // ключа (`HbA1c`) больше не теряет ни норму, ни единицу.
+  const ucum = ucumInfo(code);
   if (!ucum) return { norm: value, unit };
 
   const norm = value * ucum.coeff;
@@ -124,7 +126,7 @@ export function normalizeLab(code: string, value: number, unit: string, phase?: 
  * @returns True if abnormal
  */
 export function isAbnormal(code: string, value: number, unit: string, phase?: LabPhase): boolean {
-  const ucum = UCUM_MAP[code];
+  const ucum = ucumInfo(code);
   if (!ucum) return false;
   const normValue = value * ucum.coeff;
   const phaseRef = phase ? PHASE_ADJUSTED_RANGES[code]?.[phase] : undefined;
@@ -189,7 +191,7 @@ export function predictLab(points: LabPoint[], code: string, phase?: LabPhase): 
   // Phase-adjusted ranges for alert
   let alert: string | undefined;
   const phaseRanges = phase ? PHASE_ADJUSTED_RANGES[code]?.[phase] : undefined;
-  const ucum = UCUM_MAP[code];
+  const ucum = ucumInfo(code);
   const ref = phaseRanges || ucum;
   if (ref && w6.val > ref.uln) alert = `⚠️ ${code}: прогноз превышает верхнюю границу (${ref.uln}) через 6 недель`;
 

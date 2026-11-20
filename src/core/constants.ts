@@ -717,6 +717,39 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'URINE_BLOOD_QR': { prefUnit: 'score', coeff: 1, uln: 0.5, lln: 0, name: 'Кровь мочи (тест-полос.)' },
 } as const;
 
+/** Запись каталога анализов: единица, коэффициент, нормы и русское имя. */
+export type UcumEntry = { prefUnit: string; coeff: number; uln: number; lln: number; name: string };
+
+/**
+ * Единственное правило поиска анализа в каталоге `UCUM_MAP` по коду (проход 174).
+ *
+ * Коды каталога в основном ВЕРХНИЕ, но часть намеренно смешанная (`HbA1c`): так
+ * их печатают бланки и так они записаны в `labs-synonyms.json`. Приложение же
+ * почти везде ищет по `code.toUpperCase()`, поэтому прямой `UCUM_MAP['HBA1C']`
+ * не находил анализ — при ручном вводе и при импорте терялись имя и единица
+ * (`%`), и анализ сохранялся «без единицы», хотя каталог её знает.
+ *
+ * Порядок поиска намеренный: точное совпадение главнее регистронезависимого,
+ * поэтому если однажды появятся два разных ключа, отличающихся только регистром,
+ * поведение не станет зависеть от порядка `Object.keys`.
+ */
+export function ucumKey(code: string | null | undefined): string | undefined {
+  const raw = String(code ?? '').trim();
+  if (!raw) return undefined;
+  const table = UCUM_MAP as Record<string, UcumEntry>;
+  if (table[raw]) return raw;
+  const upper = raw.toUpperCase();
+  if (table[upper]) return upper;
+  const lower = raw.toLowerCase();
+  return Object.keys(table).find((key) => key.toLowerCase() === lower);
+}
+
+/** Запись каталога по коду в любом регистре (см. `ucumKey`). */
+export function ucumInfo(code: string | null | undefined): UcumEntry | undefined {
+  const key = ucumKey(code);
+  return key ? (UCUM_MAP as Record<string, UcumEntry>)[key] : undefined;
+}
+
 // ── Нормализация лабораторных значений к единицам РФ (Гемотест, Инвитро, Хеликс, КДЛ) ──
 // Российские лаборатории используют специфичные единицы для ряда гормонов.
 // Функция определяет единицу по величине значения и приводит к стандарту, используемому в UCUM_MAP.

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { UCUM_MAP } from '../../../core/constants';
+import { UCUM_MAP, ucumInfo } from '../../../core/constants';
 import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
@@ -322,13 +322,13 @@ export default function LabsCatalogTab({
         const entry = labFieldEntry(valStr);
         if (!entry) {
           skippedRows.push({
-            name: UCUM_MAP[code.toUpperCase()]?.name || code,
+            name: ucumInfo(code)?.name || code,
             text: String(valStr).trim(),
             reason: labFieldUnreadReason(valStr),
           });
           continue;
         }
-        const info = UCUM_MAP[code.toUpperCase()];
+        const info = ucumInfo(code);
         const lab: LabPoint = {
           id: uid(),
           code: code.toUpperCase(),
@@ -649,7 +649,7 @@ export default function LabsCatalogTab({
                 <div style={{ display: 'grid', gap: 3 }}>
                   {entries.map(entry => {
                     const upper = entry.code.toUpperCase();
-                    const info = UCUM_MAP[upper];
+                    const info = ucumInfo(entry.code);
                     const existing = existingCodes[upper];
                     const val = values[upper] ?? '';
                     // Проход 155: поле читается тем же правилом, что и расчёт. Знак

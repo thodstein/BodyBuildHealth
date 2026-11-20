@@ -12,7 +12,7 @@
  *  - сторона не доказана (граница внутрь нормы, нет нормы) — это «без вывода»,
  *    отдельный счётчик, а не «норма».
  */
-import { UCUM_MAP } from '../../../core/constants';
+import { ucumInfo } from '../../../core/constants';
 import { normalizeLabMeasurement } from '../../../core/labs-mapping';
 import { boundProvesSide, type LabBound } from '../../../core/lab-bound';
 import { getLabNorm } from '../../../engines/lab-norms.engine';
@@ -79,8 +79,10 @@ export function computeMarkerDeviations(
   let unknownCount = 0;
 
   for (const lab of labs) {
-    // P0 fix: HbA1c кейс — HBA1C vs HbA1c
-    const ref = (UCUM_MAP as any)[lab.code] || (UCUM_MAP as any)[lab.code.toUpperCase()] || (UCUM_MAP as any)[lab.code.toLowerCase()] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === String(lab.code).toLowerCase())?.[1] as any);
+    // Проход 174: запись каталога ищется одним правилом (`ucumInfo`) — прежний
+    // четырёхступенчатый перебор регистров здесь был копией правила и молчал
+    // на любом новом ключе со смешанным регистром.
+    const ref = ucumInfo(lab.code);
     // Проход 147: маркер без нормы не «в норме» — норма неизвестна.
     if (!ref) { unknownCount += 1; unknown.push({ code: lab.code, value: lab.value, bound: lab.bound, reason: 'no_norm' }); continue; }
     const coeff = ref.coeff || 1;

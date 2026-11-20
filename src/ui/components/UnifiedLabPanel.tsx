@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { UCUM_MAP, REQUIRED_LABS_PER_PHASE } from '../../core/constants';
+import { ucumInfo, REQUIRED_LABS_PER_PHASE } from '../../core/constants';
 import type { LabPoint } from '../../core/types';
 import { db } from '../../core/db';
 import { getProfile } from '../../core/profile-manager';
@@ -166,7 +166,10 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
     saveTimerRef.current = setTimeout(async () => {
       try {
         const profile = getProfile();
-        const ucum = UCUM_MAP[code];
+        // Проход 174: запись склада берёт имя и единицу тем же правилом поиска
+        // каталога (`ucumInfo`) — смешанный регистр кода (`HbA1c`) больше не
+        // сохраняет анализ «без единицы».
+        const ucum = ucumInfo(code);
         await db.put('labs_log', {
           id: crypto.randomUUID(),
           code,
@@ -202,7 +205,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
     return Object.entries(SYSTEM_GROUPS).map(([key, group]) => {
       const codes = group.codes.filter(c => ALL_CODES.has(c));
       const markers = codes.map(code => {
-        const ucum = UCUM_MAP[code];
+        const ucum = ucumInfo(code);
         const sperm = SPERM_MARKERS[code];
         const name = ucum?.name || sperm?.name || code;
         const unit = ucum?.prefUnit || sperm?.unit || '';
@@ -238,7 +241,7 @@ export const UnifiedLabPanel: React.FC<UnifiedLabPanelProps> = ({ hidePhase, hid
     const entry = labFieldEntry(val);
     if (!entry) return null;
     const n = entry.value;
-    const ucum = UCUM_MAP[code];
+    const ucum = ucumInfo(code);
     if (!ucum) {
       const sperm = SPERM_MARKERS[code];
       if (!sperm) return null;

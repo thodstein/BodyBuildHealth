@@ -2814,6 +2814,32 @@ P2 — вкладка «Анализы»: отображение и индика
 
 **Осталось.** Остаток долга дат — `TrainingScreen_parts` (46) и `NutritionScreen_parts` (1), то есть чужие активные зоны; входить в них отдельным проходом после их завершения.
 
+### Семьдесят четвёртый проход (запись каталога анализов по одному правилу)
+
+**Проблема.** Каталог `UCUM_MAP` держит коды в основном верхними (`ALT`, `TSH`), но часть — намеренно смешанными: `HbA1c` так печатают бланки и так он записан в синонимах. Правило «найти запись по коду» было скопировано по файлам в разных вариантах, и каждая копия забывала хотя бы один регистр:
+
+- `labs-mapping.normalizedRatio` перебирал четыре варианта сам (`[code]`, `[code.toUpperCase()]`, `[code.toLowerCase()]`, поиск по `Object.entries`), а `mapToUcumCode` проверял существование только точным ключом — на `hba1c` возвращалось `HBA1C`, ключ, которого в каталоге нет;
+- `lab-norms.engine` держал **четвёртую** копию обхода (`ucumEntry`), `lab-trend.engine` — свою двухступенчатую, `lab-marker-risks` — четырёхступенчатую с комментарием «P0 fix: HbA1c кейс»;
+- `labs.engine` (`normalizeLab`/`isAbnormal`/`forecast`), `risk-calculator-v2`, `ocr-engine` (три места), `lab-auto-parser` искали ровно `UCUM_MAP[code]` — для записи с кодом `HBA1C` (так её пишет `normalizeFlatLabs`) запись не находилась;
+- экраны искали по `code.toUpperCase()`: `LabsScreen` (8 мест — пакетный ввод, ручной ввод, чипы графика, подсказка единицы), `LabsResults` (3 варианта в одной строке), `UnifiedLabPanel` (запись склада), `ExtendedLabsTab`, `LabsCatalogTab`.
+
+Цена одна и та же на всех путях: анализ с кодом `HBA1C` оставался без нормы 4.0–5.7 `%`, без имени и без единицы. На экране это «нет нормы» у гликированного гемоглобина, тренд без границы, отклонение без стороны — то есть анализ лежит в складе, но не судится.
+
+**Решение.** Каталог читается одним правилом в `core/constants`:
+
+- `ucumKey(code)` — ключ каталога в его **собственном** регистре; порядок поиска намеренный: точное совпадение → верхний регистр → регистронезависимый перебор (если однажды появятся два ключа, отличающихся только регистром, поведение не начнёт зависеть от порядка `Object.keys`);
+- `ucumInfo(code)` — запись каталога по этому ключу; тип записи вынесен в `UcumEntry`.
+
+Все перечисленные места читают `ucumInfo`. `mapToUcumCode`/`resolveLabMarker` возвращают ключ в его настоящем регистре (`mapToUcumCode('hba1c')` → `HbA1c`), а не выдуманный `HBA1C`. Там, где код и так берётся из `Object.keys(UCUM_MAP)` (каталог экрана, счётчики, перебор групп), прямой доступ оставлен — это перебор таблицы, а не поиск.
+
+**Поведение.** Запись `HBA1C` теперь получает норму 4.0–5.7 `%` и имя «Гликированный Hb» во всех контурах: резолвер норм, тренд, отклонения маркеров, распознавание, запись склада и экран «Анализы». Ответ движка для канонических кодов не изменился ни на байт: для ключа верхнего регистра `ucumKey` возвращает его же, и `ucumInfo` отдаёт ту же запись, что раньше отдавал прямой доступ.
+
+**Гарды.** Новый `ucum-lookup-single-rule` (5 тестов): запись находится в любом регистре и с пробелами (`HbA1c`/`HBA1C`/`hba1c`/`HbA1C`), `ucumKey` отдаёт ключ в собственном регистре, приведение имени не выдаёт несуществующий ключ, норма и единица не теряются у `HBA1C`, и ценз исходников: `UCUM_MAP[…toUpperCase()]`/`Object.entries(UCUM_MAP)…find` — ноль мест (свой перебор регистров не возвращается).
+
+**Прогон.** `ucum-lookup-single-rule` + потребители каталога — 8 файлов / 510 зелёных; распознавание и склад (`ocr-engine`, `ocr-full-cycle`, `labs-mapping-molar-mass`, `labs-mapping-hba1c`, `labs-profile-sync`, `lab-parser-bound-values`, `lab-provider-e2e`, `lab-apk-pdf`, `lab-apk-offline`) — 9 / 147; движки (`lab-trend*`, `lab-unit-*`, `lab-numeric-norms`, `lab-diary-norms`, `report-lab-bound`, `tz-mapper-lab-norms`, `v7-lab-references-female`, `risk-verification*`, `required-labs-phase`, `lab-hl7-obx`) — 15 / 214; экраны (`lab-marker-risks`, `labs-results-female-phase`, `lab-diary-bound-visible`, `lab-compare-label`, `labs-marker-risks-ui`, `labs-risk-native`, `labs-apk`, `lab-manual-entry-honest`, `risk-labs-markers-bound`, `labs-risk-date-canon`, `lab-points-import`, `lab-unit-hint`, `lab-unit-cleared`) — 13 / 105; поддержка и индексы (`lab-slice-single-source`, `mapper-lab-units`, `lab-urine-canon`, `hydrate-lab-flags-*`, `lab-deltas-*`, `bb-lab-recovery-coverage`, `labs-indices-*`, `lab-composites-null`, `lab-analysis-bound*`) — 13 / 147; `tsc` чистый.
+
+**Осталось.** Три реестра границ (`UCUM_MAP`, `LAB_REFERENCES`, `REFERENCE_RANGES`) и имена каталога в `LAB_TIERS`/`LAB_REF`/`tz-bridge-marker` — отдельный проход, числа там подменяются только вместе с клиническим решением. Запись анализа по-прежнему может быть сохранена как `HBA1C` (`normalizeFlatLabs`) или `HbA1c` (парсер): чтение теперь одинаковое, но единого написания у склада пока нет — это часть той же задачи о единой таблице кодов.
+
 ### Осознанные отклонения
 - Кураторская база + производный fallback вместо ручного переписывания 12k-строчного каталога. Деривация консервативна и всегда помечена `q='C'` — «правдоподобно», а не «доказано».
 - UL-кап в `applyTitration` оставлен (доза всё равно безопасна), но сырые дозы доступны через `rawDosesOut` — чтобы `checkUpperLimits` мог честно предупредить о превышении.

@@ -1,5 +1,5 @@
 import type { LabPoint } from '../core/types';
-import { UCUM_MAP } from '../core/constants';
+import { ucumInfo } from '../core/constants';
 import { ruCount, ruAdjCount, RU_MARKERS } from './ru-plural';
 import { boundsComparable, boundProvesSide, type LabBound } from '../core/lab-bound';
 import { labValueLabel } from '../core/lab-value-label';
@@ -91,9 +91,9 @@ export function computeLabTrends(labs: LabPoint[]): LabTrendReport {
     const current = sorted[sorted.length - 1];
     const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
 
-    // P0 fix: UCUM_MAP ключи смешанного регистра (HbA1c), code — upper → кейс-инсенс поиск
-    const lower = code.toLowerCase();
-    const info = (UCUM_MAP as any)[code] || (Object.entries(UCUM_MAP as any).find(([k]) => k.toLowerCase() === lower)?.[1] as any);
+    // Проход 174: запись каталога — одним правилом (`ucumInfo`); прежний
+    // кейс-инсенс перебор ключей был второй копией этого правила.
+    const info = ucumInfo(code);
     const refLow = (current as any).refLow ?? info?.lln;
     const refHigh = (current as any).refHigh ?? info?.uln;
 
