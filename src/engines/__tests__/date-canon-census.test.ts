@@ -33,8 +33,13 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** date-only вызовы: .toISOString() с последующим .slice(0, 10) */
-const DATE_ONLY = /\.toISOString\(\)\s*\.slice\(\s*0\s*,\s*10\s*\)/g;
+/**
+ * date-only вызовы: обе формы — `.toISOString().slice(0, 10)` и
+ * `.toISOString().split('T')[0]`. Проход 162: вторая форма была слепой зоной
+ * ценза, и в лаборатории/рисках она прожила до прохода 159 (утренний день не
+ * попадал в историю риска, дата бланка уезжала на вчера).
+ */
+const DATE_ONLY = /\.toISOString\(\)\s*(?:\.slice\(\s*0\s*,\s*10\s*\)|\.split\(\s*['"]T['"]\s*\)\s*\[\s*0\s*\])/g;
 
 /**
  * Убираем комментарии перед подсчётом: иначе сам модуль-канон и любые
@@ -152,7 +157,12 @@ describe('витрина долга: date-only вызовы', () => {
     // смещения. На машине с отрицательным смещением localIsoDate сдвинул бы
     // dueDate на сутки назад — это календарная арифметика, а не долг канона.
     // Расти нельзя. Зона чинит -> число падает, потолок понижается здесь же.
-    const ПОТОЛОК = 129;
+    // Проход 162: ценз научился видеть вторую форму date-only —
+    // `toISOString().split('T')[0]`. Она была слепой зоной (в лаборатории и
+    // рисках прожила до прохода 159), поэтому потолок пересчитан по обеим формам:
+    // измерено 100 мест `.slice(0, 10)` + 19 мест `.split('T')[0]` = 119.
+    // Дальше правило прежнее: только уменьшать.
+    const ПОТОЛОК = 119;
     expect(
       total,
       `date-only мест стало ${total} (был максимум ${ПОТОЛОК}). Почини через core/local-date:\n${sites.slice(0, 20).join('\n')}`,
@@ -162,5 +172,22 @@ describe('витрина долга: date-only вызовы', () => {
   it('зона стронгмена/ТА чиста — там долга быть не должно', () => {
     const вЗоне = sites.filter(s => s.startsWith('src/engines/strength-sport/') || s.startsWith('src/ui/screens/strength-sport/'));
     expect(вЗоне, `в зоне стронгмена/ТА остались date-only вызовы:\n${вЗоне.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('ценз видит обе формы date-only', () => {
+  it('.slice(0, 10) и .split(\'T\')[0]', () => {
+    const формы = [
+      'new Date().toISOString().slice(0, 10)',
+      "new Date().toISOString().split('T')[0]",
+      'new Date().toISOString().split("T")[0]',
+    ];
+    for (const f of формы) {
+      DATE_ONLY.lastIndex = 0;
+      expect(f.match(DATE_ONLY), f).toHaveLength(1);
+    }
+    DATE_ONLY.lastIndex = 0;
+    // Полный таймстемп — событие во времени, а не календарный день: не долг.
+    expect('new Date().toISOString()'.match(DATE_ONLY)).toBeNull();
   });
 });
