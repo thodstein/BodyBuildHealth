@@ -172,9 +172,11 @@ export function useDataLink(): LinkedData {
          // Проход 161: склад прочитан — зеркало дневника приводится к нему сразу.
          // Раньше это делала только вкладка «Дневник», а отчёт и опции калькулятора
          // читают зеркало: свежий бланк не доезжал до них до открытия дневника.
+         // Проход 163: список прочитан целиком (фильтр по пациенту применён),
+         // поэтому дни, которых в складе нет, из зеркала удаляются.
          try {
            const sexRaw = profile?.settings?.personal?.sex;
-           syncLabsToDiary(userLabs, sexRaw === 'female' ? 'female' : sexRaw === 'male' ? 'male' : undefined);
+           syncLabsToDiary(userLabs, sexRaw === 'female' ? 'female' : sexRaw === 'male' ? 'male' : undefined, { complete: true });
          } catch {}
 
          const allCourse = await db.getAll<CourseEntry>('course_log');

@@ -275,18 +275,32 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
  * созданный в этой сессии, не видел бланки, введённые после последнего открытия
  * дневника. Нормы для вердикта берутся из единственного резолвера `getLabNorm`,
  * а не собираются каждой поверхностью отдельно.
+ *
+ * `complete` (проход 163) — вызывающий ручается, что список прочитан целиком
+ * (склад прочитан, фильтр по пациенту применён). Тогда дни зеркала, которых в
+ * списке нет, удаляются: это удалённый бланк, а не «анализов не было». Без
+ * `complete` пустой список ничего не значит — данные приходят асинхронно.
  */
 export function syncLabsToDiary(
   labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[],
   sex?: 'male' | 'female',
+  opts?: { complete?: boolean },
 ): void {
-  if (!labs || labs.length === 0) return;
-  const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
-  for (const lab of labs) {
-    const key = (lab.code || '').toUpperCase();
-    if (markerNorms[key]) continue;
-    const norm = getLabNorm(key, sex);
-    markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
+  const list = Array.isArray(labs) ? labs : [];
+  if (list.length === 0 && !opts?.complete) return;
+  if (list.length > 0) {
+    const markerNorms: Record<string, { uln?: number; lln?: number }> = {};
+    for (const lab of list) {
+      const key = (lab.code || '').toUpperCase();
+      if (markerNorms[key]) continue;
+      const norm = getLabNorm(key, sex);
+      markerNorms[key] = norm ? { lln: norm.lln, uln: norm.uln } : { lln: undefined, uln: undefined };
+    }
+    importLabsToDiary(list, markerNorms);
   }
-  importLabsToDiary(labs, markerNorms);
+  if (!opts?.complete) return;
+  const dates = new Set(list.filter(l => l && l.date).map(l => String(l.date)));
+  const diary = getLabDiary();
+  const next = diary.filter(e => dates.has(e.date));
+  if (next.length !== diary.length) saveLabDiary(next);
 }

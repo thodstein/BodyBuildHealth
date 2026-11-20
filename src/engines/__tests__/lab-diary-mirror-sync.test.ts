@@ -56,6 +56,33 @@ describe('проход 161: syncLabsToDiary', () => {
   });
 });
 
+describe('проход 163: полная сверка зеркала', () => {
+  it('день, которого нет в прочитанном складе, удаляется', () => {
+    syncLabsToDiary([lab(30, '2026-09-20')], 'male');
+    syncLabsToDiary([lab(30, '2026-09-01')], 'male');
+    expect(getLabDiary().map(d => d.date)).toEqual(['2026-09-01', '2026-09-20']);
+    syncLabsToDiary([lab(30, '2026-09-20')], 'male', { complete: true });
+    expect(getLabDiary().map(d => d.date)).toEqual(['2026-09-20']);
+  });
+
+  it('пустой полный список очищает зеркало', () => {
+    syncLabsToDiary([lab(30)], 'male');
+    syncLabsToDiary([], 'male', { complete: true });
+    expect(getLabDiary()).toEqual([]);
+  });
+
+  it('без complete пустой список зеркало не трогает', () => {
+    syncLabsToDiary([lab(30)], 'male');
+    syncLabsToDiary([], 'male');
+    expect(getLabDiary()).toHaveLength(1);
+  });
+
+  it('data-link ручается за полноту прочитанного списка', () => {
+    const src = readFileSync(join(process.cwd(), 'src/core/data-link.ts'), 'utf8');
+    expect(src).toContain('{ complete: true }');
+  });
+});
+
 describe('проход 161: одно правило записи зеркала', () => {
   const src = (rel: string) => readFileSync(join(process.cwd(), rel), 'utf8');
 
