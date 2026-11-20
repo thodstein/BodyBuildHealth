@@ -150,7 +150,6 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'RENIN',        organId: 'hematologic', mechId: 'hem5', direction: 'up', uln: 25 },
   { marker: 'ALDOSTERONE', organId: 'hematologic', mechId: 'hem5', direction: 'up', uln: 15 },
   { marker: 'COPEPTIN',     organId: 'hematologic', mechId: 'hem5', direction: 'up', uln: 14 },
-
   // ─── Эндокринный блок (перекрёстный) ───
   { marker: 'IGF1',         organId: 'hematologic', mechId: 'hem2', direction: 'up', uln: 280 },
   { marker: 'GH',           organId: 'hematologic', mechId: 'hem2', direction: 'up', uln: 5 },
@@ -163,7 +162,6 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'VITAMIN_D',     organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 30 },
   { marker: 'ZINC',         organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 10 },
   { marker: 'SELENIUM',     organId: 'hematologic', mechId: 'hem1', direction: 'down', lln: 70 },
-  { marker: 'MAGNESIUM_H',  organId: 'hematologic', mechId: 'hem4', direction: 'down', lln: 0.7 },
   { marker: 'CALCIUM_ION',  organId: 'hematologic', mechId: 'hem4', direction: 'up', uln: 1.32 },
   { marker: 'PHOSPHATASE',  organId: 'hematologic', mechId: 'hem4', direction: 'up', uln: 120 },
   { marker: 'PTH',          organId: 'hematologic', mechId: 'hem4', direction: 'up', uln: 65 },
@@ -190,10 +188,34 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'CALCIUM',      organId: 'hematologic',  mechId: 'hem4', direction: 'up', uln: 2.6 },
   { marker: 'MAGNESIUM',    organId: 'hematologic',  mechId: 'hem4', direction: 'down', lln: 0.7 },
   { marker: 'PSA',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 4.0 },
-  // GLUCOSE как маркер hem2 (инсулинорезистентность) — повторная запись,
-  // чтобы GLUCOSE активировал ОБА меха: cns5 (гипо) и hem2 (IR)
-  { marker: 'GLUCOSE',      organId: 'hematologic',  mechId: 'hem2', direction: 'up', uln: 5.6 },
 ];
+
+/**
+ * Второй механизм одного анализа (проход 181).
+ *
+ * Таблица давно умеет несколько механизмов на анализ, но вторую строку
+ * приходилось называть выдуманным именем (`POTASSIUM_HIGH`, `INSULIN_FAST`,
+ * `GLUCOSE_FAST`, `PROLAC_REP`). В лабораторных данных таких имён не бывает:
+ * приходит код склада (`POTASSIUM`, `INSULIN`, `PROLACTIN`, `HOMA_IR`), поэтому
+ * вторая строка была недостижима, и анализ получал только первый механизм:
+ * калий 6.0 не активировал электролитный, инсулин 40 — инсулинорезистентность,
+ * пролактин 40 — подавление HPG-оси, гипогликемия — только ЦНС.
+ *
+ * Здесь только имя строки: порог и направление берутся из неё самой, второго
+ * числа нет. `MAGNESIUM`/`CALCIUM` ходят через сокращения склада (`MG`, `CA`),
+ * поэтому их вторая строка записана от сокращения.
+ */
+export const MARKER_SECOND_NAME: Record<string, string[]> = {
+  POTASSIUM: ['POTASSIUM_HIGH'],
+  GLUCOSE: ['GLUCOSE_FAST', 'GLUCOSE_LOW'],
+  INSULIN: ['INSULIN_FAST'],
+  HOMA_IR: ['HOMA_IR_H'],
+  PROLACTIN: ['PROLAC_REP'],
+  CORTISOL: ['CORTISOL_H'],
+  MG: ['MAGNESIUM'],
+  CA: ['CALCIUM'],
+  SODIUM: ['NA'],
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 //  АЛИАСЫ: синонимы маркёров → ключ UCUM_MAP / MARKER_TO_TZ_MECH
@@ -271,6 +293,17 @@ export const MARKER_ALIASES: Record<string, string> = {
   'ANTI_TG': 'ANTI_TG',
   '3A_ADG': '3A_ADG',
   'CA_125': 'CA_125',
+  // ─── Проход 181: канон формы и код склада находят строку механизма ───
+  // Форма называет тромбоциты `PLATELETS`, а строка — `PLT` (тот же анализ,
+  // та же единица). Тропонин I — код склада `TROPONIN_I`, строка `TROPONIN`
+  // (оба 0.04 нг/мл). Натрийуретический маркер приходит как `NT-PROBNP`
+  // (канон подписи) и как `NT_PROBNP` (склад), строка — `NTproBNP`.
+  'PLATELETS': 'PLT',
+  'TROPONIN_I': 'TROPONIN',
+  'NT-PROBNP': 'NTproBNP',
+  'NT_PROBNP': 'NTproBNP',
+  'HOMA': 'HOMA_IR',
+  'HOMAIR': 'HOMA_IR',
 };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -290,6 +323,20 @@ export function normalizeMarker(m: string): string {
     if (x.marker.toLowerCase() === lower) return x.marker;
   }
   return trimmed; // вернуть как есть — возможно canonical
+}
+
+/**
+ * Строки механизмов одного анализа (проход 181).
+ *
+ * Сначала своё имя, затем вторые направления из `MARKER_SECOND_NAME`. Имена
+ * строк с суффиксом (`POTASSIUM_HIGH`, `INSULIN_FAST`) в лабораторных данных не
+ * встречаются — они существуют только как строки таблицы.
+ */
+function linksForMarker(marker: string): MarkerMechLink[] {
+  const direct = MARKER_TO_TZ_MECH.filter(x => x.marker === marker);
+  const extra = MARKER_SECOND_NAME[marker];
+  if (!extra || extra.length === 0) return direct;
+  return [...direct, ...MARKER_TO_TZ_MECH.filter(x => extra.includes(x.marker))];
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -343,8 +390,10 @@ export function getActivatedTzMechs(labs: LabValues): ActivatedMech[] {
     if (typeof value !== 'number' || !isFinite(value)) continue;
     const marker = normalizeMarker(rawMarker);
     // filter (не find) — один маркер может активировать несколько мехов
-    // (например, GLUCOSE → cns5 гипогликемия + hem2 инсулинорезистентность)
-    const links = MARKER_TO_TZ_MECH.filter(x => x.marker === marker);
+    // (например, GLUCOSE → cns5 гипогликемия + hem2 инсулинорезистентность).
+    // Проход 181: к строкам самого имени добавляются вторые направления из
+    // `MARKER_SECOND_NAME` — раньше их открывало только выдуманное имя.
+    const links = linksForMarker(marker);
     if (links.length === 0) continue;
 
     for (const link of links) {
@@ -363,7 +412,14 @@ export function getActivatedTzMechs(labs: LabValues): ActivatedMech[] {
           markers: [entry],
         });
       } else {
-        existing.markers.push(entry);
+        // Проход 181: две строки одного анализа в одном механизме (например,
+        // `MG` и `MAGNESIUM`) — это одна находка, а не две; берём худшую степень.
+        const prev = existing.markers.find(m => m.marker === marker);
+        if (prev) {
+          if (sevRank[sev] > sevRank[prev.severity]) prev.severity = sev;
+        } else {
+          existing.markers.push(entry);
+        }
         // эскалация до максимальной severity
         if (sevRank[sev] > sevRank[existing.severity]) {
           existing.severity = sev;
