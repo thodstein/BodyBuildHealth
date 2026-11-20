@@ -72,6 +72,14 @@ function totalThyroidRange(code: 'T3' | 'T4'): { low: number; high: number; unit
  * «по смыслу» — вместе с чужой единицей это давало ложную критическую
  * гиперфункцию щитовидной железы (см. `totalThyroidRange`). Нет источника —
  * нет и уровня; проверка ниже это учитывает.
+ *
+ * Проход 171: печёночные, почечные и кровяные границы больше не литералы. ALT/AST
+ * и ГГТ держали копии `LFT_ULN`/`GGT_ULN` (40/80 и 55/110), гемоглобин —
+ * `HGB_THRESHOLDS` (170/185), гематокрит — устаревшие 50/54 при действии 51/54
+ * (`HCT_THRESHOLDS`). Свои копии старели отдельно: разбор называл «высоким» HCT
+ * 50, тогда как тиры, проверочные маркеры и гейты уже считали эритроцитоз с 51,
+ * а его лабораторная норма кончается на 52. Теперь числа берутся у тех же
+ * констант, что и остальные поверхности.
  */
 const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh?: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
@@ -91,11 +99,11 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   T4: totalThyroidRange('T4'),
   FREE_T3: { low: 3.1, high: 6.8, criticalHigh: 9, unit: 'пмоль/л' },
   FREE_T4: { low: 9, high: 22, criticalHigh: 30, unit: 'пмоль/л' },
-  ALT: { low: 5, high: 40, criticalHigh: 80, unit: 'Ед/л' },
-  AST: { low: 5, high: 40, criticalHigh: 80, unit: 'Ед/л' },
-  GGT: { low: 5, high: 55, criticalHigh: 110, unit: 'Ед/л' },
+  ALT: { low: 5, high: LFT_ULN.ALT.male, criticalHigh: LFT_STAGE_ULN.reduce.male, unit: 'Ед/л' },
+  AST: { low: 5, high: LFT_ULN.AST.male, criticalHigh: LFT_STAGE_ULN.reduce.male, unit: 'Ед/л' },
+  GGT: { low: 5, high: GGT_ULN.male, criticalHigh: GGT_STAGE_ULN.double.male, unit: 'Ед/л' },
   BILIRUBIN: { low: 3, high: 20, criticalHigh: 35, unit: 'мкмоль/л' },
-  CREATININE: { low: 60, high: 110, criticalHigh: 140, unit: 'мкмоль/л' },
+  CREATININE: { low: 60, high: CREATININE_ULN.male, criticalHigh: 140, unit: 'мкмоль/л' },
   UREA: { low: 2.5, high: 8.3, criticalHigh: 12, unit: 'ммоль/л' },
   GLUCOSE: { low: 3.5, high: 6.1, criticalHigh: 7.0, unit: 'ммоль/л' },
   INSULIN: { low: 2, high: 10, criticalHigh: 15, unit: 'мкЕд/мл' },
@@ -106,8 +114,21 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   CRP: { low: 0, high: 3, criticalHigh: 10, unit: 'мг/л' },
   FERRITIN: { low: 20, high: 300, criticalHigh: 500, unit: 'мкг/л' },
   HOMOCYSTEINE: { low: 5, high: 12, criticalHigh: 15, unit: 'мкмоль/л' },
-  HEMOGLOBIN: { low: 130, high: 170, criticalHigh: 185, unit: 'г/л' },
-  HEMATOCRIT: { low: 39, high: 50, criticalHigh: 54, unit: '%' },
+  HEMOGLOBIN: {
+    low: getLabNorm('HGB')?.lln ?? 130,
+    high: HGB_THRESHOLDS.male.upper,
+    criticalHigh: HGB_THRESHOLDS.male.block,
+    unit: 'г/л',
+  },
+  HEMATOCRIT: {
+    // Проход 171: 39/50 были устаревшей копией. Низ — лабораторная норма
+    // (`UCUM_MAP`, у женщины он же), верх — начало эритроцитоза из
+    // `HCT_THRESHOLDS` (51), критическое — порог блока (54), как у женщины 48/52.
+    low: getLabNorm('HCT')?.lln ?? 36,
+    high: HCT_THRESHOLDS.male.erythrocytosis,
+    criticalHigh: HCT_THRESHOLDS.male.block,
+    unit: '%',
+  },
   ERYTHROCYTES: { low: 4.2, high: 5.8, criticalHigh: 6.2, unit: '10^12/л' },
   LEUKOCYTES: { low: 4, high: 10, criticalHigh: 12, unit: '10^9/л' },
   THROMBOCYTES: { low: 150, high: 400, criticalHigh: 500, unit: '10^9/л' },
@@ -130,9 +151,9 @@ const FEMALE_REFERENCE_OVERRIDES: Record<string, { low?: number; high?: number; 
   ALT: { high: LFT_ULN.ALT.female, criticalHigh: LFT_STAGE_ULN.reduce.female },
   AST: { high: LFT_ULN.AST.female, criticalHigh: LFT_STAGE_ULN.reduce.female },
   GGT: { high: GGT_ULN.female, criticalHigh: GGT_STAGE_ULN.double.female },
-  CREATININE: { low: 44, high: CREATININE_ULN.female, criticalHigh: 120 },
-  HEMOGLOBIN: { low: 120, high: HGB_THRESHOLDS.female.upper, criticalHigh: HGB_THRESHOLDS.female.block },
-  HEMATOCRIT: { low: 36, high: HCT_THRESHOLDS.female.erythrocytosis, criticalHigh: HCT_THRESHOLDS.female.block },
+  CREATININE: { low: getLabNorm('CREATININE', 'female')?.lln ?? 44, high: CREATININE_ULN.female, criticalHigh: 120 },
+  HEMOGLOBIN: { low: getLabNorm('HGB', 'female')?.lln ?? 120, high: HGB_THRESHOLDS.female.upper, criticalHigh: HGB_THRESHOLDS.female.block },
+  HEMATOCRIT: { low: getLabNorm('HCT', 'female')?.lln ?? 36, high: HCT_THRESHOLDS.female.erythrocytosis, criticalHigh: HCT_THRESHOLDS.female.block },
   TESTOSTERONE_TOTAL: { low: 0, high: 6, criticalHigh: 10 },
   TESTOSTERONE_FREE: { low: 0 },
   ESTRADIOL: { low: FEMALE_HORMONE_ULN.E2.low, high: FEMALE_HORMONE_ULN.E2.high, criticalHigh: FEMALE_HORMONE_ULN.E2.criticalHigh },
