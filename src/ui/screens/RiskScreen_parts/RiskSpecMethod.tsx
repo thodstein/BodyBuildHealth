@@ -2,10 +2,11 @@
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
 import React, { useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, mechanismCoverageOf, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
-import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
+import { buildTzInputCore, flatLabUnit, readFlatLabs } from '../../../engines/support-plan/engine-helpers';
 // Проход 169: одно имя анализа — мост «легаси-имя/подпись поля → код склада» (движок и верификация).
 import { canonicalLabValues, LEGACY_LAB_CODES } from '../../../engines/lab-code-bridge';
 import { useDataLink } from '../../../core/data-link';
+import { ucumInfo } from '../../../core/constants';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../../core/pharma-database';
 import { DRUG_DB } from '../../../data/support-db';
@@ -156,7 +157,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
 
   // Проход 169: покрытие считается по кодам склада — `EGFR` (не `eGFR`) и `NA`
   // (не `Na`) раньше не совпадали с ключами, и покрытие занижалось на два анализа.
-  const labMap = useMemo(() => canonicalLabValues(normalizeFlatLabs(labs)), [labs]);
+  // Проход 182: `readFlatLabs` переводит единицу бланка в единицу расчёта и
+  // отдельно называет записи, которые перевести нечем (КФК-МВ Е/л против нормы
+  // в нг/мл): они не исчезают молча — см. подпись под списком.
+  const flatLabs = useMemo(() => readFlatLabs(labs), [labs]);
+  const labMap = useMemo(() => canonicalLabValues(flatLabs.values), [flatLabs]);
   // Показ без двойного счёта: если у анализа есть канон-ключ, его прежнее имя
   // (например, `TC` рядом с `CHOL`) в списке не печатается второй строкой.
   const displayLabs = useMemo(() => {
@@ -658,6 +663,15 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                       +{Object.keys(displayLabs).length - 16} ещё
                     </span>
                   )}
+                </div>
+              )}
+              {flatLabs.unread.length > 0 && !forceNoLabs && (
+                <div data-labs-unread style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {flatLabs.unread.map(u => (
+                    <span key={u.code} style={{ ...GlassChip, fontSize: 11, fontWeight: 700, padding: '6px 10px', background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.30)', color: '#fff' }}>
+                      ⚠ {ucumInfo(u.code)?.name ?? u.code}: {u.value} {u.unit} — пересчёта в {flatLabUnit(u.code)} нет, в расчёт не вошло
+                    </span>
+                  ))}
                 </div>
               )}
             </div>

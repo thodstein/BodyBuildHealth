@@ -470,8 +470,15 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
   // превращалось в «18.4 ng/dL» (реально 530). Если обе единицы разобраны как
   // концентрации, но пересчёт невозможен (например, Лп(а) mg/dL → nmol/L или
   // КФК-МВ U/L → ng/mL), честно оставляем исходную единицу.
-  if (!converted && from && from !== target && sourceDim && targetDim) {
-    return { value: round(value), unit: unit.trim() };
+  //
+  // Проход 182: правило распространилось и на НЕразобранные единицы («балл»,
+  // «10⁹/л», «—»). Раньше здесь стоял канон каталога, и число без пересчёта
+  // подписывалось чужой единицей — «5 нмоль/л» общего тестостерона с единицей
+  // «—» превращалось в «5 ng/dL» (0.17 нмоль/л), то есть в тяжёлый дефицит.
+  // Единица без пересчёта — единица бланка; канон ставится только тогда, когда
+  // пересчёт был или единицы бланка не было вовсе.
+  if (!converted) {
+    return { value: round(value), unit: unit.trim() || info.prefUnit };
   }
   return { value: round(value * factor), unit: info.prefUnit };
 }
@@ -499,6 +506,19 @@ export function unitsIncommensurable(a: string, b: string): boolean {
   const da = parseConcentrationUnit(ka);
   const db = parseConcentrationUnit(kb);
   return !!da && !!db && da.kind !== db.kind;
+}
+
+/**
+ * Одна и та же единица после сведения написаний (проход 182).
+ *
+ * «МЕ/л» и «mIU/L», «мкг/л» и «ug/L», «пг/мл» и «pg/mL» — один ключ `unitKey`,
+ * поэтому числа можно сравнивать без пересчёта. Пустое написание считается
+ * «неизвестным» и тоже не мешает: пересчитывать нечего (см. `readLabInUnit`).
+ */
+export function sameLabUnit(a: string, b: string): boolean {
+  const ka = unitKey(a || '');
+  const kb = unitKey(b || '');
+  return !ka || !kb || ka === kb;
 }
 
 /**
@@ -560,6 +580,55 @@ export function convertToUnit(code: string, value: number, fromUnit: string, toU
 
 function round(value: number): number {
   return Number(value.toFixed(Math.abs(value) >= 100 ? 1 : 3));
+}
+
+/**
+ * Число бланка в единице расчёта (проход 182).
+ *
+ * Модель риска и шкалы ждут число в своей единице (`target`: пг/мл у эстрадиола,
+ * нмоль/л у общего тестостерона, Е/л у ферментов). Плоский список анализов
+ * (`normalizeFlatLabs`) переводил единицу только у шести гормонов, а всем
+ * остальным отдавал число как есть: 60 пмоль/л инсулина читались как 60 мЕд/л
+ * (норма 17), 90 мг/дл глюкозы — как 90 ммоль/л, 15 г/дл гемоглобина — как
+ * 15 г/л. Догадка по величине здесь тем более не нужна: единица известна.
+ *
+ * Один порядок чтения:
+ *  1) единица уже та — число не трогаем (и не округляем);
+ *  2) общий пересчёт каталога (`normalizeLabMeasurement`: масса↔моль, ферменты,
+ *     мккат/л, HbA1c mmol/mol, инсулин пмоль/л);
+ *  3) остаток до нужной единицы (`convertToUnit`);
+ *  4) пересчитать нечем и величины разные (`unitsIncommensurable`) — `null`:
+ *     число нельзя выдавать за прочитанное в единице расчёта.
+ *
+ * Неразобранная единица («10⁹/л», «балл», «—») остаётся как есть: «не знаю
+ * единицу» ≠ «другая величина», и отнимать за это число нельзя. Единицы нет
+ * вовсе — тоже как есть: что делать с числом без единицы, решает вызывающий.
+ */
+export function readLabInUnit(code: string, value: number, unit: string, target: string): number | null {
+  if (!Number.isFinite(value)) return null;
+  if (!target || !unit) return value;
+  if (sameLabUnit(unit, target)) return value;
+
+  // Проход 182: первым идёт общий пересчёт каталога — в нём живут клинические
+  // коэффициенты (глюкоза 18.018, молярные массы, HbA1c, инсулин). `convertToUnit`
+  // считает ту же пару по молярной массе и давал 90 мг/дл = 4.996 вместо 4.995:
+  // одно преобразование — одно число.
+  const measured = normalizeLabMeasurement(code, value, unit);
+  // Единица не сменилась — пересчёта не было (единица не разобрана или её нет):
+  // второй шаг из такой «единицы» увёл бы число из чужого измерения.
+  if (!sameLabUnit(measured.unit, unit)) {
+    if (sameLabUnit(measured.unit, target)) return measured.value;
+    const toTarget = convertToUnit(code, measured.value, measured.unit, target);
+    if (toTarget !== null) return toTarget;
+  }
+
+  // Канон каталога и единица расчёта разошлись (общий тестостерон: ng/dL против
+  // нмоль/л) — прямой пересчёт из единицы бланка.
+  const direct = convertToUnit(code, value, unit, target);
+  if (direct !== null) return direct;
+
+  if (unitsIncommensurable(measured.unit, target)) return null;
+  return value;
 }
 
 /** Convert any known code to a UCUM_MAP key (returns the code itself if no alias exists) */
