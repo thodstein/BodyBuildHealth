@@ -11,15 +11,12 @@ import { localIsoDate } from '../../../core/local-date';
 import type { WorkoutLog } from '../../../core/types';
 import {
   buildWorkoutSummary,
-  buildWorkoutInsights,
+  buildWorkoutReportText,
   buildSetDetails,
   compareWorkoutSummaries,
   filterWorkoutsByRange,
   monthRange,
   weekRangeFor,
-  formatSummaryPeriod,
-  muscleLandmarksFor,
-  volumeAdvice,
 } from '../../../engines/workout-summary.engine';
 import { WorkoutSummaryReport } from './WorkoutSummaryReport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -181,105 +178,17 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   }, [workouts, pickQuery]);
 
   const copyReport = () => {
-    const lines: string[] = [];
-    lines.push(`📊 Отчёт: ${formatSummaryPeriod(summary)}`);
-    lines.push(`Тренировок: ${summary.totals.sessions} · подходов: ${summary.totals.sets} · повторов: ${summary.totals.reps}`);
-    lines.push(`Тоннаж: ${fmtTon(summary.totals.tonnageKg)} · время: ${summary.totals.durationMin} мин · плотность: ${summary.totals.densityKgPerMin} кг/мин`);
-    if (summary.totals.avgIntensityPct != null) {
-      lines.push(`Средняя интенсивность: ${summary.totals.avgIntensityPct}% от e1RM`);
-    }
-    lines.push('');
-    lines.push('По мышцам:');
-    const weeksCount = Math.max(1, summary.weeks.length);
-    const perWeek = summary.totals.sessions > 1;
-    const weeklyUnit = perWeek ? 'подх/нед' : 'подх за сессию';
-    summary.muscles.forEach(m => {
-      const weekly = Math.round(m.sets / weeksCount);
-      const trend = m.weeklyTrendPct != null ? ` (${m.weeklyTrendPct > 0 ? '+' : ''}${m.weeklyTrendPct}% к первой неделе)` : '';
-      // Совет по объёму — та же правка, что видна на экране: +5/нед до MEV.
-      const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, hub.level), perWeek);
-      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
-    });
-    lines.push('');
-    lines.push('По упражнениям:');
-    summary.exercises.forEach(e => lines.push(`  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${fmtTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}`));
-    if (summary.patterns.length) {
-      lines.push('');
-      lines.push('Движения:');
-      summary.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${fmtTon(p.tonnageKg)}`));
-    }
+    // Сборка текста живёт в движке: дневник и «Итог» плеера копируют одно и то же.
     const cmp = previousWorkouts.length > 0
       ? compareWorkoutSummaries(summary, buildWorkoutSummary(previousWorkouts))
       : null;
-    const insights = buildWorkoutInsights(summary, hub.level, cmp);
-    if (insights.length) {
-      lines.push('');
-      lines.push('Выводы:');
-      insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
-    }
-    if (cmp && !cmp.empty) {
-      const fmtDelta = (d: { delta: number; pct: number | null }) =>
-        `${d.delta > 0 ? '+' : ''}${fmtInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
-      lines.push('');
-      lines.push(`Сравнение с ${previousLabel}:`);
-      lines.push(`  Тоннаж: ${fmtInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
-      lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
-      lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
-      if (cmp.metrics.duration.previous > 0) {
-        lines.push(`  Время: ${fmtInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
-      }
-      if (cmp.metrics.rir) {
-        const r = cmp.metrics.rir;
-        const fmtRir = (n: number) => String(Math.round(n * 10) / 10);
-        lines.push(`  Средний RIR: ${fmtRir(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtRir(r.delta)}`);
-      }
-      const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
-      const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
-      if (movedMuscles.length) {
-        lines.push('  Мышцы:');
-        movedMuscles.forEach(m => {
-          lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`);
-        });
-      }
-      const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
-      if (movedPatterns.length) {
-        lines.push('  Движения:');
-        movedPatterns.forEach(p => {
-          lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`);
-        });
-      }
-      const movedE1rm = cmp.exercises
-        .filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0)
-        .slice(0, 5);
-      if (movedE1rm.length) {
-        lines.push('  e1RM по упражнениям:');
-        movedE1rm.forEach(e => {
-          lines.push(
-            e.e1rm.previous > 0
-              ? `    ${e.name}: ${e.e1rm.previous} → ${e.e1rm.current} кг (${signed(e.e1rm.delta)})`
-              : `    ${e.name}: новое · ${e.e1rm.current} кг`,
-          );
-        });
-      }
-    }
-    if (summary.totals.weightlessSets > 0) {
-      lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${summary.totals.weightlessSets} подх.`);
-    }
-    if (summary.workouts <= 3) {
-      const perSet = buildSetDetails(selected);
-      if (perSet.length) {
-        lines.push('');
-        lines.push('Подходы:');
-        perSet.forEach(session => {
-          lines.push(`  ${session.date} · ${session.split} · ${fmtTon(session.tonnageKg)}`);
-          session.exercises.forEach(ex => {
-            const sets = ex.sets.map(st => `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`).join(', ');
-            lines.push(`    ${ex.name}: ${sets}`);
-          });
-        });
-      }
-    }
-    void navigator.clipboard?.writeText(lines.join('\n')).then(() => {
+    const text = buildWorkoutReportText(summary, {
+      level: hub.level,
+      comparison: cmp,
+      comparisonLabel: previousLabel,
+      details: summary.workouts <= 3 ? buildSetDetails(selected) : null,
+    });
+    void navigator.clipboard?.writeText(text).then(() => {
       setCopyDone(true);
       setTimeout(() => setCopyDone(false), 1800);
     }).catch(() => {});

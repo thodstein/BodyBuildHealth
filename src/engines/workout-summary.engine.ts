@@ -1502,6 +1502,151 @@ export const PLAN_ROW_COLOR: Record<PlanRowStatus, string> = {
   unplanned: '#a78bfa',
 };
 
+// ─── Текстовый отчёт (копирование) ─────────────────────────────────────────
+
+const textInt = (n: number): string => Math.round(n || 0).toLocaleString('ru-RU');
+const textTon = (kg: number): string => (kg >= 1000 ? `${(kg / 1000).toFixed(1)} т` : `${textInt(kg)} кг`);
+
+export interface WorkoutReportTextOptions {
+  /** Уровень спортсмена — для ориентиров MEV/MAV/MRV. */
+  level?: string;
+  /** Сравнение с прошлым периодом. */
+  comparison?: SummaryComparison | null;
+  /** Как назвать предыдущий период: «прошлой тренировкой». */
+  comparisonLabel?: string;
+  /** План против факта (плеер). */
+  plan?: PlanVsActual | null;
+  /** Подходы «как есть» — переданы только для короткого периода. */
+  details?: SetDetailSession[] | null;
+  /** Своя первая строка (например, «📊 Итог: FullBody — 62 мин»). */
+  header?: string;
+  /** Дополнительные строки в конце (например, прогрессия к следующей сессии). */
+  footer?: string[];
+}
+
+/**
+ * Текст отчёта для «Копировать»: одна и та же сборка для дневника и «Итога»
+ * плеера, чтобы цифры и формулировки не расходились между экранами.
+ * Текст самодостаточен: объём с правкой по MEV, сравнение, план и подходы.
+ */
+export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTextOptions = {}): string {
+  const level = opts.level || 'intermediate';
+  const lines: string[] = [];
+  lines.push(opts.header || `📊 Отчёт: ${formatSummaryPeriod(s)}`);
+  lines.push(`Тренировок: ${s.totals.sessions} · подходов: ${s.totals.sets} · повторов: ${s.totals.reps}`);
+  lines.push(`Тоннаж: ${textTon(s.totals.tonnageKg)} · время: ${s.totals.durationMin} мин · плотность: ${s.totals.densityKgPerMin} кг/мин`);
+  if (s.totals.avgIntensityPct != null) {
+    lines.push(`Средняя интенсивность: ${s.totals.avgIntensityPct}% от e1RM`);
+  }
+
+  const weeksCount = summaryWeeksCount(s);
+  const perWeek = s.totals.sessions > 1;
+  const weeklyUnit = perWeek ? 'подх/нед' : 'подх за сессию';
+  lines.push('');
+  lines.push('По мышцам:');
+  s.muscles.forEach(m => {
+    const weekly = Math.round(m.sets / weeksCount);
+    const trend = m.weeklyTrendPct != null ? ` (${signedPct(m.weeklyTrendPct)} к первой неделе)` : '';
+    const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, level), perWeek);
+    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · ${m.sharePct}%`);
+  });
+
+  lines.push('');
+  lines.push('По упражнениям:');
+  s.exercises.forEach(e => lines.push(
+    `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}`,
+  ));
+
+  if (s.patterns.length) {
+    lines.push('');
+    lines.push('Движения:');
+    s.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)}`));
+  }
+
+  if (opts.plan && !opts.plan.empty) {
+    const pva = opts.plan;
+    lines.push('');
+    lines.push(`План: ${pva.plannedSets} подх · факт: ${pva.actualSets} подх${pva.setsPct != null ? ` (${pva.setsPct}%)` : ''} · ${textTon(pva.plannedTonnageKg)} → ${textTon(pva.actualTonnageKg)}`);
+    pva.rows.forEach(r => {
+      if (r.status === 'done') return;
+      const tone = r.status === 'unplanned' ? 'не по плану' : r.status === 'skipped' ? 'пропущено' : r.status === 'over' ? 'сверх плана' : 'не добито';
+      lines.push(`  ${r.name}: план ${r.plannedSets} → факт ${r.actualSets} (${tone})`);
+    });
+  }
+
+  const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan);
+  if (insights.length) {
+    lines.push('');
+    lines.push('Выводы:');
+    insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
+  }
+
+  const cmp = opts.comparison;
+  if (cmp && !cmp.empty) {
+    const fmtDelta = (d: MetricDelta) =>
+      `${d.delta > 0 ? '+' : ''}${textInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
+    const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+    lines.push('');
+    lines.push(`Сравнение с ${opts.comparisonLabel || 'прошлым периодом'}:`);
+    lines.push(`  Тоннаж: ${textInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
+    lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
+    lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
+    if (cmp.metrics.duration.previous > 0) {
+      lines.push(`  Время: ${textInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
+    }
+    if (cmp.metrics.rir) {
+      const r = cmp.metrics.rir;
+      const fmtRir = (n: number) => String(Math.round(n * 10) / 10);
+      lines.push(`  Средний RIR: ${fmtRir(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtRir(r.delta)}`);
+    }
+    const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
+    if (movedMuscles.length) {
+      lines.push('  Мышцы:');
+      movedMuscles.forEach(m => lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`));
+    }
+    const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
+    if (movedPatterns.length) {
+      lines.push('  Движения:');
+      movedPatterns.forEach(p => lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`));
+    }
+    const movedE1rm = cmp.exercises.filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0).slice(0, 5);
+    if (movedE1rm.length) {
+      lines.push('  e1RM по упражнениям:');
+      movedE1rm.forEach(e => lines.push(
+        e.e1rm.previous > 0
+          ? `    ${e.name}: ${e.e1rm.previous} → ${e.e1rm.current} кг (${signed(e.e1rm.delta)})`
+          : `    ${e.name}: новое · ${e.e1rm.current} кг`,
+      ));
+    }
+  }
+
+  if (s.totals.weightlessSets > 0) {
+    lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${s.totals.weightlessSets} подх.`);
+  }
+
+  const details = opts.details || [];
+  if (details.length) {
+    lines.push('');
+    lines.push('Подходы:');
+    details.forEach(session => {
+      lines.push(`  ${session.date} · ${session.split} · ${textTon(session.tonnageKg)}`);
+      session.exercises.forEach(ex => {
+        const sets = ex.sets
+          .map(st => `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`)
+          .join(', ');
+        lines.push(`    ${ex.name}: ${sets}`);
+      });
+    });
+  }
+
+  if (opts.footer && opts.footer.length > 0) {
+    lines.push('');
+    lines.push(...opts.footer);
+  }
+
+  return lines.join('\n');
+}
+
 export const VOLUME_STATUS_LABEL: Record<VolumeStatus, string> = {
   below_mev: 'ниже MEV',
   optimal: 'в норме',

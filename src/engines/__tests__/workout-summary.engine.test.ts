@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorkoutSummary,
   buildWorkoutInsights,
+  buildWorkoutReportText,
   buildSetDetails,
   compareWorkoutSummaries,
   comparePlanVsActual,
@@ -722,5 +723,62 @@ describe('workout-summary: план против факта', () => {
     expect(pva.setsPct).toBe(100);
     expect(buildWorkoutInsights(summary, 'intermediate', null, pva).some(i => i.id === 'plan-gap')).toBe(false);
     expect(buildWorkoutInsights(summary).some(i => i.id === 'plan-gap')).toBe(false);
+  });
+});
+
+describe('workout-summary: текст отчёта для копирования', () => {
+  const wk = () => mkWorkout('2026-11-03', [
+    { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+    { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3 },
+  ]);
+
+  it('собирает тот же отчёт, что на экране', () => {
+    const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]));
+    expect(txt.startsWith('📊 Отчёт: ')).toBe(true);
+    expect(txt).toContain('По мышцам:');
+    expect(txt).toContain('Грудь');
+    expect(txt).toContain('По упражнениям:');
+    expect(txt).toContain('Жим штанги лёжа: 3×8');
+    expect(txt).toContain('Движения:');
+  });
+
+  it('своя шапка и хвост обрамляют отчёт', () => {
+    const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]), {
+      header: '🏋️ Тренировка: FullBody — 2026-11-03',
+      footer: ['📈 Следующая сессия:', '  Жим штанги лёжа → 82.5кг×8'],
+    });
+    expect(txt.split('\n')[0]).toBe('🏋️ Тренировка: FullBody — 2026-11-03');
+    expect(txt).toContain('📈 Следующая сессия:');
+    expect(txt.trimEnd().endsWith('Жим штанги лёжа → 82.5кг×8')).toBe(true);
+  });
+
+  it('план и подходы попадают в текст', () => {
+    const s = buildWorkoutSummary([wk()]);
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: Array.from({ length: 4 }, () => ({ weight: 80, reps: 8 })) },
+    ], s);
+    const txt = buildWorkoutReportText(s, { plan: pva, details: buildSetDetails([wk()]) });
+    expect(txt).toContain('План: 4 подх · факт: 6 подх (150%)');
+    expect(txt).toContain('Жим штанги лёжа: план 4 → факт 3 (не добито)');
+    expect(txt).toContain('Тяга верхнего блока: план 0 → факт 3 (не по плану)');
+    expect(txt).toContain('Подходы:');
+    expect(txt).toContain('80×8@2');
+  });
+
+  it('сравнение называет период и показывает движения и e1RM', () => {
+    const prev = mkWorkout('2026-10-27', [
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
+    ]);
+    const cur = mkWorkout('2026-11-03', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+    ]);
+    const s = buildWorkoutSummary([cur]);
+    const cmp = compareWorkoutSummaries(s, buildWorkoutSummary([prev]));
+    const txt = buildWorkoutReportText(s, { comparison: cmp, comparisonLabel: 'прошлой тренировкой' });
+    expect(txt).toContain('Сравнение с прошлой тренировкой:');
+    expect(txt).toContain('  Мышцы:');
+    expect(txt).toContain('  Движения:');
+    expect(txt).toContain('  e1RM по упражнениям:');
+    expect(txt).toContain('Жим штанги лёжа: новое · ');
   });
 });

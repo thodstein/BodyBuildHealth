@@ -41,7 +41,7 @@ import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-read
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
 import { WorkoutSummaryReport } from '../TrainingScreen_parts/WorkoutSummaryReport';
-import { sessionToWorkoutLog, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput } from '../../../engines/workout-summary.engine';
+import { sessionToWorkoutLog, buildWorkoutSummary, buildWorkoutReportText, buildSetDetails, compareWorkoutSummaries, comparePlanVsActual, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput } from '../../../engines/workout-summary.engine';
 import { getVolumeLandmarks, checkVolumeStatus, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
@@ -196,6 +196,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
   const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
+  // Фидбек кнопки «Копировать сводку» — на 1.8 с меняется на «✓ Скопировано».
+  const [copyDone, setCopyDone] = useState(false);
   // План завершённой тренировки — снимок на момент финиша. День в плеере
   // можно переключить, а «Итог» должен сравнивать с тем планом, что выполняли.
   const [donePlan, setDonePlan] = useState<PlannedExerciseInput[] | null>(null);
@@ -2635,29 +2637,33 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             
              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => {
                if (!done) return;
-               const lines: string[] = [];
-               lines.push(`🏋️ Тренировка: ${done.focus} — ${done.date}`);
-               lines.push(`⏱ ${done.startTime}–${done.endTime} (${done.durationMin} мин)`);
-               lines.push(`📊 Тоннаж: ${done.totalVolume.toLocaleString()} кг · Подходы: ${done.totalSets} · Повторы: ${done.totalReps}`);
-               if (topE1RM.e1rm > 0) lines.push(`🎯 Лучший 1RM: ${topE1RM.exercise} ${topE1RM.weight}кг×${topE1RM.reps} → ${topE1RM.e1rm}кг`);
-               lines.push('');
-               done.exercises.forEach(ex => {
-                 lines.push(`${ex.exerciseName} (${ex.muscleGroup})`);
-                 ex.sets.forEach(s => {
-                   lines.push(`  #${s.setNumber} ${s.weightKg}кг×${s.reps} RPE${s.rpe} e1RM~${Math.round(s.weightKg * (1 + s.reps / 30))}кг${s.isPR ? ' 🏆 PR' : ''}`);
-                 });
-                 lines.push(`  Итого: ${ex.totalVolume}кг · лучший 1RM: ${ex.best1RM}кг`);
-               });
+               // Текст собирает движок: тот же отчёт, что в дневнике и на экране.
+               const log = sessionToWorkoutLog(done);
+               const summary = buildWorkoutSummary([log], doneHistory);
+               const cmp = doneHistory.length > 0
+                 ? compareWorkoutSummaries(summary, buildWorkoutSummary(doneHistory.slice(0, 1)))
+                 : null;
+               const planVs = donePlan && donePlan.length > 0 ? comparePlanVsActual(donePlan, summary) : null;
+               const footer: string[] = [];
                if (nextSuggestions.length > 0) {
-                 lines.push('');
-                 lines.push('📈 Следующая сессия:');
-                 nextSuggestions.forEach(s => lines.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
+                 footer.push('📈 Следующая сессия:');
+                 nextSuggestions.forEach(s => footer.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
                }
-               const text = lines.join('\n');
+               const text = buildWorkoutReportText(summary, {
+                 level: profile.level,
+                 comparison: cmp,
+                 comparisonLabel: 'прошлой тренировкой',
+                 plan: planVs,
+                 details: buildSetDetails([log]),
+                 header: `🏋️ Тренировка: ${done.focus} — ${done.date}\n⏱ ${done.startTime}–${done.endTime} (${done.durationMin} мин)`,
+                 footer,
+               });
                navigator.clipboard?.writeText(text).then(() => {
+                 setCopyDone(true);
+                 setTimeout(() => setCopyDone(false), 1800);
                  if (timerSoundSettings.vibrate) hapticNotify('success');
                }).catch(() => {});
-             }}>📋 Копировать сводку</button>
+             }}>{copyDone ? '✓ Скопировано' : '📋 Копировать сводку'}</button>
              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
             {days.length > 1 && dayIdx < days.length - 1 && (
               <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
