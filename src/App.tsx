@@ -462,31 +462,49 @@ export default function App() {
     let alive = true;
     let lastAt = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const sync = () => {
+    let offNutrition: (() => void) | undefined;
+    const push = () => {
       if (!alive) return;
-      const now = Date.now();
-      // focus + visibilitychange часто приходят парой — не дублируем работу.
-      if (now - lastAt < 8000) return;
-      lastAt = now;
+      lastAt = Date.now();
       void import('./ui/native/widget-sync')
         .then((m) => m.syncAllWidgets())
         .catch(() => {
           /* виджеты — необязательный слой */
         });
     };
+    const sync = () => {
+      // focus + visibilitychange часто приходят парой — не дублируем работу.
+      if (Date.now() - lastAt < 8000) return;
+      push();
+    };
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         if (timer) clearTimeout(timer);
         // Даём WebView восстановиться после фона, затем отдаём данные.
         timer = setTimeout(sync, 350);
+        return;
       }
+      // Уходим на рабочий стол — виджет должен показывать то, что только что
+      // записали в приложении, а не цифры прошлого синка.
+      if (Date.now() - lastAt > 1500) push();
     };
     timer = setTimeout(sync, 1200);
+    // Правки дневника/плана пере-пушим сразу (с дебаунсом) — числа на столе
+    // совпадают с приложением без ожидания сворачивания.
+    void import('./ui/native/widget-sync')
+      .then((m) => {
+        if (!alive) return;
+        offNutrition = m.watchNutritionForWidgets();
+      })
+      .catch(() => {
+        /* виджеты — необязательный слой */
+      });
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
       alive = false;
       if (timer) clearTimeout(timer);
+      if (offNutrition) offNutrition();
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };

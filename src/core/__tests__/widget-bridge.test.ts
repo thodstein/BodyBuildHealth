@@ -39,6 +39,7 @@ import {
   formatPlanLine,
   trainingWeekdays,
   collectCalendar,
+  watchNutritionForWidgets,
 } from '../../ui/native/widget-sync';
 import { localIsoDate } from '../local-date';
 
@@ -631,5 +632,79 @@ describe('аналитика питания: день, неделя, месяц'
     expect(n.periods.month.kcal).toBe(sum(monthFirst, monthLast));
     expect(n.periods.month.days).toBe(count(monthFirst, monthLast));
     expect(n.periods.month.days).toBeGreaterThanOrEqual(n.periods.week.days);
+  });
+
+  it('33. collectNutrition: цели как на экране «Питание» — из плана, не из профиля', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const { publishPlanTargets, PLAN_TARGETS_KEY } = await import(
+      '../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge'
+    );
+
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: { meals: { lunch: [{ name: 'Блюдо', kcal: 700, p: 40, f: 20, c: 70, qty: 200 }] } },
+    } as any);
+
+    publishPlanTargets({ kcal: 2150, protein: 180, fats: 60, carbs: 210 });
+    const n = collectNutrition();
+
+    // Цели — ровно те, что видит дневник (мост плана), а не профильный расчёт.
+    expect(n.targetKcal).toBe(2150);
+    expect(n.targetProtein).toBe(180);
+    expect(n.targetFat).toBe(60);
+    expect(n.targetCarbs).toBe(210);
+    // Факт КБЖУ берётся из дневника и целью не подменяется.
+    expect(n.kcal).toBe(700);
+    expect(n.protein).toBe(40);
+    expect(n.fat).toBe(20);
+    expect(n.carbs).toBe(70);
+    expect(JSON.parse(localStorage.getItem(PLAN_TARGETS_KEY) || '{}').kcal).toBe(2150);
+  });
+
+  it('34. без плана цели виджета остаются профильными, мусорный план их не подменяет', async () => {
+    const { PLAN_TARGETS_KEY } = await import(
+      '../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge'
+    );
+    const before = collectNutrition();
+    expect(before.targetKcal).toBeGreaterThan(0);
+    expect(before.targetProtein).toBeGreaterThan(0);
+
+    // Полупустой/нулевой план — не цель: мост отбрасывает его (kcal <= 0).
+    localStorage.setItem(
+      PLAN_TARGETS_KEY,
+      JSON.stringify({ kcal: 0, protein: 999, fats: 1, carbs: 1 }),
+    );
+    const after = collectNutrition();
+    expect(after.targetKcal).toBe(before.targetKcal);
+    expect(after.targetProtein).toBe(before.targetProtein);
+    // Вода планом не задаётся — цель остаётся профильной.
+    expect(after.waterTargetMl).toBeGreaterThan(0);
+  });
+
+  it('35. правка дневника сразу пере-пушивает снапшот питания', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    vi.useFakeTimers();
+    try {
+      const off = watchNutritionForWidgets(10);
+      const today = localIsoDate();
+      writeDiaryV2({
+        [today]: { meals: { lunch: [{ name: 'Блюдо', kcal: 480, p: 30, f: 12, c: 55 }] } },
+      } as any);
+      await vi.advanceTimersByTimeAsync(60);
+
+      const snap = readFallbackSnapshot('nutrition') as {
+        kcal: number;
+        protein: number;
+        periods: { day: { kcal: number; protein: number } };
+      };
+      // Снапшот обновлён без возврата приложения в фокус — цифры стола совпадают.
+      expect(snap.kcal).toBe(480);
+      expect(snap.protein).toBe(30);
+      expect(snap.periods.day.kcal).toBe(480);
+      expect(snap.periods.day.protein).toBe(30);
+      off();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -29,7 +29,12 @@ import { loadWaterLog, addWater } from '../../engines/nutrition-tracker.engine';
 import {
   readDiaryV2,
   writeDiaryV2,
+  onDiaryChangeV2,
 } from '../screens/NutritionScreen_parts/diary-storage-v2';
+import {
+  readPlanTargets,
+  PLAN_TARGETS_EVENT,
+} from '../screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge';
 import {
   syncTrainingWidget,
   syncComplianceWidget,
@@ -209,37 +214,58 @@ function collectCompliance(): { pct: number; label: string; detail: string } {
   };
 }
 
+/**
+ * Цели дня для виджета. Источник — тот же, что у экрана «Питание»:
+ * сначала ФАКТИЧЕСКИЕ цели Плана (`he_plan_kbju_targets` — ручное КБЖУ, цель,
+ * фаза, профицит, ББ-заметка), иначе профильный расчёт. Раньше виджет считал
+ * только по профилю, поэтому «из 2 500 ккал» и проценты колец не совпадали с
+ * дневником, где цели приходят из плана (`plan-targets-bridge`).
+ *
+ * Вода планом не задаётся — её цель остаётся профильной (как в «Обзоре»).
+ */
 function collectTargets(): { kcal: number; protein: number; fats: number; carbs: number; waterMl: number } {
   const fallback = { kcal: 2500, protein: 160, fats: 70, carbs: 300, waterMl: 2500 };
+  let base = fallback;
   try {
     const s = (safe(() => getProfile(), null as never) as unknown as {
       settings?: Record<string, Record<string, number & string>>;
     } | null)?.settings;
     const p = (s?.personal ?? {}) as Record<string, number & string>;
     const tr = (s?.training ?? {}) as Record<string, number & string>;
-    if (!p?.weight) return fallback;
-    const pal = derivePAL(
-      tr?.daysPerWeek as number | undefined,
-      tr?.minutesPerSession as number | undefined,
-    );
-    const t = calcNutrition({
-      weightKg: Number(p.weight),
-      heightCm: Number(p.height) || 175,
-      age: Number(p.age) || 30,
-      sex: (p.sex as 'male' | 'female') || 'male',
-      pal,
-      goal: (tr?.primaryGoal as string) || 'maintenance',
-    });
-    return {
-      kcal: t.kcal || fallback.kcal,
-      protein: t.protein || fallback.protein,
-      fats: t.fats || fallback.fats,
-      carbs: t.carbs || fallback.carbs,
-      waterMl: Math.round((t.water || 2.5) * 1000),
-    };
+    if (p?.weight) {
+      const pal = derivePAL(
+        tr?.daysPerWeek as number | undefined,
+        tr?.minutesPerSession as number | undefined,
+      );
+      const t = calcNutrition({
+        weightKg: Number(p.weight),
+        heightCm: Number(p.height) || 175,
+        age: Number(p.age) || 30,
+        sex: (p.sex as 'male' | 'female') || 'male',
+        pal,
+        goal: (tr?.primaryGoal as string) || 'maintenance',
+      });
+      base = {
+        kcal: t.kcal || fallback.kcal,
+        protein: t.protein || fallback.protein,
+        fats: t.fats || fallback.fats,
+        carbs: t.carbs || fallback.carbs,
+        waterMl: Math.round((t.water || 2.5) * 1000),
+      };
+    }
   } catch {
-    return fallback;
+    base = fallback;
   }
+  // Цели плана читаются так же, как в `macroTargets` экрана «Питание»:
+  // нет опубликованного плана — остаётся профильная база.
+  const plan = readPlanTargets();
+  return {
+    kcal: plan ? Math.round(plan.kcal) : base.kcal,
+    protein: plan ? Math.round(plan.protein) : base.protein,
+    fats: plan ? Math.round(plan.fats) : base.fats,
+    carbs: plan ? Math.round(plan.carbs) : base.carbs,
+    waterMl: base.waterMl,
+  };
 }
 
 /** Границы периода для аналитики: неделя — Пн..Вс, месяц — 1..последнее число. */
@@ -1217,5 +1243,44 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     nutritionOk,
     calendarOk,
     notesOk,
+  };
+}
+
+/**
+ * Держит виджеты в согласии с приложением в тот же момент, а не только при
+ * следующем возврате в приложение: подписывается на правки дневника питания
+ * (`writeDiaryV2` → слушатели) и на публикацию целей Плана и пере-пушивает
+ * снапшоты с дебаунсом (правка дня — это десятки записей подряд).
+ *
+ * Без этого цифры на столе отставали: пользователь добавлял еду, сворачивал
+ * приложение — а виджет показывал прежние КБЖУ до следующего открытия.
+ *
+ * Возвращает функцию отписки.
+ */
+export function watchNutritionForWidgets(delayMs = 1200): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const schedule = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = undefined;
+      void syncAllWidgets().catch(() => {
+        /* виджеты — необязательный слой */
+      });
+    }, delayMs);
+  };
+  const offDiary = onDiaryChangeV2(schedule);
+  try {
+    window.addEventListener(PLAN_TARGETS_EVENT, schedule);
+  } catch {
+    /* SSR/jsdom без window — молча */
+  }
+  return () => {
+    if (timer) clearTimeout(timer);
+    offDiary();
+    try {
+      window.removeEventListener(PLAN_TARGETS_EVENT, schedule);
+    } catch {
+      /* ignore */
+    }
   };
 }
