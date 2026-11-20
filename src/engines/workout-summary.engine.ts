@@ -655,11 +655,27 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     }))
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
-  const weekKeys = Array.from(weekAgg.keys()).sort();
+  const activeWeekKeys = Array.from(weekAgg.keys()).sort();
+  // Для динамики мышц нужна сплошная шкала недель: пропущенная неделя — это
+  // ноль, а не отсутствие точки, иначе график склеивает перерыв.
+  const muscleWeekKeys: string[] = (() => {
+    const first = dateValues[0] ? weekRangeFor(dateValues[0]).from : '';
+    const last = dateValues[dateValues.length - 1] ? weekRangeFor(dateValues[dateValues.length - 1]).from : '';
+    if (!first || !last) return activeWeekKeys;
+    const fmt = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    const cur = new Date(`${first}T00:00:00`);
+    const end = new Date(`${last}T00:00:00`);
+    const keys: string[] = [];
+    while (cur.getTime() <= end.getTime() && keys.length < 104) {
+      keys.push(fmt(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    return keys.length > 0 ? keys : activeWeekKeys;
+  })();
 
   const musclesOut: SummaryMuscle[] = Array.from(muscleAgg.entries())
     .map(([muscle, v]) => {
-      const weeklySets = weekKeys.map(k => v.byWeek.get(k) || 0);
+      const weeklySets = muscleWeekKeys.map(k => v.byWeek.get(k) || 0);
       const active = weeklySets.filter(x => x > 0);
       const weeklyTrendPct = active.length >= 2 && active[0] > 0
         ? Math.round(((active[active.length - 1] - active[0]) / active[0]) * 1000) / 10
@@ -691,7 +707,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     }))
     .sort((a, b) => b.sets - a.sets || b.tonnageKg - a.tonnageKg);
 
-  const weeksOut: SummaryWeek[] = weekKeys.map(k => {
+  const weeksOut: SummaryWeek[] = activeWeekKeys.map(k => {
     const v = weekAgg.get(k)!;
     return { label: v.label, sessions: v.sessions, sets: v.sets, reps: v.reps, tonnageKg: Math.round(v.tonnageKg) };
   });
@@ -997,6 +1013,40 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate'):
         title: `Выше MRV: ${over.slice(0, 3).join(', ')}`,
         detail: 'Объём за пределом восстановления — распределите подходы или запланируйте разгрузку.',
       });
+    }
+  }
+
+  // Мышца вне коридора несколько недель подряд — это уже не разовая неделя,
+  // а тренд, который стоит показать отдельно.
+  if ((s.weeks || []).length >= 2) {
+    for (const kind of ['exceeding_mrv', 'below_mev'] as const) {
+      let best: { label: string; weeks: number } | null = null;
+      for (const m of s.muscles || []) {
+        if (m.muscle === 'other' || !Array.isArray(m.weeklySets) || m.weeklySets.length < 2) continue;
+        // берём только хвост без пропусков: неделя отдыха сбрасывает серию
+        const run: number[] = [];
+        for (let i = m.weeklySets.length - 1; i >= 0 && m.weeklySets[i] > 0; i -= 1) run.unshift(m.weeklySets[i]);
+        if (run.length < 2) continue;
+        const statuses = run.map(v => muscleLandmarksFor(m.muscle, v, level)?.status || null);
+        if (statuses[statuses.length - 1] !== kind) continue;
+        let n = 1;
+        for (let k = statuses.length - 2; k >= 0 && statuses[k] === kind; k -= 1) n += 1;
+        if (n >= 2 && (!best || n > best.weeks)) best = { label: m.label, weeks: n };
+      }
+      if (!best) continue;
+      if (kind === 'exceeding_mrv') {
+        out.push({
+          id: 'mrv-streak', tone: 'warn', icon: '🚧',
+          title: `${best.label} выше MRV ${best.weeks} нед. подряд`,
+          detail: 'Объём копится быстрее восстановления — запланируйте разгрузку или уберите 2–4 подхода в неделю.',
+        });
+      } else {
+        out.push({
+          id: 'mev-streak', tone: 'info', icon: '🎯',
+          title: `${best.label} ниже MEV ${best.weeks} нед. подряд`,
+          detail: 'Мышца недополучает минимальный объём — добавьте подходы, если она в приоритете.',
+        });
+      }
     }
   }
 

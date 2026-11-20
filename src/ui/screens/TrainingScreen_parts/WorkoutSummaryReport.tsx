@@ -226,6 +226,7 @@ export const WorkoutSummaryBody: React.FC<{
   /** Подпись предыдущего периода: «прошлой неделей» и т.п. */
   previousLabel?: string;
 }> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel }) => {
+  const [onlyProblems, setOnlyProblems] = React.useState(false);
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -243,6 +244,15 @@ export const WorkoutSummaryBody: React.FC<{
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
   const maxWeekTonnage = Math.max(1, ...summary.weeks.map(w => w.tonnageKg));
+  // Ориентиры считаем один раз: они нужны и фильтру, и сводке статусов.
+  const muscleRows = summary.muscles.map(m => {
+    const weekly = Math.round(m.sets / weeksCount);
+    return { m, weekly, lm: muscleLandmarksFor(m.muscle, weekly, level) };
+  });
+  const problemCount = muscleRows.filter(r => r.lm && (r.lm.status === 'below_mev' || r.lm.status === 'exceeding_mrv')).length;
+  const shownMuscleRows = onlyProblems
+    ? muscleRows.filter(r => r.lm && (r.lm.status === 'below_mev' || r.lm.status === 'exceeding_mrv'))
+    : muscleRows;
 
   return (
     <>
@@ -401,11 +411,31 @@ export const WorkoutSummaryBody: React.FC<{
       {has('muscles') && summary.muscles.length > 0 && (
         <div style={CARD}>
           <SectionTitle icon="💪" title="По мышцам" hint="подходы · тоннаж · доля · ориентир MEV/MAV/MRV" />
+          {muscleRows.some(r => r.lm) && (
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+              {(['below_mev', 'optimal', 'approaching_mrv', 'exceeding_mrv'] as const).map(st => {
+                const n = muscleRows.filter(r => r.lm?.status === st).length;
+                if (n === 0) return null;
+                const color = VOLUME_STATUS_COLOR[st];
+                return (
+                  <span key={st} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 999, background: `${color}14`, border: `1px solid ${color}38`, color }}>
+                    <b>{n}</b> {VOLUME_STATUS_LABEL[st]}
+                  </span>
+                );
+              })}
+              {problemCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOnlyProblems(v => !v)}
+                  style={{ marginLeft: 'auto', padding: '2px 9px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: `1px solid ${onlyProblems ? 'rgba(245,158,11,0.55)' : 'rgba(255,255,255,0.14)'}`, background: onlyProblems ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.04)', color: onlyProblems ? '#f59e0b' : '#fff' }}
+                >
+                  {onlyProblems ? 'Показать все' : `Только проблемные (${problemCount})`}
+                </button>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {summary.muscles.map(m => {
-              const weekly = Math.round(m.sets / weeksCount);
-              const lm = muscleLandmarksFor(m.muscle, weekly, level);
-              return (
+            {shownMuscleRows.map(({ m, lm }) => (
               <div key={m.muscle} style={{ position: 'relative', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.tonnageKg / maxMuscleTonnage) * 100}%`, background: m.color, opacity: 0.14 }} />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
@@ -440,8 +470,7 @@ export const WorkoutSummaryBody: React.FC<{
                   </div>
                 )}
               </div>
-              );
-            })}
+            ))}
           </div>
         </div>
       )}

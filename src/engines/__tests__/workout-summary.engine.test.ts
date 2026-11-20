@@ -334,6 +334,31 @@ describe('workout-summary: недельная динамика и интенси
     ]);
     expect(buildWorkoutInsights(hi).some(i => i.id === 'intensity')).toBe(true);
   });
+
+  it('видит недобор объёма несколько недель подряд', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    expect(buildWorkoutInsights(s).find(i => i.id === 'mev-streak')?.title).toContain('3 нед. подряд');
+  });
+
+  it('видит перебор MRV несколько недель подряд', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 21 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 21 }]),
+    ]);
+    expect(buildWorkoutInsights(s).find(i => i.id === 'mrv-streak')?.title).toContain('2 нед. подряд');
+  });
+
+  it('неделя отдыха сбрасывает серию', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    expect(buildWorkoutInsights(s).some(i => i.id === 'mev-streak')).toBe(false);
+  });
 });
 
 describe('workout-summary: прогрессия упражнений', () => {

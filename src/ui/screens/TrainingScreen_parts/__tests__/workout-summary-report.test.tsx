@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { render, fireEvent, screen } from '@testing-library/react';
 import { WorkoutSummaryReport, ReportBlockPicker } from '../WorkoutSummaryReport';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
@@ -46,6 +47,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('MEV ');
     expect(html).toContain('Интенсивность');
     expect(html).toContain('инт. ');
+    expect(html).toContain('Только проблемные (2)');
+    expect(html).toContain('ниже MEV');
   });
 
   it('уважает выбор блоков (только «Общее»)', () => {
@@ -84,6 +87,31 @@ describe('WorkoutSummaryReport', () => {
     };
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[pullupWorkout]} blocks={['totals']} />);
     expect(html).toContain('2 подх. без веса');
+  });
+
+  it('фильтр «только проблемные» оставляет мышцы вне коридора', () => {
+    const mixed: WorkoutLog = {
+      ...mkWorkout('2026-11-03'),
+      exercises: [
+        {
+          id: '2026-11-03_bench', date: '2026-11-03', exerciseId: 'bench_bar', exerciseName: 'Жим штанги лёжа',
+          isCompound: true, weekNumber: 1,
+          sets: Array.from({ length: 10 }, () => ({ weight: 80, reps: 8, rir: 2, rpe: 7 })),
+          totalVolume: 6400, estimated1RM: 101,
+        },
+        {
+          id: '2026-11-03_squat', date: '2026-11-03', exerciseId: 'squat', exerciseName: 'Приседания со штангой',
+          isCompound: true, weekNumber: 1,
+          sets: [{ weight: 100, reps: 5, rir: 2, rpe: 7 }],
+          totalVolume: 500, estimated1RM: 117,
+        },
+      ] as StrengthLogEntry[],
+    };
+    render(<WorkoutSummaryReport workouts={[mixed]} blocks={['muscles']} />);
+    expect(screen.getByText('Грудь')).toBeTruthy();
+    fireEvent.click(screen.getByText(/Только проблемные/));
+    expect(screen.queryByText('Грудь')).toBeNull();
+    expect(screen.getByText('Квадрицепсы')).toBeTruthy();
   });
 
   it('пустая история даёт честное пустое состояние', () => {
