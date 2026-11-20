@@ -1213,8 +1213,11 @@ function extractLabValues(
   if (num(coag.Fibrinogen) !== undefined) v['FIBRINOGEN'] = num(coag.Fibrinogen)!;
 
   // panelCardiac: CK, CK-MB, Troponin I, NT-proBNP
+  // Проход 168: поле называется своим именем. Раньше NT-proBNP уезжал в ключ
+  // `BNP` (другой анализ, другая норма 100), и на экране «Риск» склад с
+  // `NT_PROBNP` не находил значения вовсе — анализ молча не участвовал.
   const card = (fp.panelCardiac || {}) as Record<string, any>;
-  if (num(card['NT-proBNP']) !== undefined) v['BNP'] = num(card['NT-proBNP'])!;
+  if (num(card['NT-proBNP']) !== undefined) v['NT_PROBNP'] = num(card['NT-proBNP'])!;
 
   // panelInflammatory: IL-6, TNF-alpha, hsCRP
   const infl = (fp.panelInflammatory || {}) as Record<string, any>;

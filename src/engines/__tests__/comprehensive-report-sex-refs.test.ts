@@ -262,11 +262,14 @@ describe('сводный отчёт: референс — из резолвер�
     expect([labOf('Эстрадиол').refLow, labOf('Эстрадиол').refHigh]).toEqual([40, 160]);
   });
 
-  it('холестерин общий: верх из резолвера, нижняя граница резолвера — 0', async () => {
+  it('холестерин общий: верх из резолвера, нижней границы нет (lln 0 = «нет границы»)', async () => {
     const { labOf } = await reportFor('male');
     const n = getLabNorm('CHOL', 'male')!;
     expect(labOf('Холестерин общий').refHigh).toBe(n.uln);
-    expect(labOf('Холестерин общий').refLow).toBe(n.lln);
+    // Проход 168: `lln: 0` в каталоге — это «нижней границы нет», а не норма
+    // «от нуля». Отчёт печатал «0–5.2» и выдавал одностороннюю норму за двустороннюю.
+    expect(n.lln).toBe(0);
+    expect(labOf('Холестерин общий').refLow).toBeUndefined();
   });
 });
 

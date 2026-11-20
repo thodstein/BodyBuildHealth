@@ -85,7 +85,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'cardio', name: TZ_SYSTEM_LABELS.cardio, icon: TZ_SYSTEM_ICONS.cardio, color: '#ef4444',
     mechanisms: [
       { id: 'cv1', weight: 0.8, markers: [
-        M('BNP', 'NT-proBNP', 'пг/мл', 'high', [125, 300, 900]),
+        M('NT_PROBNP', 'NT-proBNP', 'пг/мл', 'high', [125, 300, 900]),
         M('CK', 'КФК (креатинкиназа)', 'Ед/л', 'high', [200, 500, 1000]),
       ] },
       { id: 'cv2', weight: 1.0, markers: [

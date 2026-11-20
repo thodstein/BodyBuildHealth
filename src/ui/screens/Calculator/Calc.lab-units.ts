@@ -43,7 +43,9 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K',
   // ── свёртывание, сердце, опухолевые маркеры ──
   'Fibrinogen': 'FIBRINOGEN', 'D-dimer': 'D_DIMER', 'PT': 'PT', 'APTT': 'APTT',
-  'CK': 'CK', 'CK-MB': 'CK_MB', 'Troponin I': 'TROPONIN', 'NT-proBNP': 'BNP',
+  // Проход 168: поле подписано «NT-proBNP» и пересчитывается как NT-proBNP.
+  // Раньше мост вёл в `BNP` — запись другого анализа с другой нормой (100 против 125).
+  'CK': 'CK', 'CK-MB': 'CK_MB', 'Troponin I': 'TROPONIN', 'NT-proBNP': 'NT_PROBNP',
   'PSA total': 'PSA', 'PSA free': 'PSA_FREE',
   'CEA': 'CEA', 'AFP': 'AFP', 'CA-125': 'CA125', 'Renin': 'RENIN',
 };

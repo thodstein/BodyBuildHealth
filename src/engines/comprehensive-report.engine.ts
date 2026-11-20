@@ -395,7 +395,10 @@ function sexRefs(
       if (!markerCode) return null;
       const n = getLabNorm(markerCode, sex);
       if (!n || !sameUnit(unit ?? '', n.unit)) return null;
-      return { refLow: n.lln, refHigh: n.uln };
+      // Проход 168: в каталоге `lln: 0` — это «нижней границы нет» (холестерин,
+      // ЛПНП, Д-димер, тропонин, СРБ…), а не норма «от нуля». Отчёт печатал
+      // «0–5.2» и терял односторонность строки; ноль в нижнюю границу не отдаём.
+      return { refLow: n.lln > 0 ? n.lln : undefined, refHigh: n.uln };
     }
   }
 }

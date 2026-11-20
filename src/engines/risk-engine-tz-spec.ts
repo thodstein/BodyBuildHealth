@@ -236,7 +236,7 @@ export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number
 
 // ── Релевантные лабораторные маркеры механизмов (для per-system верификации) ──
 const MECH_LAB_MARKERS:Record<string,string[]>={
-  cv1:['BNP','CK'],cv2:['LDL','HDL','TG','TC'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
+  cv1:['NT_PROBNP','CK'],cv2:['LDL','HDL','TG','TC'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
   liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
   ren1:['eGFR','CREAT','UREA','URIC'],ren2:['eGFR'],ren3:['UACR','PROTEIN_URINE'],ren4:['K','NA','MG','CA'],
   cns1:['PRL'],cns2:['CRP','HOMOCYSTEINE','IL6','TNFA','FERRITIN'],cns3:['HOMOCYSTEINE'],cns4:['TSH','CORTISOL','T3','T4','DHEAS'],cns5:['GLU'],cns6:[],
@@ -365,7 +365,7 @@ export function getMiFromLab(mechId:string,labValues:Record<string,number>,doseF
   const proteinUrine=labValues['PROTEIN_URINE'];
   const lh=labValues['LH'];const fsh=labValues['FSH'];const tt=labValues['TT'];const e2=labValues['E2'];const prl=labValues['PRL'];const shbg=labValues['SHBG'];
   const glu=labValues['GLU'];const homa=labValues['HOMA'];const crp=labValues['CRP'];const homoc=labValues['HOMOCYSTEINE'];
-  const tsh=labValues['TSH'];const bnp=labValues['BNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
+  const tsh=labValues['TSH'];const ntProbnp=labValues['NT_PROBNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
   const psa=labValues['PSA'];
   const cortisol=labValues['CORTISOL'];
   const ferritin=labValues['FERRITIN'];const vitd=labValues['VITD'];const b12=labValues['B12'];const folate=labValues['FOLATE'];
@@ -401,9 +401,12 @@ export function getMiFromLab(mechId:string,labValues:Record<string,number>,doseF
   switch(mechId){
     // ── ССС ──
     case'cv1': { // ремоделирование: NT-proBNP (high = worse), CK (мышечное повреждение)
-      const bnpMi = labMi(bnp,[125,300,900]);
+      // Проход 168: ключ — `NT_PROBNP`, как в складе и каталоге. `BNP` — другой
+      // анализ со своей нормой (100 пг/мл) и без лестницы ступеней; судить его
+      // порогами NT-proBNP нельзя.
+      const ntProbnpMi = labMi(ntProbnp,[125,300,900]);
       const ckMi = labMi(ck,[200,500,1000]);
-      const vals = [bnpMi,ckMi].filter(v=>v!==undefined) as number[];
+      const vals = [ntProbnpMi,ckMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
       break;
     }
