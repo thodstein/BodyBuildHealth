@@ -246,6 +246,8 @@ export interface SummaryExercise {
   bestReps: number;
   bestE1RM: number;
   avgLoadKg: number;
+  /** Средний вес подхода в % от лучшего e1RM этого упражнения за период. */
+  avgIntensityPct: number | null;
   avgRepsPerSet: number;
   avgRIR: number | null;
   avgRPE: number | null;
@@ -270,6 +272,10 @@ export interface SummaryMuscle {
   sharePct: number;
   /** Подходов на сессию — сравнение с MEV/MAV в уме. */
   setsPerSession: number;
+  /** Подходы по неделям периода (по возрастанию) — для мини-графика. */
+  weeklySets: number[];
+  /** Изменение подходов/нед от первой недели к последней, % (null — нет базы). */
+  weeklyTrendPct: number | null;
 }
 
 export interface SummaryPattern {
@@ -299,6 +305,8 @@ export interface SummaryWeek {
   label: string;
   sessions: number;
   sets: number;
+  /** КПШ — количество подъёмов за неделю. */
+  reps: number;
   tonnageKg: number;
 }
 
@@ -327,6 +335,8 @@ export interface WorkoutSummaryTotals {
   densityKgPerMin: number;
   avgRIR: number | null;
   avgRPE: number | null;
+  /** Средняя нагрузка в % от лучшего e1RM — насколько тяжело шла работа. */
+  avgIntensityPct: number | null;
   prs: number;
   /** Уникальных дней с тренировкой (для «несколько тренировок»). */
   trainingDays: number;
@@ -418,7 +428,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     wlSets: number;
   };
   const exMap = new Map<string, ExAgg>();
-  const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string> }>();
+  const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number> }>();
   const patternAgg = new Map<string, { sets: number; reps: number; tonnageKg: number }>();
   const sessionRows: SummarySession[] = [];
   const weekAgg = new Map<string, SummaryWeek>();
@@ -457,6 +467,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
 
   for (const w of list) {
     const date = String(w.date || '').slice(0, 10);
+    const wk = weekRangeFor(date);
     if (date) days.add(date);
     const duration = num(w.duration);
     totalDuration += duration;
@@ -571,8 +582,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       prev.sessions.add(w.id || date);
       exMap.set(key, prev);
 
-      const mPrev = muscleAgg.get(meta.muscle) || { sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>() };
+      const mPrev = muscleAgg.get(meta.muscle) || { sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>(), byWeek: new Map<string, number>() };
       mPrev.sets += exSets; mPrev.reps += exReps; mPrev.tonnageKg += exTonnage; mPrev.ex.add(name);
+      if (wk.from) mPrev.byWeek.set(wk.from, (mPrev.byWeek.get(wk.from) || 0) + exSets);
       muscleAgg.set(meta.muscle, mPrev);
 
       const pPrev = patternAgg.get(meta.pattern) || { sets: 0, reps: 0, tonnageKg: 0 };
@@ -597,11 +609,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       density: duration > 0 ? Math.round((sTonnage / duration) * 10) / 10 : 0,
     });
 
-    const wk = weekRangeFor(date);
-    if (wk.from) {
-      const wPrev = weekAgg.get(wk.from) || { label: wk.label, sessions: 0, sets: 0, tonnageKg: 0 };
-      wPrev.sessions += 1; wPrev.sets += sSets; wPrev.tonnageKg += sTonnage;
-      weekAgg.set(wk.from, wPrev);
+    const wkRange = weekRangeFor(date);
+    if (wkRange.from) {
+      const wPrev = weekAgg.get(wkRange.from) || { label: wkRange.label, sessions: 0, sets: 0, reps: 0, tonnageKg: 0 };
+      wPrev.sessions += 1; wPrev.sets += sSets; wPrev.reps += sReps; wPrev.tonnageKg += sTonnage;
+      weekAgg.set(wkRange.from, wPrev);
     }
   }
 
@@ -622,6 +634,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       bestReps: e.bestReps,
       bestE1RM: Math.round(e.bestE1RM),
       avgLoadKg: e.sets > 0 ? Math.round((e.tonnageKg / Math.max(1, e.reps)) * 10) / 10 : 0,
+      avgIntensityPct: e.bestE1RM > 0 && e.reps > 0
+        ? Math.round(((e.tonnageKg / e.reps) / e.bestE1RM) * 1000) / 10
+        : null,
       avgRepsPerSet: e.sets > 0 ? Math.round((e.reps / e.sets) * 10) / 10 : 0,
       avgRIR: e.rirN > 0 ? Math.round((e.rirSum / e.rirN) * 10) / 10 : null,
       avgRPE: e.rpeN > 0 ? Math.round((e.rpeSum / e.rpeN) * 10) / 10 : null,
@@ -640,18 +655,29 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     }))
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
+  const weekKeys = Array.from(weekAgg.keys()).sort();
+
   const musclesOut: SummaryMuscle[] = Array.from(muscleAgg.entries())
-    .map(([muscle, v]) => ({
-      muscle,
-      label: MUSCLE_LABELS[muscle],
-      color: MUSCLE_COLORS[muscle],
-      sets: v.sets,
-      reps: v.reps,
-      tonnageKg: Math.round(v.tonnageKg),
-      exercises: v.ex.size,
-      sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
-      setsPerSession: sessions > 0 ? Math.round((v.sets / sessions) * 10) / 10 : 0,
-    }))
+    .map(([muscle, v]) => {
+      const weeklySets = weekKeys.map(k => v.byWeek.get(k) || 0);
+      const active = weeklySets.filter(x => x > 0);
+      const weeklyTrendPct = active.length >= 2 && active[0] > 0
+        ? Math.round(((active[active.length - 1] - active[0]) / active[0]) * 1000) / 10
+        : null;
+      return {
+        muscle,
+        label: MUSCLE_LABELS[muscle],
+        color: MUSCLE_COLORS[muscle],
+        sets: v.sets,
+        reps: v.reps,
+        tonnageKg: Math.round(v.tonnageKg),
+        exercises: v.ex.size,
+        sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
+        setsPerSession: sessions > 0 ? Math.round((v.sets / sessions) * 10) / 10 : 0,
+        weeklySets,
+        weeklyTrendPct,
+      };
+    })
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
   const patternsOut: SummaryPattern[] = Array.from(patternAgg.entries())
@@ -665,9 +691,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     }))
     .sort((a, b) => b.sets - a.sets || b.tonnageKg - a.tonnageKg);
 
-  const weeksOut: SummaryWeek[] = Array.from(weekAgg.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([, v]) => ({ ...v, tonnageKg: Math.round(v.tonnageKg) }));
+  const weeksOut: SummaryWeek[] = weekKeys.map(k => {
+    const v = weekAgg.get(k)!;
+    return { label: v.label, sessions: v.sessions, sets: v.sets, reps: v.reps, tonnageKg: Math.round(v.tonnageKg) };
+  });
 
   return {
     workouts: sessions,
@@ -689,6 +716,16 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       densityKgPerMin: totalDuration > 0 ? Math.round((totalTonnage / totalDuration) * 10) / 10 : 0,
       avgRIR: totalRirN > 0 ? Math.round((totalRir / totalRirN) * 10) / 10 : null,
       avgRPE: totalRpeN > 0 ? Math.round((totalRpe / totalRpeN) * 10) / 10 : null,
+      avgIntensityPct: (() => {
+        let weighted = 0;
+        let base = 0;
+        for (const e of exercisesOut) {
+          if (!(e.bestE1RM > 0) || e.sets <= 0 || e.reps <= 0) continue;
+          weighted += ((e.tonnageKg / e.reps) / e.bestE1RM) * e.sets;
+          base += e.sets;
+        }
+        return base > 0 ? Math.round((weighted / base) * 1000) / 10 : null;
+      })(),
       prs: prs.length,
       trainingDays: days.size,
       weightlessSets: exercisesOut.reduce((a, e) => a + e.weightlessSets, 0),
@@ -978,6 +1015,32 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate'):
       out.push({ id: 'rir', tone: 'warn', icon: '🔥', title: `Средний RIR ${rir}`, detail: 'Почти все подходы в отказ — копится усталость. Оставьте 1–2 повтора в запасе.' });
     } else if (rir > 4) {
       out.push({ id: 'rir', tone: 'info', icon: '🫧', title: `Средний RIR ${rir}`, detail: 'Запас велик: можно поднять вес или добавить повтор для стимула.' });
+    }
+  }
+
+  const intensity = s.totals.avgIntensityPct;
+  if (intensity != null && s.totals.sessions >= 2) {
+    if (intensity < 60) {
+      out.push({ id: 'intensity', tone: 'info', icon: '🪶', title: `Средняя интенсивность ${intensity}% от e1RM`, detail: 'Подходы далеки от максимума — если цель сила, добавьте вес; если выносливость, так и задумано.' });
+    } else if (intensity >= 85) {
+      out.push({ id: 'intensity', tone: 'info', icon: '🏋️', title: `Средняя интенсивность ${intensity}% от e1RM`, detail: 'Работа идёт близко к максимуму — следите за восстановлением и техникой.' });
+    }
+  }
+
+  if (s.weeks.length >= 2) {
+    const moved = (s.muscles || [])
+      .filter(m => m.weeklyTrendPct != null && Math.abs(m.weeklyTrendPct) >= 20)
+      .sort((a, b) => Math.abs(b.weeklyTrendPct as number) - Math.abs(a.weeklyTrendPct as number))[0];
+    if (moved && moved.weeklyTrendPct != null) {
+      const active = moved.weeklySets.filter(x => x > 0);
+      const up = moved.weeklyTrendPct > 0;
+      out.push({
+        id: 'muscle-trend',
+        tone: up ? 'good' : 'info',
+        icon: up ? '📈' : '📉',
+        title: `${moved.label}: ${signedPct(moved.weeklyTrendPct)} подходов по неделям`,
+        detail: `Было ${active[0]} → стало ${active[active.length - 1]} в неделю. ${up ? 'Объём растёт — проверьте, успевает ли мышца восстанавливаться.' : 'Объём снижается — нормально для разгрузки, но не для прогресса.'}`,
+      });
     }
   }
 

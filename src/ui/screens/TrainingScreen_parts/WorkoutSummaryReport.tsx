@@ -259,6 +259,7 @@ export const WorkoutSummaryBody: React.FC<{
             <Tile label="Плотность" value={t.densityKgPerMin > 0 ? `${fmtInt(t.densityKgPerMin)} кг/мин` : '—'} sub="объём ÷ время" color="#22d3ee" />
             <Tile label="Средний вес" value={t.avgLoadKg > 0 ? `${t.avgLoadKg} кг` : '—'} sub={t.maxLoadKg > 0 ? `макс ${t.maxLoadKg} кг` : undefined} />
             <Tile label="Лучший e1RM" value={bestE1RM > 0 ? `${fmtInt(bestE1RM)} кг` : '—'} sub={t.avgRIR != null ? `ср. RIR ${t.avgRIR}` : undefined} color="#f472b6" />
+            <Tile label="Интенсивность" value={t.avgIntensityPct != null ? `${t.avgIntensityPct}%` : '—'} sub="средний вес от e1RM" color="#fb923c" />
           </div>
           {(topMuscle || t.prs > 0 || t.weightlessSets > 0) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
@@ -420,8 +421,20 @@ export const WorkoutSummaryBody: React.FC<{
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 8.5, color: '#fff', opacity: 0.8 }}>
                       <span>
                         ≈ <b style={{ color: VOLUME_STATUS_COLOR[lm.status] }}>{lm.weeklySets}</b> подх/нед · {VOLUME_STATUS_LABEL[lm.status]}
+                        {m.weeklyTrendPct != null && m.weeklyTrendPct !== 0 && (
+                          <span style={{ marginLeft: 5, color: m.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                            {m.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(m.weeklyTrendPct)}%
+                          </span>
+                        )}
                       </span>
-                      <span style={{ whiteSpace: 'nowrap' }}>MEV {lm.mev} · MAV {lm.mav} · MRV {lm.mrv}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ whiteSpace: 'nowrap' }}>MEV {lm.mev} · MAV {lm.mav} · MRV {lm.mrv}</span>
+                        {m.weeklySets.length > 1 && (
+                          <span title={`Подходы по неделям: ${m.weeklySets.join(' → ')}`} style={{ display: 'inline-flex' }}>
+                            <Sparkline values={m.weeklySets} color={VOLUME_STATUS_COLOR[lm.status]} width={44} height={12} />
+                          </span>
+                        )}
+                      </span>
                     </div>
                     <LandmarkBar sets={lm.weeklySets} mev={lm.mev} mav={lm.mav} mrv={lm.mrv} />
                   </div>
@@ -449,6 +462,9 @@ export const WorkoutSummaryBody: React.FC<{
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, color: '#fff', opacity: 0.78, flexWrap: 'wrap' }}>
                   <span>Лучший <b style={{ color: '#f59e0b' }}>{e.bestWeight > 0 ? `${e.bestWeight} кг` : '—'}</b> × {e.bestReps}</span>
                   <span>e1RM <b style={{ color: '#fff' }}>{e.bestE1RM || '—'}</b> кг</span>
+                  {e.avgIntensityPct != null && (
+                    <span title="Средний вес подхода в % от лучшего e1RM упражнения">инт. <b style={{ color: '#fb923c' }}>{e.avgIntensityPct}%</b></span>
+                  )}
                   <span>доля <b style={{ color: '#fff' }}>{e.sharePct}%</b></span>
                   {e.avgRIR != null && <span>RIR <b style={{ color: '#fff' }}>{e.avgRIR}</b></span>}
                   {e.sessions > 1 && <span>в {e.sessions} трен.</span>}
@@ -558,7 +574,7 @@ export const WorkoutSummaryBody: React.FC<{
               <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 4 }}>Тоннаж по неделям</div>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
                 {summary.weeks.slice(-10).map((w, i) => (
-                  <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · ${w.sessions} трен.`}>
+                  <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · ${w.sessions} трен. · ${w.reps} повт.`}>
                     <div style={{ width: '100%', height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
                     <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
                   </div>

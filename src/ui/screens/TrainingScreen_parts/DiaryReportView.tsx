@@ -183,12 +183,15 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     lines.push(`📊 Отчёт: ${formatSummaryPeriod(summary)}`);
     lines.push(`Тренировок: ${summary.totals.sessions} · подходов: ${summary.totals.sets} · повторов: ${summary.totals.reps}`);
     lines.push(`Тоннаж: ${fmtTon(summary.totals.tonnageKg)} · время: ${summary.totals.durationMin} мин · плотность: ${summary.totals.densityKgPerMin} кг/мин`);
+    if (summary.totals.avgIntensityPct != null) {
+      lines.push(`Средняя интенсивность: ${summary.totals.avgIntensityPct}% от e1RM`);
+    }
     lines.push('');
     lines.push('По мышцам:');
     summary.muscles.forEach(m => lines.push(`  ${m.label}: ${m.sets} подх · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`));
     lines.push('');
     lines.push('По упражнениям:');
-    summary.exercises.forEach(e => lines.push(`  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${fmtTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})`));
+    summary.exercises.forEach(e => lines.push(`  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${fmtTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}`));
     if (summary.patterns.length) {
       lines.push('');
       lines.push('Движения:');

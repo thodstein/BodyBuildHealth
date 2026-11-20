@@ -293,6 +293,49 @@ describe('workout-summary: детализация подходов', () => {
   });
 });
 
+describe('workout-summary: недельная динамика и интенсивность', () => {
+  const w1 = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
+  const w2 = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]);
+
+  it('считает КПШ по неделям', () => {
+    const s = buildWorkoutSummary([w1, w2]);
+    expect(s.weeks.map(w => w.reps)).toEqual([24, 40]);
+  });
+
+  it('строит подходы по неделям и тренд по мышце', () => {
+    const s = buildWorkoutSummary([w1, w2]);
+    const chest = s.muscles.find(m => m.muscle === 'chest');
+    expect(chest?.weeklySets).toEqual([3, 5]);
+    expect(chest?.weeklyTrendPct).toBe(66.7);
+  });
+
+  it('одна неделя не даёт тренда', () => {
+    const s = buildWorkoutSummary([w1]);
+    expect(s.muscles[0].weeklySets).toEqual([3]);
+    expect(s.muscles[0].weeklyTrendPct).toBeNull();
+  });
+
+  it('интенсивность — средний вес в % от лучшего e1RM', () => {
+    const s = buildWorkoutSummary([w1]);
+    // 80 кг при e1RM 101 → 79.2%
+    expect(s.exercises[0].avgIntensityPct).toBe(79.2);
+    expect(s.totals.avgIntensityPct).toBe(79.2);
+  });
+
+  it('выводит тренд объёма мышцы по неделям', () => {
+    const ins = buildWorkoutInsights(buildWorkoutSummary([w1, w2]));
+    expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');
+  });
+
+  it('замечает высокую интенсивность', () => {
+    const hi = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 3, sets: 3 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 3, sets: 3 }]),
+    ]);
+    expect(buildWorkoutInsights(hi).some(i => i.id === 'intensity')).toBe(true);
+  });
+});
+
 describe('workout-summary: прогрессия упражнений', () => {
   it('собирает e1RM по тренировкам и считает прирост', () => {
     const w1 = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
