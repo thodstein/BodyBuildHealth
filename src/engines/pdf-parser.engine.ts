@@ -420,6 +420,9 @@ function extractNumberBeforeUnit(text: string): number | null {
     const after = text.slice(numEnd, numEnd + 4);
     if (/[-–]\s*$/.test(before)) continue;
     if (/^\s*[-–]/.test(after)) continue;
+    // Проход 167: число после «<»/«>» — граница нормы, а не результат
+    // («АЛТ 35 <41 Е/л» давал 41). Само значение в этом формате стоит раньше.
+    if (/[<>≤≥]\s*$/.test(before)) continue;
     const value = Number(m[1].replace(',', '.'));
     if (Number.isFinite(value)) return value;
   }
@@ -427,17 +430,6 @@ function extractNumberBeforeUnit(text: string): number | null {
 }
 
 function extractRefRange(text: string): { low?: number; high?: number } {
-  // Handle "<N" and ">N" reference bounds common in Invitro/Gemotest formats
-  const ltMatch = text.match(/<\s*(\d+[\.,]?\d*)/);
-  const gtMatch = text.match(/>\s*(\d+[\.,]?\d*)/);
-  if (ltMatch) {
-    const high = parseFloat(ltMatch[1].replace(',', '.'));
-    if (Number.isFinite(high) && high > 0 && high < 100000) return { high };
-  }
-  if (gtMatch) {
-    const low = parseFloat(gtMatch[1].replace(',', '.'));
-    if (Number.isFinite(low) && low >= 0 && low < 100000) return { low };
-  }
   const patterns = [
     /(?:ref|референс|норма|от|до)\s*[:\-]?\s*(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/i,
     /(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s*(?:единиц|ед\.?|unit|u\/l|mmol|umol|mg|ng|pg|g|мг\/дл|мкмоль|ммоль|нг\/мл|пг\/мл|г\/л|%|сек)/i,
@@ -462,6 +454,25 @@ function extractRefRange(text: string): { low?: number; high?: number } {
        if (!isNaN(low) && !isNaN(high) && low < high && low >= 0 && high < 100000) {
         return { low, high };
       }
+    }
+  }
+
+  // Проход 167: «<N» и «>N» — это референс, только если в строке есть другое
+  // число: само значение. Раньше «СРБ <0.5 мг/л» получал «норму до 0.5»
+  // (результат становился собственной границей), а настоящее отклонение
+  // читалось нормой. Настоящий диапазон «30-400» уже отработан выше, поэтому
+  // «Ферритин >1000 нг/мл 30-400» больше не берёт «>1000» за нижнюю границу.
+  const numbers = text.replace(/[<>≤≥]/g, ' ').match(/\d+[\.,]?\d*/g) ?? [];
+  const ltMatch = text.match(/<\s*(\d+[\.,]?\d*)/);
+  const gtMatch = text.match(/>\s*(\d+[\.,]?\d*)/);
+  if (numbers.length >= 2) {
+    if (ltMatch) {
+      const high = parseFloat(ltMatch[1].replace(',', '.'));
+      if (Number.isFinite(high) && high > 0 && high < 100000) return { high };
+    }
+    if (gtMatch) {
+      const low = parseFloat(gtMatch[1].replace(',', '.'));
+      if (Number.isFinite(low) && low >= 0 && low < 100000) return { low };
     }
   }
   // Односторонние границы из реальных бланков Инвитро/КДЛ/Хеликс:

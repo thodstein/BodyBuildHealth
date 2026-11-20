@@ -15,7 +15,7 @@
  * «какую сторону запись доказывает», а не только «какой вывод был бы выдумкой».
  */
 import { describe, it, expect } from 'vitest';
-import { boundMakesConclusionUnsafe, boundProvesSide, keptBound } from '../lab-bound';
+import { boundProvesSide, keptBound } from '../lab-bound';
 
 describe('проход 142: какую сторону доказывает запись', () => {
   it('число без границы доказано целиком', () => {
@@ -49,12 +49,17 @@ describe('проход 142: какую сторону доказывает за�
     expect(boundProvesSide(undefined, 1000, undefined, undefined)).toBeUndefined();
   });
 
-  it('«вывод небезопасен» остался прежним (проход 138)', () => {
-    expect(boundMakesConclusionUnsafe('>', 1000, 30, 400)).toBe(false);
-    expect(boundMakesConclusionUnsafe('>', 110, 130, 170)).toBe(true);
-    expect(boundMakesConclusionUnsafe('<', 500, 30, 400)).toBe(true);
-    expect(boundMakesConclusionUnsafe('<', 50, 62, 106)).toBe(false);
-    expect(boundMakesConclusionUnsafe(undefined, 110, 130, 170)).toBe(false);
+  it('«вывод небезопасен» = сторона не доказана (единое правило, проход 167)', () => {
+    // Прежний `boundMakesConclusionUnsafe` отвечал на тот же вопрос с другой
+    // стороны. Теперь при знаке «вывод небезопасен» равносильно «сторона не
+    // доказана», а «нормы по обрезанному числу» не бывает вовсе.
+    const unsafe = (bound: '<' | '>' | undefined, value: number, low?: number, high?: number) =>
+      bound !== undefined && boundProvesSide(bound, value, low, high) === undefined;
+    expect(unsafe('>', 1000, 30, 400)).toBe(false);
+    expect(unsafe('>', 110, 130, 170)).toBe(true);
+    expect(unsafe('<', 500, 30, 400)).toBe(true);
+    expect(unsafe('<', 50, 62, 106)).toBe(false);
+    expect(unsafe(undefined, 110, 130, 170)).toBe(false);
   });
 });
 

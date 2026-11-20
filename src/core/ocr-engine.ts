@@ -1,7 +1,7 @@
 import { parseLabText as parseLabTextFromPdf, parseLabFile, ocrScannedPdf, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
 import { parseNutritionText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
-import { boundMakesConclusionUnsafe } from './lab-bound';
+import { boundProvesSide } from './lab-bound';
 import { parseLabResults as parseWithBiomarkerRegex, type ExtractedMarker } from '../engines/biomarker-regex-engine';
 import { UCUM_MAP } from './constants';
 import { mapToUcumCode, normalizeLabMeasurement } from './labs-mapping';
@@ -228,6 +228,9 @@ function mergeParsedResults(
     const sourceUnit = source.unit || '';
     const normalized = normalizeLabMeasurement(code, source.value, sourceUnit);
     const info = UCUM_MAP[code];
+    const providerNormalized = providerValue
+      ? normalizeLabMeasurement(code, providerValue.value, providerValue.unit || sourceUnit).value
+      : undefined;
     const refUnit = table?.unit || source.unit || '';
     const refLow = table?.refLow !== undefined
       ? normalizeLabMeasurement(code, table.refLow, refUnit).value
@@ -239,22 +242,35 @@ function mergeParsedResults(
       : providerValue?.refHigh !== undefined
       ? normalizeLabMeasurement(code, providerValue.refHigh, providerValue.unit || refUnit).value
       : undefined;
-    const bound = source.bound;
+    // Проход 167: знак границы принадлежит тому значению, которое выбрано.
+    // Табличный разбор бланка («Ферритин >1000 нг/мл 30-400») терял знак, и
+    // число 1000 становилось точным измерением. Берём знак у провайдера, если
+    // его число совпало с выбранным.
+    const bound = source.bound
+      ?? (providerNormalized !== undefined && Math.abs(providerNormalized - normalized.value) < 1e-9
+        ? providerValue?.bound
+        : undefined);
     // Явный референс из бланка важнее среднепопуляционных границ UCUM_MAP.
     // Раньше при односторонней границе «>12» (только refLow) проверялся
     // лишь refHigh, и отклонение терялось: значение ниже нижней границы
     // помечалось нормой по общим uln/lln.
-    let abnormal = refLow !== undefined || refHigh !== undefined
-      ? (refHigh !== undefined && normalized.value > refHigh)
-        || (refLow !== undefined && normalized.value < refLow)
-      : info ? normalized.value > info.uln || normalized.value < info.lln : table?.isAbnormal;
-    // Проход 138: по обрезанному числу нельзя делать вывод, который граница не
-    // доказывает. «<0.5» при верхней границе 3 — не «выше нормы», «>1000» при
-    // нижней 30 — не «ниже нормы»; такие вердикты остаются неизвестными.
-    if (abnormal && boundMakesConclusionUnsafe(
-      bound, normalized.value,
-      refLow ?? info?.lln, refHigh ?? info?.uln,
-    )) abnormal = undefined;
+    //
+    // Проход 167: при знаке границы вывод даёт только доказанная сторона
+    // (`boundProvesSide`). «<0.5» при норме до 5 — не «норма»: истинное
+    // значение неизвестно, поэтому `undefined` («не доказано»), а не `false`.
+    const low = refLow ?? info?.lln;
+    const high = refHigh ?? info?.uln;
+    let abnormal: boolean | undefined;
+    if (bound) {
+      abnormal = boundProvesSide(bound, normalized.value, low, high) ? true : undefined;
+    } else if (refLow !== undefined || refHigh !== undefined) {
+      abnormal = (refHigh !== undefined && normalized.value > refHigh)
+        || (refLow !== undefined && normalized.value < refLow);
+    } else if (info) {
+      abnormal = normalized.value > info.uln || normalized.value < info.lln;
+    } else {
+      abnormal = table?.isAbnormal;
+    }
     const result = {
       code,
       name: info?.name ?? table?.name ?? code,
@@ -267,8 +283,10 @@ function mergeParsedResults(
       raw: isUsefulRawLine(table?.raw) ? table?.raw : undefined,
     };
     if (table && providerValue) {
-      const providerNormalized = normalizeLabMeasurement(code, providerValue.value, providerValue.unit).value;
-      if (Math.abs(providerNormalized - normalized.value) > Math.max(0.01, Math.abs(normalized.value) * 0.05)) {
+      // Табличный результат выбран, но если провайдер прочитал другое число —
+      // предупреждаем человека, а не молчим.
+      const providerVal = normalizeLabMeasurement(code, providerValue.value, providerValue.unit).value;
+      if (Math.abs(providerVal - normalized.value) > Math.max(0.01, Math.abs(normalized.value) * 0.05)) {
         warnings.push(`Разные варианты распознавания для ${result.name}; выбран табличный результат.`);
       }
     }
@@ -1164,16 +1182,28 @@ export async function saveParsedLabs(
       // нормы подставляем только когда бланк диапазона не дал, и проверяем
       // ОБЕ границы — раньше при наличии uln нижняя граница игнорировалась
       // (женский гемоглобин 110 при норме 120–160 считался нормальным).
+      //
+      // Проход 167: знак границы главнее любой нормы. «<0.5» при норме до 5 не
+      // даёт вердикта, «>1000» при верхней границе 400 — даёт «высокий»: сторона
+      // берётся из `boundProvesSide`, а не из обрезанного числа.
       let isAbnormal = lab.isAbnormal;
       const hasReportReference = lab.refLow !== undefined || lab.refHigh !== undefined;
+      let low = lab.refLow;
+      let high = lab.refHigh;
       if (!hasReportReference && opts?.sex) {
         try {
           const norm = getLabNorm(lab.code, opts.sex as 'male' | 'female');
           if (norm && (norm.uln != null || norm.lln != null)) {
-            isAbnormal = (norm.uln != null && lab.value > norm.uln)
-              || (norm.lln != null && lab.value < norm.lln);
+            low = norm.lln;
+            high = norm.uln;
           }
         } catch { /* нет нормы для кода — оставляем как распознали */ }
+      }
+      if (lab.bound && (low !== undefined || high !== undefined)) {
+        isAbnormal = boundProvesSide(lab.bound, lab.value, low, high) ? true : undefined;
+      } else if (!hasReportReference && (low !== undefined || high !== undefined)) {
+        isAbnormal = (high !== undefined && lab.value > high)
+          || (low !== undefined && lab.value < low);
       }
       const point: LabPoint = {
         id: typeof globalThis.crypto?.randomUUID === 'function'

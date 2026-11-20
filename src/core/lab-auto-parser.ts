@@ -2,7 +2,7 @@ import { resolveLabMarker, normalizedRatio } from './labs-mapping';
 import { UCUM_MAP } from './constants';
 // Проход 142: толкование знака границы живёт в core/lab-bound — его же читают
 // дневник анализов и HL7-выгрузка.
-import { boundMakesConclusionUnsafe } from './lab-bound';
+import { boundProvesSide } from './lab-bound';
 
 export interface ParsedLabResult {
   marker: string;
@@ -205,9 +205,13 @@ function isResolvedMarker(marker: string, rawName: string): boolean {
  * Один и тот же вывод считался в трёх местах парсера (табличная строка, обычная
  * строка, строки-паттерны) и в каждом — по-своему. Явный референс бланка главнее
  * UCUM-норм, но его нижняя и верхняя границы проверяются обе (женский гемоглобин
- * 110 при норме 120–160 — отклонение). Если в бланке стоит граница («>1000»),
- * выводы, которые она не доказывает, не делаются вовсе: «норма» по обрезанному
- * числу — выдумка.
+ * 110 при норме 120–160 — отклонение).
+ *
+ * Проход 167: при границе бланка («>1000», «<0.5») вердикт даёт только
+ * доказанная сторона (`boundProvesSide`). Раньше проверялось лишь «не делает ли
+ * граница отклонение ложным», и «<0.5» при норме до 5 получало `false` —
+ * прочитанное как «норма» и уезжало в склад. Теперь неизвестное значение —
+ * `undefined` («не доказано»).
  */
 function judgeValue(
   marker: string,
@@ -216,18 +220,20 @@ function judgeValue(
   ref: { low?: number; high?: number },
 ): { isAbnormal?: boolean; deviation?: 'low' | 'high' } {
   const ucum = UCUM_MAP[marker];
-  const low = ref.low ?? ucum?.lln;
-  const high = ref.high ?? ucum?.uln;
   const hasRef = ref.low !== undefined || ref.high !== undefined;
-  let isAbnormal: boolean | undefined;
-  if (hasRef) {
-    isAbnormal = (ref.low !== undefined && value < ref.low) || (ref.high !== undefined && value > ref.high);
-  } else if (ucum) {
-    isAbnormal = value < ucum.lln || value > ucum.uln;
+  // Явный бланк не дополняем догадкой из UCUM: его односторонняя граница —
+  // это весь референс строки.
+  const low = hasRef ? ref.low : ucum?.lln;
+  const high = hasRef ? ref.high : ucum?.uln;
+  if (!Number.isFinite(value) || (low === undefined && high === undefined)) {
+    return { isAbnormal: undefined };
   }
-  if (!isAbnormal) return { isAbnormal };
-  if (boundMakesConclusionUnsafe(bound, value, low, high)) return { isAbnormal: undefined };
-  return { isAbnormal: true, deviation: low !== undefined && value < low ? 'low' : 'high' };
+  if (bound) {
+    const side = boundProvesSide(bound, value, low, high);
+    return side ? { isAbnormal: true, deviation: side } : { isAbnormal: undefined };
+  }
+  const side = boundProvesSide(undefined, value, low, high);
+  return side ? { isAbnormal: true, deviation: side } : { isAbnormal: false };
 }
 
 /**

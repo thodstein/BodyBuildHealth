@@ -36,7 +36,7 @@ vi.mock('../db', () => ({
 vi.mock('../data-link', () => ({ notifyDataChange: vi.fn() }));
 
 import { parseLabText } from '../lab-auto-parser';
-import { saveParsedLabs } from '../ocr-engine';
+import { saveParsedLabs, processUploadedFile } from '../ocr-engine';
 import { labValueLabel } from '../lab-value-label';
 
 beforeEach(() => {
@@ -86,8 +86,10 @@ describe('проход 138: граница «>N» / «<N» доходит до �
     expect(crp.bound).toBe('<');
     expect(crp.value).toBe(0.5);
     expect(crp.refRange).toBeUndefined();
-    // 0.5 мг/л ниже верхней границы СРБ — вердикт «высокий» был бы выдумкой.
-    expect(crp.isAbnormal).toBe(false);
+    // Проход 167: 0.5 мг/л — обрезанное число. Граница «<» не доказывает ни
+    // «выше», ни «ниже», поэтому вердикта нет вовсе; прежний `false` читался
+    // как «норма» и переживал сохранение в склад.
+    expect(crp.isAbnormal).toBeUndefined();
   });
 
   it('вывод, который граница не доказывает, не делается', () => {
@@ -124,6 +126,103 @@ describe('проход 138: граница «>N» / «<N» доходит до �
     expect(labValueLabel(0.5, '<')).toBe('<0.5');
     expect(labValueLabel(30)).toBe('30');
     expect(labValueLabel(undefined, '>')).toBe('—');
+  });
+});
+
+describe('проход 167: при границе бланка вердикт — только доказанная сторона', () => {
+  it('«>1000» при верхней границе 400 — доказанное отклонение', () => {
+    const ferritin = one('Ферритин >1000 нг/мл 30-400');
+    expect(ferritin.bound).toBe('>');
+    expect(ferritin.isAbnormal).toBe(true);
+    expect(ferritin.deviation).toBe('high');
+  });
+
+  it('«>100» при норме 30–400 — не «норма»: значение неизвестно', () => {
+    // Обрезанное число 100 внутри нормы, но «>100» может быть и 500.
+    const ferritin = one('Ферритин >100 нг/мл 30-400');
+    expect(ferritin.bound).toBe('>');
+    expect(ferritin.isAbnormal).toBeUndefined();
+  });
+
+  it('«<0.5» СРБ — тоже без вердикта, а не «норма»', () => {
+    const crp = one('СРБ <0.5 мг/л');
+    expect(crp.isAbnormal).toBeUndefined();
+  });
+
+  it('без знака вердикт прежний: оба числа точные', () => {
+    expect(one('АЛТ 120 Ед/л 0-41').isAbnormal).toBe(true);
+    expect(one('АЛТ 20 Ед/л 0-41').isAbnormal).toBe(false);
+  });
+
+  it('склад не получает «норму» по обрезанному числу', async () => {
+    await saveParsedLabs([
+      { code: 'ALT', name: 'АЛТ', value: 30, unit: 'Ед/л', bound: '>', refLow: 0, refHigh: 41, isAbnormal: false },
+    ], 'course');
+    expect(savedLabPoints[0].bound).toBe('>');
+    expect(savedLabPoints[0].isAbnormal).toBeUndefined();
+  });
+
+  it('склад берёт сторону по половой норме: «>1000» ферритина — выше', async () => {
+    await saveParsedLabs([
+      { code: 'FERRITIN', name: 'Ферритин', value: 1000, unit: 'нг/мл', bound: '>' },
+    ], 'course', { sex: 'male' });
+    expect(savedLabPoints[0].isAbnormal).toBe(true);
+    await saveParsedLabs([
+      { code: 'CRP', name: 'СРБ', value: 0.5, unit: 'мг/л', bound: '<' },
+    ], 'course', { sex: 'male' });
+    expect(savedLabPoints[1].isAbnormal).toBeUndefined();
+  });
+
+  it('без нормы вердикт не выдумывается', async () => {
+    await saveParsedLabs([
+      { code: 'UNKNOWN_MARKER', name: 'Неизвестный', value: 5, unit: 'мг/л', bound: '>' },
+    ], 'course');
+    expect(savedLabPoints[0].isAbnormal).toBeUndefined();
+  });
+});
+
+describe('проход 167: полный конвейер бланка не подменяет норму знаком', () => {
+  const pipeline = async (text: string) => {
+    const result = await processUploadedFile(new File([text], 'labs.txt', { type: 'text/plain' }));
+    return result.labs;
+  };
+
+  it('«Ферритин >1000 нг/мл 30-400»: норма 30–400, а не сам результат', async () => {
+    const labs = await pipeline('Ферритин >1000 нг/мл 30-400');
+    expect(labs).toHaveLength(1);
+    const [ferritin] = labs;
+    expect(ferritin.bound).toBe('>');
+    expect(ferritin.value).toBe(1000);
+    // Раньше «>1000» становилось нижней границей нормы (refLow 1000).
+    expect(ferritin.refLow).toBe(30);
+    expect(ferritin.refHigh).toBe(400);
+    expect(ferritin.isAbnormal).toBe(true);
+  });
+
+  it('«Ферритин >100 нг/мл 30-400»: обрезанное число — без вердикта', async () => {
+    const [ferritin] = await pipeline('Ферритин >100 нг/мл 30-400');
+    expect(ferritin.bound).toBe('>');
+    expect(ferritin.refLow).toBe(30);
+    // 100 внутри нормы, но «>100» может быть и 500 — «норма» была бы выдумкой.
+    expect(ferritin.isAbnormal).toBeUndefined();
+  });
+
+  it('«СРБ <0.5 мг/л»: референс не собирается из значения', async () => {
+    const [crp] = await pipeline('СРБ <0.5 мг/л');
+    expect(crp.bound).toBe('<');
+    expect(crp.value).toBe(0.5);
+    // Раньше «<0.5» становилось «нормой до 0.5».
+    expect(crp.refLow).toBeUndefined();
+    expect(crp.refHigh).toBeUndefined();
+    expect(crp.isAbnormal).toBeUndefined();
+  });
+
+  it('«АЛТ 35 <41 Е/л»: знак в колонке нормы остаётся нормой', async () => {
+    const [alt] = await pipeline('АЛТ 35 <41 Е/л');
+    expect(alt.value).toBe(35);
+    expect(alt.bound).toBeUndefined();
+    expect(alt.refHigh).toBe(41);
+    expect(alt.isAbnormal).toBe(false);
   });
 });
 
