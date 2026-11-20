@@ -3,6 +3,7 @@
 // Каталог маркеров повторяет таблицу T4 движка risk-engine-tz-spec (пороги m_i=1/2/3)
 // и якорные пороги clinicalFloorsForLabs — единый источник для UI-списка «Анализы».
 import { TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS } from '../data/support-db';
+import { canonicalLabValues } from './lab-code-bridge';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_STEPS, HGB_STEPS, RBC_STEPS, UA_STAGE_ULN,
@@ -80,6 +81,11 @@ export function markerDirection(m: VerifMarker, sex?: 'male' | 'female'): VerifD
   return sex === 'female' && m.femaleDirection ? m.femaleDirection : m.direction;
 }
 
+// Проход 169: коды маркеров — канон склада (`UCUM_MAP`, парсеры, `normalizeFlatLabs`):
+// `CHOL`, `CREATININE`, `UA`, `EGFR`, `DHEA_S`, `TNF_ALPHA`, свободные `FT3`/`FT4`.
+// Прежние имена модели (`TC`, `CREAT`, `URIC`, `eGFR`, `DHEAS`, `TNFA`) и старые
+// снапшоты приводятся тем же мостом (`labAliasMap` → `canonicalLabValues`).
+// Иначе строка «есть маркер» не находила значение склада: анализ есть, вклада нет.
 export const VERIFICATION_SYSTEMS: VerifSystem[] = [
   {
     id: 'cardio', name: TZ_SYSTEM_LABELS.cardio, icon: TZ_SYSTEM_ICONS.cardio, color: '#ef4444',
@@ -92,7 +98,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('LDL', 'ЛПНП', 'ммоль/л', 'high', [2.6, 3.4, 4.9]),
         M('HDL', 'ЛПВП', 'ммоль/л', 'low', [1.5, 1.0, 0.8]),
         M('TG', 'Триглицериды', 'ммоль/л', 'high', [1.7, 2.3, 5.6]),
-        M('TC', 'Холестерин общий', 'ммоль/л', 'high', [5.0, 6.2, 7.5]),
+        M('CHOL', 'Холестерин общий', 'ммоль/л', 'high', [5.0, 6.2, 7.5]),
       ] },
       { id: 'cv3', weight: 0.7, markers: [
         M('NA', 'Натрий', 'ммоль/л', 'high', [145, 148, 155]),
@@ -151,19 +157,19 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'renal', name: TZ_SYSTEM_LABELS.renal, icon: TZ_SYSTEM_ICONS.renal, color: '#3b82f6',
     mechanisms: [
       { id: 'ren1', weight: 1.0, markers: [
-        M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'low', [90, 60, 30]),
+        M('EGFR', 'СКФ (eGFR)', 'мл/мин', 'low', [90, 60, 30]),
         // Ступени — из `CREATININE_STEPS` (♂ 110/130/200, ♀ 97/130/200, проход 126):
         // мужской ряд начинался с 90, то есть ниже ВГН 110 — норма читалась как
         // отклонение, а у женщины вторая ступень стояла на 110 при её ВГН 97.
-        M('CREAT', 'Креатинин', 'мкмоль/л', 'high', CREATININE_STEPS.male, { thresholds: CREATININE_STEPS.female }),
+        M('CREATININE', 'Креатинин', 'мкмоль/л', 'high', CREATININE_STEPS.male, { thresholds: CREATININE_STEPS.female }),
         M('UREA', 'Мочевина', 'ммоль/л', 'high', [8, 12, 20]),
         // Ступени — из резолвера (`UA_STAGE_ULN`): ♂ 420/480/540, ♀ 350/400/450.
         // До прохода 77 у женщины не было ни ВГН, ни ступеней: 380 мкмоль/л не
         // давало вклада в риск, хотя её норма (350) уже превышена.
-        M('URIC', 'Мочевая кислота', 'мкмоль/л', 'high', UA_STAGE_ULN.male, { thresholds: UA_STAGE_ULN.female }),
+        M('UA', 'Мочевая кислота', 'мкмоль/л', 'high', UA_STAGE_ULN.male, { thresholds: UA_STAGE_ULN.female }),
       ] },
       { id: 'ren2', weight: 0.6, markers: [
-        M('eGFR', 'СКФ (eGFR)', 'мл/мин', 'high', [120, 140, 160]),
+        M('EGFR', 'СКФ (eGFR)', 'мл/мин', 'high', [120, 140, 160]),
       ], note: 'гиперфильтрация — ранний признак перегрузки' },
       { id: 'ren3', weight: 0.8, markers: [
         M('UACR', 'Альбумин/креатинин мочи', 'мг/г', 'high', [30, 300, 1000]),
@@ -180,8 +186,8 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       ] },
     ],
     floors: [
-      { code: 'eGFR', op: '<=', value: 60, label: 'СКФ < 60 мл/мин — ХБП', risk: 50 },
-      { code: 'eGFR', op: '<=', value: 30, label: 'СКФ < 30 мл/мин — тяжёлая ХБП', risk: 75 },
+      { code: 'EGFR', op: '<=', value: 60, label: 'СКФ < 60 мл/мин — ХБП', risk: 50 },
+      { code: 'EGFR', op: '<=', value: 30, label: 'СКФ < 30 мл/мин — тяжёлая ХБП', risk: 75 },
       { code: 'UACR', op: '>=', value: 300, label: 'Альбуминурия > 300 мг/г', risk: 50 },
     ],
   },
@@ -196,7 +202,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         M('CRP', 'СРБ', 'мг/л', 'high', [5, 10, 20]),
         M('HOMOCYSTEINE', 'Гомоцистеин', 'мкмоль/л', 'high', [15, 20, 30]),
         M('IL6', 'IL-6', 'пг/мл', 'high', [2, 5, 10]),
-        M('TNFA', 'TNF-α', 'пг/мл', 'high', [3, 5, 10]),
+        M('TNF_ALPHA', 'TNF-α', 'пг/мл', 'high', [3, 5, 10]),
         // Женский ряд — `FERRITIN_STEPS.female` (♀ цель 150 · 300 · 400, проход 126):
         // раньше женской ветки не было, и 200 мкг/л у женщины давали ноль вклада.
         M('FERRITIN', 'Ферритин', 'мкг/л', 'high', FERRITIN_STEPS.male, { thresholds: FERRITIN_STEPS.female }),
@@ -210,12 +216,12 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         // Первая ступень Т3/Т4 (4.5 / 12 пмоль/л) выше нижней нормы тиров (3.5 / 9)
         // намеренно — это функциональная цель, как 12 нмоль/л у общего тестостерона
         // при LLN 8.6; вторая ступень уже совпадает с LLN. Проверено в проходе 126.
-        M('T3', 'Т3 свободный', 'пмоль/л', 'low', [4.5, 3.5, 2.5]),
-        M('T4', 'Т4 свободный', 'пмоль/л', 'low', [12, 9, 6]),
+        M('FT3', 'Т3 свободный', 'пмоль/л', 'low', [4.5, 3.5, 2.5]),
+        M('FT4', 'Т4 свободный', 'пмоль/л', 'low', [12, 9, 6]),
         // ДГЭА-С: женской ветки нет намеренно — её норма возрастная (пик 20–30 лет
         // и спад после 40), одного числа в репозитории нет, а ряд «по памяти»
         // запрещён (проход 126). Мужской ряд — 100/50/20 мкг/дл.
-        M('DHEAS', 'DHEA-S', 'мкг/дл', 'low', [100, 50, 20]),
+        M('DHEA_S', 'DHEA-S', 'мкг/дл', 'low', [100, 50, 20]),
       ] },
       { id: 'cns5', weight: 0.8, markers: [
         M('GLU', 'Глюкоза', 'ммоль/л', 'low', [3.9, 3.3, 2.8]),
@@ -295,7 +301,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
   },
 ];
 
-const FLOOR_CODES = new Set<string>(['LDL', 'K', 'ALT', 'AST', 'eGFR', 'UACR', 'PRL', 'GLU', 'LH', 'HCT', 'HOMA']);
+const FLOOR_CODES = new Set<string>(['LDL', 'K', 'ALT', 'AST', 'EGFR', 'UACR', 'PRL', 'GLU', 'LH', 'HCT', 'HOMA']);
 const COMPUTED_CODES = new Set<string>(['AST', 'ALT']);
 
 export const VERIFICATION_TOTAL_MECHANISMS = VERIFICATION_SYSTEMS.reduce((s, x) => s + x.mechanisms.length, 0);
@@ -365,15 +371,30 @@ export interface VerifReport {
   floorsCount: number;
 }
 
+/**
+ * Плоский список анализов в кодах, на которые смотрит `VERIFICATION_SYSTEMS`.
+ *
+ * Проход 169: главный мост — `canonicalLabValues` (легаси-имена модели → код
+ * склада, `EGFR`/`CREATININE`/`UA`/`DHEA_S`/`TNF_ALPHA`/`BIL`/`HGB`). Здесь
+ * остаются только имена, которых нет в `UCUM_MAP`: парсерные `POTASSIUM`,
+ * `SODIUM`, `GLUCOSE`. Один анализ не занимает чужое имя: канонический ключ
+ * перезаписывается только тогда, когда его нет.
+ */
 export function labAliasMap(labMap: Record<string, number>): Record<string, number> {
-  const m: Record<string, number> = { ...labMap };
-  if (m['EGFR'] !== undefined && m['eGFR'] === undefined) m['eGFR'] = m['EGFR'];
-  if (m['CREATININE'] !== undefined && m['CREAT'] === undefined) m['CREAT'] = m['CREATININE'];
-  if (m['BILIRUBIN'] !== undefined && m['BIL'] === undefined) m['BIL'] = m['BILIRUBIN'];
-  if (m['POTASSIUM'] !== undefined && m['K'] === undefined) m['K'] = m['POTASSIUM'];
-  if (m['SODIUM'] !== undefined && m['NA'] === undefined) m['NA'] = m['SODIUM'];
-  if (m['GLUCOSE'] !== undefined && m['GLU'] === undefined) m['GLU'] = m['GLUCOSE'];
-  if (m['HB'] !== undefined && m['HGB'] === undefined) m['HGB'] = m['HB'];
+  const m: Record<string, number> = { ...canonicalLabValues(labMap) };
+  const bridge = (code: string, aliases: string[]) => {
+    if (m[code] !== undefined) return;
+    for (const alias of aliases) {
+      const value = m[alias];
+      if (value !== undefined && Number.isFinite(value)) {
+        m[code] = value;
+        return;
+      }
+    }
+  };
+  bridge('K', ['POTASSIUM']);
+  bridge('NA', ['SODIUM']);
+  bridge('GLU', ['GLUCOSE']);
   return m;
 }
 

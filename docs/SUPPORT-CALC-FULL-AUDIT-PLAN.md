@@ -2703,6 +2703,32 @@ P2 — вкладка «Анализы»: отображение и индика
 
 **Осталось.** `BNP` как отдельный анализ не имеет шкалы ступеней и ВГН в риск-контуре — это блокер с причиной (нужен клинический источник порогов BNP), а не забытая правка. `risk-calculator-v2.engine` держит и `BNP`, и `NT_PROBNP` — там это веса органов, не пороги, но при следующем касании этот контур стоит свести к одной записи.
 
+### Шестьдесят девятый проход (одно имя анализа на границе `labValues`)
+
+**Проблема.** Один анализ жил в двух словарях. Склад (`UCUM_MAP`, парсеры, `normalizeFlatLabs`, `labs-profile-sync`) пишет коды `CHOL`, `CREATININE`, `UA`, `EGFR`, `DHEA_S`, `P`, `FOL`, `TPO_AB`, `TNF_ALPHA`, а движок риска и верификация читали прежние имена модели — `TC`, `CREAT`, `URIC`, `eGFR`, `DHEAS`, `PHOS`, `FOLATE`, `ANTI_TPO`, `TNFA`. Последствия:
+
+- значение склада не находило ключа: анализ есть, вклада в риск нет, верификация пишет «нет данных», «подтверждено анализами» занижено;
+- карточка «Риск» на `LabsScreen` держала свою таблицу алиасов (`EGFR→eGFR`, `CREATININE→CREAT`, `BILIRUBIN→BIL`), а вкладка `RiskSpecMethod` — свой список обязательных кодов с `eGFR`/`Na`: покрытие считалось по двум разным словарям;
+- `T3`/`T4` в складе — **общие** гормоны (nmol/L), а `cns4` читал их как свободные (pmol/L): 2.0 nmol/L общего Т3 давали «тяжёлый дефицит».
+
+**Решение.** Один мост на границе плоского списка анализов — новый `src/engines/lab-code-bridge.ts`:
+
+- `LEGACY_LAB_CODES` — прежние имена модели и подписи полей формы → код склада (`TC→CHOL`, `CREAT→CREATININE`, `URIC→UA`, `DHEAS→DHEA_S`, `PHOS→P`, `FOLATE→FOL`, `ANTI_TPO→TPO_AB`, `TNFA→TNF_ALPHA`, `ALDO→ALDOSTERONE`, `PTH→PARATHYROID`, `HB→HGB`, `BILIRUBIN→BIL`, `TOTAL_CHOLESTEROL→CHOL`, `TESTOSTERONE→TT`, `FREE_TESTOSTERONE→FT`, `ESTRADIOL→E2`, `ANTI_TG→TG_AB`, `IL_6→IL6`, `PSA_TOTAL→PSA`);
+- `canonicalLabValues` добавляет канон-ключ, не удаляя исходный и никогда не перезаписывая существующий канон; остальное приводит `mapToUcumCode`, но только к настоящим кодам `UCUM_MAP` (`CREAT`/`URIC`/`FOLATE`/`PHOS`/`BILIRUBIN`). Менять нечего — возвращается тот же объект.
+- Мост стоит на входах: `getMiFromLab`, `clinicalFloorsForLabs`, `calculateTzSpecRisk`; `labAliasMap`/`buildVerificationReport`; `LabsScreen.tzLabValues`; `RiskSpecMethod.labMap`.
+- Читатели переведены на канон: `MECH_LAB_MARKERS` (`CHOL`, `EGFR`, `CREATININE`, `UA`, `DHEA_S`, `TNF_ALPHA`, `FT3`, `FT4`), строки `VERIFICATION_SYSTEMS`, `FLOOR_CODES` (`EGFR`), `REQUIRED_LAB_CODES` (`EGFR`, `NA`), `extractLabValues` (`CREATININE`, `CHOL`, `UA`, `DHEA_S`, `P`, `FOL`, `TPO_AB`, `TNF_ALPHA`, свободные `FT3`/`FT4`, вычисленная `EGFR`).
+- Свои таблицы удалены: приватные алиасы в `LabsScreen` и список с `eGFR`/`Na` в `RiskSpecMethod` (там же список маркеров печатается без двойного счёта: `TC` рядом с `CHOL` больше не второй строкой). В `Calc.labs-derived` добавлены коды склада `CHOL` (поле «Холестерин общий») и `P` (фосфор, вместе с панелью и мостом единицы в `Calc.lab-units`): раньше бланк из склада молча не находил этих полей. В каталог анализов (`LabsUI`/`LabsCatalogTab`) добавлены `CHOL` и `FOL` — они есть в `UCUM_MAP`, но в справочник не попадали.
+- `MetabolicHub` («Кровь») читал СКФ как `labs['eGFR']` из `UnifiedSettings.labs.summary`, где ключ — код склада `EGFR`: значение туда не попадало никогда. Теперь читается `EGFR` (прежние написания остались вторыми).
+- Мёртвые чтения движка удалены: `VITD`, `B12`, `FOL`, `P`, `TPO_AB`, `ALDOSTERONE`, `PARATHYROID`, `PSA`, `PSA_FREE`, `DHT`, `PROG` механизм-моделью не судятся (ступеней нет), и код больше не делает вид, что анализ учтён.
+
+**Что теперь читается.** Склад даёт `CREATININE 200` → верификация отмечает маркер `CREATININE` (раньше — «нет данных»), якоря СКФ `EGFR < 60`/`< 30` срабатывают от `EGFR`, а старый снапшот с `CREAT`/`eGFR` даёт тот же результат. Общий Т3 в `T3` в `cns4` не участвует — там только `FT3`/`FT4`.
+
+**Гарды.** Новый `lab-name-bridge` (14): легаси-имена получают канон и не теряются; канон главнее; все значения `LEGACY_LAB_CODES` — коды `UCUM_MAP`; подписи формы (`TOTAL_CHOLESTEROL`/`URIC_ACID`/`T3_FREE`) приводятся к канону; `m_i` совпадает для `ren1`/`cv2`/`cns2`/`liv2`/`hem1`; `clinicalFloorsForLabs` и `calculateTzSpecRisk` совпадают целиком; карта склада подтверждает `EGFR`/`CREATININE`/`UA` и поднимает оба якоря СКФ; покрытие легаси-карты и карты склада одинаково; ни один маркер/якорь верификации не остался под прежним именем; движок не читает прежних имён и держит мост на трёх входах. Обновлены ожидания `risk-verification` (переписан блок `labAliasMap`), `risk-verification-female` (`CREATININE`/`UA`), `lab-numeric-norms` (`UA`), `lab-unit-read` (`v['FOL']`, `v['FT3']`/`v['FT4']`).
+
+**Прогон.** Движки (`src/engines/__tests__`) — 238 файлов / 4552 теста: 4551 зелёный, единственный красный — известный чужой `diary-mmc-checkin-integration.test.tsx`. Экраны и смежные контуры (`Calculator`, `LabsScreen_parts`, `RiskScreen_parts`, `support-plan`, лабораторные тесты `src/ui/__tests__`) — 85 файлов / 673 зелёных; `src/core` — 55 файлов / 799 зелёных; `tsc` чистый; `verify:apk-design` OK. Новый `lab-name-bridge` — 14 тестов.
+
+**Осталось.** `LAB_TIERS`/`LAB_REF` и `tz-bridge-marker` живут под именами каталога (`URIC_ACID`, `FOLATE`, `ANTI_TPO`, `PTH`): риск-контур их больше не путает, но единой таблицы кодов каталога нет — сводить вместе с тремя реестрами границ. `HBA1C`/`HbA1c` — два написания одного анализа (мост их не сводит: движок получает `HBA1C` после `normalizeFlatLabs`), `CKMB`/`CK_MB` — та же история. СКФ калькулятора: в форме (`FULL_PANELS`) поля нет, поэтому триггер «Фильтрация» в `Calc.mapper` читает пустой `labs.eGFR` и никогда не срабатывает; чтобы считать её из креатинина, `mapper-ctx` нужен возраст — решение отложено, число не придумываем. `lab-analysis.engine` держит `T3: { low: 2.5, high: 6.5, unit: 'пмоль/л' }`, а `UCUM_MAP.T3` — общий Т3 в nmol/L: один анализ, две единицы в разных реестрах — сводить вместе с тремя реестрами границ.
+
 ### Осознанные отклонения
 - Кураторская база + производный fallback вместо ручного переписывания 12k-строчного каталога. Деривация консервативна и всегда помечена `q='C'` — «правдоподобно», а не «доказано».
 - UL-кап в `applyTitration` оставлен (доза всё равно безопасна), но сырые дозы доступны через `rawDosesOut` — чтобы `checkUpperLimits` мог честно предупредить о превышении.

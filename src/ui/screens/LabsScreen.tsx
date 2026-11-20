@@ -22,6 +22,7 @@ import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
 import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../engines/risk-engine-tz-spec';
+import { canonicalLabValues } from '../../engines/lab-code-bridge';
 import { db } from '../../core/db';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
 import { LabsSchedule } from './LabsScreen_parts/LabsSchedule';
@@ -504,17 +505,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   // ── Механизм-ориентированная модель (ТЗ) — данные из фазы ──
   // лаб. значения: code → number (единый источник для движка и вкладки верификации,
   // чтобы «верифицировано анализами» в карточке и во вкладке считались от ОДНОГО набора)
+  // Проход 169: имена приводит тот же мост, что и движок (`canonicalLabValues`).
+  // Своей таблицы алиасов больше нет: иначе карточка и вкладка расходились по коду.
   const tzLabValues = useMemo<Record<string, number>>(() => {
     const m: Record<string, number> = {};
     for (const l of currentLabs) {
       const c = l.code?.toUpperCase();
       if (c && typeof l.value === 'number' && isFinite(l.value)) m[c] = l.value;
     }
-    // алиасы для движка
-    if (m['EGFR'] !== undefined) m['eGFR'] = m['EGFR'];
-    if (m['CREATININE'] !== undefined) m['CREAT'] = m['CREATININE'];
-    if (m['BILIRUBIN'] !== undefined) m['BIL'] = m['BILIRUBIN'];
-    return m;
+    return canonicalLabValues(m);
   }, [currentLabs]);
 
   const tzSpecResult = useMemo<TzSpecResult | null>(() => {

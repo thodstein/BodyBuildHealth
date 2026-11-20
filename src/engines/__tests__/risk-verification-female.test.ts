@@ -40,7 +40,7 @@ describe('женские пороги маркеров (паритет с getMiF
   });
 
   it('Креатинин: 125 мкмоль/л — у мужчины и у женщины m1 (♀ ВГН 97, дальше 130/200)', () => {
-    const cr = findMarker('renal', 'ren1', 'CREAT');
+    const cr = findMarker('renal', 'ren1', 'CREATININE');
     expect(markerStatus(cr, 125, 'male')).toBe(1);
     expect(markerStatus(cr, 125, 'female')).toBe(1);
     // Проход 126: женский ряд стал ВГН 97 · 130 · 200. До него вторая ступень
@@ -82,7 +82,7 @@ describe('женские пороги маркеров (паритет с getMiF
   });
 
   it('Мочевая кислота: 380 — у женщины уже m1, у мужчины m0 (♀ 350/400/450)', () => {
-    const ua = findMarker('renal', 'ren1', 'URIC');
+    const ua = findMarker('renal', 'ren1', 'UA');
     expect(markerThresholds(ua, 'male')).toEqual([420, 480, 540]);
     expect(markerThresholds(ua, 'female')).toEqual([350, 400, 450]);
     expect(markerStatus(ua, 380, 'male')).toBe(0);

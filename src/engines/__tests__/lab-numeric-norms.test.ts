@@ -240,7 +240,7 @@ describe('мочевая кислота: ВГН и ступени половые
   });
 
   it('risk-verification: те же ступени, что в резолвере', () => {
-    const ua = findMarker('renal', 'ren1', 'URIC');
+    const ua = findMarker('renal', 'ren1', 'UA');
     expect(markerThresholds(ua, 'male')).toEqual(UA_STAGE_ULN.male);
     expect(markerThresholds(ua, 'female')).toEqual(UA_STAGE_ULN.female);
   });

@@ -540,7 +540,9 @@ export const MetabolicHub: React.FC = () => {
       apply('hct', setHct, pick('HCT','Hct','hematocrit','Гематокрит'));
       apply('hgb', setHgb, pick('HGB','Hgb','hemoglobin','Гемоглобин'));
       apply('ferritin', setFerritin, pick('FERRITIN','Ferritin','ферритин'));
-      apply('gfr', setGfr, pick('eGFR','GFR','gfr'));
+      // Проход 169: склад (`UnifiedSettings.labs.summary`) ключует по коду бланка —
+      // `EGFR`. Прежнее `eGFR` не находилось никогда, и СКФ в «Кровь» не подтягивалась.
+      apply('gfr', setGfr, pick('EGFR','eGFR','GFR','gfr'));
       apply('hdl', setHdlMgDl, pick('HDL','hdl','HDLc','ЛПВП'));
       apply('ast', setAst, pick('AST','ast','АСТ'));
       apply('alt', setAlt, pick('ALT','alt','АЛТ'));
@@ -739,7 +741,7 @@ export const MetabolicHub: React.FC = () => {
       if(hgbLab?.value) setHgb(Number(hgbLab.value));
       const ferrLab = labs['FERRITIN'] || labs['Ferritin'] || labs['ферритин'];
       if(ferrLab?.value) setFerritin(Number(ferrLab.value));
-      const gfrLab = labs['eGFR'] || labs['GFR'] || labs['gfr'];
+      const gfrLab = labs['EGFR'] || labs['eGFR'] || labs['GFR'] || labs['gfr'];
       if(gfrLab?.value) setGfr(Number(gfrLab.value));
       const tshLab = labs['TSH'] || labs['tsh'];
       if(tshLab?.value) setTsh(Number(tshLab.value));

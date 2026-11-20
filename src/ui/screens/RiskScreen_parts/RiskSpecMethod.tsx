@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, mechanismCoverageOf, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, normalizeFlatLabs } from '../../../engines/support-plan/engine-helpers';
+// Проход 169: одно имя анализа — мост «легаси-имя/подпись поля → код склада» (движок и верификация).
+import { canonicalLabValues, LEGACY_LAB_CODES } from '../../../engines/lab-code-bridge';
 import { useDataLink } from '../../../core/data-link';
 import { getRiskColor } from '../../../core/utils/risk-colors';
 import { PHARMA_DB } from '../../../core/pharma-database';
@@ -152,9 +154,22 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     return { drugClass, avgDose, totalWeeks: Math.max(1, totalWeeks), form, combos: drugClasses.length, count: course.length, classes: drugClasses };
   }, [course]);
 
-  const labMap = useMemo(() => normalizeFlatLabs(labs), [labs]);
-  const labCount = Object.keys(labMap).length;
-  const REQUIRED_LAB_CODES = ['LDL','HDL','TG','HCT','ALT','AST','GGT','CREATININE','eGFR','GLU','LH','FSH','TT','E2','K','Na'];
+  // Проход 169: покрытие считается по кодам склада — `EGFR` (не `eGFR`) и `NA`
+  // (не `Na`) раньше не совпадали с ключами, и покрытие занижалось на два анализа.
+  const labMap = useMemo(() => canonicalLabValues(normalizeFlatLabs(labs)), [labs]);
+  // Показ без двойного счёта: если у анализа есть канон-ключ, его прежнее имя
+  // (например, `TC` рядом с `CHOL`) в списке не печатается второй строкой.
+  const displayLabs = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [code, value] of Object.entries(labMap)) {
+      const canon = LEGACY_LAB_CODES[code.trim().toUpperCase()];
+      if (canon && labMap[canon] !== undefined) continue;
+      out[code] = value;
+    }
+    return out;
+  }, [labMap]);
+  const labCount = Object.keys(displayLabs).length;
+  const REQUIRED_LAB_CODES = ['LDL','HDL','TG','HCT','ALT','AST','GGT','CREATININE','EGFR','GLU','LH','FSH','TT','E2','K','NA'];
   const presentCount = REQUIRED_LAB_CODES.filter(c => labMap[c] !== undefined).length;
   const rawDcov = labCount > 0 ? presentCount / REQUIRED_LAB_CODES.length : 0.1;
   const dCov = forceNoLabs ? 0.1 : Math.max(0.1, rawDcov);
@@ -633,14 +648,14 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
               </div>
               {labCount > 0 && !forceNoLabs && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {Object.entries(labMap).slice(0, 16).map(([code, val]) => (
+                  {Object.entries(displayLabs).slice(0, 16).map(([code, val]) => (
                     <span key={code} style={{ ...GlassChip, fontSize: 12, fontWeight:700, padding:'6px 10px', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.22)', color: '#fff' }}>
                       {code}: {val}
                     </span>
                   ))}
-                  {Object.keys(labMap).length > 16 && (
+                  {Object.keys(displayLabs).length > 16 && (
                     <span style={{ fontSize: 12, color: '#fff', padding: '6px 0' }}>
-                      +{Object.keys(labMap).length - 16} ещё
+                      +{Object.keys(displayLabs).length - 16} ещё
                     </span>
                   )}
                 </div>

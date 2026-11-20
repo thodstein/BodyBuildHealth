@@ -495,10 +495,12 @@ describe('проход 120: свободные Т3/Т4 читаются по е�
     expect(readLabValue('T4 free', 1.2, 'пг/мл').value).toBeCloseTo(fromImport.value, 0);
   });
 
-  it('движок берёт Т3/Т4 через чтение с единицей', () => {
+  it('движок берёт свободные Т3/Т4 через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['T3'] = readHormone('T3 free', 'panelThyroid'");
-    expect(src).toContain("v['T4'] = readHormone('T4 free', 'panelThyroid'");
+    // Проход 169: ключ — канон склада (`FT3`/`FT4`); `T3`/`T4` в `UCUM_MAP` —
+    // ОБЩИЕ гормоны (nmol/L), и пороги свободных (pmol/L) судили бы не тот анализ.
+    expect(src).toContain("v['FT3'] = readHormone('T3 free', 'panelThyroid'");
+    expect(src).toContain("v['FT4'] = readHormone('T4 free', 'panelThyroid'");
   });
 });
 
@@ -579,7 +581,7 @@ describe('проход 122: фолат читается по единице бл
 
   it('движок берёт фолат через чтение с единицей', () => {
     const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['FOLATE'] = readHormone('Folate', 'panelVitamin'");
+    expect(src).toContain("v['FOL'] = readHormone('Folate', 'panelVitamin'");
   });
 });
 

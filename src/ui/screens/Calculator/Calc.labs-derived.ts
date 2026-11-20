@@ -101,6 +101,7 @@ MARKER_TO_PANEL['fibrinogen'] = 'panelCoagulation';
 MARKER_TO_PANEL['il_6'] = 'panelInflammatory';
 MARKER_TO_PANEL['tnf_alpha'] = 'panelInflammatory';
 MARKER_TO_PANEL['calcium'] = 'panelMineral';
+MARKER_TO_PANEL['phosphorus'] = 'panelMineral';
 MARKER_TO_PANEL['magnesium'] = 'panelMineral';
 MARKER_TO_PANEL['sodium'] = 'panelMineral';
 MARKER_TO_PANEL['potassium'] = 'panelMineral';
@@ -149,6 +150,9 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'CRP': 'CRP', 'HS_CRP': 'hsCRP', 'HSCRP': 'hsCRP',
   // ── липиды ──
   'TC': 'Total Cholesterol', 'TOTAL_CHOLESTEROL': 'Total Cholesterol', 'CHOLESTEROL': 'Total Cholesterol',
+  // Проход 169: код склада `CHOL` (`UCUM_MAP`) — тот же анализ; без него бланк
+  // из склада не находил поля «Холестерин общий» и молча терялся.
+  'CHOL': 'Total Cholesterol',
   'TG': 'Triglycerides', 'TRIGLYCERIDES': 'Triglycerides',
   'APO_B': 'ApoB', 'APOB': 'ApoB', 'APO_A1': 'ApoA1', 'APOA1': 'ApoA1',
   'LP_A': 'Lp(a)', 'LPA': 'Lp(a)',
@@ -174,6 +178,8 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'CA': 'Calcium', 'CALCIUM': 'Calcium', 'MG': 'Magnesium', 'MAGNESIUM': 'Magnesium',
   'NA': 'Sodium', 'SODIUM': 'Sodium', 'K': 'Potassium', 'POTASSIUM': 'Potassium',
   'CL': 'Chloride', 'CHLORIDE': 'Chloride', 'PHOS': 'Phosphorus', 'PHOSPHORUS': 'Phosphorus',
+  // Проход 169: код склада `P` — фосфор (`UCUM_MAP.P`), а не «неизвестный код».
+  'P': 'Phosphorus',
   'ALDO': 'Aldosterone', 'ALDOSTERONE': 'Aldosterone', 'RENIN': 'Renin',
   'PTH': 'PTH', 'PARATHYROID': 'PTH', 'ANDROSTENEDIONE': 'Androstenedione',
   '3A_ADG': '3a-ADG',

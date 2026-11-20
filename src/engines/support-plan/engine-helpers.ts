@@ -1145,6 +1145,10 @@ function extractLabValues(
 ): Record<string, number> {
   const v: Record<string, number> = {};
   // Проход 136: бланк выбирается одним правилом на всё приложение.
+  // Проход 169: ключи — коды склада (`UCUM_MAP`), а не прежние имена модели:
+  // `CREATININE`, `CHOL`, `UA`, `EGFR`, `DHEA_S`, `P`, `FOL`, `TPO_AB`, `TNF_ALPHA`,
+  // свободные `FT3`/`FT4` (общие Т3/Т4 — другой анализ в другой единице).
+  // Один анализ не занимает чужое имя и не пропадает при передаче в движок.
   const fp = currentLabSlice(labs);
   if (!fp) return v;
 
@@ -1155,7 +1159,7 @@ function extractLabValues(
   if (num(b.GGT) !== undefined) v['GGT'] = num(b.GGT)!;
   if (num(b.Bilirubin) !== undefined) v['BIL'] = num(b.Bilirubin)!;
   if (num(b.Glucose) !== undefined) v['GLU'] = num(b.Glucose)!;
-  if (num(b.Creatinine) !== undefined) v['CREAT'] = num(b.Creatinine)!;
+  if (num(b.Creatinine) !== undefined) v['CREATININE'] = num(b.Creatinine)!;
   if (num(b.CRP) !== undefined) v['CRP'] = num(b.CRP)!;
   if (num(b.Homocysteine) !== undefined) v['HOMOCYSTEINE'] = num(b.Homocysteine)!;
   // Insulin (may be in panelBiochem or panelSex depending on lab)
@@ -1174,7 +1178,7 @@ function extractLabValues(
   if (num(lip.LDL) !== undefined) v['LDL'] = num(lip.LDL)!;
   if (num(lip.HDL) !== undefined) v['HDL'] = num(lip.HDL)!;
   if (num(lip.Triglycerides) !== undefined) v['TG'] = num(lip.Triglycerides)!;
-  if (num(lip['Total Cholesterol']) !== undefined) v['TC'] = num(lip['Total Cholesterol'])!;
+  if (num(lip['Total Cholesterol']) !== undefined) v['CHOL'] = num(lip['Total Cholesterol'])!;
 
   // panelHematology: HCT, Hemoglobin, RBC, WBC, Platelets
   const h = (fp.panelHematology || {}) as Record<string, any>;
@@ -1253,18 +1257,19 @@ function extractLabValues(
   // Проход 123: B12 тоже читается по единице бланка (пг/мл против пмоль/л).
   if (num(vit.B12) !== undefined) v['B12'] = readHormone('B12', 'panelVitamin', num(vit.B12)!);
   // Проход 122: фолат тоже читается по единице бланка (нг/мл против нмоль/л).
-  if (num(vit.Folate) !== undefined) v['FOLATE'] = readHormone('Folate', 'panelVitamin', num(vit.Folate)!);
+  // Проход 169: фолат — канон `FOL` (код склада), не `FOLATE`.
+  if (num(vit.Folate) !== undefined) v['FOL'] = readHormone('Folate', 'panelVitamin', num(vit.Folate)!);
 
   // panelAdrenal: DHEA-S, Aldosterone, PTH
   const adr = (fp.panelAdrenal || {}) as Record<string, any>;
-  if (num(adr['DHEA-S']) !== undefined) v['DHEAS'] = readHormone('DHEA-S', 'panelAdrenal', num(adr['DHEA-S'])!);
-  if (num(adr.Aldosterone) !== undefined) v['ALDO'] = num(adr.Aldosterone)!;
-  if (num(adr.PTH) !== undefined) v['PTH'] = num(adr.PTH)!;
+  if (num(adr['DHEA-S']) !== undefined) v['DHEA_S'] = readHormone('DHEA-S', 'panelAdrenal', num(adr['DHEA-S'])!);
+  if (num(adr.Aldosterone) !== undefined) v['ALDOSTERONE'] = num(adr.Aldosterone)!;
+  if (num(adr.PTH) !== undefined) v['PARATHYROID'] = num(adr.PTH)!;
 
   // panelMineral: Calcium, Magnesium, Phosphorus
   if (num(min.Calcium) !== undefined) v['CA'] = num(min.Calcium)!;
   if (num(min.Magnesium) !== undefined) v['MG'] = num(min.Magnesium)!;
-  if (num(min.Phosphorus) !== undefined) v['PHOS'] = num(min.Phosphorus)!;
+  if (num(min.Phosphorus) !== undefined) v['P'] = num(min.Phosphorus)!;
 
   // panelCardiac: CK, CK-MB, Troponin
   if (num(card.CK) !== undefined) v['CK'] = num(card.CK)!;
@@ -1273,11 +1278,11 @@ function extractLabValues(
 
   // panelInflammatory: IL-6, TNF-alpha
   if (num(infl['IL-6']) !== undefined) v['IL6'] = num(infl['IL-6'])!;
-  if (num(infl['TNF-alpha']) !== undefined) v['TNFA'] = num(infl['TNF-alpha'])!;
+  if (num(infl['TNF-alpha']) !== undefined) v['TNF_ALPHA'] = num(infl['TNF-alpha'])!;
 
   // panelBiochem доп: Urea, Uric acid
   if (num(b.Urea) !== undefined) v['UREA'] = num(b.Urea)!;
-  if (num(b['Uric acid']) !== undefined) v['URIC'] = num(b['Uric acid'])!;
+  if (num(b['Uric acid']) !== undefined) v['UA'] = num(b['Uric acid'])!;
 
   // panelHematology доп: RBC, WBC
   if (num(h.RBC) !== undefined) v['RBC'] = num(h.RBC)!;
@@ -1295,20 +1300,22 @@ function extractLabValues(
 
   // panelThyroid доп: T3 free, T4 free, Anti-TPO
   // Проход 120: Т3/Т4 читаются по единице бланка (пг/мл против пмоль/л).
-  if (num(th['T3 free']) !== undefined) v['T3'] = readHormone('T3 free', 'panelThyroid', num(th['T3 free'])!);
-  if (num(th['T4 free']) !== undefined) v['T4'] = readHormone('T4 free', 'panelThyroid', num(th['T4 free'])!);
-  if (num(th['Anti-TPO']) !== undefined) v['ANTI_TPO'] = num(th['Anti-TPO'])!;
+  // Проход 169: свободные гормоны пишутся своими кодами `FT3`/`FT4`; `T3`/`T4`
+  // в складе — ОБЩИЕ гормоны (nmol/L), и пороги cns4 (pmol/L) судили бы не тот анализ.
+  if (num(th['T3 free']) !== undefined) v['FT3'] = readHormone('T3 free', 'panelThyroid', num(th['T3 free'])!);
+  if (num(th['T4 free']) !== undefined) v['FT4'] = readHormone('T4 free', 'panelThyroid', num(th['T4 free'])!);
+  if (num(th['Anti-TPO']) !== undefined) v['TPO_AB'] = num(th['Anti-TPO'])!;
 
   // eGFR: CKD-EPI 2021 (race-free) — учитывает пол, но не возраст при отсутствии возраста.
   // Раньше был MDRD без пола/возраста → у женщин СКФ систематически завышалась
   // (~на 10-15%), и ренальный риск занижался.
   // Проход 133: сама формула одна на приложение (`lab-norms.engine`, `ckdEpi2021`):
   // вторая копия в `clinical-indices` считала по смешанным коэффициентам 2009/2021.
-  if (v['CREAT'] !== undefined) {
+  if (v['CREATININE'] !== undefined) {
     // Возраст: при отсутствии — 40 лет (нейтральная точка CKD-EPI).
     const years = Number.isFinite(age) && (age as number) > 0 ? (age as number) : 40;
-    const egfr = Math.round(ckdEpi2021(v['CREAT'], years, sex));
-    v['eGFR'] = Math.min(150, Math.max(5, egfr));
+    const egfr = Math.round(ckdEpi2021(v['CREATININE'], years, sex));
+    v['EGFR'] = Math.min(150, Math.max(5, egfr));
   }
 
   return v;

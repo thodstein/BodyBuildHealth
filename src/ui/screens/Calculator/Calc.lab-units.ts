@@ -40,7 +40,9 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   // Проход 132: насыщение трансферрина — процент (канон `TRANSFERRIN_SAT`).
   'Transferrin Sat': 'TRANSFERRIN_SAT',
   // ── электролиты ──
-  'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K',
+  // Проход 169: фосфор — код склада `P`; без моста единица поля не подсказывалась,
+  // и мг/дл из бланка ложились как ммоль/л (разница 3.2).
+  'Calcium': 'CA', 'Magnesium': 'MG', 'Sodium': 'NA', 'Potassium': 'K', 'Phosphorus': 'P',
   // ── свёртывание, сердце, опухолевые маркеры ──
   'Fibrinogen': 'FIBRINOGEN', 'D-dimer': 'D_DIMER', 'PT': 'PT', 'APTT': 'APTT',
   // Проход 168: поле подписано «NT-proBNP» и пересчитывается как NT-proBNP.

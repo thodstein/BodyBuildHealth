@@ -115,10 +115,13 @@ describe('markerStatus / статусы', () => {
 });
 
 describe('labAliasMap', () => {
-  it('алиасы кодов приводятся к канону T4', () => {
+  // Проход 169: канон — код склада (`EGFR`/`CREATININE`/`BIL`/`HGB`). Прежние имена
+  // модели (`eGFR`, `CREAT`) остаются как есть, но значения к ним больше не копируются:
+  // иначе у одного анализа два места, и верификация считала бы его по разным ключам.
+  it('алиасы кодов приводятся к канону склада', () => {
     const m = labAliasMap({ EGFR: 80, CREATININE: 110, BILIRUBIN: 21, POTASSIUM: 4.0, SODIUM: 140, GLUCOSE: 5.0, HB: 150 });
-    expect(m['eGFR']).toBe(80);
-    expect(m['CREAT']).toBe(110);
+    expect(m['EGFR']).toBe(80);
+    expect(m['CREATININE']).toBe(110);
     expect(m['BIL']).toBe(21);
     expect(m['K']).toBe(4.0);
     expect(m['NA']).toBe(140);
@@ -126,9 +129,11 @@ describe('labAliasMap', () => {
     expect(m['HGB']).toBe(150);
   });
 
-  it('существующие канонические ключи не перезаписываются', () => {
+  it('легаси-имя модели находит значение склада, но не перезаписывает канон', () => {
     const m = labAliasMap({ EGFR: 80, eGFR: 90 });
-    expect(m['eGFR']).toBe(90);
+    expect(m['EGFR']).toBe(80);
+    const legacy = labAliasMap({ eGFR: 90 });
+    expect(legacy['EGFR']).toBe(90);
   });
 });
 
@@ -188,7 +193,7 @@ describe('buildVerificationReport', () => {
     const hem = rep.systems.find(s => s.id === 'hematologic')!;
     const ren = rep.systems.find(s => s.id === 'renal')!;
     expect(hem.floorHits.map(f => f.code)).toContain('HCT');
-    expect(ren.floorHits.map(f => f.code)).toEqual(['eGFR', 'eGFR']);
+    expect(ren.floorHits.map(f => f.code)).toEqual(['EGFR', 'EGFR']);
     // HCT 55 ≥ 54 (risk 50) и ≥ 51 (risk 25) — два якоря, HCT-якорь расширен женским порогом 48/52
     expect(rep.floorsCount).toBe(4);
   });
@@ -291,7 +296,7 @@ describe('проходы 125/126: единицы и лестницы m_i', () =>
   });
 
   it('креатинин начинается с ВГН, а не ниже неё', () => {
-    const cr = marker('renal', 'CREAT');
+    const cr = marker('renal', 'CREATININE');
     expect(cr.thresholds).toEqual([110, 130, 200]);
     expect(cr.femaleThresholds).toEqual([97, 130, 200]);
     expect(markerStatus(cr, 95)).toBe(0);

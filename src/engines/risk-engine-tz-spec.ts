@@ -5,6 +5,7 @@ import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanc
 import { resolvePedAlias } from '../data/ped-alias-map';
 import { HCT_THRESHOLDS, HCT_STEPS, HGB_STEPS, RBC_STEPS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, UA_STAGE_ULN,
   BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS } from './lab-norms.engine';
+import { canonicalLabValues } from './lab-code-bridge';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
 
@@ -235,11 +236,15 @@ export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number
 }
 
 // ── Релевантные лабораторные маркеры механизмов (для per-system верификации) ──
+// Проход 169: коды — канон склада, а не прежние имена модели. Значение склада
+// приходит под `CHOL`/`CREATININE`/`UA`/`EGFR`/`DHEA_S`/`TNF_ALPHA`; старые имена
+// (`TC`, `CREAT`, `URIC`, `eGFR`, `DHEAS`, `TNFA`) приводит мост `canonicalLabValues`.
+// `T3`/`T4` — общие гормоны (nmol/L), здесь стоят `FT3`/`FT4`: пороги cns4 свободные.
 const MECH_LAB_MARKERS:Record<string,string[]>={
-  cv1:['NT_PROBNP','CK'],cv2:['LDL','HDL','TG','TC'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
+  cv1:['NT_PROBNP','CK'],cv2:['LDL','HDL','TG','CHOL'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
   liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
-  ren1:['eGFR','CREAT','UREA','URIC'],ren2:['eGFR'],ren3:['UACR','PROTEIN_URINE'],ren4:['K','NA','MG','CA'],
-  cns1:['PRL'],cns2:['CRP','HOMOCYSTEINE','IL6','TNFA','FERRITIN'],cns3:['HOMOCYSTEINE'],cns4:['TSH','CORTISOL','T3','T4','DHEAS'],cns5:['GLU'],cns6:[],
+  ren1:['EGFR','CREATININE','UREA','UA'],ren2:['EGFR'],ren3:['UACR','PROTEIN_URINE'],ren4:['K','NA','MG','CA'],
+  cns1:['PRL'],cns2:['CRP','HOMOCYSTEINE','IL6','TNF_ALPHA','FERRITIN'],cns3:['HOMOCYSTEINE'],cns4:['TSH','CORTISOL','FT3','FT4','DHEA_S'],cns5:['GLU'],cns6:[],
   rep1:['LH','FSH'],rep2:['TT','FT','SHBG'],rep3:['FSH'],rep4:['E2'],rep5:['LH','TT'],
   hem1:['HCT','HGB','RBC','WBC'],hem2:['GLU','HOMA'],hem3:['GLU'],hem4:['K'],hem5:['K','NA','MG','CA'],
 };
@@ -294,9 +299,12 @@ export { LFT_ULN, lftUlnText, LFT_STAGES, LFT_STAGE_ULN } from './lab-norms.engi
 export { FEMALE_HORMONE_BANDS, labUlnText } from './lab-norms.engine';
 
 
-export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
+export function clinicalFloorsForLabs(rawLabValues:Record<string,number>, sex?:'male'|'female'):ClinicalFloor[]{
   const floors:ClinicalFloor[]=[];
   const fem = sex === 'female';
+  // Проход 169: лабораторные имена приводятся к канону склада один раз на входе
+  // (`canonicalLabValues`): старый `eGFR` из снапшота находит `EGFR`.
+  const labValues = canonicalLabValues(rawLabValues || {});
   const v=(k:string)=>labValues[k];
   const push=(cond:boolean,organId:string,label:string,level:number)=>{if(cond)floors.push({organId,label,level});};
   // HCT: женские зоны 48/52 (мужские 51/54) — из `HCT_THRESHOLDS`
@@ -305,8 +313,8 @@ export function clinicalFloorsForLabs(labValues:Record<string,number>, sex?:'mal
   push(v('HCT')!==undefined&&v('HCT')>=hctCut.erythrocytosis,'hematologic',fem?`HCT ≥ ${hctCut.erythrocytosis}% — эритроцитоз (женский порог)`:`HCT ≥ ${hctCut.erythrocytosis}% — эритроцитоз`,25);
   push(v('LDL')!==undefined&&v('LDL')!>=4.9,'cardio','LDL ≥ 4.9 ммоль/л (ESC/EAS: очень высокий риск)',50);
   push(v('LDL')!==undefined&&v('LDL')!>=3.4,'cardio','LDL ≥ 3.4 ммоль/л',25);
-  push(v('eGFR')!==undefined&&v('eGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
-  push(v('eGFR')!==undefined&&v('eGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
+  push(v('EGFR')!==undefined&&v('EGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
+  push(v('EGFR')!==undefined&&v('EGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
   push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3',50);
   push(v('UACR')!==undefined&&v('UACR')!>30,'renal','UACR > 30 — альбуминурия A2',25);
   // ALT/AST: три ступени `LFT_STAGE_ULN` (2× — снизить/пересмотреть орал, 3× — отмена
@@ -345,7 +353,7 @@ export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:
 
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
 /** Экспортируется для гардов: вклад анализа проверяется напрямую, а не через весь расчёт. */
-export function getMiFromLab(mechId:string,labValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
+export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
   // Базовые defaults — единый источник M_I_BASE_DEFAULTS (модуль-левел, см. выше)
   const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
   const raw = M_I_BASE_DEFAULTS[mechId] ?? 0;
@@ -356,25 +364,35 @@ export function getMiFromLab(mechId:string,labValues:Record<string,number>,doseF
   const hem1Base = mechId==='hem1' && rawDose !== undefined && rawDose <= 200 ? 1 : raw;
   const defaults = Math.min(3, Math.round(hem1Base * mult));
 
-  // Все доступные лабораторные маркеры
-  const ldl=labValues['LDL'];const hdl=labValues['HDL'];const tg=labValues['TG'];const tc=labValues['TC'];
-  const hct=labValues['HCT'];const hgb=labValues['HGB'];const plt=labValues['PLT'];
-  const alt=labValues['ALT'];const ast=labValues['AST'];const ggt=labValues['GGT'];const bil=labValues['BIL'];
-  const k=labValues['K'];const na=labValues['NA'];const egfr=labValues['eGFR'];const creat=labValues['CREAT'];const uacr=labValues['UACR'];
+  // Все доступные лабораторные маркеры.
+  // Проход 169: имена приводятся к коду склада один раз на границе (`canonicalLabValues`),
+  // дальше читаем только канон — `CHOL`, `CREATININE`, `UA`, `EGFR`, `DHEA_S`, `P`, `FOL`,
+  // `TPO_AB`, `TNF_ALPHA`. Свободные гормоны — `FT3`/`FT4`: `T3`/`T4` в складе значат
+  // ОБЩИЕ (nmol/L), а пороги cns4 — свободные (pmol/L), подставлять одно вместо другого нельзя.
+  const lv = canonicalLabValues(rawLabValues || {});
+  const ldl=lv['LDL'];const hdl=lv['HDL'];const tg=lv['TG'];const tc=lv['CHOL'];
+  const hct=lv['HCT'];const hgb=lv['HGB'];const plt=lv['PLT'];
+  const alt=lv['ALT'];const ast=lv['AST'];const ggt=lv['GGT'];const bil=lv['BIL'];
+  const k=lv['K'];const na=lv['NA'];const egfr=lv['EGFR'];const creat=lv['CREATININE'];const uacr=lv['UACR'];
   // Проход 130: белок мочи — отдельный маркер (г/л), а не «UACR». См. `ren3`.
-  const proteinUrine=labValues['PROTEIN_URINE'];
-  const lh=labValues['LH'];const fsh=labValues['FSH'];const tt=labValues['TT'];const e2=labValues['E2'];const prl=labValues['PRL'];const shbg=labValues['SHBG'];
-  const glu=labValues['GLU'];const homa=labValues['HOMA'];const crp=labValues['CRP'];const homoc=labValues['HOMOCYSTEINE'];
-  const tsh=labValues['TSH'];const ntProbnp=labValues['NT_PROBNP'];const dDimer=labValues['D_DIMER'];const fib=labValues['FIBRINOGEN'];
-  const psa=labValues['PSA'];
-  const cortisol=labValues['CORTISOL'];
-  const ferritin=labValues['FERRITIN'];const vitd=labValues['VITD'];const b12=labValues['B12'];const folate=labValues['FOLATE'];
-  const dheas=labValues['DHEAS'];const mg=labValues['MG'];const ca=labValues['CA'];const phos=labValues['PHOS'];
-  const ck=labValues['CK'];const il6=labValues['IL6'];const tnfa=labValues['TNFA'];
-  const urea=labValues['UREA'];const uric=labValues['URIC'];const wbc=labValues['WBC'];const rbcVal=labValues['RBC'];
-  const ft=labValues['FT'];const dht=labValues['DHT'];const prog=labValues['PROG'];
-  const t3=labValues['T3'];const t4=labValues['T4'];const antiTpo=labValues['ANTI_TPO'];
-  const psaFree=labValues['PSA_FREE'];const aldo=labValues['ALDO']??labValues['ALDOSTERONE'];const pth=labValues['PTH']??labValues['PARATHYROID'];
+  const proteinUrine=lv['PROTEIN_URINE'];
+  const lh=lv['LH'];const fsh=lv['FSH'];const tt=lv['TT'];const e2=lv['E2'];const prl=lv['PRL'];const shbg=lv['SHBG'];
+  const glu=lv['GLU'];const homa=lv['HOMA'];const crp=lv['CRP'];const homoc=lv['HOMOCYSTEINE'];
+  const tsh=lv['TSH'];const ntProbnp=lv['NT_PROBNP'];const dDimer=lv['D_DIMER'];const fib=lv['FIBRINOGEN'];
+  const cortisol=lv['CORTISOL'];
+  const ferritin=lv['FERRITIN'];
+  const dheas=lv['DHEA_S'];const mg=lv['MG'];const ca=lv['CA'];
+  const ck=lv['CK'];const il6=lv['IL6'];const tnfa=lv['TNF_ALPHA'];
+  const urea=lv['UREA'];const uric=lv['UA'];const wbc=lv['WBC'];const rbcVal=lv['RBC'];
+  const ft=lv['FT'];
+  const t3=lv['FT3'];const t4=lv['FT4'];
+  // Проход 169: мёртвых чтений нет. Витамин D, B12, фолат, фосфор, АТ-ТПО,
+  // альдостерон, ПТГ, ПСА (общий/свободный), ДГТ и прогестерон механизм-моделью
+  // не судятся — ступеней для них нет. Раньше они читались «на всякий случай»
+  // под именами модели (`FOLATE`, `PHOS`, `ANTI_TPO`…), и код выглядел так, будто
+  // анализ учтён. Появятся клинические пороги — появится и чтение канона
+  // (`VITD`, `B12`, `FOL`, `P`, `TPO_AB`, `ALDOSTERONE`, `PARATHYROID`, `PSA`,
+  // `PSA_FREE`, `DHT`, `PROG`).
 
   // Хелпер: лабораторный m_i → max(default, labValue)
   const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
@@ -788,7 +806,11 @@ export function calculateTzSpecRiskTimeline(input: TzSpecInput, totalWeeks?: num
 
 // ── ГЛАВНАЯ ФУНКЦИЯ РАСЧЁТА ──
 export function calculateTzSpecRisk(input: TzSpecInput): TzSpecResult {
-  const{duration,combinations,labCoverage,labValues,supportSubstances}=input;
+  const{duration,combinations,labCoverage,supportSubstances}=input;
+  // Проход 169: канон склада один раз на входе — по нему считаются механизмы,
+  // floors и «есть ли маркер» (`MECH_LAB_MARKERS`). Старые снапшоты калькулятора
+  // с `TC`/`CREAT`/`URIC`/`eGFR` находят свои значения через `canonicalLabValues`.
+  const labValues = canonicalLabValues(input.labValues || {});
   const T_i=getDurationFactor(duration);const C_i=getCombinationFactor(combinations);
   const U_i=getPenaltyFactor(labCoverage);
   const genetics=input.genetics||{};
