@@ -97,6 +97,13 @@ import { saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const AMBER = '#f59e0b';
 
+/**
+ * Сколько ждём подтверждения «микрофон запущен». Нативное разрешение может
+ * висеть (диалог не показался, мост не ответил) — без предела кнопка навсегда
+ * оставалась бы «запускается» и не давала нажать себя снова.
+ */
+const DICTATION_START_TIMEOUT_MS = 30_000;
+
 const ls = (): Storage | null => {
   try {
     return typeof localStorage !== 'undefined' ? localStorage : null;
@@ -210,7 +217,7 @@ type MediaView = { src?: string; missing?: boolean };
 
 type ViewerState = { attachmentId: string; url: string; kind: CoachNoteAttachmentKind };
 
-type DictationState = 'idle' | 'listening' | 'error';
+type DictationState = 'idle' | 'starting' | 'listening' | 'error';
 
 export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initialAthleteId }) => {
   const athletes = useMemo(() => readCoachState(ls()).athletes, []);
@@ -454,6 +461,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       }
     }
     stopVoiceCapture();
+    // Незавершённый старт диктовки не должен блокировать следующий редактор.
+    dictationStartingRef.current = false;
     setEditor(null);
     setError(null);
     setVoiceError(null);
@@ -721,6 +730,22 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     }
     if (dictationStartingRef.current) return;
     dictationStartingRef.current = true;
+    // Видимая реакция на тап: раньше кнопка молчала, пока шёл асинхронный старт
+    // (разрешение микрофона, запрос к движку), и «ничего не происходит» было
+    // буквально правдой.
+    setDictation('starting');
+
+    let settled = false;
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      dictationStartingRef.current = false;
+      setDictation('error');
+      setVoiceError(
+        'Распознавание не запустилось за 30 секунд: микрофон не подтвердил запуск. Проверьте разрешение и нажмите ещё раз.',
+      );
+    }, DICTATION_START_TIMEOUT_MS);
+
     void (async () => {
       // Причина отказа может прийти из движка ДО возврата null — тогда не
       // затираем её общим «не подключено».
@@ -753,7 +778,14 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           setDictation('idle');
         },
       });
+      clearTimeout(watchdog);
       dictationStartingRef.current = false;
+      if (settled) {
+        // Старт опоздал: watchdog уже сказал «не вышло» — микрофон не оставляем.
+        session?.stop();
+        return;
+      }
+      settled = true;
       if (!session) {
         if (!reported) {
           setDictation('error');
@@ -1128,10 +1160,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               data-notes="dictate"
               data-dictation={dictation}
               style={{ ...btn('ghost'), fontSize: 12, opacity: dictationSupported ? 1 : 0.55 }}
+              aria-busy={dictation === 'starting'}
             >
-              {dictation === 'listening' ? 'Стоп диктовку' : 'Голос в текст'}
+              {dictation === 'starting'
+                ? 'Запускаю микрофон…'
+                : dictation === 'listening'
+                  ? 'Стоп диктовку'
+                  : 'Голос в текст'}
             </button>
           </div>
+
+          {/* Что именно услышит кнопка и слышит ли она сейчас — видно без логов.
+              Нажатие сразу меняет эту строку: «ничего не происходит» больше
+              невозможно, даже если ответ движка запаздывает. */}
+          {dictationSupported && (
+            <div
+              data-notes="speech-source"
+              style={{ marginTop: 8, fontSize: 11.5, color: dictation === 'starting' ? AMBER : colors.textSubtle, lineHeight: 1.5 }}
+            >
+              {dictation === 'starting'
+                ? 'Запрашиваю доступ к микрофону…'
+                : `Распознавание: ${speech.dictation === 'native' ? 'системный движок телефона' : 'сервис браузера'}`}
+            </div>
+          )}
 
           <input
             ref={audioInputRef}
