@@ -450,7 +450,7 @@ function pressPositionRank(name: string, primaryMuscle: string): number {
 // primary muscle first, horizontal press before vertical, isolation from lengthened position.
 export const SESSION_TIDY_RATIONALE = "Exercise order rebuilt (compound -> isolation, day primary muscle first, redundant per-muscle exercises capped).";
 
-const MUSCLE_EX_CAP: Record<string, number> = {
+export const MUSCLE_EX_CAP: Record<string, number> = {
   traps: 2, calves: 2, forearms: 2, abs: 3, core: 3,
   biceps: 3, triceps: 3, arms: 3,
   delt_rear: 2, delt_front: 2, delt_mid: 2,

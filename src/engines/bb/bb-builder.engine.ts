@@ -34,7 +34,7 @@ import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine'
 import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
 import { volumeRegimeOf, type VolumeRegime } from './bb-ped-profile';
 import type { Injury } from '../manual-plan-builder';
-import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import { prescribeLoad, applyPostPhaseProcessing, taperWindowOf, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection, applyRegressedMuscleRelief } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression } from './bb-mesocycle-progression.engine';
 import { buildExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
@@ -65,7 +65,7 @@ function mastersMrvMult(age?: number): number {
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
 import { distributePhases, PHASE_CONFIGS, PHASE_LABELS, getPhaseConfig, getPhaseVolumeMult, getVolumeWaveFactor, type BBPhase } from '../periodization';
-import { orderSessionExercises, shouldInterleave, axialCostOf, isCompoundEx, type SessionMethodology } from './bb-session-order.engine';
+import { orderSessionExercises, shouldInterleave, axialCostOf, isCompoundEx, MUSCLE_EX_CAP, type SessionMethodology } from './bb-session-order.engine';
 import { methodologySpecFor, applyMethodologyRest } from './bb-methodology-spec';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -728,6 +728,33 @@ export interface BBPlan {
   };
 }
 
+/** Пучок дельты для упражнения: в плане плечевые движения помечены 'shoulders'
+ *  (каталог отдаёт delt_mid/delt_rear только у части записей), поэтому пучок
+ *  определяется по названию. Единое правило для отчёта объёма
+ *  (`getBBVolumeLandmarks`) и auto-MEV-фидера — иначе фидер добивает не ту
+ *  головку, которую показывает отчёт. Не-плечевые ключи возвращаются как есть. */
+export function bbShoulderHeadOf(ex: { muscle?: string; name?: string; exerciseName?: string }): string {
+  const muscle = String(ex.muscle || '');
+  if (muscle !== 'shoulders') return collapseKey(muscle);
+  const nm = String(ex.name || ex.exerciseName || '').toLowerCase();
+  // Задняя дельта: face pull («тяга к лицу»), разведения/махи в НАКЛОНЕ (bent-over fly),
+  // обратные разведения, «задняя дельта». Порядок важен: наклонное движение — задняя
+  // головка, даже если в названии есть «разводка»/«махи» (иначе «Разводка сидя в
+  // наклоне» уходила в delt_mid и фидер считал среднюю головку накормленной).
+  if (/задн|rear|обратн|тяга.*лиц|face.?pull|наклон.*(разводк|мах|сведен)/i.test(nm)) return 'delt_rear';
+  if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) return 'delt_front';
+  if (/мах|lateral|отведен|raise|подъем/i.test(nm)) return 'delt_mid';
+  return 'delt_mid';
+}
+
+/** Задняя дельта по НАЗВАНИЮ, независимо от текущей метки мышцы: до поздней
+ *  нормализации задняя дельта часто живёт в теге `back` («Разведение на заднюю
+ *  дельту», «Тяга к лицу»), поэтому счётчик по метке видел 0–2 сета при 4
+ *  реальных и фидер добивал ещё раз (bro_5: задняя дельта 8 при MEV 4). */
+export function isRearDeltNamed(name?: string): boolean {
+  return /задн\w*\s*дельт|наклон\w*\s*дельт|на заднюю дельт|тяга.*лиц|face.?pull|обратн\w*\s*(сведен|бабоч)|rear.?\s*delt/i.test(String(name || ''));
+}
+
 /**
  * Агрегация объёма BB-плана по группам мышц и сравнение с volume-landmarks (MEV/MAV/MRV).
  * Берётся пиковая по суммарному объёму неделя (наиболее нагруженная) — «худший случай».
@@ -736,18 +763,10 @@ export interface BBPlan {
 export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1): VolumeLandmarkRow[] {
   let peakIdx = 0, peakTotal = -1;
   const weekGroups: Record<number, Record<string, number>> = {};
-  const shoulderHead = (ex: any): string => {
-    if (ex.muscle !== 'shoulders') return collapseKey(ex.muscle);
-    const nm = String(ex.name || '').toLowerCase();
-    if (/задн|rear|обратн|лиц.*тяга|face.*pull/i.test(nm)) return 'delt_rear';
-    if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) return 'delt_front';
-    if (/мах|lateral|отведен|raise|подъем/i.test(nm)) return 'delt_mid';
-    return 'delt_mid';
-  };
   plan.weeks.forEach((wk, i) => {
     const g: Record<string, number> = {};
     for (const s of wk.sessions) for (const ex of s.exercises) {
-      const ck = ex.muscle === 'shoulders' ? shoulderHead(ex) : collapseKey(ex.muscle);
+      const ck = bbShoulderHeadOf(ex);
       g[ck] = (g[ck] || 0) + (ex.sets || 0);
     }
     weekGroups[i] = g;
@@ -4988,37 +5007,60 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   if (finalPlan.weeks.length > 0) {
     const wk1 = finalPlan.weeks[0];
     const normLvl = normLevel(level);
-    const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings', 'shoulders', 'biceps', 'triceps'];
+    // P2-1 (аудит 2026-11): feeder добивает НЕДЕЛЬНЫЙ MEV, но тапер-неделя снижена
+    // намеренно (снятие накопленной усталости). Авто-taper идёт ПОСЛЕ билдера и
+    // жмёт каждое упражнение до `max(2, round(sets × mult))` — добавленное здесь
+    // упражнение поднимает «пол» недели и ломает монотонность окна (замер
+    // fullbody_3/8 нед: недели ×0.75 и ×0.50 после добивки плеч/икр стали 71 = 71,
+    // P0-1 taper-сторож покраснел). Поэтому окно берём тем же правилом, что и
+    // тайпер (`taperWindowOf`), и недели окна не добиваем вовсе.
+    const taperWin = taperWindowOf(finalPlan);
+    // P2-8 (аудит 2026-11): «плечи» считались по точному ключу `shoulders`, а пучки
+    // дельт живут отдельными ключами (collapseKey намеренно их не схлопывает) —
+    // неделя с 16 сетами дельт видела «3–6 плеч» и получала полный разрыв до MEV
+    // поверх реальной работы. Групповой MEV «плеч» остаётся за финализатором
+    // (`bbTopUpMuscle`: группа `shoulders`, комната сессии, защита доноров), а фидер
+    // ядра больше не добивает группу вслепую: он добивает ОТСТАЮЩУЮ ГОЛОВКУ
+    // (`delt_mid`/`delt_rear`) по её собственному MEV — тем же правилом имени, что и
+    // отчёт объёма (`bbShoulderHeadOf`), — и только в свободное место сессии.
+    // Передняя дельта не добивается: её MEV 0, объём дают жимы.
+    const autoFeedMuscles = ['calves', 'glutes', 'abs', 'forearms', 'hamstrings', 'delt_mid', 'delt_rear', 'biceps', 'triceps'];
+    const shoulderFamily = new Set(['shoulders', 'delt_front', 'delt_mid', 'delt_rear']);
     for (const m of autoFeedMuscles) {
+      const isDeltHead = m === 'delt_mid' || m === 'delt_rear';
       // BUG-FIX: auto-MEV-feeder НЕ должен добавлять упражнения для исключённых
       // травмами мышц (exclude=true) или в щадящем режиме (graded — объём
       // снижен намеренно) — иначе «legs exclude» возвращало ноги в план,
-      // а щадящий режим раздувался до MEV.
-      if (excludedMuscles.has(m) || excludedMuscles.has(collapseKey(m))) continue;
-      if (gradedInjuries.some(inj => collapseKey(inj.muscle) === m)) continue;
+      // а щадящий режим раздувался до MEV. Травма «плечо» исключает и пучки.
+      const blockedKeys = isDeltHead ? [m, 'shoulders'] : [m];
+      if (blockedKeys.some(k => excludedMuscles.has(k) || excludedMuscles.has(collapseKey(k)))) continue;
+      if (gradedInjuries.some(inj => blockedKeys.includes(collapseKey(inj.muscle)))) continue;
+      const countsAs = (e: any): boolean => {
+        if (!isDeltHead) return collapseKey(e.muscle) === m;
+        if (bbShoulderHeadOf(e) === m) return true;
+        // До нормализации задняя дельта может быть помечена `back`: считаем её
+        // по названию движения, иначе неделя с 4 сетами задней дельты видит 2.
+        return m === 'delt_rear' && isRearDeltNamed(e.name);
+      };
       let weekSets = 0;
-      for (const s of wk1.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) weekSets += e.sets;
+      for (const s of wk1.sessions) for (const e of s.exercises) if (countsAs(e)) weekSets += e.sets;
       const lm = getVolumeLandmarks(normLvl, m);
       if (!lm) continue;
       const targetMEV = Math.round(lm.mev * effectiveMrvMult);
-      if (weekSets >= targetMEV) continue;
+      // P2-8: для пучка дельты выход по ПЕРВОЙ неделе не отменяет добор в остальных:
+      // разрыв считается в недельном цикле ниже (bro_5: задняя дельта w1 = 4 = MEV,
+      // но w2 = 2 — ранний `continue` пропускал всю мышцу целиком).
+      if (!isDeltHead && weekSets >= targetMEV) continue;
       // Найти ближайший день с этой мышцей (или совместимый тег)
       const allowedTags = WEAKPOINT_DAY_TAGS[m] ?? ['Legs', 'Lower', 'FullBody'];
-      let bestSlot: BBSession | null = null;
-      let bestScore = -Infinity;
-      for (const w of finalPlan.weeks) {
-        for (const s of w.sessions) {
-          const tag = (s.sessionTag || '').toLowerCase();
-          if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
-          const score = s.exercises.length * 10;
-          if (score > bestScore) { bestScore = score; bestSlot = s; }
-        }
-      }
-      if (!bestSlot) continue;
-      // Найти изоляцию на эту мышцу
+      // Найти изоляцию на эту мышцу. Для пучка в каталоге метка группы — `shoulders`,
+      // головку задаёт имя («махи» — средняя, «задняя/face pull» — задняя, «жим» —
+      // передняя); без явного имени головки упражнение не берём, чтобы не добить
+      // чужую головку.
       const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
         const mg = collapseKey(trueMuscleOf(e) || e.group || '');
-        if (mg !== m) return false;
+        if (mg !== (isDeltHead ? 'shoulders' : m)) return false;
+        if (isDeltHead && bbShoulderHeadOf({ muscle: 'shoulders', name: e.name }) !== m) return false;
         if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
         if (isBBJunk(e)) return false;
         if (isInappropriateBB(e)) return false;
@@ -5028,7 +5070,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       });
       if (!feederPool.length) continue;
       feederPool.sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0));
-      const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
+      const fWeightKey = isDeltHead ? 'shoulders' : m;
+      const fBase = (workMax as any)[fWeightKey] || DEFAULT_WORKMAX[fWeightKey] || 50;
       const feederWeight = Math.max(5, Math.round(fBase * 0.3 * 10) / 10);
       const fTempo = tempoFor('памп', undefined, phaseByWeek.get(wk1.week) || 'accumulation');
       // P1-5: максимум 5 сетов на одно упражнение (про-объём добивается
@@ -5038,14 +5081,25 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const fName = fData.name || fData.id;
       const fData2 = feederPool[1] ?? null;
       const fName2 = fData2 ? (fData2.name || fData2.id) : null;
+      // Свободное место сессии по лимитам уровня/режима (sessLimits): фидер
+      // добавляет упражнение, только если оно не вытеснит чужую мышцу.
+      const roomOf = (s: BBSession) => {
+        const work = s.exercises.filter((e: any) => !(e as any).warmupActivator);
+        const workSets = work.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        return { ex: sessLimits.maxExercises - work.length, sets: sessLimits.maxWorkingSets - workSets, work };
+      };
       // Добавить feeder в каждую неделю
-      for (const w of finalPlan.weeks) {
+      for (let wIdx = 0; wIdx < finalPlan.weeks.length; wIdx++) {
+        const w = finalPlan.weeks[wIdx];
         // P2-1 (аудит 2026-11): feeder добивает НЕДЕЛЬНЫЙ MEV, но разгрузочная и
         // тапер-неделя снижены намеренно (делод — минус объём, тапер — снятие
         // накопленной усталости). Добивать их до MEV = отменять саму разгрузку.
         // У cross-day аналога (compensateCrossDayWeakPoints) такой гейт был, здесь — нет.
         const wPhase = String((w as any).phase || '').toLowerCase();
         if (wPhase === 'deload' || (w as any).deload || (w as any).taper || (w as any).taperApplied || wPhase === 'peaking') continue;
+        // Окно авто-taper (см. `taperWin` выше): недели, которые тайпер ужмёт,
+        // объёмом не добиваем.
+        if (taperWin && wIdx >= taperWin.start && wIdx < taperWin.end) continue;
         // P2-7 (аудит 2026-11): разрыв до MEV считался ОДИН раз по первой неделе и
         // затем механически добавлялся в каждую неделю мезо, хотя объём мышцы внутри
         // мезо растёт (прогрессия) → в поздних неделях фидер перебирал цель. Заодно
@@ -5054,35 +5108,81 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // шум округления лендмарка, а упражнение на один сет ловит `single_work_set`
         // в валидаторе и MEV осмысленно не покрывает.
         let wWeekSets = 0;
-        for (const s of w.sessions) for (const e of s.exercises) if (collapseKey(e.muscle) === m) wWeekSets += e.sets;
+        for (const s of w.sessions) for (const e of s.exercises) if (countsAs(e)) wWeekSets += e.sets;
         const gap = targetMEV - wWeekSets;
         if (gap < 2) continue;
-        const useTwoEx = gap > perExCapM && !!fName2;
+        const useTwoEx = !isDeltHead && gap > perExCapM && !!fName2;
         const setsPerEx = useTwoEx ? Math.ceil(gap / 2) : Math.min(gap, perExCapM);
+        const newFeeder = (sets: number, second: boolean) => ({
+          // P2-8 (аудит 2026-11): метка ГРУППЫ, не головки. Головку однозначно
+          // задаёт имя упражнения (bbShoulderHeadOf), а отдельная метка
+          // delt_mid/delt_rear добавляет в день НОВЫЙ ключ мышцы — и меняет
+          // бюджет финального фита: сумма guard'ов дня 79→85, scale 0.759→0.706,
+          // трапеции 6→5 и пресс 13→10 (замер upper_lower_4/enhanced). Плечи и
+          // так живут одной группой в guard/кап-бюджете, поэтому метка группы.
+          muscle: isDeltHead ? 'shoulders' : m, name: second ? fName2 : fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
+          sets, repsRange: [15, 20] as [number, number], rir: 3,
+          workSets: Array.from({ length: sets }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
+          exerciseName: second ? fName2 : fName, tempoSpec: fTempo.notation, restSeconds: 30,
+          comment: `Auto-MEV-feeder${second ? ' (2)' : ''} для ${m}: ${sets}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${wWeekSets} < MEV ${targetMEV}).`,
+          warmupSets: [], rationale: second ? 'MEV coverage: auto-feeder (2-е упражнение).' : 'MEV coverage: auto-feeder.',
+        });
+        if (!isDeltHead) {
+          // P2-8 (аудит 2026-11): поведение фидера для НЕ-плечевых мышц сохранено
+          // 1:1 (первая подходящая сессия дня, setsPerEx сетов, без учёта свободного
+          // места). Аудит касается только подсчёта плеч/пучков: room-гейт для
+          // остальных мышц сдвигал калибровку объёма — замер upper_lower_4/enhanced:
+          // грудь 15→18, пресс 10→6, предплечья 6→2, спина 31→30, трапеции 6→5.
+          for (const s of w.sessions) {
+            const tag = (s.sessionTag || '').toLowerCase();
+            if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
+            if (s.exercises.some(e => e.name === fName)) continue;
+            s.exercises.push(newFeeder(setsPerEx, false));
+            if (useTwoEx && fName2 && !s.exercises.some(e => e.name === fName2)) {
+              s.exercises.push(newFeeder(gap - setsPerEx, true));
+            }
+            break;
+          }
+          continue;
+        }
+        // P2-8 (аудит 2026-11): добор ПУЧКА дельты идёт только в СВОБОДНОЕ место
+        // сессии (roomEx / лимит сетов уровня-режима) и не сверх капа упражнений на
+        // мышцу — иначе финальный кап и нормализация MRV срезают не добавленное, а
+        // чужую мышцу (upper_lower_4/intermediate: трицепс 5→2 при добивке дельт).
+        const exCap = MUSCLE_EX_CAP[m] ?? 4;
+        const familyCap = MUSCLE_EX_CAP['shoulders'] ?? 4;
+        // P2-8 (аудит 2026-11): «свободное место» — не только формальный остаток до
+        // лимита, но и запас на АДДИТИВНЫЕ проходы финала (back-аллокация,
+        // спец-частота, головки рук): они добивают день до cap и затем тримят любые
+        // сеты, включая чужие. Замер upper_lower_4/enhanced: добивка вошла в день
+        // 57/60, финал вырастил его до лимита, и трим снял 2 сета спины и 3 сета
+        // пресса — «добивка в свободное место» обернулась потерей чужой работы.
+        // Поэтому берём сет-место только при запасе ≥10% сета-бюджета дня.
+        const headReserve = Math.max(2, Math.round(sessLimits.maxWorkingSets * 0.1));
+        const slots: Array<{ s: BBSession; sets: number; ex: number }> = [];
         for (const s of w.sessions) {
           const tag = (s.sessionTag || '').toLowerCase();
           if (!allowedTags.some(at => tag.includes(at.toLowerCase()))) continue;
           if (s.exercises.some(e => e.name === fName)) continue;
-          s.exercises.push({
-            muscle: m, name: fName, role: 'accessory' as const, character: 'памп' as DayCharacter,
-            sets: setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
-            workSets: Array.from({ length: setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
-            exerciseName: fName, tempoSpec: fTempo.notation, restSeconds: 30,
-            comment: `Auto-MEV-feeder для ${m}: ${setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${wWeekSets} < MEV ${targetMEV}).`,
-            warmupSets: [], rationale: 'MEV coverage: auto-feeder.',
-          });
-          // Второе упражнение (если gap > perExCap)
-          if (useTwoEx && fName2 && !s.exercises.some(e => e.name === fName2)) {
-            s.exercises.push({
-              muscle: m, name: fName2, role: 'accessory' as const, character: 'памп' as DayCharacter,
-              sets: gap - setsPerEx, repsRange: [15, 20] as [number, number], rir: 3,
-              workSets: Array.from({ length: gap - setsPerEx }, () => ({ reps: 18, rir: 3, weight: feederWeight, tempo: fTempo.notation, restSeconds: 30 })),
-              exerciseName: fName2, tempoSpec: fTempo.notation, restSeconds: 30,
-              comment: `Auto-MEV-feeder (2) для ${m}: ${gap - setsPerEx}×15-20 RIR 3 @${feederWeight}кг (недельный объём ${wWeekSets} < MEV ${targetMEV}).`,
-              warmupSets: [], rationale: 'MEV coverage: auto-feeder (2-е упражнение).',
-            });
-          }
-          break; // только один день
+          const room = roomOf(s);
+          if (room.ex < 1 || room.sets - headReserve < 2) continue;
+          if (room.work.filter(e => countsAs(e)).length >= exCap) continue;
+          if (isDeltHead && room.work.filter(e => shoulderFamily.has(String(e.muscle || ''))).length >= familyCap) continue;
+          slots.push({ s, sets: room.sets, ex: room.ex });
+        }
+        if (!slots.length) continue;
+        slots.sort((a, b) => (b.sets * 10 + b.ex) - (a.sets * 10 + a.ex));
+        // Пучок распределяем по всем подходящим дням недели, а не в один: финализатор
+        // гарантирует среднюю/заднюю дельту в КАЖДОМ Push/Pull-дне, поэтому добитый
+        // один день не отменял добавку в остальные (mid 8 → 14 после финализации).
+        let need = gap;
+        for (const slot of slots) {
+          if (need < 2) break;
+          const free = roomOf(slot.s).sets - headReserve;
+          const add = Math.min(need, perExCapM, free);
+          if (add < 2) continue;
+          slot.s.exercises.push(newFeeder(add, false));
+          need -= add;
         }
       }
     }

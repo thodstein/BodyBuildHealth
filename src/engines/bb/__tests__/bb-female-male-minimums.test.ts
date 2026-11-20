@@ -52,6 +52,12 @@ function build(patternId: string, level: string, sex: 'male' | 'female', weeks =
 describe('BB: минимумы на рабочем пике (женщины)', () => {
   const cases: Array<[string, string, number, number]> = [
     // pattern, level, glutes-min, delts-min
+    // P2-8 (аудит 2026-11): female_wellness_5/intermediate 7 → 6. Единственный
+    // верхний день стоит на потолке 24 сета, все мышцы в нём на своей цели или
+    // ниже, а собственная цель плана по плечам — 6 (MEV 6). Прежние 7 давало
+    // двойное добивание: счётчик «плеч» по метке видел 0 сетов, добавлял
+    // «Махи Lu» 4 сета поверх 3 уже имеющихся, а обрезка сессии снимала 2 сета
+    // с груди (5→3), чтобы остаться в лимите.
     ['female_glute_3', 'beginner', 9, 5],
     ['female_glute_3', 'intermediate', 16, 5],
     ['female_glute_3', 'advanced', 16, 9],
@@ -64,7 +70,7 @@ describe('BB: минимумы на рабочем пике (женщины)', (
     ['female_glute_5', 'enhanced', 18, 10],
     ['female_glute_6', 'intermediate', 16, 6],
     ['female_glute_6', 'enhanced', 18, 10],
-    ['female_wellness_5', 'intermediate', 16, 7],
+    ['female_wellness_5', 'intermediate', 16, 6],
     ['female_wellness_5', 'enhanced', 18, 8],
     ['female_bikini_5', 'enhanced', 18, 12],
   ];

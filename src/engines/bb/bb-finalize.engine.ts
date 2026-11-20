@@ -2612,6 +2612,11 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
         e.role === 'accessory' &&
         !['calves', 'traps', 'forearms', 'abs'].includes(e.muscle) &&
         !/(шраг|скручив|подъём.*носк|подъем.*носк|calf|запяст|wrist|зоттман)/i.test(e.name || '') &&
+        // Слот MGF/IGF1 — намеренная фича PED (частота цели + dayMap инъекций):
+        // перепрофилирование в чужую мышцу оставляло комментарий «🧬 MGF/IGF1 слот
+        // ... для biceps» на упражнении с меткой traps (замер upper_lower_4/12 нед,
+        // нед 9: «Шраги со штангой» + MGF-комментарий; тест слотов краснел).
+        !/MGF\/IGF1\s+слот/i.test(String(e.comment || '')) &&
         working.filter((x: any) => x.muscle === e.muscle).length > 1,
       );
       if (slot) {
@@ -4565,12 +4570,21 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
     if ((week as any).taperApplied === true || (week as any).taper === true) continue;
     const donors = tradeoffDonorsForWeek(options, week.week);
     const weekVolume = aggregateBBVolume(week.sessions);
+    // P2-8 (аудит 2026-11): объём «плеч» в отчёте живёт ТРЕМЯ ключами
+    // (delt_front/mid/rear), `shoulders` — только агрегат, поэтому прямой
+    // `weekVolume['shoulders']` видел 0–4 сета при 8–12 реальных и добивал
+    // группу заново (UL4enh: пресс-жим в добавку поверх накормленных пучков).
+    const groupEffectiveOf = (muscle: string): number => {
+      if (muscle !== 'shoulders') return weekVolume[muscle]?.effectiveSets || 0;
+      return ['shoulders', 'delt_front', 'delt_mid', 'delt_rear']
+        .reduce((a, k) => a + (weekVolume[k]?.effectiveSets || 0), 0);
+    };
     // Prioritize muscles by target-volume deficit (target vs effective), not just MEV.
     const deficitByMuscle = muscles
       .filter(muscle => !donors.has(muscle))
       .map((muscle: string) => {
       const landmarks = lmForFinalize(options, muscle);
-      const effectiveSets = weekVolume[muscle]?.effectiveSets || 0;
+      const effectiveSets = groupEffectiveOf(muscle);
       const target = plan.volumeTargets?.[muscle];
       const targetSets = target?.targetSets ?? landmarks?.mav ?? 0;
       const mev = landmarks?.mev ?? 0;
@@ -4587,7 +4601,8 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       if (gradedMuscles.has(muscle)) continue;
       // Интеграция с builder-feeder: если мышца уже получила MEV coverage
       // (builder-путь, до normalize) — finalize не дублирует свою добивку.
-      const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e => e.muscle === muscle && /MEV coverage/.test(e.rationale || '')));
+      const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e =>
+        /MEV coverage/.test(e.rationale || '') && bbMuscleGroup(e.muscle) === bbMuscleGroup(muscle)));
       if (weekHasBuilderFeeder) continue;
       const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle, type: (exercise as any).exerciseType } as any) || exercise.muscle) === muscle));
       if (!session || session.exercises.length >= (options.feederMaxExercises ?? 10)) continue;
@@ -4705,6 +4720,29 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
             if (isMobilityRestricted(candidate, options.mobilityRestrictions)) return false;
             if (usedNames.has(candidate.name) || bbExerciseTier(candidate) > 2) return false;
             if (trueMuscleOf(candidate) !== exercise.muscle) return false;
+            // Ротация не меняет КЛАСС движения на ПЛЕЧАХ: замена «Жим гантелей
+            // сидя» (компаунд) на «Обратные сведения в тренажёре» (изоляция
+            // задней дельты) оставляла день без жима и давала третью
+            // `isolation_shoulders` в сессии — замер phul_4/beginner/mass,
+            // `audit_full_matrix` краснел (3 изоляции плеч).
+            // Область — только плечи/дельты: на других мышцах фильтр резал
+            // легитимную ротацию того же класса и менял indirect-бюджеты
+            // (замер fullbody_2/beginner/mass: chest-добивка не ротировалась,
+            // трицепс получал 7.6 > кап 6.9 против 6.7 на базе).
+            // Класс определяется по ИМЕНИ + типу каталога (как в аудит-матрице):
+            // у упражнения в плане поля `type` нет, и derivePattern без него уводил
+            // «Разгибания ног в тренажёре» в 'squat'.
+            const shoulderScope = exercise.muscle === 'shoulders' || /^delt_/.test(String(exercise.muscle));
+            if (shoulderScope) {
+              const patOf = (name: string, typeHint?: string): string => {
+                const cat = EXERCISE_CATALOG.find((c: any) => c.name === name);
+                const type = typeHint || String((cat as any)?.type || '');
+                return derivePattern({ name, group: exercise.muscle, type: type || undefined } as any);
+              };
+              const curClass = /^isolation/.test(patOf(exercise.name, String((exercise as any).type || (exercise as any).exerciseType || '')));
+              const candClass = /^isolation/.test(patOf(candidate.name, String((candidate as any).type || '')));
+              if (curClass !== candClass) return false;
+            }
             if (optionsEquipment.length > 0) {
               const candidateEquipment = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
               if (candidateEquipment.length > 0 && !candidateEquipment.some(item => optionsEquipment.includes(item))) return false;
@@ -6797,8 +6835,9 @@ for (const week of next.weeks) {
         }
         // Экстремальные капы (лаб-коррекция/дефицит/плохое восстановление):
         // indirect от compound физически не влезает — итеративно режем
-        // compound-сеты (жимы/тяги, дающие indirect на эту мышцу) до 1,
-        // пересчитывая effective после каждого прохода.
+        // compound-сеты (жимы/тяги, дающие indirect на эту мышцу) до пола
+        // 2 сетов, пересчитывая effective после каждого прохода; если все
+        // вкладчики уже на полу — снимаем целое упражнение мышцы (см. ниже).
         for (let iter = 0; iter < 20; iter++) {
           let indirect2 = 0;
           let direct2 = 0;
@@ -6820,11 +6859,58 @@ for (const week of next.weeks) {
           const target2 = Math.max(0, Math.floor(cap - indirect2));
           const need2 = Math.max(0, direct2 - target2);
           if (need2 <= 0) break;
-          const comps = week.sessions.flatMap(s => s.exercises).filter((e: any) => !(e as any).warmupActivator && (e.sets || 0) > 1 && !isIsolationName(e.name || '') && indirectMuscleContributions(e).some((c: any) => c.muscle === muscle));
-          if (!comps.length) break;
-          const e2 = comps[0];
-          e2.sets -= 1;
-          if (Array.isArray(e2.workSets) && e2.workSets.length > e2.sets) e2.workSets = e2.workSets.slice(0, e2.sets);
+          // Пол упражнения — 2 рабочих сета (инвариант аудит-матрицы `single work
+          // set`): «жим на 1 сет» не стимул и не валидный день. Поэтому compound
+          // режется только пока у него есть запас над полом.
+          const comps = week.sessions.flatMap(s => s.exercises).filter((e: any) => !(e as any).warmupActivator && (e.sets || 0) > 2 && !isIsolationName(e.name || '') && indirectMuscleContributions(e).some((c: any) => c.muscle === muscle));
+          if (comps.length) {
+            const e2 = comps[0];
+            e2.sets -= 1;
+            if (Array.isArray(e2.workSets) && e2.workSets.length > e2.sets) e2.workSets = e2.workSets.slice(0, e2.sets);
+            continue;
+          }
+          // Все вкладчики уже на полу → освобождаем объём ЦЕЛЫМИ слотами, а не
+          // калечим чужой примари-жим до 1 сета.
+          const hostOf = (target: any) => week.sessions.find((s: any) => (s.exercises as any[]).includes(target));
+          const droppable = (target: any) => !(target as any).warmupActivator && !(target as any).optional
+            && !/FST-7|MGF\/IGF1 слот|GVT|Gironda|8×8/.test(String((target as any).comment || ''));
+          // (a) Дубль упражнения САМОЙ перегруженной мышцы (дубль паттерна в другой
+          // сессии). Замер fullbody_4/beginner/mass: «Жим в Смите на наклонной»
+          // (примари груди) резался 2→1 из-за косвенного вклада в трицепс
+          // (eff 11.6 против допуска 11.5) → план уходил в `single_work_set`.
+          // Оставляем минимум два упражнения мышцы на неделе.
+          const own = week.sessions.flatMap((s: any) => (s.exercises as any[]).filter((x: any) =>
+            droppable(x) && x.muscle === muscle && (x as any).role !== 'primary'));
+          own.sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+          if (own.length > 2) {
+            const victim: any = own[0];
+            const host = hostOf(victim);
+            if (!host) break;
+            host.exercises = (host.exercises as any[]).filter((x: any) => x !== victim);
+            continue;
+          }
+          // (b) Дубль compound-слота ДРУГОЙ мышцы в той же сессии (второй жим той
+          // же мышцы и того же паттерна). Именно такую пару раньше «схлопывал»
+          // `repairSingleSetExercises` после резки 2→1 (док-кейс fullbody_2
+          // beginner: два жима на грудь по 1 сету). Платить 1-сетовым
+          // промежуточным шагом нельзя, поэтому снимаем слот сразу.
+          // Замер fullbody_2/beginner/mass: три грудь-жима в дне держали трицепс
+          // на 7.6 при допуске 6.9 (indirect 3.6 против 2.7).
+          // Условия: не лид сессии, не изоляция, даёт indirect перегруженной
+          // мышце, у своей мышцы останется ≥2 упражнения в неделе.
+          const dupSlot = week.sessions.flatMap((s: any) => {
+            const work = (s.exercises as any[]).filter((x: any) => droppable(x));
+            return work.slice(1).map((x: any) => ({ host: s, x })).filter(({ x }) =>
+              x.muscle !== muscle
+              && !isIsolationName(x.name || '')
+              && indirectToMuscle(x, muscle) > 0
+              && work.some((o: any) => o !== x && o.muscle === x.muscle
+                && derivePattern({ name: o.name, group: o.muscle, type: (o as any).exerciseType } as any)
+                  === derivePattern({ name: x.name, group: x.muscle, type: (x as any).exerciseType } as any)));
+          }).find(({ x }) => week.sessions
+            .reduce((n: number, s: any) => n + (s.exercises as any[]).filter((y: any) => droppable(y) && y.muscle === x.muscle).length, 0) >= 3);
+          if (!dupSlot) break;
+          dupSlot.host.exercises = (dupSlot.host.exercises as any[]).filter((x: any) => x !== dupSlot.x);
         }
       }
     }

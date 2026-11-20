@@ -19,6 +19,8 @@
  *   и без снижения MRV (раньше выводились только при `labMrvMultiplier < 1`).
  * - P2-7 (финализация): финальный кап/порядок упражнений выполняется для всех сессий, а не
  *   только для тех, где есть разминка-активатор (сторож инварианта, см. комментарий у теста).
+ * - P2-8 (ядро): добивка плеч считается по ГОЛОВКАМ (средняя/задняя дельта по имени
+ *   упражнения), а не по метке группы; в переполненный день головка не добивается вовсе.
  * - P2-3 (валидация): safety-ремонт (замена упражнения + пересчёт веса) работает и при
  *   `reorder:false` — раньше error-коды валидатора оставались на плане навсегда.
  */
@@ -226,15 +228,29 @@ describe('P2-4 (ядро): макроцикл обновляет фазу нед
 describe('P2-7 (ядро): auto-MEV-feeder добивает точно и по своей неделе', () => {
   it('не перебирает MEV и считает разрыв по каждой неделе', () => {
     const plan = buildBBPlan(makeInput({ patternId: 'bro_5', weeks: 8 })) as any;
-    const groups = new Map<string, { muscle: string; week: number; before: number; mev: number; sets: number }>();
+    const groups = new Map<string, { muscle: string; week: number; before: number; mev: number; sets: number; added: number }>();
     for (const w of plan.weeks) {
       for (const e of (w.sessions || []).flatMap((s: any) => s.exercises || [])) {
         if (!/Auto-MEV-feeder/i.test(String(e.comment || ''))) continue;
-        const key = `${w.week}|${e.muscle}`;
-        const g = groups.get(key) || { muscle: String(e.muscle), week: Number(w.week), before: -1, mev: -1, sets: 0 };
+        // P2-8 (аудит 2026-11): цель фидера берём из ЕГО КОММЕНТАРИЯ («для X»), а не
+        // из метки упражнения. Добивка головки дельты помечена ГРУППОЙ (`shoulders`),
+        // чтобы не добавлять дню новый ключ мышцы и не ломать guard-бюджет фита, —
+        // при ключе по метке две добивки разных головок (delt_mid 4 + delt_rear 2)
+        // сливались в одну «shoulders 0+6 vs MEV 4».
+        const target = /для\s+([a-z_]+)\s*:/.exec(String(e.comment));
+        const muscle = target ? target[1] : String(e.muscle);
+        const key = `${w.week}|${muscle}`;
+        const g = groups.get(key) || { muscle, week: Number(w.week), before: -1, mev: -1, sets: 0, added: 0 };
         const mm = /недельный объём (\d+) < MEV (\d+)/.exec(String(e.comment));
         if (mm) { g.before = Number(mm[1]); g.mev = Number(mm[2]); }
         g.sets += Number(e.sets) || 0;
+        // Сеты, которые добавил САМ фидер, — из его комментария («N×15-20»).
+        // `e.sets` для этой инварианты не годится: поздние проходы (минимумы
+        // группы, рампа, прогрессия) законно доращивают упражнение, и двойной
+        // учёт `before + e.sets` обвинял бы фидер в чужом объёме (bro_5 w3:
+        // комментарий 2×, факт 5, before 2, MEV 4 → «2+5 > 4» при 2+2 = 4).
+        const add = /Auto-MEV-feeder[^:]*:\s*(\d+)×/.exec(String(e.comment));
+        if (add) g.added += Number(add[1]);
         groups.set(key, g);
       }
     }
@@ -242,7 +258,8 @@ describe('P2-7 (ядро): auto-MEV-feeder добивает точно и по �
     expect(list.length).toBeGreaterThan(0);
     for (const g of list) {
       expect(g.mev, `MEV в комментарии фидера ${g.muscle}/w${g.week}`).toBeGreaterThan(0);
-      expect(g.before + g.sets, `${g.muscle} w${g.week}: ${g.before}+${g.sets} vs MEV ${g.mev}`)
+      expect(g.added, `фидер не пишет число сетов ${g.muscle}/w${g.week}`).toBeGreaterThan(0);
+      expect(g.before + g.added, `${g.muscle} w${g.week}: ${g.before}+${g.added} vs MEV ${g.mev}`)
         .toBeLessThanOrEqual(g.mev);
     }
     // Если бы разрыв брался из первой недели, число фидер-сетов было бы одинаковым
@@ -322,6 +339,53 @@ describe('P2-7 (финализация): финальный кап/порядо�
         }
       }
     }
+  });
+});
+
+// P2-8 (ядро, аудит 2026-11): добивка плеч считалась по МЕТКЕ мышцы, поэтому группа
+// «shoulders» видела 0-4 сета при 8-24 реальных сетов пучков и добивалась заново
+// (двойная добивка), а средняя/задняя дельта не имели своего минимума. Теперь головка
+// определяется по ИМЕНИ упражнения (bbShoulderHeadOf) и добивается до своего MEV.
+describe('P2-8 (ядро): добивка плеч идёт по ГОЛОВКАМ и только в свободное место дня', () => {
+  const WM = { chest: 100, back: 120, shoulders: 60, biceps: 50, triceps: 60, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
+  const PED = { pedDoses: { AAS: 500 }, courseIntensity: 'moderate' as const };
+  const feedersFor = (plan: any, target: RegExp) => (plan.weeks || [])
+    .flatMap((w: any) => (w.sessions || []).flatMap((s: any) => (s.exercises || [])))
+    .filter((e: any) => /Auto-MEV-feeder/i.test(String(e.comment || '')) && target.test(String(e.comment || '')));
+
+  it('ppl_6: группа «плечи» накормлена пучками — группового фидера нет, добита головка', () => {
+    const p: any = buildBBPlan(makeInput({ patternId: 'ppl_6', level: 'intermediate', weeks: 1 }));
+    // До P2-8 здесь стояли ДВЕ добивки `для shoulders` (махи Lu 3 + YTЛ лёжа 3):
+    // группа считалась по метке и «видела» 0 сетов, хотя в неделе 24 сета плеч
+    // (замер HEAD: delt_front 6 + delt_mid 3 + delt_rear 12 + shoulders 3).
+    expect(feedersFor(p, /для shoulders:/)).toHaveLength(0);
+    // Вместо этого добита ГОЛОВКА: средняя дельта доходит до своего MEV
+    // (natural intermediate: delt_mid MEV 4; до P2-8 было 3 сета).
+    const vol = p.weeklyVolume?.[1] || {};
+    expect(vol.delt_mid?.directSets || 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it('добивка головки помечена ГРУППОЙ: нового ключа мышцы в дне не появляется', () => {
+    const p: any = buildBBPlan(makeInput({ patternId: 'ppl_6', level: 'intermediate', weeks: 1 }));
+    const headFeeds = feedersFor(p, /для delt_(mid|rear):/);
+    expect(headFeeds.length).toBeGreaterThan(0);
+    // До P2-8 добивка несла СОБСТВЕННУЮ метку `delt_mid`: в сессии появлялся новый
+    // ключ мышцы, рос guard-бюджет дня (замер upper_lower_4/enhanced: total 79→85,
+    // scale 0.759→0.706) и трим снимал ЧУЖУЮ работу — трапеции 6→5, пресс 13→10.
+    // Плечи и так живут одной группой в guard/капе, поэтому метка — группа.
+    for (const e of headFeeds) {
+      expect(String(e.muscle), `добивка головки «${e.name}» получила метку ${e.muscle}`).toBe('shoulders');
+    }
+  });
+
+  it('upper_lower_4 enhanced: в переполненный день добивка головки не входит', () => {
+    const p: any = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, ...PED });
+    // Дни Upper заполнены (15 упражнений / 37 сетов, кап группы плеч занят): добивка
+    // головки не входит — иначе её 2 сета вытесняли чужую работу (замер при собственной
+    // метке головки: пресс 13→10, спина 35→31, guard-бюджет 79→85).
+    expect(feedersFor(p, /для delt_(mid|rear):/)).toHaveLength(0);
+    // И группа не добивается «вслепую»: плечи уже покрыты пучками.
+    expect(feedersFor(p, /для shoulders:/)).toHaveLength(0);
   });
 });
 

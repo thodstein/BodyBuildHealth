@@ -1067,18 +1067,18 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 }
 
 /**
- * Taper protocol — постепенное снижение объёма за 2-3 нед до пика/соревнования.
+ * Окно авто-taper (`applyTaperToFinalWeeks`): индексы недель `[start, end)`.
+ * `null` — авто-taper не применяется (план <4 нед, prep-разметка, делод в
+ * середине плана, источник со своим делодом).
  *
- * В отличие от deload (резкое −50% объём, −45% интенсивность за 1 нед),
- * taper снижает объём ПОСТЕПЕННО (−25%/нед) при СОХРАНЕНИИ интенсивности.
- * Цель: снизить утомление, сохранив адаптацию (Bosquet 2005 meta-analysis:
- * 2-3 нед taper → +2-3% производительность; объём −25%/нед, интенсивность 100%).
- *
- * Применяется к последним 2-3 неделям плана ПЕРЕД финальным deload (или вместо
- * deload если план заканчивается peaking без deload).
+ * Функция вынесена, чтобы проходы, которые ДОБАВЛЯЮТ объём, могли спросить то же
+ * окно: тайпер идёт ПОСЛЕ билдера и ужимает каждое упражнение до
+ * `max(2, round(sets × mult))` — лишнее упражнение в taper-неделе поднимает её
+ * «пол» и ломает монотонность окна (замер: fullbody_3/8 нед — недели ×0.75 и
+ * ×0.50 стали равны 73 = 73 после добивки плеч).
  */
-export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPlan {
-  if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
+export function taperWindowOf(plan: BBPlan): { start: number; end: number } | null {
+  if (!plan || plan.weeks.length < 4) return null; // taper только для планов ≥4 нед
 
   // 🏁 Contest prep guard: план уже размечен фазами contest prep (contestPhase /
   // peakWeek / prepProtocol) — его последние недели уже управляются каноническим
@@ -1089,7 +1089,7 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
     w.peakWeek === true
     || (typeof w.prepProtocol === 'string' && w.prepProtocol.length > 0)
     || (w.contestPhase === 'taper' || w.contestPhase === 'peak_week');
-  if (plan.weeks.some(isPrepMarked)) return plan;
+  if (plan.weeks.some(isPrepMarked)) return null;
 
   // Найти последнюю deload-неделю (если есть) — taper применяется к неделям ДО неё.
   // Если deload нет — taper к последним 2-3 неделям.
@@ -1111,13 +1111,13 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
     const prevSets = i > 0 ? weeks[i - 1].sessions.flatMap(s => s.exercises).reduce((sum, e) => sum + e.sets, 0) : totalSets;
     if (totalSets < prevSets * 0.6) { lastDeloadIdx = i; break; }
   }
-  if (lastDeloadIdx >= 0 && weeks.length - 1 - lastDeloadIdx > 2) return plan;
+  if (lastDeloadIdx >= 0 && weeks.length - 1 - lastDeloadIdx > 2) return null;
   // Ф1.1: источник управляет своей периодизацией (cycle-convert с meta.deloadWeeks —
   // ставит plan.sourceDeloads) — авто-taper «3 недели перед финальным делодом»
   // резал блок повторного набора после серединного делода (cycle-bb-08 [5,9]).
   // Generic-планы (distributePhases) НЕ помечаются — их taper-окно сохранено.
   const explicitDeloads = weeks.filter(w => w.deload === true || w.phase === 'deload').length;
-  if ((plan as any).sourceDeloads && explicitDeloads >= 1) return plan;
+  if ((plan as any).sourceDeloads && explicitDeloads >= 1) return null;
 
   // Taper-окно: 3 недели перед deload (или концом плана) — длина берётся из
   // plan.weeks.length. Параметр _totalWeeks оставлен для совместимости API
@@ -1131,7 +1131,32 @@ export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPla
   // берётся с КОНЦА (глубокий ×0.50 — всегда последняя неделя перед делодом).
   const taperLen = Math.min(3, Math.max(1, taperEnd - 1));
   const taperStart = Math.max(0, taperEnd - taperLen);
-  if (taperEnd - taperStart < 2) return plan; // недостаточно нед для taper
+  if (taperEnd - taperStart < 2) return null; // недостаточно нед для taper
+  return { start: taperStart, end: taperEnd };
+}
+
+/**
+ * Taper protocol — постепенное снижение объёма за 2-3 нед до пика/соревнования.
+ *
+ * В отличие от deload (резкое −50% объём, −45% интенсивность за 1 нед),
+ * taper снижает объём ПОСТЕПЕННО (−25%/нед) при СОХРАНЕНИИ интенсивности.
+ * Цель: снизить утомление, сохранив адаптацию (Bosquet 2005 meta-analysis:
+ * 2-3 нед taper → +2-3% производительность; объём −25%/нед, интенсивность 100%).
+ *
+ * Применяется к последним 2-3 неделям плана ПЕРЕД финальным deload (или вместо
+ * deload если план заканчивается peaking без deload).
+ */
+export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPlan {
+  if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
+
+  // Окно taper — одно правило с `taperWindowOf` (его же спрашивает auto-MEV-фидер,
+  // чтобы не добавлять объём в недели, которые тайпер потом урежет).
+  const win = taperWindowOf(plan);
+  if (!win) return plan;
+  const weeks = plan.weeks;
+  const taperStart = win.start;
+  const taperEnd = win.end;
+  const taperLen = taperEnd - taperStart;
   // Смещение профиля: короткое окно (2 нед) → [0.75, 0.50] (с конца), полное → [1.0, 0.75, 0.50].
   const profileShift = Math.max(0, 3 - taperLen);
 
