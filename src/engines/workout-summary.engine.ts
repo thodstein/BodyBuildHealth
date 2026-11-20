@@ -940,7 +940,7 @@ const signedPct = (pct: number): string => `${pct > 0 ? '+' : ''}${pct}%`;
  * выход за MEV/MRV по мышцам, плотность, RIR и рекорды. Правила молчат,
  * если данных мало — лучше пусто, чем выдуманный совет.
  */
-export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', comparison?: SummaryComparison | null): SummaryInsight[] {
+export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', comparison?: SummaryComparison | null, plan?: PlanVsActual | null): SummaryInsight[] {
   const out: SummaryInsight[] = [];
   if (!s || !s.workouts) return out;
 
@@ -1093,6 +1093,25 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
         detail: `Было ${active[0]} → стало ${active[active.length - 1]} в неделю. ${up ? 'Объём растёт — проверьте, успевает ли мышца восстанавливаться.' : 'Объём снижается — нормально для разгрузки, но не для прогресса.'}`,
       });
     }
+  }
+
+  // План против факта. Блок «По упражнениям» показывает это построчно, но
+  // итог читают в «Выводах»: сколько подходов не добито и что пропущено.
+  if (plan && !plan.empty && plan.setsPct != null && plan.setsPct < 80) {
+    const under = plan.rows
+      .filter(r => r.status === 'under')
+      .slice(0, 3)
+      .map(r => `${r.name} ${r.actualSets}/${r.plannedSets}`);
+    const parts: string[] = [];
+    if (under.length) parts.push(`не добито: ${under.join(', ')}`);
+    if (plan.skipped.length) parts.push(`пропущено: ${plan.skipped.slice(0, 3).join(', ')}`);
+    out.push({
+      id: 'plan-gap',
+      tone: 'warn',
+      icon: '📋',
+      title: `План по подходам выполнен на ${plan.setsPct}%`,
+      detail: `${parts.join('; ') || 'часть подходов не сделана'}. По плану ${plan.plannedSets} подх, по факту ${plan.actualSets}.`,
+    });
   }
 
   // Сравнение с прошлым равным периодом: объём упал не у одной мышцы, а у

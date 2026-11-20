@@ -676,4 +676,28 @@ describe('workout-summary: план против факта', () => {
     expect(pva.tonnagePct).toBeNull();
     expect(comparePlanVsActual([], actual()).plannedSets).toBe(0);
   });
+
+  it('недобор плана попадает в выводы', () => {
+    const summary = actual();
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
+    ], summary);
+    const gap = buildWorkoutInsights(summary, 'intermediate', null, pva).find(i => i.id === 'plan-gap');
+    expect(gap).toBeTruthy();
+    expect(gap!.title).toContain('75%');
+    expect(gap!.detail).toContain('не добито: Жим штанги лёжа 2/3');
+    expect(gap!.detail).toContain('пропущено: Тяга штанги в наклоне');
+  });
+
+  it('выполненный план вывод не создаёт', () => {
+    const summary = actual();
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+    ], summary);
+    expect(pva.setsPct).toBe(100);
+    expect(buildWorkoutInsights(summary, 'intermediate', null, pva).some(i => i.id === 'plan-gap')).toBe(false);
+    expect(buildWorkoutInsights(summary).some(i => i.id === 'plan-gap')).toBe(false);
+  });
 });

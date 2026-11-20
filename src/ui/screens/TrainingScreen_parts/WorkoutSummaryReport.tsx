@@ -260,7 +260,7 @@ export const WorkoutSummaryBody: React.FC<{
   const bestE1RM = summary.exercises.reduce((m, e) => Math.max(m, e.bestE1RM), 0);
   const topExercise = summary.exercises[0] || null;
   const topMuscle = summary.muscles[0] || null;
-  const insights = buildWorkoutInsights(summary, level, comparison);
+  const insights = buildWorkoutInsights(summary, level, comparison, planVsActual);
   const weeksCount = summaryWeeksCount(summary);
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));

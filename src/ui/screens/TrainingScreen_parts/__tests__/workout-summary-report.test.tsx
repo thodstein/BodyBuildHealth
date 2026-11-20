@@ -81,6 +81,21 @@ describe('WorkoutSummaryReport', () => {
     expect(text).toContain('не по плану: Приседания со штангой');
   });
 
+  it('недобор плана виден в выводах', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-03')]}
+        blocks={['insights']}
+        plan={[
+          { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+          { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
+        ]}
+      />,
+    );
+    expect(html).toContain('План по подходам выполнен на 75%');
+    expect(html).toContain('пропущено: Тяга штанги в наклоне');
+  });
+
   it('без плана строк «план → факт» нет', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['exercises']} />);
     expect(html).not.toContain('пропущено:');
