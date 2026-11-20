@@ -9,7 +9,7 @@ import { ModernHero, ModernPill, modernCardBg } from './nutrition-modern-kit';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 import { readDiaryV2 } from './diary-storage-v2';
 import { readUserRecipes } from './diary/user-recipes';
-import { componentsFromIngredientLines } from './diary/recipe-to-diary';
+import { customRecipeToRecipe, recipeComponents } from './diary/recipe-to-diary';
 import { localIsoDate } from '../../../core/local-date';
 
 type PlannerTab = 'dashboard' | 'settings' | 'catalog' | 'compare' | 'meal' | 'swap' | 'targeting';
@@ -400,10 +400,9 @@ export const ProductUsefulnessPlanner: React.FC = () => {
         const allRecipes = readUserRecipes();
         const recipe = allRecipes.find((r: any) => r.id === id);
         if (recipe) {
-          // Разбираем «Курица 200 г» через общий парсер: раньше строка целиком
-          // искалась в FOOD_DB и почти никогда не совпадала, а найденному
-          // продукту всегда ставили 100 г.
-          const mapped: MealProduct[] = componentsFromIngredientLines(recipe.ingredients || [])
+          // Состав берём общим слоем: если пользователь ввёл КБЖУ ингредиентов
+          // руками — используем эти строки, иначе разбираем «Курица 200 г».
+          const mapped: MealProduct[] = recipeComponents(customRecipeToRecipe(recipe))
             .filter(component => component.foodId)
             .map(component => ({ foodId: component.foodId as string, weightGrams: component.qty }));
           if (mapped.length > 0) { setMealProducts(prev => [...prev, ...mapped]); showToast(`✅ Добавлено ${mapped.length} продуктов из «${recipe.name}»`); }

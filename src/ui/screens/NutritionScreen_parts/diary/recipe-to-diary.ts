@@ -15,6 +15,14 @@ import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import type { DiaryItem } from '../types';
 import type { DiaryRecipeComponent } from '../diary-storage';
+import { toIngredientRows } from './user-recipes';
+
+/**
+ * Рецепт + состав с КБЖУ по продуктам. Пользовательский рецепт может хранить
+ * КБЖУ ингредиентов, введённое руками (products вне каталога), — тогда состав
+ * берём как есть, а не пересобираем из строк.
+ */
+export type RecipeWithIngredientRows = Recipe & { ingredientRows?: DiaryRecipeComponent[] };
 
 const round0 = (v: number) => Math.round(Number.isFinite(v) ? v : 0);
 const round1 = (v: number) => Math.round((Number.isFinite(v) ? v : 0) * 10) / 10;
@@ -77,8 +85,7 @@ export function parseIngredientLine(line: string, food?: FoodItem): { name: stri
 }
 
 /** Строки ингредиентов пользовательского рецепта → продукты с КБЖУ. */
-export function componentsFromIngredientLines(lines: string[]): DiaryRecipeComponent[] {
-  const out: DiaryRecipeComponent[] = [];
+export function componentsFromIngredientLines(lines: string[]): DiaryRecipeComponent[] {  const out: DiaryRecipeComponent[] = [];
   for (const raw of lines || []) {
     const parsed = parseIngredientLine(raw);
     if (!parsed.name) continue;
@@ -107,8 +114,55 @@ export function componentsFromIngredientLines(lines: string[]): DiaryRecipeCompo
   return out;
 }
 
+/**
+ * Готовый состав рецепта (КБЖУ на вес каждого продукта) → компоненты записи.
+ * Введённые руками значения не пересчитываются; если строка осталась без КБЖУ,
+ * пробуем подставить каталог — так «Соус 30 г» не превращается в нули.
+ */
+export function componentsFromRecipeRows(rows: DiaryRecipeComponent[]): DiaryRecipeComponent[] {
+  return (rows || [])
+    .filter(row => String(row?.name || '').trim())
+    .map(row => {
+      const name = String(row.name).trim();
+      const qty = Math.max(1, Math.round(Number(row.qty) || 100));
+      const entered = (Number(row.kcal) || 0) > 0
+        || (Number(row.p) || 0) > 0
+        || (Number(row.f) || 0) > 0
+        || (Number(row.c) || 0) > 0;
+      if (entered) {
+        // Введённое руками КБЖУ — источник истины. foodId не додумываем по
+        // похожему названию: чужой продукт в анализаторе хуже, чем пропуск.
+        return {
+          name,
+          qty,
+          kcal: round0(Number(row.kcal) || 0),
+          p: round1(Number(row.p) || 0),
+          f: round1(Number(row.f) || 0),
+          c: round1(Number(row.c) || 0),
+          ...(row.foodId ? { foodId: row.foodId } : {}),
+        };
+      }
+      const food = findFood(name);
+      if (!food) return { name, qty, kcal: 0, p: 0, f: 0, c: 0 };
+      const factor = qty / 100;
+      return {
+        name: food.name,
+        qty,
+        kcal: round0((food.kcal || 0) * factor),
+        p: round1((food.protein || 0) * factor),
+        f: round1((food.fat || 0) * factor),
+        c: round1((food.carbs || 0) * factor),
+        foodId: food.id,
+      };
+    });
+}
+
 /** Состав любого рецепта (встроенного или пользовательского) в продуктах. */
-export function recipeComponents(recipe: Recipe): DiaryRecipeComponent[] {
+export function recipeComponents(recipe: RecipeWithIngredientRows): DiaryRecipeComponent[] {
+  // Пользователь ввёл КБЖУ по продуктам — это источник истины, каталог не главный.
+  if (Array.isArray(recipe.ingredientRows) && recipe.ingredientRows.length > 0) {
+    return componentsFromRecipeRows(recipe.ingredientRows);
+  }
   const decomposed = decomposeRecipeRaw(recipe);
   if (decomposed.length > 0) {
     const components = decomposed.map<DiaryRecipeComponent>(item => ({
@@ -126,7 +180,8 @@ export function recipeComponents(recipe: Recipe): DiaryRecipeComponent[] {
 }
 
 /** Пользовательский рецепт из «Моих рецептов» (Кухня) → объект формы Recipe. */
-export function customRecipeToRecipe(raw: any): Recipe {
+export function customRecipeToRecipe(raw: any): RecipeWithIngredientRows {
+  const ingredientRows = toIngredientRows(raw?.ingredientRows);
   return {
     name: String(raw?.name || 'Мой рецепт'),
     meal: typeof raw?.meal === 'string' ? raw.meal : 'other',
@@ -136,6 +191,7 @@ export function customRecipeToRecipe(raw: any): Recipe {
     fat: Number(raw?.fat) || 0,
     carbs: Number(raw?.carbs) || 0,
     ingredients: Array.isArray(raw?.ingredients) ? raw.ingredients.map(String) : [],
+    ...(ingredientRows.length > 0 ? { ingredientRows } : {}),
     instructions: Array.isArray(raw?.instructions)
       ? raw.instructions.map(String)
       : typeof raw?.instructions === 'string' && raw.instructions.trim()
@@ -158,7 +214,7 @@ export interface RecipeDiaryEntryOptions {
  * продукта в очереди), `qty` — общий вес порции; `recipe.components` хранит
  * КБЖУ каждого продукта.
  */
-export function buildRecipeDiaryEntry(recipe: Recipe, opts: RecipeDiaryEntryOptions = {}): DiaryItem {
+export function buildRecipeDiaryEntry(recipe: RecipeWithIngredientRows, opts: RecipeDiaryEntryOptions = {}): DiaryItem {
   const servings = Math.max(0.25, Math.min(5, Number(opts.servings) || 1));
   let components = recipeComponents(recipe);
   if (servings !== 1) components = components.map(c => scaleComponent(c, servings));

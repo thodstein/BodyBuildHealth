@@ -1,5 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { createUserRecipe, type UserRecipeRecord } from './user-recipes';
+import { createUserRecipe, deleteUserRecipe, recipeKey, type UserRecipeRecord } from './user-recipes';
+import {
+  IngredientRowsEditor,
+  componentsToIngredientRows,
+  emptyIngredientRow,
+  rowsToComponents,
+  rowsToIngredientLines,
+  sumIngredientComponents,
+  type IngredientRowDraft,
+} from './IngredientRowsEditor';
+import { componentsFromIngredientLines } from './recipe-to-diary';
 
 interface RecipeCreateModalProps {
   open: boolean;
@@ -10,6 +20,8 @@ interface RecipeCreateModalProps {
   defaultMeal?: string;
   /** Подставить название, например из строки поиска. */
   initialName?: string;
+  /** Открыть на редактирование существующего рецепта. */
+  initialRecipe?: UserRecipeRecord | null;
 }
 
 const MEALS: Array<{ id: string; label: string; icon: string }> = [
@@ -36,13 +48,13 @@ const labelStyle: React.CSSProperties = {
  * Рецепт сохраняется в оба пользовательских хранилища (Кухня + планировщик).
  */
 export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
-  open, onClose, onSaved, defaultMeal = 'lunch', initialName = '',
+  open, onClose, onSaved, defaultMeal = 'lunch', initialName = '', initialRecipe = null,
 }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [meal, setMeal] = useState(defaultMeal);
   const [prepTime, setPrepTime] = useState(10);
-  const [ingredients, setIngredients] = useState('');
+  const [ingredientRows, setIngredientRows] = useState<IngredientRowDraft[]>([emptyIngredientRow()]);
   const [instructions, setInstructions] = useState('');
   const [kcal, setKcal] = useState(0);
   const [protein, setProtein] = useState(0);
@@ -51,19 +63,39 @@ export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
   const [tags, setTags] = useState('');
   const [error, setError] = useState('');
 
-  // Каждое открытие — чистая форма (с подставленным названием из поиска).
+  // Каждое открытие: либо чистая форма (с названием из поиска), либо
+  // заполненная карточка существующего рецепта — состав уже с КБЖУ.
   useEffect(() => {
     if (!open) return;
+    if (initialRecipe) {
+      const saved = initialRecipe;
+      setName(saved.name || '');
+      setDescription(saved.description || '');
+      setMeal(saved.meal || defaultMeal || 'lunch');
+      setPrepTime(saved.prepTimeMin ?? 10);
+      const rows = saved.ingredientRows && saved.ingredientRows.length > 0
+        ? componentsToIngredientRows(saved.ingredientRows)
+        : componentsToIngredientRows(componentsFromIngredientLines(saved.ingredients || []));
+      setIngredientRows(rows.length > 0 ? rows : [emptyIngredientRow()]);
+      setInstructions((saved.instructions || []).join('\n'));
+      setKcal(saved.kcal || 0);
+      setProtein(saved.protein || 0);
+      setFat(saved.fat || 0);
+      setCarbs(saved.carbs || 0);
+      setTags((saved.tags || []).join(', '));
+      setError('');
+      return;
+    }
     setName(initialName || '');
     setDescription('');
     setMeal(defaultMeal || 'lunch');
     setPrepTime(10);
-    setIngredients('');
+    setIngredientRows([emptyIngredientRow()]);
     setInstructions('');
     setKcal(0); setProtein(0); setFat(0); setCarbs(0);
     setTags('');
     setError('');
-  }, [open, defaultMeal, initialName]);
+  }, [open, defaultMeal, initialName, initialRecipe]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,18 +115,31 @@ export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
 
   const save = () => {
     if (!name.trim()) { setError('Укажите название рецепта'); return; }
-    if (!(kcal > 0)) { setError('Укажите калорийность больше 0 — иначе блюдо не попадёт в расчёт'); return; }
+    // Состав с КБЖУ — источник истины: если по ингредиентам что-то посчитано,
+    // итог берём из суммы (так правка одного продукта сразу меняет калорийность).
+    const components = rowsToComponents(ingredientRows);
+    const totals = sumIngredientComponents(components);
+    const finalKcal = totals.kcal > 0 ? Math.round(totals.kcal) : kcal;
+    if (!(finalKcal > 0)) {
+      setError('Укажите калорийность рецепта или КБЖУ ингредиентов — иначе блюдо не попадёт в расчёт');
+      return;
+    }
+    // Переименование: старую запись убираем, иначе останутся две.
+    if (initialRecipe && recipeKey(initialRecipe.name) !== recipeKey(name)) {
+      deleteUserRecipe({ id: initialRecipe.id, name: initialRecipe.name });
+    }
     const recipe = createUserRecipe({
       name,
       description,
       meal,
       prepTimeMin: prepTime,
-      ingredients,
+      ingredients: rowsToIngredientLines(ingredientRows),
+      ingredientRows: components,
       instructions,
-      kcal,
-      protein,
-      fat,
-      carbs,
+      kcal: finalKcal,
+      protein: totals.p > 0 ? Math.round(totals.p * 10) / 10 : protein,
+      fat: totals.f > 0 ? Math.round(totals.f * 10) / 10 : fat,
+      carbs: totals.c > 0 ? Math.round(totals.c * 10) / 10 : carbs,
       tags,
     });
     onSaved?.(recipe);
@@ -102,7 +147,7 @@ export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Создать рецепт"
+    <div role="dialog" aria-modal="true" aria-label={initialRecipe ? 'Изменить рецепт' : 'Создать рецепт'}
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 320, display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(8px)', padding: 12 }}>
@@ -113,8 +158,10 @@ export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
           <span style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🍳</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Создать рецепт</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Сохранится в Кухню и в планировщик</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{initialRecipe ? 'Изменить рецепт' : 'Создать рецепт'}</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+              {initialRecipe ? 'Изменения сохранятся в Кухню и в планировщик' : 'Сохранится в Кухню и в планировщик'}
+            </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Закрыть создание рецепта"
             style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
@@ -177,10 +224,20 @@ export const RecipeCreateModal: React.FC<RecipeCreateModalProps> = ({
           </div>
 
           <div>
-            <div style={labelStyle}>Ингредиенты (по одному на строку)</div>
-            <textarea value={ingredients} onChange={e => setIngredients(e.target.value)}
-              aria-label="Ингредиенты рецепта" placeholder={'Яйца 2 шт\nОвсянка 30 г\nТворог 50 г'}
-              rows={3} style={{ ...inputStyle, resize: 'vertical', minHeight: 72, fontSize: 12 }} />
+            <div style={labelStyle}>Ингредиенты и их КБЖУ</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginBottom: 6, lineHeight: 1.4 }}>
+              КБЖУ — на указанный вес продукта. Пустые поля подставятся из базы, если продукт там есть; итог рецепта соберётся из состава.
+            </div>
+            <IngredientRowsEditor
+              rows={ingredientRows}
+              onChange={setIngredientRows}
+              onUseTotals={totals => {
+                setKcal(Math.round(totals.kcal));
+                setProtein(Math.round(totals.p * 10) / 10);
+                setFat(Math.round(totals.f * 10) / 10);
+                setCarbs(Math.round(totals.c * 10) / 10);
+              }}
+            />
           </div>
 
           <div>

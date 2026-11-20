@@ -32,6 +32,12 @@ export const RecipesTabModern: React.FC = () => {
   const [planPicker, setPlanPicker] = useState<{name:string, idx:number}|null>(null);
   const [toast, setToast] = useState<string|null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
+  // Рецепт, который правим в модалке; null — создание нового.
+  const [editingRecipe, setEditingRecipe] = useState<UserRecipeRecord | null>(null);
+  const openRecipeCreator = (recipe: UserRecipeRecord | null = null) => {
+    setEditingRecipe(recipe);
+    setShowRecipeModal(true);
+  };
   const [myRecipes, setMyRecipes] = useState<UserRecipeRecord[]>(() => readUserRecipes());
   const [favoriteRecipes, setFavoriteRecipes] = useState<string[]>(() => readFavoriteRecipeNames());
   const [myRecExpanded, setMyRecExpanded] = useState(false);
@@ -206,7 +212,7 @@ export const RecipesTabModern: React.FC = () => {
               Готовый cookbook для бодибилдинга — все <b style={{color:'#fff'}}>236</b> с привязкой к FOOD_DB и полезностью. Фильтры по цели, быстрый поиск, сортировка.
             </div>
           </div>
-          <button onClick={() => setShowRecipeModal(true)} style={{ padding:'9px 14px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:750, border:'1px solid rgba(0,230,138,0.3)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.25)', whiteSpace:'nowrap', minHeight:44 }}>＋ Рецепт</button>
+          <button onClick={() => openRecipeCreator(null)} style={{ padding:'9px 14px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:750, border:'1px solid rgba(0,230,138,0.3)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.25)', whiteSpace:'nowrap', minHeight:44 }}>＋ Рецепт</button>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:12 }}>
           {[
@@ -233,7 +239,7 @@ export const RecipesTabModern: React.FC = () => {
               <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:999, background:'rgba(167,139,250,0.14)', color:'#a78bfa' }}>{visibleMyRecipes.length}</span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <button type="button" onClick={e => { e.stopPropagation(); setShowRecipeModal(true); }}
+              <button type="button" onClick={e => { e.stopPropagation(); openRecipeCreator(null); }}
                 aria-label="Создать свой рецепт" title="Создать свой рецепт"
                 style={{ minHeight:44, padding:'0 10px', borderRadius:8, border:'1px solid rgba(0,230,138,0.28)', background:'rgba(0,230,138,0.10)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>＋ Создать</button>
               <span style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>{myRecExpanded ? '▲' : '▼'}</span>
@@ -265,6 +271,8 @@ export const RecipesTabModern: React.FC = () => {
                       style={{ width:44, height:44, flexShrink:0, borderRadius:10, border:favorite ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)', background:favorite ? 'rgba(251,191,36,0.14)' : 'rgba(255,255,255,0.03)', color:favorite ? '#fbbf24' : 'rgba(255,255,255,0.45)', cursor:'pointer', fontSize:16 }}>{favorite ? '★' : '☆'}</button>
                     <button onClick={() => addRecipeToDiary(r, true)} aria-label={`Добавить рецепт ${r.name} в дневник`} title="В дневник (с продуктами и КБЖУ)"
                       style={{ padding:'0 10px', minHeight:44, borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'rgba(0,230,138,0.10)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>＋ В дневник</button>
+                    <button onClick={() => openRecipeCreator(r)} aria-label={`Редактировать рецепт ${r.name}`} title="Изменить состав и КБЖУ ингредиентов"
+                      style={{ width:44, height:44, flexShrink:0, borderRadius:10, border:'1px solid rgba(96,165,250,0.22)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', cursor:'pointer', fontSize:14 }}>✎</button>
                     <button onClick={() => deleteMyRecipe(r)} aria-label={pendingDeleteId === r.id ? `Подтвердить удаление рецепта ${r.name}` : `Удалить рецепт ${r.name}`}
                       style={{ minWidth:44, minHeight:44, flexShrink:0, padding: pendingDeleteId === r.id ? '0 10px' : 0, borderRadius:10, border:'1px solid rgba(239,68,68,0.15)', background:pendingDeleteId === r.id ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize: pendingDeleteId === r.id ? 10 : 14, fontWeight:700 }}>{pendingDeleteId === r.id ? 'Точно?' : '✕'}</button>
                   </div>
@@ -560,11 +568,13 @@ export const RecipesTabModern: React.FC = () => {
       {/* Create modal — общий для Кухни и дневника компонент */}
       <RecipeCreateModal
         open={showRecipeModal}
-        onClose={() => setShowRecipeModal(false)}
+        initialRecipe={editingRecipe}
+        onClose={() => { setShowRecipeModal(false); setEditingRecipe(null); }}
         onSaved={(recipe) => {
+          const edited = Boolean(editingRecipe);
           setMyRecipes(readUserRecipes());
           setMyRecExpanded(true);
-          setToast(`✅ Рецепт «${recipe.name}» создан`);
+          setToast(edited ? `✅ Рецепт «${recipe.name}» обновлён` : `✅ Рецепт «${recipe.name}» создан`);
           setTimeout(() => setToast(null), 2400);
         }}
       />

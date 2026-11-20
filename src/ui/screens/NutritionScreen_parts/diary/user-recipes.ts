@@ -13,6 +13,8 @@
  * поэтому звёздочка в дневнике/Кухне сразу видна планировщику и наоборот.
  */
 
+import type { DiaryRecipeComponent } from '../diary-storage';
+
 export const USER_RECIPES_KEY = 'he_recipes';
 export const PLANNER_RECIPES_KEY = 'he_user_recipes';
 export const FAVORITE_RECIPES_KEY = 'he_recipe_fav';
@@ -21,6 +23,12 @@ export interface UserRecipeRecord {
   id: string;
   name: string;
   ingredients: string[];
+  /**
+   * Состав с КБЖУ каждого продукта на его вес. Появляется, когда пользователь
+   * ввёл КБЖУ руками (или они подставились из каталога): продукты вне FOOD_DB
+   * иначе оставались нулевыми и блюдо недосчитывало калории.
+   */
+  ingredientRows?: DiaryRecipeComponent[];
   instructions: string[];
   kcal: number;
   protein: number;
@@ -39,6 +47,8 @@ export interface UserRecipeRecord {
 export interface UserRecipeInput {
   name: string;
   ingredients?: string[] | string;
+  /** Состав с КБЖУ по продуктам (вес в граммах, КБЖУ — на этот вес). */
+  ingredientRows?: DiaryRecipeComponent[];
   instructions?: string[] | string;
   kcal?: number;
   protein?: number;
@@ -74,6 +84,46 @@ function toTags(value: unknown): string[] {
   return [];
 }
 
+const round1 = (value: number): number => Math.round((Number.isFinite(value) ? value : 0) * 10) / 10;
+
+/** Вес может прийти числом, «200» или «200 г» — берём первое число. */
+function parseRowQty(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  const match = String(value ?? '').match(/(\d+(?:[.,]\d+)?)/);
+  return match ? Number(match[1].replace(',', '.')) || 0 : 0;
+}
+
+/**
+ * Состав с КБЖУ из любого источника (`he_recipes`, планировщик, старые записи).
+ * Понимает и `kcal/protein/fat/carbs`, и короткие `p/f/c`, и `grams/weight`.
+ */
+export function toIngredientRows(value: unknown): DiaryRecipeComponent[] {
+  if (!Array.isArray(value)) return [];
+  const rows: DiaryRecipeComponent[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    const item = raw as Record<string, unknown>;
+    const name = String(item.name || '').trim();
+    if (!name) continue;
+    const qty = Math.max(1, Math.round(parseRowQty(item.qty ?? item.grams ?? item.weight) || 100));
+    rows.push({
+      name,
+      qty,
+      kcal: Math.round(num(item.kcal)),
+      p: round1(num(item.p ?? item.protein)),
+      f: round1(num(item.f ?? item.fat)),
+      c: round1(num(item.c ?? item.carbs)),
+      ...(String(item.foodId || '').trim() ? { foodId: String(item.foodId) } : {}),
+    });
+  }
+  return rows;
+}
+
+/** Строки состава для старых читателей: «Курица 200 г». */
+function ingredientLinesFromRows(rows: DiaryRecipeComponent[]): string[] {
+  return rows.map(row => (row.qty > 0 ? `${row.name} ${Math.round(row.qty)} г` : row.name));
+}
+
 export function recipeKey(name: string): string {
   return String(name || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 }
@@ -82,10 +132,13 @@ export function normalizeUserRecipe(raw: any, source?: 'kitchen' | 'planner'): U
   if (!raw || typeof raw !== 'object') return null;
   const name = String(raw.name || '').trim();
   if (!name) return null;
+  const ingredientRows = toIngredientRows(raw.ingredientRows);
+  const ingredients = toLines(raw.ingredients);
   return {
     id: String(raw.id || `user-${slug(name)}`),
     name,
-    ingredients: toLines(raw.ingredients),
+    ingredients: ingredients.length > 0 ? ingredients : ingredientLinesFromRows(ingredientRows),
+    ...(ingredientRows.length > 0 ? { ingredientRows } : {}),
     instructions: toLines(raw.instructions),
     kcal: num(raw.kcal),
     protein: num(raw.protein ?? raw.p),
@@ -146,10 +199,13 @@ export function hasUserRecipe(name: string): boolean {
  */
 export function createUserRecipe(input: UserRecipeInput): UserRecipeRecord {
   const now = Date.now();
+  const ingredientRows = toIngredientRows(input.ingredientRows);
+  const ingredients = toLines(input.ingredients);
   const recipe: UserRecipeRecord = {
     id: `r-${now}-${Math.random().toString(36).slice(2, 7)}`,
     name: String(input.name || '').trim(),
-    ingredients: toLines(input.ingredients),
+    ingredients: ingredients.length > 0 ? ingredients : ingredientLinesFromRows(ingredientRows),
+    ...(ingredientRows.length > 0 ? { ingredientRows } : {}),
     instructions: toLines(input.instructions),
     kcal: num(input.kcal),
     protein: num(input.protein),

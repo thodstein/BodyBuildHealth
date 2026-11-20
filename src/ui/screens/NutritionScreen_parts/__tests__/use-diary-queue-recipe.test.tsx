@@ -9,7 +9,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useDiaryQueue } from '../diary/hooks/useDiaryQueue';
-import { buildRecipeDiaryEntry } from '../diary/recipe-to-diary';
+import { buildRecipeDiaryEntry, customRecipeToRecipe } from '../diary/recipe-to-diary';
 import { RECIPE_DB } from '../../../../data/recipe-db';
 
 const DATE = '2026-11-20';
@@ -65,6 +65,23 @@ describe('useDiaryQueue: рецепт', () => {
     const saved = saveDiary.mock.calls[0][0][DATE].meals[MEAL][0];
     expect(saved.qty).toBe(150);
     expect(saved.kcal).toBe(195);
+  });
+
+  it('свой рецепт с КБЖУ, введённым по продуктам, сохраняет именно этот состав', () => {
+    const { result, saveDiary } = setup();
+
+    act(() => result.current.addRecipeToQueue(customRecipeToRecipe({
+      name: 'Крем-десерт',
+      kcal: 120, protein: 21, fat: 2, carbs: 3,
+      ingredientRows: [{ name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21, f: 2, c: 3 }],
+    }), 1, true));
+    act(() => result.current.saveItemsToDiary(result.current.parsedItems));
+
+    const saved = savedEntry(saveDiary);
+    expect(saved.recipe?.components[0]).toMatchObject({ name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21 });
+    // Запись — на 30 г: 120 ккал ровно введённые, без «добора» из каталога.
+    expect(saved.qty).toBe(30);
+    expect(Number(saved.kcal)).toBe(120);
   });
 
   it('пересчитывает состав при изменении веса в очереди', () => {

@@ -28,6 +28,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
+import { IngredientRowsEditor, rowsToComponents, sumIngredientComponents } from "../diary/IngredientRowsEditor";
 import { createUserRecipe, recipeKey } from "../diary/user-recipes";
 import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
@@ -1760,26 +1761,42 @@ const doImportPlan = (raw: string): boolean => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5 }}>
                 {[{k:'kcal',l:'Ккал',c:'#22c55e'},{k:'protein',l:'Белки',c:'#3b82f6'},{k:'fat',l:'Жиры',c:'#f59e0b'},{k:'carbs',l:'Угл',c:'#f97316'}].map(f => <div key={f.k}><input type="number" min={0} value={(newRecipe as Record<string,number|string>)[f.k] as number} onChange={e => setNewRecipe({...newRecipe, [f.k]: Math.max(0, +e.target.value || 0)})} placeholder={f.l} style={{ width:'100%', padding:'14px 6px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:f.c, fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:700 }} /></div>)}
               </div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты</div>
-              <textarea value={newRecipe.ingredients} onChange={e => setNewRecipe({...newRecipe, ingredients: e.target.value})} placeholder="Ингредиенты (каждый с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
+              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты и их КБЖУ</div>
+              <IngredientRowsEditor compact
+                rows={newRecipe.ingredientRows || []}
+                onChange={rows => setNewRecipe({...newRecipe, ingredientRows: rows})}
+                onUseTotals={totals => setNewRecipe({...newRecipe,
+                  kcal: Math.round(totals.kcal),
+                  protein: Math.round(totals.p * 10) / 10,
+                  fat: Math.round(totals.f * 10) / 10,
+                  carbs: Math.round(totals.c * 10) / 10,
+                })} />
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Приготовление</div>
               <textarea value={newRecipe.instructions} onChange={e => setNewRecipe({...newRecipe, instructions: e.target.value})} placeholder="Инструкция (каждый шаг с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
               <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Теги</div>
               <input value={newRecipe.tags} onChange={e => setNewRecipe({...newRecipe, tags: e.target.value})} placeholder="Теги (через запятую)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', fontSize:13 }} />
               <button onClick={() => {
-                // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
-                if (!Number.isFinite(newRecipe.kcal) || newRecipe.kcal <= 0) { setErrorMsg('Укажите калорийность рецепта больше 0'); return; }
                 if (!newRecipe.name.trim()) { setErrorMsg('Укажите название рецепта'); return; }
+                // Состав с КБЖУ главнее введённого итога: правка продукта сразу
+                // меняет калорийность рецепта, как и в Кухне.
+                const components = rowsToComponents(newRecipe.ingredientRows || []);
+                const totals = sumIngredientComponents(components);
+                const kcal = totals.kcal > 0 ? Math.round(totals.kcal) : Number(newRecipe.kcal);
+                // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
+                if (!Number.isFinite(kcal) || kcal <= 0) { setErrorMsg('Укажите калорийность рецепта больше 0'); return; }
                 // Общее хранилище: рецепт из планировщика сразу виден в Кухне,
                 // выборе рецепта для дневника и в «Избранном».
                 const saved = createUserRecipe({
                   name: newRecipe.name,
                   ingredients: newRecipe.ingredients,
+                  // Состав с КБЖУ по продуктам: попадёт в дневник построчно,
+                  // без пересборки из текста.
+                  ingredientRows: components,
                   instructions: newRecipe.instructions,
-                  kcal: Number(newRecipe.kcal),
-                  protein: Number(newRecipe.protein),
-                  fat: Number(newRecipe.fat),
-                  carbs: Number(newRecipe.carbs),
+                  kcal,
+                  protein: totals.p > 0 ? Math.round(totals.p * 10) / 10 : Number(newRecipe.protein),
+                  fat: totals.f > 0 ? Math.round(totals.f * 10) / 10 : Number(newRecipe.fat),
+                  carbs: totals.c > 0 ? Math.round(totals.c * 10) / 10 : Number(newRecipe.carbs),
                   meal: newRecipe.meal,
                   prepTimeMin: Number(newRecipe.prepTime),
                   tags: newRecipe.tags,
@@ -1791,7 +1808,7 @@ const doImportPlan = (raw: string): boolean => {
                   { ...saved, prepTime: saved.prepTimeMin ?? 10, userCreated: true },
                 ]);
                 setShowRecipeCreator(false);
-                setNewRecipe({ name: '', meal: 'lunch', prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
+                setNewRecipe({ name: '', meal: 'lunch', prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', ingredientRows: [], instructions: '', tags: '' });
               }} style={{ width:'100%', padding:'13px', borderRadius:14, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:15, fontWeight:700, letterSpacing:0.2 }}>✓ Сохранить рецепт</button>
             </div>
           </div>

@@ -1644,7 +1644,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    const [takenSupplements, setTakenSupplements] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_nutrition_supps') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []; } catch { return []; } });
   const [showSuppPicker, setShowSuppPicker] = useState(false);
   const [suppSearch, setSuppSearch] = useState('');
-  const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', instructions: '', tags: '' });
+  const [newRecipe, setNewRecipe] = useState({ name: '', meal: 'lunch' as string, prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', ingredientRows: [] as any[], instructions: '', tags: '' });
   // FIX persist-audit (B6): фаза v2-скоринга не сохранялась — сбрасывалась на «Набор»
   const [v2Phase, setV2Phase] = useState(() => {
     try { const v = localStorage.getItem('he_planner_v2_phase'); if (typeof v === 'string' && v.length > 0) return v; } catch {}

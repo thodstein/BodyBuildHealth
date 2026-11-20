@@ -125,7 +125,10 @@ describe('RecipePickerPanel: избранное и создание на мес�
     const dialog = screen.getByRole('dialog', { name: 'Создать рецепт' });
 
     fireEvent.change(within(dialog).getByLabelText('Название рецепта'), { target: { value: 'Сырники фитнес' } });
-    fireEvent.change(within(dialog).getByLabelText('Ингредиенты рецепта'), { target: { value: 'Творог 200 г\nЯйца 1 шт' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: название'), { target: { value: 'Творог' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: граммы'), { target: { value: '200' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: ккал'), { target: { value: '240' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: белки'), { target: { value: '34' } });
     fireEvent.change(within(dialog).getByLabelText('Описание рецепта'), { target: { value: 'Полезный завтрак после тренировки' } });
     fireEvent.change(within(dialog).getByLabelText('Ккал'), { target: { value: '320' } });
     fireEvent.change(within(dialog).getByLabelText('Белки'), { target: { value: '28' } });
@@ -141,6 +144,40 @@ describe('RecipePickerPanel: избранное и создание на мес�
     expect(onAdd.mock.calls[0][0]).toMatchObject({ name: 'Сырники фитнес' });
     expect(onAdd.mock.calls[0][1]).toBe(1);
     expect(onAdd.mock.calls[0][2]).toBe(true);
+  });
+
+  it('КБЖУ ингредиента вводится руками и уходит в рецепт и в дневник', () => {
+    const onAdd = vi.fn();
+
+    render(
+      <RecipePickerPanel open onClose={() => {}} mealType="Обед" initialQuery="Крем" onAdd={onAdd} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Создать свой рецепт' }));
+    const dialog = screen.getByRole('dialog', { name: 'Создать рецепт' });
+
+    fireEvent.change(within(dialog).getByLabelText('Название рецепта'), { target: { value: 'Крем-десерт' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: название'), { target: { value: 'Протеиновый крем XXL' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: граммы'), { target: { value: '30' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: ккал'), { target: { value: '120' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: белки'), { target: { value: '21' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: жиры'), { target: { value: '2' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: углеводы'), { target: { value: '3' } });
+    // КБЖУ рецепта не заполняем: сумма по составу подставится сама.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить рецепт' }));
+
+    const saved = store()[0];
+    expect(saved.ingredientRows).toEqual([
+      expect.objectContaining({ name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21, f: 2, c: 3 }),
+    ]);
+    expect(saved.kcal).toBe(120);
+    expect(saved.protein).toBe(21);
+    // Читается обратно из единого хранилища с тем же составом.
+    expect(readUserRecipes()[0].ingredientRows?.[0]).toMatchObject({ kcal: 120, p: 21 });
+
+    // Создание «на месте» сразу отдаёт рецепт в приём — с введённым составом.
+    const entry = onAdd.mock.calls[0][0];
+    expect(entry.ingredientRows?.[0]).toMatchObject({ name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21 });
   });
 
   it('рецепт находится поиском по описанию и показывает его в карточке', () => {
@@ -226,7 +263,11 @@ describe('Кухня: звёздочка, фильтр избранного и �
     fireEvent.click(screen.getByRole('button', { name: '＋ Рецепт' }));
     const dialog = screen.getByRole('dialog', { name: 'Создать рецепт' });
     fireEvent.change(within(dialog).getByLabelText('Название рецепта'), { target: { value: 'Куриный боул' } });
-    fireEvent.change(within(dialog).getByLabelText('Ингредиенты рецепта'), { target: { value: 'Курица 200 г\nРис 100 г' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: название'), { target: { value: 'Курица' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: граммы'), { target: { value: '200' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить ингредиент' }));
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 2: название'), { target: { value: 'Рис' } });
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 2: граммы'), { target: { value: '100' } });
     fireEvent.change(within(dialog).getByLabelText('Ккал'), { target: { value: '650' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить рецепт' }));
 
@@ -235,6 +276,25 @@ describe('Кухня: звёздочка, фильтр избранного и �
     // Появился в «Моих рецептах» с кнопкой добавления в дневник.
     expect(screen.getByText('Куриный боул')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Добавить рецепт Куриный боул в дневник' })).toBeInTheDocument();
+  });
+
+  it('свой рецепт открывается на правку — КБЖУ ингредиента можно вписать', () => {
+    createUserRecipe({ name: 'Суп-пюре', ingredients: 'Фрямба 30 г', kcal: 100 });
+    render(<RecipesTabModern />);
+
+    fireEvent.click(screen.getByText('Мои рецепты'));
+    fireEvent.click(screen.getByRole('button', { name: 'Редактировать рецепт Суп-пюре' }));
+    const dialog = screen.getByRole('dialog', { name: 'Изменить рецепт' });
+
+    // Старый текстовый состав разобран в строки, пустое КБЖУ можно заполнить.
+    expect(within(dialog).getByLabelText('Ингредиент 1: название')).toHaveValue('Фрямба');
+    fireEvent.change(within(dialog).getByLabelText('Ингредиент 1: ккал'), { target: { value: '90' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить рецепт' }));
+
+    // Одна запись, а не дубль: правка перезаписывает рецепт в обеих базах.
+    expect(store()).toHaveLength(1);
+    expect(store()[0].ingredientRows[0]).toMatchObject({ name: 'Фрямба', qty: 30, kcal: 90 });
+    expect(store()[0].kcal).toBe(90);
   });
 
   it('свой рецепт удаляется только вторым тапом по ✕', () => {

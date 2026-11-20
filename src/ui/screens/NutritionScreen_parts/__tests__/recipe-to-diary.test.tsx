@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import {
   buildRecipeDiaryEntry,
   componentsFromIngredientLines,
+  componentsFromRecipeRows,
   customRecipeToRecipe,
   parseIngredientLine,
   recipeMicros,
@@ -108,6 +109,39 @@ describe('buildRecipeDiaryEntry', () => {
     expect(entry.recipe!.custom).toBe(true);
     expect(entry.recipe!.components.length).toBe(2);
     expect(entry.kcal).toBeGreaterThan(0);
+  });
+});
+
+describe('состав с КБЖУ, введённым руками', () => {
+  const rows = [
+    { name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21, f: 2, c: 3 },
+    { name: 'Молоко 1.5%', qty: 200, kcal: 90, p: 6, f: 3, c: 9 },
+  ];
+
+  it('введённые значения не переписываются каталогом, пустые — добираются из него', () => {
+    const components = componentsFromRecipeRows(rows);
+    expect(components).toHaveLength(2);
+    expect(components[0]).toMatchObject({ name: 'Протеиновый крем XXL', qty: 30, kcal: 120, p: 21, f: 2, c: 3 });
+
+    // Строка без КБЖУ: продукт есть в каталоге — подставляем, чтобы не нулить блюдо.
+    const [filled] = componentsFromRecipeRows([{ name: 'Куриная грудка', qty: 100, kcal: 0, p: 0, f: 0, c: 0 }]);
+    expect(filled.kcal).toBeGreaterThan(0);
+    expect(filled.foodId).toBeTruthy();
+  });
+
+  it('итог записи равен сумме введённых КБЖУ — даже для продукта вне каталога', () => {
+    const entry = buildRecipeDiaryEntry(customRecipeToRecipe({
+      name: 'Крем-десерт',
+      kcal: 210, protein: 27, fat: 5, carbs: 12,
+      ingredients: ['Протеиновый крем XXL 30 г', 'Молоко 1.5% 200 г'],
+      ingredientRows: rows,
+    }), { custom: true });
+
+    expect(entry.recipe!.components).toHaveLength(2);
+    expect(entry.recipe!.components[0].kcal).toBe(120);
+    const weight = entry.recipe!.totalWeight;
+    expect(weight).toBe(230);
+    expect(Number(entry.kcal)).toBeCloseTo((210 / weight) * 100, 1);
   });
 });
 
