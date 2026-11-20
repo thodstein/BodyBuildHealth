@@ -25,6 +25,7 @@ import { widgetTimerCommand } from '../../../core/widget-bridge';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { useTrainingProfile } from '../TrainingScreen_parts/training-profile';
+import { collectExerciseBests, setIntensity, normalizeExerciseName, type ExerciseBest } from '../../../engines/set-intensity.engine';
 import { recommendTempo, formatTempo, TEMPO_PRESETS, type TempoPhase } from '../../../engines/rep-tempo.engine';
 import { recordSessionRIR, getSessionRIRFeedback } from '../../../engines/rir-calibration.engine';
 import { recordMMC } from '../../../engines/mmc-tracking.engine';
@@ -353,6 +354,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   }, [plannedDay, readinessToday]);
   const [last, setLast] = useState<WorkoutSession | null>(() => getLastSession());
   const prs = useMemo(() => getRecentPRs(3), [done]);
+  // Лучший e1RM по каждому упражнению из истории — база для «% от лучшего»
+  // прямо в подходе. Историю читаем один раз, а не на каждый подход в рендере.
+  const exerciseBests = useMemo(() => {
+    try { return collectExerciseBests(loadSessions()); } catch { return new Map<string, ExerciseBest>(); }
+  }, [done]);
 
   useEffect(() => {
     let active = true;
@@ -1983,6 +1989,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                  const rpeDelta = a.rpe > 0 ? a.rpe - targetRPE : 0;
                  const nextW = a.rpe > 0 ? (rpeDelta > 0 ? Math.max(0, a.weight - 2.5) : rpeDelta < -1 ? a.weight + 2.5 : a.weight) : a.weight;
                  const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
+                 const bestForEx = exerciseBests.get(normalizeExerciseName(ex.name));
+                 const intensity = setIntensity(a.weight, a.reps, bestForEx);
                  return (
                    <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
                      <span style={{ color: '#fff', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
@@ -1998,7 +2006,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                          {/* Предыдущая сессия — инлайн сравнение */}
                          {(() => {
-                           const prev = getLastSession();
+                           const prev = last;
                            if (!prev) return null;
                            const prevEx = prev.exercises.find(e => e.exerciseName.toLowerCase() === ex.name.toLowerCase());
                            if (!prevEx || !prevEx.sets.length) return null;
@@ -2033,6 +2041,31 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                             <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: a.reps + 1 } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                         </div>
+                        {/* Сколько это от личного лучшего: абсолютный вес без базы не читается */}
+                        {intensity.pct !== null && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
+                            <span
+                              data-pl-set-intensity={intensity.zone}
+                              title={`e1RM подхода ${intensity.e1rm} кг · лучший ${intensity.bestE1RM} кг (${bestForEx?.weight}×${bestForEx?.reps}, ${bestForEx?.date})`}
+                              style={{
+                                padding: '2px 8px', borderRadius: 999, fontWeight: 800,
+                                color: intensity.color,
+                                background: `${intensity.color}18`,
+                                border: `1px solid ${intensity.color}3a`,
+                              }}
+                            >
+                              {intensity.isRecord ? '🏆' : '🎯'} {intensity.pct}% от лучшего
+                            </span>
+                            <span style={{ color: '#fff', opacity: 0.6 }}>
+                              {intensity.label} · лучший {intensity.bestE1RM} кг
+                            </span>
+                            {intensity.isRecord && !logged && (
+                              <span style={{ color: '#00e68a', fontWeight: 700 }}>
+                                рекорд, если запишете
+                              </span>
+                            )}
+                          </div>
+                        )}
                         {/* RPE пилюли + VBT + кнопки */}
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
