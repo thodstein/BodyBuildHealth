@@ -1,6 +1,7 @@
 import { currentSpaceId, DATA_SPACE_KEY, HOME_SPACE_ID, parseRegistry } from './data-space';
 import { closeWeightPhotoDb, weightPhotoDbNameFor } from '../engines/weight-photo-store';
 import { deleteNoteMediaDatabaseSync } from '../engines/note-media-store';
+import { labStorageCode } from './lab-storage-code';
 
 const DB_NAME = 'HealthEngineDB_v3';
 const DB_VERSION = 7;
@@ -79,6 +80,21 @@ const INDEXES: Record<string, { name: string; keyPath: string }[]> = {
   workout_log: [{ name: 'date', keyPath: 'date' }],
   cardio_sessions: [{ name: 'date', keyPath: 'date' }],
 };
+
+/**
+ * Проход 179: перед записью анализа код приводится к написанию склада.
+ *
+ * Это единственная точка правила: все пути записи — `put`, `update`,
+ * `writeSpaceStores` (восстановление бэкапа) и `putSpaceRecords` (синхронизация
+ * чужого пространства) — проходят через неё, поэтому новый вызывающий не может
+ * записать второе написание того же анализа (`HBA1C` рядом с `HbA1c`).
+ * Чтение не меняется: старые записи находят свою норму через `ucumInfo`.
+ */
+function withStorageLabCode(store: string, rec: any): any {
+  if (store !== 'labs_log' || !rec || typeof rec.code !== 'string') return rec;
+  const code = labStorageCode(rec.code);
+  return code === rec.code ? rec : { ...rec, code };
+}
 
 /**
  * Имя базы IndexedDB для пространства данных: home — как было (`HealthEngineDB_v3`,
@@ -216,7 +232,7 @@ export async function writeSpaceStores(
         os.clear();
         for (const rec of stores[s] || []) {
           try {
-            os.put(rec);
+            os.put(withStorageLabCode(s, rec));
           } catch {
             /* сбойная запись не должна срывать восстановление остальных */
           }
@@ -276,7 +292,7 @@ export async function putSpaceRecords(
         for (const rec of records[s]) {
           if (!rec || (rec as any).id == null) continue;
           try {
-            os.put(rec);
+            os.put(withStorageLabCode(s, rec));
             written++;
           } catch {
             /* одна битая запись не должна срывать остальные */
@@ -383,7 +399,7 @@ class HealthDB {
     if (!this.db) throw new Error('DB not init');
     return new Promise<void>((res, rej) => {
       const tx = this.db!.transaction(store, 'readwrite');
-      tx.objectStore(store).put(data);
+      tx.objectStore(store).put(withStorageLabCode(store, data));
       tx.oncomplete = () => res();
       tx.onerror = () => rej(tx.error);
     });
@@ -470,7 +486,7 @@ class HealthDB {
       const getReq = os.get(data.id);
       getReq.onsuccess = () => {
         const existing = getReq.result || {};
-        os.put({ ...existing, ...data });
+        os.put(withStorageLabCode(store, { ...existing, ...data }));
       };
       tx.oncomplete = () => res();
       tx.onerror = () => rej(tx.error);
