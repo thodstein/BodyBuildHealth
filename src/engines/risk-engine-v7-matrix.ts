@@ -8,7 +8,7 @@ import { zScore, hillEffect, hillTox, nutritionMultipliers, trainingMultipliers,
 import type { LabPoint, CourseEntry } from '../core/types';
 import { PHARMA_DB } from '../core/pharma-database';
 import { resolveFemaleAasProfile, type FemaleAasProfile } from './female-aas-risk';
-import { UCUM_MAP } from '../core/constants';
+import { ucumInfo } from '../core/constants';
 
 // --- 7x7 Risk Systems & Mechanisms ---
 
@@ -697,43 +697,73 @@ export function drugContributionScale(id: string, sex?: 'male' | 'female'): numb
 
 export interface LabReference { mean: number; sd: number; uln: number; sensitive: boolean; alpha: number; /** Л8: нижняя граница (только женские частичные записи; базовая таблица её не использует). */ lln?: number }
 
+/**
+ * Верхняя граница — из каталога `UCUM_MAP` (проход 176).
+ *
+ * `mean/sd/alpha` — параметры модели (z-термы), в каталоге их нет и они остаются
+ * литералами. А верхняя граница — та же норма, что показывает экран «Анализы»:
+ * копия уже расходилась (АСТ 35 против 40, ГГТ 50 против 55, креатинин 106
+ * против 110 — так было до прохода 24), и расхождение читалось как «риск там,
+ * где экран показывает норму». Теперь значение берётся записью каталога через
+ * `ucumInfo` — тем же правилом поиска, что у остальных потребителей (проход 174).
+ *
+ * Нет записи — не повод молча оставить литерал: бросаем на загрузке модуля,
+ * чтобы ошибку поймали тесты и сборка, а не пользователь.
+ */
+function ulnFromUcum(code: string, scale = 1): number {
+  const info = ucumInfo(code);
+  if (!info || typeof info.uln !== 'number') {
+    throw new Error(`LAB_REFERENCES: в UCUM_MAP нет верхней границы для ${code}`);
+  }
+  return info.uln * scale;
+}
+
 export const LAB_REFERENCES: Record<string, LabReference> = {
-  ALT: { mean: 25, sd: 10, uln: 40, sensitive: true, alpha: 0.5 },
-  AST: { mean: 22, sd: 8, uln: 35, sensitive: true, alpha: 0.5 },
-  GGT: { mean: 30, sd: 15, uln: 50, sensitive: false, alpha: 0.2 },
-  ALP: { mean: 70, sd: 20, uln: 120, sensitive: false, alpha: 0.2 },
-  Bilirubin: { mean: 10, sd: 4, uln: 20, sensitive: false, alpha: 0.2 },
+  ALT: { mean: 25, sd: 10, uln: ulnFromUcum('ALT'), sensitive: true, alpha: 0.5 },
+  AST: { mean: 22, sd: 8, uln: ulnFromUcum('AST'), sensitive: true, alpha: 0.5 },
+  GGT: { mean: 30, sd: 15, uln: ulnFromUcum('GGT'), sensitive: false, alpha: 0.2 },
+  ALP: { mean: 70, sd: 20, uln: ulnFromUcum('ALP'), sensitive: false, alpha: 0.2 },
+  Bilirubin: { mean: 10, sd: 4, uln: ulnFromUcum('BIL'), sensitive: false, alpha: 0.2 },
   SBP: { mean: 120, sd: 12, uln: 140, sensitive: false, alpha: 0.2 },
   DBP: { mean: 80, sd: 8, uln: 90, sensitive: false, alpha: 0.2 },
-  Hct: { mean: 0.45, sd: 0.04, uln: 0.52, sensitive: true, alpha: 0.5 },
-  Hb: { mean: 150, sd: 12, uln: 170, sensitive: false, alpha: 0.2 },
+  // Hct в V7 хранится долей (0.52 = 52 %), каталог — процентами.
+  Hct: { mean: 0.45, sd: 0.04, uln: ulnFromUcum('HCT', 0.01), sensitive: true, alpha: 0.5 },
+  Hb: { mean: 150, sd: 12, uln: ulnFromUcum('HGB'), sensitive: false, alpha: 0.2 },
+  // Верх WBC в модели — 11 (клинический верх лейкоцитоза), в каталоге 9.0;
+  // это разные смыслы (норма лаборатории vs порог модели), см. §4 доки.
   WBC: { mean: 7.0, sd: 2.0, uln: 11.0, sensitive: false, alpha: 0.2 },
-  PLT: { mean: 250, sd: 50, uln: 400, sensitive: false, alpha: 0.2 },
+  PLT: { mean: 250, sd: 50, uln: ulnFromUcum('PLT'), sensitive: false, alpha: 0.2 },
   LDL: { mean: 2.8, sd: 0.8, uln: 3.4, sensitive: false, alpha: 0.2 },
   HDL: { mean: 1.4, sd: 0.3, uln: 2.0, sensitive: false, alpha: 0.2 },
-  TG: { mean: 1.2, sd: 0.5, uln: 1.7, sensitive: false, alpha: 0.2 },
+  TG: { mean: 1.2, sd: 0.5, uln: ulnFromUcum('TG'), sensitive: false, alpha: 0.2 },
   NonHDL: { mean: 3.2, sd: 0.9, uln: 4.0, sensitive: false, alpha: 0.2 },
   Glucose: { mean: 5.0, sd: 0.5, uln: 5.8, sensitive: true, alpha: 0.5 },
-  HbA1c: { mean: 5.0, sd: 0.5, uln: 5.7, sensitive: false, alpha: 0.2 },
-  eGFR: { mean: 100, sd: 15, uln: 120, sensitive: false, alpha: 0.2 },
-  Creatinine: { mean: 80, sd: 15, uln: 106, sensitive: false, alpha: 0.2 },
+  HbA1c: { mean: 5.0, sd: 0.5, uln: ulnFromUcum('HbA1c'), sensitive: false, alpha: 0.2 },
+  eGFR: { mean: 100, sd: 15, uln: ulnFromUcum('EGFR'), sensitive: false, alpha: 0.2 },
+  Creatinine: { mean: 80, sd: 15, uln: ulnFromUcum('CREATININE'), sensitive: false, alpha: 0.2 },
   Proteinuria: { mean: 0, sd: 10, uln: 30, sensitive: false, alpha: 0.2 },
-  Fibrinogen: { mean: 3.0, sd: 0.6, uln: 4.0, sensitive: false, alpha: 0.2 },
-  D_dimer: { mean: 0.3, sd: 0.2, uln: 0.5, sensitive: false, alpha: 0.2 },
-  CRP: { mean: 1.0, sd: 1.0, uln: 5.0, sensitive: false, alpha: 0.2 },
-  IL6: { mean: 2.0, sd: 1.5, uln: 7.0, sensitive: false, alpha: 0.2 },
-  TNF: { mean: 3.0, sd: 1.5, uln: 8.0, sensitive: false, alpha: 0.2 },
-  Homocysteine: { mean: 10, sd: 3, uln: 15, sensitive: false, alpha: 0.2 },
+  Fibrinogen: { mean: 3.0, sd: 0.6, uln: ulnFromUcum('FIBRINOGEN'), sensitive: false, alpha: 0.2 },
+  D_dimer: { mean: 0.3, sd: 0.2, uln: ulnFromUcum('D_DIMER'), sensitive: false, alpha: 0.2 },
+  CRP: { mean: 1.0, sd: 1.0, uln: ulnFromUcum('CRP'), sensitive: false, alpha: 0.2 },
+  IL6: { mean: 2.0, sd: 1.5, uln: ulnFromUcum('IL6'), sensitive: false, alpha: 0.2 },
+  TNF: { mean: 3.0, sd: 1.5, uln: ulnFromUcum('TNF_ALPHA'), sensitive: false, alpha: 0.2 },
+  Homocysteine: { mean: 10, sd: 3, uln: ulnFromUcum('HOMOCYSTEINE'), sensitive: false, alpha: 0.2 },
+  // Пролактин: V7-верх 20 против каталожных 15 — модельная граница (верх
+  // «мужской нормы» в модели), см. §4.
   Prolactin: { mean: 10, sd: 4, uln: 20, sensitive: false, alpha: 0.2 },
-  PSA: { mean: 1.0, sd: 0.5, uln: 4.0, sensitive: false, alpha: 0.2 },
-  Na: { mean: 140, sd: 3, uln: 145, sensitive: false, alpha: 0.2 },
+  PSA: { mean: 1.0, sd: 0.5, uln: ulnFromUcum('PSA'), sensitive: false, alpha: 0.2 },
+  Na: { mean: 140, sd: 3, uln: ulnFromUcum('NA'), sensitive: false, alpha: 0.2 },
+  // Калий 5.0 против каталожных 5.1 — расходящаяся пара, выбор клинический (§4).
   K: { mean: 4.2, sd: 0.4, uln: 5.0, sensitive: false, alpha: 0.2 },
+  // Магний 1.0 против каталожных 1.1 — та же пара, §4.
   Mg: { mean: 0.85, sd: 0.08, uln: 1.0, sensitive: false, alpha: 0.2 },
+  // Тестостерон/E2/ЛГ/ФСГ: у модели своя единица и своя семантика z-термов
+  // (нмоль/л, пг/мл), каталог хранит другие числа — не сводим (§4).
   Testosterone: { mean: 15, sd: 5, uln: 30, sensitive: false, alpha: 0.2 },
   Estradiol: { mean: 30, sd: 15, uln: 80, sensitive: false, alpha: 0.2 },
   LH: { mean: 5, sd: 2, uln: 10, sensitive: false, alpha: 0.2 },
   FSH: { mean: 5, sd: 2, uln: 10, sensitive: false, alpha: 0.2 },
-  TSH: { mean: 2.0, sd: 1.0, uln: 4.0, sensitive: false, alpha: 0.2 },
+  TSH: { mean: 2.0, sd: 1.0, uln: ulnFromUcum('TSH'), sensitive: false, alpha: 0.2 },
   Cortisol: { mean: 300, sd: 100, uln: 600, sensitive: false, alpha: 0.2 },
   IGF1: { mean: 200, sd: 50, uln: 350, sensitive: false, alpha: 0.2 },
   Insulin: { mean: 8, sd: 4, uln: 25, sensitive: true, alpha: 0.5 },
@@ -742,37 +772,25 @@ export const LAB_REFERENCES: Record<string, LabReference> = {
   LVmass: { mean: 100, sd: 20, uln: 125, sensitive: false, alpha: 0.2 },
   Weight_acute: { mean: 0, sd: 1, uln: 3, sensitive: false, alpha: 0.2 },
   OxidativeMarkers: { mean: 1.0, sd: 0.5, uln: 2.0, sensitive: false, alpha: 0.2 },
-  Ferritin: { mean: 100, sd: 50, uln: 300, sensitive: false, alpha: 0.2 },
+  Ferritin: { mean: 100, sd: 50, uln: ulnFromUcum('FERRITIN'), sensitive: false, alpha: 0.2 },
   Transferrin: { mean: 2.5, sd: 0.4, uln: 3.5, sensitive: false, alpha: 0.2 },
-  LDH: { mean: 200, sd: 40, uln: 250, sensitive: false, alpha: 0.2 },
+  LDH: { mean: 200, sd: 40, uln: ulnFromUcum('LDH'), sensitive: false, alpha: 0.2 },
   Haptoglobin: { mean: 1.0, sd: 0.4, uln: 2.0, sensitive: false, alpha: 0.2 },
-  RBC: { mean: 5.0, sd: 0.4, uln: 5.8, sensitive: false, alpha: 0.2 },
+  RBC: { mean: 5.0, sd: 0.4, uln: ulnFromUcum('RBC'), sensitive: false, alpha: 0.2 },
 };
 
 /**
- * §6.2 (P2, проход 24): ULN печёночной/почечной панели — из ЕДИНСТВЕННОГО
- * источника норм (`UCUM_MAP`, его же показывает «Анализы»/`lab-norms`), а не
- * своя копия. Было: АСТ 35 против 40, ГГТ 50 против 55, креатинин 106 против
- * 110, ЩФ 120 против 130, билирубин 20 против 17.1 — риск-модель считала
- * «отклонение» там, где экран анализов показывал норму (и наоборот).
+ * Где верхняя граница сведена, а где осталась своей (проходы 24 и 176).
  *
- * `mean/sd/alpha` остаются параметрами модели (z-термы): UCUM задаёт только
- * верхнюю границу. Hct в V7 хранится долей (0.52 = 52 %) — переводим.
+ * Верхние границы печёночной, почечной, кровяной, липидной и воспалительной
+ * панели читаются из `UCUM_MAP` прямо в строке (`ulnFromUcum`): одна норма у
+ * экрана «Анализы» и у риск-модели. Остальные значения — расходящиеся пары с
+ * клиническим смыслом (WBC 11 против 9.0, LDL 3.4 против 3.0, K 5.0 против
+ * 5.1, Mg 1.0 против 1.1, пролактин 20 против 15, тестостерон/E2/ЛГ/ФСГ в
+ * других единицах, SBP/DBP как пороги модели, IGF1 как возрастной верх).
+ * Подмена одного числа другим — клиническое решение, а не рефакторинг:
+ * перечень пар живёт в `docs/LAB-NORMS-SINGLE-SOURCE.md` §4.
  */
-const UCUM_ULN_SOURCE: Record<string, string> = {
-  ALT: 'ALT',
-  AST: 'AST',
-  GGT: 'GGT',
-  ALP: 'ALP',
-  Bilirubin: 'BIL',
-  Creatinine: 'CREATININE',
-  Hct: 'HCT',
-};
-for (const [key, code] of Object.entries(UCUM_ULN_SOURCE)) {
-  const src = (UCUM_MAP as Record<string, { uln?: number } | undefined>)[code];
-  if (!src || typeof src.uln !== 'number') continue;
-  LAB_REFERENCES[key].uln = key === 'Hct' ? src.uln / 100 : src.uln;
-}
 
 /**
  * §6.2 (P2) — женские нормы V7-референсов (только маркеры с однозначным направлением

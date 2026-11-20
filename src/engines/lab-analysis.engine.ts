@@ -1,6 +1,7 @@
 // Lab Analysis Engine — interprets lab values into mechanisms, organs, systems, risks
 import type { LabPoint } from '../core/types';
 import { convertToUnit } from '../core/labs-mapping';
+import { ucumInfo } from '../core/constants';
 import { boundProvesSide, boundsComparable, type LabBound } from '../core/lab-bound';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
@@ -81,14 +82,33 @@ function totalThyroidRange(code: 'T3' | 'T4'): { low: number; high: number; unit
  * а его лабораторная норма кончается на 52. Теперь числа берутся у тех же
  * констант, что и остальные поверхности.
  */
-const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh?: number; unit: string }> = {
+/**
+ * Пара «низ–верх» из каталога `UCUM_MAP` (проход 176).
+ *
+ * `REFERENCE_RANGES` — третий реестр границ. Там, где смысл совпадает с нормой
+ * лаборатории, число больше не пишется второй раз: низ и верх берутся записью
+ * каталога, а `criticalHigh` (уровень действия, его в каталоге нет) остаётся
+ * своим. Где пара намеренно расходится (СРБ 3 против 5, глюкоза 6.1 против 5.6,
+ * гомоцистеин 12 против 15, ЛПНП низ 1.5 против 1.0, ЛПВП 1.0–2.0 против
+ * 0.9–1.5, калий 5.1/5.0 — это про `LAB_TIERS`), число остаётся литералом:
+ * подмена — клиническое решение (`docs/LAB-NORMS-SINGLE-SOURCE.md` §4).
+ *
+ * Нет записи в каталоге — ошибка на загрузке модуля, а не молчаливый литерал.
+ */
+function ucumRange(code: string): { low: number; high: number } {
+  const info = ucumInfo(code);
+  if (!info) throw new Error(`REFERENCE_RANGES: в UCUM_MAP нет записи ${code}`);
+  return { low: info.lln, high: info.uln };
+}
+
+export const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh?: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
   TESTOSTERONE_FREE: { low: 0.2, high: 0.6, criticalHigh: 0.9, unit: 'нмоль/л' },
-  ESTRADIOL: { low: 10, high: 40, criticalHigh: 60, unit: 'пг/мл' },
+  ESTRADIOL: { ...ucumRange('E2'), criticalHigh: 60, unit: 'пг/мл' },
   PROLACTIN: { low: 50, high: 350, criticalHigh: 500, unit: 'мЕд/л' },
   LH: { low: 1, high: 10, criticalHigh: 15, unit: 'МЕ/л' },
   FSH: { low: 1, high: 12, criticalHigh: 18, unit: 'МЕ/л' },
-  TSH: { low: 0.4, high: 4.0, criticalHigh: 10, unit: 'мЕд/л' },
+  TSH: { ...ucumRange('TSH'), criticalHigh: 10, unit: 'мЕд/л' },
   // Проход 170: общий Т3/Т4 — в нмоль/л (единица склада) и с границами резолвера.
   // Было `2.5–6.5` и `10–24` с подписью «пмоль/л», то есть числа шкалы нмоль/л под
   // чужой единицей: нормальный общий Т3 1.8 нмоль/л пересчитывался в 1800 пмоль/л
@@ -107,12 +127,12 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   UREA: { low: 2.5, high: 8.3, criticalHigh: 12, unit: 'ммоль/л' },
   GLUCOSE: { low: 3.5, high: 6.1, criticalHigh: 7.0, unit: 'ммоль/л' },
   INSULIN: { low: 2, high: 10, criticalHigh: 15, unit: 'мкЕд/мл' },
-  LDL: { low: 1.5, high: 3.0, criticalHigh: 4.9, unit: 'ммоль/л' },
+  LDL: { ...ucumRange('LDL'), low: 1.5, criticalHigh: 4.9, unit: 'ммоль/л' },
   HDL: { low: 1.0, high: 2.0, criticalHigh: 2.5, unit: 'ммоль/л' },
-  TRIGLYCERIDES: { low: 0.5, high: 1.7, criticalHigh: 2.3, unit: 'ммоль/л' },
+  TRIGLYCERIDES: { ...ucumRange('TG'), low: 0.5, criticalHigh: 2.3, unit: 'ммоль/л' },
   APOB: { low: 0.5, high: 1.0, criticalHigh: 1.3, unit: 'г/л' },
   CRP: { low: 0, high: 3, criticalHigh: 10, unit: 'мг/л' },
-  FERRITIN: { low: 20, high: 300, criticalHigh: 500, unit: 'мкг/л' },
+  FERRITIN: { ...ucumRange('FERRITIN'), low: 20, criticalHigh: 500, unit: 'мкг/л' },
   HOMOCYSTEINE: { low: 5, high: 12, criticalHigh: 15, unit: 'мкмоль/л' },
   HEMOGLOBIN: {
     low: getLabNorm('HGB')?.lln ?? 130,
@@ -129,11 +149,11 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
     criticalHigh: HCT_THRESHOLDS.male.block,
     unit: '%',
   },
-  ERYTHROCYTES: { low: 4.2, high: 5.8, criticalHigh: 6.2, unit: '10^12/л' },
+  ERYTHROCYTES: { ...ucumRange('RBC'), low: 4.2, criticalHigh: 6.2, unit: '10^12/л' },
   LEUKOCYTES: { low: 4, high: 10, criticalHigh: 12, unit: '10^9/л' },
-  THROMBOCYTES: { low: 150, high: 400, criticalHigh: 500, unit: '10^9/л' },
-  POTASSIUM: { low: 3.5, high: 5.1, criticalHigh: 6.0, unit: 'ммоль/л' },
-  SODIUM: { low: 135, high: 145, criticalHigh: 155, unit: 'ммоль/л' },
+  THROMBOCYTES: { ...ucumRange('PLT'), criticalHigh: 500, unit: '10^9/л' },
+  POTASSIUM: { ...ucumRange('POTASSIUM'), criticalHigh: 6.0, unit: 'ммоль/л' },
+  SODIUM: { ...ucumRange('SODIUM'), criticalHigh: 155, unit: 'ммоль/л' },
 };
 
 /**
