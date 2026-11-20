@@ -18,13 +18,18 @@ import {
 } from '../../../../engines/coach/coach-mode.engine';
 import {
   COACH_MONTH_LABELS,
+  COACH_WEEKDAY_LABELS,
   addCoachTask,
   emptyCoachPlanner,
   readCoachPlanner,
   shiftCoachMonth,
   writeCoachPlanner,
 } from '../../../../engines/coach/coach-planner.engine';
-import { AGENDA_SOURCES, readAgendaSources } from '../../../../engines/coach/coach-agenda.engine';
+import {
+  AGENDA_SOURCES,
+  readAgendaSources,
+  readAgendaTimeOverrides,
+} from '../../../../engines/coach/coach-agenda.engine';
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* ignore */ }
@@ -211,8 +216,12 @@ describe('авто-события из приложения', () => {
     const row = container.querySelector('[data-planner="auto-item"][data-source="injections"]') as HTMLElement;
     expect(row).not.toBeNull();
     expect(row.textContent).toContain('Test E');
-    // В авто-строке нет кнопок: планёр её не отмечает, не переносит и не удаляет.
-    expect(row.querySelectorAll('button')).toHaveLength(0);
+    // В авто-строке нет кнопок задач: планёр её не отмечает, не переносит и не удаляет.
+    expect(row.querySelector('[data-planner="toggle"]')).toBeNull();
+    expect(row.querySelector('[data-planner="move"]')).toBeNull();
+    expect(row.querySelector('[data-planner="delete"]')).toBeNull();
+    // Но время поправить можно — это единственное местное поле.
+    expect(row.querySelector('[data-planner="auto-time"]')).not.toBeNull();
     // И в задачи она не превратилась.
     expect(items(container)).toHaveLength(0);
     expect(readCoachPlanner(localStorage).items).toHaveLength(0);
@@ -224,6 +233,31 @@ describe('авто-события из приложения', () => {
     const { container } = render(<ProfilePlannerTab />);
     const row = container.querySelector('[data-planner="auto-item"][data-source="injections"]') as HTMLElement;
     expect(row.getAttribute('data-done')).toBe('true');
+  });
+
+  it('время авто-события правится и сбрасывается, источник не меняется', () => {
+    localStorage.setItem(
+      'he_injection_schedule',
+      JSON.stringify([{ id: 'inj1', substance: 'Test E', dose: '250', daysOfWeek: [todayDow], active: true, time: '09:00' }]),
+    );
+    const { container } = render(<ProfilePlannerTab />);
+    const input = (): HTMLInputElement =>
+      container.querySelector('[data-planner="auto-time"]') as HTMLInputElement;
+    expect(input().value).toBe('09:00');
+
+    fireEvent.change(input(), { target: { value: '21:15' } });
+    expect(input().value).toBe('21:15');
+    const overrides = readAgendaTimeOverrides(localStorage);
+    const eventId = Object.keys(overrides)[0];
+    expect(eventId).toContain('agenda:injections:');
+    expect(overrides[eventId]).toBe('21:15');
+    // Источник не тронут, задача не появилась.
+    expect(JSON.parse(localStorage.getItem('he_injection_schedule') as string)[0].time).toBe('09:00');
+    expect(items(container)).toHaveLength(0);
+
+    fireEvent.click(container.querySelector('[data-planner="auto-time-reset"]') as HTMLElement);
+    expect(input().value).toBe('09:00');
+    expect(readAgendaTimeOverrides(localStorage)).toEqual({});
   });
 
   it('выключенный источник исчезает из дня и из точек календаря', () => {
@@ -248,5 +282,61 @@ describe('авто-события из приложения', () => {
     fireEvent.click(container.querySelector('[data-planner="source-all"]') as HTMLElement);
     expect(readAgendaSources(localStorage)).toEqual(AGENDA_SOURCES.map(s => s.id));
     expect(container.querySelector('[data-planner="source-all"]')).toBeNull();
+  });
+});
+
+describe('повтор задачи', () => {
+  const todayDay = (new Date(`${today}T00:00:00`).getDay() + 6) % 7;
+
+  it('дни недели: день задачи выбран сразу, выбор сохраняется и виден в бейдже', () => {
+    const { container } = render(<ProfilePlannerTab />);
+    const repeat = container.querySelector('[data-planner="repeat"]') as HTMLSelectElement;
+    fireEvent.change(repeat, { target: { value: 'weekdays' } });
+
+    const days = container.querySelectorAll('[data-planner="repeat-day"]');
+    expect(days).toHaveLength(7);
+    expect(
+      container.querySelector(`[data-planner="repeat-day"][data-day="${todayDay}"]`)?.getAttribute('data-active'),
+    ).toBe('true');
+
+    const otherDay = (todayDay + 1) % 7;
+    fireEvent.click(container.querySelector(`[data-planner="repeat-day"][data-day="${otherDay}"]`) as HTMLElement);
+    addTask(container, 'Кардио');
+
+    const task = readCoachPlanner(localStorage).items[0];
+    expect(task.repeat).toBe('weekdays');
+    expect(task.repeatDays).toEqual([todayDay, otherDay].sort((a, b) => a - b));
+    expect(container.querySelector('[data-planner="task-repeat"]')?.textContent).toContain(
+      COACH_WEEKDAY_LABELS[todayDay],
+    );
+  });
+
+  it('свой интервал сохраняется и показывается в бейдже', () => {
+    const { container } = render(<ProfilePlannerTab />);
+    fireEvent.change(container.querySelector('[data-planner="repeat"]') as HTMLSelectElement, {
+      target: { value: 'custom' },
+    });
+    fireEvent.change(container.querySelector('[data-planner="repeat-interval"]') as HTMLInputElement, {
+      target: { value: '10' },
+    });
+    addTask(container, 'Готовка');
+
+    expect(readCoachPlanner(localStorage).items[0]).toMatchObject({ repeat: 'custom', repeatInterval: 10 });
+    expect(container.querySelector('[data-planner="task-repeat"]')?.textContent).toContain('10 дн.');
+  });
+
+  it('«через день» и «каждые 2 недели» доступны в выборе', () => {
+    const { container } = render(<ProfilePlannerTab />);
+    const options = Array.from(
+      (container.querySelector('[data-planner="repeat"]') as HTMLSelectElement).options,
+    ).map(o => o.value);
+    expect(options).toEqual(
+      expect.arrayContaining(['none', 'daily', 'eod', 'weekdays', 'weekly', 'biweekly', 'monthly', 'custom']),
+    );
+    fireEvent.change(container.querySelector('[data-planner="repeat"]') as HTMLSelectElement, {
+      target: { value: 'eod' },
+    });
+    addTask(container, 'Через день');
+    expect(readCoachPlanner(localStorage).items[0].repeat).toBe('eod');
   });
 });

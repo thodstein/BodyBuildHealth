@@ -5,8 +5,9 @@
  * Что важно и что сознательно НЕ делаем:
  *  • даты — ТОЛЬКО календарные (канон `core/local-date`): `toISOString()` в UTC+10
  *    вечером даёт вчерашний день, и задача уезжает на сутки;
- *  • «повторяющиеся» задачи не выдумываем: без честного механизма серий лучше
- *    не обещать; вместо этого — быстрые кнопки «сегодня/завтра»;
+ *  • «повторяющиеся» задачи не выдумываем: серия появляется только после
+ *    закрытия вхождения и только по выбранному правилу (день/через день/дни
+ *    недели/интервал) — без фантомных будущих задач;
  *  • лимит 2000 задач и 140 символов заголовка: localStorage не резиновый,
  *    при переполнении возвращаем ошибку, а не выкидываем чужие задачи;
  *  • просроченные задачи не «сгорают»: они остаются в дне, пока их не закрыли;
@@ -20,7 +21,20 @@ export const COACH_TASK_TITLE_MAX = 140;
 export const COACH_TASK_NOTE_MAX = 2000;
 
 export type CoachTaskPriority = 'none' | 'low' | 'medium' | 'high';
-export type CoachRepeat = 'none' | 'daily' | 'weekly' | 'monthly';
+/**
+ * Повтор задачи. `weekdays` — выбранные дни недели (`repeatDays`),
+ * `custom` — свой интервал в днях (`repeatInterval`). Старые сохранённые
+ * значения (`daily/weekly/monthly/none`) читаются как раньше.
+ */
+export type CoachRepeat =
+  | 'none'
+  | 'daily'
+  | 'eod'
+  | 'weekdays'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly'
+  | 'custom';
 export type CoachTaskList = 'inbox' | 'training' | 'health' | 'work' | 'personal';
 
 export const COACH_PRIORITY_LABELS: Record<CoachTaskPriority, string> = {
@@ -33,8 +47,12 @@ export const COACH_PRIORITY_LABELS: Record<CoachTaskPriority, string> = {
 export const COACH_REPEAT_LABELS: Record<CoachRepeat, string> = {
   none: 'Один раз',
   daily: 'Каждый день',
+  eod: 'Через день',
+  weekdays: 'Дни недели',
   weekly: 'Каждую неделю',
+  biweekly: 'Каждые 2 недели',
   monthly: 'Каждый месяц',
+  custom: 'Свой интервал',
 };
 
 export const COACH_TASK_LIST_LABELS: Record<CoachTaskList, string> = {
@@ -47,7 +65,14 @@ export const COACH_TASK_LIST_LABELS: Record<CoachTaskList, string> = {
 
 export const COACH_TASK_LISTS: readonly CoachTaskList[] = ['inbox', 'training', 'health', 'work', 'personal'];
 export const COACH_PRIORITIES: readonly CoachTaskPriority[] = ['none', 'low', 'medium', 'high'];
-export const COACH_REPEATS: readonly CoachRepeat[] = ['none', 'daily', 'weekly', 'monthly'];
+export const COACH_REPEATS: readonly CoachRepeat[] = [
+  'none', 'daily', 'eod', 'weekdays', 'weekly', 'biweekly', 'monthly', 'custom',
+];
+
+/** Границы своего интервала повтора (дни). */
+export const COACH_REPEAT_INTERVAL_MIN = 1;
+export const COACH_REPEAT_INTERVAL_MAX = 365;
+export const COACH_REPEAT_INTERVAL_DEFAULT = 2;
 
 export interface CoachTask {
   id: string;
@@ -65,6 +90,10 @@ export interface CoachTask {
   priority?: CoachTaskPriority;
   /** Повтор: при закрытии задачи создаётся следующее вхождение. */
   repeat?: CoachRepeat;
+  /** Дни недели для `repeat: 'weekdays'`: 0 = Пн … 6 = Вс. */
+  repeatDays?: number[];
+  /** Интервал в днях для `repeat: 'custom'`: 1..365. */
+  repeatInterval?: number;
   /** Список/папка задачи. */
   list?: CoachTaskList;
 }
@@ -72,6 +101,9 @@ export interface CoachTask {
 export const coachTaskPriority = (t: CoachTask): CoachTaskPriority => t.priority ?? 'none';
 export const coachTaskRepeat = (t: CoachTask): CoachRepeat => t.repeat ?? 'none';
 export const coachTaskList = (t: CoachTask): CoachTaskList => t.list ?? 'inbox';
+
+/** Дни недели повтора (пустой массив, если повтор не «по дням»). */
+export const coachTaskRepeatDays = (t: CoachTask): number[] => t.repeatDays ?? [];
 
 export interface CoachPlannerStore {
   version: 1;
@@ -111,6 +143,43 @@ export function normalizeRepeat(v: unknown): CoachRepeat {
   return COACH_REPEATS.includes(v as CoachRepeat) ? (v as CoachRepeat) : 'none';
 }
 
+/** 0 = Пн … 6 = Вс для локальной ISO-даты (невалидная дата → Пн). */
+export function coachWeekdayIndex(iso: string): number {
+  const d = parseLocalIsoDate(iso);
+  return d ? (d.getDay() + 6) % 7 : 0;
+}
+
+/** Дни недели повтора: уникальные 0..6, по возрастанию; всё прочее отбрасываем. */
+export function normalizeRepeatDays(v: unknown): number[] {
+  const out = new Set<number>();
+  for (const raw of Array.isArray(v) ? v : []) {
+    const n = Number(raw);
+    if (Number.isInteger(n) && n >= 0 && n <= 6) out.add(n);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/** Свой интервал повтора в днях: 1..365, иначе значение по умолчанию. */
+export function normalizeRepeatInterval(v: unknown): number {
+  const n = Math.trunc(Number(v));
+  if (!Number.isFinite(n) || n <= 0) return COACH_REPEAT_INTERVAL_DEFAULT;
+  return Math.min(COACH_REPEAT_INTERVAL_MAX, Math.max(COACH_REPEAT_INTERVAL_MIN, n));
+}
+
+/** Человекочитаемая подпись повтора — для бейджа в задаче. */
+export function coachRepeatLabel(t: CoachTask): string {
+  const repeat = coachTaskRepeat(t);
+  if (repeat === 'weekdays') {
+    const days = coachTaskRepeatDays(t);
+    if (days.length === 0) return COACH_REPEAT_LABELS.weekdays;
+    return `Дни: ${days.map(d => COACH_WEEKDAY_LABELS[d]).join(', ')}`;
+  }
+  if (repeat === 'custom') {
+    return `Каждые ${t.repeatInterval ?? COACH_REPEAT_INTERVAL_DEFAULT} дн.`;
+  }
+  return COACH_REPEAT_LABELS[repeat];
+}
+
 export function normalizeList(v: unknown): CoachTaskList {
   return COACH_TASK_LISTS.includes(v as CoachTaskList) ? (v as CoachTaskList) : 'inbox';
 }
@@ -123,6 +192,8 @@ function normalizeTask(raw: unknown): CoachTask | null {
   const date = text(t.date, 10);
   if (!id || !title || !isValidCoachDate(date)) return null;
   const createdAt = text(t.createdAt, 40) || nowIso();
+  const repeat = normalizeRepeat(t.repeat);
+  const repeatDays = normalizeRepeatDays(t.repeatDays);
   return {
     id,
     title,
@@ -134,7 +205,11 @@ function normalizeTask(raw: unknown): CoachTask | null {
     createdAt,
     updatedAt: text(t.updatedAt, 40) || createdAt,
     priority: normalizePriority(t.priority),
-    repeat: normalizeRepeat(t.repeat),
+    repeat,
+    ...(repeat === 'weekdays'
+      ? { repeatDays: repeatDays.length > 0 ? repeatDays : [coachWeekdayIndex(date)] }
+      : {}),
+    ...(repeat === 'custom' ? { repeatInterval: normalizeRepeatInterval(t.repeatInterval) } : {}),
     list: normalizeList(t.list),
   };
 }
@@ -206,6 +281,8 @@ export function addCoachTask(
     note?: string;
     priority?: CoachTaskPriority;
     repeat?: CoachRepeat;
+    repeatDays?: readonly number[];
+    repeatInterval?: number;
     list?: CoachTaskList;
   },
   opts: { id?: string; now?: string } = {},
@@ -216,6 +293,8 @@ export function addCoachTask(
   if (!isValidCoachDate(date)) return { store, task: null, error: 'date' };
   if (store.items.length >= COACH_PLANNER_MAX) return { store, task: null, error: 'limit' };
   const now = opts.now ?? nowIso();
+  const repeat = normalizeRepeat(input.repeat);
+  const repeatDays = normalizeRepeatDays(input.repeatDays);
   const task: CoachTask = {
     id: opts.id ?? `t_${now.replace(/[^0-9]/g, '').slice(0, 14)}_${store.items.length + 1}`,
     title,
@@ -227,7 +306,11 @@ export function addCoachTask(
     createdAt: now,
     updatedAt: now,
     priority: normalizePriority(input.priority),
-    repeat: normalizeRepeat(input.repeat),
+    repeat,
+    ...(repeat === 'weekdays'
+      ? { repeatDays: repeatDays.length > 0 ? repeatDays : [coachWeekdayIndex(date)] }
+      : {}),
+    ...(repeat === 'custom' ? { repeatInterval: normalizeRepeatInterval(input.repeatInterval) } : {}),
     list: normalizeList(input.list),
   };
   return { store: { version: 1, items: [...store.items, task] }, task, error: null };
@@ -245,6 +328,9 @@ export function updateCoachTask(
     note?: string;
     priority?: CoachTaskPriority;
     repeat?: CoachRepeat;
+    /** Пустой массив/undefined — дни не выбраны (для «по дням» возьмём день задачи). */
+    repeatDays?: readonly number[];
+    repeatInterval?: number;
     list?: CoachTaskList;
   },
   opts: { now?: string } = {},
@@ -256,8 +342,16 @@ export function updateCoachTask(
   if (!title) return store;
   const date = patch.date === undefined ? prev.date : text(patch.date, 10);
   if (!isValidCoachDate(date)) return store;
-  const items = [...store.items];
-  items[idx] = {
+  const repeat = patch.repeat === undefined ? coachTaskRepeat(prev) : normalizeRepeat(patch.repeat);
+  const repeatDays =
+    patch.repeatDays === undefined
+      ? coachTaskRepeatDays(prev)
+      : normalizeRepeatDays(patch.repeatDays);
+  const repeatInterval =
+    patch.repeatInterval === undefined
+      ? prev.repeatInterval ?? COACH_REPEAT_INTERVAL_DEFAULT
+      : normalizeRepeatInterval(patch.repeatInterval);
+  const next: CoachTask = {
     ...prev,
     title,
     date,
@@ -266,21 +360,65 @@ export function updateCoachTask(
     done: patch.done === undefined ? prev.done : patch.done === true,
     note: patch.note === undefined ? prev.note : text(patch.note, COACH_TASK_NOTE_MAX),
     priority: patch.priority === undefined ? coachTaskPriority(prev) : normalizePriority(patch.priority),
-    repeat: patch.repeat === undefined ? coachTaskRepeat(prev) : normalizeRepeat(patch.repeat),
+    repeat,
     list: patch.list === undefined ? coachTaskList(prev) : normalizeList(patch.list),
     updatedAt: opts.now ?? nowIso(),
   };
+  // Выключаем повтор / меняем тип — не тащим «хвосты» прошлой настройки.
+  delete next.repeatDays;
+  delete next.repeatInterval;
+  if (repeat === 'weekdays') {
+    next.repeatDays = repeatDays.length > 0 ? repeatDays : [coachWeekdayIndex(date)];
+  } else if (repeat === 'custom') {
+    next.repeatInterval = repeatInterval;
+  }
+  const items = [...store.items];
+  items[idx] = next;
   return { version: 1, items };
 }
 
-/** Следующее вхождение повтора (локальная дата), либо null. */
-export function nextRepeatDate(iso: string, repeat: CoachRepeat): string | null {
+export interface CoachRepeatConfig {
+  /** Дни недели для `weekdays` (0 = Пн … 6 = Вс). */
+  days?: readonly number[];
+  /** Интервал в днях для `custom`. */
+  interval?: number;
+}
+
+/**
+ * Следующее вхождение повтора (локальная дата), либо null.
+ * Для `weekdays` — ближайший выбранный день после текущего (сканируем 1..7),
+ * для `custom` — через `interval` дней.
+ */
+export function nextRepeatDate(
+  iso: string,
+  repeat: CoachRepeat,
+  config: CoachRepeatConfig = {},
+): string | null {
   if (!isValidCoachDate(iso) || repeat === 'none') return null;
   const d = parseLocalIsoDate(iso);
   if (!d) return null;
-  if (repeat === 'daily') return localIsoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
-  if (repeat === 'weekly') return localIsoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7));
-  return localIsoDate(new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+  const plus = (days: number): string =>
+    localIsoDate(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days));
+  switch (repeat) {
+    case 'daily': return plus(1);
+    case 'eod': return plus(2);
+    case 'weekly': return plus(7);
+    case 'biweekly': return plus(14);
+    case 'custom': return plus(normalizeRepeatInterval(config.interval));
+    case 'weekdays': {
+      const days = normalizeRepeatDays(config.days);
+      const chosen = new Set(days.length > 0 ? days : [coachWeekdayIndex(iso)]);
+      for (let step = 1; step <= 7; step++) {
+        const candidate = plus(step);
+        if (chosen.has(coachWeekdayIndex(candidate))) return candidate;
+      }
+      return null;
+    }
+    case 'monthly':
+      return localIsoDate(new Date(d.getFullYear(), d.getMonth() + 1, d.getDate()));
+    default:
+      return null;
+  }
 }
 
 /**
@@ -301,7 +439,10 @@ export function completeCoachTask(
   items[idx] = { ...prev, done: nextDone, updatedAt: now };
   const repeat = coachTaskRepeat(prev);
   if (nextDone && repeat !== 'none') {
-    const nextDate = nextRepeatDate(prev.date, repeat);
+    const nextDate = nextRepeatDate(prev.date, repeat, {
+      days: prev.repeatDays,
+      interval: prev.repeatInterval,
+    });
     const exists = nextDate
       ? items.some(t => t.date === nextDate && t.title === prev.title && coachTaskList(t) === coachTaskList(prev))
       : false;

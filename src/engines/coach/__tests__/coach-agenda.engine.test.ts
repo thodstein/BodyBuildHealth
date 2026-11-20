@@ -12,15 +12,20 @@ import { describe, expect, it } from 'vitest';
 import {
   AGENDA_SOURCES,
   AGENDA_SOURCES_KEY,
+  AGENDA_TIME_KEY,
   collectAgenda,
   countAgendaByDate,
   countAgendaBySource,
   defaultAgendaSources,
   groupAgendaByDate,
+  isLifestyleSupportId,
   readAgendaSources,
+  readAgendaTimeOverrides,
   sanitizeAgendaSources,
   writeAgendaSources,
+  writeAgendaTimeOverride,
 } from '../coach-agenda.engine';
+import { supportNameRu } from '../../../data/support-names';
 
 const MON = '2026-11-02'; // понедельник
 const THU = '2026-11-05';
@@ -104,8 +109,46 @@ describe('сбор событий', () => {
       { id: 'inj2', substance: 'Старое', dose: '100', daysOfWeek: [0], active: false },
     ],
     he_injection_diary: [{ date: MON, substance: 'Test E' }],
-    he_support_plan_result: ['creatine'],
-    he_support_diary: [{ date: '2026-11-03', substances: { creatine: { taken: true } } }],
+    he_support_plan_result: ['creatine', 'hydration', 'daily_steps'],
+    he_support_diary: [{
+      date: '2026-11-03',
+      substances: { creatine: { taken: true }, hydration: { taken: true } },
+    }],
+    he_active_cardio_cycle: {
+      id: 'cardio1',
+      name: 'Кардио-цикл',
+      goal: 'health',
+      totalWeeks: 2,
+      totalKcal: 0,
+      source: 'manual',
+      version: 1,
+      createdAt: '2026-10-01T00:00:00.000Z',
+      rationale: [],
+      startDate: MON,
+      weeks: [
+        {
+          week: 1, phase: 'base', deload: false, taper: false, rationale: [], totalMinutes: 80, totalKcal: 0,
+          sessions: [{
+            type: 'zone2', durationMin: 40, weeklyFrequency: 2, intensity: 'low',
+            kcalPerSession: 0, purpose: 'Аэробная база',
+          }],
+        },
+        {
+          week: 2, phase: 'base', deload: false, taper: false, rationale: [], totalMinutes: 20, totalKcal: 0,
+          sessions: [{
+            type: 'hiit', durationMin: 20, weeklyFrequency: 1, intensity: 'high',
+            kcalPerSession: 0, purpose: 'Интервалы',
+          }],
+        },
+      ],
+    },
+    he_cardio_sessions: [{ date: MON, durationMin: 40 }],
+    he_reminders_v1: { weigh: { enabled: true, time: '07:15' } },
+    he_weight_log: [{ date: '2026-11-03', weight: 90 }],
+    he_habits: [{
+      id: 'water', name: 'Вода 3 л', target: '3 л',
+      completions: [{ date: '2026-11-03', done: true, notes: '' }],
+    }],
     he_nutrition_active_plan_v1: {
       date: MON,
       weekPlan: {
@@ -209,6 +252,61 @@ describe('сбор событий', () => {
     for (const row of rows) expect(row.title).toContain('Анализы');
   });
 
+  it('образ жизни — отдельным источником, а не строкой БАДов', () => {
+    expect(isLifestyleSupportId('hydration')).toBe(true);
+    expect(isLifestyleSupportId('daily_steps')).toBe(true);
+    // Электролиты — минерал, остаются в приёме БАДов.
+    expect(isLifestyleSupportId('electrolyte_balance')).toBe(false);
+    expect(isLifestyleSupportId('creatine')).toBe(false);
+
+    const supp = bySource('supplements');
+    expect(supp.every(r => r.title.startsWith('БАДы'))).toBe(true);
+    expect(supp.some(r => r.detail.includes('Водный режим'))).toBe(false);
+
+    const lifestyle = bySource('lifestyle');
+    const mon = lifestyle.filter(r => r.date === MON);
+    expect(mon.some(r => r.title === supportNameRu('hydration'))).toBe(true);
+    expect(mon.some(r => r.title === supportNameRu('daily_steps'))).toBe(true);
+    expect(
+      lifestyle.find(r => r.date === '2026-11-03' && r.title === supportNameRu('hydration'))?.done,
+    ).toBe(true);
+    expect(
+      lifestyle.find(r => r.date === MON && r.title === supportNameRu('hydration'))?.done,
+    ).toBe(false);
+  });
+
+  it('кардио — из активного цикла, факт из кардио-журнала', () => {
+    const rows = bySource('cardio');
+    expect(rows.map(r => r.date)).toEqual([MON, '2026-11-03', '2026-11-09']);
+    expect(rows[0].title).toContain('Zone 2');
+    expect(rows[0].title).toContain('40 мин');
+    expect(rows[0].detail).toContain('Аэробная база');
+    expect(rows[0].done).toBe(true);
+    expect(rows[1].done).toBe(false);
+    expect(rows[2].title).toContain('HIIT');
+  });
+
+  it('взвешивание — только если напоминание включено, факт из дневника веса', () => {
+    const rows = bySource('weigh');
+    expect(rows).toHaveLength(14); // весь диапазон, каждый день
+    expect(rows.every(r => r.time === '07:15')).toBe(true);
+    expect(rows.find(r => r.date === '2026-11-03')?.done).toBe(true);
+    expect(rows.find(r => r.date === MON)?.done).toBe(false);
+
+    const off = { ...base, he_reminders_v1: { weigh: { enabled: false, time: '07:15' } } };
+    expect(
+      collectAgenda(mem(off), { ...RANGE, today: '2026-11-06', sources: ['weigh'] }),
+    ).toEqual([]);
+  });
+
+  it('привычки — ежедневные пункты с фактом из completions', () => {
+    const rows = bySource('habits');
+    expect(rows).toHaveLength(14);
+    expect(rows[0]).toMatchObject({ title: 'Вода 3 л', detail: '3 л' });
+    expect(rows.find(r => r.date === '2026-11-03')?.done).toBe(true);
+    expect(rows.find(r => r.date === MON)?.done).toBe(false);
+  });
+
   it('все даты в диапазоне и в календарном формате', () => {
     for (const ev of events()) {
       expect(ev.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -283,5 +381,55 @@ describe('сбор событий', () => {
       const kb = `${b.date} ${b.time || '99:99'}`;
       expect(ka <= kb).toBe(true);
     }
+  });
+
+  describe('время авто-событий', () => {
+    const withOverride = (time: string) =>
+      mem({
+        ...base,
+        [AGENDA_TIME_KEY]: {
+          version: 1,
+          times: { [`agenda:training:${MON}`]: time },
+        },
+      });
+
+    it('поправка применяется поверх источника и сортирует день', () => {
+      const storage = mem({
+        ...base,
+        [AGENDA_TIME_KEY]: {
+          version: 1,
+          times: { [`agenda:injections:0:${MON}`]: '05:00' },
+        },
+      });
+      const rows = collectAgenda(storage, { ...RANGE, today: '2026-11-06', sources: ['training', 'injections'] });
+      const mon = rows.filter(r => r.date === MON);
+      // Инъекция без времени была «на весь день» — после правки встала в 05:00.
+      expect(mon[0].id).toBe(`agenda:injections:0:${MON}`);
+      expect(mon[0].time).toBe('05:00');
+      expect(mon[1].time).toBe('18:30');
+    });
+
+    it('сброс возвращает время источника', () => {
+      const storage = withOverride('06:00');
+      expect(readAgendaTimeOverrides(storage)['agenda:training:2026-11-02']).toBe('06:00');
+      const left = writeAgendaTimeOverride(storage, `agenda:training:${MON}`, null);
+      expect(left[`agenda:training:${MON}`]).toBeUndefined();
+      const rows = collectAgenda(storage, { ...RANGE, today: '2026-11-06', sources: ['training'] });
+      expect(rows.find(r => r.id === `agenda:training:${MON}`)?.time).toBe('18:30');
+    });
+
+    it('битое/чужое время поправкой не считается', () => {
+      expect(readAgendaTimeOverrides(withOverride('99:99'))).toEqual({});
+      expect(readAgendaTimeOverrides(mem({ [AGENDA_TIME_KEY]: '{не json' }))).toEqual({});
+      const rows = collectAgenda(withOverride('99:99'), { ...RANGE, today: '2026-11-06', sources: ['training'] });
+      expect(rows.find(r => r.id === `agenda:training:${MON}`)?.time).toBe('18:30');
+    });
+
+    it('пишет в хранилище формат v1 (id → время)', () => {
+      const storage = mem();
+      writeAgendaTimeOverride(storage, 'agenda:training:2026-11-02', '06:00');
+      const saved = JSON.parse(storage.raw.get(AGENDA_TIME_KEY) as string);
+      expect(saved).toEqual({ version: 1, times: { 'agenda:training:2026-11-02': '06:00' } });
+    });
   });
 });

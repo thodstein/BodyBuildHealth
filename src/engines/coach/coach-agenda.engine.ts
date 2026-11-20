@@ -14,6 +14,11 @@
  *  • Выбор пользователя живёт отдельно (`he_coach_planner_sources`), задачи
  *    планера (`he_coach_planner`) не трогаются: авто-события не дублируются в
  *    задачи и не «закрываются» как задачи.
+ *  • Время источника можно поправить локально (`he_coach_planner_times`):
+ *    поправка хранится по id события и применяется только при сборке — чужая
+ *    схема/план не перезаписывается.
+ *  • «Образ жизни» из калькулятора поддержки (вода, шаги, отказ от курения)
+ *    идёт отдельным источником, а не строками «БАДы · в любой приём».
  *  • Даты — только канон `core/local-date` (см. даты ниже: UTC-срез в UTC+10
  *    вечером даёт вчера и уводит событие на сутки).
  *
@@ -28,6 +33,7 @@
  */
 import { localIsoDate, parseLocalIsoDate, shiftIsoDate } from '../../core/local-date';
 import { supportNameRu } from '../../data/support-names';
+import { cardioSessionsForDate, type CardioCycle } from '../lms/cardio.engine';
 import {
   buildSupplementTiming,
   type SuppSlotKey,
@@ -36,17 +42,24 @@ import {
 import { generateLabSchedule } from '../labs-schedule.engine';
 
 export const AGENDA_SOURCES_KEY = 'he_coach_planner_sources';
+/** Правки времени авто-событий: id события → HH:MM (планёр только хранит). */
+export const AGENDA_TIME_KEY = 'he_coach_planner_times';
+export const AGENDA_TIME_MAX = 500;
 
 /** Источники, которые планёр умеет подтягивать сам. */
 export type AgendaSourceId =
   | 'training'
+  | 'cardio'
   | 'injections'
   | 'supplements'
+  | 'lifestyle'
   | 'meals'
   | 'food_shop'
   | 'supp_shop'
   | 'pharma_shop'
-  | 'labs';
+  | 'labs'
+  | 'weigh'
+  | 'habits';
 
 export interface AgendaSourceMeta {
   id: AgendaSourceId;
@@ -69,6 +82,14 @@ export const AGENDA_SOURCES: readonly AgendaSourceMeta[] = [
     hint: 'Дни по графику тренировок и упражнения из активного плана («Тренировки»).',
   },
   {
+    id: 'cardio',
+    label: 'Кардио',
+    short: 'Кардио',
+    icon: '🏃',
+    color: '#22d3ee',
+    hint: 'Запланированные кардио-сессии активного цикла («Тренировки» → Кардио).',
+  },
+  {
     id: 'injections',
     label: 'Инъекции',
     short: 'Инъек.',
@@ -83,6 +104,14 @@ export const AGENDA_SOURCES: readonly AgendaSourceMeta[] = [
     icon: '💊',
     color: '#22c55e',
     hint: 'Слоты приёма (утро/день/вечер) из плана БАДов, время — по приёмам еды.',
+  },
+  {
+    id: 'lifestyle',
+    label: 'Образ жизни',
+    short: 'ОЖ',
+    icon: '🌿',
+    color: '#84cc16',
+    hint: 'Водный режим, шаги, отказ от курения/алкоголя из плана поддержки — отдельно от БАДов.',
   },
   {
     id: 'meals',
@@ -123,6 +152,22 @@ export const AGENDA_SOURCES: readonly AgendaSourceMeta[] = [
     icon: '🔬',
     color: '#a78bfa',
     hint: 'Контрольные точки анализов от даты старта курса (фаза из профиля).',
+  },
+  {
+    id: 'weigh',
+    label: 'Взвешивание',
+    short: 'Вес',
+    icon: '⚖️',
+    color: '#e879f9',
+    hint: 'Включённое напоминание о взвешивании; факт — из дневника веса.',
+  },
+  {
+    id: 'habits',
+    label: 'Привычки',
+    short: 'Привычки',
+    icon: '✅',
+    color: '#2dd4bf',
+    hint: 'Ежедневные привычки из трекера привычек (вода, шаги, сон и т.п.).',
   },
 ];
 
@@ -314,6 +359,13 @@ interface AgendaContext {
   nutritionPlan: MealPlanLike | null;
   foodDiary: JsonRecord | null;
   cart: JsonRecord[];
+  /** Активный кардио-цикл; без валидного старта серии «съезжают» каждый день. */
+  cardioCycle: CardioCycle | null;
+  cardioDone: Set<string>;
+  /** Включённое напоминание о взвешивании (`he_reminders_v1`). */
+  weighReminder: { time: string } | null;
+  weightDone: Set<string>;
+  habits: JsonRecord[];
 }
 
 function isMealPlan(value: unknown): value is MealPlanLike {
@@ -385,6 +437,50 @@ function readInjectionDone(storage: AgendaStorage | null | undefined): Set<strin
   return out;
 }
 
+/**
+ * Активный кардио-цикл — только с валидной датой старта. Без старта
+ * `cardioSessionsForDate` считает неделей 1 «сегодня», и серии ползут вперёд
+ * каждый день: это была бы выдумка, а не план.
+ */
+function readActiveCardioCycle(storage: AgendaStorage | null | undefined): CardioCycle | null {
+  const raw = readJson(storage, 'he_active_cardio_cycle');
+  if (!isRecord(raw) || !Array.isArray(raw.weeks) || raw.weeks.length === 0) return null;
+  if (!validIso(raw.startDate)) return null;
+  return raw as unknown as CardioCycle;
+}
+
+function readCardioDone(storage: AgendaStorage | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const row of readArray(storage, 'he_cardio_sessions')) {
+    if (!isRecord(row)) continue;
+    const iso = validIso(row.date);
+    if (iso) out.add(iso);
+  }
+  return out;
+}
+
+function readWeighReminder(storage: AgendaStorage | null | undefined): { time: string } | null {
+  const prefs = readJson(storage, 'he_reminders_v1');
+  if (!isRecord(prefs) || !isRecord(prefs.weigh) || prefs.weigh.enabled !== true) return null;
+  return { time: validTime(prefs.weigh.time) };
+}
+
+function readWeightDone(storage: AgendaStorage | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const row of readArray(storage, 'he_weight_log')) {
+    if (!isRecord(row)) continue;
+    const iso = validIso(row.date);
+    if (iso) out.add(iso);
+  }
+  return out;
+}
+
+function readHabits(storage: AgendaStorage | null | undefined): JsonRecord[] {
+  return readArray(storage, 'he_habits')
+    .filter((row): row is JsonRecord => isRecord(row) && text(row.name, 60) !== '')
+    .slice(0, 20);
+}
+
 function buildContext(storage: AgendaStorage | null | undefined, today: string): AgendaContext {
   const profileRaw = readJson(storage, 'he_profile_v2');
   let profile: AgendaContext['profile'] = null;
@@ -418,6 +514,11 @@ function buildContext(storage: AgendaStorage | null | undefined, today: string):
     nutritionPlan: readNutritionPlan(storage),
     foodDiary: isRecord(foodDiaryRaw) ? foodDiaryRaw : null,
     cart: readArray(storage, 'supportCart').filter(isRecord),
+    cardioCycle: readActiveCardioCycle(storage),
+    cardioDone: readCardioDone(storage),
+    weighReminder: readWeighReminder(storage),
+    weightDone: readWeightDone(storage),
+    habits: readHabits(storage),
   };
 }
 
@@ -577,6 +678,48 @@ function trainingEvents(ctx: AgendaContext, from: string, to: string): CoachAgen
     });
   });
 
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   1b. Кардио (активный кардио-цикл)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const CARDIO_TYPE_LABEL: Record<string, string> = {
+  zone2: 'Zone 2',
+  hiit: 'HIIT',
+  miss: 'MISS',
+  recovery: 'Recovery',
+};
+
+function cardioEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
+  const cycle = ctx.cardioCycle;
+  if (!cycle) return [];
+  const out: CoachAgendaEvent[] = [];
+  eachDate(from, to, iso => {
+    let scheduled: ReturnType<typeof cardioSessionsForDate> = null;
+    try {
+      scheduled = cardioSessionsForDate(cycle, iso);
+    } catch {
+      return;
+    }
+    if (!scheduled || scheduled.sessions.length === 0) return;
+    scheduled.sessions.forEach((session, i) => {
+      const type = text(session.type, 20);
+      const label = CARDIO_TYPE_LABEL[type] ?? (type || 'Кардио');
+      const minutes = Math.max(0, Math.round(num(session.durationMin)));
+      const equipment = text(session.equipment, 20);
+      pushEvent(out, {
+        id: `agenda:cardio:${iso}:${i}`,
+        source: 'cardio',
+        date: iso,
+        time: '',
+        title: `${label}${minutes > 0 ? ` · ${minutes} мин` : ''}`,
+        detail: [text(session.purpose, 100), equipment].filter(Boolean).join(' · '),
+        done: ctx.cardioDone.has(iso),
+      });
+    });
+  });
   return out;
 }
 
@@ -743,8 +886,23 @@ function foodShopEvents(ctx: AgendaContext, from: string, to: string): CoachAgen
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   5. Приём БАДов
+   5. Приём БАДов · 5b. Образ жизни (отдельно от БАДов)
    ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * «Образ жизни» из калькулятора поддержки (`FOUNDATION_ITEMS`, kind=lifestyle).
+ * Электролиты — минерал, остаются в БАДах: это всё-таки приём, а не привычка.
+ */
+const LIFESTYLE_SUPPORT_IDS: ReadonlySet<string> = new Set([
+  'hydration',
+  'cardio_aerobic',
+  'daily_steps',
+  'no_smoking',
+  'no_alcohol',
+]);
+
+export const isLifestyleSupportId = (id: string): boolean =>
+  LIFESTYLE_SUPPORT_IDS.has(String(id ?? '').trim().toLowerCase());
 
 const SUPP_SLOT_TITLE: Record<SuppSlotKey, string> = {
   preWO: 'перед тренировкой',
@@ -768,14 +926,16 @@ function takenSubstances(ctx: AgendaContext, iso: string): Set<string> {
 }
 
 function supplementEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
-  if (ctx.supplementPlan.length === 0) return [];
+  // «Образ жизни» — не приём БАДов: у него свой источник и своя строка.
+  const planIds = ctx.supplementPlan.filter(id => !isLifestyleSupportId(id));
+  if (planIds.length === 0) return [];
   const training = ctx.profile?.training ?? null;
   const personal = ctx.profile?.personal ?? null;
   const weightKg = Math.max(30, num(personal?.weight) || 80);
   const sex = text(personal?.sex, 10) === 'female' ? 'female' : 'male';
   const goal = text(training?.primaryGoal, 20) || undefined;
 
-  const supplements = ctx.supplementPlan.map(id => ({ id, nameRu: supportNameRu(id) }));
+  const supplements = planIds.map(id => ({ id, nameRu: supportNameRu(id) }));
   const out: CoachAgendaEvent[] = [];
 
   eachDate(from, to, iso => {
@@ -815,9 +975,80 @@ function supplementEvents(ctx: AgendaContext, from: string, to: string): CoachAg
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   6. Закупка БАДов / фармы (корзина + старт курса) + 7. Анализы
+   5c. Образ жизни — ежедневные привычки из плана поддержки
    ═══════════════════════════════════════════════════════════════════════ */
 
+function lifestyleEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
+  const ids = ctx.supplementPlan.filter(isLifestyleSupportId);
+  if (ids.length === 0) return [];
+  const out: CoachAgendaEvent[] = [];
+  eachDate(from, to, iso => {
+    const taken = takenSubstances(ctx, iso);
+    for (const id of ids) {
+      pushEvent(out, {
+        id: `agenda:lifestyle:${iso}:${id}`,
+        source: 'lifestyle',
+        date: iso,
+        time: '',
+        title: supportNameRu(id),
+        detail: 'Из плана поддержки · ежедневно',
+        done: taken.has(id),
+      });
+    }
+  });
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   5d. Взвешивание и привычки (трекеры)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function weighEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
+  const reminder = ctx.weighReminder;
+  if (!reminder) return [];
+  const out: CoachAgendaEvent[] = [];
+  eachDate(from, to, iso => {
+    pushEvent(out, {
+      id: `agenda:weigh:${iso}`,
+      source: 'weigh',
+      date: iso,
+      time: reminder.time,
+      title: 'Взвешивание',
+      detail: 'Напоминание из «Напоминаний» · факт из дневника веса',
+      done: ctx.weightDone.has(iso),
+    });
+  });
+  return out;
+}
+
+function habitsEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
+  if (ctx.habits.length === 0) return [];
+  const out: CoachAgendaEvent[] = [];
+  eachDate(from, to, iso => {
+    for (const habit of ctx.habits) {
+      const name = text(habit.name, 60);
+      if (!name) continue;
+      const habitId = text(habit.id, 60) || name;
+      const done = asArray(habit.completions).some(
+        row => isRecord(row) && validIso(row.date) === iso && row.done === true,
+      );
+      pushEvent(out, {
+        id: `agenda:habits:${iso}:${habitId}`,
+        source: 'habits',
+        date: iso,
+        time: '',
+        title: name,
+        detail: text(habit.target, 40),
+        done,
+      });
+    }
+  });
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   6. Закупка БАДов / фармы (корзина + старт курса) + 7. Анализы
+   ═══════════════════════════════════════════════════════════════════════ */
 function isPharmaCartItem(item: JsonRecord): boolean {
   const category = text(item.category, 20).toLowerCase();
   if (category === 'pharma') return true;
@@ -942,6 +1173,73 @@ function labEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEve
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Правки времени авто-событий
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Время, которое человек поправил в планёре, поверх времени источника.
+ * Ключ — id конкретного события (он включает дату): правка «на этот день»,
+ * а не тихая подмена всей серии. Источник при этом не меняется — планёр
+ * лишь хранит поправку и применяет её при сборке.
+ */
+export function readAgendaTimeOverrides(
+  storage: AgendaStorage | null | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!storage) return out;
+  const parsed = readJson(storage, AGENDA_TIME_KEY);
+  if (!isRecord(parsed) || parsed.version !== 1 || !isRecord(parsed.times)) return out;
+  for (const [rawId, rawTime] of Object.entries(parsed.times)) {
+    const id = text(rawId, 160);
+    const time = validTime(rawTime);
+    if (id && time) out[id] = time;
+  }
+  return out;
+}
+
+/**
+ * Поставить/сбросить время события. `null` или `''` — вернуть время источника.
+ * Возвращает актуальную карту (для состояния UI).
+ */
+export function writeAgendaTimeOverride(
+  storage: { getItem?: (key: string) => string | null; setItem?: (key: string, value: string) => void } | null | undefined,
+  eventId: string,
+  time: string | null,
+): Record<string, string> {
+  const id = text(eventId, 160);
+  const next = readAgendaTimeOverrides(storage as AgendaStorage | null | undefined);
+  const valid = time ? validTime(time) : '';
+  if (!id) return next;
+  if (valid) next[id] = valid;
+  else delete next[id];
+  // localStorage не резиновый: старые поправки не должны расти вечно.
+  const keys = Object.keys(next);
+  if (keys.length > AGENDA_TIME_MAX) {
+    for (const stale of keys.slice(0, keys.length - AGENDA_TIME_MAX)) delete next[stale];
+  }
+  if (storage && typeof storage.setItem === 'function') {
+    try {
+      storage.setItem(AGENDA_TIME_KEY, JSON.stringify({ version: 1, times: next }));
+    } catch {
+      /* quota/private — поправка не критична для чтения данных */
+    }
+  }
+  return next;
+}
+
+/** Применить поправки времени (и вернуть новые объекты только там, где меняли). */
+export function applyAgendaTimeOverrides(
+  events: readonly CoachAgendaEvent[],
+  overrides: Record<string, string> | null | undefined,
+): CoachAgendaEvent[] {
+  if (!overrides) return [...events];
+  return events.map(ev => {
+    const time = overrides[ev.id];
+    return time ? { ...ev, time } : ev;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    Публичный сбор
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -988,8 +1286,10 @@ export function collectAgenda(
   };
 
   if (enabled.has('training')) safely(() => trainingEvents(ctx, from, to));
+  if (enabled.has('cardio')) safely(() => cardioEvents(ctx, from, to));
   if (enabled.has('injections')) safely(() => injectionEvents(ctx, from, to));
   if (enabled.has('supplements')) safely(() => supplementEvents(ctx, from, to));
+  if (enabled.has('lifestyle')) safely(() => lifestyleEvents(ctx, from, to));
   if (enabled.has('meals')) safely(() => mealEvents(ctx, from, to));
   if (enabled.has('food_shop')) safely(() => foodShopEvents(ctx, from, to));
   if (enabled.has('supp_shop') || enabled.has('pharma_shop')) {
@@ -997,8 +1297,13 @@ export function collectAgenda(
   }
   if (enabled.has('pharma_shop')) safely(() => pharmaCourseEvents(ctx, from, to));
   if (enabled.has('labs')) safely(() => labEvents(ctx, from, to));
+  if (enabled.has('weigh')) safely(() => weighEvents(ctx, from, to));
+  if (enabled.has('habits')) safely(() => habitsEvents(ctx, from, to));
 
-  return out.sort(byDateThenTime);
+  // Поправки времени — после сборки: сортировка дня учитывает именно то
+  // время, которое человек видит в строках.
+  const withTimes = applyAgendaTimeOverrides(out, readAgendaTimeOverrides(storage));
+  return withTimes.sort(byDateThenTime);
 }
 
 /** Сгруппировать события по дате (ключ — YYYY-MM-DD). */

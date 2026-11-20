@@ -5,14 +5,16 @@
  * отметкой «сделано», привязка к атлету, блок «просрочено» и быстрые кнопки
  * «сегодня/завтра».
  *
- * Плюс авто-события (coach-agenda.engine): тренировки, инъекции, приём БАДов,
- * приёмы пищи, закупки продуктов/БАДов/фармы и контрольные анализы приезжают в
- * календарь сами. Человек сам решает, какие источники показывать. Такие
- * события — только чтение: они не превращаются в задачи, не отмечаются здесь и
- * не меняют чужие дневники.
+ * Плюс авто-события (coach-agenda.engine): тренировки, кардио, инъекции, приём
+ * БАДов, образ жизни, приёмы пищи, закупки продуктов/БАДов/фармы, контрольные
+ * анализы, взвешивание и привычки приезжают в календарь сами. Человек сам
+ * решает, какие источники показывать. Такие события не превращаются в задачи,
+ * не отмечаются здесь и не меняют чужие дневники; единственная местная правка —
+ * время события (хранится в планёре поверх времени источника).
  *
  * Чего сознательно НЕТ, чтобы не обещать лишнего:
- *  • повторяющихся серий (без честного механизма повторов лучше не делать вид);
+ *  • фантомных будущих вхождений: серия появляется после закрытия задачи и
+ *    только по выбранному правилу (день/через день/дни недели/интервал);
  *  • напоминаний и пушей — планёр их не отправляет;
  *  • автопереноса просроченных: задача остаётся в своём дне, пока её не закроют,
  *    и показывается отдельным блоком — «сгоревших» задач не бывает.
@@ -30,6 +32,9 @@ import {
   COACH_PLANNER_MAX,
   COACH_PRIORITY_LABELS,
   COACH_PRIORITIES,
+  COACH_REPEAT_INTERVAL_DEFAULT,
+  COACH_REPEAT_INTERVAL_MAX,
+  COACH_REPEAT_INTERVAL_MIN,
   COACH_REPEAT_LABELS,
   COACH_REPEATS,
   COACH_TASK_LIST_LABELS,
@@ -37,9 +42,11 @@ import {
   COACH_WEEKDAY_LABELS,
   addCoachTask,
   buildCoachMonthGrid,
+  coachRepeatLabel,
   coachTaskList,
   coachTaskPriority,
   coachTaskRepeat,
+  coachWeekdayIndex,
   completeCoachTask,
   countTasksByList,
   countTasksByDate,
@@ -63,7 +70,9 @@ import {
   countAgendaByDate,
   countAgendaBySource,
   readAgendaSources,
+  readAgendaTimeOverrides,
   writeAgendaSources,
+  writeAgendaTimeOverride,
   type AgendaSourceId,
 } from '../../../engines/coach/coach-agenda.engine';
 
@@ -145,6 +154,8 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
   const [time, setTime] = useState('');
   const [priority, setPriority] = useState<CoachTaskPriority>('none');
   const [repeat, setRepeat] = useState<CoachRepeat>('none');
+  const [repeatDays, setRepeatDays] = useState<number[]>([]);
+  const [repeatInterval, setRepeatInterval] = useState<number>(COACH_REPEAT_INTERVAL_DEFAULT);
   const [list, setList] = useState<CoachTaskList>('inbox');
   const [filterList, setFilterList] = useState<CoachTaskList | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -158,10 +169,16 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
   // Что подтягивать из приложения: выбор живёт отдельно от задач и не меняет
   // чужие дневники. Данные читаются заново при возврате вкладки/фокусе.
   const [sources, setSources] = useState<AgendaSourceId[]>(() => readAgendaSources(ls()));
+  // Время авто-событий: поправка хранится отдельно и применяется при сборке.
+  const [timeOverrides, setTimeOverrides] = useState<Record<string, string>>(() => readAgendaTimeOverrides(ls()));
   const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
-    const bump = () => setRefreshTick(t => t + 1);
+    const bump = () => {
+      // Другой модуль мог изменить план/дневник — перечитываем и поправки времени.
+      setTimeOverrides(readAgendaTimeOverrides(ls()));
+      setRefreshTick(t => t + 1);
+    };
     const onVisible = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') bump();
     };
@@ -231,6 +248,22 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
 
   const enableAllSources = () => setSources(writeAgendaSources(ls(), AGENDA_SOURCES.map(s => s.id)));
 
+  /** Выбор повтора: для «дни недели» сразу подставляем день задачи. */
+  const changeRepeat = (value: CoachRepeat) => {
+    setRepeat(value);
+    if (value === 'weekdays' && repeatDays.length === 0) setRepeatDays([coachWeekdayIndex(selected)]);
+  };
+
+  const toggleRepeatDay = (day: number) => {
+    setRepeatDays(prev => (prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b)));
+  };
+
+  /** Поправить время авто-события (пусто — вернуть время источника). */
+  const setAutoTime = (eventId: string, value: string) => {
+    setTimeOverrides(writeAgendaTimeOverride(ls(), eventId, value || null));
+    setRefreshTick(t => t + 1);
+  };
+
   const add = () => {
     const res = addCoachTask(store, {
       title,
@@ -239,6 +272,8 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
       athleteId: athleteId || null,
       priority,
       repeat,
+      repeatDays: repeat === 'weekdays' ? repeatDays : undefined,
+      repeatInterval: repeat === 'custom' ? repeatInterval : undefined,
       list,
     });
     if (res.error === 'title') {
@@ -636,7 +671,7 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                           color: '#a7f3d0', background: 'rgba(16,185,129,0.14)', border: '1px solid rgba(16,185,129,0.32)',
                         }}
                       >
-                        ↻ {COACH_REPEAT_LABELS[coachTaskRepeat(t)]}
+                        ↻ {coachRepeatLabel(t)}
                       </span>
                     )}
                   </div>
@@ -700,7 +735,7 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
               <div style={{ fontSize: 12, fontWeight: 800, color: '#c4b5fd' }}>
                 Из приложения · {dayAgenda.length}
               </div>
-              <div style={{ fontSize: 10.5, color: colors.textSubtle }}>только просмотр</div>
+              <div style={{ fontSize: 10.5, color: colors.textSubtle }}>время можно поправить</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
               {dayAgenda.map(ev => {
@@ -736,11 +771,6 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                           textDecoration: ev.done ? 'line-through' : undefined,
                         }}
                       >
-                        {ev.time && (
-                          <span style={{ color: meta.color, fontVariantNumeric: 'tabular-nums', marginRight: 7 }}>
-                            {ev.time}
-                          </span>
-                        )}
                         {ev.title}
                       </div>
                       {ev.detail && (
@@ -749,22 +779,76 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                         </div>
                       )}
                     </div>
-                    <span
-                      data-planner="auto-badge"
+                    <div
                       style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: 4,
                         flexShrink: 0,
-                        fontSize: 9.5,
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: 999,
-                        color: meta.color,
-                        background: withAlpha(meta.color, '1f'),
-                        border: `1px solid ${withAlpha(meta.color, '3d')}`,
-                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {meta.short}
-                    </span>
+                      <input
+                        type="time"
+                        value={ev.time}
+                        onChange={e => setAutoTime(ev.id, e.target.value)}
+                        aria-label={`Время события: ${ev.title}`}
+                        title="Время события — правка только в планёре, источник не меняется"
+                        data-planner="auto-time"
+                        data-event-id={ev.id}
+                        style={{
+                          width: 92,
+                          minHeight: 32,
+                          borderRadius: 9,
+                          padding: '2px 6px',
+                          fontSize: 11.5,
+                          color: meta.color,
+                          fontVariantNumeric: 'tabular-nums',
+                          background: 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${withAlpha(meta.color, '3d')}`,
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      {timeOverrides[ev.id] && (
+                        <button
+                          type="button"
+                          onClick={() => setAutoTime(ev.id, '')}
+                          aria-label="Вернуть время из источника"
+                          title="Вернуть время из источника"
+                          data-planner="auto-time-reset"
+                          style={{
+                            minHeight: 26,
+                            padding: '1px 7px',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            background: 'transparent',
+                            color: colors.textMuted,
+                          }}
+                        >
+                          ↺ своё
+                        </button>
+                      )}
+                      <span
+                        data-planner="auto-badge"
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          padding: '2px 6px',
+                          borderRadius: 999,
+                          color: meta.color,
+                          background: withAlpha(meta.color, '1f'),
+                          border: `1px solid ${withAlpha(meta.color, '3d')}`,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {meta.short}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
@@ -826,7 +910,7 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
             </select>
             <select
               value={repeat}
-              onChange={e => setRepeat(e.target.value as CoachRepeat)}
+              onChange={e => changeRepeat(e.target.value as CoachRepeat)}
               aria-label="Повтор задачи"
               data-planner="repeat"
               style={{ ...inputStyle, flex: '0 0 auto' }}
@@ -835,6 +919,62 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
                 <option key={r} value={r}>{COACH_REPEAT_LABELS[r]}</option>
               ))}
             </select>
+            {repeat === 'weekdays' && (
+              <div
+                role="group"
+                aria-label="Дни недели повтора"
+                data-planner="repeat-days"
+                style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}
+              >
+                {COACH_WEEKDAY_LABELS.map((label, day) => {
+                  const active = repeatDays.includes(day);
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => toggleRepeatDay(day)}
+                      aria-pressed={active}
+                      aria-label={`Повтор: ${label}`}
+                      data-planner="repeat-day"
+                      data-day={day}
+                      data-active={active}
+                      style={{
+                        minHeight: 34,
+                        minWidth: 34,
+                        padding: '4px 6px',
+                        borderRadius: 9,
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        border: `1px solid ${active ? withAlpha(BLUE, '99') : 'rgba(255,255,255,0.14)'}`,
+                        background: active ? withAlpha(BLUE, '26') : 'rgba(255,255,255,0.04)',
+                        color: active ? '#fff' : colors.textMuted,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {repeat === 'custom' && (
+              <label
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: colors.textMuted }}
+              >
+                каждые
+                <input
+                  type="number"
+                  min={COACH_REPEAT_INTERVAL_MIN}
+                  max={COACH_REPEAT_INTERVAL_MAX}
+                  value={repeatInterval}
+                  onChange={e => setRepeatInterval(Number(e.target.value) || COACH_REPEAT_INTERVAL_DEFAULT)}
+                  aria-label="Интервал повтора в днях"
+                  data-planner="repeat-interval"
+                  style={{ ...inputStyle, width: 78, flex: '0 0 auto', minHeight: 40 }}
+                />
+                дн.
+              </label>
+            )}
             {athletes.length > 0 && (
               <select
                 value={athleteId}
@@ -906,8 +1046,9 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
           <NativeIcon name="clock" size={13} />
         </span>
         <span>
-          Планёр — это ваш распорядок: события из разделов подтягиваются только на
-          просмотр, планёр не меняет чужие планы и не отправляет уведомления.
+          Планёр — это ваш распорядок: события из разделов подтягиваются на просмотр,
+          время можно поправить только здесь, планёр не меняет чужие планы и не
+          отправляет уведомления.
         </span>
       </div>
     </div>
