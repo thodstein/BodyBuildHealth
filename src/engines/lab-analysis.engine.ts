@@ -4,7 +4,7 @@ import { convertToUnit } from '../core/labs-mapping';
 import { boundProvesSide, boundsComparable, type LabBound } from '../core/lab-bound';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl, getLabNorm,
 } from './lab-norms.engine';
 import { phaseHormoneBand, phaseUnionBand, type CycleState } from './female-cycle-phase.engine';
 
@@ -54,7 +54,26 @@ export const RISK_MODEL_LABELS: Record<RiskModelType, string> = {
   pharma_integrated: '💊 Фарма-интегрированная (PK/PD + анализы)',
 };
 
-const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh: number; unit: string }> = {
+/**
+ * Границы общего Т3/Т4 — из резолвера норм (`UCUM_MAP`), в единице склада
+ * (нмоль/л). Своих чисел у разбора нет: иначе он судит тот же анализ по другой
+ * шкале, чем «Анализы», доли нормы и риск-модель.
+ */
+function totalThyroidRange(code: 'T3' | 'T4'): { low: number; high: number; unit: string } {
+  const norm = getLabNorm(code);
+  return { low: norm?.lln ?? 0, high: norm?.uln ?? 0, unit: 'нмоль/л' };
+}
+
+/**
+ * Границы вывода разбора анализов.
+ *
+ * Проход 170: `criticalHigh` стал необязательным. У общего Т3/Т4 критического
+ * уровня в репозитории нет ни в одном источнике, и прежняя строка заполняла его
+ * «по смыслу» — вместе с чужой единицей это давало ложную критическую
+ * гиперфункцию щитовидной железы (см. `totalThyroidRange`). Нет источника —
+ * нет и уровня; проверка ниже это учитывает.
+ */
+const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh?: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
   TESTOSTERONE_FREE: { low: 0.2, high: 0.6, criticalHigh: 0.9, unit: 'нмоль/л' },
   ESTRADIOL: { low: 10, high: 40, criticalHigh: 60, unit: 'пг/мл' },
@@ -62,8 +81,14 @@ const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh
   LH: { low: 1, high: 10, criticalHigh: 15, unit: 'МЕ/л' },
   FSH: { low: 1, high: 12, criticalHigh: 18, unit: 'МЕ/л' },
   TSH: { low: 0.4, high: 4.0, criticalHigh: 10, unit: 'мЕд/л' },
-  T3: { low: 2.5, high: 6.5, criticalHigh: 8, unit: 'пмоль/л' },
-  T4: { low: 10, high: 24, criticalHigh: 30, unit: 'пмоль/л' },
+  // Проход 170: общий Т3/Т4 — в нмоль/л (единица склада) и с границами резолвера.
+  // Было `2.5–6.5` и `10–24` с подписью «пмоль/л», то есть числа шкалы нмоль/л под
+  // чужой единицей: нормальный общий Т3 1.8 нмоль/л пересчитывался в 1800 пмоль/л
+  // и читался «критически высоким» с риском гипотиреоза. Свободные Т3/Т4 при этом
+  // судились правильно — один анализ выдавал чужой совет. Критического уровня для
+  // общих гормонов в репозитории нет, поэтому его здесь нет.
+  T3: totalThyroidRange('T3'),
+  T4: totalThyroidRange('T4'),
   FREE_T3: { low: 3.1, high: 6.8, criticalHigh: 9, unit: 'пмоль/л' },
   FREE_T4: { low: 9, high: 22, criticalHigh: 30, unit: 'пмоль/л' },
   ALT: { low: 5, high: 40, criticalHigh: 80, unit: 'Ед/л' },
@@ -323,7 +348,10 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
     // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой).
     // Проход 150: «>N» при N ≥ критической границы доказывает критическое, а
     // точное число — строгим сравнением, как раньше.
-    if (proven === 'high' && (value > bounds.criticalHigh || (read.bound === '>' && value >= bounds.criticalHigh))) {
+    // Проход 170: `criticalHigh` может отсутствовать (общий Т3/Т4) — тогда
+    // «критически высоко» не выводится вовсе: уровня нет, а не «равен верхнему».
+    const crit = bounds.criticalHigh;
+    if (proven === 'high' && crit !== undefined && (value > crit || (read.bound === '>' && value >= crit))) {
       status = 'critical_high';
     }
 
