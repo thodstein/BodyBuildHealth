@@ -33,6 +33,8 @@ import {
 } from '../../../engines/workout-summary.engine';
 
 const ACCENT = '#00e68a';
+/** Сколько тренировок в блоке «Все подходы» показывать до раскрытия. */
+const SETS_LIMIT = 40;
 const CARD: React.CSSProperties = {
   padding: 12,
   borderRadius: 14,
@@ -227,6 +229,9 @@ export const WorkoutSummaryBody: React.FC<{
   previousLabel?: string;
 }> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel }) => {
   const [onlyProblems, setOnlyProblems] = React.useState(false);
+  // Список подходов в отчёте длинный: за неделю-месяц это десятки тренировок.
+  // Показываем первые SETS_LIMIT и даём раскрыть всё — без «обрезано и всё».
+  const [showAllSets, setShowAllSets] = React.useState(false);
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -518,7 +523,7 @@ export const WorkoutSummaryBody: React.FC<{
         <div style={CARD}>
           <SectionTitle icon="🧾" title="Все подходы" hint="вес × повторы · RIR/RPE по каждой тренировке" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {(details || []).slice(0, compact ? 3 : 40).map(session => (
+            {(details || []).slice(0, compact ? 3 : showAllSets ? undefined : SETS_LIMIT).map(session => (
               <div key={session.id}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5, marginBottom: 3 }}>
                   <span style={{ color: '#fff', fontWeight: 800, whiteSpace: 'nowrap' }}>{fmtDate(session.date)}</span>
@@ -549,9 +554,20 @@ export const WorkoutSummaryBody: React.FC<{
               </div>
             ))}
           </div>
-          {(details || []).length > (compact ? 3 : 40) && (
-            <div style={{ marginTop: 6, fontSize: 9, color: '#fff', opacity: 0.65 }}>
-              Показаны {(compact ? 3 : 40)} из {details?.length} тренировок.
+          {(details || []).length > (compact ? 3 : SETS_LIMIT) && (
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 9, color: '#fff', opacity: 0.8 }}>
+              <span>
+                Показаны {compact ? 3 : showAllSets ? details!.length : SETS_LIMIT} из {details?.length} тренировок.
+              </span>
+              {!compact && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllSets(v => !v)}
+                  style={{ marginLeft: 'auto', padding: '2px 9px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+                >
+                  {showAllSets ? 'Свернуть' : `Показать все (${details?.length})`}
+                </button>
+              )}
             </div>
           )}
         </div>

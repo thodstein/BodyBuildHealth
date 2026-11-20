@@ -165,6 +165,18 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('<polyline');
     expect(html).toContain('→ 0%');
   });
+
+  it('длинный список подходов раскрывается целиком', () => {
+    const many: WorkoutLog[] = Array.from({ length: 45 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 7, 1 + i));
+      return mkWorkout(d.toISOString().slice(0, 10));
+    });
+    render(<WorkoutSummaryReport workouts={many} blocks={['sets']} />);
+    expect(screen.getByText(/Показаны 40 из 45 тренировок/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Показать все (45)'));
+    expect(screen.getByText(/Показаны 45 из 45 тренировок/)).toBeTruthy();
+    expect(screen.getByText('Свернуть')).toBeTruthy();
+  });
 });
 
 describe('Дневник → Отчёт', () => {

@@ -188,7 +188,12 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     }
     lines.push('');
     lines.push('По мышцам:');
-    summary.muscles.forEach(m => lines.push(`  ${m.label}: ${m.sets} подх · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`));
+    const weeksCount = Math.max(1, summary.weeks.length);
+    summary.muscles.forEach(m => {
+      const weekly = Math.round(m.sets / weeksCount);
+      const trend = m.weeklyTrendPct != null ? ` (${m.weeklyTrendPct > 0 ? '+' : ''}${m.weeklyTrendPct}% к первой неделе)` : '';
+      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} подх/нед${trend} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
+    });
     lines.push('');
     lines.push('По упражнениям:');
     summary.exercises.forEach(e => lines.push(`  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${fmtTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}`));
