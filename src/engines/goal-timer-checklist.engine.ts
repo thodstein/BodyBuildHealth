@@ -10,6 +10,8 @@
  * @module goal-timer-checklist-engine
  */
 
+import { localIsoDate } from '../core/local-date';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════════════════
@@ -95,7 +97,7 @@ export function updateGoalProgress(id: string, currentValue: number): SmartGoal[
   g.progress = Math.round(Math.min(100, (currentValue - g.measurable.startValue) / (g.measurable.targetValue - g.measurable.startValue) * 100));
   if (g.progress >= 100) g.status = 'achieved'; else if (g.progress > 0) g.status = 'in_progress';
   g.updated = new Date().toISOString();
-  for (const m of g.milestones) { if (!m.achieved && currentValue >= m.value) { m.achieved = true; m.date = new Date().toISOString().slice(0, 10); } }
+  for (const m of g.milestones) { if (!m.achieved && currentValue >= m.value) { m.achieved = true; m.date = localIsoDate(); } }
   goals[idx] = g; saveGoals(goals); return goals;
 }
 

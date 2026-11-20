@@ -6,6 +6,7 @@
  */
 import { loadSRPESessions } from './pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio, type TrainingSession } from './pro/training-load.engine';
+import { localIsoDateOffset } from '../core/local-date';
 
 export interface WeekFeedback {
   /** Множитель веса для следующей недели (0.85–1.10) */
@@ -25,9 +26,11 @@ export interface WeekFeedback {
 }
 
 function daysAgoDate(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  // Проход 172: окно «последние N дней» — календарь пользователя. Прежняя
+  // запись резала UTC-дату, поэтому местным утром (когда по UTC ещё вчера)
+  // окно начиналось на день раньше и в него попадала сессия восьмидневной
+  // давности — средний RPE недели считался по лишнему дню.
+  return localIsoDateOffset(-days);
 }
 
 /** Получить фидбэк для следующей недели */

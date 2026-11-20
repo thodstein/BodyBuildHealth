@@ -13,6 +13,7 @@ import { barLoopFlag } from './bar-path-core.engine';
 import { barSpeedHeat, BAR_HEAT_COLORS } from '../strength-sport/strength-sport-video.engine';
 // Перенос длинных подписей — один на SVG и PNG, иначе картинки расходятся в трактовке.
 import { wrapCaptionLines } from './trajectory-overlay.engine';
+import { localIsoDate } from '../../core/local-date';
 
 export type VideoOverlayMode = 'panel' | 'calibration' | 'perspective';
 
@@ -224,7 +225,9 @@ export function buildHeatTrendCsv(rows: HeatTrendExportRow[], liftRu: string): s
   let prev: number | null = null;
   for (const r of clean) {
     const d = new Date(r.ts);
-    const iso = d.toISOString().slice(0, 10);
+    // Проход 172: подпись строки печатается местным `toLocaleDateString`, поэтому
+    // неделя должна считаться по тому же местному дню, а не по UTC-дате.
+    const iso = localIsoDate(d);
     const delta = prev == null ? null : Math.round(r.slowPct - prev);
     out.push([
       d.toLocaleDateString('ru-RU'),
@@ -301,7 +304,7 @@ export function buildMovementDiagnosticsCsv(inp: MovementDiagnosticsExportInput)
     ['VBT пауза, мс', inp.vbtPauseMs != null ? String(inp.vbtPauseMs) : '—'],
     ['LVP r²', inp.lvpR2 != null ? String(inp.lvpR2) : '—'],
     ['Видео', inp.videoNote || '—'],
-    ['Дата', inp.createdAt || new Date().toISOString().slice(0, 10)],
+    ['Дата', inp.createdAt || localIsoDate()],
   ];
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
 }
@@ -347,7 +350,7 @@ export function buildMovementDiagnosticsHtml(inp: MovementDiagnosticsExportInput
       : 'не измерена';
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Диагностика движений — ${esc(inp.liftRu)}</title></head><body style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:16px;color:#111;">`
     + `<h1 style="font-size:18px;">Диагностика движений — ${esc(inp.liftRu)}</h1>`
-    + `<p style="font-size:12px;color:#555;">Фаза: ${esc(inp.phaseRu || '—')} · Дата: ${esc(inp.createdAt || new Date().toISOString().slice(0, 10))}</p>`
+    + `<p style="font-size:12px;color:#555;">Фаза: ${esc(inp.phaseRu || '—')} · Дата: ${esc(inp.createdAt || localIsoDate())}</p>`
     + `<table style="border-collapse:collapse;width:100%;font-size:13px;">`
     + li('Отклонения траектории', inp.issuesRu.length ? inp.issuesRu.join('; ') : '—')
     + li('VBT', vbtLine)
@@ -554,7 +557,7 @@ export function buildTrajectorySvg(inp: TrajectoryExportInput): string {
     parts.push(`<text x="${PAD_X}" y="${textY}" fill="${line.color}" font-family="sans-serif" font-size="10">${esc(line.text)}</text>`);
     textY += 14;
   }
-  parts.push(`<text x="${PAD_X}" y="${H - 12}" fill="#6b7280" font-family="sans-serif" font-size="9">${esc(inp.createdAt || new Date().toISOString().slice(0, 10))} · скорость из видео — оценка (не LPT)</text>`);
+  parts.push(`<text x="${PAD_X}" y="${H - 12}" fill="#6b7280" font-family="sans-serif" font-size="9">${esc(inp.createdAt || localIsoDate())} · скорость из видео — оценка (не LPT)</text>`);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
     + `<title>${esc(`Траектория штанги — ${inp.liftRu}`)}</title>`

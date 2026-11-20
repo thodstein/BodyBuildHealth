@@ -1,4 +1,5 @@
 import { labValueLabel } from './lab-value-label';
+import { localIsoDate } from './local-date';
 
 export function exportToJSON(data: any): string {
   return JSON.stringify(data, null, 2);
@@ -12,7 +13,9 @@ export function exportToCSV(points: any[]): string {
 }
 
 export function generateReportText(data: any): string {
-  const d = new Date().toISOString().slice(0, 10);
+  // Проход 172: «дата формирования» — календарный день пользователя. Прежний
+  // UTC-вырез до 10:00 по Владивостоку печатал в отчёте вчерашнее число.
+  const d = localIsoDate();
   let txt = `📊 HEALTH ENGINE REPORT | Дата формирования: ${d}\n\n`;
   
   if (data.readiness?.length) {

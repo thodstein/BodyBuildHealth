@@ -5,6 +5,7 @@
 
 import { SUPPORT_CATALOG_DATA, type SupportCatalogEntry } from '../data/support-catalog-data';
 import { ruCount, RU_SUPPLEMENTS } from './ru-plural';
+import { localIsoDate } from '../core/local-date';
 
 export const MIX_DIARY_KEY = 'he_training_mixes';
 export const FAVORITES_KEY = 'he_support_favorites';
@@ -319,7 +320,7 @@ export function saveMixToDiary(input: SaveMixInput, date?: string): DiaryMixReco
     label: input.label,
     substances: input.substances,
     recommendations: null,
-    date: date || new Date().toISOString().slice(0, 10),
+    date: date || localIsoDate(),
     ts: Date.now(),
   };
   const arr = readDiaryMixes();

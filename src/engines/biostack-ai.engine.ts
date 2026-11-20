@@ -1,5 +1,6 @@
 import { SUPPORT_CATALOG_DATA, SYSTEM_LABELS_CATALOG, ORGAN_LABELS } from '../data/support-database';
 import { getProfile, updateProfile } from '../core/profile-manager';
+import { localIsoDate } from '../core/local-date';
 import type { UserProfile } from '../core/types';
 
 export type CognitiveTask = 'memory' | 'focus' | 'creativity' | 'reaction_speed' | 'learning';
@@ -231,7 +232,7 @@ export function saveBioStackProfile(p: BioStackProfile): void {
       s.nutrition = { ...s.nutrition, currentSupplements: p.currentSupplements.map(id => ({ id, name: SUPPORT_CATALOG_DATA[id]?.name || id, doseMg: 0, doseUnit: 'mg' as const })) };
     }
     if (p.jointSymptoms?.length) {
-      s.health = { ...s.health, injuries: [...(s.health?.injuries || []), ...p.jointSymptoms.map((j: string) => ({ id: `bio_${Date.now()}_${j}`, type: j, location: 'unspecified', painLevel: 3, movementLimit: false, date: new Date().toISOString().split('T')[0] }))] } as any;
+      s.health = { ...s.health, injuries: [...(s.health?.injuries || []), ...p.jointSymptoms.map((j: string) => ({ id: `bio_${Date.now()}_${j}`, type: j, location: 'unspecified', painLevel: 3, movementLimit: false, date: localIsoDate() }))] } as any;
     }
     updateProfile({ settings: s });
   } catch {}

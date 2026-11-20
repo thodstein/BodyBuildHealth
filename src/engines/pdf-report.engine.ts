@@ -1,5 +1,6 @@
 import type { LabPoint, RiskResult, PCTSchedule, UserContext } from '../core/types';
 import { labValueLabelHtml } from '../core/lab-value-label';
+import { localIsoDate } from '../core/local-date';
 
 export function generateMedicalReportHTML(
   ctx: UserContext,
@@ -8,7 +9,7 @@ export function generateMedicalReportHTML(
   pctPlan: PCTSchedule | null,
   notes: string
 ): string {
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localIsoDate();
   const latestLabs = labs.slice(-15).reverse();
 
   return `

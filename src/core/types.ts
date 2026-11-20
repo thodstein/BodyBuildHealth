@@ -1,3 +1,5 @@
+import { localIsoDate } from './local-date';
+
 export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type InteractionType = 'synergy' | 'conflict' | 'danger' | 'caution';
 export type Onset = 'fast' | 'medium' | 'slow';
@@ -828,7 +830,7 @@ export function getDefaultSettings(): UnifiedSettings {
       loadStrategy: 'double_progression',
     },
     pharma: {
-      phase: 'baseline', courseStartDate: new Date().toISOString().slice(0, 10),
+      phase: 'baseline', courseStartDate: localIsoDate(),
       experience: 'none', totalCycles: 0, yearsOnGear: 0, monthsSinceLastCourse: 0,
       hcgEnabled: false, aiEnabled: false,
       trainingCycleType: 'mass', trainingCycleWeeks: 12, previousCycles: 0,

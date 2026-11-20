@@ -251,8 +251,6 @@ export function substituteExercisesForDay(
   confidence: string;
   reason: string;
 }> {
-  const today = new Date().toISOString().slice(0, 10);
-
   return exercises.map(ex => {
     if (!injuredMuscles.has(ex.muscle)) {
       return { originalName: ex.name, substituted: false, exerciseName: ex.name, muscle: ex.muscle, sets: ex.sets, weight: ex.weight, reps: ex.reps, rir: ex.rir, confidence: 'high', reason: '' };

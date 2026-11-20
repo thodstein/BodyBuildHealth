@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { registry } from './core/data/registry';
+import { localIsoDate } from './core/local-date';
 import { DashboardScreen } from './ui/screens/DashboardScreen';
 import { InfoErrorBoundary } from './ui/components/InfoErrorBoundary';
 
@@ -617,7 +618,9 @@ export default function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `pl-plan-${new Date().toISOString().slice(0, 10)}.${ext}`;
+        // Проход 172: имя скачанного файла — календарный день пользователя
+        // (UTC-вырез местным утром давал вчерашнюю дату в имени плана).
+        a.download = `pl-plan-${localIsoDate()}.${ext}`;
         document.body.appendChild(a);
         a.click();
         a.remove();

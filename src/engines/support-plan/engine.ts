@@ -31,6 +31,7 @@ import {
   CREATININE_FLAG_STEP,
   LDL_FLAG_STEPS, TG_FLAG_STEPS, BILIRUBIN_FLAG_STEPS, HDL_LOW,
 } from '../lab-norms.engine';
+import { localIsoDate } from '../../core/local-date';
 
 const AUTO_DOCTOR_ONLY = new Set([
   'warfarin', 'enoxaparin', 'sulodexide', 'lumbrokinase',
@@ -1193,7 +1194,7 @@ export function hydrateState(): Partial<CalculatorState> {
       const raw = localStorage.getItem('nutrition_diary_v2');
       if (raw) {
         const diary = JSON.parse(raw);
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localIsoDate();
         const todayEntries = Object.values(diary?.[today]?.meals || {}).flatMap((items: any) => Array.isArray(items) ? items : []);
         if (todayEntries.length > 0) {
           const totals = todayEntries.reduce((acc: any, e: any) => ({

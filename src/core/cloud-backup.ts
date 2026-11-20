@@ -1,6 +1,7 @@
 import { db } from './db';
 import { secureGetAll, securePut } from './db-encryption';
 import type { UserProfile } from './types';
+import { localIsoDate } from './local-date';
 
 const BACKUP_VERSION = '2.9';
 const STORES = ['labs_log', 'nutrition_log', 'diagnostics_log', 'doctor_notes', 'food_diary', 'articles'] as const;
@@ -14,7 +15,8 @@ export async function exportEncryptedBackup(profile: UserProfile): Promise<void>
   const blob = new Blob([json], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `health-engine-backup-${new Date().toISOString().slice(0,10)}.json`;
+  // Проход 172: имя файла — календарный день пользователя (UTC давал «вчера»).
+  a.download = `health-engine-backup-${localIsoDate()}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
 }

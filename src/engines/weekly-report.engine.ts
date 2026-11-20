@@ -1,5 +1,6 @@
 import type { UserContext, LabPoint, CourseEntry } from '../core/types';
 import { labValueLabelHtml } from '../core/lab-value-label';
+import { localIsoDate } from '../core/local-date';
 
 export interface WeeklyReportData {
   ctx: UserContext;
@@ -15,7 +16,7 @@ export interface WeeklyReportData {
 }
 
 export function generateWeeklyReportHTML(data: WeeklyReportData): string {
-  const date = new Date().toISOString().slice(0, 10);
+  const date = localIsoDate();
   const weekNum = Math.ceil((new Date().getTime() - new Date(data.ctx.courseStartDate || 0).getTime()) / (7 * 24 * 60 * 60 * 1000));
 
   const courseSummary = data.course.map(c => `${c.substanceId} ${c.doseValue}${c.doseUnit} | ${c.frequency} | Старт: ${c.startWeek}`).join('<br>');

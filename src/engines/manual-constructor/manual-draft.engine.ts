@@ -4,6 +4,7 @@
  */
 import { selectExercisesSmart, type SelectedExercise, isAxialLoadExercise } from '../exercise-selector.engine';
 import type { Exercise } from '../../core/types';
+import { localIsoDate } from '../../core/local-date';
 import { getExercisesByGroup } from '../../core/exercise-catalog';
 import type { UserProgram, BBProgramBody } from '../user-program/user-program.types';
 import { buildBBPlan, type BBBuilderInput, type BBPlan, type BBGoal } from '../bb/bb-builder.engine';
@@ -189,7 +190,7 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
       }
     })()
   );
-  const injuries: Injury[] = (opts.injuries ?? []).map((inj) => ({ muscle: inj.muscle, from: inj.from ?? new Date().toISOString().split('T')[0], to: inj.to, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap, exclude: inj.exclude }));
+  const injuries: Injury[] = (opts.injuries ?? []).map((inj) => ({ muscle: inj.muscle, from: inj.from ?? localIsoDate(), to: inj.to, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap, exclude: inj.exclude }));
   const requestedWeeks = Math.max(1, Math.min(opts.weeks, 52));
   const buildWeeks = Math.min(requestedWeeks, 16);
   const input: BBBuilderInput = {

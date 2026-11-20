@@ -10,6 +10,7 @@
 
 import type { SparringLoad } from './combat-sparring.engine';
 import { loadCardioLog, estimateCardioEntryKcal, type CardioLogEntry } from '../lms/cardio-diary.engine';
+import { localIsoDate } from '../../core/local-date';
 
 // ─── 8.1 Журнал веса ───────────────────────────────────────────────────────
 
@@ -1029,10 +1030,10 @@ export interface DiaryTrainingKcal {
   note: string;
 }
 
-/** Локальная ISO-дата (без UTC-сдвига). */
+/** Локальная ISO-дата (без UTC-сдвига). Проход 172: своя формула больше не
+ *  нужна — это ровно `localIsoDate`, и одна копия канона здесь ни к чему. */
 function todayIsoLocal(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return localIsoDate();
 }
 
 /** Сдвиг ISO-даты в UTC-арифметике (date-only строки — безопасно). */

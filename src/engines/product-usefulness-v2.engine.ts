@@ -7,6 +7,7 @@
 
 import { FOOD_DB, calcBBQualityScore, type FoodItem } from '../core/nutrition-database';
 import { getMicro } from "../core/nutrition-micros";
+import { localIsoDate } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. TYPES
@@ -913,7 +914,7 @@ export function analyzeDailyDiet(
   }
 
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: localIsoDate(),
     totalKcal: Math.round(kcal),
     mtorTriggered,
     mtorDeficitMg: Math.round(mtorDeficitMg),

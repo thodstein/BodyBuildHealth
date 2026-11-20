@@ -4,6 +4,7 @@
  */
 import type { SRPESession } from './srpe-store';
 import { sessionLoad } from './training-load.engine';
+import { localIsoDate } from '../../core/local-date';
 
 export interface IntelExportSummary {
   acwr: string; acwrZone: string; recovery: string; pri: string;
@@ -48,7 +49,10 @@ export function buildIntelDeloadIcs(deload: boolean, referenceDate = new Date())
   const d = new Date(referenceDate);
   const dow = (d.getDay() + 6) % 7; // Пн=0
   d.setDate(d.getDate() + (7 - dow));
-  const fmt = (x: Date) => x.toISOString().slice(0, 10).replace(/-/g, '');
+  // Проход 172: день недели отсчитывается по МЕСТНОМУ календарю (`setDate` выше),
+  // поэтому и в ICS-дату он должен попадать местным числом, а не UTC-вырезом:
+  // иначе местным утром (по UTC ещё вчера) deload ставился на день раньше.
+  const fmt = (x: Date) => localIsoDate(x).replace(/-/g, '');
   const end = new Date(d);
   end.setDate(end.getDate() + 7);
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//intel-hub//deload//RU', 'BEGIN:VEVENT',

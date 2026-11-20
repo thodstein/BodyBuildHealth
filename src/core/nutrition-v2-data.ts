@@ -1,4 +1,5 @@
 import { calcTrendFromHistory as calcTrendCentral } from './metabolic-constants';
+import { localIsoDate } from './local-date';
 
 const STORAGE_KEY = 'he_nutrition_v2';
 
@@ -106,7 +107,10 @@ export function saveNutritionV2Data(data: Partial<NutritionV2Data>) {
 
 export function addWeightEntry(kg: number) {
   const data = getNutritionV2Data();
-  const entry = { date: new Date().toISOString().split('T')[0], kg };
+  // Проход 172: ключ дня веса — календарный день пользователя. Местное утро
+  // (когда по UTC ещё вчера) попадало во вчерашнюю точку истории, и тренд веса
+  // считался по съехавшей дате.
+  const entry = { date: localIsoDate(), kg };
   data.weightHistory = [...data.weightHistory, entry].slice(-90);
   data.lastUpdated = new Date().toISOString();
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}

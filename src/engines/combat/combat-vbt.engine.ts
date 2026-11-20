@@ -13,6 +13,7 @@ import {
   type VBTIntent,
   type VelocityLossResult,
 } from '../pro/vbt.engine';
+import { localIsoDate } from '../../core/local-date';
 
 export type CombatLiftId = string;
 
@@ -96,7 +97,7 @@ export function loadVbtHistoryCB(): VbtHistoryEntry[] {
         const out = arr.map((x: any) => ({
           liftId: String(x.liftId || x.id || x.exerciseId || 'squat'),
           velocity: Number(x.velocity ?? x.vel ?? x.v),
-          date: String(x.date || new Date().toISOString().slice(0,10)),
+          date: String(x.date || localIsoDate()),
           weight: x.weight != null ? Number(x.weight) : undefined,
         })).filter((e: any) => Number.isFinite(e.velocity) && e.velocity > 0.05 && e.velocity < 4);
         if (out.length) return out;

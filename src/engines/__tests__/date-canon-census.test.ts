@@ -47,11 +47,37 @@ const DATE_ONLY = /\.toISOString\(\)\s*(?:\.slice\(\s*0\s*,\s*10\s*\)|\.split\(\
  * в долг как реальные места. Полнострочные `//` и блоки `/* *\/` — то, где
  * живут все такие пояснения; хвостовые `//` после кода остаются, но в них
  * календарных дат не пишут.
+ *
+ * Проход 172: блок-комментарий заменяется не пустой строкой, а таким же числом
+ * переводов строки — иначе номера строк в сообщении об ошибке съезжали на
+ * высоту вырезанного блока и указывали не туда.
  */
 const stripComments = (src: string): string =>
   src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ''))
     .replace(/^\s*\/\/.*$/gm, '');
+
+/**
+ * Места, где `toISOString()` — НЕ долг, а календарная арифметика над date-only
+ * строкой: `new Date('YYYY-MM-DD')` разбирается как полночь UTC, прибавление
+ * целых суток и извлечение UTC-дня дают ровно «строка + N дней» при любом
+ * смещении машины. Так же устроена проверка «это настоящий YYYY-MM-DD»: она
+ * сравнивает обратно тот же UTC-день. Переводить их на `localIsoDate` нельзя —
+ * на машине с отрицательным смещением дата съедет на день назад (это уже
+ * записано в `labs-scheduler`). Таблица фиксирует, СКОЛЬКО таких мест в файле:
+ * переписали на канон — число уменьшаем здесь же; появилось новое место — долг
+ * растёт и потолок ниже падает.
+ */
+const UTC_ARITHMETIC: Record<string, number> = {
+  'src/engines/arm/arm-plan-feedback.engine.ts': 1,        // addDaysIso
+  'src/engines/combat/combat-annual.ts': 2,                 // blockStartDate + isValidIsoDateAnnual
+  'src/engines/combat/combat-taper.engine.ts': 1,           // isValidIsoDate
+  'src/engines/combat/combat-measurements.engine.ts': 1,    // isoShiftDays
+  'src/engines/labs-scheduler.engine.ts': 3,                // dueDate + extra_8 + extra_12
+  'src/engines/lms/lms-taper-coach.engine.ts': 1,           // isoAddDays
+  'src/engines/lms/lms-taper.engine.ts': 1,                 // isoAddDays
+  'src/engines/nutrition-cycling.engine.ts': 1,             // день цикла = cycleStart + i
+};
 
 const zoneOf = (rel: string): string =>
   rel.split(/[\\/]/).slice(0, 3).join('/') || 'src';
@@ -59,17 +85,24 @@ const zoneOf = (rel: string): string =>
 function census() {
   const files = walk(SRC).filter(f => !/[\\/]__tests__[\\/]/.test(f) && !/\.test\.(ts|tsx)$/.test(f));
   const perZone = new Map<string, number>();
+  const perFile = new Map<string, number>();
   const sites: string[] = [];
   for (const f of files) {
     const src = stripComments(readFileSync(f, 'utf8'));
-    const hits = src.match(DATE_ONLY);
-    if (!hits || !hits.length) continue;
-    const rel = f.replace(/\\/g, '/').split('/src/')[1] ? 'src/' + f.replace(/\\/g, '/').split('/src/')[1] : f;
+    const hits = [...src.matchAll(DATE_ONLY)];
+    if (!hits.length) continue;
+    const rel = 'src/' + f.replace(/\\/g, '/').split('/src/')[1];
+    perFile.set(rel, hits.length);
     const z = zoneOf(rel);
     perZone.set(z, (perZone.get(z) || 0) + hits.length);
-    hits.forEach((_, i) => sites.push(`${rel}:${i + 1}`));
+    for (const m of hits) {
+      const line = src.slice(0, m.index).split('\n').length;
+      sites.push(`${rel}:${line}`);
+    }
   }
-  return { perZone, sites, total: sites.length };
+  const arithmetic = [...perFile.entries()]
+    .reduce((sum, [file, n]) => sum + Math.min(n, UTC_ARITHMETIC[file] ?? 0), 0);
+  return { perZone, perFile, sites, total: sites.length, arithmetic, debt: sites.length - arithmetic };
 }
 
 describe('канон календарной даты (core/local-date)', () => {
@@ -114,12 +147,20 @@ describe('канон календарной даты (core/local-date)', () => {
 });
 
 describe('витрина долга: date-only вызовы', () => {
-  const { perZone, sites, total } = census();
+  const { perZone, perFile, sites, total, arithmetic, debt } = census();
 
   it('инвентаризация напечатана (где чинить дальше)', () => {
     const строки = [...perZone.entries()].sort((a, b) => b[1] - a[1]).map(([z, n]) => `  ${z}: ${n}`);
-    console.log(`[date-canon] date-only мест в production-коде: ${total}\n${строки.join('\n')}`);
+    console.log(`[date-canon] date-only мест в production-коде: ${total}, из них UTC-арифметика дат: ${arithmetic}, долг: ${debt}\n${строки.join('\n')}`);
     expect(total).toBeGreaterThanOrEqual(0);
+  });
+
+  it('таблица UTC-арифметики не устарела', () => {
+    // Если место переписали на канон, в файле осталось меньше UTC-мест, чем в
+    // таблице, — это не ошибка кода, а сигнал обновить таблицу и опустить потолок.
+    for (const [file, n] of Object.entries(UTC_ARITHMETIC)) {
+      expect(perFile.get(file) ?? 0, `${file}: UTC-мест стало меньше, чем в таблице (${n}) — обнови UTC_ARITHMETIC и потолок`).toBeGreaterThanOrEqual(n);
+    }
   });
 
   it('долг не растёт: новых мест быть не должно', () => {
@@ -161,11 +202,16 @@ describe('витрина долга: date-only вызовы', () => {
     // `toISOString().split('T')[0]`. Она была слепой зоной (в лаборатории и
     // рисках прожила до прохода 159), поэтому потолок пересчитан по обеим формам:
     // измерено 100 мест `.slice(0, 10)` + 19 мест `.split('T')[0]` = 119.
+    // Проход 172 снял 22 места в ядре и движках (даты отчётов, ключи дней,
+    // имена выгрузок, дата травмы/цели, окно «последние N дней», ICS-подпись,
+    // «сегодня» в поддержке и фолбэк VBT) и вынес 11 мест UTC-арифметики дат в
+    // таблицу `UTC_ARITHMETIC` — они не долг и меряются отдельно. Считается
+    // теперь ДОЛГ (все места минус таблица), чтобы арифметика не съедала потолок.
     // Дальше правило прежнее: только уменьшать.
-    const ПОТОЛОК = 119;
+    const ПОТОЛОК = 86;
     expect(
-      total,
-      `date-only мест стало ${total} (был максимум ${ПОТОЛОК}). Почини через core/local-date:\n${sites.slice(0, 20).join('\n')}`,
+      debt,
+      `date-only мест стало ${debt} (был максимум ${ПОТОЛОК}; всего ${total}, из них UTC-арифметика ${arithmetic}). Почини через core/local-date:\n${sites.slice(0, 20).join('\n')}`,
     ).toBeLessThanOrEqual(ПОТОЛОК);
   });
 
