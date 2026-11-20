@@ -60,15 +60,30 @@ describe('WorkoutSummaryReport', () => {
 
   it('ReportBlockPicker рендерит чекбоксы всех блоков', () => {
     const html = renderToStaticMarkup(<ReportBlockPicker value={['totals']} onChange={() => {}} />);
-    ['Общее', 'Выводы', 'Объём', 'Мышцы', 'Упражнения', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
+    ['Общее', 'Выводы', 'Объём', 'Мышцы', 'Упражнения', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
       expect(html).toContain(label);
     });
+  });
+
+  it('блок «Подходы» показывает каждый подход с весом, повторами и RIR', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['sets']} />);
+    expect(html).toContain('Все подходы');
+    expect(html).toContain('80×8');
+    expect(html).toContain('100×5');
+    expect(html).toContain('@2');
+    expect(html).not.toContain('По мышцам');
   });
 
   it('блок выводов показывает наблюдения по периоду', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['insights']} />);
     expect(html).toContain('Выводы');
     expect(html).toContain('Тоннаж недели');
+  });
+
+  it('в упражнениях видна прогрессия e1RM (спарклайн и проценты)', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['exercises']} />);
+    expect(html).toContain('<polyline');
+    expect(html).toContain('→ 0%');
   });
 });
 

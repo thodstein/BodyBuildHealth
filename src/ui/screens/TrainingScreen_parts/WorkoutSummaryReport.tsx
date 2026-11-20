@@ -15,6 +15,7 @@ import type { WorkoutLog } from '../../../core/types';
 import {
   buildWorkoutSummary,
   buildWorkoutInsights,
+  buildSetDetails,
   formatSummaryPeriod,
   muscleLandmarksFor,
   summaryWeeksCount,
@@ -24,6 +25,7 @@ import {
   ALL_REPORT_BLOCKS,
   REPORT_BLOCKS,
   type ReportBlockId,
+  type SetDetailSession,
   type WorkoutSummary,
 } from '../../../engines/workout-summary.engine';
 
@@ -173,6 +175,23 @@ const LandmarkBar: React.FC<{ sets: number; mev: number; mav: number; mrv: numbe
   );
 };
 
+/** Мини-график тренда e1RM по тренировкам периода. */
+const Sparkline: React.FC<{ values: number[]; color?: string; width?: number; height?: number }> = ({ values, color = ACCENT, width = 56, height = 16 }) => {
+  if (!values || values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const step = width / (values.length - 1);
+  const y = (v: number) => height - ((v - min) / span) * (height - 3) - 1.5;
+  const pts = values.map((v, i) => `${(i * step).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ flexShrink: 0 }} aria-hidden="true">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={width} cy={y(values[values.length - 1])} r={1.8} fill={color} />
+    </svg>
+  );
+};
+
 /* ─── Тело отчёта (без выбора блоков) ─── */
 export const WorkoutSummaryBody: React.FC<{
   summary: WorkoutSummary;
@@ -180,7 +199,9 @@ export const WorkoutSummaryBody: React.FC<{
   compact?: boolean;
   /** Уровень спортсмена — для ориентиров MEV/MAV/MRV. */
   level?: string;
-}> = ({ summary, blocks, compact, level = 'intermediate' }) => {
+  /** Подходы «как есть» для блока «Подходы». */
+  details?: SetDetailSession[];
+}> = ({ summary, blocks, compact, level = 'intermediate', details }) => {
   const has = (id: ReportBlockId) => blocks.includes(id);
   const t = summary.totals;
   if (summary.workouts === 0) {
@@ -334,13 +355,63 @@ export const WorkoutSummaryBody: React.FC<{
                   <span>доля <b style={{ color: '#fff' }}>{e.sharePct}%</b></span>
                   {e.avgRIR != null && <span>RIR <b style={{ color: '#fff' }}>{e.avgRIR}</b></span>}
                   {e.sessions > 1 && <span>в {e.sessions} трен.</span>}
+                  {e.progressPct != null && (
+                    <span style={{ color: e.progressPct > 0 ? '#22c55e' : e.progressPct < 0 ? '#ef4444' : '#fff', opacity: e.progressPct === 0 ? 0.65 : 1, fontWeight: 700 }}>
+                      {`${e.progressPct > 0 ? '▲' : e.progressPct < 0 ? '▼' : '→'} ${Math.abs(e.progressPct)}%`}
+                    </span>
+                  )}
                   <div style={{ flex: 1, minWidth: 60 }}>
                     <Bar pct={(e.tonnageKg / maxExTonnage) * 100} color={MUSCLE_COLORS[e.muscle] || ACCENT} height={3} />
                   </div>
+                  <Sparkline values={e.e1rmSeries} color={e.progressPct != null && e.progressPct < 0 ? '#ef4444' : ACCENT} />
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── ПОДХОДЫ ── */}
+      {has('sets') && (details || []).length > 0 && (
+        <div style={CARD}>
+          <SectionTitle icon="🧾" title="Все подходы" hint="вес × повторы · RIR/RPE по каждой тренировке" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {(details || []).slice(0, compact ? 3 : 40).map(session => (
+              <div key={session.id}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5, marginBottom: 3 }}>
+                  <span style={{ color: '#fff', fontWeight: 800, whiteSpace: 'nowrap' }}>{fmtDate(session.date)}</span>
+                  <span style={{ flex: 1, minWidth: 40, color: '#fff', opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{session.split}</span>
+                  <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmtTon(session.tonnageKg)}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {session.exercises.map((ex, ei) => (
+                    <div key={`${session.id}_${ex.name}_${ei}`} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 9.5, paddingLeft: 4, borderLeft: `2px solid ${MUSCLE_COLORS[ex.muscle] || 'rgba(255,255,255,0.2)'}` }}>
+                      <span style={{ minWidth: 74, maxWidth: 110, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.name}</span>
+                      <span style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {ex.sets.map((st, si) => (
+                          <span
+                            key={si}
+                            title={st.rir != null ? `RIR ${st.rir}` : st.rpe != null ? `RPE ${st.rpe}` : undefined}
+                            style={{ fontSize: 8.5, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.07)', color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                          >
+                            {st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}
+                            {st.rir != null && <b style={{ color: st.rir <= 0 ? '#ef4444' : st.rir <= 2 ? '#f59e0b' : '#22c55e' }}> @{st.rir}</b>}
+                            {st.rir == null && st.rpe != null && <b style={{ color: '#60a5fa' }}> @{st.rpe}RPE</b>}
+                          </span>
+                        ))}
+                      </span>
+                      <span style={{ color: '#f59e0b', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>e1RM {ex.bestE1RM || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {(details || []).length > (compact ? 3 : 40) && (
+            <div style={{ marginTop: 6, fontSize: 9, color: '#fff', opacity: 0.65 }}>
+              Показаны {(compact ? 3 : 40)} из {details?.length} тренировок.
+            </div>
+          )}
         </div>
       )}
 
@@ -446,6 +517,10 @@ export const WorkoutSummaryReport: React.FC<{
     }
   };
   const summary = React.useMemo(() => buildWorkoutSummary(workouts), [workouts]);
+  const details = React.useMemo(
+    () => (selected.includes('sets') ? buildSetDetails(workouts) : []),
+    [workouts, selected],
+  );
 
   return (
     <div className="workout-summary-report" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -478,7 +553,7 @@ export const WorkoutSummaryReport: React.FC<{
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} />
     </div>
   );
 };

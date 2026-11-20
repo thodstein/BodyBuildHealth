@@ -2423,7 +2423,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 title="Сводка тренировки"
                 subtitle={`${done.focus || 'Тренировка'}${done.durationMin ? ` · ${done.durationMin} мин` : ''}`}
                 storageKey="he_workout_done_blocks"
-                defaultBlocks={['totals', 'insights', 'muscles', 'exercises', 'prs']}
+                defaultBlocks={['totals', 'insights', 'muscles', 'exercises', 'sets', 'prs']}
               />
             </div>
           )}

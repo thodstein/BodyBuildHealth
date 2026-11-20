@@ -222,6 +222,7 @@ export const REPORT_BLOCKS = [
   { id: 'volume', label: 'Объём' },
   { id: 'muscles', label: 'Мышцы' },
   { id: 'exercises', label: 'Упражнения' },
+  { id: 'sets', label: 'Подходы' },
   { id: 'movement', label: 'Движения' },
   { id: 'sessions', label: 'Тренировки' },
   { id: 'prs', label: 'Рекорды' },
@@ -249,6 +250,10 @@ export interface SummaryExercise {
   avgRPE: number | null;
   sharePct: number;
   sessions: number;
+  /** Лучший e1RM по последним (до 12) тренировкам периода — для спарклайна. */
+  e1rmSeries: number[];
+  /** Прирост e1RM от первой к последней точке серии, % (null — меньше двух точек). */
+  progressPct: number | null;
 }
 
 export interface SummaryMuscle {
@@ -400,6 +405,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
     name: string; muscle: MuscleKey; muscleLabel: string; pattern: string; patternLabel: string;
     sets: number; reps: number; tonnageKg: number; bestWeight: number; bestReps: number; bestE1RM: number;
     rirSum: number; rirN: number; rpeSum: number; rpeN: number; sessions: Set<string>;
+    /** Лучший e1RM по тренировкам периода (по возрастанию даты). */
+    e1rmSeries: number[];
+    /** Метка последней тренировки в серии — чтобы не дублировать одну и ту же. */
+    seriesStamp: string;
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string> }>();
@@ -495,6 +504,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
         pattern: meta.pattern, patternLabel: meta.patternLabel,
         sets: 0, reps: 0, tonnageKg: 0, bestWeight: 0, bestReps: 0, bestE1RM: 0,
         rirSum: 0, rirN: 0, rpeSum: 0, rpeN: 0, sessions: new Set<string>(),
+        e1rmSeries: [],
+        seriesStamp: '',
       };
       prev.sets += exSets;
       prev.reps += exReps;
@@ -502,6 +513,17 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       prev.bestWeight = Math.max(prev.bestWeight, exBestWeight);
       prev.bestReps = Math.max(prev.bestReps, exBestReps);
       prev.bestE1RM = Math.max(prev.bestE1RM, exBestE1RM);
+      if (exBestE1RM > 0) {
+        const stamp = String(w.id || date);
+        const rounded = Math.round(exBestE1RM);
+        if (prev.seriesStamp === stamp && prev.e1rmSeries.length > 0) {
+          const lastIdx = prev.e1rmSeries.length - 1;
+          prev.e1rmSeries[lastIdx] = Math.max(prev.e1rmSeries[lastIdx], rounded);
+        } else {
+          prev.e1rmSeries.push(rounded);
+          prev.seriesStamp = stamp;
+        }
+      }
       prev.rirSum += exRirSum; prev.rirN += exRirN;
       prev.rpeSum += exRpeSum; prev.rpeN += exRpeN;
       prev.sessions.add(w.id || date);
@@ -563,6 +585,15 @@ export function buildWorkoutSummary(workouts: WorkoutLog[]): WorkoutSummary {
       avgRPE: e.rpeN > 0 ? Math.round((e.rpeSum / e.rpeN) * 10) / 10 : null,
       sharePct: totalTonnage > 0 ? Math.round((e.tonnageKg / totalTonnage) * 1000) / 10 : 0,
       sessions: e.sessions.size,
+      e1rmSeries: e.e1rmSeries.slice(-12),
+      progressPct: (() => {
+        const s = e.e1rmSeries.slice(-12);
+        if (s.length < 2) return null;
+        const first = s[0];
+        const last = s[s.length - 1];
+        if (first <= 0) return null;
+        return Math.round(((last - first) / first) * 1000) / 10;
+      })(),
     }))
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
@@ -778,6 +809,89 @@ export function buildWorkoutInsights(s: WorkoutSummary): SummaryInsight[] {
   }
 
   return out.slice(0, 6);
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Детализация подходов (для «самой подробной» карточки тренировки)
+// ───────────────────────────────────────────────────────────────────────────
+
+export interface SetDetailRow {
+  weight: number;
+  reps: number;
+  rir: number | null;
+  rpe: number | null;
+}
+
+export interface SetDetailExercise {
+  name: string;
+  muscle: MuscleKey;
+  muscleLabel: string;
+  sets: SetDetailRow[];
+  tonnageKg: number;
+  bestE1RM: number;
+}
+
+export interface SetDetailSession {
+  id: string;
+  date: string;
+  split: string;
+  durationMin: number;
+  tonnageKg: number;
+  exercises: SetDetailExercise[];
+}
+
+/** Подходы как есть: вес × повторы × RIR/RPE, по тренировкам (свежие первыми). */
+export function buildSetDetails(workouts: WorkoutLog[]): SetDetailSession[] {
+  const list = (Array.isArray(workouts) ? workouts : [])
+    .filter(Boolean)
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+  return list.map(w => {
+    const exercises: SetDetailExercise[] = [];
+    const raw = (Array.isArray(w.exercises) ? w.exercises : []) as LooseExercise[];
+    for (const ex of raw) {
+      if (!ex) continue;
+      const name = String(ex.exerciseName || ex.name || ex.exerciseId || 'Упражнение').trim();
+      if (!name) continue;
+      const sets: SetDetailRow[] = [];
+      let tonnage = 0;
+      let best = 0;
+      for (const st of (Array.isArray(ex.sets) ? ex.sets : []) as LooseSet[]) {
+        const weight = setWeight(st);
+        const reps = setReps(st);
+        if (weight <= 0 && reps <= 0) continue;
+        const rirRaw = (st as any)?.rir;
+        const rpeRaw = (st as any)?.rpe;
+        sets.push({
+          weight,
+          reps,
+          rir: rirRaw != null && Number.isFinite(Number(rirRaw)) ? Number(rirRaw) : null,
+          rpe: rpeRaw != null && Number.isFinite(Number(rpeRaw)) ? Number(rpeRaw) : null,
+        });
+        tonnage += weight * reps;
+        if (weight > 0 && reps > 0) best = Math.max(best, epley1RM(weight, reps));
+      }
+      if (sets.length === 0) continue;
+      const meta = resolveExerciseMeta(ex as any);
+      exercises.push({
+        name,
+        muscle: meta.muscle,
+        muscleLabel: MUSCLE_LABELS[meta.muscle],
+        sets,
+        tonnageKg: Math.round(tonnage),
+        bestE1RM: Math.round(best),
+      });
+    }
+    return {
+      id: String(w.id || `${w.date}_detail`),
+      date: String(w.date || '').slice(0, 10),
+      split: String(w.split || 'Тренировка'),
+      durationMin: num(w.duration),
+      tonnageKg: Math.round(exercises.reduce((acc, e) => acc + e.tonnageKg, 0)),
+      exercises,
+    };
+  });
 }
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWorkoutSummary,
   buildWorkoutInsights,
+  buildSetDetails,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -224,5 +225,72 @@ describe('workout-summary: ориентиры объёма', () => {
     ]);
     expect(summaryWeeksCount(s)).toBe(2);
     expect(summaryWeeksCount(buildWorkoutSummary([]))).toBe(1);
+  });
+});
+
+describe('workout-summary: детализация подходов', () => {
+  it('отдаёт подходы как есть, свежие тренировки первыми', () => {
+    const older = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2, rir: 2 }]);
+    const newer = mkWorkout('2026-11-09', [{ name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3, rir: 1 }]);
+    const details = buildSetDetails([older, newer]);
+    expect(details.map(d => d.date)).toEqual(['2026-11-09', '2026-11-02']);
+    expect(details[0].exercises[0].name).toBe('Тяга верхнего блока');
+    expect(details[0].exercises[0].sets).toHaveLength(3);
+    expect(details[0].exercises[0].sets[0]).toEqual({ weight: 60, reps: 10, rir: 1, rpe: 7 });
+    expect(details[0].tonnageKg).toBe(60 * 10 * 3);
+  });
+
+  it('RIR 0 сохраняется как значение, а не как «нет данных»', () => {
+    const w = mkWorkout('2026-11-10', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0 }]);
+    expect(buildSetDetails([w])[0].exercises[0].sets[0].rir).toBe(0);
+  });
+
+  it('устойчив к legacy-записям и мусору', () => {
+    const legacy = {
+      id: 'legacy_1',
+      date: '2026-11-05',
+      duration: 45,
+      split: 'FullBody',
+      exercises: [
+        { name: 'Жим гантелей лёжа', sets: [{ weightKg: 30, reps: 12 }, { reps: 10 }] },
+        { exerciseName: 'Планка', sets: [] },
+        null,
+      ],
+    } as any;
+    const details = buildSetDetails([legacy, null as any, { id: 'broken', date: '2026-11-06', exercises: 'oops' } as any]);
+    expect(details).toHaveLength(2);
+    const day = details.find(d => d.date === '2026-11-05');
+    expect(day?.exercises).toHaveLength(1);
+    expect(day?.exercises[0].sets.map(s => s.weight)).toEqual([30, 0]);
+    expect(day?.exercises[0].sets[1].rir).toBeNull();
+    expect(details.find(d => d.date === '2026-11-06')?.exercises).toEqual([]);
+  });
+
+  it('блок «Подходы» есть в наборе блоков', () => {
+    expect(ALL_REPORT_BLOCKS).toContain('sets');
+  });
+});
+
+describe('workout-summary: прогрессия упражнений', () => {
+  it('собирает e1RM по тренировкам и считает прирост', () => {
+    const w1 = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
+    const w2 = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 3 }]);
+    const ex = buildWorkoutSummary([w1, w2]).exercises.find(e => e.name === 'Жим штанги лёжа');
+    expect(ex?.e1rmSeries).toEqual([101, 114]);
+    expect(ex?.progressPct).toBe(12.9);
+  });
+
+  it('одна тренировка не выдаёт прирост', () => {
+    const w = mkWorkout('2026-11-02', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5 }]);
+    const ex = buildWorkoutSummary([w]).exercises[0];
+    expect(ex.e1rmSeries).toHaveLength(1);
+    expect(ex.progressPct).toBeNull();
+  });
+
+  it('упражнения без веса не попадают в серию e1RM', () => {
+    const w = mkWorkout('2026-11-02', [{ name: 'Планка', id: 'plank', weight: 0, reps: 60, sets: 2 }]);
+    const ex = buildWorkoutSummary([w]).exercises[0];
+    expect(ex.e1rmSeries).toEqual([]);
+    expect(ex.progressPct).toBeNull();
   });
 });

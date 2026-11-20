@@ -12,6 +12,7 @@ import type { WorkoutLog } from '../../../core/types';
 import {
   buildWorkoutSummary,
   buildWorkoutInsights,
+  buildSetDetails,
   filterWorkoutsByRange,
   monthRange,
   weekRangeFor,
@@ -212,6 +213,20 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       lines.push('');
       lines.push('Выводы:');
       insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
+    }
+    if (summary.workouts <= 3) {
+      const perSet = buildSetDetails(workouts);
+      if (perSet.length) {
+        lines.push('');
+        lines.push('Подходы:');
+        perSet.forEach(session => {
+          lines.push(`  ${session.date} · ${session.split} · ${fmtTon(session.tonnageKg)}`);
+          session.exercises.forEach(ex => {
+            const sets = ex.sets.map(st => `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`).join(', ');
+            lines.push(`    ${ex.name}: ${sets}`);
+          });
+        });
+      }
     }
     void navigator.clipboard?.writeText(lines.join('\n')).then(() => {
       setCopyDone(true);
