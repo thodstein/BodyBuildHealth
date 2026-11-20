@@ -18,6 +18,8 @@ import {
   monthRange,
   weekRangeFor,
   formatSummaryPeriod,
+  muscleLandmarksFor,
+  volumeAdvice,
 } from '../../../engines/workout-summary.engine';
 import { WorkoutSummaryReport } from './WorkoutSummaryReport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -192,7 +194,9 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     summary.muscles.forEach(m => {
       const weekly = Math.round(m.sets / weeksCount);
       const trend = m.weeklyTrendPct != null ? ` (${m.weeklyTrendPct > 0 ? '+' : ''}${m.weeklyTrendPct}% к первой неделе)` : '';
-      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} подх/нед${trend} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
+      // Совет по объёму — та же правка, что видна на экране: +5/нед до MEV.
+      const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, hub.level));
+      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} подх/нед${trend}${adv ? ` · ${adv.chip}` : ''} · ${fmtTon(m.tonnageKg)} · ${m.sharePct}%`);
     });
     lines.push('');
     lines.push('По упражнениям:');

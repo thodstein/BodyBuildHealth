@@ -8,6 +8,7 @@ import {
   formatSummaryPeriod,
   monthRange,
   muscleLandmarksFor,
+  volumeAdvice,
   resolveExerciseMeta,
   sessionToWorkoutLog,
   summaryWeeksCount,
@@ -550,5 +551,43 @@ describe('workout-summary: рекорды и подходы без веса', ()
     expect(s.totals.sets).toBe(4);
     expect(s.exercises.find(e => e.name === 'Подтягивания')?.weightlessSets).toBe(2);
     expect(s.exercises.find(e => e.name === 'Подтягивания')?.tonnageKg).toBe(0);
+  });
+});
+
+describe('workout-summary: что делать с объёмом мышцы', () => {
+  const lm = (weeklySets: number, mev: number, mav: number, mrv: number, status: any) =>
+    ({ weeklySets, mev, mav, mrv, status });
+
+  it('ниже MEV — говорит, сколько добавить', () => {
+    const adv = volumeAdvice(lm(4, 8, 14, 20, 'below_mev'));
+    expect(adv).toEqual(expect.objectContaining({ delta: 4, chip: '+4/нед до MEV' }));
+    expect(adv!.hint).toContain('не хватает 4');
+  });
+
+  it('в норме — показывает запас до MRV', () => {
+    const adv = volumeAdvice(lm(12, 8, 14, 20, 'optimal'));
+    expect(adv).toEqual(expect.objectContaining({ delta: 8, chip: 'запас +8 до MRV' }));
+  });
+
+  it('близко к MRV — предупреждает, что дальше предел', () => {
+    const adv = volumeAdvice(lm(19, 8, 14, 20, 'approaching_mrv'));
+    expect(adv).toEqual(expect.objectContaining({ delta: 1, chip: '+1 до предела' }));
+    expect(adv!.hint).toContain('близок к предельному');
+  });
+
+  it('выше MRV — говорит, сколько убрать', () => {
+    const adv = volumeAdvice(lm(24, 8, 14, 20, 'exceeding_mrv'));
+    expect(adv).toEqual(expect.objectContaining({ delta: -4, chip: '−4/нед' }));
+    expect(adv!.hint).toContain('уберите');
+  });
+
+  it('ниже MEV не выдаёт нулевую правку', () => {
+    // 7.6 округляется до 8 = MEV, но статус ещё below_mev — совет не должен стать «+0».
+    expect(volumeAdvice(lm(7.6, 8, 14, 20, 'below_mev'))?.delta).toBe(1);
+  });
+
+  it('без ориентиров молчит', () => {
+    expect(volumeAdvice(null)).toBeNull();
+    expect(volumeAdvice(lm(NaN, 8, 14, 20, 'optimal'))).toBeNull();
   });
 });

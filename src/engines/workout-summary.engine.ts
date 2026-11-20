@@ -1251,6 +1251,53 @@ export function muscleLandmarksFor(muscle: MuscleKey, weeklySets: number, level:
   return { weeklySets, mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status: checkVolumeStatus(weeklySets, lm) };
 }
 
+export interface VolumeAdvice {
+  /** Сколько подходов в неделю добавить (+) или убрать (−). */
+  delta: number;
+  /** Короткий ярлык для строки мышцы: «+4/нед до MEV». */
+  chip: string;
+  hint: string;
+}
+
+/**
+ * Что делать с объёмом мышцы: числа MEV/MAV/MRV сами по себе не подсказывают
+ * действие. Возвращает одну конкретную правку — сколько подходов в неделю
+ * добавить или убрать и зачем.
+ */
+export function volumeAdvice(lm: MuscleLandmarkInfo | null): VolumeAdvice | null {
+  if (!lm || !Number.isFinite(lm.weeklySets)) return null;
+  const sets = Math.round(lm.weeklySets);
+  if (lm.status === 'below_mev') {
+    const delta = Math.max(1, Math.round(lm.mev - sets));
+    return {
+      delta,
+      chip: `+${delta}/нед до MEV`,
+      hint: `До минимального эффективного объёма не хватает ${delta} подходов в неделю.`,
+    };
+  }
+  if (lm.status === 'exceeding_mrv') {
+    const over = Math.max(1, Math.round(sets - lm.mrv));
+    return {
+      delta: -over,
+      chip: `−${over}/нед`,
+      hint: `На ${over} подходов в неделю выше предела восстановления — уберите их или запланируйте разгрузку.`,
+    };
+  }
+  const delta = Math.max(0, Math.round(lm.mrv - sets));
+  if (lm.status === 'approaching_mrv') {
+    return {
+      delta,
+      chip: delta > 0 ? `+${delta} до предела` : 'у предела',
+      hint: 'Объём близок к предельному — расти дальше только при хорошем восстановлении.',
+    };
+  }
+  return {
+    delta,
+    chip: `запас +${delta} до MRV`,
+    hint: 'В рабочем коридоре: держите темп или постепенно растите к MAV.',
+  };
+}
+
 export const VOLUME_STATUS_LABEL: Record<VolumeStatus, string> = {
   below_mev: 'ниже MEV',
   optimal: 'в норме',

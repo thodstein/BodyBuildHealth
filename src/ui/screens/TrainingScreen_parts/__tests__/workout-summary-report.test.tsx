@@ -49,6 +49,9 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('инт. ');
     expect(html).toContain('Только проблемные (2)');
     expect(html).toContain('ниже MEV');
+    // Конкретная правка объёма: не только «ниже MEV», но и сколько добавить.
+    expect(html).toContain('+5/нед до MEV');
+    expect(html).toContain('+6/нед до MEV');
   });
 
   it('уважает выбор блоков (только «Общее»)', () => {
@@ -240,5 +243,30 @@ describe('Дневник → Отчёт', () => {
     const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="reports" />);
     expect(html).toContain('Охват отчёта');
     expect(html).toContain('Неделя');
+  });
+
+  it('копируемый отчёт несёт недельный объём и правку по MEV', async () => {
+    const writes: string[] = [];
+    const orig = (navigator as any).clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: (s: string) => { writes.push(s); return Promise.resolve(); } },
+      configurable: true,
+    });
+    // Живой маунт тянет эффекты хаба: заглушка отвечает на любой вызов дневника.
+    const stubDiary = new Proxy({}, {
+      get: () => () => Promise.resolve([]),
+    }) as unknown as StrengthDiary;
+    try {
+      render(<TrainingDiaryHub {...baseProps} diary={stubDiary} initialMode="summary" />);
+      fireEvent.click(screen.getByText(/Копировать отчёт/));
+      await Promise.resolve();
+      const txt = writes.join('\n');
+      expect(txt).toContain('По мышцам:');
+      expect(txt).toContain('подх/нед');
+      expect(txt).toContain('+6/нед до MEV');
+      expect(txt).toContain('Грудь');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { value: orig, configurable: true });
+    }
   });
 });

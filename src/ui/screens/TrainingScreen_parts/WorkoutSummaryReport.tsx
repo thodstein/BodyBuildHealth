@@ -19,6 +19,7 @@ import {
   compareWorkoutSummaries,
   formatSummaryPeriod,
   muscleLandmarksFor,
+  volumeAdvice,
   summaryWeeksCount,
   MUSCLE_COLORS,
   VOLUME_STATUS_COLOR,
@@ -440,7 +441,9 @@ export const WorkoutSummaryBody: React.FC<{
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {shownMuscleRows.map(({ m, lm }) => (
+            {shownMuscleRows.map(({ m, lm }) => {
+              const adv = volumeAdvice(lm);
+              return (
               <div key={m.muscle} style={{ position: 'relative', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.025)', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${(m.tonnageKg / maxMuscleTonnage) * 100}%`, background: m.color, opacity: 0.14 }} />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
@@ -461,6 +464,11 @@ export const WorkoutSummaryBody: React.FC<{
                             {m.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(m.weeklyTrendPct)}%
                           </span>
                         )}
+                        {adv && (
+                          <span title={adv.hint} style={{ marginLeft: 5, fontWeight: 800, color: VOLUME_STATUS_COLOR[lm.status], whiteSpace: 'nowrap' }}>
+                            {adv.chip}
+                          </span>
+                        )}
                       </span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ whiteSpace: 'nowrap' }}>MEV {lm.mev} · MAV {lm.mav} · MRV {lm.mrv}</span>
@@ -475,7 +483,8 @@ export const WorkoutSummaryBody: React.FC<{
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
