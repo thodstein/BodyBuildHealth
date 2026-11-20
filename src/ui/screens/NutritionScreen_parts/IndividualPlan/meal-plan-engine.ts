@@ -5359,6 +5359,112 @@ const preferVegPlan122 = (veg: DayPlanV2, plain: DayPlanV2, input: MealPlanInput
  * §8.122: публичная сборка дня. День без добора — «честный» (он же и HEAD-поведение при
  * `vegTopUp88:false`); день с добором — кандидат, который проходит проверку инвариантов.
  */
+/**
+ * §8.123 «пери-окно не обещает того, чего нет в тарелке».
+ *
+ * Дефект (замер 80 тренировочных дней сетки §8.112): 33 окна обещали 21–30 г углеводов,
+ * а тарелка несла 0–3 г. Механика: билдер кладёт болюс по бюджету (сухие 50 г), посадка
+ * дня при сходимости ужимает его до 19–23 г (ниже смыслового пола), а проход «мелочь
+ * <30 г» (§8.117 — там правка отклонена замером) снимает позицию целиком. Цель окна при
+ * этом оставалась 22/27 г, а ноты дня обещали «сыворотка + быстрые углеводы».
+ *
+ * Правило: витрина окна = ФАКТ тарелки. Если фактическая доза меньше 60 % обещанной,
+ * цель окна приводится к факту, а нота/rationale перестают обещать то, чего нет.
+ * Граммы тарелки не меняются — калибровка дня (сходимость ≤3 %, обрезки) не страдает.
+ */
+function reconcilePeriPromises123(meals: Meal[], notes: string[]): void {
+  const _periTypes = ['preworkout', 'postworkout', 'intra'];
+  const _peris = (meals || []).filter((m: any) => _periTypes.includes(String(m.type)));
+  if (_peris.length === 0) return;
+  const _carbLike = (it: any) => it.role === 'carb_slow' || it.role === 'carb_fast'
+    || (it.role === 'liquid' && (Number(it.c) || 0) > 0.5);
+  const _protLike = (it: any) => it.role === 'protein' || it.role === 'fast_protein' || it.role === 'slow_protein';
+  // §8.113b-нота говорит о ЦЕЛЬНОМ продукте окна (рыба/птица/творог), порошок в окне — законная
+  // доза (шейкер) и противоречием не является. Считаем только цельный белок.
+  const _wholeProt = (it: any) => it.role === 'protein' && !isProteinPowderId(String(it.id)) && !(it as any)._fixedGrams;
+  const TOL = 0.6; // «выполнено», если тарелка несёт ≥60 % обещанной дозы
+  const _carbFloor = Number(MIN_MEANINGFUL_G.carb_slow || 30);
+  let _winProtG = 0;
+  for (const m of _peris) {
+    const items = (m.items || []) as any[];
+    const ac = Math.round(items.filter(_carbLike).reduce((s: number, it: any) => s + (Number(it.c) || 0), 0));
+    const ap = Math.round(items.filter(_protLike).reduce((s: number, it: any) => s + (Number(it.p) || 0), 0) * 10) / 10;
+    const tgt = ((m as any).target || {}) as any;
+    const pc = Number(tgt.c) || 0;
+    const pp = Number(tgt.p) || 0;
+    if (String((m as any).type) !== 'intra') _winProtG += Math.round(items.filter(_wholeProt).reduce((s: number, it: any) => s + (Number(it.p) || 0), 0) * 10) / 10;
+    let _touched = false;
+    if (pc > 0 && ac < pc * TOL) {
+      tgt.c = ac;
+      _touched = true;
+    }
+    if (pp > 0 && ap < pp * TOL) {
+      tgt.p = ap;
+      _touched = true;
+    }
+    if (!_touched) continue;
+    // Rationale приёма: обещание по дозе — по факту тарелки.
+    if (Array.isArray((m as any).rationale)) {
+      (m as any).rationale = (m as any).rationale.map((r: any) => {
+        if (typeof r !== 'string') return r;
+        if (/^(Медленные|Быстрые) углеводы \d+ г/.test(r)) {
+          return ac > 0
+            ? `Углеводы окна ${ac} г (план ${pc} г): посадка дня ужала болюс ниже смыслового пола ${_carbFloor} г — остаток в основных приёмах`
+            : `Углеводов в окне нет (план ${pc} г): болюс ниже смыслового пола ${_carbFloor} г не размещён, углеводы в основных приёмах`;
+        }
+        if (/^(Post-workout \+60 мин: сывороточный белок|Pre-workout за ~90 мин: белок) \d+ г/.test(r)) {
+          return `Белок окна ${ap} г (план ${pp} г) — факт тарелки`;
+        }
+        return r;
+      });
+    }
+    if (String((m as any).type) === 'preworkout') {
+      notes.push(`🍽️ «${m.label}»: цель окна приведена к факту — углеводы ${ac} г (план ${pc} г), белок ${ap} г: болюс ниже смыслового пола ${_carbFloor} г не размещён, углеводы дня в основных приёмах.`);
+    } else if (String((m as any).type) === 'postworkout') {
+      notes.push(`🍽️ «${m.label}»: цель окна приведена к факту — углеводы ${ac} г (план ${pc} г), белок ${ap} г: быстрые углеводы окна не размещены, день несёт их в основных приёмах.`);
+    } else {
+      notes.push(`🍽️ «${m.label}»: цель окна приведена к факту — углеводы ${ac} г (план ${pc} г), белок ${ap} г.`);
+    }
+  }
+  // Ноты дня, которые обещают дозу окна («белок + медленные углеводы», «сыворотка + быстрые»).
+  const _prew = _peris.find((m: any) => String(m.type) === 'preworkout') as any;
+  const _postw = _peris.find((m: any) => String(m.type) === 'postworkout') as any;
+  const _dose = (m: any) => (m?.items || []).filter(_carbLike).reduce((s: number, it: any) => s + (Number(it.c) || 0), 0);
+  const _rewrite = (re: RegExp, m: any, label: string) => {
+    if (!m) return;
+    const ac = Math.round(_dose(m));
+    if (ac >= 20) return;
+    const ix = notes.findIndex((n) => typeof n === 'string' && re.test(n));
+    if (ix < 0) return;
+    const ap = Math.round((m.items || []).filter(_protLike).reduce((s: number, it: any) => s + (Number(it.p) || 0), 0));
+    notes[ix] = `${label}: белок ${ap} г — углеводов в окне ${ac} г, дозу не обещаем (день несёт углеводы в основных приёмах).`;
+  };
+  _rewrite(/^Pre-workout:/, _prew, 'Pre-workout за 90 мин');
+  _rewrite(/^Post-workout: сыворотка/, _postw, 'Post-workout через 30 мин');
+  // Intra: нота «EAA + циклодекстрин» врёт, если QG2 снял добавки (сессия <90 мин + pre/post
+  // дают ≥30 г белка) или углеводную загрузку срезала сходимость дня. Состав — по тарелке.
+  {
+    const _intra = _peris.find((m: any) => String(m.type) === 'intra') as any;
+    if (_intra) {
+      const _ids = (_intra.items || []).map((it: any) => String(it.id));
+      const _hasAA = _ids.some((id: string) => /eaa|bcaa/i.test(id));
+      const _hasCarbLoad = _ids.some((id: string) => /amylopectin|dextrose|maltodextrin|vitargo|cyclic/i.test(id));
+      if (!_hasAA || !_hasCarbLoad) {
+        const ix = notes.findIndex((n) => typeof n === 'string' && /^Intra-workout:/.test(n));
+        if (ix >= 0) {
+          const _names = (_intra.items || []).map((it: any) => String(it.name || it.id)).join(' + ') || 'пусто';
+          notes[ix] = `Intra-workout: в окне ${_names} — EAA/углеводная загрузка не размещены (белка дня хватает, углеводы окна не нужны).`;
+        }
+      }
+    }
+  }
+  // §8.113b-нота «остаются углеводными»: правда только если окна белка реально не несут.
+  const _ix113 = notes.findIndex((n: any) => typeof n === 'string' && /^🍽️ Предтрен\/пост-трен остаются углеводными/.test(n));
+  if (_ix113 >= 0 && _winProtG > 0) {
+    notes[_ix113] = `🍽️ Предтрен/пост-трен: окно несёт ${Math.round(_winProtG)} г цельного белка (порция в окне не режется в обрезок) — остальной белок в основных приёмах.`;
+  }
+}
+
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const plain = buildDayPlanCore({ ...(input as any), vegTopUp88: false } as unknown as MealPlanInput);
   if ((input as any).vegTopUp88 === false) return plain;
@@ -20082,6 +20188,8 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       // и цифры не совпали с тарелками).
       _refreshProteinNote();
     }
+    // §8.123: последняя точка обещаний — витрина пери-окна = факт тарелки.
+    reconcilePeriPromises123(meals, notes);
     return {
      dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
