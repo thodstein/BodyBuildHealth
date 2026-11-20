@@ -1,6 +1,6 @@
 // Lab Analysis Engine — interprets lab values into mechanisms, organs, systems, risks
 import type { LabPoint } from '../core/types';
-import { convertToUnit } from '../core/labs-mapping';
+import { convertToUnit, unitsIncommensurable } from '../core/labs-mapping';
 import { ucumInfo } from '../core/constants';
 import { boundProvesSide, boundsComparable, type LabBound } from '../core/lab-bound';
 import {
@@ -270,11 +270,20 @@ function findLabPoint(labs: LabPoint[], code: string): { value: number; bound?: 
   // поэтому без пересчёта «600 нг/дл» тестостерона читалось как 600 нмоль/л, а
   // пролактин «15 нг/мл» — как 15 мЕд/л. Проход 84: если единицу разобрать не
   // удалось, у E2 остаётся честный перевод пмоль/л.
-  const converted = convertToUnit(code, lab.value, lab.unit || '', REFERENCE_RANGES[code]?.unit || '');
+  const targetUnit = REFERENCE_RANGES[code]?.unit || '';
+  const converted = convertToUnit(code, lab.value, lab.unit || '', targetUnit);
   // Пересчёт единицы — умножение на положительный коэффициент: знак границы
   // при этом не меняется, поэтому он переносится как есть.
   if (converted !== null) return { value: converted, bound: lab.bound };
   if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };
+  // Проход 178: единица указана, но это ДРУГАЯ величина, чем шкала (инсулин
+  // «пмоль/л» против «мкЕд/мл», АпоB «ммоль/л» против «г/л»): коэффициент
+  // вещества неизвестен, пересчитать нечем. Тогда записи для вывода нет —
+  // «нет нормы в этой единице», а не «критично». Раньше число шло в сравнение
+  // как есть: 60 пмоль/л инсулина читались как 60 мкЕд/мл. Пустая или
+  // неразобранная единица («балл») остаётся прежним путём — число читается в
+  // единице приложения, о чём говорит пометка «единица не указана».
+  if (String(lab.unit || '').trim() && unitsIncommensurable(lab.unit || '', targetUnit)) return null;
   return { value: lab.value, bound: lab.bound };
 }
 

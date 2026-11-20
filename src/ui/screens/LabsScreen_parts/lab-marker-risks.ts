@@ -13,7 +13,7 @@
  *    отдельный счётчик, а не «норма».
  */
 import { ucumInfo } from '../../../core/constants';
-import { normalizeLabMeasurement } from '../../../core/labs-mapping';
+import { normalizeLabMeasurement, unitsIncommensurable } from '../../../core/labs-mapping';
 import { boundProvesSide, type LabBound } from '../../../core/lab-bound';
 import { getLabNorm } from '../../../engines/lab-norms.engine';
 import { LABS_SYSTEM_GROUPS } from './LabsUI';
@@ -31,13 +31,17 @@ export interface MarkerDeviation {
   system: string;
 }
 
-/** Запись без вердикта: почему сторона не доказана (проход 154). */
+/** Запись без вердикта: почему сторона не доказана (проход 154, 178). */
 export interface MarkerUnknown {
   code: string;
   value: number;
   bound?: LabBound;
-  /** `bound` — граница не доказывает сторону; `no_norm` — нормы маркера нет. */
-  reason: 'bound' | 'no_norm';
+  /**
+   * `bound` — граница не доказывает сторону; `no_norm` — нормы маркера нет;
+   * `unit` — число в единице другой величины, чем норма (КФК-МВ в Е/л против
+   * нормы в нг/мл): пересчитать нечем, значит сравнивать нельзя.
+   */
+  reason: 'bound' | 'no_norm' | 'unit';
 }
 
 export interface MarkerRiskSummary {
@@ -92,6 +96,15 @@ export function computeMarkerDeviations(
     // прежний `coeff`.
     const hasUnit = !!String(lab.unit || '').trim();
     const normalized = hasUnit ? normalizeLabMeasurement(lab.code, lab.value, String(lab.unit)) : null;
+    // Проход 178: единица бланка — часть данных. Если пересчитать не удалось и
+    // она — другая величина, чем норма приложения (КФК-МВ в Е/л против нг/мл,
+    // Лп(а) в мг/дл против нмоль/л), то сравнения нет: это «нормы в этой
+    // единице нет», а не «отклонение 400 %». Диапазон, напечатанный в самом
+    // бланке, остаётся главнее: он в той же единице, что и число.
+    const hasOwnReference = lab.refHigh !== undefined || lab.refLow !== undefined;
+    if (!hasOwnReference && normalized && unitsIncommensurable(normalized.unit, ref.prefUnit)) {
+      unknownCount += 1; unknown.push({ code: lab.code, value: lab.value, bound: lab.bound, reason: 'unit' }); continue;
+    }
     const factor = normalized && lab.value ? normalized.value / lab.value : coeff;
     const norm = lab.value * factor;
     // Prefer stored reference ranges from parsed lab forms;
