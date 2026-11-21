@@ -67,8 +67,40 @@ describe('📥 diaryLabs: авто-подстановка свежих анал�
     }, { timeout: 6000 });
   });
 
-  it('дневник СТАРШЕ fullPanel → перезаписи нет (реф-гард по дате)', async () => {
+  it('запись без поля в бланке названа в статусе, а не исчезает (проход 196)', async () => {
     localStorage.setItem('he_lab_diary', JSON.stringify([
+      { date: '2026-09-20', markers: [
+        { code: 'ALT', value: 180, unit: 'U/L' },
+        { code: 'MCV', value: 88, unit: 'fL' },
+      ] },
+    ]));
+    mount();
+    await waitFor(() => {
+      expect(screen.getAllByText(/не перенесено 1/).length).toBeGreaterThan(0);
+    }, { timeout: 6000 });
+    expect(screen.getAllByText(/Средний объём эритроцита/).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+      expect(saved?.labs?.fullPanel?.panelBiochem?.ALT).toBe('180');
+    }, { timeout: 6000 });
+  });
+
+  it('абсолютные ретикулоциты не подписываются процентами (проход 196)', async () => {
+    localStorage.setItem('he_lab_diary', JSON.stringify([
+      { date: '2026-09-20', markers: [
+        { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л' },
+      ] },
+    ]));
+    mount();
+    // Одного поля нет — но и «подставлено» без объяснения не звучит.
+    await waitFor(() => {
+      expect(screen.getAllByText(/Ретикулоциты 50 10⁹\/л — единица другой величины/).length).toBeGreaterThan(0);
+    }, { timeout: 6000 });
+    const saved = JSON.parse(localStorage.getItem('he_autocalc_state') || '{}');
+    expect(saved?.labs?.fullPanel?.panelHematology?.Reticulocytes).toBeUndefined();
+  });
+
+  it('дневник СТАРШЕ fullPanel → перезаписи нет (реф-гард по дате)', async () => {    localStorage.setItem('he_lab_diary', JSON.stringify([
       { date: '2025-01-01', totalMarkers: 1, abnormalCount: 0, markers: [{ code: 'ALT', name: 'АЛТ', value: 99, unit: 'U/L', inRange: true }] },
     ]));
     mount();

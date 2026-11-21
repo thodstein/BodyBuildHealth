@@ -5,10 +5,10 @@ import {
   BILIRUBIN_FLAG_STEPS, LDL_FLAG_STEPS, TG_FLAG_STEPS, HDL_LOW,
   CREATININE_ULN, CREATININE_FLAG_STEP,
 } from '../../../engines/lab-norms.engine';
-import { LAB_UNIT_CHOICES, labUnitKey } from '../../../core/constants';
+import { LAB_UNIT_CHOICES, labUnitKey, ucumInfo } from '../../../core/constants';
 import { labFieldNumber } from '../../../engines/support-plan';
-import { normalizeLabMeasurement, resolveLabMarker } from '../../../core/labs-mapping';
-import { FULL_PANELS } from './Calc.lab';
+import { normalizeLabMeasurement, resolveLabMarker, mapToUcumCode, unitsIncommensurable } from '../../../core/labs-mapping';
+import { FULL_PANELS, ruMarker } from './Calc.lab';
 import { MARKER_TO_UCUM } from './Calc.lab-units';
 
 // ═══════════════════════════════════════════════════════════════
@@ -138,6 +138,9 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'PLT': 'Platelets', 'PLATELETS': 'Platelets',
   'NEUT': 'Neutrophils', 'NEUTROPHILS': 'Neutrophils',
   'LYMPH': 'Lymphocytes', 'LYM': 'Lymphocytes', 'LYMPHOCYTES': 'Lymphocytes',
+  // Проход 196: ретикулоциты. Без записи код склада не находил поля, и анализ
+  // с бланка пропадал целиком — «шкала есть, ввести некуда».
+  'RETICULOCYTES': 'Reticulocytes', 'RETIC': 'Reticulocytes', 'RET': 'Reticulocytes',
   // ── биохимия ──
   'GLU': 'Glucose', 'GLUCOSE': 'Glucose',
   'CREAT': 'Creatinine', 'CREA': 'Creatinine', 'CREATININE': 'Creatinine',
@@ -289,7 +292,55 @@ export function countSliceMarkers(slice: LabSlice | null): number {
 //  Конвертация из LabPoint[] → LabSlice
 //  Принимает: LabPoint[], массив {code,value,unit,date}, LabDiaryEntry[]
 // ═══════════════════════════════════════════════════════════════
-export function labPointsToSlice(input: any): LabSlice | null {
+
+/**
+ * Запись, которую импорт не смог положить в бланк (проход 196).
+ *
+ * Две причины, и обе раньше были тишиной:
+ *  - `unit` — у поля есть своя величина (ретикулоциты в %), а запись пришла в
+ *    другой (абсолютное 10⁹/л). Без числа эритроцитов пересчёта нет; положить
+ *    число «как есть» значило бы выдать 50 ‰ за 50 %;
+ *  - `marker` — анализ есть в каталоге, но поля в бланке у него нет. Раньше
+ *    такая строка просто исчезала, а «анализы подставлены» всё равно звучало.
+ * Незнакомый код (LOINC и прочий мусор) сюда не попадает: назвать его нечем.
+ */
+export interface LabImportSkip {
+  /** Код записи, как он лежал в данных. */
+  code: string;
+  /** Русское имя для человека: подпись поля бланка или имя каталога. */
+  label: string;
+  /** Значение, как оно было записано. */
+  value: string;
+  unit?: string;
+  reason: 'unit' | 'marker';
+}
+
+/**
+ * Одна строка «что не перенесено» для статуса импорта.
+ *
+ * Список не режется молча: первые три названы, остаток — числом. Дубли
+ * (одна и та же запись в двух источниках) схлопываются, иначе счёт врал бы.
+ */
+export function labImportSkipLine(skips: LabImportSkip[]): string {
+  if (!skips.length) return '';
+  const seen = new Set<string>();
+  const unique = skips.filter((s) => {
+    // Одна и та же строка из двух источников (склад и зеркало дневника) —
+    // одно и то же значение; разные даты одного маркера — разные строки.
+    const key = `${s.code}|${s.unit ?? ''}|${s.reason}|${s.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const shown = unique.slice(0, 3).map((s) => {
+    const why = s.reason === 'unit' ? 'единица другой величины' : 'нет поля в бланке';
+    return `${s.label} ${s.value}${s.unit ? ` ${s.unit}` : ''} — ${why}`;
+  });
+  const rest = unique.length > shown.length ? `, и ещё ${unique.length - shown.length}` : '';
+  return `не перенесено ${unique.length}: ${shown.join('; ')}${rest}`;
+}
+
+export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlice | null {
   if (!input) return null;
   const slice: LabSlice = {
     date: '', panelSex: {}, panelBiochem: {}, panelHematology: {},
@@ -303,28 +354,70 @@ export function labPointsToSlice(input: any): LabSlice | null {
   // который не наш, просто пропускается (как и раньше), но пустое значение
   // больше не считается «импортированным»: раньше счётчик врал, и бланк с
   // нераспознанными кодами возвращался как заполненный.
+  //
+  // Проход 196: пропуск, который человеку важно знать, называется в `skipped`:
+  // анализ каталога без поля в бланке и запись в величине, которую поле не
+  // читает. Панель бланка — не место для догадки: сменить единицу в записи
+  // нельзя, поэтому такая строка не входит в бланк вовсе.
   const put = (rawCode: string, rawVal: any, unit?: string, valueStr?: string): boolean => {
     const marker = sliceMarkerFor(rawCode);
-    if (!marker) return false;
+    const val = rawVal != null && rawVal !== '' ? String(rawVal) : '';
+    const rawText = val || (valueStr != null ? String(valueStr) : '');
+    if (!marker) {
+      if (!rawText) return false;
+      const info = ucumInfo(mapToUcumCode(String(rawCode || '').trim()));
+      if (info) {
+        skipped?.push({
+          code: rawCode, label: info.name || String(rawCode),
+          value: rawText, unit, reason: 'marker',
+        });
+      }
+      return false;
+    }
     // Моча приходит отдельными кодами (`GLUCOSE_URINE`, `URINE_PROTEIN`): у неё
     // свои поля, иначе глюкоза мочи заняла бы место кровяной.
     const isUrine = /(^|[_\s-])(URINE|МОЧА?|MOCH)/i.test(rawCode);
     const panel = isUrine ? 'panelUrinalysis' : MARKER_TO_PANEL[marker.toLowerCase()];
     if (!panel) return false;
-    const val = rawVal != null && rawVal !== '' ? String(rawVal) : '';
-    let text = val || (valueStr != null ? String(valueStr) : '');
+    let text = rawText;
     if (!text) return false;
     // Проход 112: значение приводится к единице приложения тем же конвертером,
     // что и в остальном импорте. Без этого гемоглобин 15 г/дл из FHIR или
     // дневника ложился как «15» в поле, где норма 130–170 г/л, и нормальный
     // бланк читался как тяжёлая анемия.
     const ucum = MARKER_TO_UCUM[marker];
-    if (ucum && unit && !LAB_UNIT_CHOICES[marker]) {
+    const choices = LAB_UNIT_CHOICES[marker];
+    // Проход 196: величина, которую поле не читает (ретикулоциты в 10⁹/л против
+    // процентов), не переименовывается в единицу поля. Пересчитать её нечем —
+    // значит, записи здесь нет, а не «есть число».
+    //
+    // У маркеров с выбором единицы число не пересчитывается на импорте: единица
+    // едет вместе с числом, и читает её `readLabValue` (проходы 121–124).
+    // Поэтому проверяем только «другую величину», которую выбор не знает:
+    // «‰» у ретикулоцитов выбор знает, а «10⁹/л» — нет.
+    if (choices && unit && !choices.includes(labUnitKey(unit)) && unitsIncommensurable(unit, choices[0])) {
+      skipped?.push({
+        code: rawCode, label: ruMarker(marker),
+        value: text, unit, reason: 'unit',
+      });
+      return false;
+    }
+    if (ucum && unit && !choices) {
       const num = Number(text.replace(',', '.'));
       if (Number.isFinite(num)) {
         const norm = normalizeLabMeasurement(ucum, num, unit);
         if (Number.isFinite(norm.value)) text = String(norm.value);
         if (norm.unit) unit = norm.unit;
+      }
+      // Пересчёт не состоялся, а величины разные (КФК-МВ в нг/мл против Ед/л):
+      // число из одного измерения нельзя подписать единицей другого.
+      const appUnit = ucumInfo(ucum)?.prefUnit ?? '';
+      if (appUnit && unitsIncommensurable(unit, appUnit)) {
+        skipped?.push({
+          code: rawCode, label: ruMarker(marker),
+          value: text, unit, reason: 'unit',
+        });
+        return false;
       }
     }
     (slice[panel] as Record<string, string>)[marker] = text;

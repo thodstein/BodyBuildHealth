@@ -9,9 +9,10 @@
  * хотя она была в данных.
  */
 import { describe, it, expect } from 'vitest';
-import { labPointsToSlice, sliceMarkerFor } from '../Calc.labs-derived';
+import { labPointsToSlice, labImportSkipLine, sliceMarkerFor } from '../Calc.labs-derived';
+import type { LabImportSkip } from '../Calc.labs-derived';
 import { FULL_PANELS, labUnitHint } from '../Calc.lab';
-import { LAB_UNIT_CHOICES, UCUM_MAP } from '../../../../core/constants';
+import { LAB_UNIT_CHOICES, UCUM_MAP, readLabValue } from '../../../../core/constants';
 import { MARKER_TO_UCUM, markerReadUnit } from '../Calc.lab-units';
 
 const point = (code: string, value: number | string, unit?: string) =>
@@ -162,5 +163,74 @@ describe('проход 114: подсказка единицы в форме', ()
     expect(labUnitHint('E2')).toBeUndefined();
     expect(labUnitHint('Total T')).toBeUndefined();
     expect(labUnitHint('Prolactin')).toBeUndefined();
+  });
+});
+
+/**
+ * Проход 196: ретикулоциты.
+ *
+ * Шкала `RETIC_BAND` и советы `TIER_RULES.RETICULOCYTES` были, а ввести число
+ * было некуда: поля в бланке нет, код склада не находил маркера. При этом бланк
+ * печатает ретикулоциты и в процентах, и в промилле, и в абсолютных 10⁹/л.
+ * Первые две — одна величина (1 % = 10 ‰); третья без числа эритроцитов в
+ * проценты не переводится, и занимать ею поле процентов нельзя: 50 10⁹/л
+ * читались бы как 50 % (риск «лечения» из воздуха).
+ */
+describe('проход 196: ретикулоциты — проценты и промилле, без абсолютного числа', () => {
+  it('код склада находит поле «Гематологии»', () => {
+    const s = point('RETICULOCYTES', 1.2, '%')!;
+    expect(s.panelHematology!.Reticulocytes).toBe('1.2');
+    expect(s.units!.panelHematology.Reticulocytes).toBe('%');
+    expect(sliceMarkerFor('RETIC')).toBe('Reticulocytes');
+    expect(sliceMarkerFor('Ретикулоциты')).toBe('Reticulocytes');
+  });
+
+  it('промилле едут вместе с числом — в проценты их переводит чтение', () => {
+    const s = point('RETIC', 6.8, '‰')!;
+    expect(s.panelHematology!.Reticulocytes).toBe('6.8');
+    expect(s.units!.panelHematology.Reticulocytes).toBe('‰');
+    expect(readLabValue('Reticulocytes', 6.8, '‰')).toEqual({ value: 0.68, guessed: false });
+    expect(readLabValue('Reticulocytes', 0.68, '%')).toEqual({ value: 0.68, guessed: false });
+  });
+
+  it('абсолютное 10⁹/л не становится процентами и называется в отчёте', () => {
+    const skipped: LabImportSkip[] = [];
+    const s = labPointsToSlice([
+      { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л', date: '2026-11-01' },
+    ], skipped);
+    expect(s).toBeNull();
+    expect(skipped).toEqual([
+      { code: 'RETICULOCYTES', label: 'Ретикулоциты', value: '50', unit: '10⁹/л', reason: 'unit' },
+    ]);
+    expect(labImportSkipLine(skipped)).toBe(
+      'не перенесено 1: Ретикулоциты 50 10⁹/л — единица другой величины',
+    );
+  });
+
+  it('поле есть в форме, единица выбирается рядом (не подсказкой)', () => {
+    expect(FULL_PANELS.flatMap(p => p.markers)).toContain('Reticulocytes');
+    expect(LAB_UNIT_CHOICES['Reticulocytes']).toEqual(['%', '‰']);
+    // У маркеров с выбором единицы подсказки нет — её заменяет UnitPicker.
+    expect(labUnitHint('Reticulocytes')).toBeUndefined();
+  });
+
+  it('анализ каталога без поля в бланке больше не исчезает молча', () => {
+    const skipped: LabImportSkip[] = [];
+    const s = labPointsToSlice([
+      { code: 'MCV', value: 88, unit: 'fL', date: '2026-11-01' },
+    ], skipped);
+    expect(s).toBeNull();
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].reason).toBe('marker');
+    expect(skipped[0].label).toBe('Средний объём эритроцита');
+    expect(labImportSkipLine(skipped)).toMatch(/нет поля в бланке/);
+  });
+
+  it('одна запись из двух источников не задваивает счёт', () => {
+    const row = { code: 'MCV', value: 88, unit: 'fL' };
+    const skipped: LabImportSkip[] = [];
+    labPointsToSlice([row], skipped);
+    labPointsToSlice([row], skipped);
+    expect(labImportSkipLine(skipped)).toMatch(/не перенесено 1:/);
   });
 });
