@@ -789,7 +789,9 @@ export function microTuneDay(
       });
     }
   });
-  if (!knobs.length) return { devBefore, devAfter: devBefore, rounds: 0, applied: false };
+  if (!knobs.length) {
+    return { devBefore, devAfter: devBefore, rounds: 0, applied: false };
+  }
 
   const solidOf = (m: any) => (m.items || []).filter((x: any) => x.role !== 'liquid').reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
   const sumOf = (m: any, key: string) => (m.items || []).reduce((s: number, x: any) => s + (Number(x[key]) || 0), 0);
@@ -842,6 +844,13 @@ export function microTuneDay(
   // ход с минусом — даже −2 г мяса, — и день навсегда застревал на 6.0%.
   const MICRO_FLOOR_E_MG = 10.5; // 70% RDA 15 мг
   const _eFloor111 = baseE >= MICRO_FLOOR_E_MG ? MICRO_FLOOR_E_MG : baseE * 0.9;
+  // §8.131: кап орехов/семян — не абсолютный пол. День, пришедший к доводчику ВЫШЕ капа
+  // (замер: 55 кг, ручные 4/отдых — семена чиа 64 г при капе 55, потому что это единственный
+  // жировой нож дня: масел в дне нет, яйцо — витрина), иначе запирает жировую ось намертво:
+  // шаг «+7 г семян» даёт 0 г, и день навсегда остаётся на Ж −5.4 % / У +5.4 %. Защищаем
+  // «не хуже +15 %» — ровно как Ca (§8.113) и витамин E (§8.111); для дня, который в кап
+  // укладывается, кап остаётся абсолютным.
+  const _nutCeil = baseNut > nutCap + 1e-9 ? Math.max(nutCap, baseNut * 1.15) : nutCap;
   // Оценка хода: (худшая ось, сумма отклонений) — лексикографически. Одной худшей оси
   // мало: когда белок +17.6% и углеводы −17.6%, ход «убрать 5 г белка» не двигает
   // максимум и отвергается, хотя он — половина обмена; с суммой он проходит, и день
@@ -1017,7 +1026,7 @@ export function microTuneDay(
     // (замер: 1 день из 30 садился до 57% на подсолнечном масле; прежний пол 60% пропускал
     // «минус грамм масла» и выводил день на 68%, что валило QG35).
     if (dE < 0 && baseE > 0 && baseE + dE < _eFloor111 - 1e-9) { _em = Infinity; _es = Infinity; return false; }
-    if (baseNut + dNut > nutCap + 1e-9) { _em = Infinity; _es = Infinity; return false; }
+    if (baseNut + dNut > _nutCeil + 1e-9) { _em = Infinity; _es = Infinity; return false; }
     if (baseEgg + dEgg > eggCap + 1e-9) { _em = Infinity; _es = Infinity; return false; }
     const rK = rel(dayK + dK, goal.kcal); const rP = rel(dayP + dP, goal.p);
     const rF = rel(dayF + dF, goal.f); const rC = rel(dayC + dC, goal.c);
