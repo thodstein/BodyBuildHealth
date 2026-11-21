@@ -1234,6 +1234,23 @@ export function buildWorkoutInsights(
     }
   }
 
+  // Объём растёт, а сила стоит: делать упражнение чаще и становиться сильнее —
+  // разные вещи. Три активные недели обязательны, иначе это шум двух точек.
+  const strengthGap = (s.patterns || [])
+    .filter(p => p.pattern !== 'other')
+    .filter(p => p.weeklySets.filter(x => x > 0).length >= 3)
+    .filter(p => p.e1rmTrendPct != null && p.e1rmTrendPct <= 0 && p.weeklyTrendPct != null && p.weeklyTrendPct >= 20)
+    .sort((a, b) => (b.weeklyTrendPct as number) - (a.weeklyTrendPct as number))[0];
+  if (strengthGap) {
+    out.push({
+      id: 'pattern-strength',
+      tone: 'warn',
+      icon: '💪',
+      title: `${strengthGap.label}: подходы ${signedPct(strengthGap.weeklyTrendPct as number)}, сила ${signedPct(strengthGap.e1rmTrendPct as number)}`,
+      detail: `Лучший e1RM движения — ${strengthGap.bestE1RM} кг${strengthGap.bestExercise ? ` (${strengthGap.bestExercise})` : ''}. Подходов больше, а сила не выросла: добавляйте вес или повторы, а не только объём.`,
+    });
+  }
+
   // План против факта. Блок «По упражнениям» показывает это построчно, но
   // итог читают в «Выводах»: сколько подходов не добито и что пропущено.
   if (plan && !plan.empty && plan.setsPct != null && plan.setsPct < 80) {
@@ -1331,6 +1348,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   prs: 95,
   'pattern-drop': 90,
   deload: 85,
+  'pattern-strength': 76,
   'mrv-streak': 74,
   'week-plan': 73,
   'mev-streak': 72,

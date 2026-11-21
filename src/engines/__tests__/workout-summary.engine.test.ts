@@ -396,6 +396,23 @@ describe('workout-summary: недельная динамика и интенси
     expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');
   });
 
+  it('говорит, когда объём растёт, а сила стоит', () => {
+    const weeks = (weights: number[]) => weights.map((weight, i) => mkWorkout(
+      ['2026-11-02', '2026-11-09', '2026-11-16'][i],
+      [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight, reps: 8, sets: 2 + i * 2 }],
+    ));
+    const gap = buildWorkoutInsights(buildWorkoutSummary(weeks([80, 80, 80])))
+      .find(i => i.id === 'pattern-strength');
+    expect(gap?.title).toContain('Горизонтальный жим');
+    expect(gap?.title).toContain('+200%');
+    // Тот же вес — сила не выросла; это и есть повод сказать.
+    expect(gap?.title).toContain('сила 0%');
+    expect(gap?.detail).toContain('Жим штанги лёжа');
+    // Объём растёт и вес растёт — это прогресс, вывод не нужен.
+    expect(buildWorkoutInsights(buildWorkoutSummary(weeks([80, 85, 90])))
+      .some(i => i.id === 'pattern-strength')).toBe(false);
+  });
+
   it('считает подходы по неделям для упражнения', () => {
     const s = buildWorkoutSummary([w1, w2]);
     const bench = s.exercises[0];
