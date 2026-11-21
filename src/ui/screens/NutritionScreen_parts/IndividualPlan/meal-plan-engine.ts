@@ -20180,6 +20180,131 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         recalcDayTotals(meals, totals);
       }
     }
+    // ─── §8.127 «ведро — это один пункт»: дробление носителя между приёмами ───
+    // Замер §8.126 (160 дней): «ведро» — это ОДИН пункт 300–850 г (`хлопья 846`, `овсянка +
+    // сухая мука 541`, `картофель 390`), а не сумма позиций: перенос ЦЕЛОЙ позиции отклонялся
+    // в 90 % случаев, потому что у такого приёма единственный носитель. По решению владельца
+    // (вариант А) носитель можно ДРОБИТЬ между двумя приёмами одного класса: одна позиция
+    // продукта в двух тарелках, обе части ≥ пола роли — это не обрезок. Итоги дня не меняются
+    // (те же граммы), новых продуктов не появляется, овощной пол и ≤3 % не затрагиваются.
+    // Приёмка строгая: класс обязан стать ровнее (вёдер меньше, иначе разброс max/min меньше),
+    // донор не опускается ниже средней доли класса, получатель не выходит за 1,35 × доли.
+    {
+      const _cls127 = (t: string): string => (t === 'breakfast' || t === 'lunch' || t === 'dinner')
+        ? 'main' : (/^snack/.test(t) ? 'snack' : '');
+      // Предел тарелки — 700 г: тот же контракт, по которому §8.122 принимает «овощной» план.
+      // Замер: при 900 г пас разгонял обед до 705 г, и овощ терялся на весь день
+      // (`preferVegPlan122`: solidOf122 > max(700, solidOf122(plain))).
+      const _P127 = 700;
+      const _solid127 = (m: any): number => (m.items || [])
+        .filter((x: any) => String(x.role || '') !== 'liquid')
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _prot127 = (m: any): boolean => (m.items || []).some((x: any) =>
+        x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein');
+      const _car127 = (m: any): any[] => (m.items || []).filter((x: any) =>
+        (x.role === 'carb_slow' || x.role === 'carb_fast') && !x._fixedGrams);
+      const _kcal127 = (m: any): number => Number(m?.totals?.kcal) || 0;
+      const _buck127 = (list: any[], lim: number): number => list.filter((m: any) => _kcal127(m) > lim).length;
+      const _spread127 = (list: any[]): number => {
+        const ks = list.map((m: any) => _kcal127(m)).filter((k: number) => k > 0);
+        return ks.length < 2 ? 1 : Math.max(...ks) / Math.max(1, Math.min(...ks));
+      };
+      const _floor127 = (r: string): number => Math.max(30, Number((MIN_MEANINGFUL_G as any)[r] || 20));
+      const _scale127 = (it: any, g: number): any => {
+        const k = g / Math.max(1e-9, Number(it.amount) || 0);
+        const o: any = { ...it };
+        o.amount = g;
+        o.p = Math.round((Number(it.p) || 0) * k * 10) / 10;
+        o.f = Math.round((Number(it.f) || 0) * k * 10) / 10;
+        o.c = Math.round((Number(it.c) || 0) * k * 10) / 10;
+        o.kcal = Math.round(4 * o.p + 9 * o.f + 4 * o.c);
+        o.fiber = Math.round((Number(it.fiber) || 0) * k * 10) / 10;
+        return o;
+      };
+      let _split127 = 0;
+      for (const cls of ['main', 'snack']) {
+        for (let _p127 = 0; _p127 < 40; _p127++) {
+          const list = meals.filter((m: any) => (m.items || []).length > 0 && _cls127(String(m.type || '')) === cls);
+          if (list.length < 2) break;
+          const sh = list.reduce((s: number, m: any) => s + _kcal127(m), 0) / list.length;
+          const lim = sh * 1.35;
+          const donor = [...list].sort((a: any, b: any) => _kcal127(b) - _kcal127(a))[0];
+          if (_kcal127(donor) <= lim + 1) break;              // вёдер в классе не осталось
+          // Получатель выбирается ПОД конкретный носитель: сначала приём, где этот же продукт уже
+          // есть (нового пункта на тарелке не появляется), затем приём БЕЗ носителя (на тарелке
+          // остаётся ровно один крахмал), и только потом — с чужим носителем.
+          const _pool127 = list.filter((m: any) => m !== donor && _prot127(m) && _kcal127(m) < lim);
+          if (_pool127.length === 0) break;
+          const _pick127 = (it: any): any => {
+            const same = _pool127.find((m: any) => (m.items || []).some((x: any) =>
+              x.id === it.id && !x._fixedGrams && (x.role === 'carb_slow' || x.role === 'carb_fast')));
+            if (same) return same;
+            const empty = _pool127.filter((m: any) => _car127(m).length === 0)
+              .sort((a: any, b: any) => _kcal127(a) - _kcal127(b));
+            if (empty.length > 0) return empty[0];
+            // Последний вариант — приём с другим носителем. Замер: без него вёдра не уходят
+            // вовсе (31/25 → 29/23), с ним — 31/25 → 7/6; цена — второй крахмал на некоторых
+            // тарелках («2+ носителя» 22 → 44), см. §8.127 в аудите.
+            return [..._pool127].sort((a: any, b: any) => _kcal127(a) - _kcal127(b))[0];
+          };
+          const bBefore = _buck127(list, lim);
+          const sBefore = _spread127(list);
+          let accepted = false;
+          const cands = _car127(donor)
+            .filter((x: any) => (Number(x.amount) || 0) >= 2 * _floor127(String(x.role)))
+            .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+          for (const it of cands) {
+            const recv = _pick127(it);
+            if (!recv) continue;
+            const a0 = Number(it.amount) || 0;
+            const kPerG = (Number(it.kcal) || 0) / Math.max(1, a0);
+            if (!(kPerG > 0)) continue;
+            const gRoom = _P127 - _solid127(recv);
+            const kGoal = Math.min(_kcal127(donor) - sh, lim - _kcal127(recv), (_kcal127(donor) - _kcal127(recv)) / 2);
+            const g = Math.floor(Math.min(kGoal / kPerG, a0 - _floor127(String(it.role)), gRoom) / 5) * 5;
+            if (g < _floor127(String(it.role))) continue;
+            const part = _scale127(it, g);
+            const snapD = JSON.stringify(donor.items);
+            const snapR = JSON.stringify(recv.items);
+            const kd = (a0 - g) / a0;
+            it.amount = a0 - g;
+            it.p = Math.round((Number(it.p) || 0) * kd * 10) / 10;
+            it.f = Math.round((Number(it.f) || 0) * kd * 10) / 10;
+            it.c = Math.round((Number(it.c) || 0) * kd * 10) / 10;
+            it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+            it.fiber = Math.round((Number(it.fiber) || 0) * kd * 10) / 10;
+            const same = (recv.items || []).find((x: any) => x.id === it.id && x.role === it.role && !x._fixedGrams);
+            if (same) {
+              const b0 = Number(same.amount) || 0;
+              const kb = (b0 + g) / Math.max(1, b0);
+              same.amount = b0 + g;
+              same.p = Math.round((Number(same.p) || 0) * kb * 10) / 10;
+              same.f = Math.round((Number(same.f) || 0) * kb * 10) / 10;
+              same.c = Math.round((Number(same.c) || 0) * kb * 10) / 10;
+              same.kcal = Math.round(4 * same.p + 9 * same.f + 4 * same.c);
+              same.fiber = Math.round((Number(same.fiber) || 0) * kb * 10) / 10;
+            } else {
+              recv.items = [...(recv.items || []), part];
+            }
+            recalcMealTotals(meals as any[]);
+            const list2 = meals.filter((m: any) => (m.items || []).length > 0 && _cls127(String(m.type || '')) === cls);
+            const bAfter = _buck127(list2, lim);
+            const sAfter = _spread127(list2);
+            if (bAfter < bBefore || (bAfter === bBefore && sAfter < sBefore - 1e-9)) {
+              accepted = true; _split127++; break;
+            }
+            donor.items = JSON.parse(snapD);
+            recv.items = JSON.parse(snapR);
+            recalcMealTotals(meals as any[]);
+          }
+          if (!accepted) break;
+        }
+      }
+      if (_split127 > 0) {
+        recalcDayTotals(meals as any[], totals);
+        notes.push(`🍽️ Тарелки выровнены: ${_split127} перенос(ов) части носителя между приёмами — порции не обрезаны (обе части выше пола роли), итоги дня не изменились (§8.127).`);
+      }
+    }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
     mergeDuplicateItems(meals);
     // §8.107d (витрина не врёт): финальная сверка «Сводки MPS» и клетчатки с ФАКТОМ
