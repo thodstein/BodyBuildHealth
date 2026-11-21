@@ -360,6 +360,9 @@ describe('WorkoutSummaryReport', () => {
     );
     expect(html).toContain('Подходы по движениям');
     expect(html).toContain('+1 подх.');
+    // Сводка по движениям: видно, изменилось одно из двух, а не «пропало всё».
+    expect(html).toContain('▲ 1');
+    expect(html).toContain('▼ 0');
   });
 
   it('в сравнении по упражнениям видно и подходы, а не только e1RM', () => {

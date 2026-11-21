@@ -2113,6 +2113,12 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       lines.push('  Мышцы:');
       movedMuscles.forEach(m => lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`));
     }
+    const patternRows = cmp.patterns.filter(p => p.sets.previous + p.sets.current > 0);
+    const grownPatterns = patternRows.filter(p => p.sets.delta > 0).length;
+    const fallenPatterns = patternRows.filter(p => p.sets.delta < 0).length;
+    if (patternRows.length) {
+      lines.push(`  Подходы по движениям: выросло ${grownPatterns}, просело ${fallenPatterns}, без изменений ${patternRows.length - grownPatterns - fallenPatterns}`);
+    }
     const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
     if (movedPatterns.length) {
       lines.push('  Движения:');
