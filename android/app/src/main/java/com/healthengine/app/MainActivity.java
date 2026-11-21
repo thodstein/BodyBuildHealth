@@ -51,6 +51,17 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {}
     }
 
+    /**
+     * Разрешение микрофона: окно показывает мы сами (ActivityCompat), поэтому
+     * результат приходит сюда, а не в Capacitor. Передаём его плагину HeSpeech —
+     * иначе он не смог бы отличить «отказали» от «окно не показали».
+     */
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        HeSpeechPlugin.deliverPermissionResult(requestCode, grantResults);
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);

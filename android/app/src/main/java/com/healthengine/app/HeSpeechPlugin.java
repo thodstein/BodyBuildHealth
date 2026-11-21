@@ -1,24 +1,30 @@
 package com.healthengine.app;
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import com.getcapacitor.annotation.Permission;
-import com.getcapacitor.annotation.PermissionCallback;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -35,13 +41,13 @@ import java.util.Locale;
  * recognition/synthesis = false, а JS-сторона говорит об этом словами.
  *
  * ВНИМАНИЕ: внутри javadoc нельзя писать звездочка-слэш (закрывает комментарий).
+ *
+ * Разрешение микрофона спрашиваем сами через ActivityCompat, а не через
+ * Capacitor-алиасы: если механизм алиасов почему-то не срабатывает, PluginCall
+ * остаётся без ответа навсегда, и в UI вечно висит «Запрашиваю доступ». Здесь
+ * на каждый путь есть ответ — окно, отказ или таймаут с причиной.
  */
-@CapacitorPlugin(
-    name = "HeSpeech",
-    permissions = {
-        @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO })
-    }
-)
+@CapacitorPlugin(name = "HeSpeech")
 public class HeSpeechPlugin extends Plugin {
 
     private SpeechRecognizer recognizer;
@@ -64,6 +70,21 @@ public class HeSpeechPlugin extends Plugin {
     private volatile boolean stopping = false;
     /** Три пустых круга подряд — движок молчит; честно выходим, не крутимся вечно. */
     private static final int MAX_SILENT_ROUNDS = 3;
+
+    /* ── Разрешение микрофона ──────────────────────────────────────────── */
+    private static final int MIC_REQUEST_CODE = 0x4D49; // 'MI' — только наш код
+    private static final String PERMISSION_PREFS = "he_speech";
+    private static final String ASKED_KEY = "mic_asked";
+    /**
+     * Сколько ждём ответа на системное окно. Таймаут нужен потому, что на части
+     * прошивок окно не появляется вообще (политика устройства, «не спрашивать
+     * снова»), и без предела ожидание повисло бы навсегда.
+     */
+    private static final long MIC_RESULT_TIMEOUT_MS = 12_000;
+    /** Экземпляр для MainActivity: результат разрешения приходит в активити. */
+    private static volatile HeSpeechPlugin current;
+    private PluginCall pendingMicCall;
+    private Runnable micWatchdog;
 
     /* ── Возможности платформы ─────────────────────────────────────────── */
 
@@ -106,22 +127,147 @@ public class HeSpeechPlugin extends Plugin {
 
     /* ── Речь в текст ──────────────────────────────────────────────────── */
 
-    @PluginMethod
-    public void startRecognition(PluginCall call) {
-        if (getPermissionState("microphone") != PermissionState.GRANTED) {
-            requestPermissionForAlias("microphone", call, "microphoneCallback");
-            return;
-        }
-        startListening(call.getString("lang", "ru-RU"), call);
+    @Override
+    public void load() {
+        current = this;
     }
 
-    @PermissionCallback
-    private void microphoneCallback(PluginCall call) {
-        if (getPermissionState("microphone") == PermissionState.GRANTED) {
+    private SharedPreferences prefs() {
+        return getContext().getSharedPreferences(PERMISSION_PREFS, Context.MODE_PRIVATE);
+    }
+
+    private boolean micGranted() {
+        try {
+            return ContextCompat.checkSelfPermission(getContext(), Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Android готов снова показать окно (отказ был, но не «навсегда»). */
+    private boolean canPromptMic() {
+        try {
+            Activity activity = getActivity();
+            return activity != null
+                && ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * granted — можно слушать; prompt — окно ещё покажут; blocked — Android его
+     * больше не показывает, спасают только настройки приложения.
+     */
+    private String micStateName() {
+        if (micGranted()) return "granted";
+        if (canPromptMic()) return "prompt";
+        return prefs().getBoolean(ASKED_KEY, false) ? "blocked" : "prompt";
+    }
+
+    /** Открыть «Настройки → Приложения → это приложение»: единственный путь при blocked. */
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        JSObject ret = new JSObject();
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.fromParts("package", getContext().getPackageName(), null));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            ret.put("opened", true);
+        } catch (Exception e) {
+            ret.put("opened", false);
+        }
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void startRecognition(PluginCall call) {
+        if (micGranted()) {
             startListening(call.getString("lang", "ru-RU"), call);
             return;
         }
-        rejectStart(call, "no-permission");
+        // Окно уже не покажут — не заставляем ждать 12 секунд впустую.
+        if ("blocked".equals(micStateName())) {
+            rejectStart(call, "permission-blocked");
+            return;
+        }
+        askMicPermission(call);
+    }
+
+    /**
+     * Системный запрос RECORD_AUDIO. Ответ приходит в MainActivity, а та
+     * передаёт его в deliverPermissionResult — то есть мост получает ответ
+     * всегда: разрешено, отказано или таймаут.
+     */
+    private void askMicPermission(final PluginCall call) {
+        final Activity activity = getActivity();
+        if (activity == null) {
+            rejectStart(call, "no-activity");
+            return;
+        }
+        // Предыдущее ожидание не оставляем без ответа: пусть честно закроется.
+        PluginCall previous = pendingMicCall;
+        releaseMicWait();
+        if (previous != null) rejectStart(previous, "superseded");
+        pendingMicCall = call;
+        micWatchdog = new Runnable() {
+            @Override
+            public void run() {
+                PluginCall waiting = pendingMicCall;
+                releaseMicWait();
+                if (waiting != null) rejectStart(waiting, "permission-timeout");
+            }
+        };
+        main.postDelayed(micWatchdog, MIC_RESULT_TIMEOUT_MS);
+        main.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    prefs().edit().putBoolean(ASKED_KEY, true).apply();
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        new String[] { Manifest.permission.RECORD_AUDIO },
+                        MIC_REQUEST_CODE
+                    );
+                } catch (Exception e) {
+                    PluginCall waiting = pendingMicCall;
+                    releaseMicWait();
+                    if (waiting != null) rejectStart(waiting, "permission-request-failed");
+                }
+            }
+        });
+    }
+
+    private void releaseMicWait() {
+        if (micWatchdog != null) {
+            main.removeCallbacks(micWatchdog);
+            micWatchdog = null;
+        }
+        pendingMicCall = null;
+    }
+
+    /** Результат системного окна (из MainActivity). */
+    void handleMicResult(boolean granted) {
+        PluginCall waiting = pendingMicCall;
+        releaseMicWait();
+        if (waiting == null) return;
+        if (granted) {
+            startListening(waiting.getString("lang", "ru-RU"), waiting);
+            return;
+        }
+        rejectStart(waiting, canPromptMic() ? "no-permission" : "permission-blocked");
+    }
+
+    /** Точка входа из MainActivity.onRequestPermissionsResult. */
+    static void deliverPermissionResult(int requestCode, int[] grantResults) {
+        HeSpeechPlugin plugin = current;
+        if (plugin == null || requestCode != MIC_REQUEST_CODE) return;
+        boolean granted = grantResults != null
+            && grantResults.length > 0
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        plugin.handleMicResult(granted);
     }
 
     private void rejectStart(PluginCall call, final String reason) {
@@ -138,6 +284,12 @@ public class HeSpeechPlugin extends Plugin {
                 try {
                     if (!isRecognitionAvailable()) {
                         rejectStart(call, "not-available");
+                        return;
+                    }
+                    // Разрешение могли отозвать между стартом и запуском движка:
+                    // без проверки SpeechRecognizer упал бы SecurityException.
+                    if (!micGranted()) {
+                        rejectStart(call, "no-permission");
                         return;
                     }
                     stopListeningInternal();
@@ -162,6 +314,10 @@ public class HeSpeechPlugin extends Plugin {
                     JSObject ret = new JSObject();
                     ret.put("started", true);
                     call.resolve(ret);
+                } catch (SecurityException e) {
+                    continuous = false;
+                    lastIntent = null;
+                    rejectStart(call, "no-permission");
                 } catch (Exception e) {
                     continuous = false;
                     lastIntent = null;
@@ -176,6 +332,11 @@ public class HeSpeechPlugin extends Plugin {
         main.post(new Runnable() {
             @Override
             public void run() {
+                // Ждём системное окно, а человек уже нажал «Стоп»: отпускаем
+                // ожидание, иначе «Запрашиваю доступ…» висело бы до таймаута.
+                PluginCall waiting = pendingMicCall;
+                releaseMicWait();
+                if (waiting != null) rejectStart(waiting, "cancelled");
                 stopListeningInternal();
                 call.resolve();
             }
@@ -434,6 +595,8 @@ public class HeSpeechPlugin extends Plugin {
 
     @Override
     protected void handleOnDestroy() {
+        if (current == this) current = null;
+        releaseMicWait();
         pendingCaps = null;
         try {
             stopListeningInternal();

@@ -29,6 +29,8 @@ interface HeSpeechPlugin {
     error?: string;
   } | null>;
   stopRecognition: () => Promise<void>;
+  /** «Настройки → Приложения → это приложение»: путь выдачи микрофона вручную. */
+  openAppSettings: () => Promise<{ opened?: boolean } | null>;
   speak: (opts: { text: string; lang?: string; rate?: number }) => Promise<{
     started?: boolean;
     error?: string;
@@ -43,6 +45,39 @@ export interface NativeSpeechCaps {
 }
 
 const NO_CAPS: NativeSpeechCaps = { dictation: false, speak: false };
+
+/**
+ * Ответ моста может не прийти вовсе (окно разрешения не показалось, плагин
+ * завис). Без предела ожидания кнопка висела бы на «Запрашиваю доступ».
+ */
+const START_CALL_TIMEOUT_MS = 12_000;
+const LISTENER_TIMEOUT_MS = 4_000;
+const PERMISSION_CALL_TIMEOUT_MS = 4_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('timeout'));
+    }, ms);
+    promise.then(
+      value => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 let pluginPromise: Promise<HeSpeechPlugin | null> | null = null;
 let capsPromise: Promise<NativeSpeechCaps> | null = null;
@@ -124,34 +159,50 @@ export async function nativeStartDictation(
   };
   try {
     subs.push(
-      await p.addListener('recognitionText', data => {
-        const d = (data ?? {}) as { text?: unknown; final?: unknown };
-        const text = typeof d.text === 'string' ? d.text : '';
-        if (text) handlers.onText(text, d.final === true);
-      }),
+      await withTimeout(
+        p.addListener('recognitionText', data => {
+          const d = (data ?? {}) as { text?: unknown; final?: unknown };
+          const text = typeof d.text === 'string' ? d.text : '';
+          if (text) handlers.onText(text, d.final === true);
+        }),
+        LISTENER_TIMEOUT_MS,
+      ),
     );
     subs.push(
-      await p.addListener('recognitionError', data => {
-        const d = (data ?? {}) as { code?: unknown };
-        const code = typeof d.code === 'string' ? d.code : String(d.code ?? 'error');
-        handlers.onError(code);
-      }),
+      await withTimeout(
+        p.addListener('recognitionError', data => {
+          const d = (data ?? {}) as { code?: unknown };
+          const code = typeof d.code === 'string' ? d.code : String(d.code ?? 'error');
+          handlers.onError(code);
+        }),
+        LISTENER_TIMEOUT_MS,
+      ),
     );
     subs.push(
-      await p.addListener('recognitionEnd', () => {
-        cleanup();
-        handlers.onEnd();
-      }),
+      await withTimeout(
+        p.addListener('recognitionEnd', () => {
+          cleanup();
+          handlers.onEnd();
+        }),
+        LISTENER_TIMEOUT_MS,
+      ),
     );
     dictationCleanup = cleanup;
-    const res = await p.startRecognition({ lang });
+    const res = await withTimeout(p.startRecognition({ lang }), START_CALL_TIMEOUT_MS);
     if (!res?.started) {
       handlers.onError(res?.reason || res?.error || 'not-started');
       cleanup();
       return false;
     }
     return true;
-  } catch {
+  } catch (err) {
+    // Раньше здесь стоял молчаливый catch: сбой моста оставлял UI в
+    // «Запрашиваю доступ…» без единого слова. Теперь причина уходит наверх.
+    handlers.onError(
+      String((err as { message?: unknown } | null)?.message ?? '') === 'timeout'
+        ? 'bridge-timeout'
+        : 'bridge-error',
+    );
     cleanup();
     return false;
   }
@@ -223,6 +274,22 @@ export async function nativeStopSpeak(): Promise<void> {
     await p?.stopSpeaking();
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Открыть системные настройки приложения. Нужны, когда Android больше не
+ * показывает окно разрешения: снаружи это выглядит как «кнопка молчит», а
+ * выдать микрофон можно только руками.
+ */
+export async function openNativeAppSettings(): Promise<boolean> {
+  const p = await heSpeech();
+  if (!p) return false;
+  try {
+    const res = await withTimeout(p.openAppSettings(), PERMISSION_CALL_TIMEOUT_MS);
+    return res?.opened === true;
+  } catch {
+    return false;
   }
 }
 

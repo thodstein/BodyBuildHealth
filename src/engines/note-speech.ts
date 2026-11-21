@@ -27,6 +27,7 @@ import {
   nativeStartDictation,
   nativeStopDictation,
   nativeStopSpeak,
+  openNativeAppSettings,
 } from '../core/speech-native';
 
 export type SpeechSource = 'native' | 'web' | 'none';
@@ -58,6 +59,11 @@ export interface DictationOptions {
   /** Кусок распознанного текста; `final: false` — промежуточная гипотеза. */
   onText: (text: string, final: boolean) => void;
   onError: (message: string) => void;
+  /**
+   * Код отказа до перевода в текст: UI по нему понимает, что нужны настройки
+   * Android, а не «попробуйте ещё раз».
+   */
+  onErrorCode?: (code: string) => void;
   onEnd: () => void;
 }
 
@@ -96,11 +102,28 @@ export function webDictationError(ev: unknown): string {
  * Текст ошибки по коду нативного движка (`no-permission`, `not-available`,
  * `error-N`). Коды SpeechRecognizer: 2 — сеть, 3 — звук, 4/11 — сервер,
  * 6 — тишина, 7 — не расслышал, 8 — движок занят, 10 — слишком часто.
+ *
+ * Отдельно — коды разрешения: окно могло не появиться вовсе
+ * (`permission-timeout`) или Android уже не показывает его (`permission-blocked`).
+ * В обоих случаях человеку нужен ручной путь через настройки, и он есть.
  */
 export function nativeDictationError(code: string): string {
   switch (code) {
     case 'no-permission':
-      return 'Микрофон запрещён в настройках Android — разрешите доступ и попробуйте снова.';
+      return 'Микрофон запрещён в настройках Android. Нажмите «Настройки микрофона» ниже, включите доступ и попробуйте снова.';
+    case 'permission-blocked':
+      return 'Микрофон запрещён для приложения: Android больше не показывает окно разрешения. Нажмите «Настройки микрофона» ниже → «Разрешения» → «Микрофон» → «Разрешить».';
+    case 'permission-timeout':
+      return 'Android не показал окно разрешения на микрофон. Нажмите «Настройки микрофона» ниже и включите доступ вручную.';
+    case 'permission-request-failed':
+    case 'no-activity':
+      return 'Не удалось запросить доступ к микрофону. Откройте «Настройки микрофона» ниже и выдайте разрешение вручную.';
+    case 'bridge-timeout':
+    case 'bridge-error':
+      return 'Системное распознавание не ответило. Закройте и снова откройте приложение, затем попробуйте ещё раз.';
+    case 'cancelled':
+    case 'superseded':
+      return 'Распознавание остановлено.';
     case 'not-available':
       return 'Распознавание речи на этом телефоне недоступно: в системе нет русского движка. Голос можно записать и приложить к заметке.';
     case 'error-6':
@@ -182,7 +205,10 @@ export async function startDictation(opts: DictationOptions): Promise<DictationS
     let stopped = false;
     const started = await nativeStartDictation(opts.lang ?? 'ru-RU', {
       onText: opts.onText,
-      onError: code => opts.onError(nativeDictationError(code)),
+      onError: code => {
+        opts.onErrorCode?.(code);
+        opts.onError(nativeDictationError(code));
+      },
       onEnd: opts.onEnd,
     });
     if (!started) return null;
@@ -246,4 +272,13 @@ export function stopSpeakingBest(): void {
     /* ignore */
   }
   void nativeStopSpeak();
+}
+
+/**
+ * Открыть системные настройки приложения. Нужны, когда Android больше не
+ * показывает окно разрешения на микрофон: выдать доступ можно только руками.
+ * false — не APK или система не приняла запрос (тогда UI просто не обещает).
+ */
+export async function openMicrophoneSettings(): Promise<boolean> {
+  return openNativeAppSettings();
 }

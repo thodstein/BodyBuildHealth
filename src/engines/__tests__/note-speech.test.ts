@@ -39,6 +39,7 @@ vi.mock('@capacitor/core', () => ({
       return { started: true };
     },
     stopSpeaking: async () => {},
+    openAppSettings: async () => ({ opened: true }),
     addListener: async (event: string, cb: (data: unknown) => void) => {
       const list = h.subs[event] ?? (h.subs[event] = []);
       list.push(cb);
@@ -53,6 +54,7 @@ vi.mock('@capacitor/core', () => ({
 
 import {
   nativeDictationError,
+  openMicrophoneSettings,
   speakTextBest,
   speechSupport,
   speechSupportSync,
@@ -276,5 +278,30 @@ describe('причина отказа называется словами, а н
     expect(session).toBeNull();
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain('Микрофон запрещён');
+  });
+
+  it('разрешение не выдано — назван путь через настройки, и он работает', async () => {
+    expect(nativeDictationError('permission-blocked')).toContain('не показывает окно');
+    expect(nativeDictationError('permission-blocked')).toContain('Настройки микрофона');
+    expect(nativeDictationError('permission-timeout')).toContain('Настройки микрофона');
+    expect(nativeDictationError('bridge-timeout')).toContain('не ответило');
+    h.native = true;
+    __resetNativeSpeechForTests();
+    expect(await openMicrophoneSettings()).toBe(true);
+  });
+
+  it('код отказа уходит в UI отдельно от текста', async () => {
+    h.native = true;
+    h.recognition = true;
+    __resetNativeSpeechForTests();
+    const codes: string[] = [];
+    await startDictation({
+      onText: () => {},
+      onError: () => {},
+      onErrorCode: code => codes.push(code),
+      onEnd: () => {},
+    });
+    emit('recognitionError', { code: 'permission-blocked' });
+    expect(codes).toEqual(['permission-blocked']);
   });
 });

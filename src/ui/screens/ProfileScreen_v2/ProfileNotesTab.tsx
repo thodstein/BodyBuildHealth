@@ -75,6 +75,7 @@ import {
   recordingMime,
 } from '../../../engines/note-media.engine';
 import {
+  openMicrophoneSettings,
   speakTextBest,
   speechSupport,
   speechSupportSync,
@@ -103,6 +104,19 @@ const AMBER = '#f59e0b';
  * оставалась бы «запускается» и не давала нажать себя снова.
  */
 const DICTATION_START_TIMEOUT_MS = 30_000;
+
+/**
+ * Отказы, которые лечатся не повтором, а разрешением в настройках Android.
+ * Для них показываем кнопку «Настройки микрофона» — иначе человек читает
+ * «попробуйте снова» и упирается в то же самое.
+ */
+const MIC_PERMISSION_CODES = new Set([
+  'no-permission',
+  'permission-blocked',
+  'permission-timeout',
+  'permission-request-failed',
+  'no-activity',
+]);
 
 const ls = (): Storage | null => {
   try {
@@ -263,6 +277,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const [dictation, setDictation] = useState<DictationState>('idle');
   /** Промежуточная гипотеза распознавания — показываем, что нас слышат. */
   const [interim, setInterim] = useState('');
+  /** Отказ из-за разрешения: показываем кнопку «Настройки микрофона». */
+  const [micSettingsNeeded, setMicSettingsNeeded] = useState(false);
   const dictationRef = useRef<{ stop: () => void } | null>(null);
   /** Старт диктовки асинхронный: двойной тап не должен поднять второй микрофон. */
   const dictationStartingRef = useRef(false);
@@ -719,6 +735,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   const toggleDictation = () => {
     setVoiceError(null);
+    setMicSettingsNeeded(false);
     if (dictation === 'listening') {
       // Гасим состояние сразу, а не ждём recognitionEnd: нативная остановка
       // может не прислать событие (мы снимаем подписки) — и «Слушаю» залипло бы.
@@ -741,6 +758,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       settled = true;
       dictationStartingRef.current = false;
       setDictation('error');
+      setMicSettingsNeeded(true);
       setVoiceError(
         'Распознавание не запустилось за 30 секунд: микрофон не подтвердил запуск. Проверьте разрешение и нажмите ещё раз.',
       );
@@ -771,6 +789,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           reported = true;
           setDictation('error');
           setVoiceError(message);
+        },
+        onErrorCode: code => {
+          // Разрешение выдаётся только в настройках Android — предлагаем путь.
+          if (MIC_PERMISSION_CODES.has(code)) setMicSettingsNeeded(true);
         },
         onEnd: () => {
           dictationRef.current = null;
@@ -1306,6 +1328,21 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <div role="alert" data-notes="voice-error" style={{ marginTop: 8, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}>
               {voiceError}
             </div>
+          )}
+
+          {/* Только APK: в браузере системных настроек приложения нет, и кнопка
+              была бы пустышкой. */}
+          {micSettingsNeeded && speech.dictation === 'native' && (
+            <button
+              type="button"
+              data-notes="mic-settings"
+              onClick={() => {
+                void openMicrophoneSettings();
+              }}
+              style={{ ...btn('ghost'), fontSize: 12, marginTop: 8 }}
+            >
+              Настройки микрофона
+            </button>
           )}
 
           <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '12px 0 5px' }}>
