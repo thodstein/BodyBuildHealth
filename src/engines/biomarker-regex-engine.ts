@@ -262,7 +262,7 @@ export const UNIT_MAP: Record<string, string> = {
   'E2': 'pmol/L', 'Prolactin': 'mIU/L', 'LH': 'IU/L', 'FSH': 'IU/L',
   'Progesterone': 'nmol/L', 'Cortisol': 'nmol/L', 'DHEA_S': 'mcmol/L',
   'TSH': 'mIU/L', 'T3_Free': 'pmol/L', 'T4_Free': 'pmol/L',
-  'SHBG': 'nmol/L', 'DHT': 'nmol/L', 'IGF-1': 'ng/mL',
+  'SHBG': 'nmol/L', 'DHT': 'pg/mL', 'IGF-1': 'ng/mL',
   'PSA': 'ng/mL', 'PSA_Free': 'ng/mL',
   'Hematocrit': '%', 'Hemoglobin': 'g/L', 'Ferritin': 'ng/mL',
   'WBC': '10^9/L', 'RBC': '10^12/L', 'Platelets': '10^9/L',

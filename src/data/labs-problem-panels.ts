@@ -10,7 +10,7 @@
  *   - support-calculator: приоритетная коррекция по сценарию
  */
 
-import { FEMALE_HORMONE_BANDS, FT_MALE_BAND } from '../engines/lab-norms.engine';
+import { FEMALE_HORMONE_BANDS, FT_MALE_BAND, DHT_BAND } from '../engines/lab-norms.engine';
 
 export type MarkerImportance = 'critical' | 'important' | 'optional';
 
@@ -24,6 +24,16 @@ export type MarkerImportance = 'critical' | 'important' | 'optional';
 const FT_TARGET = `${FT_MALE_BAND.low}–${FT_MALE_BAND.high} пг/мл`;
 const FT_ABOVE = `>${FT_MALE_BAND.low} пг/мл`;
 const FT_LOW = `↓ <${FT_MALE_BAND.low} пг/мл`;
+
+/**
+ * Цель ДГТ в панелях — шкала каталога (`UCUM_MAP.DHT`, проход 192): 143–842 пг/мл,
+ * референс РФ-бланка для мужчин 19–89 лет (Хеликс 08-024 / КДЛ 7.4.A4.201 /
+ * CMD 060206). Прежние «200–600» и «250–600» пг/мл были обрезками шкалы 130–870,
+ * которой нет ни в одном бланке РФ: цель ниже референса показывала «достигнуто»
+ * при значении, которое лаборатория считает нормой.
+ */
+const DHT_TARGET = `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`;
+const DHT_LOW = `↓ <${DHT_BAND.low} пг/мл`;
 
 /**
  * Фазовые коридоры прогестерона — женская половина строки панели. Числа берутся
@@ -112,7 +122,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: '↓ биодоступный Т — рассчитать по SHBG+альбумину', target: FT_ABOVE },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ исходная гиперэстрогения', target: '15-35 пг/мл' },
       { code: 'SHBG', label: 'ГСПГ', importance: 'critical', highMeaning: '↑ снижает свободный Т; ↓ на оральных — резкий скачок', target: '20-45 нмоль/л' },
-      { code: 'DHT', label: 'Дигидротестостерон', importance: 'important', highMeaning: '↑ риск алопеции/акне/простаты', target: '200-600 пг/мл' },
+      { code: 'DHT', label: 'Дигидротестостерон', importance: 'important', highMeaning: '↑ на тестостероне ожидаемо (инъекции ×2, гель ×5); риск алопеции/акне/простаты', target: DHT_TARGET },
       { code: 'PRL', label: 'Пролактин', importance: 'important', highMeaning: '>15 нг/мл — пролактинома? Макропролактин?', target: '<12 нг/мл' },
       { code: 'LH', label: 'ЛГ', importance: 'critical', lowMeaning: '↓ гипогонадотропный гипогонадизм', target: '>3 мМЕ/мл' },
       { code: 'FSH', label: 'ФСГ', importance: 'critical', lowMeaning: '↓ нарушение сперматогенеза', target: '>3 мМЕ/мл' },
@@ -330,7 +340,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>15 нг/мл — лактационная гинекомастия', target: '<12 нг/мл' },
       { code: 'PROG', label: 'Прогестерон', importance: 'important', highMeaning: '>1.2 нг/мл — прогестиновая гинекомастия (дека/трен); ♀ — это норма по фазе, а не отклонение', target: `<0.8 нг/мл (♂); ♀ ${PROG_PHASES.follicular.low}–${PROG_PHASES.follicular.high} фолл. / ${PROG_PHASES.luteal.low}–${PROG_PHASES.luteal.high} лют.` },
       { code: 'SHBG', label: 'ГСПГ', importance: 'important', lowMeaning: '↓ → ↑ свободный Т → ↑ ароматизация', target: '20-45 нмоль/л' },
-      { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: '↓ на финастериде → ↑ E2/T-баланс', target: '200-600 пг/мл' },
+      { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: '↓ на финастериде/дутастериде — ожидаемо (общий T при этом растёт на ~20%)', target: DHT_TARGET },
       { code: 'ANDROSTENEDIONE', label: 'Андростендион', importance: 'optional', highMeaning: '↑ >6 нмоль/л — дополнительный источник E2', target: '<5 нмоль/л' },
     ],
     clinicalNotes: 'Эстрогенная: E2↑, PRL-N, Prog-N → анастрозол 0.5 мг 2р/нед. Прогестиновая: E2-N, Progesterone↑ (дека/трен) → каберголин 0.25 мг 2р/нед. Смешанная: E2↑ + Prog↑ — оба. Стадии Tanner: I — боль без уплотнения (обратимо); II — уплотнение <2 см (обратимо 80%); III — >2 см + фиброз (частично обратим); IV — сформированная ткань (только хирургия).',
@@ -355,18 +365,18 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: `${FT_LOW} — низкий биодоступный Т`, target: FT_TARGET },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ >50 — эстрогенная ЭД; ↓ <10 — сухость/отсутствие', target: '20-35 пг/мл' },
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>15 — гиперпролактинемическая ЭД', target: '<10 нг/мл' },
-      { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: '↓ <150 пг/мл — финастерид/дутастерид', target: '250-600 пг/мл' },
+      { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: `${DHT_LOW} — на 5-АРИ ожидаемо, не на 5-АРИ — гипогонадизм`, target: DHT_TARGET },
       { code: 'SHBG', label: 'ГСПГ', importance: 'important', highMeaning: '↑ >50 — связывает свободный Т', target: '20-40 нмоль/л' },
       { code: 'CORTISOL', label: 'Кортизол', importance: 'important', highMeaning: '↑ >500 — стресс-индуцированная ЭД', target: '<400 нмоль/л' },
       { code: 'DHEA_S', label: 'ДГЭА-С', importance: 'important', lowMeaning: '↓ <120 мкг/дл — низкие нейростероиды', target: '>180 мкг/дл' },
       { code: 'TSH', label: 'ТТГ', importance: 'important', highMeaning: '>4 — гипотиреоз → депрессия + ЭД', target: '0.5-2.5 мМЕ/л' },
     ],
-    clinicalNotes: 'Триада: (1) гормональная — TT↓/E2↑/PRL↑/DHT↓; (2) нейростероидная — DHEA-S↓, прогестерон↑; (3) психогенная — кортизол↑, все гормоны в норме. Пост-финастеридный синдром: DHT↓, TT-N, нейростероиды↓. Лечение: восстановить E2-баланс (20-35 пг/мл), PRL<10, DHT>200.',
+    clinicalNotes: 'Триада: (1) гормональная — TT↓/E2↑/PRL↑/DHT↓; (2) нейростероидная — DHEA-S↓, прогестерон↑; (3) психогенная — кортизол↑, все гормоны в норме. Пост-финастеридный синдром: DHT↓, TT-N, нейростероиды↓. Лечение: восстановить E2-баланс (20-35 пг/мл), PRL<10, ДГТ вернуть в референс (${DHT_TARGET}).',
     triggerSymptoms: ['libido_decrease', 'mood_swings', 'fatigue', 'insomnia'],
     recommendedActions: [
       'Восстановить E2 20-35 пг/мл (не ниже 15!)',
       'PRL>15 → каберголин 0.25 мг 2р/нед',
-      'DHT↓ → отмена финастерида/дутастерида',
+      'ДГТ↓ на финастериде/дутастериде — ожидаемый эффект 5-АРИ; отмену обсуждать с врачом, не самостоятельно',
       'DHEA-S↓ → DHEA 25-50 мг/сут',
       'Психогенная → фосфатидилсерин 400-600 мг',
     ],

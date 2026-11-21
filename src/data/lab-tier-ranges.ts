@@ -13,6 +13,7 @@ import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN, UA_LLN, NT_PROBNP_STEPS, CK_MB_STEPS, E2_MALE_BAND,
   FT_MALE_BAND,
+  DHT_BAND,
 } from '../engines/lab-norms.engine';
 import { ucumInfo } from '../core/constants';
 import { unitsIncommensurable } from '../core/labs-mapping';
@@ -106,7 +107,17 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   // «⛔ STOP COURSE» здоровому. `direction:'low'`: высокий свободный T на курсе —
   // не болезнь шкалы, ступени у него нет.
   FREE_TESTOSTERONE: { marker:'FREE_TESTOSTERONE', normal:[FT_MALE_BAND.low, FT_MALE_BAND.high], borderline:[FT_MALE_BAND.elderlyLow, FT_MALE_BAND.low], treatment:[0, FT_MALE_BAND.elderlyLow], direction:'low', unit:'pg/mL', label:'Своб. T' },
-  DHT:              { marker:'DHT', normal:[1.0,3.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'nmol/L', label:'ДГТ' },
+  // Проход 192: ДГТ — двусторонняя шкала в пг/мл от нормы РФ-бланка
+  // (`DHT_BAND`: 143–842, Хеликс/КДЛ/CMD). Прежняя строка 1.0–3.0 нмоль/л с
+  // `direction:'low'` жила в другой единице, поэтому число в пг/мл было больше 3
+  // почти всегда: ДГТ не получал ни ступени, ни совета ни при каком значении.
+  // Низкая сторона — 5α-редуктаза (финастерид/дутастерид) и гипогонадизм,
+  // высокая — андрогенная нагрузка. Ступени — кратности от границ (`halfLow` =
+  // 0.5·LLN, `doubleHigh` = 2×ВГН), новых клинических порогов нет. Верхней
+  // экстренной ступени нет: ряд «лечения» тянется до арифметического предела, а
+  // «STOP COURSE» по одному ДГТ не выдаётся (`docs/LAB-NORMS-SINGLE-SOURCE.md`,
+  // проход 192).
+  DHT: { marker:'DHT', normal:[DHT_BAND.low, DHT_BAND.high], borderline:[DHT_BAND.halfLow, DHT_BAND.low, DHT_BAND.high, DHT_BAND.doubleHigh], treatment:[0, DHT_BAND.halfLow, DHT_BAND.doubleHigh, Number.MAX_SAFE_INTEGER], direction:'both', unit:'pg/mL', label:'ДГТ' },
   DHEA_S:           { marker:'DHEA_S', normal:[200,500], borderline:[150,200], treatment:[100,150], emergencyLow:100, direction:'low', unit:'mcg/dL', label:'ДГЭА-С' },
   SHBG:             { marker:'SHBG', normal:[20,60], borderline:[60,80], treatment:[80,120], emergencyHigh:120, direction:'high', unit:'nmol/L', label:'ГСПГ' },
   // Проход 190: шкала — пороги ДЕЙСТВИЯ в нг/мл, а не «лабораторная норма».

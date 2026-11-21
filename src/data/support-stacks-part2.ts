@@ -1,4 +1,5 @@
 import { SupportStack } from './support-stacks-types';
+import { DHT_BAND } from '../engines/lab-norms.engine';
 export const STACKS_PART_2: SupportStack[] = [
   // ════════════════════════════════════════════════════════
   // 26. ВОЛОСЫ, КОЖА, НОГТИ
@@ -47,14 +48,14 @@ export const STACKS_PART_2: SupportStack[] = [
         { with: 'витамин A в высоких дозах', effect: 'Токсичность и выпадение волос', mechanism: 'Повышение ретиноевой кислоты — повышение апоптоза кератиноцитов и телогена', strength: 'MEDIUM' },
       ],
       specialInstructions: 'Zn и биотин разделить на утро/вечер. Коллаген натощак. Селен и Vit C вместе утром.',
-      cautions: 'При андрогенетической алопеции добавить ингибитор 5-альфа-редуктазы. При DHT >1000 пг/мл — снизить Zn до 15 мг.',
+      cautions: 'При андрогенетической алопеции ингибитор 5-альфа-редуктазы обсуждать с врачом: ДГТ при этом падает на 70–95%, и это ожидаемый эффект, а не дефицит.',
     },
     structuredLabControl: {
       markers: [
         { marker: 'Цинк', when: 'Каждые 4 нед', targetRange: '10-18 мкмоль/л' },
         { marker: 'Селен', when: 'Каждые 4 нед', targetRange: '0.8-1.5 мкмоль/л' },
         { marker: 'Ферритин', when: 'Каждые 4 нед', targetRange: '30-150 мкг/л' },
-        { marker: 'DHT', when: 'Каждые 4 нед', targetRange: '250-900 пг/мл' },
+        { marker: 'DHT', when: 'Каждые 4 нед', targetRange: `${DHT_BAND.low}-${DHT_BAND.high} пг/мл` },
         { marker: 'ТТГ', when: 'Каждые 8 нед', targetRange: '0.4-4.0 мМЕ/л' },
       ],
     },

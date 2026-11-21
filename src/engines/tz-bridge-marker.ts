@@ -179,7 +179,10 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'TESTOSTERONE_FREE', organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 12.3 },
   { marker: 'EPI_TESTO',    organId: 'reproductive', mechId: 'rep5', direction: 'down', lln: 5 },
   // ─── ДОПОЛНИТЕЛЬНЫЕ МАРКЁРЫ (отсутствовали в MARKER_TO_TZ_MECH) ───
-  { marker: 'DHT',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 3.5 },
+  // Проход 192: ВГН в единице бланка (`DHT_BAND` — 842 пг/мл). Прежние 3.5 были
+  // тем же порогом в нмоль/л: мост сравнивал их с числом в пг/мл и активировал
+  // механизм почти у любого.
+  { marker: 'DHT',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 842 },
   { marker: 'CK',           organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 200 },
   { marker: 'ESR',          organId: 'cardio',       mechId: 'cv1',  direction: 'up', uln: 15 },
   { marker: 'PLT',          organId: 'hematologic',  mechId: 'hem1', direction: 'up', uln: 400 },

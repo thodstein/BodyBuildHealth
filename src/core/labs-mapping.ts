@@ -1,5 +1,5 @@
 import synonyms from '../data/labs-synonyms.json';
-import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL, ucumInfo, ucumKey } from './constants';
+import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL, DHT_NMOL_TO_PG, ucumInfo, ucumKey } from './constants';
 import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
@@ -354,6 +354,9 @@ const MOLAR_MASS: Record<string, number> = {
   CA: 40.078, CALCIUM: 40.078, MG: 24.305, MAGNESIUM: 24.305,
   P: 30.974, PHOSPHORUS: 30.974, IRON: 55.845, TIBC: 55.845, UIBC: 55.845,
   TT: 288.42, FT: 288.42, E2: 272.38, ESTRADIOL: 272.38, PROG: 314.46, PROGESTERONE: 314.46,
+  // Проход 192: ДГТ — та же молярная масса, что и в `LAB_UNIT_READ`, один литерал
+  // на два читателя (`DHT_NMOL_TO_PG`).
+  DHT: DHT_NMOL_TO_PG,
   DHEA_S: 368.49, CORTISOL: 362.46, CORTISOL_NIGHT: 362.46,
   FT4: 776.87, T4: 776.87, FT3: 650.97, T3: 650.97,
   ALDOSTERONE: 360.44, ACTH: 4541.1, PARATHYROID: 9424.8,

@@ -1,4 +1,5 @@
 import type { SymptomEntry } from './symptom-solver.types';
+import { DHT_BAND } from './lab-norms.engine';
 
 export const DB_PART2: SymptomEntry[] = [
   {
@@ -15,7 +16,7 @@ export const DB_PART2: SymptomEntry[] = [
         drugInteractions: ['Финастерид + нандролон → ↓ DHT → ↑ депрессия + ↓ либидо (ДГТ нужен для нейростероидогенеза)', 'Тамоксифен моно — может быть недостаточен при нандролоновой супрессии (нужен hCG + enclomiphene)'],
         labMarkers: [
           { marker: 'Пролактин', expectedChange: '↑↑', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
-          { marker: 'DHT', expectedChange: '↓↓', targetRange: '0.4-2.5 нмоль/л', when: 'При симптомах' },
+          { marker: 'DHT', expectedChange: '↓↓', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При симптомах' },
           { marker: 'Прогестерон', expectedChange: '↑', targetRange: '<1.2 нмоль/л ♂', when: 'При симптомах' },
           { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
         ],
@@ -1009,7 +1010,7 @@ export const DB_PART2: SymptomEntry[] = [
         mechanism: '↑Testosterone → ↑DHT (через 5α-редуктазу) в сальных железах → ↑секреция себума + гиперкератинизация фолликула → колонизация P. acnes → воспаление',
         labMarkers: [
           { marker: 'Тестостерон', expectedChange: '↑↑↑', targetRange: '20-35 нмоль/л', when: 'Контроль' },
-          { marker: 'DHT', expectedChange: '↑↑', targetRange: '0.4-2.5 нмоль/л', when: 'Спец. анализ' },
+          { marker: 'DHT', expectedChange: '↑↑', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'Спец. анализ' },
         ],
         solutions: [
           { substanceId: 'isotretinoin', name: 'Изотретиноин', type: 'pharma', dose: '0.5-1 мг/кг/день (под контролем АЛТ/АСТ)', mechanism: '↓себум, ↓размер сальных желез, ↑дифференциация', evidenceLevel: 'A' },
@@ -1045,7 +1046,7 @@ export const DB_PART2: SymptomEntry[] = [
         probability: 'high',
         mechanism: 'DHT→AR в фолликулах → миниатюризация → ↓фаза анагена, ↑фаза телогена → выпадение. Генетическая предрасположенность (AR gene CAG repeat) определяет риск.',
         labMarkers: [
-          { marker: 'DHT', expectedChange: '↑↑', targetRange: '0.4-2.5 нмоль/л', when: 'Спец. анализ' },
+          { marker: 'DHT', expectedChange: '↑↑', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'Спец. анализ' },
           { marker: 'Тестостерон', expectedChange: '↑↑', targetRange: 'Баланс', when: 'Контроль' },
         ],
         solutions: [

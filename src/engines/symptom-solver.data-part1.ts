@@ -1,4 +1,5 @@
 import type { SymptomEntry } from './symptom-solver.types';
+import { DHT_BAND } from './lab-norms.engine';
 
 export const DB_PART1: SymptomEntry[] = [
   // ═══ СЕРДЕЧНО-СОСУДИСТАЯ ═══
@@ -330,7 +331,7 @@ export const DB_PART1: SymptomEntry[] = [
         labMarkers: [
           { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'При ↓ либидо' },
           { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
-          { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T и ↓ либидо' },
+          { marker: 'DHT', expectedChange: '↓', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При нормальном T и ↓ либидо' },
         ],
         solutions: [
           { substanceId: 'cabergoline', name: 'Каберголин (D2-агонист)', type: 'pharma', dose: '0.25-0.5 мг 2×/нед', mechanism: '↓ секреция пролактина', evidenceLevel: 'A' },
@@ -595,7 +596,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'ААС → AR в себоцитах → ↑ липогенез → ↑ себум + кератинизация → комедоны. P. acnes ферментирует себум → воспаление.',
         labMarkers: [
           { marker: 'E2', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'При акне' },
-          { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При тяжёлом акне' },
+          { marker: 'DHT', expectedChange: '↔', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При тяжёлом акне' },
         ],
         solutions: [
           { substanceId: 'isotretinoin', name: 'Изотретиноин (низкодозный)', type: 'pharma', dose: '10-20 мг/сут', mechanism: '↓ размер сальных желёз на 90%', evidenceLevel: 'A' },
@@ -619,7 +620,7 @@ export const DB_PART1: SymptomEntry[] = [
         problem: 'DHT-опосредованная АГА', probability: 'medium',
         mechanism: '5α-редуктаза конвертирует T в DHT в фолликулах. DHT в 5× аффиннее к AR → ↓ анагеновая фаза → миниатюризация фолликула.',
         labMarkers: [
-          { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При выпадении' },
+          { marker: 'DHT', expectedChange: '↔', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При выпадении' },
           { marker: 'Ферритин', expectedChange: '↔', targetRange: '>70 мкг/л', when: 'Исключить телогеновую алопецию' },
           { marker: 'ТТГ', expectedChange: '↔', targetRange: '0.4-4.0', when: 'Исключить гипотиреоз' },
         ],
@@ -757,7 +758,7 @@ export const DB_PART1: SymptomEntry[] = [
         labMarkers: [
           { marker: 'E2 (эстрадиол)', expectedChange: '↔', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Немедленно' },
           { marker: 'Пролактин', expectedChange: '↔', targetRange: '86-324 мкМЕ/мл (♀ <800 мМЕ/л)', when: 'Немедленно' },
-          { marker: 'DHT', expectedChange: '↓', targetRange: '0.4-2.5 нмоль/л', when: 'При нормальном T' },
+          { marker: 'DHT', expectedChange: '↓', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При нормальном T' },
           { marker: 'Гематокрит', expectedChange: '↑', targetRange: '40-50% (♀ 36-48%)', when: 'Каждые 4-8 нед' },
           { marker: 'Гомоцистеин', expectedChange: '↔', targetRange: '<15 мкмоль/л', when: 'При ЭД (маркер эндотелиальной дисфункции)' },
         ],
@@ -787,7 +788,7 @@ export const DB_PART1: SymptomEntry[] = [
         mechanism: 'DHT (из тестостерона через 5α-редуктазу) — основной фактор роста простаты. E2 через ER-α также стимулирует пролиферацию стромы. ААС ↑ оба фактора → ↑ объём простаты → компрессия уретры → СНМП.',
         labMarkers: [
           { marker: 'ПСА общий + свободный', expectedChange: '↔', targetRange: '<4 нг/мл, своб/общ >25%', when: 'До курса, каждые 6 мес' },
-          { marker: 'DHT', expectedChange: '↔', targetRange: '0.4-2.5 нмоль/л', when: 'При СНМП' },
+          { marker: 'DHT', expectedChange: '↔', targetRange: `${DHT_BAND.low}–${DHT_BAND.high} пг/мл`, when: 'При СНМП' },
           { marker: 'E2', expectedChange: '↑', targetRange: '20-50 пг/мл (♂; ♀ — по фазе, не подавлять)', when: 'Каждые 4 нед' },
           { marker: 'УЗИ простаты (ТРУЗИ)', expectedChange: '↔', targetRange: 'Объём <30 см³', when: 'До курса, при СНМП' },
           { marker: 'IPSS (опросник)', expectedChange: '↔', targetRange: '0-7 баллов (лёгкая)', when: 'При СНМП' },

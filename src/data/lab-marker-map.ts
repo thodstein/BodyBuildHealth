@@ -5,6 +5,8 @@
 //  automatically makes it appear in recommendations for these markers.
 // ══════════════════════════════════════════════════════════════════════
 
+import { DHT_BAND } from '../engines/lab-norms.engine';
+
 export interface LabMarkerMap {
   marker: string;
   name: string;
@@ -91,7 +93,10 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'LH', name:'ЛГ', organ:'PITUITARY', system:'endocrine', mechanisms:['LH_UP','GNRH_UP'], higherIsWorse:false, defaultValue:1, unit:'мМЕ/мл', correctionIds:['enclomiphene','daa','tamoxifen'] },
   { marker:'FSH', name:'ФСГ', organ:'PITUITARY', system:'endocrine', mechanisms:['FSH_UP','GNRH_UP'], higherIsWorse:false, defaultValue:1, unit:'мМЕ/мл', correctionIds:['enclomiphene','daa','tamoxifen'] },
   { marker:'SHBG', name:'ГСПГ', organ:'LIVER', system:'endocrine', mechanisms:['SHBG_REGULATION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:60, unit:'нмоль/л', correctionIds:['boron','tongkat_ali','mesterolone'] },
-  { marker:'DHT', name:'ДГТ', organ:'PROSTATE', system:'endocrine', mechanisms:['5AR_INHIBITION','DHT_REDUCTION'], higherIsWorse:true, defaultValue:870, unit:'пг/мл', correctionIds:['saw_palmetto','zinc_sup','mesterolone'] },
+  // Проход 192: порог — ВГН шкалы (`DHT_BAND`), единица пг/мл. Прежние 870 были
+  // округлением 3.0 нмоль/л в чужой единице: порог сравнивался с числом в пг/мл
+  // и не срабатывал почти никогда.
+  { marker:'DHT', name:'ДГТ', organ:'PROSTATE', system:'endocrine', mechanisms:['5AR_INHIBITION','DHT_REDUCTION'], higherIsWorse:true, defaultValue:DHT_BAND.high, unit:'пг/мл', correctionIds:['saw_palmetto','zinc_sup','mesterolone'] },
   // Проход 190: направление — как у шкалы (`LAB_TIERS.PROG.direction: 'high'`):
   // у мужчины значимо ПОВЫШЕНИЕ (адренальный/лекарственный источник), а низкий
   // прогестерон на подавленной оси — ожидаемое состояние, не «дефицит». Своих
