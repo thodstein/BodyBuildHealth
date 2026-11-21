@@ -324,7 +324,27 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('прошлой неделей');
     expect(html).toContain('без изменений');
     expect(html).toContain('Средний RIR');
+    // Интенсивность сравнивается отдельной строкой, а не через % от %.
+    expect(html).toContain('Интенсивность, %');
     expect(html).toContain('Время, мин');
+  });
+
+  it('сравнение интенсивности говорит про процентные пункты', () => {
+    const heavier = mkWorkout('2026-11-10');
+    heavier.exercises = [{
+      ...heavier.exercises[0],
+      sets: [{ weight: 90, reps: 5, rir: 2, rpe: 8 }],
+    }] as StrengthLogEntry[];
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[heavier]}
+        blocks={['compare']}
+        previousWorkouts={[mkWorkout('2026-11-03')]}
+        showSelector={false}
+      />,
+    );
+    expect(html).toContain('Интенсивность, %');
+    expect(html).toContain('п.п.');
   });
 
   it('в сравнении видны и движения, а не только мышцы', () => {

@@ -743,6 +743,28 @@ describe('workout-summary: сравнение периодов', () => {
     expect(compareWorkoutSummaries(cur, null).metrics.rir).toBeNull();
     expect(compareWorkoutSummaries(prev, prev).metrics.rir).toEqual({ current: 3, previous: 3, delta: 0, pct: 0 });
   });
+
+  it('сравнивает интенсивность в процентных пунктах', () => {
+    const prev = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    const cur = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 5, sets: 3 }]),
+    ]);
+    const c = compareWorkoutSummaries(cur, prev);
+    // 90×5 при e1RM 105 — 85.7%; 80×8 при 101 — 79.2%.
+    expect(c.metrics.intensity?.current).toBe(85.7);
+    expect(c.metrics.intensity?.delta).toBe(6.5);
+    // Относительный процент тут не нужен: это процентные пункты.
+    expect(c.metrics.intensity?.pct).toBeNull();
+    const txt = buildWorkoutReportText(cur, { comparison: c, comparisonLabel: 'прошлой тренировкой' });
+    expect(txt).toContain('Интенсивность: 85.7% от e1RM, +6.5 п.п.');
+    // Нет веса хоть в одном периоде — интенсивности не сравниваем.
+    const bodyweight = buildWorkoutSummary([
+      mkWorkout('2026-11-16', [{ name: 'Подтягивания', id: 'pullup', weight: 0, reps: 10, sets: 3 }]),
+    ]);
+    expect(compareWorkoutSummaries(bodyweight, prev).metrics.intensity).toBeNull();
+  });
 });
 
 describe('workout-summary: рекорды и подходы без веса', () => {

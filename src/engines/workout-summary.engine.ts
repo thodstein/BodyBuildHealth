@@ -951,6 +951,8 @@ export interface SummaryComparison {
     prs: MetricDelta;
     /** Средний RIR: null — в одном из периодов RIR не записан. */
     rir: MetricDelta | null;
+    /** Средняя интенсивность, % от e1RM: null — в одном из периодов нет веса. */
+    intensity: MetricDelta | null;
   };
   muscles: Array<{ muscle: MuscleKey; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
   patterns: Array<{ pattern: string; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
@@ -976,6 +978,8 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
 
   const curRIR = cur?.avgRIR;
   const prevRIR = prev?.avgRIR;
+  const curIntensity = cur?.avgIntensityPct;
+  const prevIntensity = prev?.avgIntensityPct;
   const metrics = {
     sessions: mkDelta(cur?.sessions || 0, prev?.sessions || 0),
     sets: mkDelta(cur?.sets || 0, prev?.sets || 0),
@@ -986,6 +990,10 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
     prs: mkDelta(cur?.prs || 0, prev?.prs || 0),
     // RIR — не объём: без записи хотя бы в одном периоде дельту не выдумываем.
     rir: curRIR != null && prevRIR != null ? mkDelta(curRIR, prevRIR) : null,
+    // Интенсивность в процентных пунктах: «+4% от 78%» путает, а pct тут не нужен.
+    intensity: curIntensity != null && prevIntensity != null
+      ? { ...mkDelta(curIntensity, prevIntensity), pct: null }
+      : null,
   };
 
   const prevMuscles = new Map<MuscleKey, SummaryMuscle>((previous?.muscles || []).map(m => [m.muscle, m]));
@@ -2085,10 +2093,14 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     if (cmp.metrics.duration.previous > 0) {
       lines.push(`  Время: ${textInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
     }
+    const fmtDec1 = (n: number) => String(Math.round(n * 10) / 10);
     if (cmp.metrics.rir) {
       const r = cmp.metrics.rir;
-      const fmtRir = (n: number) => String(Math.round(n * 10) / 10);
-      lines.push(`  Средний RIR: ${fmtRir(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtRir(r.delta)}`);
+      lines.push(`  Средний RIR: ${fmtDec1(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtDec1(r.delta)}`);
+    }
+    if (cmp.metrics.intensity) {
+      const it = cmp.metrics.intensity;
+      lines.push(`  Интенсивность: ${fmtDec1(it.current)}% от e1RM, ${it.delta > 0 ? '+' : ''}${fmtDec1(it.delta)} п.п.`);
     }
     const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
     const grown = muscleRows.filter(m => m.sets.delta > 0).length;
