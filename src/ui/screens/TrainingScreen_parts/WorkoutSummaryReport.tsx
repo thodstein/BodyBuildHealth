@@ -729,7 +729,7 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── ДВИЖЕНИЯ ── */}
       {has('movement') && summary.patterns.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж" />
+          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · тренд по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {summary.patterns.map(p => (
               <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
@@ -738,6 +738,17 @@ export const WorkoutSummaryBody: React.FC<{
                 <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{p.sets} подх.</span>
                 <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>{fmtTon(p.tonnageKg)}</span>
                 <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.sharePct}%</span>
+                {p.weeklyTrendPct != null && p.weeklyTrendPct !== 0 && (
+                  <span
+                    title={`Подходы по неделям: ${p.weeklySets.join(' · ')}`}
+                    style={{ color: p.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
+                  >
+                    {p.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.weeklyTrendPct)}%
+                  </span>
+                )}
+                {p.weeklySets.filter(x => x > 0).length >= 3 && (
+                  <Sparkline values={p.weeklySets} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
+                )}
               </div>
             ))}
           </div>

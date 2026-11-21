@@ -287,6 +287,10 @@ export interface SummaryPattern {
   reps: number;
   tonnageKg: number;
   sharePct: number;
+  /** Подходы по неделям периода (по возрастанию) — для тренда. */
+  weeklySets: number[];
+  /** Изменение подходов/нед первой недели к последней, % (null — нет базы). */
+  weeklyTrendPct: number | null;
 }
 
 export interface SummarySession {
@@ -431,7 +435,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number> }>();
-  const patternAgg = new Map<string, { sets: number; reps: number; tonnageKg: number }>();
+  const patternAgg = new Map<string, { sets: number; reps: number; tonnageKg: number; byWeek: Map<string, number> }>();
   const sessionRows: SummarySession[] = [];
   const weekAgg = new Map<string, SummaryWeek>();
   const prs: SummaryPR[] = [];
@@ -589,8 +593,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       if (wk.from) mPrev.byWeek.set(wk.from, (mPrev.byWeek.get(wk.from) || 0) + exSets);
       muscleAgg.set(meta.muscle, mPrev);
 
-      const pPrev = patternAgg.get(meta.pattern) || { sets: 0, reps: 0, tonnageKg: 0 };
+      const pPrev = patternAgg.get(meta.pattern) || { sets: 0, reps: 0, tonnageKg: 0, byWeek: new Map<string, number>() };
       pPrev.sets += exSets; pPrev.reps += exReps; pPrev.tonnageKg += exTonnage;
+      if (wk.from) pPrev.byWeek.set(wk.from, (pPrev.byWeek.get(wk.from) || 0) + exSets);
       patternAgg.set(meta.pattern, pPrev);
     }
 
@@ -675,13 +680,18 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     return keys.length > 0 ? keys : activeWeekKeys;
   })();
 
+  // Тренд по активным неделям: перерыв не считается «ростом с нуля», а
+  // единственная неделя базы не даёт — сравнивать не с чем.
+  const weeklyTrendFrom = (series: number[]): number | null => {
+    const active = series.filter(x => x > 0);
+    if (active.length < 2 || active[0] <= 0) return null;
+    return Math.round(((active[active.length - 1] - active[0]) / active[0]) * 1000) / 10;
+  };
+
   const musclesOut: SummaryMuscle[] = Array.from(muscleAgg.entries())
     .map(([muscle, v]) => {
       const weeklySets = muscleWeekKeys.map(k => v.byWeek.get(k) || 0);
-      const active = weeklySets.filter(x => x > 0);
-      const weeklyTrendPct = active.length >= 2 && active[0] > 0
-        ? Math.round(((active[active.length - 1] - active[0]) / active[0]) * 1000) / 10
-        : null;
+      const weeklyTrendPct = weeklyTrendFrom(weeklySets);
       return {
         muscle,
         label: MUSCLE_LABELS[muscle],
@@ -699,14 +709,19 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
   const patternsOut: SummaryPattern[] = Array.from(patternAgg.entries())
-    .map(([pattern, v]) => ({
-      pattern,
-      label: PATTERN_LABELS[pattern] || PATTERN_LABELS.other,
-      sets: v.sets,
-      reps: v.reps,
-      tonnageKg: Math.round(v.tonnageKg),
-      sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
-    }))
+    .map(([pattern, v]) => {
+      const weeklySets = muscleWeekKeys.map(k => v.byWeek.get(k) || 0);
+      return {
+        pattern,
+        label: PATTERN_LABELS[pattern] || PATTERN_LABELS.other,
+        sets: v.sets,
+        reps: v.reps,
+        tonnageKg: Math.round(v.tonnageKg),
+        sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
+        weeklySets,
+        weeklyTrendPct: weeklyTrendFrom(weeklySets),
+      };
+    })
     .sort((a, b) => b.sets - a.sets || b.tonnageKg - a.tonnageKg);
 
   const weeksOut: SummaryWeek[] = activeWeekKeys.map(k => {
@@ -1605,7 +1620,10 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
   if (s.patterns.length) {
     lines.push('');
     lines.push('Движения:');
-    s.patterns.forEach(p => lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)}`));
+    s.patterns.forEach(p => {
+      const trend = p.weeklyTrendPct != null ? ` (${signedPct(p.weeklyTrendPct)} к первой неделе)` : '';
+      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)}${trend}`);
+    });
   }
 
   if (opts.plan && !opts.plan.empty) {

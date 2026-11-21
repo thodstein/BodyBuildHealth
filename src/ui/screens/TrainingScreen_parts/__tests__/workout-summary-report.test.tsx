@@ -43,6 +43,7 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('По мышцам');
     expect(html).toContain('По упражнениям');
     expect(html).toContain('Движения (паттерны)');
+    expect(html).toContain('тренд по неделям');
     expect(html).toContain('По тренировкам');
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');

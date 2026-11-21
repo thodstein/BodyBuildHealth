@@ -73,6 +73,21 @@ describe('workout-summary: сводка по одной тренировке', (
     expect(labels.some(l => /Горизонтальный жим/i.test(l))).toBe(true);
     expect(labels.some(l => /Приседание/i.test(l))).toBe(true);
   });
+
+  it('считает недельный тренд движений', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 4 }]),
+    ]);
+    const bench = s.patterns.find(p => p.pattern === resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern)!;
+    expect(bench.weeklySets).toEqual([2, 4]);
+    expect(bench.weeklyTrendPct).toBe(100);
+    // Одна неделя — базы для тренда нет, нули не выдумываем.
+    expect(
+      buildWorkoutSummary([mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }])])
+        .patterns.every(p => p.weeklyTrendPct === null),
+    ).toBe(true);
+  });
 });
 
 describe('workout-summary: период из нескольких тренировок', () => {
@@ -772,6 +787,16 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('По упражнениям:');
     expect(txt).toContain('Жим штанги лёжа: 3×8');
     expect(txt).toContain('Движения:');
+  });
+
+  it('пишет тренд движения по неделям', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 4 }]),
+    ]);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('Движения:');
+    expect(txt).toContain('(+100% к первой неделе)');
   });
 
   it('своя шапка и хвост обрамляют отчёт', () => {
