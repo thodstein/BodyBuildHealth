@@ -1792,7 +1792,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
     PROG: { default: 1.5, higherIsWorse: true },
     SHBG: { default: 40, higherIsWorse: false },
     DHT: { default: 2.5, higherIsWorse: false },
-    CK_MB: { default: 5, higherIsWorse: true },
+    CK_MB: { default: 24, higherIsWorse: true },
     TROPONIN: { default: 0.04, higherIsWorse: true },
     ESR: { default: 15, higherIsWorse: true },
   };

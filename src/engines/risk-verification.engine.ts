@@ -8,6 +8,7 @@ import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_STEPS, HGB_STEPS, RBC_STEPS, UA_STAGE_ULN,
   BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS,
+  NT_PROBNP_STEPS, E2_MALE_BAND,
 } from './lab-norms.engine';
 
 export type VerifDirection = 'high' | 'low';
@@ -91,7 +92,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
     id: 'cardio', name: TZ_SYSTEM_LABELS.cardio, icon: TZ_SYSTEM_ICONS.cardio, color: '#ef4444',
     mechanisms: [
       { id: 'cv1', weight: 0.8, markers: [
-        M('NT_PROBNP', 'NT-proBNP', 'пг/мл', 'high', [125, 300, 900]),
+        M('NT_PROBNP', 'NT-proBNP', 'пг/мл', 'high', [NT_PROBNP_STEPS[0], NT_PROBNP_STEPS[1], NT_PROBNP_STEPS[2]]),
         M('CK', 'КФК (креатинкиназа)', 'Ед/л', 'high', [200, 500, 1000]),
       ] },
       { id: 'cv2', weight: 1.0, markers: [
@@ -254,7 +255,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
         // Подпись единицы врала (проход 126): пороги и данные — пг/мл
         // (`FLAT_TARGET_UNIT.E2 = pg/mL`, `readLabValue` канон пг/мл), а рядом с числом
         // печаталось «пмоль/л» — 60 пг/мл читались как 60 пмоль/л (16 пг/мл).
-        M('E2', 'Эстрадиол', 'пг/мл', 'high', [40, 55, 80], { thresholds: [150, 220, 400] }),
+        M('E2', 'Эстрадиол', 'пг/мл', 'high', [E2_MALE_BAND.steps[0], E2_MALE_BAND.steps[1], E2_MALE_BAND.steps[2]], { thresholds: [150, 220, 400] }),
       ] },
       { id: 'rep5', weight: 0.6, markers: [
         M('LH', 'ЛГ', 'МЕ/л', 'low', [2.0, 1.0, 0.5]),

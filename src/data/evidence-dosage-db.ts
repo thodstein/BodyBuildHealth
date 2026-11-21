@@ -2,6 +2,22 @@
 // Каждый reference: либо guideline (ESC, Endocrine Society, FDA label, NIH ODS, EMA, Cochrane),
 // либо опущен (нет PMID — значит нет ссылки, только дозировка из стандартных справочников)
 
+import { E2_PG_TO_PMOL } from '../core/constants';
+import { E2_MALE_BAND } from '../engines/lab-norms.engine';
+
+/**
+ * Цель и порог старта AI по эстрадиолу — из единого ряда мужчины (`E2_MALE_BAND`),
+ * а не из собственных чисел справочника (проход 187).
+ *
+ * Было: «цель 80-120 пмоль/л» и «старт 0.5 мг через день при E2 >80 пмоль/л»,
+ * «не подавлять E2 <50». В пмоль/л это 21.8 пг/мл и 13.6 пг/мл — то есть совет
+ * начинать ингибитор ароматазы на НИЖНЕЙ половине цели и «не подавлять» ниже
+ * физиологической нормы мужчины. Числа были написаны в пг/мл, но подписаны
+ * пмоль/л (1 пг/мл = 3.671 пмоль/л).
+ */
+const E2_TARGET_PG = `${E2_MALE_BAND.targetLow}–${E2_MALE_BAND.steps[0]} пг/мл`;
+const E2_TARGET_PMOL = `${Math.round(E2_MALE_BAND.targetLow * E2_PG_TO_PMOL)}–${Math.round(E2_MALE_BAND.steps[0] * E2_PG_TO_PMOL)} пмоль/л`;
+
 export interface EvidenceDosage {
   minMg: number;
   optMg: number;
@@ -377,12 +393,12 @@ export const EVIDENCE_DOSAGES: Record<DosageId, EvidenceDosage> = {
   anastrozole: {
     minMg: 0.5, optMg: 1, maxMg: 2, unit: 'мг',
     timing: '1x/д, фиксированное время',
-    duration: 'По E2 (цель 80-120 пмоль/л)',
+    duration: `По E2 (цель ${E2_TARGET_PG} = ${E2_TARGET_PMOL})`,
     references: [
       'FDA Arimidex (NDA 20-541) — 1 мг/сут, титрация по ответу',
       'ASCO 2020 Clinical Practice Guideline — AI дозировки',
     ],
-    notes: 'Старт 0.5 мг через день при E2 >80 пмоль/л. Не подавлять E2 <50.',
+    notes: `Старт 0.5 мг через день при E2 выше ${E2_MALE_BAND.steps[0]} пг/мл (верхняя граница цели). Не подавлять E2 ниже ${E2_MALE_BAND.targetLow} пг/мл — гипоэстрогения (суставы, либидо, липиды).`,
     titration: [0.5, 1, 1.5],
     contraindications: ['Беременность/лактация', 'Тяжёлая печёночная недостаточность'],
   },

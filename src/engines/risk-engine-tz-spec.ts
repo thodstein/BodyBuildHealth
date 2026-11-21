@@ -4,7 +4,7 @@ import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, T
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
 import { HCT_THRESHOLDS, HCT_STEPS, HGB_STEPS, RBC_STEPS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, UA_STAGE_ULN,
-  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS } from './lab-norms.engine';
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS, E2_MALE_BAND, NT_PROBNP_STEPS } from './lab-norms.engine';
 import { canonicalLabValues } from './lab-code-bridge';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
@@ -422,7 +422,7 @@ export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,do
       // Проход 168: ключ — `NT_PROBNP`, как в складе и каталоге. `BNP` — другой
       // анализ со своей нормой (100 пг/мл) и без лестницы ступеней; судить его
       // порогами NT-proBNP нельзя.
-      const ntProbnpMi = labMi(ntProbnp,[125,300,900]);
+      const ntProbnpMi = labMi(ntProbnp, NT_PROBNP_STEPS);
       const ckMi = labMi(ck,[200,500,1000]);
       const vals = [ntProbnpMi,ckMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -602,8 +602,10 @@ export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,do
       break;
     }
     case'rep4': { // эстрогенный сдвиг: E2 (нормализовано в pg/mL)
-      // Женщины: физиологические E2 до ~200 pg/mL — мужская шкала [40,55,80] дала бы ложный m2/m3.
-      const e2Mi = fem ? labMi(e2,[150,220,400]) : labMi(e2,[40,55,80]);
+      // Женщины: физиологические E2 до ~200 pg/mL — мужская шкала дала бы ложный m2/m3.
+      // Мужская тройка — из резолвера норм (`E2_MALE_BAND.steps`, проход 187): одна
+      // с лестницей ступеней, а не второй ряд 55/80.
+      const e2Mi = fem ? labMi(e2,[150,220,400]) : labMi(e2, E2_MALE_BAND.steps);
       if (e2Mi !== undefined) labResult = e2Mi;
       break;
     }

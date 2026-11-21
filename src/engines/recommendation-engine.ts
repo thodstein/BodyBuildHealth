@@ -9,7 +9,7 @@ import { getSupportByMechanism, getSupportBySystem, getFullChainSupport } from '
 import { readLabValue, E2_PG_TO_PMOL } from '../core/constants';
 import { formatDoseFromMg } from '../data/dose-units';
 import { getPrioritySubstances, getBrandName, getSubstancePriority, getPriorityReason, deriveSeverity, type SeverityLevel } from '../data/lab-priority-map';
-import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU, HDL_LOW, TG_FLAG_STEPS, SCREEN_TARGETS, BILIRUBIN_FLAG_STEPS, getLabNorm } from './lab-norms.engine';
+import { HCT_STEPS, FEMALE_HORMONE_ULN, PRL_NG_TO_MIU, HDL_LOW, TG_FLAG_STEPS, SCREEN_TARGETS, BILIRUBIN_FLAG_STEPS, getLabNorm, E2_MALE_BAND } from './lab-norms.engine';
 
 export type RecSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type RecStatus = 'active' | 'escalated' | 'blocked' | 'covered';
@@ -345,12 +345,19 @@ function orderByPriority(ids: string[], marker?: string): string[] {
   // ── Aromatization → E2 control (priority: E2) ──
   const e2Read = readV(fp, 'panelSex', 'E2', sexT);
   const e2Val = e2Read ? e2Read.value : null;
-  // Проход 99: у женщины «ароматизация» меряется её коридором, а не мужскими 40/55.
+  // Проход 99: у женщины «ароматизация» меряется её коридором, а не мужским рядом.
   // E2 70 pg/mL — нормальная лютеиновая, и анастрозол на неё не назначается; её
   // тревожные бэнды (400/800) и шаги живут в `FEMALE_HORMONE_ULN`, `femaleHormoneAlert`
   // и `femaleHormoneSteps`.
-  const e2Trigger = sex === 'female' ? FEMALE_HORMONE_ULN.E2.high : 40;
-  const e2SevereAt = sex === 'female' ? FEMALE_HORMONE_ULN.E2.criticalHigh : 55;
+  //
+  // Проход 187: у мужчины числа — из единого ряда (`E2_MALE_BAND`, резолвер норм),
+  // а не литералы 40/55. Прежние 55 («добавить анастрозол») не совпадали ни с
+  // лестницей (40 грань / 60 лечение / 100 гинекомастия), ни со справочником
+  // дозировок («старт AI при E2 выше 40»). Теперь: совет появляется на границе
+  // 40, добавление AI — там же (верх цели, как в справочнике и в правиле tier1),
+  // тяжёлая степень — с порога лечения 60.
+  const e2Trigger = sex === 'female' ? FEMALE_HORMONE_ULN.E2.high : E2_MALE_BAND.steps[0];
+  const e2SevereAt = sex === 'female' ? FEMALE_HORMONE_ULN.E2.criticalHigh : E2_MALE_BAND.steps[1];
   // Проход 106: у женщины единица E2 может быть не указана, а 1600 без единицы — это
   // и 1600 пг/мл (критично), и 436 пг/мл (просто высоко). Значение читается как пг/мл
   // (деление молча прятало её реально высокий E2), но ступень берём по нижней оценке:
@@ -367,10 +374,10 @@ function orderByPriority(ids: string[], marker?: string): string[] {
     const reasoning: Record<string, string> = {};
     ids.forEach(id => { reasoning[id] = getPriorityReason('E2', id) || 'контроль ароматизации эстрогенов'; });
     // Женщине ИА не назначаем: её высокая E2 — вопрос фазы, дозы и гинеколога, а не таблетки.
-    if (sex !== 'female' && e2Val !== null && e2Val > 55) {
+    if (sex !== 'female' && e2Val !== null && e2Val > E2_MALE_BAND.steps[0]) {
       if (!ids.includes('anastrozole') && !ids.some(id => id.toLowerCase() === 'pharma_anastrozole')) {
         ids.push('anastrozole');
-        reasoning['anastrozole'] = 'Фарма-антиароматазин: контроль E2 (только при лаб. подтверждении E2 >55)';
+        reasoning['anastrozole'] = `Фарма-антиароматазин: контроль E2 (только при лаб. подтверждении E2 >${E2_MALE_BAND.steps[0]})`;
       }
     }
     const hasAnastro = ids.includes('anastrozole') || ids.some(id => id.toLowerCase() === 'pharma_anastrozole');
@@ -388,7 +395,7 @@ function orderByPriority(ids: string[], marker?: string): string[] {
       ids, reasoning,
       sex === 'female'
         ? `${e2UnitMissing ? `Единица E2 не указана: ${e2Val} читается и как пг/мл, и как пмоль/л (${e2Alt} пг/мл) — уточните её в бланке, ступень взята по нижней оценке. ` : ''}E2 > ${e2Trigger} pg/mL: пересдать на 2-5 день цикла (без стимуляции овуляции), УЗИ яичников — исключить кисту и гиперстимуляцию. AI без гинеколога не назначать, дозу тестостерона не повышать.`
-        : 'E2 > 55 pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <10 — прекратить AI (краш). Контроль E2 каждые 4 нед.',
+        : `E2 > ${E2_MALE_BAND.steps[0]} pg/mL: +Анастрозол 0.25-0.5 мг eod, доза по E2. При E2 <${E2_MALE_BAND.targetLow} — прекратить AI (краш). Контроль E2 каждые 4 нед.`,
       sex === 'female' ? 'E2, прогестерон, ЛГ, ФСГ каждые 4 нед' : 'E2, пролактин, ЛГ, ФСГ каждые 4 нед',
       'E2', { allowEmpty: true });
   }

@@ -10,9 +10,10 @@
  *
  * Гард меряет поведением, а не таблицей: каждый псевдоним обязан вести в строку
  * порогов, давать ту же ступень, что каноническое имя, и печатать свою находку
- * или совет. Два двойника, у которых единица каталога и единица строки — разные
- * величины (`CK_MB`, `FT`), псевдонима НЕ имеют и не должны получить без
- * клинического источника.
+ * или совет. `FT` — единственный оставшийся двойник с разной шкалой (каталог
+ * 8–30 пг/мл против диализной 0.3–1.0 нмоль/л): псевдонима НЕ имеет и не должен
+ * получить без решения о методе. КФК-МВ переведён в Ед/л в проходе 185, поэтому
+ * написание парсера `CKMB` строку находит.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -91,15 +92,21 @@ describe('проход 180: код склада → строка порогов'
     expect(res.addSubs.some((s) => s.marker === 'UA')).toBe(true);
   });
 
-  it('двойники с разной величиной остаются без псевдонима', () => {
-    // `CKMB` (форма) и `FT` (форма) не переводятся: каталог в массе, строка в
-    // активности/количестве вещества. Ждём блокер, а не выдуманную единицу.
-    expect(TIER_MARKER_ALIAS['CKMB']).toBeUndefined();
+  it('двойник с разной шкалой остаётся без псевдонима', () => {
+    // `FT`: каталог 8–30 пг/мл (иммуноанализ) против строки 0.3–1.0 нмоль/л
+    // (диализ/расчёт). Ждём решение о методе, а не выдуманную единицу.
     expect(TIER_MARKER_ALIAS['FT']).toBeUndefined();
-    expect(STORAGE_TIER_ALIAS['CKMB']).toBeUndefined();
     expect(STORAGE_TIER_ALIAS['FT']).toBeUndefined();
-    expect(deriveTier('CKMB', 12, 'male')).toBe(0);
     expect(deriveTier('FT', 0.1, 'male')).toBe(0);
+  });
+
+  it('КФК-МВ: написание парсера «CKMB» находит строку в Ед/л', () => {
+    expect(TIER_MARKER_ALIAS['CKMB']).toBe('CK_MB');
+    expect(tierMarkerKey('CKMB')).toBe('CK_MB');
+    expect(deriveTier('CKMB', 60, 'male')).toBe(2);
+    const res = computeTierAdjustments({ CKMB: 60 }, 'male');
+    expect(res.tierSummary.map((s) => s.marker)).toContain('CKMB');
+    expect(res.nutrition.some((n) => n.target.toLowerCase().includes('тропонин'))).toBe(true);
   });
 
   it('тропонин из формы читается кодом склада', () => {

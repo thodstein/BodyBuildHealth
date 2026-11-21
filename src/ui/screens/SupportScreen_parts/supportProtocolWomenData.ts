@@ -440,7 +440,7 @@ export const FEMALE_LAB_GROUPS: FemaleLabGroup[] = [
     rows:[
       { marker:'СРБ (hsCRP)', normal:'<3.0 мг/л', green:'<3.0', yellow:'3.0–5.0', red:'>5.0' },
       { marker:'Гомоцистеин', normal:'5–12 мкмоль/л', green:'<12', yellow:'12–15', red:'>15', symptom:'ТРОМБОЗ — фолат+B12+B6' },
-      { marker:'NT-proBNP', normal:'<125 пг/мл', green:'<125', yellow:'125–300', red:'>300' },
+      { marker:'NT-proBNP', normal:'<125 пг/мл', green:'<125', yellow:'125–450', red:'>450' },
       { marker:'Тропонин I', normal:'<0.04 нг/мл', green:'<0.04', yellow:'0.04–0.1', red:'>0.1', symptom:'СКОРАЯ (инфаркт?)' },
       { marker:'КФК (CK)', normal:'<145 Ед/л', green:'<300', yellow:'300–1000', red:'>1000' },
     ],

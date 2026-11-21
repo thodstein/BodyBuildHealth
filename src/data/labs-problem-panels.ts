@@ -260,7 +260,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'HR', label: 'ЧСС', importance: 'important', highMeaning: '>90 — компенсаторная тахикардия? небиволол?', target: '<80 уд/мин' },
       { code: 'K', label: 'Калий', importance: 'critical', lowMeaning: '↓ гипокалиемия (альдостерон, диуретики)', target: '4.0-5.0 ммоль/л' },
       { code: 'SODIUM', label: 'Натрий', importance: 'important', highMeaning: '↑ задержка Na+/H₂O (17α-алкил, трен)', target: '136-142 ммоль/л' },
-      { code: 'NT_PROBNP', label: 'NT-proBNP', importance: 'critical', highMeaning: '↑ >200 пг/мл — ГЛЖ/растяжение миокарда', target: '<125 пг/мл' },
+      { code: 'NT_PROBNP', label: 'NT-proBNP', importance: 'critical', highMeaning: '↑ >125 пг/мл — исключить ГЛЖ/растяжение миокарда (подтверждение от 450)', target: '<125 пг/мл' },
       { code: 'ENDOTHELIN1', label: 'Эндотелин-1', importance: 'important', highMeaning: '↑ эндотелиальная дисфункция', target: '<3.0 пг/мл' },
       { code: 'UACR', label: 'Альбумин/креатинин мочи', importance: 'important', highMeaning: '↑ >30 мг/г — гипертензивная нефропатия', target: '<30 мг/г' },
       { code: 'CYSTATIN_C', label: 'Цистатин C', importance: 'important', highMeaning: '↑ >1.0 мг/л — снижение СКФ (точнее креатинина)', target: '<0.95 мг/л' },

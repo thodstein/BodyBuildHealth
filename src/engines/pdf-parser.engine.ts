@@ -249,7 +249,7 @@ const LAB_PATTERNS: { code: string; names: string[]; unitPatterns: string[]; ref
   { code: "HR", names: ["ЧСС","HR"], unitPatterns: ["bpm"] },
   { code: "ANDROSTENEDIONE", names: ["Андростендион","ANDROSTENEDIONE"], unitPatterns: ["nmol/L"] },
   { code: "PROGESTERONE", names: ["Прогестерон","PROGESTERONE"], unitPatterns: ["nmol/L"] },
-  { code: "CK_MB", names: ["КФК-МВ","CK_MB"], unitPatterns: ["ng/mL"] },
+  { code: "CK_MB", names: ["КФК-МВ","CK_MB"], unitPatterns: ["Ед/л","Е/л","U/L","ng/mL"] },
   { code: "AMYLASE", names: ["Амилаза","AMYLASE"], unitPatterns: ["U/L"] },
   { code: "LIPASE", names: ["Липаза","LIPASE"], unitPatterns: ["U/L"] },
   { code: "TROPONIN_I", names: ["Тропонин I","TROPONIN_I"], unitPatterns: ["ng/mL"] },

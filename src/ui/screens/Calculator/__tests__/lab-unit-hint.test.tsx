@@ -102,7 +102,8 @@ describe('проход 129: у каждого поля формы есть ед�
     expect(labUnitHint('ApoB')).toBe('г/л');
     expect(labUnitHint('ApoA1')).toBe('г/л');
     expect(labUnitHint('Lp(a)')).toBe('мг/дл');
-    expect(labUnitHint('CK-MB')).toBe('нг/мл');
+    // Проход 185: КФК-МВ — активность (Ед/л), ВГН 24; масса честно не читается.
+    expect(labUnitHint('CK-MB')).toBe('Е/л');
     expect(labUnitHint('NT-proBNP')).toBe('пг/мл');
     expect(labUnitHint('IL-6')).toBe('пг/мл');
     expect(labUnitHint('Uric acid')).toBe('мкмоль/л');

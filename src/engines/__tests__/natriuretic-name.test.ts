@@ -6,7 +6,7 @@
  * `labValues` для движка риска. Склад и каталог хранят `NT_PROBNP` (ВГН 125).
  * Цена подмены: на экране «Риск» склад с `NT_PROBNP` не находил значения вовсе —
  * анализ молча не участвовал, — а `BNP` из чужого бланка судился лестницей
- * NT-proBNP (125/300/900), которой у него нет.
+ * NT-proBNP (125/450/1800), которой у него нет.
  */
 import { describe, expect, it } from 'vitest';
 import { getMiFromLab } from '../risk-engine-tz-spec';
@@ -65,7 +65,7 @@ describe('проход 168: верификация знает анализ по 
     const marker = cv1.markers.find(m => m.name === 'NT-proBNP')!;
     expect(marker.code).toBe('NT_PROBNP');
     expect(marker.unit).toBe('пг/мл');
-    expect(marker.thresholds).toEqual([125, 300, 900]);
+    expect(marker.thresholds).toEqual([125, 450, 1800]);
     expect(cv1.markers.some(m => m.code === 'BNP')).toBe(false);
   });
 

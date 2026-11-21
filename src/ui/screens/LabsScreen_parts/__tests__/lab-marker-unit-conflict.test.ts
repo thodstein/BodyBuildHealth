@@ -4,12 +4,15 @@
  * Отклонение маркера считает одно правило — `computeMarkerDeviations`. Оно
  * приводит число к единице приложения через `normalizeLabMeasurement`. Но если
  * пересчитать нечем, число оставалось в единице бланка и всё равно сравнивалось
- * с нормой: КФК-МВ 25 Е/л (активность) против нормы 0–5 нг/мл (масса) давало
- * «отклонение 400 %» — то есть вывод из сопоставления двух разных величин.
+ * с нормой: КФК-МВ 5 нг/мл (масса) против нормы 0–24 Ед/л (активность) давало
+ * «отклонение» — то есть вывод из сопоставления двух разных величин.
  *
  * Теперь такая запись уходит в «без вывода» с причиной `unit`. Диапазон,
  * напечатанный в самом бланке, главнее: он в одной единице с числом, и его
  * сравнение честное.
+ *
+ * Проход 185: канон КФК-МВ — активность Ед/л (так печатают лаборатории РФ),
+ * поэтому масса стала исключением, а активность — обычным путём.
  *
  * Гард держит границу с двух сторон:
  *  - разные величины без коэффициента → `unit`, не отклонение;
@@ -25,26 +28,28 @@ function lab(code: string, value: number, unit?: string, extra: Record<string, u
   return { code, value, unit, ...extra };
 }
 
-describe('проход 178: чужую единицу не сравниваем с нормой', () => {
-  it('КФК-МВ в Е/л — «без нормы в этой единице», а не отклонение', () => {
-    const r = computeMarkerDeviations([lab('CK_MB', 25, 'Е/л')], 'male');
-    expect(r.markerDeviations).toEqual([]);
-    expect(r.unknown).toEqual([{ code: 'CK_MB', value: 25, bound: undefined, reason: 'unit' }]);
-  });
-
-  it('строчная запись «ед/л» — та же активность, тот же вывод', () => {
-    const r = computeMarkerDeviations([lab('CK_MB', 25, 'ед/л')], 'male');
-    expect(r.unknown).toEqual([{ code: 'CK_MB', value: 25, bound: undefined, reason: 'unit' }]);
-  });
-
-  it('КФК-МВ в нг/мл — обычное сравнение', () => {
-    const r = computeMarkerDeviations([lab('CK_MB', 25, 'нг/мл')], 'male');
+describe('проход 178/185: чужую единицу не сравниваем с нормой', () => {
+  it('КФК-МВ в Ед/л — обычное сравнение с нормой 24 Ед/л', () => {
+    const r = computeMarkerDeviations([lab('CK_MB', 30, 'Е/л')], 'male');
     expect(r.unknown).toEqual([]);
     expect(r.markerDeviations.map(d => d.code)).toEqual(['CK_MB']);
   });
 
+  it('строчная запись «ед/л» — та же активность, тот же вывод', () => {
+    const r = computeMarkerDeviations([lab('CK_MB', 30, 'ед/л')], 'male');
+    expect(r.unknown).toEqual([]);
+    expect(r.markerDeviations.map(d => d.code)).toEqual(['CK_MB']);
+  });
+
+  it('КФК-МВ в нг/мл — «без нормы в этой единице», а не отклонение', () => {
+    // Массовая концентрация не пересчитывается в активность: сравнивать нечего.
+    const r = computeMarkerDeviations([lab('CK_MB', 5, 'нг/мл')], 'male');
+    expect(r.markerDeviations).toEqual([]);
+    expect(r.unknown).toEqual([{ code: 'CK_MB', value: 5, bound: undefined, reason: 'unit' }]);
+  });
+
   it('бланковый диапазон главнее: та же единица, что у числа', () => {
-    // В бланке напечатано «КФК-МВ 25 Е/л, норма до 24 Е/л» — пересчёт не нужен.
+    // В бланке напечатано «КФК-МВ 25 Ед/л, норма до 24 Ед/л» — пересчёт не нужен.
     const r = computeMarkerDeviations(
       [lab('CK_MB', 25, 'Е/л', { refLow: 0, refHigh: 24 })],
       'male',

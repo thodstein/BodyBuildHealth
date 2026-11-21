@@ -572,7 +572,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'PROGESTERONE': { prefUnit: 'nmol/L', coeff: 1, uln: 1.5, lln: 0.3, name: 'Прогестерон' },
   'PREALBUMIN': { prefUnit: 'mg/L', coeff: 1, uln: 400, lln: 200, name: 'Преальбумин' },
   'CK': { prefUnit: 'U/L', coeff: 1, uln: 200, lln: 30, name: 'КФК' },
-  'CK_MB': { prefUnit: 'ng/mL', coeff: 1, uln: 5, lln: 0, name: 'КФК-МВ' },
+  'CK_MB': { prefUnit: 'Е/л', coeff: 1, uln: 24, lln: 0, name: 'КФК-МВ' },
   'LDH': { prefUnit: 'U/L', coeff: 1, uln: 250, lln: 120, name: 'ЛДГ' },
   'AMYLASE': { prefUnit: 'U/L', coeff: 1, uln: 100, lln: 25, name: 'Амилаза' },
   'LIPASE': { prefUnit: 'U/L', coeff: 1, uln: 60, lln: 10, name: 'Липаза' },

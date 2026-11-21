@@ -80,14 +80,20 @@ describe('проход 182: число не портится там, где пе
   });
 });
 
-describe('проход 182: непереводимая запись не выдаётся за прочитанную', () => {
-  it('КФК-МВ в Е/л против нормы в нг/мл — «не прочитано», а не число', () => {
+describe('проход 182/185: непереводимая запись не выдаётся за прочитанную', () => {
+  it('КФК-МВ в Ед/л читается (это единица каталога)', () => {
     const flat = readFlatLabs([
       { code: 'GLU', value: 5.2, unit: 'ммоль/л' },
-      { code: 'CK_MB', value: 25, unit: 'Е/л' },
+      { code: 'CK_MB', value: 30, unit: 'Е/л' },
     ]);
-    expect(flat.values).toEqual({ GLU: 5.2 });
-    expect(flat.unread).toEqual([{ code: 'CK_MB', value: 25, unit: 'Е/л' }]);
+    expect(flat.values).toEqual({ GLU: 5.2, CK_MB: 30 });
+    expect(flat.unread).toEqual([]);
+  });
+
+  it('КФК-МВ в нг/мл — «не прочитано»: масса не пересчитывается в активность', () => {
+    const flat = readFlatLabs([{ code: 'CK_MB', value: 5, unit: 'нг/мл' }]);
+    expect(flat.values).toEqual({});
+    expect(flat.unread).toEqual([{ code: 'CK_MB', value: 5, unit: 'нг/мл' }]);
   });
 
   it('инсулин в нг/мл — «не прочитано»: коэффициента масса↔МЕ для него нет', () => {
@@ -100,10 +106,10 @@ describe('проход 182: непереводимая запись не выд�
 
   it('поздняя читаемая запись снимает «не прочитано» у того же кода', () => {
     const flat = readFlatLabs([
-      { code: 'CK_MB', value: 25, unit: 'Е/л' },
-      { code: 'CK_MB', value: 3, unit: 'нг/мл' },
+      { code: 'CK_MB', value: 5, unit: 'нг/мл' },
+      { code: 'CK_MB', value: 30, unit: 'Е/л' },
     ]);
-    expect(flat.values.CK_MB).toBe(3);
+    expect(flat.values.CK_MB).toBe(30);
     expect(flat.unread).toEqual([]);
   });
 });

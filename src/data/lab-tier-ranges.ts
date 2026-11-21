@@ -11,7 +11,7 @@
 
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
-  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN,
+  HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN, NT_PROBNP_STEPS, CK_MB_STEPS, E2_MALE_BAND,
 } from '../engines/lab-norms.engine';
 import { ucumInfo } from '../core/constants';
 import { unitsIncommensurable } from '../core/labs-mapping';
@@ -41,12 +41,12 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   BP_DIASTOLIC:     { marker:'BP_DIASTOLIC', normal:[60,85], borderline:[85,90], treatment:[90,110], emergencyHigh:110, direction:'high', unit:'mmHg', label:'АД диаст' },
   HR:               { marker:'HR', normal:[50,80], borderline:[80,90], treatment:[90,110], emergencyHigh:110, direction:'high', unit:'уд/мин', label:'ЧСС' },
   CK:               { marker:'CK', normal:[0,200], borderline:[200,1000], treatment:[1000,5000], emergencyHigh:5000, direction:'high', unit:'U/L', label:'КФК' },
-  NT_PROBNP:        { marker:'NT_PROBNP', normal:[0,125], borderline:[125,450], treatment:[450,1800], emergencyHigh:1800, direction:'high', unit:'pg/mL', label:'NT-proBNP' },
+  NT_PROBNP:        { marker:'NT_PROBNP', normal:[0, NT_PROBNP_STEPS[0]], borderline:[NT_PROBNP_STEPS[0], NT_PROBNP_STEPS[1]], treatment:[NT_PROBNP_STEPS[1], NT_PROBNP_STEPS[2]], emergencyHigh:NT_PROBNP_STEPS[2], direction:'high', unit:'pg/mL', label:'NT-proBNP' },
   D_DIMER:          { marker:'D_DIMER', normal:[0,0.5], borderline:[0.5,1], treatment:[1,2.5], emergencyHigh:2.5, direction:'high', unit:'мг/L', label:'D-димер' },
   FIBRINOGEN:       { marker:'FIBRINOGEN', normal:[2,4], borderline:[4,5.5], treatment:[5.5,8], emergencyHigh:8, direction:'high', unit:'г/L', label:'Фибриноген' },
   ESR:              { marker:'ESR', normal:[0,15], borderline:[15,30], treatment:[30,60], emergencyHigh:60, direction:'high', unit:'мм/ч', label:'СОЭ' },
   TROPONIN_I:       { marker:'TROPONIN_I', normal:[0,0.04], borderline:[0.04,0.1], treatment:[0.1,1], emergencyHigh:1, direction:'high', unit:'ng/mL', label:'Тропонин I' },
-  CK_MB:            { marker:'CK_MB', normal:[0,5], borderline:[5,10], treatment:[10,25], emergencyHigh:25, direction:'high', unit:'U/L', label:'КФК-MB' },
+  CK_MB:            { marker:'CK_MB', normal:[0, CK_MB_STEPS.borderline], borderline:[CK_MB_STEPS.borderline, CK_MB_STEPS.treatment], treatment:[CK_MB_STEPS.treatment, CK_MB_STEPS.emergency], emergencyHigh:CK_MB_STEPS.emergency, direction:'high', unit:'Е/л', label:'КФК-MB' },
   APO_B:            { marker:'APO_B', normal:[0,1.0], borderline:[1.0,1.2], treatment:[1.2,1.8], emergencyHigh:1.8, direction:'high', unit:'g/L', label:'ApoB' },
   LP_A:             { marker:'LP_A', normal:[0,30], borderline:[30,50], treatment:[50,100], emergencyHigh:100, direction:'high', unit:'mg/dL', label:'Lp(a)' },
 
@@ -88,7 +88,7 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   // одной строкой `INR`.
 
   // ─── HORMONAL ───
-  E2:               { marker:'E2', normal:[20,40], borderline:[40,60], treatment:[60,100], emergencyHigh:100, direction:'high', unit:'pg/mL', label:'Эстрадиол' },
+  E2:               { marker:'E2', normal:[E2_MALE_BAND.targetLow, E2_MALE_BAND.steps[0]], borderline:[E2_MALE_BAND.steps[0], E2_MALE_BAND.steps[1]], treatment:[E2_MALE_BAND.steps[1], E2_MALE_BAND.steps[2]], emergencyHigh:E2_MALE_BAND.steps[2], direction:'high', unit:'pg/mL', label:'Эстрадиол' },
   PRL:              { marker:'PRL', normal:[2,15], borderline:[15,25], treatment:[25,50], emergencyHigh:50, direction:'high', unit:'ng/mL', label:'Пролактин' },
   TSH:              { marker:'TSH', normal:[0.4,4], borderline:[4,6], treatment:[6,10], emergencyHigh:10, emergencyLow:0.1, direction:'high', unit:'mU/L', label:'ТТГ' },
   CORTISOL:         { marker:'CORTISOL', normal:[100,535], borderline:[535,700], treatment:[700,1000], emergencyHigh:1000, direction:'high', unit:'nmol/L', label:'Кортизол' },
@@ -289,6 +289,10 @@ export const TIER_MARKER_ALIAS: Record<string, string> = {
   // `APO_B` — без этого ApoB 1.5 г/л молчал (ни ступени, ни совета), хотя правило
   // в `TIER_RULES` для него есть.
   APOB: 'APO_B',
+  // Проход 185: «CKMB» — написание парсера/формы, строка называется `CK_MB`.
+  // Единицы теперь одной величины (каталог и шкала в Ед/л), поэтому перевод
+  // доказан; масса (нг/мл) в эту строку не попадает — она не читается вовсе.
+  CKMB: 'CK_MB',
 };
 
 /**
@@ -303,11 +307,15 @@ export const TIER_MARKER_ALIAS: Record<string, string> = {
  *
  * Запись добавляется только при ДОКАЗАННОМ равенстве единиц: единица каталога
  * (`UCUM_MAP[code].prefUnit`) и единица строки обязаны быть одной величины
- * (`unitsIncommensurable`). Два двойника этому не отвечают и сюда не внесены —
- * числа их шкал пришлось бы толковать в чужой единице, а клинического
+ * (`unitsIncommensurable`). Двойник, который этому не отвечает, сюда не внесён —
+ * число его шкалы пришлось бы толковать в чужой единице, а клинического
  * источника на выбор единицы нет (`docs/LAB-NORMS-SINGLE-SOURCE.md`):
- *   `CK_MB` — каталог в `ng/mL` (масса), строка в `U/L` (активность);
  *   `FT` — каталог в `pg/mL` (масса), строка `FREE_TESTOSTERONE` в `nmol/L`.
+ *     Это не разные величины (есть молярная масса), но шкала 0.3–1.0 нмоль/л
+ *     относится к диализному/расчётному методу, а не к иммуноанализу 8–30 пг/мл,
+ *     которым пользуется каталог. Сводить единицы без решения о методе нельзя.
+ * КФК-МВ (проход 185) переведён в Ед/л вместе со строкой, поэтому блокера
+ * «активность против массы» больше нет: масса честно не читается.
  */
 export const STORAGE_TIER_ALIAS: Record<string, string> = {
   UA: 'URIC_ACID',

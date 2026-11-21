@@ -116,9 +116,10 @@ describe('проход 99: гормональные триггеры — по п
     const src = readFileSync(resolve(process.cwd(), 'src/engines/recommendation-engine.ts'), 'utf8');
     expect(src).toContain("const MALE_ONLY_SCREEN = new Set(['E2', 'Prolactin', 'DHEA-S']);");
     expect(src).toContain("if (sex === 'female' && isMaleOnlyScreenMarker(rule.marker)) continue;");
-    // Пороги — из резолвера, литералов «40/55» и «25/40» в гормональных блоках нет.
-    expect(src).toContain('const e2Trigger = sex === \'female\' ? FEMALE_HORMONE_ULN.E2.high : 40;');
+    // Пороги — из резолвера: литералов E2 «40/55» в гормональных блоках нет.
+    expect(src).toContain("const e2Trigger = sex === 'female' ? FEMALE_HORMONE_ULN.E2.high : E2_MALE_BAND.steps[0];");
+    expect(src).toContain("const e2SevereAt = sex === 'female' ? FEMALE_HORMONE_ULN.E2.criticalHigh : E2_MALE_BAND.steps[1];");
     expect(src).toContain('const prlTriggerNg = sex === \'female\' ? FEMALE_HORMONE_ULN.PRL.high / PRL_NG_TO_MIU : 25;');
-    expect(src).toContain("if (sex !== 'female' && e2Val !== null && e2Val > 55)");
+    expect(src).toContain("if (sex !== 'female' && e2Val !== null && e2Val > E2_MALE_BAND.steps[0])");
   });
 });

@@ -82,12 +82,18 @@ describe('Пересчёт единиц: массовые ↔ молярные �
   });
 
   it('непереводимая пара единиц сохраняет единицу бланка, а не переименовывается', () => {
-    // Лп(а) mg/dL → nmol/L и КФК-МВ U/L → ng/mL без молярной массы/коэффициента
+    // Лп(а) nmol/L → mg/dL и КФК-МВ нг/мл → Ед/л без молярной массы/коэффициента
     // пересчитать нельзя: число нельзя подписывать канонической единицей.
-    const lpa = normalizeLabMeasurement('LP_A', 30, 'mg/dL');
-    expect(lpa).toEqual({ value: 30, unit: 'mg/dL' });
-    const ckmb = normalizeLabMeasurement('CK_MB', 10, 'U/L');
-    expect(ckmb).toEqual({ value: 10, unit: 'U/L' });
+    const lpa = normalizeLabMeasurement('LP_A', 30, 'nmol/L');
+    expect(lpa).toEqual({ value: 30, unit: 'nmol/L' });
+    const ckmb = normalizeLabMeasurement('CK_MB', 5, 'ng/mL');
+    expect(ckmb).toEqual({ value: 5, unit: 'ng/mL' });
+  });
+
+  it('КФК-МВ в Ед/л — канон каталога (проход 185)', () => {
+    // Российский бланк печатает активность: это и есть единица приложения.
+    expect(normalizeLabMeasurement('CK_MB', 30, 'Ед/л')).toEqual({ value: 30, unit: 'Е/л' });
+    expect(normalizeLabMeasurement('CK_MB', 30, 'U/L')).toEqual({ value: 30, unit: 'Е/л' });
   });
 });
 
