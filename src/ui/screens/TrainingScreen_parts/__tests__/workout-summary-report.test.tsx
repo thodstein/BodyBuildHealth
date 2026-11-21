@@ -44,6 +44,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('По упражнениям');
     expect(html).toContain('Движения (паттерны)');
     expect(html).toContain('тренд по неделям');
+    // У движений доля подходов, а не только доля тоннажа.
+    expect(html).toContain('Доля подходов');
     // Недельная динамика: тоннаж и КПШ рядом.
     expect(html).toContain('По неделям');
     expect(html).toContain('● КПШ');

@@ -736,7 +736,7 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── ДВИЖЕНИЯ ── */}
       {has('movement') && summary.patterns.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · тренд по неделям" />
+          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · доля подходов · тренд по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {summary.patterns.map(p => (
               <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
@@ -744,7 +744,7 @@ export const WorkoutSummaryBody: React.FC<{
                 <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>КПШ {p.reps}</span>
                 <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{p.sets} подх.</span>
                 <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>{fmtTon(p.tonnageKg)}</span>
-                <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.sharePct}%</span>
+                <span title={`Доля подходов ${p.setsSharePct}% · доля тоннажа ${p.sharePct}%`} style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.setsSharePct}%</span>
                 {p.weeklyTrendPct != null && p.weeklyTrendPct !== 0 && (
                   <span
                     title={`Подходы по неделям${p.weeklySets.length > 12 ? ' (последние 12)' : ''}: ${p.weeklySets.slice(-12).join(' · ')}`}

@@ -286,7 +286,10 @@ export interface SummaryPattern {
   sets: number;
   reps: number;
   tonnageKg: number;
+  /** Доля тоннажа периода, % — переоценивает тяжёлые упражнения. */
   sharePct: number;
+  /** Доля подходов периода, % — честная мера объёма. */
+  setsSharePct: number;
   /** Подходы по неделям периода (по возрастанию) — для тренда. */
   weeklySets: number[];
   /** Изменение подходов/нед первой недели к последней, % (null — нет базы). */
@@ -718,6 +721,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         reps: v.reps,
         tonnageKg: Math.round(v.tonnageKg),
         sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
+        setsSharePct: totalSets > 0 ? Math.round((v.sets / totalSets) * 1000) / 10 : 0,
         weeklySets,
         weeklyTrendPct: weeklyTrendFrom(weeklySets),
       };
@@ -1622,7 +1626,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     lines.push('Движения:');
     s.patterns.forEach(p => {
       const trend = p.weeklyTrendPct != null ? ` (${signedPct(p.weeklyTrendPct)} к первой неделе)` : '';
-      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)}${trend}`);
+      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)} · ${p.setsSharePct}% подходов${trend}`);
     });
   }
 

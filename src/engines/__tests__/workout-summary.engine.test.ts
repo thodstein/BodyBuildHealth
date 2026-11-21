@@ -72,6 +72,9 @@ describe('workout-summary: сводка по одной тренировке', (
     const labels = s.patterns.map(p => p.label);
     expect(labels.some(l => /Горизонтальный жим/i.test(l))).toBe(true);
     expect(labels.some(l => /Приседание/i.test(l))).toBe(true);
+    // Доля подходов складывается в 100% и не путается с долей тоннажа.
+    expect(s.patterns.map(p => p.setsSharePct)).toEqual([60, 40]);
+    expect(s.patterns[0].sharePct).not.toBe(s.patterns[0].setsSharePct);
   });
 
   it('считает недельный тренд движений', () => {
@@ -796,7 +799,7 @@ describe('workout-summary: текст отчёта для копирования
     ]);
     const txt = buildWorkoutReportText(s);
     expect(txt).toContain('Движения:');
-    expect(txt).toContain('(+100% к первой неделе)');
+    expect(txt).toContain('100% подходов (+100% к первой неделе)');
     // Недельная динамика в тексте: КПШ и тоннаж по неделям.
     expect(txt).toContain('По неделям:');
     expect(txt).toContain('КПШ 16');
