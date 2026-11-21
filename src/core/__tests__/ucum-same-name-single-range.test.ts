@@ -10,14 +10,19 @@
  *
  * Теперь числа живут в константах `RANGE_*` и обе строки их разделяют.
  * Двойники, у которых числа ОСТАЛИСЬ разными, — не опечатка, а клиническое
- * решение (фосфор, общий белок, мочевая кислота, прогестерон в другой
- * единице): их нельзя «выровнять» молча, иначе один и тот же анализ изменит
- * вердикт. Перечень — `docs/LAB-NORMS-SINGLE-SOURCE.md` §4.
+ * решение (фосфор, прогестерон в другой единице с метод-зависимым верхом): их
+ * нельзя «выровнять» молча, иначе один и тот же анализ изменит вердикт.
+ * Перечень — `docs/LAB-NORMS-SINGLE-SOURCE.md` §4.
  *
  * Магний вышел из этого списка в проходе 188: референс российских лабораторий
  * (ИНВИТРО и Helix, взрослые >20 лет) — 0.66–1.07 ммоль/л, и это же число уже
  * стояло в `comprehensive-report.engine`. Прежние 0.7–1.1 (`MG`) и 0.7–1.0
  * (`MAGNESIUM`) давали два ответа на 1.05.
+ *
+ * Общий белок и мочевая кислота вышли в проходе 189 по тем же основаниям:
+ * у РФ-лабораторий референс один (белок 64–83 г/л; мочевая кислота ♂ 210–420,
+ * ♀ 150–350), а в каталоге стояло по два числа. Мост имён (`labs-mapping`)
+ * и раньше считал `TP`/`TOTAL_PROTEIN` и `UA`/`URIC_ACID` одним анализом.
  *
  * Гард держит четыре вещи:
  *  1) у каждого двойника обе строки дают одинаковую норму;
@@ -29,6 +34,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UCUM_MAP, ucumInfo } from '../constants';
+import { getLabNorm } from '../../engines/lab-norms.engine';
 import { LAB_PANELS } from '../../data/labs-phase-panels';
 
 type Row = { prefUnit: string; coeff: number; uln: number; lln: number; name: string };
@@ -49,6 +55,8 @@ const IDENTICAL: Array<[a: string, b: string, range: string]> = [
   ['DBIL', 'DIRECT_BIL', 'RANGE_DBIL'],
   ['HOMA', 'HOMAIR', 'RANGE_HOMA'],
   ['MG', 'MAGNESIUM', 'RANGE_MG'],
+  ['TP', 'TOTAL_PROTEIN', 'RANGE_TP'],
+  ['UA', 'URIC_ACID', 'RANGE_UA'],
 ];
 
 /**
@@ -56,22 +64,24 @@ const IDENTICAL: Array<[a: string, b: string, range: string]> = [
  * вердикт, поэтому это отдельное клиническое решение с обновлением §4.
  */
 const DIVERGENT: Array<[a: string, b: string]> = [
-  ['UA', 'URIC_ACID'],          // низ 200 против 150
-  ['P', 'PHOSPHORUS'],          // верх 1.5 против 1.45
-  ['TP', 'TOTAL_PROTEIN'],      // 60–80 против 65–85
-  ['PROG', 'PROGESTERONE'],     // разные единицы: ng/mL против nmol/L
+  ['P', 'PHOSPHORUS'],          // верх 1.5 против 1.45 — источники РФ расходятся
+  ['PROG', 'PROGESTERONE'],     // разные единицы и метод-зависимый верх
 ];
 
 describe('проход 177: один анализ — один набор чисел', () => {
   it('составные двойники дают одинаковую норму под обоими кодами', () => {
+    const norm = (r: Row) => ({ prefUnit: r.prefUnit, coeff: r.coeff, uln: r.uln, lln: r.lln });
     for (const [a, b] of IDENTICAL) {
       const left = UCUM_MAP[a] as Row | undefined;
       const right = UCUM_MAP[b] as Row | undefined;
       expect(left, `нет строки ${a}`).toBeTruthy();
       expect(right, `нет строки ${b}`).toBeTruthy();
-      expect(left).toEqual(right);
-      // И чтение по любому написанию отдаёт ту же запись.
-      expect(ucumInfo(a)).toEqual(ucumInfo(b));
+      // Имя у второго написания может быть короче («Мочевая к-та»), но норма —
+      // та же: единица, коэффициент и обе границы.
+      expect(norm(left!), `${a}/${b}`).toEqual(norm(right!));
+      // И чтение по любому написанию отдаёт те же числа.
+      expect(ucumInfo(a)?.uln).toBe(ucumInfo(b)?.uln);
+      expect(ucumInfo(a)?.lln).toBe(ucumInfo(b)?.lln);
     }
   });
 
@@ -142,6 +152,30 @@ describe('проход 177: один анализ — один набор чис
       for (const marker of panel.markers) {
         if (marker.ucumCode !== 'MG' && marker.ucumCode !== 'MAGNESIUM') continue;
         expect(marker.ref, marker.label).toEqual([0.66, 1.07]);
+      }
+    }
+  });
+
+  it('общий белок и мочевая кислота выровнены по референсу РФ', () => {
+    // Проход 189: белок 64–83 г/л (Helixbook/KDL 06-035, «Ситилаб», ИНВИТРО);
+    // мочевая кислота ♂ 210–420, ♀ 150–350 мкмоль/л (ИНВИТРО, старше 14 лет).
+    for (const code of ['TP', 'TOTAL_PROTEIN']) {
+      expect((UCUM_MAP[code] as Row).lln, code).toBe(64);
+      expect((UCUM_MAP[code] as Row).uln, code).toBe(83);
+    }
+    for (const code of ['UA', 'URIC_ACID']) {
+      expect((UCUM_MAP[code] as Row).lln, code).toBe(210);
+      expect((UCUM_MAP[code] as Row).uln, code).toBe(420);
+    }
+    // Женская пара живёт отдельно: общий низ 210 её не подменяет.
+    expect(getLabNorm('UA', 'female')).toMatchObject({ lln: 150, uln: 350, female: true });
+    // Путь без пола — мужской, как и было обещано в `lab-norms`.
+    expect(getLabNorm('URIC_ACID')).toMatchObject({ lln: 210, uln: 420 });
+    // Панели фаз печатают пару из каталога, а не своё «60–80».
+    for (const panel of Object.values(LAB_PANELS)) {
+      for (const marker of panel.markers) {
+        if (marker.ucumCode !== 'TP' && marker.ucumCode !== 'TOTAL_PROTEIN') continue;
+        expect(marker.ref, marker.label).toEqual([64, 83]);
       }
     }
   });

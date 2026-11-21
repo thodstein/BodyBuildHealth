@@ -476,15 +476,34 @@ export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: strin
 //
 // Числа живут здесь один раз, строки каталога их разделяют (`...RANGE_K`).
 // Двойники, у которых числа ОСТАЛИСЬ разными, выравнивать молча нельзя:
-// фосфор 1.5 против 1.45, общий белок 60–80 против 65–85, мочевая кислота низ
-// 200 против 150 (плюс прогестерон, у которого разные единицы) — это
-// клинические решения, перечень в `docs/LAB-NORMS-SINGLE-SOURCE.md` §4 и в
-// гарде `src/core/__tests__/ucum-same-name-single-range.test.ts`.
+// фосфор 1.5 против 1.45 (у РФ-лабораторий источники расходятся) и прогестерон
+// (разные единицы и метод-зависимый верх) — это клинические решения, перечень
+// в `docs/LAB-NORMS-SINGLE-SOURCE.md` §4 и в гарде
+// `src/core/__tests__/ucum-same-name-single-range.test.ts`.
 const RANGE_K = { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5 } as const;
 const RANGE_NA = { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135 } as const;
 const RANGE_CA = { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1 } as const;
 const RANGE_DBIL = { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0 } as const;
 const RANGE_HOMA = { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0 } as const;
+/**
+ * Общий белок — проход 189. Референс российских лабораторий для взрослых
+ * старше 18 лет — **64–83 г/л** (Helixbook/KDL 06-035, «Ситилаб», база
+ * ИНВИТРО). В приложении было два числа: 60–80 под кодом `TP` и 65–85 под
+ * `TOTAL_PROTEIN`, хотя мост имён (`labs-mapping`) считает это одним анализом.
+ * Белок 63 г/л читался «норма» по коду склада и «ниже нормы» по коду формы,
+ * а 84 г/л — наоборот. Для тренирующегося мужчины на ААС это важно: и высокая
+ * концентрация (гемоконцентрация, воспаление), и низкая (синтез, питание)
+ * трактуются по одной границе.
+ */
+const RANGE_TP = { prefUnit: 'g/L', coeff: 1, uln: 83, lln: 64 } as const;
+/**
+ * Мочевая кислота — проход 189. ИНВИТРО (2026): мужчины >14 лет — **210–420**,
+ * женщины >14 лет — **150–350** мкмоль/л. В каталоге низ был раздвоен:
+ * `UA` 200, `URIC_ACID` 150 (это женский низ). Мужчина с 180 читал «ниже
+ * нормы» по коду формы и «норма» по коду склада. Теперь общий низ — мужской
+ * 210, женская пара живёт отдельно в `FEMALE_LAB_BOUNDS.UA` (150–350).
+ */
+const RANGE_UA = { prefUnit: 'umol/L', coeff: 1, uln: 420, lln: 210 } as const;
 /**
  * Магний — проход 188. Референс российских лабораторий (ИНВИТРО и Helix,
  * взрослые старше 20 лет) — 0.66–1.07 ммоль/л; то же число уже стояло в
@@ -520,7 +539,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'CRP': { prefUnit: 'mg/L', coeff: 1, uln: 5, lln: 0.1, name: 'СРБ' },
   'CREATININE': { prefUnit: 'umol/L', coeff: 1, uln: 110, lln: 60, name: 'Креатинин' },
   'UREA': { prefUnit: 'mmol/L', coeff: 1, uln: 7.1, lln: 2.5, name: 'Мочевина' },
-  'UA': { prefUnit: 'umol/L', coeff: 1, uln: 420, lln: 200, name: 'Мочевая к-та' },
+  'UA': { ...RANGE_UA, name: 'Мочевая к-та' },
   'FERRITIN': { prefUnit: 'ug/L', coeff: 1, uln: 300, lln: 30, name: 'Ферритин' },
   'VITD': { prefUnit: 'ng/mL', coeff: 1, uln: 100, lln: 30, name: 'Витамин D' },
   'HGB': { prefUnit: 'g/L', coeff: 10, uln: 170, lln: 130, name: 'Гемоглобин' },
@@ -534,7 +553,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'DHT':  { prefUnit: 'pg/mL', coeff: 1, uln: 870, lln: 130, name: 'Дигидротестостерон' },
   'PROG': { prefUnit: 'ng/mL', coeff: 1, uln: 1.2, lln: 0.1, name: 'Прогестерон' },
   'ALB':  { prefUnit: 'g/L', coeff: 1, uln: 50, lln: 35, name: 'Альбумин' },
-  'TP':   { prefUnit: 'g/L', coeff: 1, uln: 80, lln: 60, name: 'Общий белок' },
+  'TP':   { ...RANGE_TP, name: 'Общий белок' },
   'BIL':  { prefUnit: 'umol/L', coeff: 1, uln: 17.1, lln: 3.4, name: 'Билирубин общий' },
   'DBIL': { ...RANGE_DBIL, name: 'Билирубин прямой' },
   'ALP':  { prefUnit: 'U/L', coeff: 1, uln: 130, lln: 40, name: 'Щёлочная фосфатаза' },
@@ -604,7 +623,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'RETICULOCYTES': { prefUnit: '%', coeff: 1, uln: 2.5, lln: 0.5, name: 'Ретикулоциты' },
   'ERYTHROPOIETIN': { prefUnit: 'mIU/mL', coeff: 1, uln: 25, lln: 5, name: 'Эритропоэтин' },
   'HAPTOGLOBIN': { prefUnit: 'g/L', coeff: 1, uln: 3.0, lln: 0.5, name: 'Гаптоглобин' },
-  'URIC_ACID': { prefUnit: 'umol/L', coeff: 1, uln: 420, lln: 150, name: 'Мочевая кислота' },
+  'URIC_ACID': { ...RANGE_UA, name: 'Мочевая кислота' },
   'CYSTATIN_C': { prefUnit: 'mg/L', coeff: 1, uln: 1.0, lln: 0.5, name: 'Цистатин C' },
   'NGAL': { prefUnit: 'ng/mL', coeff: 1, uln: 150, lln: 0, name: 'NGAL' },
   'KIM1': { prefUnit: 'ng/mL', coeff: 1, uln: 2.0, lln: 0, name: 'KIM-1' },
@@ -637,7 +656,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'CHOLINESTERASE': { prefUnit: 'U/L', coeff: 1, uln: 12000, lln: 5000, name: 'Холинэстераза' },
   'BILE_ACIDS': { prefUnit: 'umol/L', coeff: 1, uln: 10, lln: 0, name: 'Желчные кислоты' },
   'DIRECT_BIL': { ...RANGE_DBIL, name: 'Билирубин прямой' },
-  'TOTAL_PROTEIN': { prefUnit: 'g/L', coeff: 1, uln: 85, lln: 65, name: 'Общий белок' },
+  'TOTAL_PROTEIN': { ...RANGE_TP, name: 'Общий белок' },
   'GLOBULIN': { prefUnit: 'g/L', coeff: 1, uln: 35, lln: 20, name: 'Глобулин' },
   'A_G_RATIO': { prefUnit: '', coeff: 1, uln: 2.0, lln: 1.1, name: 'А/Г коэффициент' },
   'OSMOLALITY': { prefUnit: 'mOsm/kg', coeff: 1, uln: 295, lln: 275, name: 'Осмоляльность' },

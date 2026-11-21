@@ -60,7 +60,7 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'AMMONIA',       organId: 'hepatic', mechId: 'liv1', direction: 'up', uln: 50 },
   { marker: 'LACTATE',       organId: 'hepatic', mechId: 'liv1', direction: 'up', uln: 2.2 },
   { marker: 'AFP',           organId: 'hepatic', mechId: 'liv3', direction: 'up', uln: 10 },
-  { marker: 'TOTAL_PROTEIN', organId: 'hepatic', mechId: 'liv1', direction: 'down', lln: 65 },
+  { marker: 'TOTAL_PROTEIN', organId: 'hepatic', mechId: 'liv1', direction: 'down', lln: 64 },
   { marker: 'ALB',           organId: 'hepatic', mechId: 'liv1', direction: 'down', lln: 35 },
   { marker: 'CHOLINESTERASE',organId: 'hepatic', mechId: 'liv1', direction: 'down', lln: 5000 },
 

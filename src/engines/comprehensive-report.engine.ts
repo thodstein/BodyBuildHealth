@@ -389,7 +389,7 @@ function sexRefs(
       return sex === 'female' ? femalePhaseRefs('LH', cycle) : null;
     case 'ФСГ':
       return sex === 'female' ? femalePhaseRefs('FSH', cycle) : null;
-    // Мочевая кислота: ♂ 200–420 / ♀ 150–350 (женский протокол) — из резолвера
+    // Мочевая кислота: ♂ 210–420 / ♀ 150–350 (женский протокол) — из резолвера
     // по полу, как и остальные маркеры ниже.
     default: {
       if (!markerCode) return null;

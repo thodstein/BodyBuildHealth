@@ -345,7 +345,9 @@ describe('сводный отчёт: мочевая кислота по полу
 
   it('мужчина: те же 380 — в его норме до 420, рекомендации нет', async () => {
     const { labOf, recOf } = await reportFor('male');
-    expect(labOf('Мочевая кислота').refLow).toBe(200);
+    // Низ мужчины — 210 (ИНВИТРО, >14 лет), проход 189; до него в отчёте
+    // печаталось 200 из каталога, где низ был раздвоен (200 и 150).
+    expect(labOf('Мочевая кислота').refLow).toBe(210);
     expect(labOf('Мочевая кислота').refHigh).toBe(420);
     expect(labOf('Мочевая кислота').status).toBe('normal');
     expect(recOf('Метаболизм').some(r => r.text.includes('гиперурикемия'))).toBe(false);

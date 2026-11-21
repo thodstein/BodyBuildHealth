@@ -200,7 +200,7 @@ export const LAB_PANELS: Record<string, LabPanel> = {
       { id: 'ast', label: 'АСТ', unit: 'U/L', ref: [0, 40], importance: 'critical', ucumCode: 'AST' },
       { id: 'ggt', label: 'ГГТ', unit: 'U/L', ref: [0, 60], importance: 'important', ucumCode: 'GGT' },
       { id: 'alb', label: 'Альбумин', unit: 'g/L', ref: [35, 50], importance: 'important', ucumCode: 'ALB' },
-      { id: 'tp', label: 'Общий белок', unit: 'g/L', ref: [60, 80], importance: 'important', ucumCode: 'TP' },
+      { id: 'tp', label: 'Общий белок', unit: 'g/L', ref: catalogRef('TP'), importance: 'important', ucumCode: 'TP' },
       { id: 'bil', label: 'Билирубин общий', unit: 'umol/L', ref: [3.4, 17.1], importance: 'important', ucumCode: 'BIL' },
       { id: 'dbil', label: 'Билирубин прямой', unit: 'umol/L', ref: [0, 5], importance: 'optional', ucumCode: 'DBIL' },
       { id: 'alp', label: 'Щёлочная фосфатаза', unit: 'U/L', ref: [40, 130], importance: 'important', ucumCode: 'ALP' }
