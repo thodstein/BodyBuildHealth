@@ -1283,6 +1283,23 @@ export function buildWorkoutInsights(
     });
   }
 
+  // Упражнение стоит на месте, хотя паттерн может расти за счёт соседних
+  // движений: «жим растёт» и «этот жим растёт» — разные вещи. Четыре сессии —
+  // минимум, чтобы говорить о плато, а не о разовой неудаче.
+  const stalled = (s.exercises || [])
+    .filter(e => e.e1rmSeries.filter(v => v > 0).length >= 4)
+    .filter(e => e.progressPct == null || e.progressPct <= 0)
+    .sort((a, b) => b.sessions - a.sessions || a.name.localeCompare(b.name))[0];
+  if (stalled) {
+    out.push({
+      id: 'stalled',
+      tone: 'info',
+      icon: '🧱',
+      title: `${stalled.name}: e1RM ${stalled.bestE1RM} кг без роста ${stalled.e1rmSeries.length} тренировок`,
+      detail: `${stalled.sets} подх · лучший ${stalled.bestWeight}×${stalled.bestReps}${stalled.avgRIR != null ? ` · средний RIR ${stalled.avgRIR}` : ''}. Четыре и больше тренировок на одном уровне — плато: смените диапазон повторов или добавьте вес.`,
+    });
+  }
+
   // План против факта. Блок «По упражнениям» показывает это построчно, но
   // итог читают в «Выводах»: сколько подходов не добито и что пропущено.
   if (plan && !plan.empty && plan.setsPct != null && plan.setsPct < 80) {
@@ -1381,6 +1398,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   'pattern-drop': 90,
   deload: 85,
   'pattern-strength': 76,
+  stalled: 56,
   'mrv-streak': 74,
   'week-plan': 73,
   'mev-streak': 72,

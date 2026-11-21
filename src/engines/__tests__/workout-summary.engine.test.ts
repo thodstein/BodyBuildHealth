@@ -450,6 +450,25 @@ describe('workout-summary: недельная динамика и интенси
       .some(i => i.id === 'pattern-strength')).toBe(false);
   });
 
+  it('называет упражнение, которое застряло на месте', () => {
+    const flat = ['2026-11-02', '2026-11-06', '2026-11-09', '2026-11-13']
+      .map(d => mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]));
+    const ins = buildWorkoutInsights(buildWorkoutSummary(flat)).find(i => i.id === 'stalled');
+    expect(ins?.title).toContain('Жим штанги лёжа');
+    expect(ins?.title).toContain('без роста 4 тренировок');
+    expect(ins?.detail).toContain('лучший 80×8');
+    // Три тренировки — ещё не плато, а разовая неудача.
+    expect(buildWorkoutInsights(buildWorkoutSummary(flat.slice(0, 3)))
+      .some(i => i.id === 'stalled')).toBe(false);
+    // Вес растёт — это не плато.
+    const grow = flat.map((w, i) => ({
+      ...w,
+      exercises: w.exercises.map(e => ({ ...e, sets: e.sets!.map(s => ({ ...s, weight: 80 + i * 2.5 })) })),
+    })) as typeof flat;
+    expect(buildWorkoutInsights(buildWorkoutSummary(grow))
+      .some(i => i.id === 'stalled')).toBe(false);
+  });
+
   it('считает подходы по неделям для упражнения', () => {
     const s = buildWorkoutSummary([w1, w2]);
     const bench = s.exercises[0];
