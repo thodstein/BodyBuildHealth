@@ -20,7 +20,7 @@ import {
   weekRangeFor,
   type WeekPlanDayInput,
 } from '../../../engines/workout-summary.engine';
-import { WorkoutSummaryReport } from './WorkoutSummaryReport';
+import { WorkoutSummaryReport, readReportBlocks } from './WorkoutSummaryReport';
 import { EditorPopupSelect } from './EditorPopup';
 import { diaryStyles as style, ACCENT } from './diary-tokens';
 import type { DiaryHubCtx } from './diary-hub-context';
@@ -210,12 +210,16 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     const cmp = previousWorkouts.length > 0
       ? compareWorkoutSummaries(summary, buildWorkoutSummary(previousWorkouts))
       : null;
+    // «Следующая сессия» — только если блок включён: иначе отчёт обещает то,
+    // что пользователь спрятал.
+    const chosen = readReportBlocks('he_workout_report_blocks');
     const text = buildWorkoutReportText(summary, {
       level: hub.level,
       comparison: cmp,
       comparisonLabel: previousLabel,
       details: summary.workouts <= 3 ? buildSetDetails(selected) : null,
       weekPlan: weekPlan ? compareWeekPlanVsActual(weekPlan, selected) : null,
+      next: chosen.includes('next'),
     });
     void navigator.clipboard?.writeText(text).then(() => {
       setCopyDone(true);

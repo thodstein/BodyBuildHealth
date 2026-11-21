@@ -226,6 +226,7 @@ export const REPORT_BLOCKS = [
   { id: 'exercises', label: 'Упражнения' },
   { id: 'plan', label: 'План → факт' },
   { id: 'weekplan', label: 'План недели' },
+  { id: 'next', label: 'Следующая сессия' },
   { id: 'sets', label: 'Подходы' },
   { id: 'movement', label: 'Движения' },
   { id: 'sessions', label: 'Тренировки' },
@@ -247,6 +248,9 @@ export interface SummaryExercise {
   tonnageKg: number;
   bestWeight: number;
   bestReps: number;
+  /** Подход с лучшим e1RM — реальные вес и повторы одного сета. */
+  topSetWeight: number;
+  topSetReps: number;
   bestE1RM: number;
   avgLoadKg: number;
   /** Средний вес подхода в % от лучшего e1RM этого упражнения за период. */
@@ -258,6 +262,8 @@ export interface SummaryExercise {
   sessions: number;
   /** Подходы без внешнего веса (свой вес, резинка) — в тоннаж не входят. */
   weightlessSets: number;
+  /** Подходы по зонам повторений: сила 1–5, гипертрофия 6–12, выносливость 13+. */
+  repZones: { strength: number; hypertrophy: number; endurance: number };
   /** Лучший e1RM по последним (до 12) тренировкам периода — для спарклайна. */
   e1rmSeries: number[];
   /** Прирост e1RM от первой к последней точке серии, % (null — меньше двух точек). */
@@ -399,6 +405,36 @@ export interface WorkoutSummary {
   prs: SummaryPR[];
 }
 
+export interface RepZoneShare {
+  /** Зона, в которой сделано больше всего подходов. */
+  label: string;
+  /** Что она тренирует: сила / гипертрофия / выносливость. */
+  hint: string;
+  sets: number;
+  total: number;
+  pct: number;
+}
+
+/**
+ * Доминирующая зона повторов — «эта работа про силу или про объём».
+ * Логика одна для отчёта, движений и упражнений: делить проценты по-разному
+ * в разных местах нельзя, иначе 60% в одном блоке и 55% в другом.
+ */
+export function dominantRepZone(
+  z: { strength: number; hypertrophy: number; endurance: number } | null | undefined,
+): RepZoneShare | null {
+  if (!z) return null;
+  const rows = [
+    { label: '1–5', hint: 'сила', sets: z.strength },
+    { label: '6–12', hint: 'гипертрофия', sets: z.hypertrophy },
+    { label: '13+', hint: 'выносливость', sets: z.endurance },
+  ];
+  const total = rows.reduce((a, r) => a + r.sets, 0);
+  if (total <= 0) return null;
+  const top = rows.reduce((a, b) => (b.sets > a.sets ? b : a), rows[0]);
+  return { ...top, total, pct: Math.round((top.sets / total) * 100) };
+}
+
 type LooseSet = { weight?: number; weightKg?: number; reps?: number; rir?: number; rpe?: number } | null | undefined;
 type LooseExercise = Partial<StrengthLogEntry> & { name?: string; totalVolume?: number; sets?: LooseSet[]; muscleGroup?: string; movementPattern?: string };
 
@@ -461,6 +497,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   type ExAgg = {
     name: string; muscle: MuscleKey; muscleLabel: string; pattern: string; patternLabel: string;
     sets: number; reps: number; tonnageKg: number; bestWeight: number; bestReps: number; bestE1RM: number;
+    /** Подход с лучшим e1RM: реальная пара вес×повторы для «следующей сессии». */
+    topSetWeight: number; topSetReps: number;
     rirSum: number; rirN: number; rpeSum: number; rpeN: number; sessions: Set<string>;
     /** Лучший e1RM по тренировкам периода (по возрастанию даты). */
     e1rmSeries: number[];
@@ -470,6 +508,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     wlSets: number;
     /** Подходы по неделям периода — та же сплошная шкала, что у мышц. */
     byWeek: Map<string, number>;
+    /** Зоны повторений упражнения за период. */
+    zoneStrength: number;
+    zoneHypertrophy: number;
+    zoneEndurance: number;
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number>; sessions: Set<string> }>();
@@ -640,18 +682,30 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         name, muscle: meta.muscle, muscleLabel: MUSCLE_LABELS[meta.muscle],
         pattern: meta.pattern, patternLabel: meta.patternLabel,
         sets: 0, reps: 0, tonnageKg: 0, bestWeight: 0, bestReps: 0, bestE1RM: 0,
+        topSetWeight: 0, topSetReps: 0,
         rirSum: 0, rirN: 0, rpeSum: 0, rpeN: 0, sessions: new Set<string>(),
         e1rmSeries: [],
         seriesStamp: '',
         wlSets: 0,
         byWeek: new Map<string, number>(),
+        zoneStrength: 0, zoneHypertrophy: 0, zoneEndurance: 0,
       };
       prev.sets += exSets;
       prev.reps += exReps;
       prev.tonnageKg += exTonnage;
+      prev.zoneStrength += exZoneStrength;
+      prev.zoneHypertrophy += exZoneHyp;
+      prev.zoneEndurance += exZoneEnd;
       prev.bestWeight = Math.max(prev.bestWeight, exBestWeight);
       prev.bestReps = Math.max(prev.bestReps, exBestReps);
+      const prevBestE1 = prev.bestE1RM;
       prev.bestE1RM = Math.max(prev.bestE1RM, exBestE1RM);
+      // Лучший подход — тот, где e1RM выше: именно с него строится прогрессия,
+      // а не с максимумов веса и повторов по отдельности.
+      if (exBestE1RM > 0 && exBestE1RM >= prevBestE1) {
+        prev.topSetWeight = exBestSetWeight;
+        prev.topSetReps = exBestSetReps;
+      }
       if (exBestE1RM > 0) {
         const stamp = String(w.id || date);
         const rounded = Math.round(exBestE1RM);
@@ -776,6 +830,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         tonnageKg: Math.round(e.tonnageKg),
         bestWeight: Math.round(e.bestWeight * 10) / 10,
         bestReps: e.bestReps,
+        topSetWeight: Math.round(e.topSetWeight * 10) / 10,
+        topSetReps: e.topSetReps,
         bestE1RM: Math.round(e.bestE1RM),
         avgLoadKg: e.sets > 0 ? Math.round((e.tonnageKg / Math.max(1, e.reps)) * 10) / 10 : 0,
         avgIntensityPct: e.bestE1RM > 0 && e.reps > 0
@@ -787,6 +843,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         sharePct: totalTonnage > 0 ? Math.round((e.tonnageKg / totalTonnage) * 1000) / 10 : 0,
         sessions: e.sessions.size,
         weightlessSets: e.wlSets,
+        repZones: { strength: e.zoneStrength, hypertrophy: e.zoneHypertrophy, endurance: e.zoneEndurance },
         e1rmSeries: e.e1rmSeries.slice(-12),
         weeklySets,
         weeklyTrendPct: weeklyTrendFrom(weeklySets),
@@ -942,6 +999,82 @@ export function sessionToWorkoutLog(session: any): WorkoutLog {
     weekNumber: session?.weekNumber,
     notes: String(session?.notes || ''),
   };
+}
+
+export interface NextSessionItem {
+  name: string;
+  /** weight — добавляем вес, reps — повтор, deload — разгрузочная сессия. */
+  kind: 'weight' | 'reps' | 'deload';
+  /** Лучший подход периода: «80×8» или «×8» для своего веса. */
+  from: string;
+  /** Цель следующей тренировки по этому упражнению. */
+  to: string;
+  note: string;
+}
+
+/** Дробный вес печатаем как 82.5, но не 82.50. */
+const fmtKg = (w: number) => String(Math.round(w * 10) / 10);
+
+/** Округление до блина 2.5 кг: иначе «82.7 кг» в зале не собрать. */
+const roundToPlate = (w: number) => Math.max(0, Math.round(w / 2.5) * 2.5);
+
+/**
+ * Что делать в следующую тренировку — двойная прогрессия по лучшему подходу
+ * (тот, где e1RM выше). Растущее упражнение получает +1 повтор, на верху
+ * диапазона — +2.5 кг с откатом повторов, а стоящее на месте — разгрузку.
+ * Живёт в движке, чтобы дневник и плеер не подсказывали разное.
+ *
+ * `limit` — сколько строк читаемо; основные движения (чаще в журнале) сверху.
+ */
+export function buildNextSessionPlan(summary: WorkoutSummary, limit = 6): NextSessionItem[] {
+  const out: NextSessionItem[] = [];
+  for (const e of summary.exercises || []) {
+    if (!(e.bestReps > 0) || !(e.sets > 0)) continue;
+    const weighted = e.bestWeight > 0;
+    const topW = e.topSetWeight > 0 ? e.topSetWeight : e.bestWeight;
+    const topR = e.topSetReps > 0 ? e.topSetReps : e.bestReps;
+    const from = weighted ? `${fmtKg(topW)}×${topR}` : `×${topR}`;
+    const stalled = weighted && e.e1rmSeries.length >= 4 && e.progressPct != null && e.progressPct <= 0;
+    if (stalled) {
+      const nextW = roundToPlate(topW * 0.9);
+      out.push({
+        name: e.name,
+        kind: 'deload',
+        from,
+        to: `${fmtKg(nextW)}×${topR}`,
+        note: `e1RM ${e.bestE1RM} кг не растёт ${e.e1rmSeries.length} тренировок — разгрузка 90%`,
+      });
+      continue;
+    }
+    if (!weighted) {
+      out.push({ name: e.name, kind: 'reps', from, to: `×${topR + 1}`, note: 'свой вес: +1 повтор' });
+      continue;
+    }
+    if (topR >= 12) {
+      // Верх диапазона повторов: дальше растить вес, а не повторы.
+      const nextW = roundToPlate(topW + 2.5);
+      const nextR = Math.max(5, topR - 2);
+      out.push({
+        name: e.name,
+        kind: 'weight',
+        from,
+        to: `${fmtKg(nextW)}×${nextR}`,
+        note: `${topR} повторов — верх диапазона: +2.5 кг и −2 повтора`,
+      });
+    } else {
+      out.push({
+        name: e.name,
+        kind: 'reps',
+        from,
+        to: `${fmtKg(topW)}×${topR + 1}`,
+        note: 'тот же вес, +1 повтор',
+      });
+    }
+  }
+  const sessions = new Map((summary.exercises || []).map(e => [e.name, e.sessions]));
+  return out
+    .sort((a, b) => (sessions.get(b.name) || 0) - (sessions.get(a.name) || 0))
+    .slice(0, limit);
 }
 
 /** Удобные подписи периодов для шапки отчёта. */
@@ -1373,7 +1506,7 @@ export function buildWorkoutInsights(
       tone: 'info',
       icon: '🧱',
       title: `${stalled.name}: e1RM ${stalled.bestE1RM} кг без роста ${stalled.e1rmSeries.length} тренировок`,
-      detail: `${stalled.sets} подх · лучший ${stalled.bestWeight}×${stalled.bestReps}${stalled.avgRIR != null ? ` · средний RIR ${stalled.avgRIR}` : ''}. Четыре и больше тренировок на одном уровне — плато: смените диапазон повторов или добавьте вес.`,
+      detail: `${stalled.sets} подх · лучший ${stalled.topSetWeight > 0 ? `${stalled.topSetWeight}×${stalled.topSetReps}` : `${stalled.bestWeight}×${stalled.bestReps}`}${stalled.avgRIR != null ? ` · средний RIR ${stalled.avgRIR}` : ''}. Четыре и больше тренировок на одном уровне — плато: смените диапазон повторов или добавьте вес.`,
     });
   }
 
@@ -2004,6 +2137,8 @@ export interface WorkoutReportTextOptions {
   weekPlan?: WeekPlanVsActual | null;
   /** Подходы «как есть» — переданы только для короткого периода. */
   details?: SetDetailSession[] | null;
+  /** Добавить «Следующая сессия»: цель по каждому упражнению. */
+  next?: boolean | null;
   /** Своя первая строка (например, «📊 Итог: FullBody — 62 мин»). */
   header?: string;
   /** Дополнительные строки в конце (например, прогрессия к следующей сессии). */
@@ -2056,8 +2191,11 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     // формально»; перерыв в шкале виден нулём.
     const weeks = e.weeklySets.filter(v => v > 0).length > 1 ? ` · подх по неделям ${e.weeklySets.join('·')}` : '';
     const weeksTrend = e.weeklyTrendPct != null ? ` (${signedPct(e.weeklyTrendPct)} к первой неделе)` : '';
+    const dz = dominantRepZone(e.repZones);
+    const zone = dz ? ` · зона ${dz.label} (${dz.pct}%)` : '';
+    const bestSet = e.topSetWeight > 0 ? `${e.topSetWeight}×${e.topSetReps}` : `${e.bestWeight}кг`;
     lines.push(
-      `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}${weeks}${weeksTrend}`,
+      `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${bestSet} (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}${weeks}${weeksTrend}${zone}`,
     );
   });
 
@@ -2232,6 +2370,19 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
         lines.push(`    ${ex.name}: ${sets}`);
       });
     });
+  }
+
+  if (opts.next) {
+    // Цель на следующую сессию — конкретная, а не «работай по прогрессии»:
+    // тот же вес и +1 повтор или +2.5 кг на верху диапазона.
+    const nextPlan = buildNextSessionPlan(s);
+    if (nextPlan.length) {
+      lines.push('');
+      lines.push('Следующая сессия:');
+      nextPlan.forEach(it => {
+        lines.push(`  ${it.kind === 'deload' ? '📉' : '📈'} ${it.name}: ${it.from} → ${it.to} (${it.note})`);
+      });
+    }
   }
 
   if (opts.footer && opts.footer.length > 0) {

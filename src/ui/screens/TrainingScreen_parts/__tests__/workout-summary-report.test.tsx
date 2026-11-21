@@ -465,6 +465,17 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('Тоннаж недели');
   });
 
+  it('блок «Следующая сессия» даёт цель по упражнениям', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-17')]} blocks={['next']} showSelector={false} />,
+    );
+    expect(html).toContain('Следующая сессия');
+    // Жим 80×8 и присед 100×5 растут повтором, а не весом.
+    expect(html).toContain('80×9');
+    expect(html).toContain('100×6');
+    expect(html).not.toContain('По мышцам');
+  });
+
   it('в упражнениях видна прогрессия e1RM (спарклайн и проценты)', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['exercises']} />);
     expect(html).toContain('<polyline');

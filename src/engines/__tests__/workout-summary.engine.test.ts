@@ -4,6 +4,7 @@ import {
   buildWorkoutInsights,
   buildWorkoutReportText,
   buildSetDetails,
+  buildNextSessionPlan,
   compareWorkoutSummaries,
   comparePlanVsActual,
   compareWeekPlanVsActual,
@@ -1170,6 +1171,72 @@ describe('workout-summary: план недели (микроцикл) проти
     const txt = buildWorkoutReportText(summary, { weekPlan: wp });
     expect(txt).toContain('План недели: 5 из 11 подх (45.5%)');
     expect(txt).toContain('план 4 → факт 3');
+  });
+});
+
+describe('workout-summary: следующая сессия', () => {
+  it('даёт тот же вес и +1 повтор для растущего упражнения', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    const plan = buildNextSessionPlan(s);
+    expect(plan[0]).toMatchObject({ name: 'Жим штанги лёжа', kind: 'reps', from: '80×8', to: '80×9' });
+    const txt = buildWorkoutReportText(s, { next: true });
+    expect(txt).toContain('Следующая сессия:');
+    expect(txt).toContain('Жим штанги лёжа: 80×8 → 80×9 (тот же вес, +1 повтор)');
+    // Без флага блок не добавляется: его включает выбор блоков.
+    expect(buildWorkoutReportText(s)).not.toContain('Следующая сессия');
+  });
+
+  it('на верху диапазона добавляет 2.5 кг и снимает два повтора', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Приседания со штангой', id: 'squat', weight: 50, reps: 12, sets: 3 }]),
+    ]);
+    expect(buildNextSessionPlan(s)[0]).toMatchObject({ kind: 'weight', from: '50×12', to: '52.5×10' });
+  });
+
+  it('работает со своим весом: +1 повтор вместо блина', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Подтягивания', id: 'pullup', weight: 0, reps: 10, sets: 3 }]),
+    ]);
+    expect(buildNextSessionPlan(s)[0]).toMatchObject({ kind: 'reps', from: '×10', to: '×11' });
+  });
+
+  it('стоящее на месте упражнение получает разгрузку, а не +1 повтор', () => {
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'].map(d =>
+      mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]));
+    const s = buildWorkoutSummary(weeks);
+    const item = buildNextSessionPlan(s)[0];
+    expect(item.kind).toBe('deload');
+    expect(item.from).toBe('80×8');
+    // 90% от 80 = 72 → до блина 2.5 кг это 72.5.
+    expect(item.to).toBe('72.5×8');
+    expect(item.note).toContain('не растёт 4 тренировок');
+  });
+
+  it('считает цель от лучшего подхода по e1RM, а не от максимумов по отдельности', () => {
+    const w = mkWorkout('2026-11-12', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 3, sets: 1 }]);
+    // 100×3 (e1RM 110) и 95×8 (e1RM 120): лучший подход — 95×8.
+    w.exercises[0].sets = [
+      { weight: 100, reps: 3, rir: 2, rpe: 8 },
+      { weight: 95, reps: 8, rir: 2, rpe: 8 },
+    ];
+    const s = buildWorkoutSummary([w]);
+    const bench = s.exercises[0];
+    expect(bench.bestWeight).toBe(100);
+    expect(bench.bestReps).toBe(8);
+    expect(bench.bestE1RM).toBe(120);
+    expect(bench.topSetWeight).toBe(95);
+    expect(bench.topSetReps).toBe(8);
+    expect(buildNextSessionPlan(s)[0]).toMatchObject({ from: '95×8', to: '95×9' });
+    expect(buildWorkoutReportText(s)).toContain('лучший 95×8 (e1RM 120)');
+  });
+
+  it('молчит, когда в журнале нет повторов', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Планка', id: 'plank', weight: 0, reps: 0, sets: 2 }]),
+    ]);
+    expect(buildNextSessionPlan(s)).toEqual([]);
   });
 });
 

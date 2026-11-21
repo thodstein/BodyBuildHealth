@@ -16,12 +16,14 @@ import {
   buildWorkoutSummary,
   buildWorkoutInsights,
   buildSetDetails,
+  buildNextSessionPlan,
   compareWorkoutSummaries,
   formatSummaryPeriod,
   muscleLandmarksFor,
   volumeAdvice,
   comparePlanVsActual,
   compareWeekPlanVsActual,
+  dominantRepZone,
   summaryWeeksCount,
   MUSCLE_COLORS,
   PLAN_ROW_COLOR,
@@ -68,20 +70,6 @@ const fmtDate = (iso: string) => {
   return Number.isNaN(d.getTime())
     ? (iso || '—')
     : d.toLocaleDateString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit' });
-};
-
-/** Доминирующая зона повторений движения: «6–12 · 71%». */
-const dominantRepZone = (z?: { strength: number; hypertrophy: number; endurance: number } | null) => {
-  if (!z) return null;
-  const rows = [
-    { label: '1–5', hint: 'сила', n: z.strength },
-    { label: '6–12', hint: 'гипертрофия', n: z.hypertrophy },
-    { label: '13+', hint: 'выносливость', n: z.endurance },
-  ];
-  const total = rows.reduce((s, r) => s + r.n, 0);
-  if (total <= 0) return null;
-  const top = rows.reduce((a, b) => (b.n > a.n ? b : a), rows[0]);
-  return { ...top, total, pct: Math.round((top.n / total) * 100) };
 };
 
 /** Блоки «Итога» плеера по умолчанию: вся глубина отчёта, без дублей на экране. */
@@ -821,10 +809,45 @@ export const WorkoutSummaryBody: React.FC<{
         );
       })()}
 
+      {/* ── СЛЕДУЮЩАЯ СЕССИЯ ── */}
+      {has('next') && (() => {
+        const nextPlan = buildNextSessionPlan(summary, compact ? 4 : 6);
+        if (nextPlan.length === 0) return null;
+        return (
+          <div style={CARD}>
+            <SectionTitle
+              icon="📈"
+              title="Следующая сессия"
+              hint="двойная прогрессия: тот же вес и +1 повтор, на верху диапазона — +2.5 кг"
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {nextPlan.map(it => {
+                const deload = it.kind === 'deload';
+                const color = deload ? '#f59e0b' : '#22c55e';
+                return (
+                  <div
+                    key={it.name}
+                    title={it.note}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 8, background: deload ? 'rgba(245,158,11,0.10)' : 'rgba(34,197,94,0.07)', fontSize: 9.5 }}
+                  >
+                    <span style={{ flex: 1, minWidth: 60, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+                    <span style={{ color: '#fff', opacity: 0.6, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{it.from} →</span>
+                    <span style={{ color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{it.to}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.6, marginTop: 5, lineHeight: 1.35 }}>
+              Цель считается от лучшего подхода периода (по e1RM), а не от максимумов веса и повторов по отдельности. Подход с плато получает разгрузку 90%.
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── УПРАЖНЕНИЯ ── */}
       {has('exercises') && summary.exercises.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🏋️" title="По упражнениям" hint="подходы × повторы · тоннаж · лучший вес / e1RM" />
+          <SectionTitle icon="🏋️" title="По упражнениям" hint="подходы × повторы · тоннаж · лучший вес / e1RM · зона повторов" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {summary.exercises.map(e => {
               const pvaRow = planVsActual?.rows.find(r => r.key === normalizeExerciseName(e.name));
@@ -837,8 +860,19 @@ export const WorkoutSummaryBody: React.FC<{
                   <span style={{ color: ACCENT, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmtTon(e.tonnageKg)}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, color: '#fff', opacity: 0.78, flexWrap: 'wrap' }}>
-                  <span>Лучший <b style={{ color: '#f59e0b' }}>{e.bestWeight > 0 ? `${e.bestWeight} кг` : '—'}</b> × {e.bestReps}</span>
+                  <span title={`Лучший подход по e1RM${e.bestWeight > e.topSetWeight ? `; максимальный вес ${e.bestWeight} кг` : ''}`}>
+                    Лучший <b style={{ color: '#f59e0b' }}>{e.topSetWeight > 0 ? `${e.topSetWeight} кг × ${e.topSetReps}` : `вес — × ${e.bestReps}`}</b>
+                  </span>
                   <span>e1RM <b style={{ color: '#fff' }}>{e.bestE1RM || '—'}</b> кг</span>
+                  {(() => {
+                    const dz = dominantRepZone(e.repZones);
+                    if (!dz) return null;
+                    return (
+                      <span title={`Зона повторов упражнения: ${dz.label} — ${dz.hint}, ${dz.sets} из ${dz.total} подходов (${dz.pct}%)`}>
+                        зона <b style={{ color: '#a78bfa' }}>{dz.label}</b> · {dz.pct}%
+                      </span>
+                    );
+                  })()}
                   {e.avgIntensityPct != null && (
                     <span title="Средний вес подхода в % от лучшего e1RM упражнения">инт. <b style={{ color: '#fb923c' }}>{e.avgIntensityPct}%</b></span>
                   )}
@@ -981,7 +1015,7 @@ export const WorkoutSummaryBody: React.FC<{
                       const dz = dominantRepZone(p.repZones);
                       if (!dz) return null;
                       return (
-                        <span title={`Зона повторений движения: ${dz.label} — ${dz.hint}, ${dz.n} из ${dz.total} подходов (${dz.pct}%)`}>
+                        <span title={`Зона повторений движения: ${dz.label} — ${dz.hint}, ${dz.sets} из ${dz.total} подходов (${dz.pct}%)`}>
                           повторы <b style={{ color: '#a78bfa' }}>{dz.label}</b> · {dz.pct}%
                         </span>
                       );
@@ -1131,8 +1165,9 @@ export const WorkoutSummaryReport: React.FC<{
     if (!weekPlanVsActual || weekPlanVsActual.empty) h.weekplan = 'нет плана недели';
     if (!(Array.isArray(plan) && plan.length > 0)) h.plan = 'только из плеера';
     if (!comparison || comparison.empty) h.compare = 'нет прошлого периода';
+    if (!summary.exercises.some(e => e.bestReps > 0)) h.next = 'нет записанных повторов';
     return h;
-  }, [weekPlanVsActual, plan, comparison]);
+  }, [weekPlanVsActual, plan, comparison, summary]);
 
   return (
     <div className="workout-summary-report" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
