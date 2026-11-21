@@ -119,6 +119,25 @@ describe('WorkoutSummaryReport', () => {
     expect(text).toContain('· 1–5 · 100%');
   });
 
+  it('скрывает блок, который экран показывает отдельно', () => {
+    // В плеере своя карточка «Следующая сессия»: включать её ещё и в отчёте —
+    // два разных совета на одном экране.
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-17')]}
+        blocks={['totals', 'next']}
+        hide={['next']}
+      />,
+    );
+    expect(html).not.toContain('Следующая сессия');
+    expect(html).toContain('Общие показатели');
+    // И в списке блоков этой галочки нет — не мёртвый чекбокс.
+    const picker = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-17')]} blocks={[]} hide={['next']} />,
+    );
+    expect(picker).not.toContain('Следующая сессия');
+  });
+
   it('блок «План → факт» сравнивает план с фактом по упражнениям', () => {
     const html = renderToStaticMarkup(
       <WorkoutSummaryReport

@@ -101,19 +101,23 @@ export const ReportBlockPicker: React.FC<{
   compact?: boolean;
   /** Пометка у блока, которого на этом экране нет: «нет плана недели». */
   hints?: Partial<Record<ReportBlockId, string>>;
-}> = ({ value, onChange, compact, hints }) => {
+  /** Блоки, которые на этом экране уже показаны отдельно — не дублируем в выборе. */
+  hide?: ReportBlockId[];
+}> = ({ value, onChange, compact, hints, hide }) => {
+  const hidden = hide || [];
+  const visibleBlocks = REPORT_BLOCKS.filter(b => !hidden.includes(b.id));
   const has = (id: ReportBlockId) => value.includes(id);
   const toggle = (id: ReportBlockId) => {
     onChange(has(id) ? value.filter(x => x !== id) : ALL_REPORT_BLOCKS.filter(x => x === id || has(x)));
   };
-  const allOn = value.length === ALL_REPORT_BLOCKS.length;
+  const allOn = visibleBlocks.every(b => has(b.id));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Что показать</span>
         <button
           type="button"
-          onClick={() => onChange(ALL_REPORT_BLOCKS.slice())}
+          onClick={() => onChange(ALL_REPORT_BLOCKS.filter(id => !hidden.includes(id)))}
           style={{
             padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 800, cursor: 'pointer',
             border: allOn ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.14)',
@@ -133,7 +137,7 @@ export const ReportBlockPicker: React.FC<{
         >Сбросить</button>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {REPORT_BLOCKS.map(b => {
+        {visibleBlocks.map(b => {
           const on = has(b.id);
           return (
             <button
@@ -1156,9 +1160,17 @@ export const WorkoutSummaryReport: React.FC<{
   weekPlan?: WeekPlanDayInput[] | null;
   /** Подпись недели, за которую взят план: «03.11–09.11». */
   weekPlanLabel?: string;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan, weekPlan, weekPlanLabel }) => {
+  /** Блоки, которые экран показывает отдельно (в плеере — своя «Следующая сессия»). */
+  hide?: ReportBlockId[];
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan, weekPlan, weekPlanLabel, hide }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readReportBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
+  // Скрытые блоки не рисуем, даже если они остались в localStorage: иначе
+  // плеер показал бы свою «Следующую сессию» дважды.
+  const shown = React.useMemo(
+    () => selected.filter(id => !(hide || []).includes(id)),
+    [selected, hide],
+  );
   const setSelected = (next: ReportBlockId[]) => {
     if (blocks == null) setLocalBlocks(next);
     onBlocksChange?.(next);
@@ -1227,11 +1239,11 @@ export const WorkoutSummaryReport: React.FC<{
         </div>
         {showSelector && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} hints={blockHints} />
+            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} hints={blockHints} hide={hide} />
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} weekPlanVsActual={weekPlanVsActual} weekPlanLabel={weekPlanLabel} />
+      <WorkoutSummaryBody summary={summary} blocks={shown} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} weekPlanVsActual={weekPlanVsActual} weekPlanLabel={weekPlanLabel} />
     </div>
   );
 };

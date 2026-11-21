@@ -2506,6 +2506,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 baselineWorkouts={doneHistory}
                 level={profile.level}
                 plan={donePlan}
+                hide={['next']}
               />
             </div>
           )}
