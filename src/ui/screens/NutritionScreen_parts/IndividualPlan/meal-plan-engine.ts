@@ -5512,6 +5512,28 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
   //  • корректор целится в 4Б + 9Ж + 4У (см. normalizeMacroTargets ниже по коду),
   //  • расхождение с введёнными ккал объявляется нотой с конкретным советом, а не прячется.
   const _kcalEntered = Number(input.goalKcal) || 0;
+  // §8.130: на противоречивом входе (ккал < 4Б+9Ж+4У) каркас дня строился от ВВЕДЁННЫХ ккал,
+  // хотя корректор целится в 4Б+9Ж+4У. Замер: 55 кг, Б132/Ж39/У110 (эталон 1319 ккал), введено
+  // 1161 — день пришёл на 1325 ккал, но с Б +11.7 % и Ж −11.8 % (приёмы 185/194/361/228/357 ккал:
+  // скелет был «на 1161», а MPS-полы приёмов в такие тарелки не влезают). Тот же вход с
+  // ккал = 1319 даёт Б +0.8 % / Ж −0.8 %. Поэтому при противоречии входа каркас строится от
+  // эталона макросов — но ТОЛЬКО в сторону роста: «уменьшённая сборка» (§8.107a, откат) не
+  // включается, полы реализма не пробиваются. Вердикт и ноты по-прежнему считаются от
+  // ВВЕДЁННЫХ ккал (`_kcalEntered`) — противоречие входа остаётся видимым, а не замазанным.
+  {
+    const _atwAlloc = 4 * (Number(input.goalProteinG) || 0)
+      + 9 * (Number(input.goalFatG) || 0)
+      + 4 * (Number(input.goalCarbsG) || 0);
+    // §8.130b: ручной день НЕ переводится на эталон макросов. Замер (55 кг, Б132/Ж39/У110,
+    // введено 1161): авто-путь без подмены давал Б +11.7 % / Ж −11.8 % (лечится ростом каркаса),
+    // а ручной путь на той же подмене ухудшался с 1.4/−1.3/0.1 % (как на HEAD) до 6.3/−6.9/−5.0 %:
+    // у ручного своя пересборка §8.108/§8.110, и ей нужен каркас ровно по введённым ккал.
+    const _manualInput = String((input as any).kbjuMode || '') === 'manual'
+      || !!(input as any).manualTargetsLocked;
+    if (!_manualInput && _kcalEntered > 0 && _atwAlloc > _kcalEntered * 1.03) {
+      input = { ...input, goalKcal: _atwAlloc };
+    }
+  }
   // §8.107a (замер и ОТКАТ): сборка дня под согласованный набор (ккал := 4Б+9Ж+4У) — единственное,
   // что реально сводит противоречивый вход: на сетке 405 дней «все 4 оси в 3%» было бы 86%
   // (231/270 несогласованных) против 17% (46/270) без неё, а кейс владельца 3000/240/100/150
@@ -16994,8 +17016,13 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
     // (замок planner-micro-closure §4.1: «день с ккал-комнатой»).
     const __awKcal = Math.round(4 * (Number(input.goalProteinG) || 0)
       + 9 * (Number(input.goalFatG) || 0) + 4 * (Number(input.goalCarbsG) || 0));
-    const __kcalOk = __awKcal <= 0 || !(Number(input.goalKcal) > 0)
-      || Math.abs(Number(input.goalKcal) - __awKcal) / __awKcal <= 0.03;
+    const __kcalOk = __awKcal <= 0 || !(_kcalEntered > 0)
+      // §8.130: сравнение — с ВВЕДЁННЫМИ ккал, а не с `input.goalKcal`: на противоречивом
+      // входе он уже подменён эталоном макросов для каркаса (§8.130), и ручная пересборка
+      // §8.108/§8.110 включалась бы там, где по замеру она не нужна и вредна (55 кг,
+      // введено 1161 при эталоне 1319, руч 5/тр: Б +7.3 %, Ж −7.9 %, У +7.9 % — авто-путь
+      // того же входа даёт 0.7/−0.5/0.2 %).
+      || Math.abs(_kcalEntered - __awKcal) / __awKcal <= 0.03;
     const __manualDay = __manualDayRaw && __kcalOk;
     if (__manualDay) {
       const _finN = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
@@ -17148,7 +17175,9 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       // валила инвариант «канон КБЖУ в 29 из 30 дней» на днях, где день честно упирался в
       // ядра/MPS-полы. Перебор Б, если он остался, называется нотой ниже.
       const _dayDevP4 = Math.max(
-        (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+        // §8.130: вердикт — всегда против ВВЕДЁННЫХ ккал (при противоречии входа сборка идёт
+        // от эталона макросов, но проглотить расхождение нельзя: ккал-ось = свойство входа).
+        _kcalEntered > 0 ? Math.abs(totals.kcal - _kcalEntered) / _kcalEntered : 0,
         (input.goalProteinG || 0) > 0 ? Math.max(0, (input.goalProteinG || 0) - totals.p) / (input.goalProteinG || 1) : 0,
         (input.goalFatG || 0) > 0 ? Math.abs(totals.f - (input.goalFatG || 0)) / (input.goalFatG || 1) : 0,
         (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
@@ -19721,7 +19750,9 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
                 : `⚠ Точность рациона: отклонение >5% (${_plX}, Ж ${Math.round(_dFx * 100)}%, У ${Math.round(_dCx * 100)}%) — проверьте пулы продуктов`;
         }
         _dayDevPctP4 = Math.round(Math.max(
-          (input.goalKcal || 0) > 0 ? Math.abs(totals.kcal - (input.goalKcal || 0)) / (input.goalKcal || 1) : 0,
+          // §8.130: вердикт — против ВВЕДЁННЫХ ккал (сборка на противоречивом входе идёт от
+          // эталона макросов, но расхождение ккал-оси — свойство входа и не должно исчезать).
+          _kcalEntered > 0 ? Math.abs(totals.kcal - _kcalEntered) / _kcalEntered : 0,
           _dPxUnder, _dFx, _dCx,
         ) * 1000) / 10;
         // §8.114b: нота «Не сошлось» пишется ДО последней мили. Если ремонт всё-таки свёл
@@ -20490,7 +20521,12 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
               const ok = _pOf128(don.d) >= 25
                 && _solidOf128(sink) <= (_cap128.get(sink) || 700) + 1e-9
                 && _buck128(sinkCls) <= buckClsB
-                && _buckAll128() <= buckAllB;
+                && _buckAll128() <= buckAllB
+                // §8.130b: обмен не выводит день за канон. Замер: на двух днях полосы
+                // (w75 4 пр / w120 5 пр) обмен «лечил» перекус, а Ж/У дня уезжали на
+                // 3.02 / 3.04 % — канон владельца важнее ещё одного вылеченного приёма.
+                // Если день уже вне канона, обмен не имеет права ухудшать его.
+                && _dev128() <= Math.max(0.03, devB + 1e-9);
               if (ok) {
                 applied++; done = true; break;
               }
@@ -20522,6 +20558,45 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
     }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
     mergeDuplicateItems(meals);
+    // §8.130c: финальный канон-страж. Всё, что двигает граммы (§8.111/§8.114b/§8.122/
+    // §8.127/§8.128), уже отработало; если день после них встал на 3.0x % (замер полосы
+    // 1152 дня: два дня — Ж 3.02 % и У 3.04 %), даём однограммовому доводчику последний
+    // шанс — с целью чуть внутри канона, чтобы шаг не перескочил его обратно. Ход стоит
+    // только на днях, которые УЖЕ вне канона: сошедшийся день не двигается ни на грамм.
+    {
+      const _g130 = {
+        kcal: Math.round(4 * (Number(input.goalProteinG) || 0) + 9 * (Number(input.goalFatG) || 0)
+          + 4 * (Number(input.goalCarbsG) || 0)) || (Number(input.goalKcal) || 0),
+        p: Number(input.goalProteinG) || 0,
+        f: Number(input.goalFatG) || 0,
+        c: Number(input.goalCarbsG) || 0,
+      };
+      const _rel130 = (v: number, g: number): number => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
+      const _dev130 = (): number => {
+        const t = { kcal: 0, p: 0, f: 0, c: 0 } as any;
+        for (const m of meals as any[]) for (const it of ((m.items || []) as any[])) {
+          t.kcal += Number(it.kcal) || 0; t.p += Number(it.p) || 0;
+          t.f += Number(it.f) || 0; t.c += Number(it.c) || 0;
+        }
+        return Math.max(_rel130(t.kcal, _g130.kcal), _rel130(t.p, _g130.p),
+          _rel130(t.f, _g130.f), _rel130(t.c, _g130.c));
+      };
+      const _tok130 = __manualDay ? 2 : PLANNER_CONVERGENCE_PCT;
+      const _devB130 = _dev130();
+      if (_devB130 > _tok130 + 1e-9) {
+        const r130 = microTuneDay(meals as any[], _g130 as any, {
+          tolPct: _tok130 - 0.1, weightKg: input.weightKg, budget: input.budget,
+          fiberCapG: input.fiberCapG, maxRounds: 24,
+          maxNaMg: input.isTrainingDay
+            ? Math.max(3000, Math.round(3000 + (Number(input.weightKg) || 0) * 5))
+            : 2300,
+        });
+        if (r130.applied) {
+          recalcMealTotals(meals as any[]);
+          recalcDayTotals(meals as any[], totals);
+        }
+      }
+    }
     // §8.107d (витрина не врёт): финальная сверка «Сводки MPS» и клетчатки с ФАКТОМ
     // тарелки. Пересборка раньше шла только в отдельных ветках финальных стадий; если
     // день заканчивался в другой ветке (замер: salt 5, C5-fix), витрина отставала на
@@ -20550,6 +20625,46 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       // Замер: список 26/9/16/10/19 при факте 21/6/9/16/1/10/19 (приём с 1 г белка выпал,
       // и цифры не совпали с тарелками).
       _refreshProteinNote();
+    }
+    // §8.129: ⚠-нота о противоречивом входе печатается ДО последней мили, а она двигает
+    // граммы (§8.111/§8.114b/§8.127) — числа в ноте обязаны быть финальными, иначе витрина
+    // врёт. Замер: вход 3200 ккал / Б190 Ж66 У380 (макросы = 2874 ккал) — нота говорила
+    // «ккал-ось 2929» и «по вашим макросам день в 7.5 %», а ФАКТ тарелки после последней
+    // мили 2885 ккал и 0.4 % по макросам. Пользователь видел провал сборки вместо свойства
+    // своего входа. Здесь строка пересобирается по ФИНАЛУ (эталон — снова 4Б+9Ж+4У из целей,
+    // а не из факта: сравнивать факт с фактом бессмысленно).
+    {
+      const _gp = Number(input.goalProteinG) || 0;
+      const _gf = Number(input.goalFatG) || 0;
+      const _gc = Number(input.goalCarbsG) || 0;
+      const _kIn = _kcalEntered;
+      const _factK = Math.round(Number(totals.kcal));
+      const _atwIn = Math.round(4 * _gp + 9 * _gf + 4 * _gc);
+      const _iProp = notes.findIndex((n) => typeof n === 'string'
+        && /«Не сошлось»/.test(n) && /следствие противоречия/.test(n));
+      if (_iProp >= 0) {
+        const _macroDev = Math.max(
+          _gp > 0 ? Math.abs(Number(totals.p) - _gp) / _gp : 0,
+          _gf > 0 ? Math.abs(Number(totals.f) - _gf) / _gf : 0,
+          _gc > 0 ? Math.abs(Number(totals.c) - _gc) / _gc : 0,
+        ) * 100;
+        const _pctK = _kIn > 0
+          ? Math.round((Math.abs(Number(totals.kcal) - _kIn) / _kIn) * 1000) / 10
+          : 0;
+        notes[_iProp] = `⚠ «Не сошлось»: ккал-ось ${Math.round(Number(totals.kcal))} против введённых ${Math.round(_kIn)} (${_pctK}%) — это следствие противоречия ккал↔макросы выше; по вашим макросам день в ${Math.round(_macroDev * 10) / 10}% (канон ${PLANNER_CONVERGENCE_PCT}%, эталон ${_atwIn} ккал)`;
+      }
+      // ⚖️-нота говорила «План собран под ваши макросы (ккал 2355)» — это ОБЕЩАНИЕ цели
+      // по макросам, а тарелка после последней мили встаёт на 2327 ккал. Пользователь
+      // читает обещанные 2355 и видит 2327: расхождение в каноне, но это всё равно
+      // несовпадение чисел на экране. Называем оба: цель по макросам и факт тарелки.
+      const _iAtw = notes.findIndex((n) => typeof n === 'string' && /^⚖️ Ккал = 4Б \+ 9Ж \+ 4У/.test(n));
+      if (_iAtw >= 0 && _atwIn > 0) {
+        const _pctAtw = Math.round((Math.abs(_factK - _atwIn) / _atwIn) * 1000) / 10;
+        notes[_iAtw] = notes[_iAtw].replace(
+          /План собран под ваши макросы \(ккал \d+\)/,
+          `План собран под ваши макросы: цель по макросам ${_atwIn} ккал, по тарелке ${_factK} ккал (${_pctAtw}%)`,
+        );
+      }
     }
     // §8.123: последняя точка обещаний — витрина пери-окна = факт тарелки.
     reconcilePeriPromises123(meals, notes);
