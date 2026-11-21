@@ -1164,6 +1164,32 @@ export function buildWorkoutInsights(
     }
   }
 
+  // Объём в норме, но вся неделя собрана в одну тренировку: 12 подходов за раз
+  // утомляют сильнее, чем 2×6, и последние подходы теряют в качестве.
+  if (s.totals.sessions >= 4 && (s.weeks || []).length >= 2) {
+    const weeks = summaryWeeksCount(s);
+    const split = (s.muscles || [])
+      .filter(m => m.muscle !== 'other')
+      .filter(m => m.frequencyPerWeek > 0 && m.frequencyPerWeek <= 1)
+      .filter(m => m.setsPerMuscleSession >= 9)
+      .filter(m => {
+        const lm = muscleLandmarksFor(m.muscle, Math.round(m.sets / weeks), level);
+        return !!lm && lm.status !== 'below_mev';
+      })
+      .sort((a, b) => b.setsPerMuscleSession - a.setsPerMuscleSession)[0];
+    if (split) {
+      const weekly = Math.round(split.sets / weeks);
+      const half = Math.max(4, Math.round(split.setsPerMuscleSession / 2));
+      out.push({
+        id: 'split-volume',
+        tone: 'info',
+        icon: '🔁',
+        title: `${split.label}: ${split.setsPerMuscleSession} подходов за тренировку, ${split.frequencyPerWeek}×/нед`,
+        detail: `Недельный объём ${weekly} подходов в норме, но набран за одну тренировку. Две по ${half} дадут тот же объём с меньшей усталостью и лучшей техникой.`,
+      });
+    }
+  }
+
   // Мышца вне коридора несколько недель подряд — это уже не разовая неделя,
   // а тренд, который стоит показать отдельно.
   if ((s.weeks || []).length >= 2) {
@@ -1426,6 +1452,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   'mev-streak': 72,
   'over-mrv': 70,
   'under-mev': 68,
+  'split-volume': 66,
   trend: 60,
   'muscle-trend': 58,
   rir: 52,

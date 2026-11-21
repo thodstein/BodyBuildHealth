@@ -570,6 +570,32 @@ describe('workout-summary: недельная динамика и интенси
     expect(buildWorkoutInsights(s).find(i => i.id === 'mrv-streak')?.title).toContain('2 нед. подряд');
   });
 
+  it('видит объём в норме, но собранный в одну тренировку в неделю', () => {
+    const s = buildWorkoutSummary([
+      // Грудь — 10 подходов за раз, раз в неделю: недельная сумма в норме,
+      // но вся нагрузка в одном занятии.
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 10 }]),
+      mkWorkout('2026-11-04', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 10 }]),
+      mkWorkout('2026-11-11', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]),
+    ]);
+    const ins = buildWorkoutInsights(s);
+    const split = ins.find(i => i.id === 'split-volume');
+    expect(split?.title).toContain('Грудь: 10 подходов за тренировку, 1×/нед');
+    expect(split?.detail).toContain('в норме');
+    expect(split?.detail).toContain('Две по 5');
+  });
+
+  it('не ругает частоту, когда мышца и так тренируется дважды в неделю', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
+      mkWorkout('2026-11-04', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
+      mkWorkout('2026-11-11', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
+    ]);
+    expect(buildWorkoutInsights(s).some(i => i.id === 'split-volume')).toBe(false);
+  });
+
   it('неделя отдыха сбрасывает серию', () => {
     const s = buildWorkoutSummary([
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
