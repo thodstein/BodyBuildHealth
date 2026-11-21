@@ -267,7 +267,12 @@ function unitKey(unit: string): string {
     // «10⁹/л» и «10^9/л» — одна единица счёта клеток, и без сведения к одному
     // ключу `sameLabUnit` считал их разными: ретикулоциты в «10⁹/л» шли
     // пересчитывать в проценты, которых из счёта клеток не получить.
-    .replace(/10([⁰¹²³⁴⁵⁶⁷⁸⁹])/g, (_m, d: string) => '10^' + SUPERSCRIPT_DIGITS[d])
+    //
+    // Проход 197: цифр в показателе бывает несколько («10¹²/л», «10⁶/мкл»).
+    // Одиночная замена превращала «10¹²/л» в «10^1²/л» — единица не разбиралась
+    // вовсе, и эритроциты в 10¹²/л не складывались в пару с ретикулоцитами.
+    .replace(/10([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_m, digits: string) =>
+      '10^' + Array.from(digits, (d) => SUPERSCRIPT_DIGITS[d]).join(''))
     .replace(/[\s.]/g, '');
 
   // Каталитическая активность (МЕ/кат): в международных бланках ферменты
@@ -698,6 +703,37 @@ export function readLabInUnit(code: string, value: number, unit: string, target:
 
   if (unitsIncommensurable(measured.unit, target)) return null;
   return value;
+}
+
+/**
+ * Ретикулоциты в процентах по абсолютному числу и эритроцитам (проход 197).
+ *
+ * Абсолютное число (`RET#`, 10⁹/л) — та же величина, что процент, но пересчёт
+ * требует второго показателя того же бланка: `% = RET# / (RBC × 10)`, где RBC —
+ * в 10¹²/л. Проверка: 1 % при RBC 5.0×10¹²/л — это 50×10⁹/л. Без эритроцитов
+ * пары нет, и число в проценты не превращается: до этого 50 из 10⁹/л попадали в
+ * шкалу процентов как «50 %» (правила 27–28).
+ *
+ * Обе величины читаются тем же `readLabInUnit`, что и остальной импорт, поэтому
+ * «10⁶/мкл» и «×10¹²/L» — одна единица. Единица каждой записи обязана быть
+ * счётом клеток: неразобранное написание не повод считать его каноном.
+ * `null` — не «ноль», а «пересчёта нет»: нет эритроцитов, эритроциты нулевые,
+ * нечисловое значение или результат вне 0–100 % (доля целого больше целого —
+ * уже не результат анализа).
+ */
+export function reticulocytePercentFromAbsolute(
+  absolute: number, absoluteUnit: string, rbc: number, rbcUnit: string,
+): number | null {
+  if (!Number.isFinite(absolute) || !Number.isFinite(rbc)) return null;
+  const absDim = parseConcentrationUnit(unitKey(absoluteUnit));
+  const rbcDim = parseConcentrationUnit(unitKey(rbcUnit));
+  if (absDim?.kind !== 'count' || rbcDim?.kind !== 'count') return null;
+  const abs = readLabInUnit('RETICULOCYTES', absolute, absoluteUnit, '10^9/L');
+  const red = readLabInUnit('RBC', rbc, rbcUnit, '10^12/L');
+  if (abs == null || red == null || !(red > 0)) return null;
+  const percent = abs / (red * 10);
+  if (!Number.isFinite(percent) || percent < 0 || percent > 100) return null;
+  return Number(percent.toFixed(2));
 }
 
 /** Convert any known code to a UCUM_MAP key (returns the code itself if no alias exists) */

@@ -7,7 +7,7 @@ import {
 } from '../../../engines/lab-norms.engine';
 import { LAB_UNIT_CHOICES, labUnitKey, ucumInfo } from '../../../core/constants';
 import { labFieldNumber } from '../../../engines/support-plan';
-import { normalizeLabMeasurement, resolveLabMarker, mapToUcumCode, unitsIncommensurable } from '../../../core/labs-mapping';
+import { normalizeLabMeasurement, resolveLabMarker, mapToUcumCode, unitsIncommensurable, reticulocytePercentFromAbsolute } from '../../../core/labs-mapping';
 import { FULL_PANELS, ruMarker } from './Calc.lab';
 import { MARKER_TO_UCUM } from './Calc.lab-units';
 
@@ -294,53 +294,73 @@ export function countSliceMarkers(slice: LabSlice | null): number {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Запись, которую импорт не смог положить в бланк (проход 196).
+ * Запись, о которой импорт обязан сказать (проходы 196–197).
  *
- * Две причины, и обе раньше были тишиной:
+ * Три причины, и все раньше были тишиной:
  *  - `unit` — у поля есть своя величина (ретикулоциты в %), а запись пришла в
- *    другой (абсолютное 10⁹/л). Без числа эритроцитов пересчёта нет; положить
- *    число «как есть» значило бы выдать 50 ‰ за 50 %;
+ *    другой (абсолютное 10⁹/л), и пересчитать её нечем. Положить число «как
+ *    есть» значило бы выдать 50 ‰ за 50 %;
  *  - `marker` — анализ есть в каталоге, но поля в бланке у него нет. Раньше
- *    такая строка просто исчезала, а «анализы подставлены» всё равно звучало.
+ *    такая строка просто исчезала, а «анализы подставлены» всё равно звучало;
+ *  - `derived` — запись в бланк легла, но числом из другой записи того же бланка
+ *    (ретикулоциты в 10⁹/л и эритроциты: `% = RET# / (RBC × 10)`). Это честный
+ *    пересчёт, а не догадка, — но человек должен знать, что видит не строку из
+ *    бланка, а вычисленное число.
  * Незнакомый код (LOINC и прочий мусор) сюда не попадает: назвать его нечем.
  */
-export interface LabImportSkip {
+export interface LabImportNote {
   /** Код записи, как он лежал в данных. */
   code: string;
   /** Русское имя для человека: подпись поля бланка или имя каталога. */
   label: string;
-  /** Значение, как оно было записано. */
+  /** Значение, как оно было записано (у `derived` — исходное абсолютное число). */
   value: string;
   unit?: string;
-  reason: 'unit' | 'marker';
+  /** У `derived` — что получилось после пересчёта. */
+  computed?: string;
+  reason: 'unit' | 'marker' | 'derived';
 }
 
 /**
- * Одна строка «что не перенесено» для статуса импорта.
+ * Одна строка «что не перенесено / что пересчитано» для статуса импорта.
  *
  * Список не режется молча: первые три названы, остаток — числом. Дубли
  * (одна и та же запись в двух источниках) схлопываются, иначе счёт врал бы.
+ * «Не перенесено» и «пересчитано» — разные фразы: первое значит, что числа в
+ * форме нет, второе — что оно есть, но получено из двух строк бланка.
  */
-export function labImportSkipLine(skips: LabImportSkip[]): string {
-  if (!skips.length) return '';
+export function labImportNoteLine(notes: LabImportNote[]): string {
+  if (!notes.length) return '';
   const seen = new Set<string>();
-  const unique = skips.filter((s) => {
+  const unique = notes.filter((s) => {
     // Одна и та же строка из двух источников (склад и зеркало дневника) —
     // одно и то же значение; разные даты одного маркера — разные строки.
-    const key = `${s.code}|${s.unit ?? ''}|${s.reason}|${s.value}`;
+    const key = `${s.code}|${s.unit ?? ''}|${s.reason}|${s.value}|${s.computed ?? ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  const shown = unique.slice(0, 3).map((s) => {
-    const why = s.reason === 'unit' ? 'единица другой величины' : 'нет поля в бланке';
-    return `${s.label} ${s.value}${s.unit ? ` ${s.unit}` : ''} — ${why}`;
-  });
-  const rest = unique.length > shown.length ? `, и ещё ${unique.length - shown.length}` : '';
-  return `не перенесено ${unique.length}: ${shown.join('; ')}${rest}`;
+  const parts: string[] = [];
+  const skipped = unique.filter((s) => s.reason !== 'derived');
+  if (skipped.length) {
+    const shown = skipped.slice(0, 3).map((s) => {
+      const why = s.reason === 'unit' ? 'единица другой величины' : 'нет поля в бланке';
+      return `${s.label} ${s.value}${s.unit ? ` ${s.unit}` : ''} — ${why}`;
+    });
+    const rest = skipped.length > shown.length ? `, и ещё ${skipped.length - shown.length}` : '';
+    parts.push(`не перенесено ${skipped.length}: ${shown.join('; ')}${rest}`);
+  }
+  const derived = unique.filter((s) => s.reason === 'derived');
+  if (derived.length) {
+    const shown = derived.slice(0, 3).map((s) =>
+      `${s.label} ${s.value}${s.unit ? ` ${s.unit}` : ''} — пересчитано по эритроцитам (${s.computed} %)`);
+    const rest = derived.length > shown.length ? `, и ещё ${derived.length - shown.length}` : '';
+    parts.push(`пересчитано ${derived.length}: ${shown.join('; ')}${rest}`);
+  }
+  return parts.join(' · ');
 }
 
-export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlice | null {
+export function labPointsToSlice(input: any, notes?: LabImportNote[]): LabSlice | null {
   if (!input) return null;
   const slice: LabSlice = {
     date: '', panelSex: {}, panelBiochem: {}, panelHematology: {},
@@ -350,16 +370,19 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
   };
   let count = 0;
 
-  // Проход 111: код → имя маркера бланка, панель — по имени маркера. Код,
+  // ── Проход 111: код → имя маркера бланка, панель — по имени маркера. Код,
   // который не наш, просто пропускается (как и раньше), но пустое значение
   // больше не считается «импортированным»: раньше счётчик врал, и бланк с
   // нераспознанными кодами возвращался как заполненный.
   //
-  // Проход 196: пропуск, который человеку важно знать, называется в `skipped`:
+  // Проход 196: пропуск, который человеку важно знать, называется в `notes`:
   // анализ каталога без поля в бланке и запись в величине, которую поле не
   // читает. Панель бланка — не место для догадки: сменить единицу в записи
   // нельзя, поэтому такая строка не входит в бланк вовсе.
-  const put = (rawCode: string, rawVal: any, unit?: string, valueStr?: string): boolean => {
+  const put = (
+    rawCode: string, rawVal: any, unit?: string, valueStr?: string,
+    rbc?: { value: any; unit?: string },
+  ): boolean => {
     const marker = sliceMarkerFor(rawCode);
     const val = rawVal != null && rawVal !== '' ? String(rawVal) : '';
     const rawText = val || (valueStr != null ? String(valueStr) : '');
@@ -367,7 +390,7 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
       if (!rawText) return false;
       const info = ucumInfo(mapToUcumCode(String(rawCode || '').trim()));
       if (info) {
-        skipped?.push({
+        notes?.push({
           code: rawCode, label: info.name || String(rawCode),
           value: rawText, unit, reason: 'marker',
         });
@@ -381,6 +404,23 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
     if (!panel) return false;
     let text = rawText;
     if (!text) return false;
+    // Проход 197: абсолютные ретикулоциты пересчитываются в проценты только по
+    // эритроцитам того же бланка (`% = RET# / (RBC × 10)`). Это единственный
+    // случай, когда поле получает число из двух записей; строка отчёта говорит
+    // об этом прямо, а без RBC ниже срабатывает отказ `unit`.
+    if (marker === 'Reticulocytes' && unit && rbc) {
+      const abs = Number(text.replace(',', '.'));
+      const red = Number(String(rbc.value ?? '').replace(',', '.'));
+      const pct = reticulocytePercentFromAbsolute(abs, unit, red, rbc.unit || '');
+      if (pct !== null) {
+        notes?.push({
+          code: rawCode, label: ruMarker(marker), value: text, unit,
+          computed: String(pct), reason: 'derived',
+        });
+        text = String(pct);
+        unit = '%';
+      }
+    }
     // Проход 112: значение приводится к единице приложения тем же конвертером,
     // что и в остальном импорте. Без этого гемоглобин 15 г/дл из FHIR или
     // дневника ложился как «15» в поле, где норма 130–170 г/л, и нормальный
@@ -396,7 +436,7 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
     // Поэтому проверяем только «другую величину», которую выбор не знает:
     // «‰» у ретикулоцитов выбор знает, а «10⁹/л» — нет.
     if (choices && unit && !choices.includes(labUnitKey(unit)) && unitsIncommensurable(unit, choices[0])) {
-      skipped?.push({
+      notes?.push({
         code: rawCode, label: ruMarker(marker),
         value: text, unit, reason: 'unit',
       });
@@ -413,7 +453,7 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
       // число из одного измерения нельзя подписать единицей другого.
       const appUnit = ucumInfo(ucum)?.prefUnit ?? '';
       if (appUnit && unitsIncommensurable(unit, appUnit)) {
-        skipped?.push({
+        notes?.push({
           code: rawCode, label: ruMarker(marker),
           value: text, unit, reason: 'unit',
         });
@@ -430,22 +470,39 @@ export function labPointsToSlice(input: any, skipped?: LabImportSkip[]): LabSlic
     // Проход 151: у маркера побеждает самая свежая запись (`latestLabPoints`), а
     // дата среза — самая поздняя из прочитанных. Раньше дата бралась у первой
     // строки массива, поэтому бланк со смешанными датами подписывался старой.
-    for (const lp of latestLabPoints(input)) {
+    const rows = latestLabPoints(input);
+    // Проход 197: эритроциты ищутся по дате бланка. Абсолютные ретикулоциты
+    // одного бланка с эритроцитами другого — не пара: пересчёт по чужой дате
+    // такой же вымысел, как число без RBC вовсе.
+    const rbcByDate = new Map<string, { value: any; unit?: string }>();
+    for (const lp of rows) {
+      const code = String(lp.code || lp.name || lp.marker || '').trim();
+      if (!code || sliceMarkerFor(code) !== 'RBC') continue;
+      const value = lp.value != null && lp.value !== '' ? lp.value : lp.valueStr;
+      if (value == null || value === '') continue;
+      rbcByDate.set(String(lp.date || ''), { value, unit: lp.unit });
+    }
+    for (const lp of rows) {
       const code = String(lp.code || lp.name || lp.marker || '').trim();
       if (!code) continue;
-      if (!put(code, lp.value, lp.unit, lp.valueStr)) continue;
-      count++;
       const date = String(lp.date || '');
+      if (!put(code, lp.value, lp.unit, lp.valueStr, rbcByDate.get(date))) continue;
+      count++;
       if (date > slice.date) slice.date = date;
     }
   }
   // ── Case 2: LabDiaryEntry {markers: [{code, value, unit, ...}]} ──
   else if (input.markers && Array.isArray(input.markers)) {
     if (input.date) slice.date = String(input.date);
+    // Проход 197: в записи дневника все маркеры одной даты — эритроциты ищутся
+    // среди её же строк.
+    const rbcRow = input.markers.find((m: any) =>
+      sliceMarkerFor(String(m.code || m.name || '').trim()) === 'RBC' && m.value != null && m.value !== '');
+    const rbc = rbcRow ? { value: rbcRow.value, unit: rbcRow.unit } : undefined;
     for (const m of input.markers) {
       const code = String(m.code || m.name || '').trim();
       if (!code) continue;
-      if (put(code, m.value, m.unit)) count++;
+      if (put(code, m.value, m.unit, undefined, rbc)) count++;
     }
   }
   // ── Case 3: уже LabSlice {panelBiochem: {...}, ...} ──

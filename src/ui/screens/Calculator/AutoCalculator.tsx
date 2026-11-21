@@ -10,8 +10,8 @@ import { Card, PopupPEDInput, PopupNumber } from './Calc.parts';
 import { TzRiskCard } from './TzRiskCard';
 import { RiskTimelineChart } from '../SupportScreen_parts/RiskTimelineChart';
 import { MechanismView } from './Calc.result';
-import { deriveStateFromLabs, labPointsToSlice, countSliceMarkers, labImportSkipLine } from './Calc.labs-derived';
-import type { LabImportSkip } from './Calc.labs-derived';
+import { deriveStateFromLabs, labPointsToSlice, countSliceMarkers, labImportNoteLine } from './Calc.labs-derived';
+import type { LabImportNote } from './Calc.labs-derived';
 import { db } from '../../../core/db';
 import { CalcMapperCard } from './Calc.mapper';
 import { deriveCourseLinkPatch } from './calc-course-link';
@@ -228,14 +228,16 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       // Проход 196: записи, которые в бланк не легли, называются в статусе. Раньше
       // ретикулоциты 50 10⁹/л могли занять поле процентов, а анализ без поля
       // пропадал молча — при этом «анализы подставлены» звучало как успех.
-      let found: { date: string; slice: LabSlice; source: 'Лаборатории' | 'дневника'; skipped: LabImportSkip[] } | null = null;
+      // Проход 197: тот же отчёт говорит и о пересчёте (ретикулоциты по
+      // эритроцитам), чтобы вычисленное число не выглядело строкой бланка.
+      let found: { date: string; slice: LabSlice; source: 'Лаборатории' | 'дневника'; notes: LabImportNote[] } | null = null;
       // Проход 160: читался ли склад и сколько в нём неархивных записей. Зеркало
       // дневника — производная склада (пишется из него), поэтому оно не спорит со
       // складом, в котором есть записи.
       let storeRows: any[] | null = null;
       // Проход 196: всё, что не легло в бланк, собирается здесь — и если не легло
       // ничего, статус всё равно скажет, что анализы есть и почему они не в форме.
-      const allSkips: LabImportSkip[] = [];
+      const allNotes: LabImportNote[] = [];
 
       // 1. Склад анализов (IndexedDB). Ошибка чтения — не повод молчать: ниже
       //    остаётся зеркало дневника.
@@ -245,10 +247,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         const rows = (await db.getAll<any>('labs_log'))
           .filter((l: any) => l && !l.archived && (l.patientId === pid || !l.patientId));
         storeRows = rows;
-        const skipped: LabImportSkip[] = [];
-        const slice = rows.length > 0 ? labPointsToSlice(rows, skipped) : null;
-        if (slice) found = { date: String(slice.date || ''), slice, source: 'Лаборатории', skipped };
-        else allSkips.push(...skipped);
+        const notes: LabImportNote[] = [];
+        const slice = rows.length > 0 ? labPointsToSlice(rows, notes) : null;
+        if (slice) found = { date: String(slice.date || ''), slice, source: 'Лаборатории', notes };
+        else allNotes.push(...notes);
       } catch { /* IndexedDB недоступен — пробуем зеркало */ }
 
       // 2. Зеркало дневника (localStorage). Дневник отсортирован по дате, но
@@ -268,10 +270,10 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
             }
             const lastDate = String(last?.date || '');
             if (last && lastDate && (!found || lastDate > found.date)) {
-              const skipped: LabImportSkip[] = [];
-              const slice = labPointsToSlice(last.markers, skipped);
-              if (slice) found = { date: lastDate, slice: { ...slice, date: lastDate }, source: 'дневника', skipped };
-              else allSkips.push(...skipped);
+              const notes: LabImportNote[] = [];
+              const slice = labPointsToSlice(last.markers, notes);
+              if (slice) found = { date: lastDate, slice: { ...slice, date: lastDate }, source: 'дневника', notes };
+              else allNotes.push(...notes);
             }
           }
         }
@@ -282,7 +284,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       // ни одна не легла в бланк, человек узнаёт и это (иначе «не подставилось»
       // неотличимо от «анализов нет»).
       if (!found || !found.date) {
-        const line = labImportSkipLine(allSkips);
+        const line = labImportNoteLine(allNotes);
         if (line) {
           setFillStatus(`📥 Анализы есть, но не перенесены · ${line}`);
           setTimeout(() => setFillStatus(''), 6000);
@@ -297,9 +299,9 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       const shown = found.date.split('-').reverse().join('.');
       // Проход 196: «не перенесено» — рядом с датой, а не вместо неё. Строка живёт
       // дольше, потому что её надо прочитать (обычный статус — 2.5 с).
-      const skipLine = labImportSkipLine(found.skipped);
-      setFillStatus(`📥 Анализы от ${shown} подставлены из ${found.source}${skipLine ? ` · ${skipLine}` : ''}`);
-      setTimeout(() => setFillStatus(''), skipLine ? 6000 : 2500);
+      const noteLine = labImportNoteLine(found.notes);
+      setFillStatus(`📥 Анализы от ${shown} подставлены из ${found.source}${noteLine ? ` · ${noteLine}` : ''}`);
+      setTimeout(() => setFillStatus(''), noteLine ? 6000 : 2500);
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -416,12 +418,12 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
         return;
       }
 
-      const skipped: LabImportSkip[] = [];
-      const slice = labPointsToSlice(src, skipped);
-      const skipLine = labImportSkipLine(skipped);
+      const notes: LabImportNote[] = [];
+      const slice = labPointsToSlice(src, notes);
+      const noteLine = labImportNoteLine(notes);
       if (!slice) {
-        setFillStatus(skipLine ? `❌ Ни один анализ не перенесён · ${skipLine}` : '❌ Не удалось распознать анализы');
-        setTimeout(() => setFillStatus(''), skipLine ? 6000 : 3000);
+        setFillStatus(noteLine ? `❌ Ни один анализ не перенесён · ${noteLine}` : '❌ Не удалось распознать анализы');
+        setTimeout(() => setFillStatus(''), noteLine ? 6000 : 3000);
         return;
       }
       update('labs', { ...state.labs, fullPanel: slice });
@@ -432,8 +434,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       const when = slice.date ? ` · бланк от ${slice.date.split('-').reverse().join('.')}` : '';
       // Проход 196: неперенесённые записи названы здесь же — «загружено» без них
       // звучало как «всё на месте».
-      setFillStatus(`✅ Анализы загружены (${ruCount(markers, RU_MARKERS)}${when})${skipLine ? ` · ${skipLine}` : ''}`);
-      setTimeout(() => setFillStatus(''), skipLine ? 6000 : 2000);
+      setFillStatus(`✅ Анализы загружены (${ruCount(markers, RU_MARKERS)}${when})${noteLine ? ` · ${noteLine}` : ''}`);
+      setTimeout(() => setFillStatus(''), noteLine ? 6000 : 2000);
     } catch {
       setFillStatus('❌ Ошибка загрузки анализов');
       setTimeout(() => setFillStatus(''), 3000);

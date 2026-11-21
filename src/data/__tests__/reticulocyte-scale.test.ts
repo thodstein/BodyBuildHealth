@@ -21,7 +21,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ucumInfo } from '../../core/constants';
-import { readLabInUnit, unitsIncommensurable } from '../../core/labs-mapping';
+import { readLabInUnit, unitsIncommensurable, reticulocytePercentFromAbsolute } from '../../core/labs-mapping';
 import { LAB_TIERS, deriveTier, getLabEntry, tierMarkerKey } from '../lab-tier-ranges';
 import { computeTierAdjustments } from '../lab-tier-recommendations';
 import { RETIC_BAND, getLabNorm } from '../../engines/lab-norms.engine';
@@ -278,5 +278,32 @@ describe('проход 195: ретикулоциты — строка разбо
     const absolute = computeMarkerDeviations([{ code: 'RETICULOCYTES', value: 50, unit: '10⁹/л' }], 'male');
     expect(absolute.markerDeviations).toEqual([]);
     expect(absolute.unknown).toEqual([{ code: 'RETICULOCYTES', value: 50, reason: 'unit' }]);
+  });
+});
+
+/**
+ * Проход 197: абсолютное число в проценты переводится только парой из одного
+ * бланка. Формула стандартная (`% = RET# / (RBC × 10)`), но живёт в одном месте
+ * (`reticulocytePercentFromAbsolute`), чтобы импорт и гард считали одинаково.
+ * Нечем считать — `null`, а не «ноль» и не число «как есть».
+ */
+describe('проход 197: ретикулоциты — абсолютное число и эритроциты одного бланка', () => {
+  it('формула: 50 ×10⁹/л при RBC 5.0 ×10¹²/л — 1 %', () => {
+    expect(reticulocytePercentFromAbsolute(50, '10⁹/л', 5.0, '10¹²/л')).toBe(1);
+    expect(reticulocytePercentFromAbsolute(60, '10^9/L', 5.0, '10^12/L')).toBe(1.2);
+  });
+
+  it('та же величина в другом написании единицы — то же число', () => {
+    // 10⁶/мкл — это 10¹²/л; запись не должна зависеть от написания.
+    expect(reticulocytePercentFromAbsolute(50, '10⁹/л', 5, '10⁶/мкл')).toBe(1);
+  });
+
+  it('нет пары или пара невозможна — пересчёта нет', () => {
+    expect(reticulocytePercentFromAbsolute(50, '10⁹/л', 0, '10¹²/л')).toBeNull();
+    expect(reticulocytePercentFromAbsolute(50, '10⁹/л', 5, '')).toBeNull();
+    expect(reticulocytePercentFromAbsolute(50, '%', 5, '10¹²/л')).toBeNull();
+    expect(reticulocytePercentFromAbsolute(Number.NaN, '10⁹/л', 5, '10¹²/л')).toBeNull();
+    // Доля целого больше целого — уже не результат анализа.
+    expect(reticulocytePercentFromAbsolute(6000, '10⁹/л', 5, '10¹²/л')).toBeNull();
   });
 });

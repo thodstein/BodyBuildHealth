@@ -9,8 +9,8 @@
  * хотя она была в данных.
  */
 import { describe, it, expect } from 'vitest';
-import { labPointsToSlice, labImportSkipLine, sliceMarkerFor } from '../Calc.labs-derived';
-import type { LabImportSkip } from '../Calc.labs-derived';
+import { labPointsToSlice, labImportNoteLine, sliceMarkerFor } from '../Calc.labs-derived';
+import type { LabImportNote } from '../Calc.labs-derived';
 import { FULL_PANELS, labUnitHint } from '../Calc.lab';
 import { LAB_UNIT_CHOICES, UCUM_MAP, readLabValue } from '../../../../core/constants';
 import { MARKER_TO_UCUM, markerReadUnit } from '../Calc.lab-units';
@@ -194,7 +194,7 @@ describe('проход 196: ретикулоциты — проценты и п�
   });
 
   it('абсолютное 10⁹/л не становится процентами и называется в отчёте', () => {
-    const skipped: LabImportSkip[] = [];
+    const skipped: LabImportNote[] = [];
     const s = labPointsToSlice([
       { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л', date: '2026-11-01' },
     ], skipped);
@@ -202,7 +202,7 @@ describe('проход 196: ретикулоциты — проценты и п�
     expect(skipped).toEqual([
       { code: 'RETICULOCYTES', label: 'Ретикулоциты', value: '50', unit: '10⁹/л', reason: 'unit' },
     ]);
-    expect(labImportSkipLine(skipped)).toBe(
+    expect(labImportNoteLine(skipped)).toBe(
       'не перенесено 1: Ретикулоциты 50 10⁹/л — единица другой величины',
     );
   });
@@ -215,7 +215,7 @@ describe('проход 196: ретикулоциты — проценты и п�
   });
 
   it('анализ каталога без поля в бланке больше не исчезает молча', () => {
-    const skipped: LabImportSkip[] = [];
+    const skipped: LabImportNote[] = [];
     const s = labPointsToSlice([
       { code: 'MCV', value: 88, unit: 'fL', date: '2026-11-01' },
     ], skipped);
@@ -223,14 +223,103 @@ describe('проход 196: ретикулоциты — проценты и п�
     expect(skipped).toHaveLength(1);
     expect(skipped[0].reason).toBe('marker');
     expect(skipped[0].label).toBe('Средний объём эритроцита');
-    expect(labImportSkipLine(skipped)).toMatch(/нет поля в бланке/);
+    expect(labImportNoteLine(skipped)).toMatch(/нет поля в бланке/);
   });
 
   it('одна запись из двух источников не задваивает счёт', () => {
     const row = { code: 'MCV', value: 88, unit: 'fL' };
-    const skipped: LabImportSkip[] = [];
+    const skipped: LabImportNote[] = [];
     labPointsToSlice([row], skipped);
     labPointsToSlice([row], skipped);
-    expect(labImportSkipLine(skipped)).toMatch(/не перенесено 1:/);
+    expect(labImportNoteLine(skipped)).toMatch(/не перенесено 1:/);
+  });
+});
+
+/**
+ * Проход 197: абсолютные ретикулоциты.
+ *
+ * `RET#` в 10⁹/л — та же величина, что процент, но перевести её можно только по
+ * числу эритроцитов того же бланка: `% = RET# / (RBC × 10)`. В 196-м такая
+ * запись честно отбрасывалась; теперь она пересчитывается, но не молча — статус
+ * говорит «пересчитано по эритроцитам». Эритроциты с другой даты парой не
+ * считаются: пересчёт по чужому бланку такой же вымысел, как число без RBC.
+ */
+describe('проход 197: абсолютные ретикулоциты — только по эритроцитам того же бланка', () => {
+  it('50 10⁹/л при RBC 5.0 10¹²/л — это 1 %, и отчёт это называет', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice([
+      { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л', date: '2026-11-01' },
+      { code: 'RBC', value: 5.0, unit: '10¹²/л', date: '2026-11-01' },
+    ], notes)!;
+    expect(s.panelHematology!.Reticulocytes).toBe('1');
+    expect(s.units!.panelHematology.Reticulocytes).toBe('%');
+    expect(s.panelHematology!.RBC).toBe('5');
+    expect(notes).toEqual([
+      {
+        code: 'RETICULOCYTES', label: 'Ретикулоциты', value: '50', unit: '10⁹/л',
+        computed: '1', reason: 'derived',
+      },
+    ]);
+    expect(labImportNoteLine(notes)).toBe(
+      'пересчитано 1: Ретикулоциты 50 10⁹/л — пересчитано по эритроцитам (1 %)',
+    );
+  });
+
+  it('латинское 10^9/L читается так же, как надстрочное', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice([
+      { code: 'RET', value: 60, unit: '10^9/L', date: '2026-11-01' },
+      { code: 'RBC', value: 5.0, unit: '10^12/L', date: '2026-11-01' },
+    ], notes)!;
+    expect(s.panelHematology!.Reticulocytes).toBe('1.2');
+    expect(notes[0].computed).toBe('1.2');
+  });
+
+  it('дневник: пара ищется среди маркеров той же записи', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice({
+      date: '2026-09-20',
+      markers: [
+        { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л' },
+        { code: 'RBC', value: 5.0, unit: '10¹²/л' },
+      ],
+    }, notes)!;
+    expect(s.panelHematology!.Reticulocytes).toBe('1');
+    expect(notes[0].reason).toBe('derived');
+  });
+
+  it('без эритроцитов число не превращается в проценты', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice([
+      { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л', date: '2026-11-01' },
+    ], notes);
+    expect(s).toBeNull();
+    expect(notes).toEqual([
+      { code: 'RETICULOCYTES', label: 'Ретикулоциты', value: '50', unit: '10⁹/л', reason: 'unit' },
+    ]);
+  });
+
+  it('эритроциты другой даты — не пара', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice([
+      { code: 'RETICULOCYTES', value: 50, unit: '10⁹/л', date: '2026-11-01' },
+      { code: 'RBC', value: 5.0, unit: '10¹²/л', date: '2026-10-01' },
+    ], notes)!;
+    expect(s.panelHematology!.Reticulocytes).toBeUndefined();
+    expect(notes.map((n) => n.reason)).toEqual(['unit']);
+  });
+
+  it('результат вне 0–100 % — не результат анализа: формулы из воздуха нет', () => {
+    const notes: LabImportNote[] = [];
+    const s = labPointsToSlice([
+      { code: 'RETICULOCYTES', value: 6000, unit: '10⁹/л', date: '2026-11-01' },
+      { code: 'RBC', value: 5.0, unit: '10¹²/л', date: '2026-11-01' },
+    ], notes)!;
+    // Эритроциты в бланк легли, ретикулоциты — нет: 120 % не бывает.
+    expect(s.panelHematology!.RBC).toBe('5');
+    expect(s.panelHematology!.Reticulocytes).toBeUndefined();
+    expect(notes).toEqual([
+      { code: 'RETICULOCYTES', label: 'Ретикулоциты', value: '6000', unit: '10⁹/л', reason: 'unit' },
+    ]);
   });
 });
