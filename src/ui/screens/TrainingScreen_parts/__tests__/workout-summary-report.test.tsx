@@ -347,6 +347,18 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('п.п.');
   });
 
+  it('показывает распределение подходов по зонам повторений', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-17')]} blocks={['totals']} showSelector={false} />,
+    );
+    // Присед 100×5 и два подхода жима 80×8: 1 подход в силовой зоне, 2 — в гипертрофии.
+    expect(html).toContain('Зоны повторений');
+    expect(html).toContain('1–5');
+    expect(html).toContain('6–12');
+    expect(html).toContain('<b>1</b> подх.');
+    expect(html).toContain('<b>2</b> подх.');
+  });
+
   it('в сравнении видны и движения, а не только мышцы', () => {
     const base = mkWorkout('2026-11-03');
     const prevOnlyBench = { ...base, exercises: base.exercises.slice(0, 1) };

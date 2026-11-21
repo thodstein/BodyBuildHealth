@@ -373,6 +373,8 @@ export interface WorkoutSummaryTotals {
   nearFailureSets: number;
   /** Подходы в отказ (RIR 0). */
   failureSets: number;
+  /** Подходы по зонам повторений: сила 1–5, гипертрофия 6–12, выносливость 13+. */
+  repZones: { strength: number; hypertrophy: number; endurance: number };
   /** Средняя нагрузка в % от лучшего e1RM — насколько тяжело шла работа. */
   avgIntensityPct: number | null;
   prs: number;
@@ -512,6 +514,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   // Сколько подходов реально было близко к отказу: объём без усилия не растит.
   let nearFailSets = 0;
   let failSets = 0;
+  // Зоны повторений: сила ~1–5, гипертрофия ~6–12, выносливость 13+.
+  // Перекос в одну зону виден сразу, без чтения всех подходов.
+  let zoneStrength = 0;
+  let zoneHypertrophy = 0;
+  let zoneEndurance = 0;
   let totalRpe = 0;
   let totalRpeN = 0;
   let maxLoad = 0;
@@ -561,6 +568,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exSets += 1;
         exReps += reps;
         exTonnage += weight * reps;
+        if (reps > 0) {
+          if (reps <= 5) zoneStrength += 1;
+          else if (reps <= 12) zoneHypertrophy += 1;
+          else zoneEndurance += 1;
+        }
         if (weight <= 0) exWl += 1;
         exBestWeight = Math.max(exBestWeight, weight);
         exBestReps = Math.max(exBestReps, reps);
@@ -856,6 +868,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       rirLoggedSets: totalRirN,
       nearFailureSets: nearFailSets,
       failureSets: failSets,
+      repZones: { strength: zoneStrength, hypertrophy: zoneHypertrophy, endurance: zoneEndurance },
       avgIntensityPct: (() => {
         let weighted = 0;
         let base = 0;
@@ -2165,6 +2178,17 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
           : `    ${e.name}: новое · ${e.e1rm.current} кг`,
       ));
     }
+  }
+
+  const zones = s.totals.repZones;
+  const zoneTotal = (zones?.strength || 0) + (zones?.hypertrophy || 0) + (zones?.endurance || 0);
+  if (zoneTotal > 0) {
+    const zonePct = (n: number) => Math.round((n / zoneTotal) * 100);
+    lines.push(
+      `Зоны повторов: 1–5 — ${zones.strength} подх. (${zonePct(zones.strength)}%), `
+      + `6–12 — ${zones.hypertrophy} (${zonePct(zones.hypertrophy)}%), `
+      + `13+ — ${zones.endurance} (${zonePct(zones.endurance)}%)`,
+    );
   }
 
   if (s.totals.weightlessSets > 0) {

@@ -58,6 +58,18 @@ describe('workout-summary: сводка по одной тренировке', (
     expect(s.totals.uniqueExercises).toBe(2);
   });
 
+  it('раскладывает подходы по зонам повторений', () => {
+    const zone = mkWorkout('2026-11-12', [
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 3, sets: 2 },
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 15, sets: 1 },
+    ]);
+    const s = buildWorkoutSummary([zone]);
+    expect(s.totals.repZones).toEqual({ strength: 2, hypertrophy: 3, endurance: 1 });
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('Зоны повторов: 1–5 — 2 подх. (33%), 6–12 — 3 (50%), 13+ — 1 (17%)');
+  });
+
   it('группирует по мышцам и упражнениям', () => {
     const s = buildWorkoutSummary([w]);
     const muscles = s.muscles.map(m => m.muscle);

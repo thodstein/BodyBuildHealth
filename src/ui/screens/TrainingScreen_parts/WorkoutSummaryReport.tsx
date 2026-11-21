@@ -324,6 +324,37 @@ export const WorkoutSummaryBody: React.FC<{
             <Tile label="Лучший e1RM" value={bestE1RM > 0 ? `${fmtInt(bestE1RM)} кг` : '—'} sub={t.avgRIR != null ? `ср. RIR ${t.avgRIR}` : undefined} color="#f472b6" />
             <Tile label="Интенсивность" value={t.avgIntensityPct != null ? `${t.avgIntensityPct}%` : '—'} sub="средний вес от e1RM" color="#fb923c" />
           </div>
+          {(() => {
+            // Распределение подходов по зонам повторений: 12 подходов бывают
+            // и 3×4, и 1×12 — для силы и для гипертрофии это разная работа.
+            const z = t.repZones;
+            const total = (z?.strength || 0) + (z?.hypertrophy || 0) + (z?.endurance || 0);
+            if (!z || total <= 0) return null;
+            const rows = [
+              { key: 'strength', label: '1–5', hint: 'сила', sets: z.strength, color: '#f472b6' },
+              { key: 'hypertrophy', label: '6–12', hint: 'гипертрофия', sets: z.hypertrophy, color: '#60a5fa' },
+              { key: 'endurance', label: '13+', hint: 'выносливость', sets: z.endurance, color: '#a78bfa' },
+            ];
+            const pct = (n: number) => Math.round((n / total) * 100);
+            return (
+              <div style={{ marginTop: 8 }} title="Зоны повторений: 1–5 — сила, 6–12 — гипертрофия, 13+ — выносливость">
+                <div style={{ display: 'flex', height: 8, borderRadius: 6, overflow: 'hidden', marginBottom: 4, background: 'rgba(255,255,255,0.05)' }}>
+                  {rows.filter(r => r.sets > 0).map(r => (
+                    <div key={r.key} title={`${r.label}: ${r.sets} подх. (${pct(r.sets)}%)`} style={{ width: `${Math.max(2, pct(r.sets))}%`, background: r.color }} />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 9, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                  {rows.map(r => (
+                    <span key={r.key} style={{ opacity: r.sets > 0 ? 1 : 0.45 }}>
+                      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 2, background: r.color, marginRight: 4 }} />
+                      {r.label} <b>{r.sets}</b> подх. <span style={{ opacity: 0.7 }}>{pct(r.sets)}%</span>
+                      <span style={{ opacity: 0.5 }}> · {r.hint}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {(topMuscle || t.prs > 0 || t.weightlessSets > 0 || t.rirLoggedSets > 0) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
               {topMuscle && (
