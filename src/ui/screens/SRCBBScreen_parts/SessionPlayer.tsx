@@ -41,7 +41,7 @@ import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-read
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
 import { WorkoutSummaryReport, PLAYER_REPORT_BLOCKS, readReportBlocks } from '../TrainingScreen_parts/WorkoutSummaryReport';
-import { sessionToWorkoutLog, buildWorkoutSummary, buildWorkoutReportText, buildSetDetails, compareWorkoutSummaries, comparePlanVsActual, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput, type ReportBlockId } from '../../../engines/workout-summary.engine';
+import { sessionToWorkoutLog, buildWorkoutSummary, buildWorkoutReportText, buildSetDetails, buildNextSessionPlan, compareWorkoutSummaries, comparePlanVsActual, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput, type ReportBlockId } from '../../../engines/workout-summary.engine';
 import { getVolumeLandmarks, checkVolumeStatus, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
@@ -1113,29 +1113,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     }).filter(Boolean) as { name: string; currentBest: number; prevBest: number; delta: number; sessions: number; trend: string }[];
   }, [done, day]);
 
-  // 2.1/2.2: двойная прогрессия + рекомендация делода по завершённой сессии
-  const nextSuggestions = useMemo(() => {
-    if (!done || !day) return [];
-    return day.exercises.map((ex, ei) => {
-      const sesEx = done.exercises[ei];
-      if (!sesEx || sesEx.sets.length === 0) return null;
-      const target = ex.targetSets[0];
-      if (!target) return null;
-      const sets = sesEx.sets;
-      const avgReps = sets.reduce((s: number, x: any) => s + x.reps, 0) / sets.length;
-      const maxRPE = Math.max(0, ...sets.map((x: any) => x.rpe || 0));
-      const inc = target.weight >= 40 ? 2.5 : 1;
-      const hitTarget = avgReps >= target.reps;
-      let nextWeight = target.weight, nextReps = target.reps, note = '', deload = false;
-      if (hitTarget) { nextWeight = target.weight + inc; note = `Прогрессия: +${inc}кг (цель ${target.reps}повт достигнута${maxRPE <= 8 ? ' при RPE≤8' : ''})`; }
-      else if (avgReps < target.reps - 1) { note = `Удержать ${target.weight}кг — добрать повторы до ${target.reps}`; }
-      else { note = 'Почти в цель — повторить вес, добавить 1 повтор'; nextReps = target.reps; }
-      if (maxRPE >= 9 && sets.length >= 3) { deload = true; note = note + ' · высокий RPE — рассмотреть делод (−15-20% объём)'; }
-      return { name: ex.name, nextWeight, nextReps, note, deload };
-    }).filter(Boolean) as { name: string; nextWeight: number; nextReps: number; note: string; deload: boolean }[];
-  }, [done, day]);
+  // «Следующая сессия» считается движком отчёта, как в дневнике: совет строится
+  // от фактического лучшего подхода, а не от targetSets плана — иначе «Итог»
+  // и дневник советовали по одной тренировке разное.
+  const nextPlan = useMemo(
+    () => (done ? buildNextSessionPlan(buildWorkoutSummary([sessionToWorkoutLog(done)]), 8) : []),
+    [done],
+  );
 
-  const anyDeload = nextSuggestions.some(s => s.deload);
+  const anyDeload = nextPlan.some(s => s.kind === 'deload');
 
   // RIR-калибровка: фидбек по сессии
   const rirFeedback = useMemo(() => {
@@ -2534,13 +2520,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Обновите workMax для этой группы в профиле, если e1RM выше текущего — веса в плане пересчитаются.</div>
             </div>
           )}
-          {nextSuggestions.length > 0 && (
+          {nextPlan.length > 0 && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: anyDeload ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.05)', border: '1px solid ' + (anyDeload ? 'rgba(239,68,68,0.25)' : 'rgba(0,230,138,0.18)') }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: anyDeload ? '#ef4444' : ACCENT, marginBottom: 6 }}>{anyDeload ? '⚠ Прогрессия + сигнал делода' : '📈 Прогрессия к следующей сессии (double progression)'}</div>
-              {anyDeload && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 6 }}>Высокий RPE на нескольких сетах — рассмотрите делод-неделю (−15-20% объём, удержание интенсивности) перед следующей прогрессией.</div>}
-              {nextSuggestions.map((s, i) => (
-                <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.deload ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
-                  <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: '#fff' }}>{s.note}</span>
+              {anyDeload && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 6 }}>Высокий RPE на нескольких сетах или плато — сделайте разгрузку: объём −15–20%, интенсивность сохраните. Цель ниже уже с учётом 90%.</div>}
+              {nextPlan.map((s, i) => (
+                <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.kind === 'deload' ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
+                  <b style={{ color: '#fff' }}>{s.name}</b> {s.from} → <b style={{ color: '#fff' }}>{s.to}</b>. <span style={{ color: '#fff' }}>{s.note}</span>
                 </div>
               ))}
             </div>
@@ -2660,9 +2646,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                  : null;
                const planVs = donePlan && donePlan.length > 0 ? comparePlanVsActual(donePlan, summary) : null;
                const footer: string[] = [];
-               if (nextSuggestions.length > 0) {
+               if (nextPlan.length > 0) {
                  footer.push('📈 Следующая сессия:');
-                 nextSuggestions.forEach(s => footer.push(`  ${s.name} → ${s.nextWeight}кг×${s.nextReps} (${s.note})`));
+                 nextPlan.forEach(s => footer.push(`  ${s.name}: ${s.from} → ${s.to} (${s.note})`));
                }
                const text = buildWorkoutReportText(summary, {
                  level: profile.level,

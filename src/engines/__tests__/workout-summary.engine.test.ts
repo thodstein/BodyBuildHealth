@@ -1260,6 +1260,14 @@ describe('workout-summary: следующая сессия', () => {
     expect(item.note).toContain('не растёт 4 тренировок');
   });
 
+  it('высокий RPE даёт разгрузку даже без истории плато', () => {
+    const w = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
+    w.exercises[0].sets = w.exercises[0].sets.map(st => ({ ...st, rpe: 9.5 }));
+    const item = buildNextSessionPlan(buildWorkoutSummary([w]))[0];
+    expect(item).toMatchObject({ kind: 'deload', from: '80×8', to: '72.5×8' });
+    expect(item.note).toContain('RPE 9.5');
+  });
+
   it('считает цель от лучшего подхода по e1RM, а не от максимумов по отдельности', () => {
     const w = mkWorkout('2026-11-12', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 3, sets: 1 }]);
     // 100×3 (e1RM 110) и 95×8 (e1RM 120): лучший подход — 95×8.

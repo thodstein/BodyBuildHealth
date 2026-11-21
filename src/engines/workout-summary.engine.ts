@@ -1059,6 +1059,19 @@ export function buildNextSessionPlan(summary: WorkoutSummary, limit = 6): NextSe
       });
       continue;
     }
+    // Высокое усилие: RPE ≥ 9 на нескольких подходах. Даже без истории плато
+    // (одна тренировка его не покажет) продолжать с тем же весом тяжело.
+    if (weighted && e.avgRPE != null && e.avgRPE >= 9 && e.sets >= 3) {
+      const nextW = roundToPlate(topW * 0.9);
+      out.push({
+        name: e.name,
+        kind: 'deload',
+        from,
+        to: `${fmtKg(nextW)}×${topR}`,
+        note: `средний RPE ${e.avgRPE} — разгрузка 90%`,
+      });
+      continue;
+    }
     if (!weighted) {
       out.push({ name: e.name, kind: 'reps', from, to: `×${topR + 1}`, note: 'свой вес: +1 повтор' });
       continue;
