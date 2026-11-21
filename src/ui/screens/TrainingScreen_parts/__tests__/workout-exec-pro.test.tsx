@@ -19,6 +19,7 @@ import {
   type WorkoutSession,
 } from '../../../../engines/workout-logger.engine';
 import { WorkoutMiniPult, WorkoutDayCard, WorkoutBigMode, requestQuickSet } from '../WorkoutSessionWidgets';
+import { ExecutionZone } from '../ExecutionZone';
 import { RestTimerPill, IntervalTimer, formatTimer } from '../WorkoutTimersPanel';
 
 function mkSession(sets: number, weight = 80): WorkoutSession {
@@ -327,7 +328,105 @@ describe('ExecutionZone: проф-карточка проведения', () => 
     expect(src).toContain('minHeight: 44');
   });
 
-  it('док зала смонтирован в зоне проведения', () => {
-    expect(src).toContain('<SessionWidgetsDock />');
+  it('док зала смонтирован в зоне проведения и получает реальное действие', () => {
+    // Без onOpen док рисовал кнопки без обработчиков («мёртвые» кнопки).
+    expect(src).toContain('<SessionWidgetsDock onOpen={openSession} />');
+  });
+
+  it('старт стоит выше разминки и плана дня — его не надо искать', () => {
+    const start = src.indexOf('data-act="start-session"');
+    expect(start).toBeGreaterThan(0);
+    expect(start).toBeLessThan(src.indexOf('План дня'));
+    expect(start).toBeLessThan(src.indexOf('Разминка дня'));
+  });
+});
+
+describe('ExecutionZone: главная кнопка старта', () => {
+  const micro = {
+    mesocycleType: 'accumulation',
+    days: [
+      { day: 'День 1 · Грудь', isTraining: true, exercises: [{ name: 'Жим штанги лёжа', sets: 3, reps: 8, weight: 80, restSec: 90 }] },
+      { day: 'Отдых', isTraining: false, exercises: [] },
+    ],
+  } as any;
+  const noop = () => {};
+
+  const Probe: React.FC = () => {
+    const [started, setStarted] = React.useState(false);
+    const [d, setD] = React.useState(0);
+    const [e, setE] = React.useState(0);
+    const [l, setL] = React.useState<Record<string, any>>({});
+    const [o, setO] = React.useState(false);
+    const [w, setW] = React.useState(0);
+    const [r, setR] = React.useState(0);
+    const [rp, setRp] = React.useState(0);
+    const [ri, setRi] = React.useState(0);
+    return (
+      <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
+        macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
+        runtimeDay={d} setRuntimeDay={setD} runtimeExIdx={e} setRuntimeExIdx={setE}
+        runtimeLogs={l} setRuntimeLogs={setL}
+        runtimeStarted={started} setRuntimeStarted={setStarted}
+        plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
+        runtimeSetW={w} setRuntimeSetW={setW} runtimeSetR={r} setRuntimeSetR={setR}
+        runtimeSetRP={rp} setRuntimeSetRP={setRp} runtimeSetRI={ri} setRuntimeSetRI={setRi}
+        diary={{} as any} onRefresh={noop} />
+    );
+  };
+
+  it('разминка и план дня свёрнуты, старт виден сразу после выбора дня', () => {
+    const html = renderToStaticMarkup(<Probe />);
+    expect(html).toContain('data-act="start-session"');
+    expect(html).toContain('Начать тренировку');
+    // Разминка не раскрыта: 20 пунктов списка перед стартом не нужны.
+    expect(html).not.toContain('Отмечайте пункты');
+    const start = html.indexOf('data-act="start-session"');
+    expect(start).toBeLessThan(html.indexOf('План дня'));
+  });
+
+  it('нажатие на «Начать тренировку» показывает плеер, «Свернуть» его не размонтирует', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const { container, unmount } = render(<Probe />);
+    const chooser = container.querySelector('[data-session="chooser"]') as HTMLElement;
+    const player = container.querySelector('[data-session="player"]') as HTMLElement;
+    expect(chooser.style.display).toBe('block');
+    expect(player.style.display).toBe('none');
+    fireEvent.click(container.querySelector('[data-act="start-session"]') as HTMLElement);
+    expect(chooser.style.display).toBe('none');
+    expect(player.style.display).toBe('block');
+    const playerBefore = container.querySelector('[data-session="player"]');
+    // «Свернуть» прячет плеер, а не уничтожает сессию: тот же DOM-узел остаётся.
+    fireEvent.click(container.querySelector('[aria-label="Свернуть проведение"]') as HTMLElement);
+    expect(player.style.display).toBe('none');
+    expect(container.querySelector('[data-session="player"]')).toBe(playerBefore);
+    unmount();
+    cleanup();
+  });
+
+  it('с построенным планом (ПЛ/ББ) старт — большая кнопка вместо «Возобновить»', () => {
+    const plRuntime = {
+      track: 'pl', focus: 'Жим', week: 1,
+      days: [{ label: 'День 1 · Грудь', exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }] }],
+    } as any;
+    const PlanProbe: React.FC = () => {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
+          macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
+          runtimeDay={0} setRuntimeDay={noop as any} runtimeExIdx={0} setRuntimeExIdx={noop as any}
+          runtimeLogs={{}} setRuntimeLogs={noop as any}
+          runtimeStarted={false} setRuntimeStarted={noop as any}
+          plRuntime={plRuntime} plRunOpen={open} setPlRunOpen={setOpen}
+          runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
+          runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
+          diary={{} as any} onRefresh={noop} />
+      );
+    };
+    const html = renderToStaticMarkup(<PlanProbe />);
+    expect(html).toContain('data-act="session-start"');
+    expect(html).toContain('Начать тренировку');
+    // Старого мелкого «Возобновить» больше нет — именно его не находили.
+    expect(html).not.toContain('Возобновить');
   });
 });

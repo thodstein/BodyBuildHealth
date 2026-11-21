@@ -21,7 +21,7 @@ import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { NativeIcon } from '../../native/NativeIcons';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
-import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SESSIONS, RU_SETS } from '../../../engines/ru-plural';
+import { ruCount, RU_APPROACHES, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
 
@@ -80,8 +80,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     diary, onRefresh: loadDiaryStats, onGoToTimers } = p;
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
-  const [dayDetailsOpen, setDayDetailsOpen] = React.useState(true);
-  const [warmupOpen, setWarmupOpen] = React.useState(true);
+  const [dayDetailsOpen, setDayDetailsOpen] = React.useState(false);
+  const [warmupOpen, setWarmupOpen] = React.useState(false);
   const [execWarmupDone, setExecWarmupDone] = React.useState<Record<string, boolean>>({});
   const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
     try { const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
@@ -120,86 +120,107 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const warmupGroups = warmupMemo.groups;
   const warmupDoneCount = React.useMemo(() => Object.values(execWarmupDone).filter(Boolean).length, [execWarmupDone]);
   const warmupPct = React.useMemo(() => warmupTotal > 0 ? Math.round(warmupDoneCount / warmupTotal * 100) : 0, [warmupDoneCount, warmupTotal]);
+  /**
+   * Старт сессии — один обработчик на всю карточку. Раньше он жил в кнопке
+   * «Старт» в самом низу: до неё надо было проскроллить план дня, разминку
+   * и прогресс, поэтому «начать тренировку» было не найти.
+   */
+  const startSession = React.useCallback(() => {
+    try {
+      const dayExercises: any[] = trainingDaysList[safeRuntimeDay]?.exercises || [];
+      const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
+      const warmupBlocks = generateWarmup({
+        sessionFocus: 'fullbody',
+        primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
+        primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
+        targetGroups: groups.length > 0 ? groups : ['fullbody'],
+        riskFlags: {}, techniqueIssues: [], fatigueLevel: 0.2, equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
+        mode: execWarmupMode,
+      });
+      const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
+      const done = Object.values(execWarmupDone).filter(Boolean).length;
+      upsertWarmupLog({ date: localIsoDate(), done: done > 0, quality: done > 0 ? (done / total >= 0.8 ? 4 : done / total >= 0.5 ? 3 : 2) : null, totalItems: total, doneItems: done });
+    } catch {}
+    setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
+  }, [trainingDaysList, safeRuntimeDay, execWarmupMode, execWarmupDone, setRuntimeStarted, setRuntimeLogs, setRuntimeExIdx]);
+  /** Открыть проведение, не стирая записанное: док не должен сбрасывать подходы. */
+  const openSession = React.useCallback(() => setRuntimeStarted(true), [setRuntimeStarted]);
   return (
     <>
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Док зала: пульт/таймеры/график уколов-БАД (session-widgets-pack, сворачивается). */}
-          <SessionWidgetsDock />
+          <SessionWidgetsDock onOpen={openSession} />
           {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
           {plRuntime && plRuntime.days.length > 0 && (
-            <div className="card" style={{ padding: '12px', border: plRunOpen ? '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.25)' : '1px solid rgba(255,255,255,0.08)', background: plRunOpen ? 'rgba(var(--train-accent-rgb, 0,230,138),0.06)' : 'rgba(255,255,255,0.02)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <NativeIcon name={plRunOpen ? 'pause' : 'play'} size={12} /> {plRunOpen ? 'Выполнение плана' : 'Сессия свёрнута'} · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
-                  </h3>
-                  <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
-                    Неделя {plRuntime.week} · {plRuntime.days.length} дн. {plRunOpen ? '· выполнение записывается в дневник' : '· прогресс сохранён, нажмите «Возобновить»'}
-                  </p>
+            <div className="card" style={{ padding: plRunOpen ? '10px 12px' : '6px', border: plRunOpen ? '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.25)' : '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.20)', background: plRunOpen ? 'rgba(var(--train-accent-rgb, 0,230,138),0.06)' : 'transparent' }}>
+              {plRunOpen ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <NativeIcon name="play" size={12} /> Проведение тренировки · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
+                    </h3>
+                    <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
+                      Неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)} · выполнение записывается в дневник
+                    </p>
+                  </div>
+                  <button onClick={() => setPlRunOpen(false)} aria-label="Свернуть проведение" style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                    <NativeIcon name="pause" size={10} /> Свернуть
+                  </button>
                 </div>
-                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <NativeIcon name={plRunOpen ? 'pause' : 'play'} size={10} /> {plRunOpen ? 'Свернуть' : 'Возобновить'}
+              ) : (
+                /* Свёрнутая карточка раньше прятала старт за кнопкой 5px высотой
+                   «Возобновить» — именно её никто не находил. Теперь старт здесь. */
+                <button type="button" data-act="session-start" onClick={() => setPlRunOpen(true)}
+                  aria-label="Открыть проведение тренировки"
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer',
+                    padding: '12px 14px', minHeight: 60, borderRadius: 13, border: 'none',
+                    background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)',
+                    boxShadow: '0 6px 20px rgba(0,230,138,0.24)', fontWeight: 800,
+                  }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <NativeIcon name="play" size={14} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                    <span style={{ display: 'block', fontSize: 14 }}>Начать тренировку</span>
+                    <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
+                      {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus} · неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)}
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
                 </button>
-              </div>
+              )}
               <div style={{ display: plRunOpen ? 'block' : 'none' }}>
                 <SessionPlayer days={plRuntime.days} weekNumber={plRuntime.week} focus={plRuntime.focus} onSaved={loadDiaryStats} />
               </div>
             </div>
           )}
           {/* Универсальная запись из сгенерированного плана — показывается только если нет активного ПЛ/ББ плана */}
-          {plRuntime && plRuntime.days.length > 0 ? null : !runtimeStarted ? (
-            <div className="card" style={{ padding: '12px' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="play" size={14} /></span> Начать тренировку</h3>
-              <p style={{ fontSize: 11, color: '#fff', margin: '0 0 10px' }}>
-                Выберите день из плана для отслеживания подходов в реальном времени.
-              </p>
+          {plRuntime && plRuntime.days.length > 0 ? null : (
+            <>
+            {/* Плеер не размонтируется при «Свернуть»: display:none сохраняет
+                разминку, записанные подходы и таймер отдыха до открытия заново. */}
+            <div className="card" data-session="chooser" style={{ padding: '12px', display: runtimeStarted ? 'none' : 'block' }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="play" size={13} /></span> Выберите день и начинайте</h3>
               {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
                 <>
+                  {/* Неделя — одной строкой. Раньше здесь стоял градиентный блок
+                      с сеткой 7 дней, которая никуда не ведёт: он съедал ~90px
+                      и отодвигал «Начать тренировку» ниже первого экрана. */}
                   {(() => {
                     const totalSetsWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
                     const totalVolWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (Number(e.reps) || 0) * (e.weight || 0), 0) || 0), 0);
-                    const allDays = (currentMicrocycle.days || []) as any[];
-                    const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-                    const trainingMap = new Set(trainingDaysList.map((d: any) => d.day || ''));
                     return (
-                      <div style={{
-                        display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8, padding: '10px 11px', borderRadius: 13,
-                        background: 'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(59,130,246,0.06))',
-                        border: '1px solid rgba(0,230,138,0.14)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 12, fontWeight: 800 }}>#{selectedWeek}</span>
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {selectedWeek} · {trainingDaysList.length} тренировки · {currentMicrocycle.mesocycleType || ''}</div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)' }}>{ruCount(totalSetsWeek, RU_SETS)} · {totalVolWeek.toLocaleString()} кг недельный объём</div>
-                            </div>
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.20)', whiteSpace: 'nowrap' }}>понедельно</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {weekDays.map((wd, wi) => {
-                            const dayObj = allDays[wi];
-                            const isTraining = dayObj ? !!dayObj.isTraining : wi < trainingDaysList.length;
-                            const label = dayObj?.day || (isTraining ? `Д${wi + 1}` : '—');
-                            const isSelected = isTraining && trainingDaysList[safeRuntimeDay]?.day === dayObj?.day;
-                            return (
-                              <div key={wi} style={{
-                                flex: 1, minWidth: 0, padding: '5px 2px', borderRadius: 9, textAlign: 'center',
-                                background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : isTraining ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
-                                border: isSelected ? '1px solid rgba(0,230,138,0.28)' : isTraining ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(255,255,255,0.04)',
-                                opacity: isTraining ? 1 : 0.45,
-                              }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? '#fff' : 'rgba(255,255,255,0.35)' }}>{wd}</div>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.25)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.slice(0, 6)}</div>
-                                <div style={{ width: 5, height: 5, borderRadius: 5, margin: '3px auto 0', background: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.22)' : 'transparent', boxShadow: isSelected ? '0 0 6px rgba(0,230,138,0.45)' : 'none' }} />
-                              </div>
-                            );
-                          })}
-                        </div>
+                      <div data-week-summary={selectedWeek} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', padding: '2px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.20)' }}>
+                          Неделя {selectedWeek}{currentMicrocycle.mesocycleType ? ` · ${currentMicrocycle.mesocycleType}` : ''}
+                        </span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)' }}>
+                          {ruCount(trainingDaysList.length, RU_TRAININGS)} · {ruCount(totalSetsWeek, RU_SETS)} · {totalVolWeek.toLocaleString()} кг
+                        </span>
                       </div>
                     );
                   })()}
@@ -238,16 +259,45 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       );
                     })}
                   </div>
-            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: '#fff' }}>
-                {ruCount(trainingDaysList[safeRuntimeDay]?.exercises?.length || 0, RU_EXERCISES)} • {trainingDaysList[safeRuntimeDay]?.duration || 60} мин
-              </div>
-              <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
-                Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'} | Схема: {currentMicrocycle.mesocycleType || ''}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 600 }}>
-                Расчётный тоннаж: {trainingDaysList[safeRuntimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
-              </div>
+            {/* Главное действие — сразу под выбором дня, без прокрутки. */}
+            {(() => {
+              const day = trainingDaysList[safeRuntimeDay] || {};
+              const dayEx: any[] = day.exercises || [];
+              const setsCnt = dayEx.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+              const estMin = Math.round((setsCnt * 60 + 300) / 60);
+              return (
+                <button
+                  type="button"
+                  data-act="start-session"
+                  onClick={startSession}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                    padding: '13px 15px', minHeight: 62, marginBottom: 10, borderRadius: 14, border: 'none', cursor: 'pointer',
+                    background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)',
+                    boxShadow: '0 6px 20px rgba(0,230,138,0.26)', fontWeight: 800,
+                  }}
+                >
+                  <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <NativeIcon name="play" size={15} />
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                    <span style={{ display: 'block', fontSize: 14 }}>Начать тренировку</span>
+                    <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
+                      {day.day || `День ${safeRuntimeDay + 1}`} · {dayEx.length} упр. · {ruCount(setsCnt, RU_APPROACHES)} · ~{estMin} мин
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
+                </button>
+              );
+            })()}
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span>Схема: {currentMicrocycle.mesocycleType || '—'}</span>
+              <span aria-hidden>·</span>
+              <span>Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'}</span>
+              <span aria-hidden>·</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                тоннаж {trainingDaysList[safeRuntimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
+              </span>
             </div>
                   {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
                   {(() => {
@@ -436,27 +486,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       </div>
                     );
                   })()}
-                  <button onClick={() => {
-                    try {
-                      const dayExercises: any[] = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                      const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
-                      const warmupBlocksExec = generateWarmup({
-                        sessionFocus: 'fullbody',
-                        primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
-                        primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
-                        targetGroups: groups.length > 0 ? groups : ['fullbody'],
-                        riskFlags: {}, techniqueIssues: [], fatigueLevel: 0.2, equipmentAvailable: ['barbell','dumbbell','band','bodyweight'],
-                        mode: execWarmupMode,
-                      });
-                      const total = warmupBlocksExec.reduce((s,b)=>s+b.exercises.length,0);
-                      const done = Object.values(execWarmupDone).filter(Boolean).length;
-                      upsertWarmupLog({ date: localIsoDate(), done: done>0, quality: done>0 ? (done/total>=0.8?4: done/total>=0.5?3:2) : null, totalItems: total, doneItems: done });
-                    } catch {}
-                    setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
-                  }} style={{
-                     width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
-                     background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)', fontWeight: 700, fontSize: 14,
-                   }}> <span style={{ display:'inline-flex', verticalAlign:'-2px', marginRight:6 }}><NativeIcon name="play" size={13} /></span>Старт</button>
+                  {/* Старт теперь вверху карточки (data-act="start-session"):
+                      до кнопки не нужно было проскролливать план и разминку. */}
                     {onGoToTimers && (() => {
                       const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
                       const compoundCount = dayExercises.filter((e: any) => ['squat','bench','deadlift','overhead','row','pull','lunge','hip','leg'].some(p => (e.name || '').toLowerCase().includes(p))).length;
@@ -518,11 +549,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                 </div>
               )}
             </div>
-          ) : (
-            // Проведение: проф-плеер (разминка → подходы → заминка → итоги).
-            // Логирование сетов, блины, VBT, RIR, сравнение с прошлой сессией,
-            // таймер отдыха, автосейв живой сессии — всё в SessionPlayer.
-            <div className="card" style={{ padding: '10px 12px', border: '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.22)', background: 'rgba(var(--train-accent-rgb, 0,230,138),0.05)' }}>
+            {/* Проведение: проф-плеер (разминка → подходы → заминка → итоги).
+                Логирование сетов, блины, VBT, RIR, сравнение с прошлой сессией,
+                таймер отдыха, автосейв живой сессии — всё в SessionPlayer. */}
+            <div className="card" data-session="player" style={{ padding: '10px 12px', display: runtimeStarted ? 'block' : 'none', border: '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.22)', background: 'rgba(var(--train-accent-rgb, 0,230,138),0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <div style={{ minWidth: 0 }}>
                   <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -544,6 +574,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                 onSaved={loadDiaryStats}
               />
             </div>
+            </>
           )}
         </div>
         </InfoErrorBoundary>

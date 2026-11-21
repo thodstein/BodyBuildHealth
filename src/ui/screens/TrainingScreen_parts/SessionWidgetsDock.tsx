@@ -5,17 +5,21 @@
  * Липкий низ над пилюлей-навигацией, safe-area, кнопки ≥44px.
  */
 import React, { useState } from 'react';
-import { WorkoutMiniPult, WorkoutDayCard, WorkoutBigMode } from './WorkoutSessionWidgets';
+import { WorkoutMiniPult } from './WorkoutSessionWidgets';
 import { RestTimerPill, IntervalTimer, SessionClock } from './WorkoutTimersPanel';
 import { ScheduleDayStrip, ScheduleWeekMatrix, ScheduleMonthHeat } from './MedScheduleCalendar';
 
 const WHITE = '#fff';
 const ACCENT = '#00e68a';
 
-export const SessionWidgetsDock: React.FC = () => {
+export const SessionWidgetsDock: React.FC<{
+  /** Открыть проведение тренировки (плеер). Без него кнопки не рисуем — мёртвых кнопок нет. */
+  onOpen?: () => void;
+}> = ({ onOpen }) => {
   const [tab, setTab] = useState<'train' | 'timers' | 'sched'>('train');
-  const [sub, setSub] = useState<'pult' | 'day' | 'big'>('pult');
-  const [open, setOpen] = useState(true);
+  // Свёрнут по умолчанию: док — вспомогательный, а не второй экран тренировки.
+  // Раньше он занимал 3 ряда кнопок + карточку и оттеснял «Начать» вниз.
+  const [open, setOpen] = useState(false);
   return (
     <section data-widget="session-dock" aria-label="Док зала" style={{ margin: '8px 0' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -36,23 +40,10 @@ export const SessionWidgetsDock: React.FC = () => {
       </div>
       {open && (
         <div data-dock-body={tab} style={{ marginTop: 8 }}>
-          {tab === 'train' && (
-            <>
-              <div role="tablist" aria-label="Вид проведения" style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
-                {([['pult', 'Пульт'], ['day', 'День'], ['big', 'BIG']] as const).map(([k, label]) => (
-                  <button key={k} role="tab" aria-selected={sub === k} data-sub={k} onClick={() => setSub(k)}
-                    style={{
-                      flex: 1, minHeight: 44, borderRadius: 12, fontWeight: 800, fontSize: 13, color: WHITE,
-                      background: sub === k ? 'rgba(0,230,138,0.12)' : 'transparent',
-                      border: sub === k ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)',
-                    }}>{label}</button>
-                ))}
-              </div>
-              {sub === 'pult' && <WorkoutMiniPult />}
-              {sub === 'day' && <WorkoutDayCard />}
-              {sub === 'big' && <WorkoutBigMode />}
-            </>
-          )}
+          {/* Только пульт: у «Карточки дня» и BIG-режима в доке не было
+              обработчиков, поэтому «Начать», «ГОТОВО» и «Завершить» молчали.
+              Проведение открывается одним действием — onOpen. */}
+          {tab === 'train' && <WorkoutMiniPult onOpen={onOpen} />}
           {tab === 'timers' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <RestTimerPill />

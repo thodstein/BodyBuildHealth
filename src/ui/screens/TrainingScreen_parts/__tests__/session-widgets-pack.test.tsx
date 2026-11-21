@@ -13,7 +13,11 @@ describe('A проведение (3)', () => {
     const html = renderToStaticMarkup(<WorkoutMiniPult state={DEMO} />);
     expect(html).toContain('data-widget="workout-pult"');
     expect(html).toContain('progressbar');
-    expect(html).toContain('+ Сет');
+    // Без живой сессии «+ Сет» писать некуда — кнопки нет, а не мёртвая кнопка.
+    expect(html).not.toContain('+ Сет');
+    expect(html).not.toContain('data-act="pult-start"');
+    const withStart = renderToStaticMarkup(<WorkoutMiniPult state={DEMO} onOpen={() => {}} />);
+    expect(withStart).toContain('▶ Начать');
   });
   it('A2 карточка дня: упражнения + старт/пропуск', () => {
     const html = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
@@ -95,10 +99,24 @@ describe('C календарь (3)', () => {
     expect(html).toContain('data-dock="train"');
     expect(html).toContain('data-dock="timers"');
     expect(html).toContain('data-dock="sched"');
-    expect(html).toContain('data-sub="big"');
+    // «Карточка дня» и BIG-режим жили в доке без обработчиков: «Начать»,
+    // «ГОТОВО» и «Завершить» молчали. Теперь в зале одна рабочая кнопка.
+    expect(html).not.toContain('data-sub="big"');
+    expect(html).not.toContain('data-sub="day"');
     const fs = await import('node:fs');
     const css = fs.readFileSync('src/styles-native.css', 'utf-8');
     expect(css).toContain('data-widget="session-dock"');
+  });
+  it('док: развёрнутый зал действительно начинает проведение', async () => {
+    const { render, fireEvent } = await import('@testing-library/react');
+    const { SessionWidgetsDock } = await import('../SessionWidgetsDock');
+    localStorage.clear();
+    let opened = 0;
+    const { container, unmount } = render(<SessionWidgetsDock onOpen={() => { opened += 1; }} />);
+    fireEvent.click(container.querySelector('[data-act="dock-toggle"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-act="pult-start"]') as HTMLElement);
+    expect(opened).toBe(1);
+    unmount();
   });
   it('встройка: ExecutionZone runtime несет док (lock против silent-drop)', async () => {
     const { render } = await import('@testing-library/react');

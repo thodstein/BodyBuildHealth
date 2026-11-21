@@ -124,8 +124,16 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
         </div>
         {live && <div style={{ color: WHITE, fontSize: 10, marginTop: 4, ...TABULAR }}>{live.volumeKg.toLocaleString()} кг{live.currentExercise ? ` · ${live.currentExercise}` : ''}</div>}
       </div>
-      <button type="button" data-act="pult-next" onClick={() => { requestQuickSet(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
-      <button type="button" data-act="pult-open" onClick={onOpen} style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }} aria-label="Открыть проведение">↗</button>
+      {/* Без живой сессии «+ Сет» писать некуда — тогда это старт.
+          Любая кнопка либо что-то делает, либо не рисуется. */}
+      {live ? (
+        <button type="button" data-act="pult-next" onClick={() => { requestQuickSet(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
+      ) : onOpen ? (
+        <button type="button" data-act="pult-start" onClick={onOpen} style={{ ...BIG_BTN, minWidth: 108 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+      ) : null}
+      {onOpen && live && (
+        <button type="button" data-act="pult-open" onClick={onOpen} style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }} aria-label="Открыть проведение">↗</button>
+      )}
     </div>
   );
 };
