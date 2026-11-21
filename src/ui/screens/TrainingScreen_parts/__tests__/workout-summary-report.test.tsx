@@ -339,6 +339,28 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('+1 подх.');
   });
 
+  it('в сравнении по упражнениям видно и подходы, а не только e1RM', () => {
+    const base = mkWorkout('2026-11-03');
+    const prev = {
+      ...base,
+      exercises: base.exercises.map(e => ({ ...e, sets: [...e.sets!, ...e.sets!] })),
+    };
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-10')]}
+        blocks={['compare']}
+        previousWorkouts={[prev]}
+        previousLabel="прошлой тренировкой"
+        showSelector={false}
+      />,
+    );
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    expect(text).toContain('Упражнения: подходы и e1RM');
+    // Подходы упали вдвое, хотя e1RM тот же — именно это и объясняет тоннаж.
+    expect(text).toContain('подх 4 → 2');
+    expect(text).toContain('подх 2 → 1');
+  });
+
   it('сравнение сводит мышцы в «выросло / просело / без изменений» и раскрывает все', () => {
     const base = mkWorkout('2026-11-03');
     const prevOnlyBench = { ...base, exercises: base.exercises.slice(0, 1) };

@@ -575,6 +575,33 @@ describe('workout-summary: недельная динамика и интенси
     expect(deload!.detail).toContain('Грудь');
   });
 
+  it('сравнивает подходы по упражнениям, включая упражнения со своим весом', () => {
+    const prev = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 },
+        { name: 'Подтягивания', id: 'pullup', weight: 0, reps: 10, sets: 4 },
+      ]),
+    ]);
+    const cur = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Подтягивания', id: 'pullup', weight: 0, reps: 10, sets: 2 },
+      ]),
+    ]);
+    const cmp = compareWorkoutSummaries(cur, prev);
+    const bench = cmp.exercises.find(e => e.name === 'Жим штанги лёжа')!;
+    expect(bench.sets.previous).toBe(5);
+    expect(bench.sets.current).toBe(3);
+    expect(bench.sets.delta).toBe(-2);
+    // Свой вес: e1RM не считается, но пропажа подходов всё равно видна.
+    const pullup = cmp.exercises.find(e => e.name === 'Подтягивания')!;
+    expect(pullup.e1rm.current).toBe(0);
+    expect(pullup.sets.delta).toBe(-2);
+    const txt = buildWorkoutReportText(cur, { comparison: cmp, comparisonLabel: 'прошлой тренировкой' });
+    expect(txt).toContain('Подходы по упражнениям:');
+    expect(txt).toContain('Жим штанги лёжа: 5 → 3 подх. (-2)');
+  });
+
   it('не называет разгрузкой падение объёма у одной мышцы', () => {
     const previous = buildWorkoutSummary([
       mkWorkout('2026-11-02', [

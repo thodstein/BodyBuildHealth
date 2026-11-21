@@ -944,7 +944,8 @@ export interface SummaryComparison {
   };
   muscles: Array<{ muscle: MuscleKey; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
   patterns: Array<{ pattern: string; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
-  exercises: Array<{ name: string; e1rm: MetricDelta; tonnage: MetricDelta }>;
+  /** По упражнениям подходы есть и у упражнений со своим весом, где e1RM нет. */
+  exercises: Array<{ name: string; sets: MetricDelta; e1rm: MetricDelta; tonnage: MetricDelta }>;
 }
 
 const mkDelta = (current: number, previous: number): MetricDelta => {
@@ -1026,12 +1027,15 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
       const p = prevExercises.get(name);
       return {
         name,
+        sets: mkDelta(c?.sets || 0, p?.sets || 0),
         e1rm: mkDelta(c?.bestE1RM || 0, p?.bestE1RM || 0),
         tonnage: mkDelta(c?.tonnageKg || 0, p?.tonnageKg || 0),
       };
     })
-    .filter(e => e.e1rm.current > 0 || e.e1rm.previous > 0)
-    .sort((a, b) => (b.e1rm.current + b.e1rm.previous) - (a.e1rm.current + a.e1rm.previous));
+    // Упражнение без веса (подтягивания, отжимания) в e1RM не попадает, но
+    // пропажа его подходов — тоже причина падения тоннажа и объёма.
+    .filter(e => e.sets.current + e.sets.previous > 0)
+    .sort((a, b) => Math.abs(b.sets.delta) - Math.abs(a.sets.delta) || Math.abs(b.e1rm.delta) - Math.abs(a.e1rm.delta));
 
   return { empty, metrics, muscles, patterns, exercises };
 }
@@ -2080,6 +2084,11 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     if (movedPatterns.length) {
       lines.push('  Движения:');
       movedPatterns.forEach(p => lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`));
+    }
+    const movedSets = cmp.exercises.filter(e => e.sets.delta !== 0).slice(0, 5);
+    if (movedSets.length) {
+      lines.push('  Подходы по упражнениям:');
+      movedSets.forEach(e => lines.push(`    ${e.name}: ${e.sets.previous} → ${e.sets.current} подх. (${signed(e.sets.delta)})`));
     }
     const movedE1rm = cmp.exercises.filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0).slice(0, 5);
     if (movedE1rm.length) {

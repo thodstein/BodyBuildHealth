@@ -478,23 +478,46 @@ export const WorkoutSummaryBody: React.FC<{
           })()}
 
           {(() => {
-            const rows = comparison.exercises.filter(e => e.e1rm.delta !== 0).slice(0, compact ? 4 : 6);
+            // Подходы и e1RM вместе: падение тоннажа чаще всего объясняется
+            // «стало меньше подходов», а у упражнений со своим весом подходам
+            // и вовсе нет замены — e1RM там не считается.
+            const rows = comparison.exercises
+              .filter(e => e.e1rm.delta !== 0 || e.sets.delta !== 0)
+              .slice(0, compact ? 4 : 6);
             if (rows.length === 0) return null;
             return (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Лучший e1RM по упражнениям, кг</div>
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Упражнения: подходы и e1RM</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {rows.map(e => {
-                    const color = e.e1rm.delta > 0 ? '#22c55e' : '#ef4444';
+                    const up = e.e1rm.delta > 0;
+                    const setsMoved = e.sets.delta !== 0;
                     return (
-                      <div key={e.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                        <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-                        <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 60, textAlign: 'right' }}>
-                          {e.e1rm.previous > 0 ? `${e.e1rm.previous} → ${e.e1rm.current}` : `новое · ${e.e1rm.current}`}
-                        </span>
-                        <span style={{ color: e.e1rm.previous > 0 ? color : '#60a5fa', fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 52, textAlign: 'right' }}>
-                          {e.e1rm.previous > 0 ? `${e.e1rm.delta > 0 ? '+' : ''}${e.e1rm.delta} кг` : '—'}
-                        </span>
+                      <div key={e.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, flexWrap: 'wrap' }}>
+                        <span style={{ flex: 1, minWidth: 70, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                        {setsMoved && (
+                          <span
+                            title="Подходы: было → стало. У упражнений со своим весом это единственный след в сравнении."
+                            style={{ color: setsMoved ? (e.sets.delta > 0 ? '#22c55e' : '#ef4444') : '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
+                          >
+                            подх {e.sets.previous} → {e.sets.current}
+                          </span>
+                        )}
+                        {e.e1rm.previous > 0 && (
+                          <>
+                            <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                              {e.e1rm.previous} → {e.e1rm.current}
+                            </span>
+                            <span style={{ color: up ? '#22c55e' : '#ef4444', fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 50, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                              {e.e1rm.delta > 0 ? '+' : ''}{e.e1rm.delta} кг
+                            </span>
+                          </>
+                        )}
+                        {e.e1rm.previous === 0 && e.e1rm.current > 0 && (
+                          <span style={{ color: '#60a5fa', fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            e1RM {e.e1rm.current} · новое
+                          </span>
+                        )}
                       </div>
                     );
                   })}
