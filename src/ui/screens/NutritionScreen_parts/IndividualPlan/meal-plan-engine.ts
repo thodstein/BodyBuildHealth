@@ -20305,6 +20305,221 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         notes.push(`🍽️ Тарелки выровнены: ${_split127} перенос(ов) части носителя между приёмами — порции не обрезаны (обе части выше пола роли), итоги дня не изменились (§8.127).`);
       }
     }
+    // ─── §8.128 «не еда»: крахмальная тарелка без белка — гарнир, а не приём ───
+    // Замер 160 дней (после §8.127): «не еда» = 42 авто / 40 руч (3–4 % приёмов), причём это
+    // ПОЧТИ ВСЕГДА перекусы (`potato_boiled 475 г` при 11 г белка, `corn_flakes 165 г` при 12 г)
+    // и только 1–2 пункта в мейнах; все — на экстремальных углеводных днях (`c1500` 1500 У,
+    // `hugeCarb` 1200 У), где день просит 9–12 приёмов.
+    // Причина не в калориях, а в РАСПРЕДЕЛЕНИИ: у дня 12 приёмов и 300 г белка (ровно 25 г на
+    // приём), но перекусы-носители получили 10–14 г, а обед/ужин — 36–45 г.
+    // Лечение — ОБМЕН, а не добор: перекус получает белок у приёма, где он в избытке (пункт
+    // выше пола роли и приём остаётся ≥ 25 г — MPS), а равную по ккал часть своего носителя
+    // отдаёт в приём С КОМНАТОЙ в тарелке. Суммы дня сохраняются точно (белок и углеводы
+    // переезжают, не рождаются), поэтому «≤ 3 %» не затрагивается по построению.
+    // Тарелка считается как в §8.122: приём не растёт выше max(700 г, его исходного размера) —
+    // иначе донор на 737–860 г не мог бы принять срез, и обмен был бы невозможен физически.
+    {
+      const _floor128 = (r: string): number => Math.max(5, Number((MIN_MEANINGFUL_G as any)[r] || 20));
+      const _pOf128 = (m: any): number => (m.items || [])
+        .reduce((s: number, x: any) => s + (Number(x.p) || 0), 0);
+      const _solidOf128 = (m: any): number => (m.items || [])
+        .filter((x: any) => String(x.role || '') !== 'liquid')
+        .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+      const _carOf128 = (m: any): any[] => (m.items || []).filter((x: any) =>
+        (x.role === 'carb_slow' || x.role === 'carb_fast') && !x._fixedGrams);
+      const _isBad128 = (m: any): boolean => (m.items || []).length > 0
+        && _pOf128(m) < 20
+        && _carOf128(m).some((x: any) => (Number(x.amount) || 0) >= 100);
+      const _badCount128 = (): number => (meals as any[]).filter(_isBad128).length;
+      const _scale128 = (it: any, g: number): any => {
+        const k = g / Math.max(1e-9, Number(it.amount) || 0);
+        const o: any = { ...it };
+        o.amount = g;
+        o.p = Math.round((Number(it.p) || 0) * k * 10) / 10;
+        o.f = Math.round((Number(it.f) || 0) * k * 10) / 10;
+        o.c = Math.round((Number(it.c) || 0) * k * 10) / 10;
+        o.kcal = Math.round(4 * o.p + 9 * o.f + 4 * o.c);
+        o.fiber = Math.round((Number(it.fiber) || 0) * k * 10) / 10;
+        return o;
+      };
+      const _sameIn128 = (m: any, it: any): any => (m.items || []).find((x: any) =>
+        x.id === it.id && x.role === it.role && !x._fixedGrams);
+      // Кладём часть продукта в приём: есть такой продукт — доливаем граммы, нет — новая позиция.
+      const _put128 = (m: any, src: any, g: number): void => {
+        const same = _sameIn128(m, src);
+        if (same) {
+          const b0 = Number(same.amount) || 0;
+          const k = (b0 + g) / Math.max(1e-9, b0);
+          same.amount = b0 + g;
+          same.p = Math.round((Number(same.p) || 0) * k * 10) / 10;
+          same.f = Math.round((Number(same.f) || 0) * k * 10) / 10;
+          same.c = Math.round((Number(same.c) || 0) * k * 10) / 10;
+          same.kcal = Math.round(4 * same.p + 9 * same.f + 4 * same.c);
+          same.fiber = Math.round((Number(same.fiber) || 0) * k * 10) / 10;
+        } else {
+          m.items = [...(m.items || []), _scale128(src, g)];
+        }
+      };
+      const _shrink128 = (it: any, g: number): void => {
+        const a0 = Number(it.amount) || 0;
+        const k = (a0 - g) / Math.max(1e-9, a0);
+        it.amount = a0 - g;
+        it.p = Math.round((Number(it.p) || 0) * k * 10) / 10;
+        it.f = Math.round((Number(it.f) || 0) * k * 10) / 10;
+        it.c = Math.round((Number(it.c) || 0) * k * 10) / 10;
+        it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+        it.fiber = Math.round((Number(it.fiber) || 0) * k * 10) / 10;
+      };
+      const _dev128 = (): number => {
+        const g = (k: string) => Number((input as any)[k]) || 0;
+        const t = (k: string) => Number((totals as any)[k]) || 0;
+        let mx = 0;
+        for (const [gk, tk] of [['goalKcal', 'kcal'], ['goalProteinG', 'p'], ['goalFatG', 'f'], ['goalCarbsG', 'c']]) {
+          const want = g(gk);
+          if (!(want > 0)) continue;
+          mx = Math.max(mx, Math.abs(t(tk) - want) / want);
+        }
+        return mx;
+      };
+      const _feeds128 = (): number => (meals as any[]).filter((m: any) => _pOf128(m) >= 25).length;
+      // Комната в тарелке — по контракту §8.122 (не растим приём выше его исходного размера).
+      const _cap128 = new Map<any, number>();
+      for (const m of meals as any[]) _cap128.set(m, Math.max(700, _solidOf128(m)));
+      const _room128 = (m: any): number => (_cap128.get(m) || 700) - _solidOf128(m);
+      // Донор белка: пункт выше пола роли, приём после передачи остаётся ≥ 25 г (MPS-порог).
+      const _bestDonor128 = (meal: any): any => {
+        let best: any = null;
+        for (const d of meals as any[]) {
+          if (d === meal || (d.items || []).length === 0 || _isBad128(d)) continue;
+          const dp = _pOf128(d);
+          for (const x of d.items || []) {
+            const r = String(x.role || '');
+            if (r !== 'protein' && r !== 'fast_protein' && r !== 'slow_protein') continue;
+            const gx = Number(x.amount) || 0;
+            const pg = (Number(x.p) || 0) / Math.max(1, gx);
+            if (!(pg >= 0.08)) continue;
+            const canG = Math.floor(Math.min(gx - _floor128(r), Math.max(0, (dp - 25) / pg)) / 5) * 5;
+            if (canG < 5) continue;
+            const gain = canG * pg;
+            if (gain < 3) continue;
+            if (!best || gain > best.gain) {
+              best = { d, x, pg, canG, gain, kpg: (Number(x.kcal) || 0) / Math.max(1, gx) };
+            }
+          }
+        }
+        return best;
+      };
+      const _sink128 = (meal: any, donor: any, need: number, car: any): any => {
+        // Приоритет: приём, где ЭТОТ ЖЕ носитель уже есть (часть меньше пола роли там не
+        // обрезок — она доливается в существующую позицию), затем сам донор белка, затем
+        // самый свободный по тарелке.
+        const rank = (m: any): number => (_sameIn128(m, car) ? 0 : (m === donor ? 1 : 2));
+        const cands = (meals as any[])
+          .filter((m: any) => m !== meal && (m.items || []).length > 0 && !_isBad128(m)
+            && _pOf128(m) >= 20 && _room128(m) >= need)
+          .sort((a: any, b: any) => rank(a) - rank(b) || _room128(b) - _room128(a));
+        return cands[0] || null;
+      };
+      // Класс приёма и «вёдра» в классе — та же метрика, что §8.127: приём не должен стать
+      // ведром своего класса только потому, что принял срез крахмала.
+      const _cls128 = (t: string): string => (t === 'breakfast' || t === 'lunch' || t === 'dinner')
+        ? 'main' : (/^snack/.test(t) ? 'snack' : 'peri');
+      const _buck128 = (cls: string): number => {
+        const list = (meals as any[]).filter((m: any) => (m.items || []).length > 0
+          && _cls128(String(m.type || '')) === cls);
+        if (list.length < 2) return 0;
+        const sh = list.reduce((s: number, m: any) => s + (Number(m.totals?.kcal) || 0), 0) / list.length;
+        if (!(sh > 0)) return 0;
+        return list.filter((m: any) => (Number(m.totals?.kcal) || 0) > sh * 1.35).length;
+      };
+      const _buckAll128 = (): number => _buck128('main') + _buck128('snack') + _buck128('peri');
+      let _swap128 = 0;
+      for (let _pass128 = 0; _pass128 < 30; _pass128++) {
+        const bad = (meals as any[]).filter(_isBad128)
+          .sort((a: any, b: any) => _pOf128(a) - _pOf128(b));   // сначала самые скупые
+        if (bad.length === 0) break;
+        let moved = false;
+        for (const meal of bad) {
+          const snap = JSON.stringify(meals.map((m: any) => m.items));
+          const devB = _dev128();
+          const feedsB = _feeds128();
+          const badB = _badCount128();
+          let applied = 0;
+          for (let guard = 0; guard < 8 && _pOf128(meal) < 20; guard++) {
+            const don = _bestDonor128(meal);
+            if (!don) break;
+            const pf = _floor128(String(don.x.role));
+            // Цель — 24 г, а не 20: срез носителя уносит из перекуса и его собственный белок
+            // (крупа/картофель — 4–8 г/100 г). Без запаса перекус вставал на 19,4 г и обмен
+            // откатывался (`руч/c1500/3/тр`: 10 + 11,8 − 2,1 = 19,4).
+            const needP = 24 - _pOf128(meal);
+            const gPwant = Math.ceil(Math.max(needP, 3) / don.pg / 5) * 5;
+            const sameProt = !!_sameIn128(meal, don.x);
+            const gP = Math.min(don.canG, sameProt ? Math.max(5, gPwant) : Math.max(pf, gPwant));
+            if (!(gP >= (sameProt ? 5 : pf))) break;
+            const kGive = don.kpg * gP;
+            // Срез носителя: самая крупная крахмальная позиция перекуса, остаток ≥ пола роли.
+            let done = false;
+            const cars = _carOf128(meal)
+              .filter((c: any) => (Number(c.amount) || 0) - _floor128(String(c.role)) >= 5)
+              .sort((a: any, b: any) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+            for (const car of cars) {
+              const g0 = Number(car.amount) || 0;
+              const kpgC = (Number(car.kcal) || 0) / Math.max(1, g0);
+              if (!(kpgC > 0)) continue;
+              // Остаток В ПЕРЕКУСЕ может опуститься ниже 100 г (метрика хороша с этого порога),
+              // но не ниже пола роли; часть, уезжающая в приём, тоже не должна быть обрезком.
+              const gS = Math.floor(Math.min(kGive / kpgC, g0 - _floor128(String(car.role))) / 5) * 5;
+              if (gS < 5) continue;
+              const sink = _sink128(meal, don.d, gS, car);
+              if (!sink) continue;
+              if (gS < _floor128(String(car.role)) && !_sameIn128(sink, car)) continue;
+              const pItem = { ...don.x };
+              const cItem = { ...car };
+              const sinkCls = _cls128(String(sink.type || ''));
+              const buckClsB = _buck128(sinkCls);
+              const buckAllB = _buckAll128();
+              _shrink128(don.x, gP);
+              _shrink128(car, gS);
+              don.d.items = (don.d.items || []).filter((x: any) => (Number(x.amount) || 0) > 0);
+              meal.items = (meal.items || []).filter((x: any) => (Number(x.amount) || 0) > 0);
+              _put128(meal, pItem, gP);
+              _put128(sink, cItem, gS);
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals as any[], totals);
+              const ok = _pOf128(don.d) >= 25
+                && _solidOf128(sink) <= (_cap128.get(sink) || 700) + 1e-9
+                && _buck128(sinkCls) <= buckClsB
+                && _buckAll128() <= buckAllB;
+              if (ok) {
+                applied++; done = true; break;
+              }
+              const restore = JSON.parse(snap);
+              meals.forEach((m: any, i: number) => { m.items = restore[i]; });
+              recalcMealTotals(meals as any[]);
+              recalcDayTotals(meals as any[], totals);
+            }
+            if (!done) break;
+          }
+          const good = applied > 0
+            && _pOf128(meal) >= 20
+            && _badCount128() < badB
+            && _feeds128() >= feedsB
+            && _dev128() <= devB + 5e-4;
+          if (good) { _swap128++; moved = true; }
+          else {
+            const restore = JSON.parse(snap);
+            meals.forEach((m: any, i: number) => { m.items = restore[i]; });
+            recalcMealTotals(meals as any[]);
+            recalcDayTotals(meals as any[], totals);
+          }
+        }
+        if (!moved) break;
+      }
+      if (_swap128 > 0) {
+        notes.push(`🍽️ Крахмальная тарелка получила белок: ${_swap128} перекус(ов)-«гарниров» стали приёмами — белок и часть носителя обменяны внутри дня, суммы дня не изменились (§8.128).`);
+      }
+    }
     // §8.104: один продукт — одна позиция в приёме (см. mergeDuplicateItems).
     mergeDuplicateItems(meals);
     // §8.107d (витрина не врёт): финальная сверка «Сводки MPS» и клетчатки с ФАКТОМ
