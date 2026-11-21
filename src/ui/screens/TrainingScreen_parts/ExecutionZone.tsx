@@ -145,6 +145,12 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   }, [trainingDaysList, safeRuntimeDay, execWarmupMode, execWarmupDone, setRuntimeStarted, setRuntimeLogs, setRuntimeExIdx]);
   /** Открыть проведение, не стирая записанное: док не должен сбрасывать подходы. */
   const openSession = React.useCallback(() => setRuntimeStarted(true), [setRuntimeStarted]);
+  /** Виджет/панель АПК просит открыть проведение — через событие, без десятка пропсов. */
+  React.useEffect(() => {
+    const onOpen = () => openSession();
+    window.addEventListener('he-workout-open', onOpen);
+    return () => window.removeEventListener('he-workout-open', onOpen);
+  }, [openSession]);
   return (
     <>
       {tab === 'runtime' && (

@@ -5,6 +5,7 @@ import { Sparkline } from './Sparkline';
 import { OneRmCalcTab } from './OneRmCalcTab';
 import { PlateCalcTab } from './PlateCalcTab';
 import { StrengthDiary, type StrengthStats, type WeeklyProgress } from '../../../engines/strength-diary.engine';
+import { loadActiveSession, summarizeActiveSession } from '../../../engines/workout-logger.engine';
 import { epley1RM } from '../../../engines/e1rm';
 import type { WorkoutLog, TrainingOutput } from '../../../core/types';
 import { computeAnalytics } from '../../../engines/analytics-engine';
@@ -145,7 +146,7 @@ const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ 
     } catch { /* ignore (jsdom/SSR) */ }
   }, [mode]);
   return (
-  <div ref={navRef} className="td-subnav" aria-label="Разделы дневника" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any, borderRadius: 12, padding: '8px', marginBottom: 4 }}>
+  <div ref={navRef} className="td-subnav" aria-label="Разделы дневника" style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' as any, background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any, borderRadius: 12, padding: '8px', marginBottom: 4 }}>
     {DIARY_NAV_ITEMS.map(item => {
       const active = mode === item.mode;
       const idleColor = item.mode === 'record' ? '#fff' : item.color;
@@ -153,7 +154,7 @@ const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ 
         <button key={item.mode} aria-pressed={active} onClick={() => onGo(item.mode)}
           data-active={active ? 'true' : 'false'} className="td-subnav-btn"
           style={{
-            flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10,
+            flex: '0 0 auto', minWidth: 90, whiteSpace: 'nowrap', padding: '8px 12px', borderRadius: 10,
             border: active ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.08)',
             background: active ? item.activeBg : item.bg,
             color: active ? item.activeColor : idleColor,
@@ -183,6 +184,8 @@ interface TrainingDiaryHubProps {
   level: string;
   onRefresh: () => void;
   onGoRecord?: () => void;
+  /** Открыть проведение тренировки (плеер) прямо из дневника. */
+  onStartSession?: () => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
   daysPerWeek: number;
@@ -196,7 +199,7 @@ interface TrainingDiaryHubProps {
 type HubMode = 'record' | 'history' | 'summary' | 'analytics' | 'analytics_lite' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback' | 'rituals';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
-  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
+  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord, onStartSession,
   trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
 }) => {
   const normalizeMode = (m: string): HubMode => {
@@ -595,6 +598,39 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Главное действие дневника. Раньше тут был только «Записать по плану»
+              (форма), а проведение тренировки из дневника открыть было нечем.
+              Стартовая кнопка стоит первой, до карточек-отчётов. */}
+          {onStartSession && (() => {
+            const todayIdx = (new Date().getDay() + 6) % 7;
+            const planned = trainingOutput?.plan?.[todayIdx];
+            const hasPlan = !!planned && Array.isArray(planned.exercises) && planned.exercises.length > 0;
+            const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession()); } catch { return null; } })();
+            const sets = hasPlan ? (planned!.exercises as any[]).reduce((s: number, e: any) => s + (Number(e.sets) || 0), 0) : 0;
+            const title = liveSum ? 'Продолжить тренировку' : 'Начать тренировку';
+            const subtitle = liveSum
+              ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
+              : hasPlan
+                ? `${planned!.name} · ${planned!.exercises.length} упр. · ${sets} подх.${planned!.duration ? ` · ~${planned!.duration} мин` : ''}`
+                : 'Разминка · подходы · таймер отдыха';
+            return (
+              <button type="button" data-act="diary-start" onClick={onStartSession}
+                aria-label={title}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer',
+                  padding: '13px 15px', minHeight: 62, borderRadius: 14, border: 'none',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))',
+                  color: 'var(--accent-contrast, #000)', fontWeight: 800, boxShadow: '0 6px 20px rgba(0,230,138,0.26)',
+                }}>
+                <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>▶</span>
+                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                  <span style={{ display: 'block', fontSize: 14 }}>{title}</span>
+                  <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subtitle}</span>
+                </span>
+                <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
+              </button>
+            );
+          })()}
           {!isOnline && (
             <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', padding: '8px 12px', fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
               Офлайн: данные сохраняются локально и синхронизируются при восстановлении сети
@@ -657,7 +693,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     const coolToday = cooldownLogForDate(today);
                     const coolPct = coolToday ? (coolToday.done ? 100 : 0) : (trainedToday ? 0 : null);
                     const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
-                      { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: () => {} },
+                      { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: trainedToday ? () => setMode('history') : (onStartSession ?? (() => setMode('history'))) },
                       { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => setMode('mindset') },
                       { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => setMode('mobility') },
                       { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => setMode('warmup') },

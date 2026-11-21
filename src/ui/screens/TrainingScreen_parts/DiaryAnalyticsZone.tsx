@@ -23,6 +23,8 @@ interface Props {
   level: string;
   onRefresh: () => void;
   onTabChange?: (tab: TrainingTab) => void;
+  /** Перейти в зону проведения тренировки (плеер) — старт из дневника. */
+  onGoWorkout?: () => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
   daysPerWeek: number;
@@ -74,6 +76,7 @@ export const DiaryAnalyticsZone: React.FC<Props> = (p) => {
         level={p.level}
         onRefresh={p.onRefresh}
         onGoRecord={p.onTabChange ? () => p.onTabChange!('diary') : undefined}
+        onStartSession={p.onGoWorkout}
         trainingOutput={p.trainingOutput}
         goal={p.goal}
         daysPerWeek={p.daysPerWeek}

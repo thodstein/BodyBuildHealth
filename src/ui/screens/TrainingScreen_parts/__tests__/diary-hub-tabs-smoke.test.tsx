@@ -118,3 +118,46 @@ describe('SessionPlayer (проведение тренировки)', () => {
     expect(html).toContain('Нет дней');
   });
 });
+
+describe('Дневник: старт тренировки', () => {
+  it('кнопка «Начать тренировку» открывает проведение', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    let opened = 0;
+    const { container, unmount } = render(
+      <TrainingDiaryHub
+        {...baseProps}
+        diary={{ checkProgressionAlerts: async () => [] } as any}
+        initialMode="record"
+        onStartSession={() => { opened += 1; }}
+      />
+    );
+    const btn = container.querySelector('[data-act="diary-start"]') as HTMLElement;
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toContain('Начать тренировку');
+    fireEvent.click(btn);
+    expect(opened).toBe(1);
+    unmount();
+    cleanup();
+  });
+
+  it('без onStartSession кнопки нет — мёртвых кнопок не рисуем', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" />);
+    expect(html).not.toContain('data-act="diary-start"');
+  });
+
+  it('подпись старта берёт план на сегодня (день, упражнения, подходы)', () => {
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const plan = Array.from({ length: 7 }, () => ({ name: 'Отдых', duration: 0, exercises: [] as any[] }));
+    plan[todayIdx] = {
+      name: 'Грудь/трицепс', duration: 55,
+      exercises: [{ name: 'Жим штанги лёжа', sets: 4, reps: 8 }, { name: 'Разводка', sets: 3, reps: 12 }],
+    } as any;
+    const html = renderToStaticMarkup(
+      <TrainingDiaryHub {...baseProps} trainingOutput={{ plan } as any} initialMode="record" onStartSession={() => {}} />
+    );
+    expect(html).toContain('data-act="diary-start"');
+    expect(html).toContain('Грудь/трицепс');
+    expect(html).toContain('7 подх.');
+  });
+});

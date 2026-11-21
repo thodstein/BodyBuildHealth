@@ -452,6 +452,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
+  /* Виджеты проведения (пульт/карточка дня/BIG) и дневник стартуют через
+     событие he-workout-open. ExecutionZone ловит его только когда смонтирован,
+     поэтому экран тренировок тоже слушает: кнопка старта работает из любого места. */
+  useEffect(() => {
+    const onOpen = () => {
+      setZone('training'); setPage('tabs'); setTab('runtime'); setRuntimeStarted(true);
+    };
+    window.addEventListener('he-workout-open', onOpen);
+    return () => window.removeEventListener('he-workout-open', onOpen);
+  }, []);
   // Запись готовности — дросселировано, не дёргаем localStorage на каждый микро-ререндер (без урезания данных)
   const lastReadinessRef = React.useRef<{ r: number; f: number } | null>(null);
   useEffect(() => {
@@ -1025,6 +1035,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           periodizationType={periodizationType} mesoLength={mesoLength}
           tprofile={tprofile} linked={linked}
           onTabChange={setTab}
+          onGoWorkout={() => { setZone('training'); setPage('tabs'); setTab('runtime'); setRuntimeStarted(true); }}
         />
       )}
 

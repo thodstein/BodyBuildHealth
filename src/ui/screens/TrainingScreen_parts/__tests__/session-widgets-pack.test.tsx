@@ -13,11 +13,32 @@ describe('A проведение (3)', () => {
     const html = renderToStaticMarkup(<WorkoutMiniPult state={DEMO} />);
     expect(html).toContain('data-widget="workout-pult"');
     expect(html).toContain('progressbar');
-    // Без живой сессии «+ Сет» писать некуда — кнопки нет, а не мёртвая кнопка.
+    // Без живой сессии «+ Сет» писать некуда — кнопка становится стартом.
     expect(html).not.toContain('+ Сет');
-    expect(html).not.toContain('data-act="pult-start"');
-    const withStart = renderToStaticMarkup(<WorkoutMiniPult state={DEMO} onOpen={() => {}} />);
-    expect(withStart).toContain('▶ Начать');
+    expect(html).toContain('data-act="pult-start"');
+  });
+  it('A1b старт виджета не мёртвый: шлёт he-workout-open', async () => {
+    const { render, fireEvent } = await import('@testing-library/react');
+    const { requestOpenSession } = await import('../WorkoutSessionWidgets');
+    let got = 0;
+    const h = () => { got += 1; };
+    window.addEventListener('he-workout-open', h);
+    requestOpenSession();
+    expect(got).toBe(1);
+    const { container, unmount } = render(<WorkoutDayCard state={DEMO} />);
+    fireEvent.click(container.querySelector('[data-act="day-start"]') as HTMLElement);
+    expect(got).toBe(2);
+    window.removeEventListener('he-workout-open', h);
+    unmount();
+  });
+  it('A1c state-проп и авто-состояние не ломают порядок хуков', async () => {
+    const { render, cleanup } = await import('@testing-library/react');
+    const { container, rerender, unmount } = render(<WorkoutMiniPult />);
+    rerender(<WorkoutMiniPult state={DEMO} />);
+    rerender(<WorkoutMiniPult />);
+    expect(container.querySelector('[data-widget="workout-pult"]')).not.toBeNull();
+    unmount();
+    cleanup();
   });
   it('A2 карточка дня: упражнения + старт/пропуск', () => {
     const html = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
@@ -25,10 +46,23 @@ describe('A проведение (3)', () => {
     expect(html).toContain('Жим');
     expect(html).toContain('Начать');
   });
-  it('A3 BIG: готово + навигация', () => {
-    const html = renderToStaticMarkup(<WorkoutBigMode state={DEMO} />);
-    expect(html).toContain('data-widget="workout-big"');
-    expect(html).toContain('ГОТОВО');
+  it('A2b нет мёртвых кнопок: «Пропуск» только с обработчиком, BIG без onFinish ведёт в плеер', () => {
+    const day = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
+    expect(day).not.toContain('data-act="day-skip"');
+    expect(renderToStaticMarkup(<WorkoutDayCard state={DEMO} onSkip={() => {}} />)).toContain('data-act="day-skip"');
+    const big = renderToStaticMarkup(<WorkoutBigMode state={DEMO} />);
+    expect(big).not.toContain('data-act="big-finish"');
+    expect(big).toContain('data-act="big-open"');
+    expect(renderToStaticMarkup(<WorkoutBigMode state={DEMO} onFinish={() => {}} />)).toContain('data-act="big-finish"');
+  });
+  it('A3 BIG: без живой сессии — старт, с сессией — ГОТОВО', () => {
+    const idle = renderToStaticMarkup(<WorkoutBigMode state={DEMO} />);
+    expect(idle).toContain('data-widget="workout-big"');
+    expect(idle).toContain('data-act="big-start"');
+    expect(idle).not.toContain('data-act="big-done"');
+    const withDone = renderToStaticMarkup(<WorkoutBigMode state={DEMO} onDoneSet={() => {}} />);
+    expect(withDone).toContain('data-act="big-done"');
+    expect(withDone).toContain('ГОТОВО');
   });
   it('панель: 3 таба', () => {
     const html = renderToStaticMarkup(<WorkoutWidgetsPanel state={DEMO} />);
@@ -117,6 +151,18 @@ describe('C календарь (3)', () => {
     fireEvent.click(container.querySelector('[data-act="pult-start"]') as HTMLElement);
     expect(opened).toBe(1);
     unmount();
+  });
+  it('док: выбор раздела сам раскрывает док (не нужно жать ▴)', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    const { SessionWidgetsDock } = await import('../SessionWidgetsDock');
+    const { container, unmount } = render(<SessionWidgetsDock />);
+    expect(container.querySelector('[data-dock-body]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-dock="timers"]') as HTMLElement);
+    expect(container.querySelector('[data-dock-body="timers"]')).not.toBeNull();
+    fireEvent.click(container.querySelector('[data-dock="train"]') as HTMLElement);
+    expect(container.querySelector('[data-dock-body="train"]')).not.toBeNull();
+    unmount();
+    cleanup();
   });
   it('встройка: ExecutionZone runtime несет док (lock против silent-drop)', async () => {
     const { render } = await import('@testing-library/react');

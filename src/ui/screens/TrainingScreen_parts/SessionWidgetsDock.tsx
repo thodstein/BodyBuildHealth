@@ -1,8 +1,8 @@
 /**
- * SessionWidgetsDock.tsx — единый телефонный док для зала (АПК).
- * Собирает 9 виджетов: проведение (пульт/день/BIG) + таймеры + календарь.
+ * SessionWidgetsDock.tsx — телефонный док для зала (АПК).
+ * Зал (один рабочий пульт) + таймеры + график.
  * Монтаж 1 строкой: <SessionWidgetsDock /> в ExecutionZone / Дневник.
- * Липкий низ над пилюлей-навигацией, safe-area, кнопки ≥44px.
+ * Свёрнут по умолчанию, safe-area, кнопки ≥44px.
  */
 import React, { useState } from 'react';
 import { WorkoutMiniPult } from './WorkoutSessionWidgets';
@@ -25,7 +25,7 @@ export const SessionWidgetsDock: React.FC<{
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div role="tablist" aria-label="Раздел дока" style={{ display: 'flex', gap: 8, flex: 1 }}>
           {([['train', '🏋️ Зал'], ['timers', '⏳ Таймеры'], ['sched', '📅 График']] as const).map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={tab === k} data-dock={k} onClick={() => setTab(k)}
+            <button key={k} role="tab" aria-selected={tab === k} data-dock={k} onClick={() => { setTab(k); setOpen(true); }}
               style={{
                 flex: 1, minHeight: 48, borderRadius: 14, fontWeight: 800, fontSize: 13, color: WHITE,
                 background: tab === k ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)',

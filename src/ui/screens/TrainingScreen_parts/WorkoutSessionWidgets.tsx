@@ -1,4 +1,4 @@
-/**
+﻿/**
  * WorkoutSessionWidgets.tsx — 3 варианта виджета проведения тренировки (АПК, in-app).
  * Только UI-слой поверх существующих SessionPlayer / he_workout_log_v2.
  * Без чужих правок: самодостаточные карточки, монтируются 1 строкой где угодно.
@@ -28,6 +28,15 @@ const TABULAR: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 /** Событие «записать следующий подход» — слушает SessionPlayer (фаза main). */
 export function requestQuickSet(): void {
   try { window.dispatchEvent(new Event('he-workout-quick-set')); } catch { /* noop */ }
+}
+
+/**
+ * Событие «открыть проведение тренировки» — слушает ExecutionZone.
+ * Виджет может стоять где угодно (док, дневник, панель АПК) и без пропсов:
+ * кнопка старта обязана что-то делать, иначе это мёртвая кнопка.
+ */
+export function requestOpenSession(): void {
+  try { window.dispatchEvent(new Event('he-workout-open')); } catch { /* noop */ }
 }
 
 /**
@@ -105,7 +114,8 @@ function readLastWorkout(): WorkoutWidgetState | null {
 
 /* ── A1: «Пульт зала» — липкая мини-полоса ─────────────────────────────── */
 export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onNextSet?: () => void }> = ({ state, onOpen, onNextSet }) => {
-  const s = state ?? useWorkoutLive();
+  const auto = useWorkoutLive();
+  const s = state ?? auto;
   const live = s?.live;
   const done = live ? live.setsDone : (s?.exercises ?? []).reduce((a, e) => a + e.done, 0);
   const total = live ? Math.max(live.setsDone, live.setsPlanned) : (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
@@ -125,12 +135,13 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
         {live && <div style={{ color: WHITE, fontSize: 10, marginTop: 4, ...TABULAR }}>{live.volumeKg.toLocaleString()} кг{live.currentExercise ? ` · ${live.currentExercise}` : ''}</div>}
       </div>
       {/* Без живой сессии «+ Сет» писать некуда — тогда это старт.
-          Любая кнопка либо что-то делает, либо не рисуется. */}
+          Старт всегда рабочий: событие he-workout-open ловит ExecutionZone,
+          поэтому кнопка не мёртвая даже без пропсов. */}
       {live ? (
         <button type="button" data-act="pult-next" onClick={() => { requestQuickSet(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
-      ) : onOpen ? (
-        <button type="button" data-act="pult-start" onClick={onOpen} style={{ ...BIG_BTN, minWidth: 108 }} aria-label="Начать проведение тренировки">▶ Начать</button>
-      ) : null}
+      ) : (
+        <button type="button" data-act="pult-start" onClick={() => { requestOpenSession(); onOpen?.(); }} style={{ ...BIG_BTN, minWidth: 108 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+      )}
       {onOpen && live && (
         <button type="button" data-act="pult-open" onClick={onOpen} style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }} aria-label="Открыть проведение">↗</button>
       )}
@@ -140,7 +151,8 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
 
 /* ── A2: «Карточка дня» — спокойная карточка на Главную/Дневник ────────── */
 export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onSkip?: () => void }> = ({ state, onOpen, onSkip }) => {
-  const s = state ?? useWorkoutLive();
+  const auto = useWorkoutLive();
+  const s = state ?? auto;
   const live = s?.live;
   return (
     <section data-widget="workout-daycard" aria-label="Тренировка дня" style={CARD}>
@@ -155,12 +167,13 @@ export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpe
       {(s?.exercises ?? []).slice(0, 4).map((e, i) => (
         <div key={i} data-ex={e.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 44, alignItems: 'center' }}>
           <span style={{ color: WHITE, fontSize: 13 }}>{e.name}</span>
-          <span style={{ color: WHITE, fontSize: 12, ...TABULAR }}>{e.done}/{e.total}{e.weight ? ` · ${e.weight} кг` : ''}</span>
+          <span style={{ color: WHITE, fontSize: 12, ...TABULAR }}>{live ? `${e.done} подх.${e.weight ? ` · ${e.weight} кг` : ''}` : `${e.done}/${e.total}${e.weight ? ` · ${e.weight} кг` : ''}`}</span>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        <button type="button" data-act="day-start" onClick={onOpen} style={{ ...BIG_BTN, flex: 2 }} aria-label={live ? 'Продолжить проведение тренировки' : 'Начать проведение тренировки'}>{live ? '▶ Продолжить' : '▶ Начать'}</button>
-        <button type="button" data-act="day-skip" onClick={onSkip} style={{ ...GHOST_BTN, flex: 1 }} aria-label="Пропустить тренировку">Пропуск</button>
+        <button type="button" data-act="day-start" onClick={() => { requestOpenSession(); onOpen?.(); }} style={{ ...BIG_BTN, flex: 2 }} aria-label={live ? 'Продолжить проведение тренировки' : 'Начать проведение тренировки'}>{live ? '▶ Продолжить' : '▶ Начать'}</button>
+        {/* «Пропуск» без обработчика — мёртвая кнопка: рисуем, только если есть что пропускать. */}
+        {onSkip && <button type="button" data-act="day-skip" onClick={onSkip} style={{ ...GHOST_BTN, flex: 1 }} aria-label="Пропустить тренировку">Пропуск</button>}
       </div>
     </section>
   );
@@ -168,7 +181,8 @@ export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpe
 
 /* ── A3: «BIG-режим» — огромные кнопки для зала одной рукой ────────────── */
 export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDoneSet?: (exIdx: number) => void; onFinish?: () => void }> = ({ state, onDoneSet, onFinish }) => {
-  const s = state ?? useWorkoutLive();
+  const auto = useWorkoutLive();
+  const s = state ?? auto;
   const live = s?.live;
   const [idx, setIdx] = useState(0);
   const exs = useMemo(() => s?.exercises ?? [], [s]);
@@ -177,20 +191,40 @@ export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDon
     <section data-widget="workout-big" aria-label="Крупный режим зала" style={{ ...CARD, textAlign: 'center' }}>
       <div style={{ color: WHITE, fontSize: 12 }}>Упражнение {exs.length ? idx + 1 : 0} из {exs.length}</div>
       <div style={{ color: WHITE, fontSize: 20, fontWeight: 800, margin: '6px 0' }}>{cur?.name ?? 'Нет упражнений'}</div>
-      <div style={{ color: WHITE, fontSize: 28, fontWeight: 800, ...TABULAR }}>{cur ? `${cur.done}/${cur.total}` : '—'}</div>
+      <div style={{ color: WHITE, fontSize: 28, fontWeight: 800, ...TABULAR }}>{cur ? (live ? cur.done : `${cur.done}/${cur.total}`) : '—'}</div>
+      {live && cur && <div style={{ color: WHITE, fontSize: 11, marginTop: -2 }}>подходов сделано</div>}
       {live && <div style={{ color: WHITE, fontSize: 12, marginTop: 2, ...TABULAR }}>{live.setsDone} подх. · {live.volumeKg.toLocaleString()} кг · {live.progressPct}%</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
         <button type="button" data-act="big-prev" disabled={idx === 0} onClick={() => setIdx(i => Math.max(0, i - 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Предыдущее упражнение">‹ Назад</button>
         <button type="button" data-act="big-next" disabled={idx >= exs.length - 1} onClick={() => setIdx(i => Math.min(exs.length - 1, i + 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Следующее упражнение">Далее ›</button>
       </div>
-      <button type="button" data-act="big-done" onClick={() => { requestQuickSet(); if (cur) onDoneSet?.(idx); }} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Готово, записать сет">✅ ГОТОВО</button>
-      <button type="button" data-act="big-finish" onClick={onFinish} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Завершить тренировку">Завершить</button>
+      {/* «ГОТОВО» без живой сессии и без обработчика ничего не записывает:
+          в этом состоянии главное действие — начать проведение. */}
+      {live || onDoneSet ? (
+        <button type="button" data-act="big-done" onClick={() => { requestQuickSet(); if (cur) onDoneSet?.(idx); }} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Готово, записать сет">✅ ГОТОВО</button>
+      ) : (
+        <button type="button" data-act="big-start" onClick={requestOpenSession} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+      )}
+      {/* Без onFinish «Завершить» молчала бы — тогда ведём в плеер, где есть завершение. */}
+      {onFinish ? (
+        <button type="button" data-act="big-finish" onClick={onFinish} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Завершить тренировку">Завершить</button>
+      ) : (
+        <button type="button" data-act="big-open" onClick={requestOpenSession} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Открыть проведение тренировки">Открыть проведение →</button>
+      )}
     </section>
   );
 };
 
 /* ── Панель-переключатель всех трёх (для предпросмотра в АПК) ──────────── */
-export const WorkoutWidgetsPanel: React.FC<{ state?: WorkoutWidgetState | null }> = ({ state }) => {
+export const WorkoutWidgetsPanel: React.FC<{
+  state?: WorkoutWidgetState | null;
+  /** Проброс действий: панель не должна показывать кнопки без обработчиков. */
+  onOpen?: () => void;
+  onNextSet?: () => void;
+  onDoneSet?: (exIdx: number) => void;
+  onFinish?: () => void;
+  onSkip?: () => void;
+}> = ({ state, onOpen, onNextSet, onDoneSet, onFinish, onSkip }) => {
   const [tab, setTab] = useState<'pult' | 'day' | 'big'>('pult');
   return (
     <section data-widget="workout-panel" aria-label="Виджеты проведения" style={CARD}>
@@ -200,9 +234,9 @@ export const WorkoutWidgetsPanel: React.FC<{ state?: WorkoutWidgetState | null }
             style={{ flex: 1, minHeight: 44, borderRadius: 12, border: tab === k ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)', background: tab === k ? 'rgba(0,230,138,0.12)' : 'transparent', color: WHITE, fontWeight: 800, fontSize: 13 }}>{label}</button>
         ))}
       </div>
-      {tab === 'pult' && <WorkoutMiniPult state={state} />}
-      {tab === 'day' && <WorkoutDayCard state={state} />}
-      {tab === 'big' && <WorkoutBigMode state={state} />}
+      {tab === 'pult' && <WorkoutMiniPult state={state} onOpen={onOpen} onNextSet={onNextSet} />}
+      {tab === 'day' && <WorkoutDayCard state={state} onOpen={onOpen} onSkip={onSkip} />}
+      {tab === 'big' && <WorkoutBigMode state={state} onDoneSet={onDoneSet} onFinish={onFinish} />}
     </section>
   );
 };
