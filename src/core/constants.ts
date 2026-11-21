@@ -476,16 +476,24 @@ export const MICRONUTRIENT_TARGETS: Record<string, { amount: number; unit: strin
 //
 // Числа живут здесь один раз, строки каталога их разделяют (`...RANGE_K`).
 // Двойники, у которых числа ОСТАЛИСЬ разными, выравнивать молча нельзя:
-// магний 1.1 против 1.0, фосфор 1.5 против 1.45, общий белок 60–80 против
-// 65–85, мочевая кислота низ 200 против 150 (плюс прогестерон, у которого
-// разные единицы) — это клинические решения, перечень в
-// `docs/LAB-NORMS-SINGLE-SOURCE.md` §4 и в гарде
-// `src/core/__tests__/ucum-same-name-single-range.test.ts`.
+// фосфор 1.5 против 1.45, общий белок 60–80 против 65–85, мочевая кислота низ
+// 200 против 150 (плюс прогестерон, у которого разные единицы) — это
+// клинические решения, перечень в `docs/LAB-NORMS-SINGLE-SOURCE.md` §4 и в
+// гарде `src/core/__tests__/ucum-same-name-single-range.test.ts`.
 const RANGE_K = { prefUnit: 'mmol/L', coeff: 1, uln: 5.1, lln: 3.5 } as const;
 const RANGE_NA = { prefUnit: 'mmol/L', coeff: 1, uln: 145, lln: 135 } as const;
 const RANGE_CA = { prefUnit: 'mmol/L', coeff: 1, uln: 2.6, lln: 2.1 } as const;
 const RANGE_DBIL = { prefUnit: 'umol/L', coeff: 1, uln: 5, lln: 0 } as const;
 const RANGE_HOMA = { prefUnit: '', coeff: 1, uln: 2.7, lln: 1.0 } as const;
+/**
+ * Магний — проход 188. Референс российских лабораторий (ИНВИТРО и Helix,
+ * взрослые старше 20 лет) — 0.66–1.07 ммоль/л; то же число уже стояло в
+ * `comprehensive-report.engine` (refLow 0.66, refHigh 1.07), то есть в
+ * приложении было два ответа на один анализ: 0.7–1.1 под кодом `MG` и
+ * 0.7–1.0 под `MAGNESIUM`. Магний 1.05 считался нормой по первому коду и
+ * верхней границей по второму.
+ */
+const RANGE_MG = { prefUnit: 'mmol/L', coeff: 1, uln: 1.07, lln: 0.66 } as const;
 
 // НОВЫЕ: Лабораторные маркеры (расширено до 30+)
 export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: number; lln: number; name: string }> & Record<string, any> = {
@@ -534,7 +542,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'NA':   { ...RANGE_NA, name: 'Натрий' },
   'CA':   { ...RANGE_CA, name: 'Кальций' },
   'P':    { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.8, name: 'Фосфор' },
-  'MG':   { prefUnit: 'mmol/L', coeff: 1, uln: 1.1, lln: 0.7, name: 'Магний' },
+  'MG':   { ...RANGE_MG, name: 'Магний' },
   'B12':  { prefUnit: 'pg/mL', coeff: 1, uln: 900, lln: 200, name: 'Витамин B12' },
   'FOL':  { prefUnit: 'ng/mL', coeff: 1, uln: 20, lln: 3, name: 'Фолат' },
   'TIBC': { prefUnit: 'umol/L', coeff: 1, uln: 70, lln: 45, name: 'ОЖСС' },
@@ -617,7 +625,7 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'CHLORIDE': { prefUnit: 'mmol/L', coeff: 1, uln: 108, lln: 98, name: 'Хлор' },
   'CALCIUM': { ...RANGE_CA, name: 'Кальций' },
   'PHOSPHORUS': { prefUnit: 'mmol/L', coeff: 1, uln: 1.45, lln: 0.8, name: 'Фосфор' },
-  'MAGNESIUM': { prefUnit: 'mmol/L', coeff: 1, uln: 1.0, lln: 0.7, name: 'Магний' },
+  'MAGNESIUM': { ...RANGE_MG, name: 'Магний' },
   'COPPER': { prefUnit: 'umol/L', coeff: 1, uln: 30, lln: 10, name: 'Медь' },
   'ZINC': { prefUnit: 'umol/L', coeff: 1, uln: 20, lln: 11, name: 'Цинк' },
   'SELENIUM': { prefUnit: 'ug/L', coeff: 1, uln: 150, lln: 70, name: 'Селен' },

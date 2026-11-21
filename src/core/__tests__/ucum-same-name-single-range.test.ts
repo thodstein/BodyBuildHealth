@@ -10,9 +10,14 @@
  *
  * Теперь числа живут в константах `RANGE_*` и обе строки их разделяют.
  * Двойники, у которых числа ОСТАЛИСЬ разными, — не опечатка, а клиническое
- * решение (магний, фосфор, общий белок, мочевая кислота, прогестерон в другой
+ * решение (фосфор, общий белок, мочевая кислота, прогестерон в другой
  * единице): их нельзя «выровнять» молча, иначе один и тот же анализ изменит
  * вердикт. Перечень — `docs/LAB-NORMS-SINGLE-SOURCE.md` §4.
+ *
+ * Магний вышел из этого списка в проходе 188: референс российских лабораторий
+ * (ИНВИТРО и Helix, взрослые >20 лет) — 0.66–1.07 ммоль/л, и это же число уже
+ * стояло в `comprehensive-report.engine`. Прежние 0.7–1.1 (`MG`) и 0.7–1.0
+ * (`MAGNESIUM`) давали два ответа на 1.05.
  *
  * Гард держит четыре вещи:
  *  1) у каждого двойника обе строки дают одинаковую норму;
@@ -24,6 +29,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UCUM_MAP, ucumInfo } from '../constants';
+import { LAB_PANELS } from '../../data/labs-phase-panels';
 
 type Row = { prefUnit: string; coeff: number; uln: number; lln: number; name: string };
 
@@ -42,17 +48,16 @@ const IDENTICAL: Array<[a: string, b: string, range: string]> = [
   ['CA', 'CALCIUM', 'RANGE_CA'],
   ['DBIL', 'DIRECT_BIL', 'RANGE_DBIL'],
   ['HOMA', 'HOMAIR', 'RANGE_HOMA'],
+  ['MG', 'MAGNESIUM', 'RANGE_MG'],
 ];
 
 /**
  * Расходящиеся двойники — выбор смысла, а не опечатка. Выравнивание меняет
- * вердикт (например, магний 1.05: при 1.1 — норма, при 1.0 — верх), поэтому
- * это отдельное клиническое решение с обновлением §4.
+ * вердикт, поэтому это отдельное клиническое решение с обновлением §4.
  */
 const DIVERGENT: Array<[a: string, b: string]> = [
   ['UA', 'URIC_ACID'],          // низ 200 против 150
   ['P', 'PHOSPHORUS'],          // верх 1.5 против 1.45
-  ['MG', 'MAGNESIUM'],          // верх 1.1 против 1.0
   ['TP', 'TOTAL_PROTEIN'],      // 60–80 против 65–85
   ['PROG', 'PROGESTERONE'],     // разные единицы: ng/mL против nmol/L
 ];
@@ -120,11 +125,24 @@ describe('проход 177: один анализ — один набор чис
   });
 
   it('вердикт двойника не зависит от написания кода', () => {
-    // Магний 1.05 и фосфор 1.47 лежат ровно в зазоре расходящихся пар: гард
-    // фиксирует, что зазор существует и что он про числа, а не про поиск.
-    expect((UCUM_MAP.MG as Row).uln).toBe(1.1);
-    expect((UCUM_MAP.MAGNESIUM as Row).uln).toBe(1.0);
+    // Фосфор 1.47 лежит ровно в зазоре расходящейся пары: гард фиксирует, что
+    // зазор существует и что он про числа, а не про поиск.
     expect((UCUM_MAP.P as Row).uln).toBe(1.5);
     expect((UCUM_MAP.PHOSPHORUS as Row).uln).toBe(1.45);
+  });
+
+  it('магний выровнен по референсу РФ и не расходится с панелями', () => {
+    // Проход 188: 0.66–1.07 ммоль/л (ИНВИТРО/Helix, взрослые >20 лет) — то же
+    // число, что в `comprehensive-report.engine`.
+    expect((UCUM_MAP.MG as Row).lln).toBe(0.66);
+    expect((UCUM_MAP.MG as Row).uln).toBe(1.07);
+    expect(UCUM_MAP.MAGNESIUM).toEqual(UCUM_MAP.MG);
+    // Панели фаз печатают ту же пару, а не своё «0.7–1.1».
+    for (const panel of Object.values(LAB_PANELS)) {
+      for (const marker of panel.markers) {
+        if (marker.ucumCode !== 'MG' && marker.ucumCode !== 'MAGNESIUM') continue;
+        expect(marker.ref, marker.label).toEqual([0.66, 1.07]);
+      }
+    }
   });
 });

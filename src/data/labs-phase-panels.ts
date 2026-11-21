@@ -1,5 +1,18 @@
 /** Phase-based lab panels (from MODULELABS healthlabs.data.js). */
+import { ucumInfo } from '../core/constants';
+
 export type LabImportance = 'critical' | 'important' | 'optional';
+
+/**
+ * Референс маркера из каталога единиц (`UCUM_MAP`) — для тех пар, где второе
+ * число уже сведено (проход 188: магний). Остальные пары в этом файле пока
+ * записаны литералами — это отдельный долг (§4 `docs/LAB-NORMS-SINGLE-SOURCE.md`),
+ * но новый код должен читать каталог, а не писать норму заново.
+ */
+const catalogRef = (code: string): [number, number] => {
+  const row = ucumInfo(code);
+  return row ? [row.lln, row.uln] : [0, 0];
+};
 
 export interface LabPanelMarker {
   id: string;
@@ -162,7 +175,7 @@ export const LAB_PANELS: Record<string, LabPanel> = {
       { id: 'na', label: 'Натрий', unit: 'mmol/L', ref: [135, 145], importance: 'critical', ucumCode: 'NA' },
       { id: 'ca', label: 'Кальций', unit: 'mmol/L', ref: [2.1, 2.6], importance: 'important', ucumCode: 'CA' },
       { id: 'p', label: 'Фосфор', unit: 'mmol/L', ref: [0.8, 1.5], importance: 'important', ucumCode: 'P' },
-      { id: 'mg', label: 'Магний', unit: 'mmol/L', ref: [0.7, 1.1], importance: 'important', ucumCode: 'MG' }
+      { id: 'mg', label: 'Магний', unit: 'mmol/L', ref: catalogRef('MG'), importance: 'important', ucumCode: 'MG' }
     ]
   },
   iron_studies: {
@@ -233,7 +246,7 @@ export const LAB_PANELS: Record<string, LabPanel> = {
     markers: [
       { id: 'vitd', label: 'Витамин D', unit: 'ng/mL', ref: [30, 100], importance: 'critical', ucumCode: 'VITD' },
       { id: 'zinc', label: 'Цинк', unit: 'umol/L', ref: [11, 20], importance: 'critical', ucumCode: 'ZINC' },
-      { id: 'magnesium', label: 'Магний', unit: 'mmol/L', ref: [0.7, 1.1], importance: 'critical', ucumCode: 'MAGNESIUM' },
+      { id: 'magnesium', label: 'Магний', unit: 'mmol/L', ref: catalogRef('MAGNESIUM'), importance: 'critical', ucumCode: 'MAGNESIUM' },
       { id: 'selenium', label: 'Селен', unit: 'ug/L', ref: [70, 150], importance: 'important', ucumCode: 'SELENIUM' },
       { id: 'copper', label: 'Медь', unit: 'umol/L', ref: [10, 30], importance: 'important', ucumCode: 'COPPER' },
       { id: 'vitamin_e', label: 'Витамин E', unit: 'umol/L', ref: [12, 35], importance: 'important', ucumCode: 'VITAMIN_E' },
