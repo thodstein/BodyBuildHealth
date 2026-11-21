@@ -107,6 +107,40 @@
             android:textColorHint="#607492"
             android:textSize="13sp" />
 
+        <!-- Поиск по базе продуктов: каталог кладёт JS один раз (WidgetStore.KEY_FOODS) -->
+        <LinearLayout
+            android:id="@+id/qa_search_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/qa_search"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/widget_input_bg"
+                android:hint="Поиск продукта (необязательно)"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLength="40"
+                android:minHeight="40dp"
+                android:paddingLeft="12dp"
+                android:paddingRight="12dp"
+                android:singleLine="true"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#607492"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/qa_search_results"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
         <!-- Еда (виджет «Питание»): ккал и Б/Ж/У на порцию -->
         <LinearLayout
             android:id="@+id/qa_food_row"
@@ -273,6 +307,7 @@
             android:visibility="gone">
 
             <TextView
+                android:id="@+id/qa_qty_label"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

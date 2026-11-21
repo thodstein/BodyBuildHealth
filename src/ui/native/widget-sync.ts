@@ -25,7 +25,7 @@ import {
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { derivePAL } from '../../core/energy-pal';
-import { loadWaterLog, addWater } from '../../engines/nutrition-tracker.engine';
+import { loadWaterLog, addWater, removeWater } from '../../engines/nutrition-tracker.engine';
 import {
   readDiaryV2,
   writeDiaryV2,
@@ -48,7 +48,16 @@ import {
   type WorkoutWidgetExercise,
   type WorkoutWidgetSnapshot,
   type NutritionPeriodStats,
+  type NutritionLastFood,
+  type NutritionDayItem,
+  type NutritionDaySnapshot,
+  type NutritionQuickFood,
+  type NutritionFoodItem,
+  pushNutritionFoods,
+  nutritionFoodsVersion,
 } from '../../core/widget-bridge';
+import { resolveFavorites } from '../screens/NutritionScreen_parts/diary/food-favorites';
+import { FOOD_DB } from '../../core/nutrition-database';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
 import {
   readCoachPlanner,
@@ -110,7 +119,11 @@ export function addDaysIso(iso: string, days: number): string {
 
 export interface WidgetSyncResult {
   drainedWaterMl: number;
+  /** Сколько воды сняли кнопкой «−» на виджете. */
+  drainedWaterRemovedMl: number;
   drainedFoods: number;
+  /** Сколько записей еды отменили кнопкой «↩» на виджете. */
+  drainedFoodsRemoved: number;
   tasksToggled: number;
   /** Новые задачи, добавленные из быстрого редактора виджета. */
   tasksAdded: number;
@@ -284,6 +297,73 @@ function periodBounds(period: 'week' | 'month', today: string): { from: string; 
   }
 }
 
+/**
+ * Позиции дня для списка на виджете: порядок как в дневнике (по приёмам),
+ * адрес каждой записи — `meal` + `index`. По этому адресу кнопка «✕» удаляет
+ * именно эту строку, а не «последнюю вообще».
+ */
+function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] {
+  const meals = diary?.[date]?.meals;
+  if (!meals || typeof meals !== 'object') return [];
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  const out: NutritionDayItem[] = [];
+  for (const [meal, list] of Object.entries(meals as Record<string, any[]>)) {
+    if (!Array.isArray(list)) continue;
+    list.forEach((item, index) => {
+      if (!item || !item.name) return;
+      const qty = num(item.qty);
+      out.push({
+        name: String(item.name).slice(0, 40),
+        kcal: num(item.kcal),
+        p: num(item.p),
+        f: num(item.f),
+        c: num(item.c),
+        meal: String(meal).slice(0, 32),
+        index,
+        ...(qty > 0 ? { qty } : {}),
+      });
+    });
+  }
+  return out.slice(0, 20);
+}
+
+/**
+ * Чипы «избранное + недавние»: тап на виджете пишет блюдо в день без ввода
+ * КБЖУ. Избранное идёт первым (пользователь выбрал его сам), дальше —
+ * последние блюда дневника за три недели, без повторов по названию.
+ */
+function collectQuickFoods(diary: Record<string, any>, today: string): NutritionQuickFood[] {
+  const out: NutritionQuickFood[] = [];
+  const seen = new Set<string>();
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  for (const fav of safe(() => resolveFavorites(), [])) {
+    const name = String(fav.name ?? '').trim();
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.push({
+      name: name.slice(0, 28),
+      kcal: num(fav.kcal),
+      p: num(fav.protein),
+      f: num(fav.fat),
+      c: num(fav.carbs),
+      qty: 100,
+      fav: true,
+    });
+    if (out.length >= 6) return out;
+  }
+  for (let n = 0; n < 21 && out.length < 6; n++) {
+    const date = addDaysIso(today, -n);
+    for (const it of dayItems(diary, date).reverse()) {
+      const key = it.name.toLowerCase();
+      if (seen.has(key) || it.kcal <= 0) continue;
+      seen.add(key);
+      out.push({ name: it.name.slice(0, 28), kcal: it.kcal, p: it.p, f: it.f, c: it.c, qty: it.qty ?? 100 });
+      if (out.length >= 6) break;
+    }
+  }
+  return out;
+}
+
 /** Сумма по дневнику еды + воде за диапазон дат (YYYY-MM-DD включительно). */
 function sumPeriod(
   diary: Record<string, any>,
@@ -335,6 +415,12 @@ function sumPeriod(
 export function collectNutrition(): {
   kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
   targetKcal: number; targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+  /** Последняя запись еды дня — по ней виджет показывает «↩». */
+  lastFood?: NutritionLastFood;
+  /** Последние 7 дней: итоги и позиции — для листания дат и списка дня. */
+  days: Record<string, NutritionDaySnapshot>;
+  /** Чипы быстрого добавления: избранное и недавние блюда. */
+  quick: NutritionQuickFood[];
   periods: {
     day: NutritionPeriodStats;
     week: NutritionPeriodStats;
@@ -361,6 +447,22 @@ export function collectNutrition(): {
   const monthRange = periodBounds('month', today);
   const week = sumPeriod(diary, waterLog, weekRange.from, weekRange.to);
   const month = sumPeriod(diary, waterLog, monthRange.from, monthRange.to);
+  const last = lastDiaryItem(diary, today);
+
+  // Последние 7 дней — чтобы листать дату на виджете без открытия приложения.
+  const days: Record<string, NutritionDaySnapshot> = {};
+  for (let n = 0; n < 7; n++) {
+    const date = addDaysIso(today, -n);
+    const stats = n === 0 ? day : sumPeriod(diary, waterLog, date, date);
+    days[date] = {
+      kcal: stats.kcal,
+      p: stats.protein,
+      f: stats.fat,
+      c: stats.carbs,
+      waterMl: stats.waterMl,
+      items: dayItems(diary, date),
+    };
+  }
 
   return {
     kcal: day.kcal,
@@ -373,6 +475,19 @@ export function collectNutrition(): {
     targetFat: targets.fats,
     targetCarbs: targets.carbs,
     waterTargetMl: targets.waterMl,
+    days,
+    quick: collectQuickFoods(diary, today),
+    lastFood: last
+      ? {
+          name: String(last.item?.name ?? '').slice(0, 40),
+          meal: last.meal,
+          kcal: Math.max(0, Math.round(Number(last.item?.kcal) || 0)),
+          protein: Math.max(0, Math.round(Number(last.item?.p) || 0)),
+          fat: Math.max(0, Math.round(Number(last.item?.f) || 0)),
+          carbs: Math.max(0, Math.round(Number(last.item?.c) || 0)),
+          qty: Math.max(0, Math.round(Number(last.item?.qty) || 0)) || undefined,
+        }
+      : undefined,
     periods: { day, week, month },
   };
 }
@@ -987,13 +1102,37 @@ export function normalizeMealKey(raw?: string | null): string {
 }
 
 /**
+ * Последняя по порядку запись дня: последний элемент последнего непустого
+ * приёма. Один выбор для двух задач — что показать в `lastFood` и что снять
+ * кнопкой «↩», иначе виджет мог бы «отменить» не то, что обещал.
+ */
+function lastDiaryItem(
+  diary: Record<string, any>,
+  date: string,
+): { meal: string; index: number; item: any } | null {
+  const meals = diary?.[date]?.meals;
+  if (!meals || typeof meals !== 'object') return null;
+  let found: { meal: string; index: number; item: any } | null = null;
+  for (const [meal, items] of Object.entries(meals as Record<string, any>)) {
+    if (!Array.isArray(items) || items.length === 0) continue;
+    const index = items.length - 1;
+    found = { meal, index, item: items[index] };
+  }
+  return found;
+}
+
+/**
  * Применить очередь виджета к журналам: вода -> he_water_log,
  * еда -> nutrition_diary_v2 в день из метки времени,
  * задача -> статус «сделано» в планшете (he_coach_planner).
  */
 export function applyWidgetQueue(items: QueuedItem[]): {
   waterMl: number;
+  /** Снятая вода («−250» на виджете) — сколько реально убрали. */
+  waterRemovedMl: number;
   foods: number;
+  /** Отменённые записи еды («↩» на виджете). */
+  foodsRemoved: number;
   tasks: number;
   tasksAdded: number;
   notesAdded: number;
@@ -1003,7 +1142,9 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   workoutsFinished: number;
 } {
   let waterMl = 0;
+  let waterRemovedMl = 0;
   let foods = 0;
+  let foodsRemoved = 0;
   let tasks = 0;
   let tasksAdded = 0;
   let notesAdded = 0;
@@ -1022,6 +1163,18 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           addWater(ml);
           waterMl += ml;
         }
+      } else if (it.type === 'water_remove') {
+        // «−250 мл» на виджете: снимаем с записи за сегодня, ниже нуля не идём.
+        const ml = Math.max(0, Math.min(2000, Math.round(it.ml ?? 0)));
+        if (ml > 0) {
+          const today = todayLocalISO();
+          const before = (loadWaterLog() as { date: string; amountMl: number }[])
+            .find((e) => e.date === today)?.amountMl ?? 0;
+          removeWater(ml);
+          const after = (loadWaterLog() as { date: string; amountMl: number }[])
+            .find((e) => e.date === today)?.amountMl ?? 0;
+          waterRemovedMl += Math.max(0, before - after);
+        }
       } else if (it.type === 'food' && it.name) {
         const date = isoFromTs(it.ts || Date.now());
         const diary = readDiaryV2();
@@ -1039,6 +1192,35 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         });
         writeDiaryV2({ ...diary, [date]: { meals: { ...day.meals, [meal]: list } } });
         foods += 1;
+      } else if (it.type === 'food_remove') {
+        // Два режима: «✕» в списке дня приходит с адресом записи
+        // (дата + приём + индекс), «↩» без адреса снимает последнюю запись дня —
+        // ровно ту, что виджет показывал в `lastFood`.
+        const explicit = typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date);
+        const date = explicit ? String(it.date) : isoFromTs(it.ts || Date.now());
+        const diary = readDiaryV2();
+        const day = diary[date] ?? { meals: {} };
+        const meals: Record<string, any[]> = { ...((day.meals as Record<string, any[]>) ?? {}) };
+        const askedMeal = it.meal ? normalizeMealKey(it.meal) : '';
+        const askedIndex = Number.isInteger(it.index) ? Number(it.index) : -1;
+        const addressed = askedMeal !== '' && askedIndex >= 0;
+        // Адрес есть — удаляем строго по нему. Если он не сошёлся (дневник уже
+        // другой), лучше не трогать ничего: фолбэк на «последнюю» снёс бы чужую еду.
+        const targeted = addressed
+          ? Array.isArray(meals[askedMeal]) && askedIndex < meals[askedMeal].length
+            ? { meal: askedMeal, index: askedIndex }
+            : null
+          : lastDiaryItem(diary, date);
+        if (targeted) {
+          const list = [...((meals[targeted.meal] as any[]) ?? [])];
+          if (targeted.index < list.length) {
+            list.splice(targeted.index, 1);
+            if (list.length > 0) meals[targeted.meal] = list;
+            else delete meals[targeted.meal];
+            writeDiaryV2({ ...diary, [date]: { ...day, meals } });
+            foodsRemoved += 1;
+          }
+        }
       } else if (it.type === 'task' && it.id) {
         const storage = localStorageRef();
         const store = readCoachPlanner(storage);
@@ -1154,7 +1336,9 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   }
   return {
     waterMl,
+    waterRemovedMl,
     foods,
+    foodsRemoved,
     tasks,
     tasksAdded,
     notesAdded,
@@ -1177,9 +1361,28 @@ export async function pushTrainingWidget(): Promise<boolean> {
  * Полный цикл: забрать очередь -> применить -> запушить свежие снапшоты.
  * Безопасен везде; вне native виджеты просто не обновятся.
  */
+/** Компактный каталог продуктов для поиска на виджете (строится один раз). */
+let foodCatalogCache: NutritionFoodItem[] | null = null;
+function foodCatalog(): NutritionFoodItem[] {
+  if (foodCatalogCache) return foodCatalogCache;
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  foodCatalogCache = (FOOD_DB as any[])
+    .filter((f) => f && f.name && num(f.kcal) > 0)
+    .map((f) => ({
+      name: String(f.name).slice(0, 48),
+      kcal: num(f.kcal),
+      p: num(f.protein),
+      f: num(f.fat),
+      c: num(f.carbs),
+    }));
+  return foodCatalogCache;
+}
+
 export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   let drainedWaterMl = 0;
+  let drainedWaterRemovedMl = 0;
   let drainedFoods = 0;
+  let drainedFoodsRemoved = 0;
   let tasksToggled = 0;
   let tasksAdded = 0;
   let notesAdded = 0;
@@ -1191,7 +1394,9 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     if (items.length > 0) {
       const applied = applyWidgetQueue(items);
       drainedWaterMl = applied.waterMl;
+      drainedWaterRemovedMl = applied.waterRemovedMl;
       drainedFoods = applied.foods;
+      drainedFoodsRemoved = applied.foodsRemoved;
       tasksToggled = applied.tasks;
       tasksAdded = applied.tasksAdded;
       notesAdded = applied.notesAdded;
@@ -1223,14 +1428,24 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       targetCarbs: n.targetCarbs,
       waterMl: n.waterMl,
       waterTargetMl: n.waterTargetMl,
+      lastFood: n.lastFood,
+      days: n.days,
+      quick: n.quick,
       periods: n.periods,
     }).catch(() => false),
     syncCalendarWidget(cal).catch(() => false),
     syncNotesWidget(nt).catch(() => false),
   ]);
+  // Каталог продуктов для поиска в нативном редакторе еды: уходит один раз на
+  // версию FOOD_DB (иначе каждый синк гонял бы ~700 позиций через мост).
+  void pushNutritionFoods(foodCatalog(), nutritionFoodsVersion(foodCatalog())).catch(
+    () => false,
+  );
   return {
     drainedWaterMl,
+    drainedWaterRemovedMl,
     drainedFoods,
+    drainedFoodsRemoved,
     tasksToggled,
     tasksAdded,
     notesAdded,

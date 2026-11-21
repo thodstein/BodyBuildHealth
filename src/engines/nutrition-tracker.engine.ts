@@ -203,6 +203,24 @@ export function addWater(amountMl: number): WaterEntry[] {
   return entries;
 }
 
+/**
+ * Отмена воды («−250 мл» на виджете): вычитает из записи за сегодня.
+ * Ниже нуля не уходит; опустевшая запись удаляется — как будто её не было,
+ * иначе день остался бы «днём с водой» с нулём.
+ */
+export function removeWater(amountMl: number): WaterEntry[] {
+  if (!isFinite(amountMl) || amountMl <= 0) return loadWaterLog();
+  const today = localIsoDate();
+  const entries = loadWaterLog();
+  const idx = entries.findIndex(e => e.date === today);
+  if (idx < 0) return entries;
+  const left = entries[idx].amountMl - amountMl;
+  if (left > 0) entries[idx].amountMl = left;
+  else entries.splice(idx, 1);
+  try { localStorage.setItem(WATER_KEY, JSON.stringify(entries.slice(-90))); } catch {}
+  return entries;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Analytics
 // ═══════════════════════════════════════════════════════════════════════════

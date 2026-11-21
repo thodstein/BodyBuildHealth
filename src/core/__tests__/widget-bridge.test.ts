@@ -179,7 +179,9 @@ describe('очередь -> дневники', () => {
     const applied = applyWidgetQueue(await drainWidgetQueue());
     expect(applied).toEqual({
       waterMl: 750,
+      waterRemovedMl: 0,
       foods: 0,
+      foodsRemoved: 0,
       tasks: 0,
       tasksAdded: 0,
       notesAdded: 0,
@@ -200,7 +202,9 @@ describe('очередь -> дневники', () => {
     const applied = applyWidgetQueue(await drainWidgetQueue());
     expect(applied).toEqual({
       waterMl: 0,
+      waterRemovedMl: 0,
       foods: 1,
+      foodsRemoved: 0,
       tasks: 0,
       tasksAdded: 0,
       notesAdded: 0,
@@ -706,5 +710,241 @@ describe('аналитика питания: день, неделя, месяц'
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('36. «−250 мл» на виджете снимает воду и не уходит ниже нуля', async () => {
+    const { addWater, loadWaterLog } = await import('../../engines/nutrition-tracker.engine');
+    addWater(400);
+
+    const first = applyWidgetQueue([{ type: 'water_remove', ml: 250, ts: Date.now() }]);
+    expect(first.waterRemovedMl).toBe(250);
+    const today = localIsoDate();
+    const left = () => (loadWaterLog() as { date: string; amountMl: number }[])
+      .find((e) => e.date === today)?.amountMl ?? 0;
+    expect(left()).toBe(150);
+
+    // Порция-ошибка больше остатка: снимаем сколько есть и не уходим в минус.
+    const second = applyWidgetQueue([{ type: 'water_remove', ml: 500, ts: Date.now() }]);
+    expect(second.waterRemovedMl).toBe(150);
+    expect(left()).toBe(0);
+  });
+
+  it('37. «↩» на виджете снимает последнюю запись еды дня', async () => {
+    const { writeDiaryV2, readDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          'Обед': [
+            { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
+            { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
+          ],
+        },
+      },
+    } as any);
+
+    // «↩» обещает отменить ровно ту запись, что виджет показал в lastFood.
+    expect(collectNutrition().lastFood?.name).toBe('Рис');
+    applyWidgetQueue([{ type: 'food_remove', ts: Date.now() }]);
+
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
+    expect(diary[today].meals['Обед'].map((f) => f.name)).toEqual(['Курица']);
+    // Завтрак не тронут: снимается только последняя запись, не весь день.
+    expect(diary[today].meals['Завтрак']).toHaveLength(1);
+  });
+
+  it('38. collectNutrition отдаёт lastFood с приёмом пищи и порцией', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: { 'Ужин': [{ name: 'Лосось', kcal: 320, p: 34, f: 18, c: 0, qty: 180 }] },
+      },
+    } as any);
+
+    const n = collectNutrition();
+    expect(n.lastFood).toEqual({
+      name: 'Лосось',
+      meal: 'Ужин',
+      kcal: 320,
+      protein: 34,
+      fat: 18,
+      carbs: 0,
+      qty: 180,
+    });
+  });
+
+  it('39. пустой день: lastFood нет, «↩» ничего не снимает', async () => {
+    const n = collectNutrition();
+    expect(n.lastFood).toBeUndefined();
+    const res = applyWidgetQueue([{ type: 'food_remove', ts: Date.now() }]);
+    expect(res.foodsRemoved).toBe(0);
+  });
+
+  it('40. collectNutrition отдаёт 7 дней с позициями и адресами meal/index', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    const yesterday = addDaysIso(today, -1);
+    writeDiaryV2({
+      [today]: {
+        meals: { 'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
+      },
+      [yesterday]: {
+        meals: {
+          'Обед': [
+            { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
+            { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
+          ],
+        },
+      },
+    } as any);
+
+    const n = collectNutrition();
+    // Ровно неделя: стрелка «‹» на виджете глубже −6 не уходит.
+    expect(Object.keys(n.days)).toHaveLength(7);
+    expect(n.days[today].kcal).toBe(300);
+    expect(n.days[today].items[0]).toMatchObject({
+      name: 'Овсянка',
+      meal: 'Завтрак',
+      index: 0,
+      qty: 200,
+    });
+    // Порядок как в дневнике, индекс — адрес записи внутри приёма.
+    expect(n.days[yesterday].items.map((i) => i.name)).toEqual(['Курица', 'Рис']);
+    expect(n.days[yesterday].items.map((i) => i.index)).toEqual([0, 1]);
+  });
+
+  it('41. «✕» удаляет позицию по дате, приёму и индексу, а не последнюю вообще', async () => {
+    const { writeDiaryV2, readDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    const yesterday = addDaysIso(today, -1);
+    writeDiaryV2({
+      [today]: {
+        meals: { 'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
+      },
+      [yesterday]: {
+        meals: {
+          'Обед': [
+            { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
+            { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
+          ],
+        },
+      },
+    } as any);
+
+    const res = applyWidgetQueue([
+      { type: 'food_remove', date: yesterday, meal: 'Обед', index: 0, ts: Date.now() },
+    ]);
+    expect(res.foodsRemoved).toBe(1);
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
+    expect(diary[yesterday].meals['Обед'].map((f) => f.name)).toEqual(['Рис']);
+    // Сегодняшний день не тронут: адрес бил в конкретную запись.
+    expect(diary[today].meals['Завтрак']).toHaveLength(1);
+  });
+
+  it('42. quick: недавние блюда дневника без повторов по названию', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    const yesterday = addDaysIso(today, -1);
+    writeDiaryV2({
+      [today]: {
+        meals: { 'Завтрак': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }] },
+      },
+      [yesterday]: {
+        meals: {
+          'Обед': [
+            { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
+            { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
+          ],
+        },
+      },
+    } as any);
+
+    const names = collectNutrition().quick.map((q) => q.name);
+    expect(names.filter((n) => n === 'Курица')).toHaveLength(1);
+    expect(names).toContain('Рис');
+    expect(names.length).toBeLessThanOrEqual(6);
+  });
+
+  it('43. снапшот режет дни до 7 свежих и чипы до 6 с именем', async () => {
+    const days: Record<string, any> = {};
+    for (let n = 0; n < 9; n++) {
+      days[addDaysIso(localIsoDate(), -n)] = {
+        kcal: 100,
+        p: 10,
+        f: 5,
+        c: 20,
+        waterMl: 250,
+        items: [{ name: `Блюдо ${n}`, kcal: 100, p: 10, f: 5, c: 20, meal: 'Обед', index: 0 }],
+      };
+    }
+    days['not-a-date'] = { kcal: 999, items: [] };
+
+    await syncNutritionWidget({
+      kcal: 100,
+      targetKcal: 2000,
+      protein: 10,
+      fat: 5,
+      carbs: 20,
+      targetProtein: 100,
+      targetFat: 60,
+      targetCarbs: 200,
+      waterMl: 250,
+      waterTargetMl: 2000,
+      days,
+      quick: [
+        ...Array.from({ length: 8 }, (_, i) => ({
+          name: `Блюдо ${i}`,
+          kcal: 100,
+          p: 10,
+          f: 5,
+          c: 20,
+          qty: 100,
+        })),
+        { name: '   ', kcal: 999, p: 0, f: 0, c: 0 },
+      ],
+    });
+
+    const snap = readFallbackSnapshot('nutrition') as {
+      days: Record<string, unknown>;
+      quick: { name: string; qty?: number }[];
+    };
+    const keys = Object.keys(snap.days);
+    expect(keys).toHaveLength(7);
+    // Мусорный ключ отброшен, старые дни — первыми в отсечке.
+    expect(keys).not.toContain('not-a-date');
+    expect(keys).toContain(localIsoDate());
+    expect(snap.quick).toHaveLength(6);
+    expect(snap.quick.every((q) => q.name.trim().length > 0)).toBe(true);
+  });
+
+  it('44. «✕» с несходящимся адресом не сносит последнюю запись дня', async () => {
+    const { writeDiaryV2, readDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          'Обед': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+        },
+      },
+    } as any);
+
+    // Дневник уже другой (позицию убрали в приложении): адрес не сошёлся,
+    // и удалять «последнюю вообще» нельзя — иначе снесём чужую еду.
+    const res = applyWidgetQueue([
+      { type: 'food_remove', date: today, meal: 'Завтрак', index: 5, ts: Date.now() },
+    ]);
+    expect(res.foodsRemoved).toBe(0);
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
+    expect(diary[today].meals['Завтрак'].map((f) => f.name)).toEqual(['Овсянка']);
+    expect(diary[today].meals['Обед'].map((f) => f.name)).toEqual(['Курица']);
   });
 });

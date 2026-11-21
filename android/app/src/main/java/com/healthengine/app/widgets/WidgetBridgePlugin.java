@@ -18,7 +18,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.healthengine.app.MainActivity;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * WidgetBridgePlugin — Capacitor-мост «WebView <-> homescreen-виджеты».
@@ -146,6 +153,52 @@ public class WidgetBridgePlugin extends Plugin {
                 if (clean.length() > 0) obj.put("periods", clean);
             }
             obj.put("queue", WidgetStore.queueSize(ctx));
+            // Последняя запись дня — кнопка «↩» на виджете.
+            JSObject lastFoodRaw = call.getObject("lastFood");
+            if (lastFoodRaw != null) {
+                JSONObject last = new JSONObject(lastFoodRaw.toString());
+                String lname = last.optString("name", "").trim();
+                if (!lname.isEmpty()) {
+                    JSONObject clean = new JSONObject();
+                    clean.put("name", clip(lname, 40));
+                    clean.put("meal", clip(last.optString("meal", ""), 32));
+                    clean.put("kcal", clampInt(last.optInt("kcal", 0)));
+                    clean.put("protein", clampInt(last.optInt("protein", 0)));
+                    clean.put("fat", clampInt(last.optInt("fat", 0)));
+                    clean.put("carbs", clampInt(last.optInt("carbs", 0)));
+                    int qty = clampInt(last.optInt("qty", 0));
+                    if (qty > 0) clean.put("qty", qty);
+                    obj.put("lastFood", clean);
+                }
+            }
+            // Последние дни (итоги + позиции) — листание дат и список дня.
+            JSObject daysRaw = call.getObject("days");
+            if (daysRaw != null) obj.put("days", cleanDays(new JSONObject(daysRaw.toString())));
+            // Чипы «недавние / избранное».
+            JSArray quickRaw = call.getArray("quick");
+            if (quickRaw != null) {
+                JSONArray quick = new JSONArray(quickRaw.toString());
+                JSONArray cleanQuick = new JSONArray();
+                for (int i = 0; i < quick.length() && cleanQuick.length() < 6; i++) {
+                    JSONObject f = quick.optJSONObject(i);
+                    if (f == null) continue;
+                    String name = f.optString("name", "").trim();
+                    if (name.isEmpty()) continue;
+                    JSONObject cf = new JSONObject();
+                    cf.put("name", clip(name, 28));
+                    cf.put("kcal", clampInt(f.optInt("kcal", 0)));
+                    cf.put("p", clampInt(f.optInt("p", 0)));
+                    cf.put("f", clampInt(f.optInt("f", 0)));
+                    cf.put("c", clampInt(f.optInt("c", 0)));
+                    int qty = clampInt(f.optInt("qty", 0));
+                    cf.put("qty", qty > 0 ? qty : 100);
+                    String meal = f.optString("meal", "");
+                    if (!meal.isEmpty()) cf.put("meal", clip(meal, 32));
+                    if (f.optBoolean("fav", false)) cf.put("fav", true);
+                    cleanQuick.put(cf);
+                }
+                if (cleanQuick.length() > 0) obj.put("quick", cleanQuick);
+            }
             obj.put("updatedAt", System.currentTimeMillis());
             WidgetStore.putJson(ctx, WidgetStore.KEY_NUTRITION, obj);
             NutritionWidgetProvider.updateAll(ctx);
@@ -159,6 +212,101 @@ public class WidgetBridgePlugin extends Plugin {
 
     private static int clampInt(int value) {
         return Math.max(0, Math.min(10_000_000, value));
+    }
+
+    private static final Pattern ISO_DATE = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}$");
+
+    /** Обрезка строки: лишние символы в RemoteViews всё равно не покажутся. */
+    private static String clip(String value, int max) {
+        String v = value == null ? "" : value.trim();
+        return v.length() > max ? v.substring(0, max) : v;
+    }
+
+    /**
+     * Дни дневника для виджета: только ISO-ключи, 7 самых свежих, позиции
+     * обрезаны по 20. Мусор из моста в префы не попадает — widget читает JSON
+     * напрямую и на неожиданных типах падает в пустой виджет.
+     */
+    private static JSONObject cleanDays(JSONObject days) throws JSONException {
+        JSONObject out = new JSONObject();
+        List<String> keys = new ArrayList<>();
+        Iterator<String> it = days.keys();
+        while (it.hasNext()) {
+            String key = it.next();
+            if (ISO_DATE.matcher(key).matches()) keys.add(key);
+        }
+        Collections.sort(keys);
+        for (int i = Math.max(0, keys.size() - 7); i < keys.size(); i++) {
+            String key = keys.get(i);
+            JSONObject day = days.optJSONObject(key);
+            if (day == null) continue;
+            JSONObject clean = new JSONObject();
+            clean.put("kcal", clampInt(day.optInt("kcal", 0)));
+            clean.put("p", clampInt(day.optInt("p", 0)));
+            clean.put("f", clampInt(day.optInt("f", 0)));
+            clean.put("c", clampInt(day.optInt("c", 0)));
+            clean.put("waterMl", clampInt(day.optInt("waterMl", 0)));
+            JSONArray items = day.optJSONArray("items");
+            JSONArray cleanItems = new JSONArray();
+            if (items != null) {
+                for (int j = 0; j < items.length() && cleanItems.length() < 20; j++) {
+                    JSONObject item = items.optJSONObject(j);
+                    if (item == null) continue;
+                    String name = item.optString("name", "").trim();
+                    if (name.isEmpty()) continue;
+                    JSONObject ci = new JSONObject();
+                    ci.put("name", clip(name, 40));
+                    ci.put("kcal", clampInt(item.optInt("kcal", 0)));
+                    ci.put("p", clampInt(item.optInt("p", 0)));
+                    ci.put("f", clampInt(item.optInt("f", 0)));
+                    ci.put("c", clampInt(item.optInt("c", 0)));
+                    ci.put("meal", clip(item.optString("meal", ""), 32));
+                    ci.put("index", Math.max(0, item.optInt("index", 0)));
+                    int qty = clampInt(item.optInt("qty", 0));
+                    if (qty > 0) ci.put("qty", qty);
+                    cleanItems.put(ci);
+                }
+            }
+            clean.put("items", cleanItems);
+            out.put(key, clean);
+        }
+        return out;
+    }
+
+    /**
+     * Каталог продуктов для поиска в нативном редакторе еды. JS присылает его
+     * один раз на версию FOOD_DB, поэтому метод не трогает виджеты.
+     */
+    @PluginMethod
+    public void syncNutritionFoods(PluginCall call) {
+        try {
+            Context ctx = getContext();
+            JSONArray arr = new JSONArray(call.getString("items", "[]"));
+            JSONArray clean = new JSONArray();
+            for (int i = 0; i < arr.length() && clean.length() < 2000; i++) {
+                JSONObject f = arr.optJSONObject(i);
+                if (f == null) continue;
+                String name = f.optString("name", "").trim();
+                if (name.isEmpty()) continue;
+                JSONObject cf = new JSONObject();
+                cf.put("n", clip(name, 48));
+                cf.put("k", clampInt(f.optInt("kcal", 0)));
+                cf.put("p", clampInt(f.optInt("p", 0)));
+                cf.put("f", clampInt(f.optInt("f", 0)));
+                cf.put("c", clampInt(f.optInt("c", 0)));
+                clean.put(cf);
+            }
+            JSONObject obj = new JSONObject();
+            obj.put("version", clip(call.getString("version", ""), 64));
+            obj.put("items", clean);
+            obj.put("updatedAt", System.currentTimeMillis());
+            WidgetStore.putJson(ctx, WidgetStore.KEY_FOODS, obj);
+            JSObject ret = new JSObject();
+            ret.put("ok", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("syncNutritionFoods failed");
+        }
     }
 
     @PluginMethod

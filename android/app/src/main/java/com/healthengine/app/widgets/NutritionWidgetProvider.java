@@ -6,11 +6,13 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.view.View;
 import android.widget.RemoteViews;
 
 import com.healthengine.app.R;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
@@ -35,12 +37,26 @@ import java.util.Locale;
 public class NutritionWidgetProvider extends AppWidgetProvider {
 
     public static final String ACTION_WATER = "com.healthengine.app.action.WIDGET_WATER";
+    /** «−250 мл»: коррекция воды, если порцию нажали по ошибке. */
+    public static final String ACTION_WATER_MINUS = "com.healthengine.app.action.WIDGET_WATER_MINUS";
     public static final String ACTION_FOOD = "com.healthengine.app.action.WIDGET_NUT_FOOD";
+    /** «↩»: отменить последнюю запись еды за сегодня. */
+    public static final String ACTION_FOOD_UNDO = "com.healthengine.app.action.WIDGET_NUT_FOOD_UNDO";
     /** Переключение периода аналитики: day / week / month (per-widget). */
     public static final String ACTION_PERIOD = "com.healthengine.app.action.WIDGET_NUT_PERIOD";
+    /** Листание дат «‹ ›»: extra `step` = ±1 (per-widget, только «День»). */
+    public static final String ACTION_DAY = "com.healthengine.app.action.WIDGET_NUT_DAY";
+    /** Тап по чипу «недавние / избранное»: extra `index` в `quick`. */
+    public static final String ACTION_QUICK = "com.healthengine.app.action.WIDGET_NUT_QUICK";
+    /** «✕» в списке дня: удалить позицию (date + meal + index). */
+    public static final String ACTION_ITEM_DEL = "com.healthengine.app.action.WIDGET_NUT_ITEM_DEL";
     public static final String EXTRA_ML = "ml";
     public static final String EXTRA_WIDGET_ID = "widget_id";
     public static final String EXTRA_PERIOD = "period";
+    public static final String EXTRA_STEP = "step";
+    public static final String EXTRA_INDEX = "index";
+    public static final String EXTRA_DATE = "date";
+    public static final String EXTRA_MEAL = "meal";
 
     private static final int C_TEXT = 0xFFE2ECFF;
     private static final int C_MUTED = 0xFF8FA3C4;
@@ -62,7 +78,51 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                 int widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
                 if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return;
                 WidgetStore.setNutritionPeriod(context, widgetId, intent.getStringExtra(EXTRA_PERIOD));
+                // Смена периода начинается с сегодняшнего дня: иначе возврат к
+                // «Дню» показывал бы вчерашний и кнопки добавления были скрыты.
+                WidgetStore.setNutritionDayOffset(context, widgetId, 0);
                 updateWidget(context, widgetId);
+                return;
+            }
+            if (ACTION_WATER_MINUS.equals(action)) {
+                int ml = intent.getIntExtra(EXTRA_ML, 250);
+                if (ml <= 0) ml = 250;
+                if (ml > 2000) ml = 2000;
+                JSONObject item = new JSONObject();
+                item.put("type", "water_remove");
+                item.put("ml", ml);
+                item.put("ts", System.currentTimeMillis());
+                WidgetStore.enqueue(context, item);
+                optimisticWater(context, -ml);
+                updateAll(context);
+                try {
+                    WaterQuickWidgetProvider.updateAll(context);
+                } catch (Exception ignored) {}
+                return;
+            }
+            if (ACTION_FOOD_UNDO.equals(action)) {
+                undoLastFood(context);
+                return;
+            }
+            if (ACTION_DAY.equals(action)) {
+                int widgetId = intent.getIntExtra(EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+                if (widgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return;
+                int step = intent.getIntExtra(EXTRA_STEP, 0);
+                int next = WidgetStore.getNutritionDayOffset(context, widgetId) + step;
+                WidgetStore.setNutritionDayOffset(context, widgetId, next);
+                updateWidget(context, widgetId);
+                return;
+            }
+            if (ACTION_QUICK.equals(action)) {
+                addQuickFood(context, intent.getIntExtra(EXTRA_INDEX, -1));
+                return;
+            }
+            if (ACTION_ITEM_DEL.equals(action)) {
+                removeDayItem(context,
+                        intent.getIntExtra(EXTRA_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID),
+                        intent.getStringExtra(EXTRA_DATE),
+                        intent.getStringExtra(EXTRA_MEAL),
+                        intent.getIntExtra(EXTRA_INDEX, -1));
                 return;
             }
             if (ACTION_WATER.equals(action)) {
@@ -99,6 +159,11 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             int[] ids = mgr.getAppWidgetIds(cn);
             for (int id : ids) {
                 mgr.updateAppWidget(id, build(context, id));
+                // Список позиций живёт в RemoteViewsService: без notify он
+                // показывал бы вчерашний набор строк после добавления/удаления.
+                try {
+                    mgr.notifyAppWidgetViewDataChanged(id, R.id.w_nut_items);
+                } catch (Exception ignored) {}
             }
         } catch (Exception ignored) {}
         // Двойной виджет аналитики читает тот же снапшот питания.
@@ -111,6 +176,9 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         try {
             AppWidgetManager mgr = AppWidgetManager.getInstance(context);
             mgr.updateAppWidget(widgetId, build(context, widgetId));
+            try {
+                mgr.notifyAppWidgetViewDataChanged(widgetId, R.id.w_nut_items);
+            } catch (Exception ignored) {}
         } catch (Exception ignored) {}
     }
 
@@ -118,19 +186,25 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
      * Вода из виджета должна быть видна сразу, не дожидаясь синка из WebView.
      * Снапшот пополняется оптимистично (включая агрегаты периода); при
      * следующем syncAllWidgets JS пересчитает воду из he_water_log.
+     *
+     * `ml` может быть отрицательным — кнопка «−250 мл»; ниже нуля не уходим.
      */
     static void optimisticWater(Context context, int ml) {
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-            d.put("waterMl", Math.max(0, d.optInt("waterMl", 0)) + Math.max(0, ml));
+            int next = Math.max(0, d.optInt("waterMl", 0) + ml);
+            d.put("waterMl", next);
             JSONObject periods = d.optJSONObject("periods");
             if (periods != null) {
                 for (String key : new String[]{"day", "week", "month"}) {
                     JSONObject p = periods.optJSONObject(key);
                     if (p == null) continue;
-                    p.put("waterMl", Math.max(0, p.optInt("waterMl", 0)) + Math.max(0, ml));
+                    int left = Math.max(0, p.optInt("waterMl", 0) + ml);
+                    p.put("waterMl", left);
                     if ("day".equals(key)) {
-                        p.put("waterDays", Math.max(1, p.optInt("waterDays", 0)));
+                        // Вода обнулилась — день перестаёт быть «днём с водой»:
+                        // иначе среднее за неделю делилось бы на пустой день.
+                        p.put("waterDays", left > 0 ? Math.max(1, p.optInt("waterDays", 0)) : 0);
                     }
                     periods.put(key, p);
                 }
@@ -140,30 +214,301 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {}
     }
 
-    /** Еда из нативного редактора: круги обновляются сразу, без входа в приложение. */
-    static void optimisticFood(Context context, int kcal, int p, int f, int c) {
+    /**
+     * Еда из нативного редактора: круги обновляются сразу, без входа в приложение.
+     * Заодно запоминаем запись в `lastFood` — по ней рисуется кнопка «↩».
+     */
+    static void optimisticFood(Context context, String name, String meal,
+                               int kcal, int p, int f, int c, int qty) {
+        if (!applyFoodDelta(context, kcal, p, f, c)) return;
+        if (name == null || name.trim().isEmpty()) return;
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-            d.put("kcal", Math.max(0, d.optInt("kcal", 0)) + Math.max(0, kcal));
-            d.put("protein", Math.max(0, d.optInt("protein", 0)) + Math.max(0, p));
-            d.put("fat", Math.max(0, d.optInt("fat", 0)) + Math.max(0, f));
-            d.put("carbs", Math.max(0, d.optInt("carbs", 0)) + Math.max(0, c));
+            JSONObject last = new JSONObject();
+            last.put("name", name.length() > 40 ? name.substring(0, 40) : name);
+            String m = meal == null ? "" : meal;
+            last.put("meal", m.length() > 32 ? m.substring(0, 32) : m);
+            last.put("kcal", Math.max(0, kcal));
+            last.put("protein", Math.max(0, p));
+            last.put("fat", Math.max(0, f));
+            last.put("carbs", Math.max(0, c));
+            if (qty > 0) last.put("qty", qty);
+            d.put("lastFood", last);
+            appendDayItem(d, dayIso(0), last);
+            WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Дописываем позицию в список дня снапшота — чтобы «✕» и список на столе
+     * сразу видели только что добавленное, не дожидаясь синка из WebView.
+     * `index` — число позиций этого приёма (адрес для удаления).
+     */
+    private static void appendDayItem(JSONObject d, String date, JSONObject food) {
+        try {
+            JSONObject days = d.optJSONObject("days");
+            if (days == null) return;
+            JSONObject day = days.optJSONObject(date);
+            if (day == null) return; // дня в снапшоте нет — синк всё равно его пришлёт
+            JSONArray items = day.optJSONArray("items");
+            if (items == null) items = new JSONArray();
+            String meal = food.optString("meal", "");
+            int index = 0;
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it != null && meal.equals(it.optString("meal", ""))) index++;
+            }
+            JSONObject item = new JSONObject();
+            item.put("name", food.optString("name", ""));
+            item.put("kcal", Math.max(0, food.optInt("kcal", 0)));
+            item.put("p", Math.max(0, food.optInt("protein", 0)));
+            item.put("f", Math.max(0, food.optInt("fat", 0)));
+            item.put("c", Math.max(0, food.optInt("carbs", 0)));
+            item.put("meal", meal);
+            item.put("index", index);
+            int qty = food.optInt("qty", 0);
+            if (qty > 0) item.put("qty", qty);
+            items.put(item);
+            day.put("items", items);
+            day.put("kcal", Math.max(0, day.optInt("kcal", 0) + item.optInt("kcal", 0)));
+            day.put("p", Math.max(0, day.optInt("p", 0) + item.optInt("p", 0)));
+            day.put("f", Math.max(0, day.optInt("f", 0) + item.optInt("f", 0)));
+            day.put("c", Math.max(0, day.optInt("c", 0) + item.optInt("c", 0)));
+            days.put(date, day);
+        } catch (Exception ignored) {
+            // Список дня — украшение: без него запись всё равно уйдёт в очередь.
+        }
+    }
+
+    /**
+     * Снимаем последнюю позицию дня из снапшота («↩»): в плоском списке она и
+     * есть последняя запись последнего непустого приёма. Индексы внутри приёма
+     * не сдвигаем — JS вернёт свежий снапшот при следующем синке, а «✕» шлёт
+     * адрес `meal` + `index`, который совпадёт с дневником только после него.
+     */
+    private static void removeLastDayItem(JSONObject d, String date) {
+        try {
+            JSONObject days = d.optJSONObject("days");
+            JSONObject day = days == null ? null : days.optJSONObject(date);
+            JSONArray items = day == null ? null : day.optJSONArray("items");
+            if (items == null || items.length() == 0) return;
+            JSONObject last = items.optJSONObject(items.length() - 1);
+            if (last == null) return;
+            JSONArray next = new JSONArray();
+            for (int i = 0; i < items.length() - 1; i++) next.put(items.optJSONObject(i));
+            day.put("items", next);
+            day.put("kcal", Math.max(0, day.optInt("kcal", 0) - Math.max(0, last.optInt("kcal", 0))));
+            day.put("p", Math.max(0, day.optInt("p", 0) - Math.max(0, last.optInt("p", 0))));
+            day.put("f", Math.max(0, day.optInt("f", 0) - Math.max(0, last.optInt("f", 0))));
+            day.put("c", Math.max(0, day.optInt("c", 0) - Math.max(0, last.optInt("c", 0))));
+            days.put(date, day);
+        } catch (Exception ignored) {
+            // КБЖУ дня уже снято выше — расхождение подтянет ближайший синк.
+        }
+    }
+
+    /**
+     * «↩»: снимаем последнюю запись еды дня. В дневнике её убирает JS при
+     * следующем синке (`type=food_remove`), здесь — сразу уменьшаем круги на
+     * её КБЖУ и снимаем `lastFood`, чтобы двойной тап не списал дважды.
+     */
+    static void undoLastFood(Context context) {
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            JSONObject last = d.optJSONObject("lastFood");
+            if (last == null) return;
+            JSONObject item = new JSONObject();
+            item.put("type", "food_remove");
+            item.put("ts", System.currentTimeMillis());
+            WidgetStore.enqueue(context, item);
+            applyFoodDelta(context,
+                    -Math.max(0, last.optInt("kcal", 0)),
+                    -Math.max(0, last.optInt("protein", 0)),
+                    -Math.max(0, last.optInt("fat", 0)),
+                    -Math.max(0, last.optInt("carbs", 0)));
+            JSONObject next = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            removeLastDayItem(next, dayIso(0));
+            next.remove("lastFood");
+            WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, next);
+            updateAll(context);
+        } catch (Exception ignored) {}
+    }
+
+    /** Тап по чипу «недавние / избранное»: пишем блюдо в день без ввода КБЖУ. */
+    static void addQuickFood(Context context, int index) {
+        if (index < 0) return;
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            JSONArray quick = d.optJSONArray("quick");
+            JSONObject q = quick == null ? null : quick.optJSONObject(index);
+            if (q == null) return;
+            String name = q.optString("name", "").trim();
+            if (name.isEmpty()) return;
+            int kcal = Math.max(0, q.optInt("kcal", 0));
+            int p = Math.max(0, q.optInt("p", 0));
+            int f = Math.max(0, q.optInt("f", 0));
+            int c = Math.max(0, q.optInt("c", 0));
+            int qty = q.optInt("qty", 100);
+            if (qty <= 0) qty = 100;
+            String meal = q.optString("meal", "");
+            if (meal.isEmpty()) meal = mealForNow();
+            JSONObject item = new JSONObject();
+            item.put("type", "food");
+            item.put("name", name);
+            item.put("kcal", kcal);
+            item.put("p", p);
+            item.put("f", f);
+            item.put("c", c);
+            item.put("qty", qty);
+            item.put("meal", meal);
+            item.put("ts", System.currentTimeMillis());
+            WidgetStore.enqueue(context, item);
+            optimisticFood(context, name, meal, kcal, p, f, c, qty);
+            updateAll(context);
+        } catch (Exception ignored) {}
+    }
+
+    /** «✕» в списке дня: удалить позицию (date + meal + index) и пересчитать снапшот. */
+    static void removeDayItem(Context context, int widgetId, String date, String meal, int index) {
+        if (date == null || meal == null || index < 0) return;
+        try {
+            JSONObject item = new JSONObject();
+            item.put("type", "food_remove");
+            item.put("date", date);
+            item.put("meal", meal);
+            item.put("index", index);
+            item.put("ts", System.currentTimeMillis());
+            WidgetStore.enqueue(context, item);
+            optimisticRemoveItem(context, date, meal, index);
+            if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) updateWidget(context, widgetId);
+            else updateAll(context);
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Убираем строку из снапшота сразу, не дожидаясь синка: иначе список на
+     * столе «отпрыгнул» бы обратно до следующего открытия приложения. Индексы
+     * оставшихся позиций того же приёма сдвигаем — они адреса для следующих «✕».
+     */
+    private static void optimisticRemoveItem(Context context, String date, String meal, int index) {
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            JSONObject days = d.optJSONObject("days");
+            JSONObject day = days == null ? null : days.optJSONObject(date);
+            if (day == null) return;
+            JSONArray items = day.optJSONArray("items");
+            if (items == null) return;
+            JSONArray next = new JSONArray();
+            int kcal = 0, p = 0, f = 0, c = 0;
+            boolean removed = false;
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject it = items.optJSONObject(i);
+                if (it == null) continue;
+                boolean sameMeal = meal.equals(it.optString("meal", ""));
+                if (!removed && sameMeal && it.optInt("index", -1) == index) {
+                    kcal = Math.max(0, it.optInt("kcal", 0));
+                    p = Math.max(0, it.optInt("p", 0));
+                    f = Math.max(0, it.optInt("f", 0));
+                    c = Math.max(0, it.optInt("c", 0));
+                    removed = true;
+                    continue;
+                }
+                if (removed && sameMeal) {
+                    it.put("index", Math.max(0, it.optInt("index", 0) - 1));
+                }
+                next.put(it);
+            }
+            if (!removed) return;
+            day.put("items", next);
+            day.put("kcal", Math.max(0, day.optInt("kcal", 0) - kcal));
+            day.put("p", Math.max(0, day.optInt("p", 0) - p));
+            day.put("f", Math.max(0, day.optInt("f", 0) - f));
+            day.put("c", Math.max(0, day.optInt("c", 0) - c));
+            if (days != null) {
+                days.put(date, day);
+                d.put("days", days);
+            }
+            // Сегодняшний день продублирован в корне снапшота и в агрегатах.
+            if (date.equals(dayIso(0))) {
+                d.put("kcal", Math.max(0, d.optInt("kcal", 0) - kcal));
+                d.put("protein", Math.max(0, d.optInt("protein", 0) - p));
+                d.put("fat", Math.max(0, d.optInt("fat", 0) - f));
+                d.put("carbs", Math.max(0, d.optInt("carbs", 0) - c));
+                JSONObject periods = d.optJSONObject("periods");
+                if (periods != null) {
+                    for (String key : new String[]{"day", "week", "month"}) {
+                        JSONObject period = periods.optJSONObject(key);
+                        if (period == null) continue;
+                        period.put("kcal", Math.max(0, period.optInt("kcal", 0) - kcal));
+                        period.put("protein", Math.max(0, period.optInt("protein", 0) - p));
+                        period.put("fat", Math.max(0, period.optInt("fat", 0) - f));
+                        period.put("carbs", Math.max(0, period.optInt("carbs", 0) - c));
+                        periods.put(key, period);
+                    }
+                    d.put("periods", periods);
+                }
+            }
+            WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
+        } catch (Exception ignored) {}
+    }
+
+    /** ISO-дата для сдвига дня: 0 — сегодня, −1 — вчера (локальный календарь). */
+    static String dayIso(int offset) {
+        try {
+            Calendar c = Calendar.getInstance();
+            c.add(Calendar.DAY_OF_MONTH, offset);
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Подпись дня в шапке: «Сегодня» / «Вчера» / «21 нояб.». */
+    static String dayLabel(int offset) {
+        if (offset == 0) return "Сегодня";
+        if (offset == -1) return "Вчера";
+        try {
+            Calendar c = Calendar.getInstance();
+            c.add(Calendar.DAY_OF_MONTH, offset);
+            return new SimpleDateFormat("d MMM", Locale.forLanguageTag("ru")).format(c.getTime());
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** Строка для RemoteViews: длиннее не влезет, а обрезать надо по границе. */
+    static String clipText(String value, int max) {
+        String v = value == null ? "" : value.trim();
+        return v.length() > max ? v.substring(0, max - 1) + "…" : v;
+    }
+
+    /** Сдвиг КБЖУ в снапшоте и агрегатах: положительный — еда, отрицательный — отмена. */
+    private static boolean applyFoodDelta(Context context, int kcal, int p, int f, int c) {
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            d.put("kcal", Math.max(0, d.optInt("kcal", 0) + kcal));
+            d.put("protein", Math.max(0, d.optInt("protein", 0) + p));
+            d.put("fat", Math.max(0, d.optInt("fat", 0) + f));
+            d.put("carbs", Math.max(0, d.optInt("carbs", 0) + c));
             JSONObject periods = d.optJSONObject("periods");
             if (periods != null) {
                 for (String key : new String[]{"day", "week", "month"}) {
                     JSONObject period = periods.optJSONObject(key);
                     if (period == null) continue;
-                    period.put("kcal", Math.max(0, period.optInt("kcal", 0)) + Math.max(0, kcal));
-                    period.put("protein", Math.max(0, period.optInt("protein", 0)) + Math.max(0, p));
-                    period.put("fat", Math.max(0, period.optInt("fat", 0)) + Math.max(0, f));
-                    period.put("carbs", Math.max(0, period.optInt("carbs", 0)) + Math.max(0, c));
-                    if (period.optInt("days", 0) <= 0) period.put("days", 1);
+                    period.put("kcal", Math.max(0, period.optInt("kcal", 0) + kcal));
+                    period.put("protein", Math.max(0, period.optInt("protein", 0) + p));
+                    period.put("fat", Math.max(0, period.optInt("fat", 0) + f));
+                    period.put("carbs", Math.max(0, period.optInt("carbs", 0) + c));
+                    if (kcal > 0 && period.optInt("days", 0) <= 0) period.put("days", 1);
                     periods.put(key, period);
                 }
                 d.put("periods", periods);
             }
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
-        } catch (Exception ignored) {}
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     static RemoteViews build(Context context, int widgetId) {
@@ -174,6 +519,16 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
 
         JSONObject periods = d.optJSONObject("periods");
         JSONObject pd = periods != null ? periods.optJSONObject(period) : null;
+        // Листание дат есть только у «Дня»: неделя и месяц всегда текущие.
+        int dayOffset = sum ? 0 : WidgetStore.getNutritionDayOffset(context, widgetId);
+        // Прошлый день — только чтение и удаление: добавление «в прошлое»
+        // писало бы в сегодняшний день, поэтому кнопки добавления скрыты.
+        boolean past = !sum && dayOffset != 0;
+        JSONObject dayJson = null;
+        if (past) {
+            JSONObject days = d.optJSONObject("days");
+            dayJson = days == null ? null : days.optJSONObject(dayIso(dayOffset));
+        }
 
         int target = Math.max(0, d.optInt("targetKcal", 0));
         int tProtein = Math.max(0, d.optInt("targetProtein", 0));
@@ -196,6 +551,17 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             totalWater = Math.max(0, pd.optInt("waterMl", 0));
             days = Math.max(0, pd.optInt("days", 0));
             waterDays = Math.max(0, pd.optInt("waterDays", 0));
+        } else if (past) {
+            // Прошлый день из снапшота: цели общие, факт — именно этого дня.
+            // Если снапшот его ещё не знает (старый кэш) — честно пустой день.
+            totalKcal = dayJson == null ? 0 : Math.max(0, dayJson.optInt("kcal", 0));
+            totalProtein = dayJson == null ? 0 : Math.max(0, dayJson.optInt("p", 0));
+            totalFat = dayJson == null ? 0 : Math.max(0, dayJson.optInt("f", 0));
+            totalCarbs = dayJson == null ? 0 : Math.max(0, dayJson.optInt("c", 0));
+            totalWater = dayJson == null ? 0 : Math.max(0, dayJson.optInt("waterMl", 0));
+            JSONArray items = dayJson == null ? null : dayJson.optJSONArray("items");
+            days = items != null && items.length() > 0 ? 1 : 0;
+            waterDays = totalWater > 0 ? 1 : 0;
         } else {
             totalKcal = Math.max(0, d.optInt("kcal", 0));
             totalProtein = Math.max(0, d.optInt("protein", 0));
@@ -217,17 +583,28 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         int waterDiv = Math.max(1, waterDays);
         int waterAvg = Math.round(totalWater / (float) waterDiv);
         int water = sum ? waterAvg : totalWater;
-        boolean has = days > 0 || (!sum && (d.has("kcal") || d.has("targetKcal")));
+        boolean has = days > 0 || totalWater > 0
+                || (!sum && dayOffset == 0 && (d.has("kcal") || d.has("targetKcal")));
 
         int queue = WidgetStore.queueSize(context);
 
-        v.setTextViewText(R.id.w_nut_date, dateLabel(period));
+        v.setTextViewText(R.id.w_nut_date, sum ? dateLabel(period) : dayLabel(dayOffset));
         stylePeriodChip(v, R.id.w_nut_p_day, "day".equals(period));
         stylePeriodChip(v, R.id.w_nut_p_week, "week".equals(period));
         stylePeriodChip(v, R.id.w_nut_p_month, "month".equals(period));
         v.setOnClickPendingIntent(R.id.w_nut_p_day, periodAction(context, widgetId, "day"));
         v.setOnClickPendingIntent(R.id.w_nut_p_week, periodAction(context, widgetId, "week"));
         v.setOnClickPendingIntent(R.id.w_nut_p_month, periodAction(context, widgetId, "month"));
+        // Стрелки листания дат — только у «Дня»; глубже недели снапшот не хранит.
+        if (sum) {
+            v.setViewVisibility(R.id.w_nut_prev, View.GONE);
+            v.setViewVisibility(R.id.w_nut_next, View.GONE);
+        } else {
+            v.setViewVisibility(R.id.w_nut_prev, dayOffset > -6 ? View.VISIBLE : View.INVISIBLE);
+            v.setViewVisibility(R.id.w_nut_next, dayOffset < 0 ? View.VISIBLE : View.INVISIBLE);
+            v.setOnClickPendingIntent(R.id.w_nut_prev, dayStepAction(context, widgetId, -1, 61));
+            v.setOnClickPendingIntent(R.id.w_nut_next, dayStepAction(context, widgetId, 1, 62));
+        }
 
         // Очередь быстрых записей (вода/еда, ещё не разобранные приложением).
         if (queue > 0) {
@@ -257,14 +634,29 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         String summary;
         if (!has) {
             summary = sum ? ("За " + periodWord(period) + " записей нет — добавьте еду")
-                    : "Данных за сегодня пока нет — добавьте еду";
+                    : (past ? "За этот день записей нет" : "Данных за сегодня пока нет — добавьте еду");
         } else if (sum) {
             summary = "Σ " + formatNum(totalKcal) + " ккал " + periodWord(period)
                     + " · " + days + " " + plural(days, "день", "дня", "дней") + " с записями";
+        } else if (past) {
+            // Прошлый день — не «осталось», а итог: цель уже не догнать.
+            String macros = "";
+            if (protein > 0) macros += " · Б" + protein;
+            if (fat > 0) macros += " Ж" + fat;
+            if (carbs > 0) macros += " У" + carbs;
+            summary = "Съедено " + formatNum(kcal) + " ккал" + macros;
         } else if (target > 0) {
             int left = target - kcal;
             if (left > 0) {
-                summary = "Осталось " + formatNum(left) + " ккал из " + formatNum(target);
+                // Остаток Б/Ж/У в граммах — как в дневнике, а не только ккал:
+                // одной цифры калорий мало, чтобы понять, чего не хватает.
+                String macros = "";
+                if (tProtein > 0) macros += " · Б" + Math.max(0, tProtein - protein);
+                if (tFat > 0) macros += " Ж" + Math.max(0, tFat - fat);
+                if (tCarbs > 0) macros += " У" + Math.max(0, tCarbs - carbs);
+                summary = macros.isEmpty()
+                        ? ("Осталось " + formatNum(left) + " ккал из " + formatNum(target))
+                        : ("Осталось " + formatNum(left) + " ккал" + macros);
             } else if (left == 0) {
                 summary = "Цель дня закрыта: " + formatNum(target) + " ккал";
             } else {
@@ -297,16 +689,62 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         v.setTextColor(R.id.w_nut_water_pct, waterDone ? C_ACCENT : C_MUTED);
         v.setProgressBar(R.id.w_nut_water_bar, 100, waterPct, false);
 
+        // ---- Быстрое добавление (избранное / недавние) и список дня ----
+        JSONArray quick = !sum && !past ? d.optJSONArray("quick") : null;
+        int[] quickIds = {R.id.w_nut_q1, R.id.w_nut_q2, R.id.w_nut_q3};
+        boolean quickOn = false;
+        for (int i = 0; i < quickIds.length; i++) {
+            JSONObject q = quick != null ? quick.optJSONObject(i) : null;
+            String qname = q == null ? "" : q.optString("name", "").trim();
+            if (qname.isEmpty()) {
+                v.setViewVisibility(quickIds[i], View.GONE);
+                continue;
+            }
+            quickOn = true;
+            v.setViewVisibility(quickIds[i], View.VISIBLE);
+            v.setTextViewText(quickIds[i], clipText(qname, 14));
+            v.setContentDescription(quickIds[i],
+                    "Добавить: " + qname + ", " + q.optInt("kcal", 0) + " ккал");
+            v.setOnClickPendingIntent(quickIds[i], quickAddAction(context, i, 63 + i));
+        }
+        v.setViewVisibility(R.id.w_nut_quick_row, quickOn ? View.VISIBLE : View.GONE);
+
+        // Список позиций дня — RemoteViewsService: строки скроллятся, «✕» удаляет.
+        v.setViewVisibility(R.id.w_nut_items_box, sum ? View.GONE : View.VISIBLE);
+        if (!sum) {
+            Intent adapter = new Intent(context, NutritionItemsWidgetService.class);
+            adapter.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+            adapter.setData(Uri.parse("he://nut-items/" + widgetId));
+            v.setRemoteAdapter(R.id.w_nut_items, adapter);
+            v.setEmptyView(R.id.w_nut_items, R.id.w_nut_items_empty);
+        }
+
         // ---- Действия ----
+        // Прошлый день только читается: добавление ушло бы в сегодняшний день.
+        v.setViewVisibility(R.id.w_nut_actions, past ? View.GONE : View.VISIBLE);
+        v.setViewVisibility(R.id.w_nut_water_actions, past ? View.GONE : View.VISIBLE);
+        v.setOnClickPendingIntent(R.id.w_nut_water_minus, waterMinusAction(context, 250, 40));
         v.setOnClickPendingIntent(R.id.w_nut_water, waterAction(context, 250, 41));
         v.setOnClickPendingIntent(R.id.w_nut_water500, waterAction(context, 500, 42));
         v.setOnClickPendingIntent(R.id.w_nut_food, foodAction(context, mealForNow(), 45));
+        // «↩» показываем только когда в дне есть что отменять: снапшот несёт
+        // последнюю запись (`lastFood`), её же снимает JS по `type=food_remove`.
+        JSONObject lastFood = d.optJSONObject("lastFood");
+        if (lastFood != null) {
+            String lastName = lastFood.optString("name", "");
+            v.setViewVisibility(R.id.w_nut_food_undo, View.VISIBLE);
+            v.setOnClickPendingIntent(R.id.w_nut_food_undo, foodUndoAction(context, 48));
+            v.setContentDescription(R.id.w_nut_food_undo,
+                    lastName.isEmpty() ? "Отменить последнюю запись еды" : "Отменить: " + lastName);
+        } else {
+            v.setViewVisibility(R.id.w_nut_food_undo, View.GONE);
+        }
         v.setOnClickPendingIntent(R.id.w_nut_scan,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION_SCAN, 46));
         v.setOnClickPendingIntent(R.id.w_nut_photo,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION_PHOTO, 47));
-        v.setOnClickPendingIntent(R.id.w_nut_open,
-                TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION, 43));
+        // «Свой» — не «открыть дневник», а свой объём воды: диалог с полем «мл».
+        v.setOnClickPendingIntent(R.id.w_nut_open, waterCustomAction(context, 43));
         v.setOnClickPendingIntent(R.id.w_nut_root,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION, 44));
 
@@ -417,6 +855,43 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
+    /** «−250 мл»: та же вода, но вычитание — запись `type=water_remove`. */
+    static PendingIntent waterMinusAction(Context context, int ml, int code) {
+        Intent i = new Intent(context, NutritionWidgetProvider.class);
+        i.setAction(ACTION_WATER_MINUS);
+        i.putExtra(EXTRA_ML, ml);
+        return PendingIntent.getBroadcast(context, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** «↩»: отмена последней записи еды дня. */
+    static PendingIntent foodUndoAction(Context context, int code) {
+        Intent i = new Intent(context, NutritionWidgetProvider.class);
+        i.setAction(ACTION_FOOD_UNDO);
+        return PendingIntent.getBroadcast(context, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** «‹ ›»: листание дат. RequestCode свой у каждого виджета, иначе extras перетираются. */
+    static PendingIntent dayStepAction(Context context, int widgetId, int step, int code) {
+        Intent i = new Intent(context, NutritionWidgetProvider.class);
+        i.setAction(ACTION_DAY);
+        i.putExtra(EXTRA_WIDGET_ID, widgetId);
+        i.putExtra(EXTRA_STEP, step);
+        int req = code * 1000 + (Math.abs(widgetId) % 900);
+        return PendingIntent.getBroadcast(context, req, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Чип «недавнее / избранное»: index в `quick`; action не зависит от виджета. */
+    static PendingIntent quickAddAction(Context context, int index, int code) {
+        Intent i = new Intent(context, NutritionWidgetProvider.class);
+        i.setAction(ACTION_QUICK);
+        i.putExtra(EXTRA_INDEX, index);
+        return PendingIntent.getBroadcast(context, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
     static PendingIntent periodAction(Context context, int widgetId, String period) {
         Intent i = new Intent(context, NutritionWidgetProvider.class);
         i.setAction(ACTION_PERIOD);
@@ -424,6 +899,16 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         i.putExtra(EXTRA_PERIOD, period);
         int code = 100000 + (Math.abs(widgetId) % 1000) * 4 + ("week".equals(period) ? 1 : "month".equals(period) ? 2 : 0);
         return PendingIntent.getBroadcast(context, code, i,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** «Свой» объём воды: тот же нативный диалог, но с полем «мл» вместо КБЖУ. */
+    static PendingIntent waterCustomAction(Context context, int code) {
+        Intent i = new Intent(context, WidgetQuickAddActivity.class);
+        i.setAction("com.healthengine.app.action.WIDGET_WATER_CUSTOM");
+        i.putExtra(WidgetQuickAddActivity.EXTRA_KIND, WidgetQuickAddActivity.KIND_WATER);
+        i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        return PendingIntent.getActivity(context, code, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 

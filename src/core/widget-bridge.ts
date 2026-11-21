@@ -26,7 +26,17 @@ export type WidgetTarget =
 export type TimerAction = 'preset' | 'start' | 'pause' | 'toggle' | 'reset';
 
 export interface QueuedItem {
-  type: 'water' | 'food' | 'task' | 'task_add' | 'note_add' | 'set_add' | 'workout_start' | 'workout_finish';
+  type:
+    | 'water'
+    | 'water_remove'
+    | 'food'
+    | 'food_remove'
+    | 'task'
+    | 'task_add'
+    | 'note_add'
+    | 'set_add'
+    | 'workout_start'
+    | 'workout_finish';
   ml?: number;
   name?: string;
   kcal?: number;
@@ -36,6 +46,10 @@ export interface QueuedItem {
   meal?: string;
   /** Порция, г (необязательно; по умолчанию 100 — как в дневнике). */
   qty?: number;
+  /** Для type='food_remove': позиция внутри приёма (кнопка «✕» на виджете). */
+  index?: number;
+  /** Для type='food_remove' («✕» на виджете) и type='task_add': ISO-дата дня. */
+  date?: string;
   /* --- Подход из виджета «Проведение» (type='set_add') --- */
   /** Упражнение, к которому относится подход (имя из плана/живой сессии). */
   exerciseName?: string;
@@ -51,8 +65,7 @@ export interface QueuedItem {
   /** Для type='task': id задачи и её новое состояние «сделано». */
   id?: string;
   done?: boolean;
-  /** Для type='task_add': дата YYYY-MM-DD, время HH:MM и приоритет. */
-  date?: string;
+  /** Для type='task_add': дата (то же поле `date` выше), время HH:MM и приоритет. */
   time?: string | null;
   priority?: string;
   /** Для type='task_add' / 'note_add': заголовок быстрого добавления. */
@@ -89,6 +102,64 @@ export interface NutritionPeriodStats {
   waterDays: number;
 }
 
+/** Последняя запись еды дня — источник для кнопки «↩» на виджете «Питание». */
+export interface NutritionLastFood {
+  name: string;
+  /** Подпись приёма пищи, как в дневнике (Завтрак/Обед/Ужин/Перекус). */
+  meal: string;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  /** Порция, г. */
+  qty?: number;
+}
+
+/**
+ * Позиция дня для списка на виджете «Питание».
+ *
+ * `meal` + `index` — адрес записи в `nutrition_diary_v2` (массив приёма), по
+ * нему кнопка «✕» удаляет именно эту строку, а не «последнюю вообще».
+ */
+export interface NutritionDayItem {
+  name: string;
+  kcal: number;
+  /** Белки, г (порции). */
+  p: number;
+  /** Жиры, г. */
+  f: number;
+  /** Углеводы, г. */
+  c: number;
+  meal: string;
+  index: number;
+  /** Порция, г. */
+  qty?: number;
+}
+
+/** День дневника для виджета: итоги и позиции (список + листание дат). */
+export interface NutritionDaySnapshot {
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+  waterMl: number;
+  items: NutritionDayItem[];
+}
+
+/** Блюдо для чипа «недавние / избранное»: тап = запись без ввода КБЖУ. */
+export interface NutritionQuickFood {
+  name: string;
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+  /** Порция, г (по умолчанию 100 — как в дневнике). */
+  qty?: number;
+  meal?: string;
+  /** true — из избранного (⭐), false — из недавних записей. */
+  fav?: boolean;
+}
+
 /**
  * Снапшот дня для homescreen-виджета «Питание» (как сводка FatSecret):
  * остаток калорий, Б/Ж/У и вода — факт и цель.
@@ -104,6 +175,19 @@ export interface NutritionWidgetSnapshot {
   targetCarbs: number;
   waterMl: number;
   waterTargetMl: number;
+  /**
+   * Последняя запись еды за сегодня. Виджет показывает по ней кнопку «↩»:
+   * отменить ошибочную порцию можно, не открывая приложение. После отмены
+   * JS пересоберёт снапшот и подставит предыдущую запись.
+   */
+  lastFood?: NutritionLastFood;
+  /**
+   * Последние дни дневника (сегодня и до 6 назад), ключ — ISO-дата. Виджет
+   * листает дату «‹ ›», не открывая приложение, и берёт итоги/позиции отсюда.
+   */
+  days?: Record<string, NutritionDaySnapshot>;
+  /** Чипы быстрого добавления: избранное и недавние блюда. */
+  quick?: NutritionQuickFood[];
   /**
    * Готовые агрегаты за день/неделю/месяц: нативный виджет переключает период
    * (и настраивает halves двойного виджета) без обращения к WebView.
@@ -224,6 +308,8 @@ interface WidgetBridgeNative {
   }): Promise<{ ok: boolean }>;
   syncCompliance(o: { pct: number; label: string; detail: string }): Promise<{ ok: boolean }>;
   syncNutrition(o: NutritionWidgetSnapshot): Promise<{ ok: boolean }>;
+  /** Каталог продуктов для поиска в нативном редакторе еды (пишется один раз). */
+  syncNutritionFoods(o: { items: string; version: string }): Promise<{ ok: boolean }>;
   syncCalendar(o: CalendarWidgetSnapshot): Promise<{ ok: boolean }>;
   syncNotes(o: NotesWidgetSnapshot): Promise<{ ok: boolean }>;
   syncWorkout(o: WorkoutWidgetSnapshot): Promise<{ ok: boolean }>;
@@ -325,7 +411,9 @@ export function parseQueueItems(raw: string): QueuedItem[] {
         !!it &&
         typeof it === 'object' &&
         (it.type === 'water' ||
+          it.type === 'water_remove' ||
           it.type === 'food' ||
+          it.type === 'food_remove' ||
           it.type === 'task' ||
           it.type === 'task_add' ||
           it.type === 'note_add' ||
@@ -451,9 +539,100 @@ function clampPeriodStats(stats?: NutritionPeriodStats): NutritionPeriodStats {
   };
 }
 
+/** Последняя запись еды: обрезаем строки и приводим числа к целым. */
+function clampLastFood(food?: NutritionLastFood): NutritionLastFood | undefined {
+  if (!food || !food.name) return undefined;
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  const qty = num(food.qty);
+  return {
+    name: String(food.name).slice(0, 40),
+    meal: String(food.meal || '').slice(0, 32),
+    kcal: num(food.kcal),
+    protein: num(food.protein),
+    fat: num(food.fat),
+    carbs: num(food.carbs),
+    ...(qty > 0 ? { qty } : {}),
+  };
+}
+
+/**
+ * Дни для листания дат: только ISO-ключи, максимум 7 самых свежих, итоги и
+ * позиции — неотрицательные целые. Лишние позиции не тащим: список на виджете
+ * короткий, а префы не должны расти от длинного дня.
+ */
+function clampNutritionDays(
+  days?: Record<string, NutritionDaySnapshot>,
+): Record<string, NutritionDaySnapshot> | undefined {
+  if (!days || typeof days !== 'object') return undefined;
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  const out: Record<string, NutritionDaySnapshot> = {};
+  const keys = Object.keys(days)
+    .filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k))
+    .sort()
+    .slice(-7);
+  for (const key of keys) {
+    const day = days[key];
+    if (!day || typeof day !== 'object') continue;
+    const items = Array.isArray(day.items)
+      ? day.items
+          .filter((it) => it && typeof it.name === 'string' && it.name.trim())
+          .slice(0, 20)
+          .map((it) => {
+            const qty = num(it.qty);
+            return {
+              name: String(it.name).slice(0, 40),
+              kcal: num(it.kcal),
+              p: num(it.p),
+              f: num(it.f),
+              c: num(it.c),
+              meal: String(it.meal || '').slice(0, 32),
+              index: num(it.index),
+              ...(qty > 0 ? { qty } : {}),
+            };
+          })
+      : [];
+    out[key] = {
+      kcal: num(day.kcal),
+      p: num(day.p),
+      f: num(day.f),
+      c: num(day.c),
+      waterMl: num(day.waterMl),
+      items,
+    };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Чипы «недавние / избранное»: не больше 6, имя обязательно. */
+function clampQuickFoods(foods?: NutritionQuickFood[]): NutritionQuickFood[] | undefined {
+  if (!Array.isArray(foods)) return undefined;
+  const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
+  const out = foods
+    .filter((food) => food && typeof food.name === 'string' && food.name.trim())
+    .slice(0, 6)
+    .map((food) => {
+      const qty = num(food.qty);
+      const meal = String(food.meal || '').slice(0, 32);
+      return {
+        name: String(food.name).slice(0, 28),
+        kcal: num(food.kcal),
+        p: num(food.p),
+        f: num(food.f),
+        c: num(food.c),
+        ...(qty > 0 ? { qty } : {}),
+        ...(meal ? { meal } : {}),
+        ...(food.fav ? { fav: true } : {}),
+      };
+    });
+  return out.length > 0 ? out : undefined;
+}
+
 export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promise<boolean> {
   const payload: NutritionWidgetSnapshot = {
     ...input,
+    lastFood: clampLastFood(input.lastFood),
+    days: clampNutritionDays(input.days),
+    quick: clampQuickFoods(input.quick),
     periods: input.periods
       ? {
           day: clampPeriodStats(input.periods.day),
@@ -473,6 +652,50 @@ export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promi
   }
   fbSnapshot('nutrition', { ...payload, updatedAt: Date.now() });
   return false;
+}
+
+/** Продукт каталога для поиска в нативном редакторе еды (на 100 г). */
+export interface NutritionFoodItem {
+  name: string;
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+}
+
+const FB_FOODS_VERSION = 'he_widget_foods_ver';
+
+/**
+ * Каталог продуктов для поиска на виджете. Пишется в SharedPreferences один
+ * раз на версию: гонять ~700 позиций через мост на каждую правку дневника
+ * незачем. `version` — отпечаток каталога (см. `nutritionFoodsVersion`).
+ *
+ * Возвращает true, если каталог реально ушёл в нативную часть.
+ */
+export async function pushNutritionFoods(
+  items: NutritionFoodItem[],
+  version: string,
+): Promise<boolean> {
+  const p = plugin();
+  if (!p) return false;
+  if (storageGet(FB_FOODS_VERSION) === version) return false;
+  try {
+    await p.syncNutritionFoods({ items: JSON.stringify(items), version });
+    storageSet(FB_FOODS_VERSION, version);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Версия каталога: длина, края списка и сумма калорий — правка продукта в
+ * середине базы тоже меняет отпечаток (одного «первый/последний» мало).
+ */
+export function nutritionFoodsVersion(items: NutritionFoodItem[]): string {
+  let kcal = 0;
+  for (const item of items) kcal += Math.max(0, Math.round(Number(item.kcal) || 0));
+  return `${items.length}|${kcal}|${items[0]?.name ?? ''}|${items[items.length - 1]?.name ?? ''}`;
 }
 
 export async function syncCalendarWidget(input: CalendarWidgetSnapshot): Promise<boolean> {

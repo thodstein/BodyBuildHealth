@@ -3,11 +3,14 @@ package com.healthengine.app.widgets;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,6 +48,8 @@ public class WidgetQuickAddActivity extends Activity {
     public static final String KIND_TASK = "task";
     public static final String KIND_NOTE = "note";
     public static final String KIND_FOOD = "food";
+    /** Свой объём воды из виджета «Питание» (кнопка «Свой»): мл в поле порции. */
+    public static final String KIND_WATER = "water";
     /** Подход из виджета «Проведение тренировки»: вес, повторы, RIR/RPE, техника. */
     public static final String KIND_SET = "set";
     public static final String ACTION_SET = "com.healthengine.app.action.WIDGET_SET";
@@ -91,6 +96,9 @@ public class WidgetQuickAddActivity extends Activity {
     private EditText rirEt;
     private EditText rpeEt;
     private EditText setNoteEt;
+    private EditText searchEt;
+    private LinearLayout searchResults;
+    private TextView qtyLabel;
     private TextView dateLabel;
     private TextView dateToday;
     private TextView dateTomorrow;
@@ -124,6 +132,7 @@ public class WidgetQuickAddActivity extends Activity {
         String k = intent == null ? null : intent.getStringExtra(EXTRA_KIND);
         if (KIND_NOTE.equals(k)) kind = KIND_NOTE;
         else if (KIND_FOOD.equals(k)) kind = KIND_FOOD;
+        else if (KIND_WATER.equals(k)) kind = KIND_WATER;
         else if (KIND_SET.equals(k)) kind = KIND_SET;
         else kind = KIND_TASK;
         String d = intent == null ? null : intent.getStringExtra(EXTRA_DATE);
@@ -145,6 +154,9 @@ public class WidgetQuickAddActivity extends Activity {
         fatEt = findViewById(R.id.qa_f);
         carbsEt = findViewById(R.id.qa_c);
         qtyEt = findViewById(R.id.qa_qty);
+        qtyLabel = findViewById(R.id.qa_qty_label);
+        searchEt = findViewById(R.id.qa_search);
+        searchResults = findViewById(R.id.qa_search_results);
         dateLabel = findViewById(R.id.qa_date_label);
         dateToday = findViewById(R.id.qa_date_today);
         dateTomorrow = findViewById(R.id.qa_date_tomorrow);
@@ -178,6 +190,7 @@ public class WidgetQuickAddActivity extends Activity {
         View setRow = findViewById(R.id.qa_set_row);
         View setLabel = findViewById(R.id.qa_set_label);
         View techRow = findViewById(R.id.qa_tech_row);
+        View searchRow = findViewById(R.id.qa_search_row);
 
         if (KIND_NOTE.equals(kind)) {
             titleLabel.setText("Новая заметка");
@@ -196,9 +209,26 @@ public class WidgetQuickAddActivity extends Activity {
             priorityRow.setVisibility(View.GONE);
             foodRow.setVisibility(View.VISIBLE);
             qtyRow.setVisibility(View.VISIBLE);
+            qtyLabel.setText("Порция, г");
             mealLabel.setVisibility(View.VISIBLE);
             mealRow.setVisibility(View.VISIBLE);
+            wireFoodSearch(searchRow);
             dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
+        } else if (KIND_WATER.equals(kind)) {
+            // Свой объём воды: одно поле «мл» вместо названия и КБЖУ.
+            titleLabel.setVisibility(View.GONE);
+            titleEt.setVisibility(View.GONE);
+            dateRow.setVisibility(View.GONE);
+            timeView.setVisibility(View.GONE);
+            priorityRow.setVisibility(View.GONE);
+            checklistLabel.setVisibility(View.GONE);
+            checklistEt.setVisibility(View.GONE);
+            qtyRow.setVisibility(View.VISIBLE);
+            qtyLabel.setText("Объём, мл");
+            qtyEt.setHint("250");
+            qtyEt.setText("250");
+            qtyEt.selectAll();
+            dateLabel.setText("Вода сразу уйдёт в дневник за сегодня");
         } else if (KIND_SET.equals(kind)) {
             titleLabel.setText(exerciseName.isEmpty() ? "Новый подход" : exerciseName);
             titleEt.setHint("Упражнение");
@@ -257,6 +287,7 @@ public class WidgetQuickAddActivity extends Activity {
         updateMealUi();
         updateTechniqueUi();
         if (KIND_SET.equals(kind)) weightEt.requestFocus();
+        else if (KIND_WATER.equals(kind)) qtyEt.requestFocus();
         else titleEt.requestFocus();
     }
 
@@ -335,7 +366,100 @@ public class WidgetQuickAddActivity extends Activity {
         v.setTextColor(on ? 0xFF07111F : 0xFFE2ECFF);
     }
 
+    /**
+     * Поиск по базе продуктов в редакторе еды. Каталог пишет JS один раз на
+     * версию FOOD_DB (`WidgetStore.KEY_FOODS`), поэтому поиск работает офлайн и
+     * не тянет WebView. Значения каталога — на 100 г, как в дневнике.
+     */
+    private void wireFoodSearch(View searchRow) {
+        JSONArray catalog = loadFoodCatalog();
+        if (catalog.length() == 0 || searchRow == null || searchResults == null) {
+            if (searchRow != null) searchRow.setVisibility(View.GONE);
+            return;
+        }
+        searchRow.setVisibility(View.VISIBLE);
+        searchEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                renderSearchResults(s == null ? "" : s.toString(), catalog);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+    }
+
+    private JSONArray loadFoodCatalog() {
+        try {
+            JSONObject raw = WidgetStore.getJson(this, WidgetStore.KEY_FOODS);
+            JSONArray items = raw == null ? null : raw.optJSONArray("items");
+            return items == null ? new JSONArray() : items;
+        } catch (Exception e) {
+            return new JSONArray();
+        }
+    }
+
+    /** Первые 4 совпадения по подстроке; тап заполняет название и КБЖУ порции. */
+    private void renderSearchResults(String query, JSONArray catalog) {
+        searchResults.removeAllViews();
+        String q = query.trim().toLowerCase(Locale.ROOT);
+        if (q.length() < 2) return;
+        int shown = 0;
+        for (int i = 0; i < catalog.length() && shown < 4; i++) {
+            JSONObject f = catalog.optJSONObject(i);
+            if (f == null) continue;
+            String name = f.optString("n", "").trim();
+            if (name.isEmpty() || !name.toLowerCase(Locale.ROOT).contains(q)) continue;
+            shown++;
+            TextView row = new TextView(this);
+            int kcal = Math.max(0, f.optInt("k", 0));
+            row.setText(name + "  ·  " + kcal + " ккал/100 г");
+            row.setTextSize(12);
+            row.setTextColor(0xFFE2ECFF);
+            row.setBackgroundResource(R.drawable.widget_input_bg);
+            row.setPadding(dp(10), dp(9), dp(10), dp(9));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(4);
+            row.setLayoutParams(lp);
+            row.setOnClickListener(v -> applyCatalogFood(f));
+            searchResults.addView(row);
+        }
+    }
+
+    /** Подставляем значения продукта на 100 г в поля порции. */
+    private void applyCatalogFood(JSONObject f) {
+        String name = f.optString("n", "").trim();
+        if (!name.isEmpty()) titleEt.setText(name);
+        kcalEt.setText(String.valueOf(Math.max(0, f.optInt("k", 0))));
+        proteinEt.setText(String.valueOf(Math.max(0, f.optInt("p", 0))));
+        fatEt.setText(String.valueOf(Math.max(0, f.optInt("f", 0))));
+        carbsEt.setText(String.valueOf(Math.max(0, f.optInt("c", 0))));
+        qtyEt.setText("100");
+        searchResults.removeAllViews();
+        if (searchEt != null) searchEt.setText("");
+        Toast.makeText(this, "Подставлено на 100 г", Toast.LENGTH_SHORT).show();
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private void save() {
+        long now = System.currentTimeMillis();
+        if (KIND_WATER.equals(kind)) {
+            try {
+                if (saveWater(now)) finish();
+            } catch (Exception e) {
+                showError("Не удалось сохранить — попробуйте ещё раз");
+            }
+            return;
+        }
         String title = titleEt.getText() == null ? "" : titleEt.getText().toString().trim();
         if (TextUtils.isEmpty(title)) {
             showError(KIND_NOTE.equals(kind) ? "Введите заголовок заметки"
@@ -346,7 +470,6 @@ public class WidgetQuickAddActivity extends Activity {
         // Лимиты совпадают с движком (140 у задачи, 120 у заметки и еды).
         int maxTitle = KIND_TASK.equals(kind) ? 140 : 120;
         if (title.length() > maxTitle) title = title.substring(0, maxTitle);
-        long now = System.currentTimeMillis();
         String id = "w_" + (KIND_NOTE.equals(kind) ? "n_" : "t_") + now + "_" + (int) (Math.random() * 1000);
 
         try {
@@ -390,9 +513,30 @@ public class WidgetQuickAddActivity extends Activity {
         item.put("meal", meal);
         item.put("ts", now);
         WidgetStore.enqueue(this, item);
-        NutritionWidgetProvider.optimisticFood(this, kcal, p, f, c);
+        NutritionWidgetProvider.optimisticFood(this, name, meal, kcal, p, f, c, qty);
         NutritionWidgetProvider.updateAll(this);
         Toast.makeText(this, "Добавлено: " + name, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    /**
+     * Свой объём воды из виджета «Питание»: очередь `type=water`, JS применит
+     * её через `addWater`. Верхний предел — 2000 мл, как у кнопок на виджете.
+     */
+    private boolean saveWater(long now) throws Exception {
+        int ml = parseQty(qtyEt, 2000);
+        if (ml <= 0) {
+            showError("Укажите объём в мл, например 300");
+            return false;
+        }
+        JSONObject item = new JSONObject();
+        item.put("type", "water");
+        item.put("ml", ml);
+        item.put("ts", now);
+        WidgetStore.enqueue(this, item);
+        NutritionWidgetProvider.optimisticWater(this, ml);
+        NutritionWidgetProvider.updateAll(this);
+        Toast.makeText(this, "Вода: " + ml + " мл", Toast.LENGTH_SHORT).show();
         return true;
     }
 

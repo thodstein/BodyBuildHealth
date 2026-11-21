@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Строка списка позиций дня на виджете «Питание»: название, ккал и «✕».
+    Высота минимальная — в блоке 40dp видно ~2 строки, остальное скроллится.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="18dp"
+    android:orientation="horizontal"
+    android:paddingLeft="2dp"
+    android:paddingRight="2dp">
+
+    <TextView
+        android:id="@+id/w_nut_item_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text=""
+        android:textColor="#E2ECFF"
+        android:textSize="9sp" />
+
+    <TextView
+        android:id="@+id/w_nut_item_kcal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:includeFontPadding="false"
+        android:text=""
+        android:textColor="#8FA3C4"
+        android:textSize="9sp" />
+
+    <TextView
+        android:id="@+id/w_nut_item_del"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_marginStart="2dp"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="✕"
+        android:textColor="#FF6B6B"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+</LinearLayout>

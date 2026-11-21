@@ -13,7 +13,7 @@
     <string name="widget_compliance_label">HE · Комплаенс</string>
     <string name="widget_compliance_desc">Процент выполнения плана за неделю</string>
     <string name="widget_nutrition_label">HE · Питание</string>
-    <string name="widget_nutrition_desc">Аналитика КБЖУ за день, неделю и месяц: ＋ еда, скан и фото прямо с рабочего стола</string>
+    <string name="widget_nutrition_desc">КБЖУ за день, неделю и месяц, остаток Б/Ж/У, список еды дня и вода — прямо с рабочего стола</string>
     <string name="widget_nutrition_panel_label">HE · Аналитика питания</string>
     <string name="widget_nutrition_panel_desc">Двойная аналитика: в каждой половине своя метрика (ккал, белки, жиры, углеводы, вода) и свой период — день, неделя или месяц</string>
     <string name="tile_water_label">HE · Вода +250</string>

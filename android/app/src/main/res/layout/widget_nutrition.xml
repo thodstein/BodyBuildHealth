@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Виджет «Питание» 3×4 — аналитика КБЖУ за день / неделю / месяц.
-    Чипы «Д · Н · М» переключают период per-widget: агрегаты приходят готовыми
-    в снапшоте (periods), поэтому неделя и месяц считаются без открытия
-    приложения. Ниже — сводка, вода и быстрые действия: своя еда (нативный
-    редактор), скан штрихкода, фото этикетки.
+    Виджет «Питание» 3×5 — аналитика КБЖУ за день / неделю / месяц.
+    Чипы «Д · Н · М» переключают период per-widget, «‹ ›» листают даты недели:
+    агрегаты и дни приходят готовыми в снапшоте (periods/days), поэтому виджет
+    считается без открытия приложения. Ниже — сводка с остатком Б/Ж/У, вода и
+    список позиций дня (RemoteViewsService) с удалением, чипы недавних блюд и
+    быстрые действия: своя еда (нативный редактор), скан, фото этикетки.
+    Высоты подобраны так, чтобы всё помещалось в 5 строк (~320dp).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_nut_root"
@@ -14,8 +16,8 @@
     android:orientation="vertical"
     android:paddingLeft="10dp"
     android:paddingRight="10dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
     android:contentDescription="@string/widget_nutrition_desc">
 
     <!-- Шапка: название + дата/период + очередь быстрых записей -->
@@ -69,9 +71,22 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="3dp"
         android:baselineAligned="false"
         android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_nut_prev"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="3dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="‹"
+            android:textColor="#E2ECFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/w_nut_p_day"
@@ -113,19 +128,32 @@
             android:textColor="#E2ECFF"
             android:textSize="9sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_nut_next"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="›"
+            android:textColor="#E2ECFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Калории крупно: круг процента + факт и цель -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <FrameLayout
-            android:layout_width="56dp"
-            android:layout_height="56dp">
+            android:layout_width="46dp"
+            android:layout_height="46dp">
 
             <ProgressBar
                 android:id="@+id/w_nut_kcal_ring"
@@ -195,7 +223,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:baselineAligned="false"
         android:orientation="horizontal">
 
@@ -208,8 +236,8 @@
             android:orientation="vertical">
 
             <FrameLayout
-                android:layout_width="42dp"
-                android:layout_height="42dp">
+                android:layout_width="30dp"
+                android:layout_height="30dp">
 
                 <ProgressBar
                     android:id="@+id/w_nut_p_ring"
@@ -266,8 +294,8 @@
             android:orientation="vertical">
 
             <FrameLayout
-                android:layout_width="42dp"
-                android:layout_height="42dp">
+                android:layout_width="30dp"
+                android:layout_height="30dp">
 
                 <ProgressBar
                     android:id="@+id/w_nut_f_ring"
@@ -323,8 +351,8 @@
             android:orientation="vertical">
 
             <FrameLayout
-                android:layout_width="42dp"
-                android:layout_height="42dp">
+                android:layout_width="30dp"
+                android:layout_height="30dp">
 
                 <ProgressBar
                     android:id="@+id/w_nut_c_ring"
@@ -378,7 +406,7 @@
         android:id="@+id/w_nut_summary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:includeFontPadding="false"
         android:maxLines="1"
@@ -390,7 +418,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
@@ -422,22 +450,96 @@
         style="@android:style/Widget.ProgressBar.Horizontal"
         android:layout_width="match_parent"
         android:layout_height="4dp"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="2dp"
         android:max="100"
         android:progress="0"
         android:progressDrawable="@drawable/widget_bar_water" />
 
-    <!-- Быстрые действия: еда / скан / фото -->
+    <!-- Список позиций дня: строки приходят из RemoteViewsService, «✕» удаляет -->
+    <FrameLayout
+        android:id="@+id/w_nut_items_box"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginTop="3dp">
+
+        <ListView
+            android:id="@+id/w_nut_items"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/w_nut_items_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:includeFontPadding="false"
+            android:text="Пока пусто — добавьте еду"
+            android:textColor="#8FA3C4"
+            android:textSize="9sp" />
+    </FrameLayout>
+
+    <!-- Чипы «недавние / избранное»: тап = запись в день без ввода КБЖУ -->
     <LinearLayout
+        android:id="@+id/w_nut_quick_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="3dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/w_nut_q1"
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text=""
+            android:textColor="#E2ECFF"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/w_nut_q2"
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="3dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text=""
+            android:textColor="#E2ECFF"
+            android:textSize="9sp" />
+
+        <TextView
+            android:id="@+id/w_nut_q3"
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text=""
+            android:textColor="#E2ECFF"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <!-- Быстрые действия: еда / скан / фото (для прошлых дней скрыты) -->
+    <LinearLayout
+        android:id="@+id/w_nut_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:orientation="horizontal">
 
         <TextView
             android:id="@+id/w_nut_food"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="28dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1.3"
             android:background="@drawable/widget_chip_on"
@@ -448,10 +550,25 @@
             android:textSize="11sp"
             android:textStyle="bold" />
 
+        <!-- «↩» — отмена последней записи еды; показывается только когда есть что отменять. -->
+        <TextView
+            android:id="@+id/w_nut_food_undo"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="↩"
+            android:textColor="#E2ECFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/w_nut_scan"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="28dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_chip"
@@ -465,7 +582,7 @@
         <TextView
             android:id="@+id/w_nut_photo"
             android:layout_width="0dp"
-            android:layout_height="30dp"
+            android:layout_height="28dp"
             android:layout_weight="1"
             android:background="@drawable/widget_chip"
             android:gravity="center"
@@ -476,17 +593,32 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Вода в один тап + дневник -->
+    <!-- Вода в один тап + свой объём (для прошлых дней скрыты) -->
     <LinearLayout
+        android:id="@+id/w_nut_water_actions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="3dp"
         android:orientation="horizontal">
+
+        <!-- «−250» — коррекция воды, если порцию нажали по ошибке. -->
+        <TextView
+            android:id="@+id/w_nut_water_minus"
+            android:layout_width="34dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/widget_chip"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="−250"
+            android:textColor="#E2ECFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/w_nut_water"
             android:layout_width="0dp"
-            android:layout_height="28dp"
+            android:layout_height="26dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_chip"
@@ -500,7 +632,7 @@
         <TextView
             android:id="@+id/w_nut_water500"
             android:layout_width="0dp"
-            android:layout_height="28dp"
+            android:layout_height="26dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_chip"
@@ -514,12 +646,12 @@
         <TextView
             android:id="@+id/w_nut_open"
             android:layout_width="0dp"
-            android:layout_height="28dp"
+            android:layout_height="26dp"
             android:layout_weight="1"
             android:background="@drawable/widget_action"
             android:gravity="center"
             android:includeFontPadding="false"
-            android:text="Дневник"
+            android:text="Свой"
             android:textColor="#C9F73A"
             android:textSize="10sp"
             android:textStyle="bold" />

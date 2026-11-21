@@ -186,12 +186,17 @@
         </FrameLayout>
     </LinearLayout>
 
-    <View
+    <!-- Разделитель половин. В RemoteViews нельзя обычный <View>: launcher
+         инфлейтит только аннотированные классы (@RemoteViews.RemoteView), и
+         android.view.View роняет весь виджет («Problem loading widget»).
+         ImageView — разрешён и рисует ту же линию фоном. -->
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="6dp"
         android:layout_marginBottom="6dp"
-        android:background="#1FFFFFFF" />
+        android:background="#1FFFFFFF"
+        android:contentDescription="@null" />
 
     <!-- ======================= половина 2 ======================= -->
     <LinearLayout
