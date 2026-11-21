@@ -361,6 +361,12 @@ export interface WorkoutSummaryTotals {
   densityKgPerMin: number;
   avgRIR: number | null;
   avgRPE: number | null;
+  /** Подходов с записанным RIR — база для доли «близко к отказу». */
+  rirLoggedSets: number;
+  /** Подходы с RIR ≤ 2: именно они дают стимул роста. */
+  nearFailureSets: number;
+  /** Подходы в отказ (RIR 0). */
+  failureSets: number;
   /** Средняя нагрузка в % от лучшего e1RM — насколько тяжело шла работа. */
   avgIntensityPct: number | null;
   prs: number;
@@ -497,6 +503,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   let totalDuration = 0;
   let totalRir = 0;
   let totalRirN = 0;
+  // Сколько подходов реально было близко к отказу: объём без усилия не растит.
+  let nearFailSets = 0;
+  let failSets = 0;
   let totalRpe = 0;
   let totalRpeN = 0;
   let maxLoad = 0;
@@ -551,7 +560,12 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exBestReps = Math.max(exBestReps, reps);
         maxLoad = Math.max(maxLoad, weight);
         const rirRaw = (st as any)?.rir;
-        if (rirRaw != null && Number.isFinite(Number(rirRaw))) { exRirSum += Number(rirRaw); exRirN += 1; }
+        if (rirRaw != null && Number.isFinite(Number(rirRaw))) {
+          const rirVal = Number(rirRaw);
+          exRirSum += rirVal; exRirN += 1;
+          if (rirVal <= 2) nearFailSets += 1;
+          if (rirVal <= 0) failSets += 1;
+        }
         const rpeRaw = (st as any)?.rpe;
         if (rpeRaw != null && Number.isFinite(Number(rpeRaw))) { exRpeSum += Number(rpeRaw); exRpeN += 1; }
         if (weight > 0 && reps > 0) {
@@ -829,6 +843,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       densityKgPerMin: totalDuration > 0 ? Math.round((totalTonnage / totalDuration) * 10) / 10 : 0,
       avgRIR: totalRirN > 0 ? Math.round((totalRir / totalRirN) * 10) / 10 : null,
       avgRPE: totalRpeN > 0 ? Math.round((totalRpe / totalRpeN) * 10) / 10 : null,
+      rirLoggedSets: totalRirN,
+      nearFailureSets: nearFailSets,
+      failureSets: failSets,
       avgIntensityPct: (() => {
         let weighted = 0;
         let base = 0;
@@ -1177,6 +1194,21 @@ export function buildWorkoutInsights(
     }
   }
 
+  // RIR записан, а подходы далеко от отказа: объём есть, а стимула мало —
+  // по среднему RIR это не видно (он «нормальный» из-за пары тяжёлых подходов).
+  if (s.totals.rirLoggedSets >= 6) {
+    const hardShare = Math.round((s.totals.nearFailureSets / s.totals.rirLoggedSets) * 100);
+    if (hardShare < 40) {
+      out.push({
+        id: 'hard-sets',
+        tone: 'info',
+        icon: '🎯',
+        title: `Только ${hardShare}% подходов близко к отказу`,
+        detail: `${s.totals.nearFailureSets} из ${s.totals.rirLoggedSets} подходов — с RIR ≤ 2. Объём есть, а стимула мало: подойдите ближе к отказу в последних подходах.`,
+      });
+    }
+  }
+
   const intensity = s.totals.avgIntensityPct;
   if (intensity != null && s.totals.sessions >= 2) {
     if (intensity < 60) {
@@ -1357,6 +1389,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   trend: 60,
   'muscle-trend': 58,
   rir: 52,
+  'hard-sets': 49,
   intensity: 50,
   density: 45,
   pushpull: 40,
@@ -1884,6 +1917,13 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
   lines.push(`Тоннаж: ${textTon(s.totals.tonnageKg)} · время: ${s.totals.durationMin} мин · плотность: ${s.totals.densityKgPerMin} кг/мин`);
   if (s.totals.avgIntensityPct != null) {
     lines.push(`Средняя интенсивность: ${s.totals.avgIntensityPct}% от e1RM`);
+  }
+  if (s.totals.rirLoggedSets > 0) {
+    const hardShare = Math.round((s.totals.nearFailureSets / s.totals.rirLoggedSets) * 100);
+    lines.push(
+      `RIR ≤ 2: ${s.totals.nearFailureSets} из ${s.totals.rirLoggedSets} подходов (${hardShare}%)`
+      + `${s.totals.avgRIR != null ? ` · средний RIR ${s.totals.avgRIR}` : ''}`,
+    );
   }
 
   const weeksCount = summaryWeeksCount(s);

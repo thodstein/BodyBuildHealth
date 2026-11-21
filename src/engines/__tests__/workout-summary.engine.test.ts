@@ -391,6 +391,43 @@ describe('workout-summary: недельная динамика и интенси
     expect(s.totals.avgIntensityPct).toBe(79.2);
   });
 
+  it('считает подходы близко к отказу, а не только средний RIR', () => {
+    const w = mkWorkout('2026-11-02', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 1 },
+    ]);
+    w.exercises[0].sets = [
+      { weight: 80, reps: 8, rir: 4, rpe: 6 },
+      { weight: 80, reps: 8, rir: 3, rpe: 7 },
+      { weight: 80, reps: 8, rir: 1, rpe: 8 },
+      { weight: 80, reps: 8, rir: 0, rpe: 9 },
+    ];
+    const s = buildWorkoutSummary([w]);
+    expect(s.totals.rirLoggedSets).toBe(4);
+    expect(s.totals.nearFailureSets).toBe(2);
+    expect(s.totals.failureSets).toBe(1);
+    // Средний RIR 2.0 выглядит нормально, а половина подходов была далеко от отказа.
+    expect(s.totals.avgRIR).toBe(2);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('RIR ≤ 2: 2 из 4 подходов (50%)');
+    expect(txt).toContain('средний RIR 2');
+  });
+
+  it('подсказывает, когда подходы далеко от отказа', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6, rir: 4 },
+        { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 2, rir: 1 },
+      ]),
+    ]);
+    const ins = buildWorkoutInsights(s).find(i => i.id === 'hard-sets');
+    expect(ins?.title).toBe('Только 25% подходов близко к отказу');
+    expect(ins?.detail).toContain('2 из 8');
+    // Все подходы с RIR ≤ 2 — подсказки нет, это нормальный режим.
+    expect(buildWorkoutInsights(buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6, rir: 1 }]),
+    ])).some(i => i.id === 'hard-sets')).toBe(false);
+  });
+
   it('выводит тренд объёма мышцы по неделям', () => {
     const ins = buildWorkoutInsights(buildWorkoutSummary([w1, w2]));
     expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');

@@ -33,6 +33,23 @@ const mkWorkout = (date: string, split = 'FullBody'): WorkoutLog => ({
 
 const workouts = [mkWorkout('2026-11-03'), mkWorkout('2026-11-05'), mkWorkout('2026-11-10')];
 
+/** Жим с запасом: три подхода далеко от отказа, один — близко. */
+const buildLazyWorkout = (): WorkoutLog => {
+  const base = mkWorkout('2026-11-12');
+  return {
+    ...base,
+    exercises: [{
+      ...base.exercises[0],
+      sets: [
+        { weight: 80, reps: 8, rir: 4, rpe: 6 },
+        { weight: 80, reps: 8, rir: 3, rpe: 7 },
+        { weight: 80, reps: 8, rir: 3, rpe: 7 },
+        { weight: 80, reps: 8, rir: 1, rpe: 8 },
+      ],
+    }] as StrengthLogEntry[],
+  };
+};
+
 describe('WorkoutSummaryReport', () => {
   it('показывает сводку: общее, объём, мышцы, упражнения, движения', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} storageKey="test_blocks_report" />);
@@ -67,6 +84,18 @@ describe('WorkoutSummaryReport', () => {
     // Конкретная правка объёма: не только «ниже MEV», но и сколько добавить.
     expect(html).toContain('+5/нед до MEV');
     expect(html).toContain('+6/нед до MEV');
+  });
+
+  it('показывает, сколько подходов было близко к отказу', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['totals']} showSelector={false} />);
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    // 3 тренировки по 3 подхода, все с RIR ≤ 2.
+    expect(text).toContain('RIR ≤2: 9 из 9 подх. (100%)');
+    const lazy = buildLazyWorkout();
+    const html2 = renderToStaticMarkup(<WorkoutSummaryReport workouts={[lazy]} blocks={['totals']} showSelector={false} />);
+    const text2 = html2.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    // 3 из 4 подходов с запасом 4–3 повтора — это видно, хотя средний RIR «нормальный».
+    expect(text2).toContain('RIR ≤2: 1 из 4 подх. (25%)');
   });
 
   it('в отчёте за одну тренировку не обещает «/нед»', () => {

@@ -322,7 +322,7 @@ export const WorkoutSummaryBody: React.FC<{
             <Tile label="Лучший e1RM" value={bestE1RM > 0 ? `${fmtInt(bestE1RM)} кг` : '—'} sub={t.avgRIR != null ? `ср. RIR ${t.avgRIR}` : undefined} color="#f472b6" />
             <Tile label="Интенсивность" value={t.avgIntensityPct != null ? `${t.avgIntensityPct}%` : '—'} sub="средний вес от e1RM" color="#fb923c" />
           </div>
-          {(topMuscle || t.prs > 0 || t.weightlessSets > 0) && (
+          {(topMuscle || t.prs > 0 || t.weightlessSets > 0 || t.rirLoggedSets > 0) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
               {topMuscle && (
                 <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', color: ACCENT }}>
@@ -339,6 +339,19 @@ export const WorkoutSummaryBody: React.FC<{
                   RPE в среднем {t.avgRPE}
                 </span>
               )}
+              {t.rirLoggedSets > 0 && (() => {
+                const share = Math.round((t.nearFailureSets / t.rirLoggedSets) * 100);
+                const color = share >= 60 ? '#22c55e' : share >= 40 ? '#f59e0b' : '#ef4444';
+                return (
+                  <span
+                    title="Подходы с RIR ≤ 2 — близко к отказу. Именно они дают стимул роста; подходы с большим запасом работают в основном на технику."
+                    style={{ fontSize: 9, padding: '3px 8px', borderRadius: 999, background: `${color}14`, border: `1px solid ${color}3a`, color }}
+                  >
+                    🎯 RIR ≤2: {t.nearFailureSets} из {t.rirLoggedSets} подх. ({share}%)
+                    {t.failureSets > 0 ? ` · в отказ ${t.failureSets}` : ''}
+                  </span>
+                );
+              })()}
               {t.weightlessSets > 0 && (
                 <span
                   title="Подходы со своим весом (подтягивания, отжимания, планка) не дают внешней нагрузки, поэтому в тоннаж не входят"
