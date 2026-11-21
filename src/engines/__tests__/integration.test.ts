@@ -23,7 +23,7 @@ describe('интеграционный тест: recommendation engine со вс
       acwr: 1.8,
       nutrition: { kcal: 1800, protein: 100, fat: 60, carbs: 120 },
       bodyWeight: 80,
-      labAnalysis: { liverStress: 8, cardioRisk: 7, inflammation: 7, kidneyStress: 3, hormoneScore: 2, homaIR: 3.0 },
+      labAnalysis: { liverStress: 70, cardioRisk: 40, inflammation: 40, kidneyStress: 30, hormoneScore: 20, homaIR: 3.0 },
       onCourse: true,
       courseIntensity: 'heavy',
       supportCoverage: { hepatic: 0.1, cardio: 0.1, neuro: 0.1, renal: 0.1 },
@@ -49,7 +49,7 @@ describe('интеграционный тест: recommendation engine со вс
       acwr: 1.0,
       nutrition: { kcal: 2800, protein: 160, fat: 80, carbs: 400 },
       bodyWeight: 80,
-      labAnalysis: { liverStress: 2, cardioRisk: 2, inflammation: 2, kidneyStress: 2, hormoneScore: 7, homaIR: 1.0 },
+      labAnalysis: { liverStress: 0, cardioRisk: 0, inflammation: 0, kidneyStress: 0, hormoneScore: 0, homaIR: 1.0 },
       onCourse: false,
       supportCoverage: { hepatic: 0.9, cardio: 0.9, neuro: 0.9, renal: 0.9 },
     });

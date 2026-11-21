@@ -344,12 +344,15 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           {linked.labAnalysis ? (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
               {/* Проход 153: неизмеренный индекс печатается «—», а не числом
-                  подставленной нормы; серый цвет = данных нет. */}
-              <span>Печень: <b style={{ color: tone(linked.labAnalysis.liverStress, (linked.labAnalysis.liverStress ?? 0) > 40) }}>{linked.labAnalysis.liverStress ?? '—'}</b></span>
-              <span>Почки: <b style={{ color: tone(linked.labAnalysis.kidneyStress, (linked.labAnalysis.kidneyStress ?? 0) > 40) }}>{linked.labAnalysis.kidneyStress ?? '—'}</b></span>
-              <span>Воспаление: <b style={{ color: tone(linked.labAnalysis.inflammation, (linked.labAnalysis.inflammation ?? 0) > 40) }}>{linked.labAnalysis.inflammation ?? '—'}</b></span>
-              <span>Гормоны: <b style={{ color: tone(linked.labAnalysis.hormoneScore, linked.labAnalysis.hormoneScore !== null && linked.labAnalysis.hormoneScore < 60, '#f59e0b') }}>{linked.labAnalysis.hormoneScore ?? '—'}</b></span>
-              <span>Кардио-риск: <b style={{ color: tone(linked.labAnalysis.cardioRisk, (linked.labAnalysis.cardioRisk ?? 0) > 40) }}>{linked.labAnalysis.cardioRisk ?? '—'}</b></span>
+                  подставленной нормы; серый цвет = данных нет.
+                  Проход 198: шкала индексов — 0..100 ступеней главной модели,
+                  поэтому подпись «/100», а гормоны считаются штрафом: высокий
+                  балл — это отклонения, а не «хороший фон». */}
+              <span>Печень: <b style={{ color: tone(linked.labAnalysis.liverStress, (linked.labAnalysis.liverStress ?? 0) > 40) }}>{linked.labAnalysis.liverStress !== null ? `${linked.labAnalysis.liverStress}/100` : '—'}</b></span>
+              <span>Почки: <b style={{ color: tone(linked.labAnalysis.kidneyStress, (linked.labAnalysis.kidneyStress ?? 0) > 40) }}>{linked.labAnalysis.kidneyStress !== null ? `${linked.labAnalysis.kidneyStress}/100` : '—'}</b></span>
+              <span>Воспаление: <b style={{ color: tone(linked.labAnalysis.inflammation, (linked.labAnalysis.inflammation ?? 0) > 40) }}>{linked.labAnalysis.inflammation !== null ? `${linked.labAnalysis.inflammation}/100` : '—'}</b></span>
+              <span>Гормоны: <b style={{ color: tone(linked.labAnalysis.hormoneScore, (linked.labAnalysis.hormoneScore ?? 0) > 40, (linked.labAnalysis.hormoneScore ?? 0) > 60 ? '#ef4444' : '#f59e0b') }}>{linked.labAnalysis.hormoneScore !== null ? `${linked.labAnalysis.hormoneScore}/100` : '—'}</b></span>
+              <span>Кардио-риск: <b style={{ color: tone(linked.labAnalysis.cardioRisk, (linked.labAnalysis.cardioRisk ?? 0) > 40) }}>{linked.labAnalysis.cardioRisk !== null ? `${linked.labAnalysis.cardioRisk}/100` : '—'}</b></span>
               <span>MRV ×{labMult.toFixed(2)}</span>
             </div>
           ) : <div style={{ marginBottom: 6, color: '#f59e0b' }}>Нет данных лаборатории — сдайте анализы для точной коррекции.</div>}

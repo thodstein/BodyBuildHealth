@@ -196,6 +196,20 @@ describe('проход 153: потребитель не принимает «н�
     const adj = labTrainingAdjust(interpretLabs([point('ALT', 200)]));
     expect(adj.mrvMultiplier).toBeLessThan(1);
     expect(adj.warnings.length).toBeGreaterThan(0);
+    // Проход 198: подпись честная — «67/100», а не число из шкалы 0..10.
+    expect(adj.warnings.join(' ')).toContain('/100');
+  });
+
+  it('hormoneScore — штраф: объём режет высокий балл, а не низкий (проход 198)', () => {
+    const mk = (hormoneScore: number) => labTrainingAdjust({
+      ...empty,
+      hormoneScore,
+    } as ReturnType<typeof interpretLabs>);
+    // Идеальный профиль — штраф 0, объём не режется.
+    expect(mk(0).mrvMultiplier).toBe(1);
+    // Отклонения копятся — и только тогда снижается объём.
+    expect(mk(75).mrvMultiplier).toBeLessThan(1);
+    expect(mk(75).warnings.join(' ')).toContain('Гормональные отклонения');
   });
 
   it('тренерские советы по неизмеренным индексам не появляются', () => {
@@ -216,5 +230,22 @@ describe('проход 153: потребитель не принимает «н�
     const assignments = src.split(/\r?\n/).filter((l) => /labStress\.\w+ = labRes\./.test(l));
     expect(assignments.length).toBeGreaterThan(0);
     for (const line of assignments) expect(line.trim().startsWith('if (')).toBe(true);
+  });
+});
+
+describe('проход 198: подпись и сторона индекса — в его шкале', () => {
+  it('CalcQualityTab печатает «/100» и красит гормоны за высокий штраф', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/TrainingScreen_parts/CalcQualityTab.tsx'), 'utf8');
+    expect(src).toContain('}/100`');
+    // Прежняя проверка красила янтарным НИЗКИЙ балл («хорошо») — сторона штрафа.
+    expect(src).not.toContain('hormoneScore < 60');
+  });
+
+  it('lab-training-adjust и training-recommendations не держат десятибалльных порогов', () => {
+    const adjust = readFileSync(resolve(process.cwd(), 'src/ui/screens/TrainingScreen_parts/lab-training-adjust.ts'), 'utf8');
+    const recs = readFileSync(resolve(process.cwd(), 'src/engines/training-recommendations.engine.ts'), 'utf8');
+    expect(adjust).not.toContain('hormoneScore < 40');
+    expect(recs).not.toContain('/10)');
+    expect(recs).toContain('LAB_INDEX_STEP2');
   });
 });

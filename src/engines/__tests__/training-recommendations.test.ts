@@ -89,8 +89,51 @@ describe('generateTrainingRecommendations', () => {
   });
 
   it('lab: high liver stress -> warn', () => {
-    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], labAnalysis: { liverStress: 8, cardioRisk: 3, inflammation: 3, kidneyStress: 3, hormoneScore: 5, homaIR: null } });
+    const recs = generateTrainingRecommendations({ historyWorkouts: [], level: 'intermediate', weakPoints: [], labAnalysis: { liverStress: 80, cardioRisk: 30, inflammation: 30, kidneyStress: 30, hormoneScore: 20, homaIR: null } });
     expect(recs.some(r => r.id === 'lab-liver' && r.severity === 'warn')).toBe(true);
+  });
+
+  it('lab: шкала индексов 0..100 — порог 40 и подпись "/100" (проход 198)', () => {
+    const mk = (v: number) => generateTrainingRecommendations({
+      historyWorkouts: [], level: 'intermediate', weakPoints: [],
+      labAnalysis: { liverStress: v, cardioRisk: null, inflammation: null, kidneyStress: null, hormoneScore: null, homaIR: null },
+    });
+    // Одна ступень (33 у женщины при АЛТ 35) — это ещё не «высокий стресс».
+    expect(mk(33).some(r => r.id === 'lab-liver')).toBe(false);
+    const at40 = mk(40);
+    expect(at40.some(r => r.id === 'lab-liver')).toBe(true);
+    expect(at40.find(r => r.id === 'lab-liver')!.text).toContain('40/100');
+  });
+
+  it('lab: hormoneScore — штраф, совет даёт высокий штраф, а не низкий (проход 198)', () => {
+    const mk = (v: number) => generateTrainingRecommendations({
+      historyWorkouts: [], level: 'intermediate', weakPoints: [],
+      labAnalysis: { liverStress: null, cardioRisk: null, inflammation: null, kidneyStress: null, hormoneScore: v, homaIR: null },
+    });
+    expect(mk(25).some(r => r.id === 'lab-hormone')).toBe(false);
+    expect(mk(55).some(r => r.id === 'lab-hormone')).toBe(true);
+  });
+
+  it('lab: cardioRisk — доля своей шкалы, порог 50, подпись "/100" (проход 198)', () => {
+    const mk = (v: number) => generateTrainingRecommendations({
+      historyWorkouts: [], level: 'intermediate', weakPoints: [],
+      labAnalysis: { liverStress: null, cardioRisk: v, inflammation: null, kidneyStress: null, hormoneScore: null, homaIR: null },
+    });
+    expect(mk(40).some(r => r.id === 'lab-cardio')).toBe(false);
+    const at50 = mk(50);
+    expect(at50.some(r => r.id === 'lab-cardio')).toBe(true);
+    expect(at50.find(r => r.id === 'lab-cardio')!.text).toContain('50/100');
+  });
+
+  it('поддержка: измеренная ступень 2 — повод для надбавки и на новой шкале (проход 198)', () => {
+    const mk = (v: number) => generateTrainingRecommendations({
+      historyWorkouts: [], level: 'intermediate', weakPoints: [],
+      labAnalysis: { liverStress: v, cardioRisk: null, inflammation: null, kidneyStress: null, hormoneScore: null, homaIR: null },
+      supportCoverage: { hepatic: 0.1, cardio: 0.1, neuro: 0.1, renal: 0.1 },
+    });
+    // Прежние «5 из 10» на шкале шагов (0/33/67/100) срабатывали на первой же ступени.
+    expect(mk(33).some(r => r.id === 'supp-hepatic')).toBe(false);
+    expect(mk(67).some(r => r.id === 'supp-hepatic')).toBe(true);
   });
 
   it('pharma: heavy course -> info', () => {
