@@ -1934,6 +1934,22 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     ));
   }
 
+  if (s.sessions.length > 1) {
+    // Период без построчного списка тренировок не отвечает на «а что было в
+    // четверг»: недели и мышцы есть, самих сессий нет.
+    lines.push('');
+    lines.push('По тренировкам:');
+    s.sessions.slice().reverse().forEach(x => {
+      const week = x.weekNumber != null ? ` · нед. ${x.weekNumber}` : '';
+      lines.push(
+        `  ${x.date}${week} · ${x.split} · ${x.sets} подх · КПШ ${x.reps} · ${textTon(x.tonnageKg)}`
+        + `${x.durationMin > 0 ? ` · ${x.durationMin} мин` : ''}`
+        + `${x.density > 0 ? ` · ${Math.round(x.density)} кг/мин` : ''}`
+        + `${x.prs > 0 ? ` · рекордов ${x.prs}` : ''}`,
+      );
+    });
+  }
+
   if (opts.plan && !opts.plan.empty) {
     const pva = opts.plan;
     lines.push('');

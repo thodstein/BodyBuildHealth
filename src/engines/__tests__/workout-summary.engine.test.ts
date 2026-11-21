@@ -1043,6 +1043,19 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('80×8@2');
   });
 
+  it('перечисляет тренировки периода с неделей мезоцикла', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-09', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]),
+    ]);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('По тренировкам:');
+    expect(txt).toContain('2026-11-09 · нед. 1 · FullBody');
+    // Свежие тренировки первыми, как в карточке.
+    expect(txt.indexOf('2026-11-09')).toBeLessThan(txt.indexOf('2026-11-02'));
+    expect(txt).toContain('КПШ 24');
+  });
+
   it('сравнение называет период и показывает движения и e1RM', () => {
     const prev = mkWorkout('2026-10-27', [
       { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
