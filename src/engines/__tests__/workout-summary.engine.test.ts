@@ -771,6 +771,25 @@ describe('workout-summary: план против факта', () => {
     expect(gap!.detail).toContain(`слабее всего — ${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel} 0/1`);
   });
 
+  it('план и рекорды не вытесняются балансовыми выводами', () => {
+    // Три недели, рост веса — рекорды; план недобран; «жимы/тяги» и MEV
+    // дают ещё 5 выводов. Раньше план и PR обрезались седьмым слотом.
+    const summary = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 85, reps: 8, sets: 4 }]),
+      mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 6 }]),
+    ]);
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: Array.from({ length: 20 }, () => ({ weight: 90, reps: 8 })) },
+    ], summary);
+    const ins = buildWorkoutInsights(summary, 'intermediate', null, pva);
+    expect(ins).toHaveLength(7);
+    expect(ins.some(i => i.id === 'plan-gap')).toBe(true);
+    expect(ins.some(i => i.id === 'prs')).toBe(true);
+    // Важное — первым, общий баланс жимов и тяг уступает место новостям.
+    expect(ins[0].id).toBe('plan-gap');
+  });
+
   it('сворачивает план по движениям', () => {
     const pva = comparePlanVsActual([
       { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },

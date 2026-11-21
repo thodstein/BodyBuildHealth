@@ -1224,8 +1224,37 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
     });
   }
 
-  return out.slice(0, 7);
+  // Семь выводов — предел читаемости, но порядок вставки — это порядок
+  // расчёта, а не важность. На периоде в 4–8 недель балансовые выводы
+  // («жимы перевешивают») вытесняли план и рекорды: они есть почти всегда,
+  // а недобор плана и PR — новость именно этой тренировки. Поэтому перед
+  // обрезкой сортируем по важности, повторяя при равенстве порядок расчёта.
+  const ranked = out
+    .map((ins, i) => ({ ins, i, p: INSIGHT_PRIORITY[ins.id] ?? 50 }))
+    .sort((a, b) => b.p - a.p || a.i - b.i)
+    .slice(0, 7)
+    .map(x => x.ins);
+  return ranked;
 }
+
+/** Важность вывода: больше — нужнее в «Выводах», когда их больше семи. */
+const INSIGHT_PRIORITY: Record<string, number> = {
+  'plan-gap': 100,
+  prs: 95,
+  'pattern-drop': 90,
+  deload: 85,
+  'mrv-streak': 74,
+  'mev-streak': 72,
+  'over-mrv': 70,
+  'under-mev': 68,
+  trend: 60,
+  'muscle-trend': 58,
+  rir: 52,
+  intensity: 50,
+  density: 45,
+  pushpull: 40,
+  kneehip: 38,
+};
 
 // ───────────────────────────────────────────────────────────────────────────
 // Детализация подходов (для «самой подробной» карточки тренировки)
