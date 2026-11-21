@@ -322,6 +322,9 @@ describe('workout-summary: недельная динамика и интенси
   it('считает КПШ по неделям', () => {
     const s = buildWorkoutSummary([w1, w2]);
     expect(s.weeks.map(w => w.reps)).toEqual([24, 40]);
+    // Плотность недели: 1920 кг / 60 мин и 3200 кг / 60 мин.
+    expect(s.weeks.map(w => w.durationMin)).toEqual([60, 60]);
+    expect(s.weeks.map(w => w.densityKgPerMin)).toEqual([32, 53.3]);
   });
 
   it('строит подходы по неделям и тренд по мышце', () => {
@@ -347,6 +350,40 @@ describe('workout-summary: недельная динамика и интенси
   it('выводит тренд объёма мышцы по неделям', () => {
     const ins = buildWorkoutInsights(buildWorkoutSummary([w1, w2]));
     expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');
+  });
+
+  it('называет движение, которое выпало из программы', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 4 },
+      ]),
+      mkWorkout('2026-11-09', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 8 },
+      ]),
+    ]);
+    const ins = buildWorkoutInsights(s);
+    const drop = ins.find(i => i.id === 'pattern-drop');
+    expect(drop?.title).toContain('Горизонтальный жим');
+    expect(drop?.title).toContain('-66.7%');
+    expect(drop?.detail).toContain('Было 6 подх/нед, стало 2');
+    // Рост приседаний не подменяет просадку жима.
+    expect(ins.some(i => i.id === 'muscle-trend')).toBe(false);
+  });
+
+  it('пропорциональное снижение — это разгрузка, а не выпавшее движение', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 4 },
+      ]),
+      mkWorkout('2026-11-09', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
+      ]),
+    ]);
+    expect(buildWorkoutInsights(s).some(i => i.id === 'pattern-drop')).toBe(false);
   });
 
   it('замечает высокую интенсивность', () => {
@@ -804,6 +841,10 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('По неделям:');
     expect(txt).toContain('КПШ 16');
     expect(txt).toContain('КПШ 32');
+    // Плотность недели: 1280 кг / 60 мин = 21, 2560 кг / 60 мин = 43.
+    expect(txt).toContain('60 мин');
+    expect(txt).toContain('21 кг/мин');
+    expect(txt).toContain('43 кг/мин');
   });
 
   it('своя шапка и хвост обрамляют отчёт', () => {

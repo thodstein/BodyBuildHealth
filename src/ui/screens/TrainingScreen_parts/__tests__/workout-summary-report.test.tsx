@@ -49,6 +49,8 @@ describe('WorkoutSummaryReport', () => {
     // Недельная динамика: тоннаж и КПШ рядом.
     expect(html).toContain('По неделям');
     expect(html).toContain('● КПШ');
+    // В подсказке недели есть плотность, а не только объём: 3 сессии + 2 недели.
+    expect((html.match(/кг\/мин/g) || []).length).toBeGreaterThanOrEqual(5);
     expect(html).toContain('По тренировкам');
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');

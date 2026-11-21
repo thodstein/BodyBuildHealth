@@ -317,6 +317,10 @@ export interface SummaryWeek {
   /** КПШ — количество подъёмов за неделю. */
   reps: number;
   tonnageKg: number;
+  /** Суммарное время тренировок недели, мин. */
+  durationMin: number;
+  /** кг/мин по неделе — работа за минуту, а не только её объём. */
+  densityKgPerMin: number;
 }
 
 export interface SummaryPR {
@@ -621,8 +625,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
 
     const wkRange = weekRangeFor(date);
     if (wkRange.from) {
-      const wPrev = weekAgg.get(wkRange.from) || { label: wkRange.label, sessions: 0, sets: 0, reps: 0, tonnageKg: 0 };
+      const wPrev = weekAgg.get(wkRange.from) || { label: wkRange.label, sessions: 0, sets: 0, reps: 0, tonnageKg: 0, durationMin: 0, densityKgPerMin: 0 };
       wPrev.sessions += 1; wPrev.sets += sSets; wPrev.reps += sReps; wPrev.tonnageKg += sTonnage;
+      wPrev.durationMin += Math.max(0, Math.round(duration));
       weekAgg.set(wkRange.from, wPrev);
     }
   }
@@ -730,7 +735,16 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
 
   const weeksOut: SummaryWeek[] = activeWeekKeys.map(k => {
     const v = weekAgg.get(k)!;
-    return { label: v.label, sessions: v.sessions, sets: v.sets, reps: v.reps, tonnageKg: Math.round(v.tonnageKg) };
+    return {
+      label: v.label,
+      sessions: v.sessions,
+      sets: v.sets,
+      reps: v.reps,
+      tonnageKg: Math.round(v.tonnageKg),
+      durationMin: v.durationMin,
+      // Время без записанной длительности даёт шум, а не плотность.
+      densityKgPerMin: v.durationMin > 0 ? Math.round((v.tonnageKg / v.durationMin) * 10) / 10 : 0,
+    };
   });
 
   return {
@@ -1108,7 +1122,38 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
     const moved = (s.muscles || [])
       .filter(m => m.weeklyTrendPct != null && Math.abs(m.weeklyTrendPct) >= 20)
       .sort((a, b) => Math.abs(b.weeklyTrendPct as number) - Math.abs(a.weeklyTrendPct as number))[0];
-    if (moved && moved.weeklyTrendPct != null) {
+
+    // Общий тренд подходов периода — фон для «просело именно это движение»:
+    // если уменьшилось всё, это разгрузка, а не выпавший паттерн.
+    const activeWeekSets = (s.weeks || []).map(w => w.sets).filter(v => v > 0);
+    const overallTrendPct = activeWeekSets.length >= 2 && activeWeekSets[0] > 0
+      ? Math.round(((activeWeekSets[activeWeekSets.length - 1] - activeWeekSets[0]) / activeWeekSets[0]) * 1000) / 10
+      : null;
+
+    const droppedPattern = (s.patterns || [])
+      .filter(p => p.pattern !== 'other' && p.weeklyTrendPct != null && Array.isArray(p.weeklySets))
+      .filter(p => {
+        const active = p.weeklySets.filter(v => v > 0);
+        // Нужна база: 2–3 подхода в неделю — ещё не программа, просадки нет.
+        if (active.length < 2 || active[0] < 4) return false;
+        const pct = p.weeklyTrendPct as number;
+        return pct <= -30 && (overallTrendPct == null || pct <= overallTrendPct - 15);
+      })
+      .sort((a, b) => (a.weeklyTrendPct as number) - (b.weeklyTrendPct as number))[0];
+
+    // Рост другой мышцы не должен заглушать просадку движения: «просело» —
+    // это минус, а не самый крупный модуль тренда.
+    const movedDown = moved && moved.weeklyTrendPct != null && moved.weeklyTrendPct < 0 ? moved : null;
+    if (droppedPattern && (!movedDown || Math.abs(droppedPattern.weeklyTrendPct as number) >= Math.abs(movedDown.weeklyTrendPct as number))) {
+      const active = droppedPattern.weeklySets.filter(v => v > 0);
+      out.push({
+        id: 'pattern-drop',
+        tone: 'warn',
+        icon: '🔀',
+        title: `${droppedPattern.label}: подходы ${signedPct(droppedPattern.weeklyTrendPct as number)} к первой неделе`,
+        detail: `Было ${active[0]} подх/нед, стало ${active[active.length - 1]}. Другие движения, похоже, забрали время — верните объём, если это не плановая разгрузка.`,
+      });
+    } else if (moved && moved.weeklyTrendPct != null) {
       const active = moved.weeklySets.filter(x => x > 0);
       const up = moved.weeklyTrendPct > 0;
       out.push({
@@ -1634,7 +1679,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     lines.push('');
     lines.push('По неделям:');
     s.weeks.forEach(w => lines.push(
-      `  ${w.label}: ${w.sessions} трен. · ${w.sets} подх · КПШ ${w.reps} · ${textTon(w.tonnageKg)}`,
+      `  ${w.label}: ${w.sessions} трен.${w.durationMin > 0 ? ` · ${w.durationMin} мин` : ''} · ${w.sets} подх · КПШ ${w.reps} · ${textTon(w.tonnageKg)}${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}`,
     ));
   }
 

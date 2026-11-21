@@ -797,7 +797,7 @@ export const WorkoutSummaryBody: React.FC<{
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
                   {weeks.map((w, i) => (
-                    <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · КПШ ${w.reps} · ${w.sessions} трен.`}>
+                    <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · КПШ ${w.reps} · ${w.sessions} трен.${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}`}>
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, width: '100%', height: 32 }}>
                         <div style={{ flex: 1, height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
                         <div style={{ flex: 1, height: Math.max(3, (w.reps / maxWeekReps) * 32), background: 'linear-gradient(180deg, rgba(96,165,250,0.9), rgba(96,165,250,0.35))', borderRadius: 3 }} />
