@@ -118,7 +118,11 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
 
   // ─── РЕПРОДУКТИВНАЯ / HPG-ось ───
   { marker: 'TESTOSTERONE', organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 12 },
-  { marker: 'FREE_TESTO',   organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 0.25 },
+  // Проход 191: два написания одного анализа — одна единица (пг/мл РФ-бланка).
+  // Прежние 0.25 нмоль/л приходили из диализной шкалы: `normalizeMarker` сводит
+  // канон `FREE_TESTOSTERONE` именно сюда, а значения плоского мира — пг/мл, так
+  // что порог 0.25 не срабатывал никогда. Низ — каталог (`UCUM_MAP.FT` 12.3).
+  { marker: 'FREE_TESTO',   organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 12.3 },
   { marker: 'LH',           organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 1.7 },
   { marker: 'FSH',          organId: 'reproductive', mechId: 'rep1', direction: 'down', lln: 1.5 },
   { marker: 'INTRATEST_T',  organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 50 },
@@ -169,7 +173,10 @@ export const MARKER_TO_TZ_MECH: MarkerMechLink[] = [
   { marker: 'CPEPTIDE',     organId: 'hematologic', mechId: 'hem2', direction: 'up', uln: 3.5 },
   { marker: 'GLUCAGRONS',   organId: 'hematologic', mechId: 'hem3', direction: 'up', uln: 200 },
   { marker: 'CORTISOL_H',   organId: 'hematologic', mechId: 'hem2', direction: 'up', uln: 700 },
-  { marker: 'TESTOSTERONE_FREE', organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 65 },
+  // Проход 191: пг/мл РФ-бланка, низ каталога (ИНВИТРО/Хеликс 18–40 лет 12.3).
+  // Прежние 65 — порог диализного метода: в пг/мл иммуноанализа его не достигает
+  // почти никто, и механизм «дефицит андрогенов» срабатывал у здорового.
+  { marker: 'TESTOSTERONE_FREE', organId: 'reproductive', mechId: 'rep2', direction: 'down', lln: 12.3 },
   { marker: 'EPI_TESTO',    organId: 'reproductive', mechId: 'rep5', direction: 'down', lln: 5 },
   // ─── ДОПОЛНИТЕЛЬНЫЕ МАРКЁРЫ (отсутствовали в MARKER_TO_TZ_MECH) ───
   { marker: 'DHT',          organId: 'reproductive', mechId: 'rep4', direction: 'up', uln: 3.5 },
@@ -265,6 +272,10 @@ export const MARKER_ALIASES: Record<string, string> = {
   'CHOLESTEROL_LDL': 'LDL',
   'CHOLESTEROL_HDL': 'HDL',
   'FREE_TESTOSTERONE': 'FREE_TESTO',
+  // Проход 191: код склада `FT` — это тот же анализ. Без алиаса анализ из бланка
+  // приходил в мост как `FT`, строки не находил и не активировал механизм ни при
+  // каком значении (в `labSliceToValues` ключ именно `FT`).
+  'FT': 'FREE_TESTO',
   'CRP': 'HsCRP',
   'HSCRP': 'HsCRP',
   'HGB': 'HEMOGLOBIN',

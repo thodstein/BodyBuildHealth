@@ -103,7 +103,13 @@ function ucumRange(code: string): { low: number; high: number } {
 
 export const REFERENCE_RANGES: Record<string, { low: number; high: number; criticalHigh?: number; unit: string }> = {
   TESTOSTERONE_TOTAL: { low: 10, high: 35, criticalHigh: 52, unit: 'нмоль/л' },
-  TESTOSTERONE_FREE: { low: 0.2, high: 0.6, criticalHigh: 0.9, unit: 'нмоль/л' },
+  // Проход 191: свободный тестостерон — из каталога и в единице бланка (пг/мл).
+  // Прежние 0.2–0.6 нмоль/л были числами диализного метода: запись бланка в пг/мл
+  // не пересчитывалась (`unitsIncommensurable` → `null`), и анализ молча выпадал из
+  // гормональной оценки, а сравнение «< 0.3» в пг/мл не срабатывало никогда.
+  // Критического верха нет: высокий свободный T — не критическое состояние (у
+  // общего T он остаётся 52 нмоль/л).
+  TESTOSTERONE_FREE: { ...ucumRange('FT'), unit: 'пг/мл' },
   ESTRADIOL: { ...ucumRange('E2'), criticalHigh: 60, unit: 'пг/мл' },
   PROLACTIN: { low: 50, high: 350, criticalHigh: 500, unit: 'мЕд/л' },
   LH: { low: 1, high: 10, criticalHigh: 15, unit: 'МЕ/л' },
@@ -554,7 +560,7 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
   let hormoneScore = 0;
   // ♀ Низкий тестостерон — не дефицит (у неё нормы другие), штраф только мужчинам.
   if (!fem && testTotal !== null && testTotal < 15) hormoneScore += 30;
-  if (!fem && testFree !== null && testFree < 0.3) hormoneScore += 25;
+  if (!fem && testFree !== null && testFree < refFT.low) hormoneScore += 25;
   // E2 у женщины — фазовая модель: нижняя граница остаётся красным бэндом (<30),
   // потому что в менструальную фазу E2 низкий по природе; верхняя берётся из
   // коридора ЕЁ фазы (фолл. 200 / лют. 500 пг/мл), а когда фазы нет (или она

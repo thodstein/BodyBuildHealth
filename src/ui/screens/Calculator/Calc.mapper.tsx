@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
+import { FT_MALE_BAND } from '../../../engines/lab-norms.engine';
 import { ruCount, RU_ELEMENTS, RU_STACKS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
 import { calculateTzSpecRisk, mechanismCoverageOf, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../engines/tz-snapshot';
@@ -170,7 +171,11 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   ],
   reproductive: [
     { id:'gonadotropins', label:'LH/FSH', icon:'🧬', markers:['LH','FSH'], ids:['hcg','enclomiphene','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
-    { id:'androgens', label:'TT/FT/SHBG', icon:'⚙️', markers:['TT','FT','SHBG'], ids:['zinc','boron','coq10'], trigger:(l)=>(l.FT??9)<8||(l.SHBG??0)>60 },
+    // Проход 191: нижняя граница свободного T — не литерал 8, а шкала каталога
+    // (12.3 пг/мл, референс РФ 18–40 лет). Прежние 8 были ниже любого бланка РФ, и
+    // мужчина с 10 пг/мл не попадал в андрогенный домен. Отсутствие записи домен не
+    // включает (`?? low` даёт равенство, а не «ниже»).
+    { id:'androgens', label:'TT/FT/SHBG', icon:'⚙️', markers:['TT','FT','SHBG'], ids:['zinc','boron','coq10'], trigger:(l)=>(l.FT??FT_MALE_BAND.low)<FT_MALE_BAND.low||(l.SHBG??0)>60 },
     { id:'fertility', label:'Сперматогенез', icon:'🔬', markers:['LH','FSH'], ids:['hcg','nac','zinc','folate','vitamin_b12'], trigger:(_l,s)=>String(s.pharma.phase)==='fertility' },
   ],
   musculoskeletal: [

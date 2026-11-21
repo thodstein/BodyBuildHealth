@@ -12,6 +12,7 @@
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN, UA_LLN, NT_PROBNP_STEPS, CK_MB_STEPS, E2_MALE_BAND,
+  FT_MALE_BAND,
 } from '../engines/lab-norms.engine';
 import { ucumInfo } from '../core/constants';
 import { unitsIncommensurable } from '../core/labs-mapping';
@@ -95,7 +96,16 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   LH:               { marker:'LH', normal:[1.7,9], borderline:[1,1.7], treatment:[0.5,1], emergencyLow:0.5, direction:'low', unit:'mU/L', label:'ЛГ' },
   FSH:              { marker:'FSH', normal:[1.5,12], borderline:[1,1.5], treatment:[0.5,1], emergencyLow:0.5, direction:'low', unit:'mU/L', label:'ФСГ' },
   TESTOSTERONE:     { marker:'TESTOSTERONE', normal:[15,50], borderline:[10,15], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'Тестостерон' },
-  FREE_TESTOSTERONE: { marker:'FREE_TESTOSTERONE', normal:[0.3,1.0], borderline:[0.15,0.3], treatment:[0.05,0.15], emergencyLow:0.05, direction:'low', unit:'nmol/L', label:'Своб. T' },
+  // Проход 191: свободный тестостерон — в единице РФ-бланка (пг/мл, иммуноанализ),
+  // норма из каталога (`UCUM_MAP.FT` = референс ИНВИТРО/Хеликс 18–40 лет 12.3–46.6).
+  // Возраста в плоском мире нет, поэтому полосы вложены в один и тот же референс:
+  // ниже 12.3 — ниже референса 18–40, но внутри полосы 40–60 (9.57) и ≥ 60 (7.72) →
+  // «грань» (повтор утром натощак, без тренировок 48 ч); ниже 7.72 — ниже ЛЮБОЙ
+  // взрослой полосы → «лечение» (эндокринолог). Нижней экстренной границы нет: для
+  // амбулаторного гормона источника на такое число нет, а выдуманное давало бы
+  // «⛔ STOP COURSE» здоровому. `direction:'low'`: высокий свободный T на курсе —
+  // не болезнь шкалы, ступени у него нет.
+  FREE_TESTOSTERONE: { marker:'FREE_TESTOSTERONE', normal:[FT_MALE_BAND.low, FT_MALE_BAND.high], borderline:[FT_MALE_BAND.elderlyLow, FT_MALE_BAND.low], treatment:[0, FT_MALE_BAND.elderlyLow], direction:'low', unit:'pg/mL', label:'Своб. T' },
   DHT:              { marker:'DHT', normal:[1.0,3.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'nmol/L', label:'ДГТ' },
   DHEA_S:           { marker:'DHEA_S', normal:[200,500], borderline:[150,200], treatment:[100,150], emergencyLow:100, direction:'low', unit:'mcg/dL', label:'ДГЭА-С' },
   SHBG:             { marker:'SHBG', normal:[20,60], borderline:[60,80], treatment:[80,120], emergencyHigh:120, direction:'high', unit:'nmol/L', label:'ГСПГ' },
@@ -267,8 +277,14 @@ FEMALE_TIER_OVERRIDES.HEMOGLOBIN = FEMALE_TIER_OVERRIDES.HGB;
  * и `PROLACTIN` в список забыли: женщина с тестостероном 6 нмоль/л под именем
  * `TOTAL_T` получала мужскую лестницу с советом про hCG, а под именем
  * `TESTOSTERONE` — ничего.
+ *
+ * Проход 191: сюда же свободный тестостерон. У женщины его верх — 5.45 пг/мл
+ * (ИНВИТРО/Хеликс), то есть мужская норма 12.3 начинается там, где у неё уже
+ * вирилизация: без строки женщина с 3 пг/мл (её норма) получала бы мужскую
+ * ступень «лечение». Низкий свободный T у женщины клинически не действуют
+ * (Helix: «снижение не принимают во внимание»), поэтому её ступени нет вовсе.
  */
-const MALE_ONLY_TIER = new Set(['E2', 'PROG', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT']);
+const MALE_ONLY_TIER = new Set(['E2', 'PROG', 'LH', 'FSH', 'TESTOSTERONE', 'PRL', 'DHT', 'FREE_TESTOSTERONE']);
 
 /** Имя анализа в словаре лестниц с учётом второго написания (проход 175). */
 function tierCanonicalKey(key: string): string {
@@ -322,13 +338,14 @@ export const TIER_MARKER_ALIAS: Record<string, string> = {
  * (`UCUM_MAP[code].prefUnit`) и единица строки обязаны быть одной величины
  * (`unitsIncommensurable`). Двойник, который этому не отвечает, сюда не внесён —
  * число его шкалы пришлось бы толковать в чужой единице, а клинического
- * источника на выбор единицы нет (`docs/LAB-NORMS-SINGLE-SOURCE.md`):
- *   `FT` — каталог в `pg/mL` (масса), строка `FREE_TESTOSTERONE` в `nmol/L`.
- *     Это не разные величины (есть молярная масса), но шкала 0.3–1.0 нмоль/л
- *     относится к диализному/расчётному методу, а не к иммуноанализу 8–30 пг/мл,
- *     которым пользуется каталог. Сводить единицы без решения о методе нельзя.
+ * источника на выбор единицы нет (`docs/LAB-NORMS-SINGLE-SOURCE.md`).
  * КФК-МВ (проход 185) переведён в Ед/л вместе со строкой, поэтому блокера
  * «активность против массы» больше нет: масса честно не читается.
+ * Проход 191: `FT` тоже переведён — строка `FREE_TESTOSTERONE` переехала в пг/мл
+ * вместе с каталогом (референс РФ-бланка 12.3–46.6, ИНВИТРО/Хеликс). До этого в
+ * строке стояли 0.3–1.0 нмоль/л: это числа ДРУГОГО метода (диализ/расчёт), а не
+ * другой перевод, поэтому свободный тестостерон из бланка молча не получал ни
+ * ступени, ни совета.
  */
 export const STORAGE_TIER_ALIAS: Record<string, string> = {
   UA: 'URIC_ACID',
@@ -343,6 +360,8 @@ export const STORAGE_TIER_ALIAS: Record<string, string> = {
   P: 'PHOSPHORUS',
   VITD: 'VITAMIN_D',
   HOMA: 'HOMAIR',
+  // Проход 191: пг/мл в каталоге и в строке (см. выше) — перевод доказан.
+  FT: 'FREE_TESTOSTERONE',
   // `TROPONIN` в каталоге — тропонин I (`UCUM_MAP` 0.04 нг/мл, как у строки).
   TROPONIN: 'TROPONIN_I',
 };

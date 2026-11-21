@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import { cardBg, pillActive, pillInactive, PhaseLabel, ItemRow, ItemRowTriage, triageBadge, phaseBadge, renderRow, renderPhase, timingBlock, monitoringBlock, ContraBanner } from './supportProtocolsShared';
 import { InfoErrorBoundary } from './SupportScreenData';
+// Проход 191: числа мочевой кислоты не держим второй раз — пара берётся из одного
+// источника (проход 189 свёл мужской низ в `RANGE_UA` 210–420). Текст был 200-420.
+import { UA_LLN, UA_ULN } from '../../../engines/lab-norms.engine';
 
 export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [jointTab, setJointTab] = useState('protocol');
@@ -185,7 +188,7 @@ export const SupportProtocolJoints: React.FC<{ s: Record<string, any> }> = ({ s 
                   {[
                     { m:'Ревматоидный фактор (RF)', t:'< 14 МЕ/мл', w:'Каждые 12 нед' },
                     { m:'С-реактивный белок (hs-CRP)', t:'< 1 мг/л', w:'Каждые 4-8 нед' },
-                    { m:'Мочевая кислота', t:'200-420 мкмоль/л (♀ 150-350)', w:'Каждые 8 нед' },
+                    { m:'Мочевая кислота', t:`${UA_LLN.male}-${UA_ULN.male} мкмоль/л (♀ ${UA_LLN.female}-${UA_ULN.female})`, w:'Каждые 8 нед' },
                     { m:'25-OH Витамин D', t:'50-80 нг/мл', w:'Каждые 12 нед' },
                     { m:'Кальций общий + ионизированный', t:'2.15-2.55 ммоль/л', w:'Каждые 12 нед' },
                     { m:'Антитела к коллагену II типа', t:'< 20 ЕД/мл', w:'При подозрении на РА' },

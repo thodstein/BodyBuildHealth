@@ -113,7 +113,7 @@ describe('источник: женские гормоны перечислены
     // Проход 175: список держит канонические имена. Вторые написания
     // (`ESTRADIOL`, `PROGESTERONE`, `TOTAL_T`, `PROLACTIN`) закрываются
     // таблицей `TIER_SAME_ANALYSIS`, а не повтором в этом наборе.
-    expect(list.sort()).toEqual(['DHT', 'E2', 'FSH', 'LH', 'PRL', 'PROG', 'TESTOSTERONE']);
+    expect(list.sort()).toEqual(['DHT', 'E2', 'FREE_TESTOSTERONE', 'FSH', 'LH', 'PRL', 'PROG', 'TESTOSTERONE']);
   });
 
   it('всякое второе имя мужского гормона ведёт к канону', () => {

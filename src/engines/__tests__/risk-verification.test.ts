@@ -272,15 +272,20 @@ describe('проходы 125/126: единицы и лестницы m_i', () =>
   const marker = (sysId: string, code: string) =>
     VERIFICATION_SYSTEMS.find(s => s.id === sysId)!.mechanisms.flatMap(m => m.markers).find(m => m.code === code)!;
 
-  it('свободный тест — пг/мл, ряд от нижней границы 8', () => {
+  it('свободный тест — пг/мл, ряд от нижней границы РФ-бланка 12.3', () => {
     const ft = marker('reproductive', 'FT');
     expect(ft.unit).toBe('пг/мл');
-    expect(ft.thresholds).toEqual([8, 6, 4]);
+    // Проход 191: нижняя граница — референс ИНВИТРО/Хеликс (мужчины 18–40 лет),
+    // кратности 0.75/0.5 от неё; прежние 8 не были референсом ни одного бланка РФ.
+    expect(ft.thresholds).toEqual([12.3, 9.2, 6.2]);
     expect(markerStatus(ft, 15)).toBe(0);   // норма; до прохода 125 здесь было m=3
-    expect(markerStatus(ft, 7)).toBe(1);
-    expect(markerStatus(ft, 5)).toBe(2);
+    expect(markerStatus(ft, 10)).toBe(1);   // ниже 18–40, но выше полосы ≥ 60 лет
+    expect(markerStatus(ft, 7)).toBe(2);
     expect(markerStatus(ft, 3)).toBe(3);
-    expect(markerStatus(ft, 12, 'female')).toBe(1); // у женщины высокий FT = вирилизация
+    // У женщины шкала обратная: ВГН 5.45 пг/мл (ИНВИТРО/Хеликс), дальше 2×/5×.
+    expect(markerStatus(ft, 8, 'female')).toBe(1);  // 1.5× ВГН — грань
+    expect(markerStatus(ft, 12, 'female')).toBe(2); // 2.2× ВГН — вирилизация
+    expect(markerStatus(ft, 3, 'female')).toBe(0);  // её норма — не мужская ступень
   });
 
   it('эстрадиол подписан пг/мл — как читается и как считается', () => {

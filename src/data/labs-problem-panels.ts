@@ -10,9 +10,20 @@
  *   - support-calculator: приоритетная коррекция по сценарию
  */
 
-import { FEMALE_HORMONE_BANDS } from '../engines/lab-norms.engine';
+import { FEMALE_HORMONE_BANDS, FT_MALE_BAND } from '../engines/lab-norms.engine';
 
 export type MarkerImportance = 'critical' | 'important' | 'optional';
+
+/**
+ * Цель свободного тестостерона в панелях — шкала каталога (`UCUM_MAP.FT`,
+ * проход 191): 12.3–46.6 пг/мл, референс РФ-бланка для мужчин 18–40 лет
+ * (ИНВИТРО тест 169 / Хеликс 08-050). Прежние «>9 пг/мл» и «9–25 пг/мл» были
+ * обрезками шкалы 8–30, которой нет ни в одном бланке РФ: цель ниже референса
+ * (9 < 12.3) показывала «цель достигнута» при значении ниже нормы.
+ */
+const FT_TARGET = `${FT_MALE_BAND.low}–${FT_MALE_BAND.high} пг/мл`;
+const FT_ABOVE = `>${FT_MALE_BAND.low} пг/мл`;
+const FT_LOW = `↓ <${FT_MALE_BAND.low} пг/мл`;
 
 /**
  * Фазовые коридоры прогестерона — женская половина строки панели. Числа берутся
@@ -98,7 +109,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
     urgency: 'routine',
     markers: [
       { code: 'TT', label: 'Тестостерон общий', importance: 'critical', lowMeaning: '↓ гипогонадизм — курс усугубит', target: '>400 нг/дл' },
-      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: '↓ биодоступный Т — рассчитать по SHBG+альбумину', target: '>9 пг/мл' },
+      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: '↓ биодоступный Т — рассчитать по SHBG+альбумину', target: FT_ABOVE },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ исходная гиперэстрогения', target: '15-35 пг/мл' },
       { code: 'SHBG', label: 'ГСПГ', importance: 'critical', highMeaning: '↑ снижает свободный Т; ↓ на оральных — резкий скачок', target: '20-45 нмоль/л' },
       { code: 'DHT', label: 'Дигидротестостерон', importance: 'important', highMeaning: '↑ риск алопеции/акне/простаты', target: '200-600 пг/мл' },
@@ -341,7 +352,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
     urgency: 'routine',
     markers: [
       { code: 'TT', label: 'Тестостерон общий', importance: 'critical', lowMeaning: '↓ <300 — гипогонадизм; ↑ >1500 — избыток', target: '400-900 нг/дл' },
-      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: '↓ <7 пг/мл — низкий биодоступный Т', target: '9-25 пг/мл' },
+      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: `${FT_LOW} — низкий биодоступный Т`, target: FT_TARGET },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ >50 — эстрогенная ЭД; ↓ <10 — сухость/отсутствие', target: '20-35 пг/мл' },
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>15 — гиперпролактинемическая ЭД', target: '<10 нг/мл' },
       { code: 'DHT', label: 'ДГТ', importance: 'important', lowMeaning: '↓ <150 пг/мл — финастерид/дутастерид', target: '250-600 пг/мл' },
@@ -464,7 +475,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'LH', label: 'ЛГ', importance: 'critical', lowMeaning: '<2 мМЕ/мл — гипофиз не отвечает', target: '>4 мМЕ/мл' },
       { code: 'FSH', label: 'ФСГ', importance: 'critical', lowMeaning: '<2 мМЕ/мл — сперматогенез подавлен', target: '>4 мМЕ/мл' },
       { code: 'TT', label: 'Тестостерон общий', importance: 'critical', lowMeaning: '<300 нг/дл — гипогонадизм; <150 — тяжёлый', target: '>400 нг/дл' },
-      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: '<7 пг/мл', target: '>9 пг/мл' },
+      { code: 'FT', label: 'Тестостерон свободный', importance: 'critical', lowMeaning: FT_LOW, target: FT_ABOVE },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ парадоксальный рост на СЕРМ; ↓ <10 — супрессия', target: '15-30 пг/мл' },
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>15 — тормозит ГнРГ', target: '<10 нг/мл' },
       { code: 'SHBG', label: 'ГСПГ', importance: 'important', highMeaning: '↑ на СЕРМ — связывает Т', target: '25-45 нмоль/л' },
@@ -495,7 +506,7 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'LH', label: 'ЛГ', importance: 'critical', lowMeaning: '<2 — гипогонадотропный (нужен ХГЧ)', target: '>4 мМЕ/мл' },
       { code: 'FSH', label: 'ФСГ', importance: 'critical', lowMeaning: '<2 — нужен ХГЧ + ХМГ/рФСГ; >15 — первичная тестикулярная недостаточность', target: '4-12 мМЕ/мл' },
       { code: 'TT', label: 'Тестостерон', importance: 'critical', lowMeaning: '<300 — интратестикулярный Т ↓', target: '>400 нг/дл' },
-      { code: 'FT', label: 'Тестостерон свободный', importance: 'important', lowMeaning: '<7 пг/мл', target: '>9 пг/мл' },
+      { code: 'FT', label: 'Тестостерон свободный', importance: 'important', lowMeaning: FT_LOW, target: FT_ABOVE },
       { code: 'E2', label: 'Эстрадиол', importance: 'critical', highMeaning: '↑ ингибирует сперматогенез; ↓ <10 — сухость', target: '15-30 пг/мл' },
       { code: 'PRL', label: 'Пролактин', importance: 'critical', highMeaning: '>12 — гиперпролактинемия → ↓ ФСГ', target: '<10 нг/мл' },
       { code: 'INHB', label: 'Ингибин Б', importance: 'critical', lowMeaning: '<80 — клетки Сертоли не работают; <30 — тяжёлое', target: '>120 пг/мл' },

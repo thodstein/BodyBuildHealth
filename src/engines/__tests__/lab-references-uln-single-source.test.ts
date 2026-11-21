@@ -131,6 +131,9 @@ const RANGE_DERIVED: Record<string, { code: string; lowFromUcum?: boolean }> = {
   THROMBOCYTES: { code: 'PLT', lowFromUcum: true },
   POTASSIUM: { code: 'POTASSIUM', lowFromUcum: true },
   SODIUM: { code: 'SODIUM', lowFromUcum: true },
+  // Проход 191: свободный тестостерон переехал из 0.2–0.6 нмоль/л (диализный
+  // метод) в пг/мл РФ-бланка: одна шкала с каталогом и ступенями.
+  TESTOSTERONE_FREE: { code: 'FT', lowFromUcum: true },
 };
 
 describe('проход 176: границы разбора — из каталога там, где смысл один', () => {

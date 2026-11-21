@@ -165,8 +165,10 @@ describe('LAB_MONITOR_DB: каждая гормональная/почечная
 // женской границы в резолвере не было вовсе — женщина с 380 мкмоль/л читала
 // «норма» по общему верху 420, хотя её ВГН 350 (женский протокол).
 describe('мочевая кислота: ♀ 150–350 из одного источника', () => {
-  it('резолвер: ♂ 200–420 / ♀ 150–350, текст с полом', () => {
-    expect(getLabNorm('UA', 'male')).toMatchObject({ lln: 200, uln: 420, female: false });
+  // Проход 189: мужской низ мочевой кислоты — 210 мкмоль/л (референс РФ-лабораторий
+  // для мужчин), а не 200: пара берётся из `RANGE_UA`, чтобы число не жило в тесте.
+  it('резолвер: ♂ 210–420 / ♀ 150–350, текст с полом', () => {
+    expect(getLabNorm('UA', 'male')).toMatchObject({ lln: 210, uln: 420, female: false });
     expect(getLabNorm('UA', 'female')).toMatchObject({ lln: 150, uln: 350, female: true });
     expect(FEMALE_LAB_BOUNDS.UA).toEqual({ lln: 150, uln: 350 });
     expect(UA_ULN).toEqual({ male: 420, female: 350 });

@@ -140,7 +140,7 @@ export const LAB_PANELS: Record<string, LabPanel> = {
       { id: 'lh', label: 'ЛГ', unit: 'mIU/mL', ref: [1.5, 9.3], importance: 'critical', ucumCode: 'LH' },
       { id: 'fsh', label: 'ФСГ', unit: 'mIU/mL', ref: [1.4, 18.1], importance: 'critical', ucumCode: 'FSH' },
       { id: 'tt', label: 'Тестостерон общий', unit: 'ng/dL', ref: [300, 1000], importance: 'important', ucumCode: 'TT' },
-      { id: 'ft', label: 'Тестостерон свободный', unit: 'pg/mL', ref: [8, 30], importance: 'important', ucumCode: 'FT' },
+      { id: 'ft', label: 'Тестостерон свободный', unit: 'pg/mL', ref: catalogRef('FT'), importance: 'important', ucumCode: 'FT' },
       { id: 'e2', label: 'Эстрадиол', unit: 'pg/mL', ref: [10, 40], importance: 'important', ucumCode: 'E2' },
       { id: 'prl', label: 'Пролактин', unit: 'ng/mL', ref: [2, 15], importance: 'important', ucumCode: 'PRL' },
       { id: 'shbg', label: 'ГСПГ', unit: 'nmol/L', ref: [15, 60], importance: 'important', ucumCode: 'SHBG' },
@@ -225,7 +225,7 @@ export const LAB_PANELS: Record<string, LabPanel> = {
     markers: [
       { id: 'psa', label: 'ПСА', unit: 'ng/mL', ref: [0, 4], importance: 'critical', ucumCode: 'PSA' },
       { id: 'tt', label: 'Тестостерон', unit: 'ng/dL', ref: [300, 1000], importance: 'important', ucumCode: 'TT' },
-      { id: 'ft', label: 'Тестостерон свободный', unit: 'pg/mL', ref: [8, 30], importance: 'important', ucumCode: 'FT' },
+      { id: 'ft', label: 'Тестостерон свободный', unit: 'pg/mL', ref: catalogRef('FT'), importance: 'important', ucumCode: 'FT' },
       { id: 'shbg', label: 'ГСПГ', unit: 'nmol/L', ref: [15, 60], importance: 'optional', ucumCode: 'SHBG' }
     ]
   },

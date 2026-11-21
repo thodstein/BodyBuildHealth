@@ -83,7 +83,9 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
 
   // ─── ENDOCRINE / Hormones ───
   { marker:'TT', name:'Тестостерон общий', organ:'TESTES', system:'endocrine', mechanisms:['TESTOSTERONE_SYNTHESIS','TESTOSTERONE_SUPPORT'], higherIsWorse:false, defaultValue:300, unit:'нг/дл', correctionIds:['zinc_sup','boron','tongkat_ali','fadogia','shilajit'] },
-  { marker:'FT', name:'Тестостерон свободный', organ:'TESTES', system:'endocrine', mechanisms:['TESTOSTERONE_SUPPORT','SHBG_REGULATION'], higherIsWorse:false, defaultValue:8, unit:'пг/мл', correctionIds:['boron','tongkat_ali','zinc_sup','mesterolone'] },
+  // Проход 191: порог «ниже нормы» — нижняя граница РФ-бланка (12.3 пг/мл, мужчины
+  // 18–40 лет, ИНВИТРО/Хеликс), а не 8 из прежней шкалы 8–30. Единица та же (пг/мл).
+  { marker:'FT', name:'Тестостерон свободный', organ:'TESTES', system:'endocrine', mechanisms:['TESTOSTERONE_SUPPORT','SHBG_REGULATION'], higherIsWorse:false, defaultValue:12.3, unit:'пг/мл', correctionIds:['boron','tongkat_ali','zinc_sup','mesterolone'] },
   { marker:'E2', name:'Эстрадиол', organ:'BREAST', system:'endocrine', mechanisms:['AROMATASE_INHIBITION','ESTROGEN_MODULATION'], higherIsWorse:true, defaultValue:150, unit:'пг/мл', correctionIds:['dim','indinol','anastrozole','zinc_sup'] },
   { marker:'PRL', name:'Пролактин', organ:'PITUITARY', system:'endocrine', mechanisms:['PROLACTIN_SUPPRESSION','DOPAMINE_PRECURSOR'], higherIsWorse:true, defaultValue:15, unit:'нг/мл', correctionIds:['vitex','p5p','cabergoline'] },
   { marker:'LH', name:'ЛГ', organ:'PITUITARY', system:'endocrine', mechanisms:['LH_UP','GNRH_UP'], higherIsWorse:false, defaultValue:1, unit:'мМЕ/мл', correctionIds:['enclomiphene','daa','tamoxifen'] },

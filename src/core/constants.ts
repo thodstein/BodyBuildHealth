@@ -549,7 +549,17 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'CORTISOL': { prefUnit: 'nmol/L', coeff: 1, uln: 550, lln: 100, name: 'Кортизол' },
   'INHB': { prefUnit: 'pg/mL', coeff: 1, uln: 340, lln: 80, name: 'Ингибин Б' },
   'AMH':  { prefUnit: 'ng/mL', coeff: 1, uln: 15, lln: 1.0, name: 'АМГ' },
-  'FT':   { prefUnit: 'pg/mL', coeff: 1, uln: 30, lln: 8.0, name: 'Тестостерон свободный' },
+  // Проход 191: свободный тестостерон — шкала РФ-бланка (пг/мл, иммуноанализ).
+  // Мужчины 18–40 лет 12.3–46.6 пг/мл (ИНВИТРО тест 169, CLIA Maglumi 4000 Plus
+  // Snibe; Хеликс 08-050 — та же пара). Возрастные полосы того
+  // же источника: 40–60 лет 9.57–40.6, ≥ 60 лет 7.72–31.4 — они держатся в
+  // `FT_MALE_BAND` (`engines/lab-norms.engine`, там же ступени риска).
+  // Прежние 8–30 не были референсом ни одного бланка РФ: нижняя 8 на 4.3 пг/мл
+  // ниже референса 18–40, и мужчина с 10 пг/мл получал «норму».
+  // Диализный/расчётный метод (0.2–0.6 нмоль/л, порог 65 пг/мл) — ДРУГОЙ метод
+  // измерения; его числа в эту шкалу не попадают, иначе одно и то же «30»
+  // читалось бы по двум шкалам (§4 `docs/LAB-NORMS-SINGLE-SOURCE.md`).
+  'FT':   { prefUnit: 'pg/mL', coeff: 1, uln: 46.6, lln: 12.3, name: 'Тестостерон свободный' },
   'DHT':  { prefUnit: 'pg/mL', coeff: 1, uln: 870, lln: 130, name: 'Дигидротестостерон' },
   'PROG': { prefUnit: 'ng/mL', coeff: 1, uln: 1.2, lln: 0.1, name: 'Прогестерон' },
   'ALB':  { prefUnit: 'g/L', coeff: 1, uln: 50, lln: 35, name: 'Альбумин' },
