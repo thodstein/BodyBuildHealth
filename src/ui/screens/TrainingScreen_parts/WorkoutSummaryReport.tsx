@@ -600,7 +600,12 @@ export const WorkoutSummaryBody: React.FC<{
                   <span style={{ width: 7, height: 7, borderRadius: 2, background: m.color, flexShrink: 0 }} />
                   <span style={{ flex: 1, color: '#fff', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
                   <span style={{ color: '#fff', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{m.sets} подх.</span>
-                  <span style={{ color: '#fff', opacity: 0.75, fontVariantNumeric: 'tabular-nums', minWidth: 36, textAlign: 'right' }}>{m.setsPerSession}/трен</span>
+                  <span
+                    title={`${m.sets} подходов в ${m.sessions} из ${t.sessions} тренировок · ${m.setsPerMuscleSession} подходов за тренировку с этой мышцей`}
+                    style={{ color: '#fff', opacity: 0.75, fontVariantNumeric: 'tabular-nums', minWidth: 36, textAlign: 'right' }}
+                  >
+                    {m.setsPerMuscleSession}/трен
+                  </span>
                   <span style={{ color: m.color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>{fmtTon(m.tonnageKg)}</span>
                   <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{m.sharePct}%</span>
                 </div>
@@ -618,6 +623,11 @@ export const WorkoutSummaryBody: React.FC<{
                           </span>
                         )}
                         {' · '}{VOLUME_STATUS_LABEL[lm.status]}
+                        {perWeek && m.frequencyPerWeek > 0 && (
+                          <span title="Сколько тренировок в неделю получает эта мышца — частота при той же недельной сумме подходов" style={{ marginLeft: 5 }}>
+                            · {m.frequencyPerWeek}×/нед
+                          </span>
+                        )}
                         {m.weeklyTrendPct != null && m.weeklyTrendPct !== 0 && (
                           <span style={{ marginLeft: 5, color: m.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
                             {m.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(m.weeklyTrendPct)}%

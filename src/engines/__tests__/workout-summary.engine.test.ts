@@ -134,6 +134,23 @@ describe('workout-summary: период из нескольких трениро
     expect(buildWorkoutSummary([mixed]).sessions[0].weekNumber).toBe(3);
   });
 
+  it('считает тренировки с мышцей и частоту, а не только подходы на все сессии', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
+      mkWorkout('2026-11-04', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
+      mkWorkout('2026-11-09', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 }]),
+    ]);
+    const chest = s.muscles.find(m => m.muscle === 'chest')!;
+    expect(chest.sessions).toBe(2);
+    // 4 подхода за 2 тренировки с грудью, а не за 3 тренировки периода.
+    expect(chest.setsPerMuscleSession).toBe(2);
+    expect(chest.setsPerSession).toBe(1.3);
+    // Две недели периода, грудь была в каждой — 1 раз в неделю.
+    expect(chest.frequencyPerWeek).toBe(1);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('Грудь: 4 подх · 2 подх/нед · 1×/нед');
+  });
+
   it('не падает на пустом наборе и на битых записях', () => {
     expect(buildWorkoutSummary([]).totals.sessions).toBe(0);
     const broken = [{ id: 'x', date: '2026-11-10', duration: 0, exercises: [{} as any], overallRPE: 0, recoveryBefore: 0, split: '' }] as WorkoutLog[];

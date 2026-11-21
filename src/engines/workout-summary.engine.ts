@@ -277,8 +277,14 @@ export interface SummaryMuscle {
   tonnageKg: number;
   exercises: number;
   sharePct: number;
-  /** Подходов на сессию — сравнение с MEV/MAV в уме. */
+  /** Подходов на тренировку — по всем тренировкам периода. */
   setsPerSession: number;
+  /** Сессий, в которых была эта мышца. */
+  sessions: number;
+  /** Подходов на тренировку, где мышца действительно была. */
+  setsPerMuscleSession: number;
+  /** Тренировок мышцы в неделю — частота. */
+  frequencyPerWeek: number;
   /** Подходы по неделям периода (по возрастанию) — для мини-графика. */
   weeklySets: number[];
   /** Изменение подходов/нед от первой недели к последней, % (null — нет базы). */
@@ -462,7 +468,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     byWeek: Map<string, number>;
   };
   const exMap = new Map<string, ExAgg>();
-  const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number> }>();
+  const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number>; sessions: Set<string> }>();
   const patternAgg = new Map<string, {
     sets: number;
     reps: number;
@@ -641,8 +647,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       prev.sessions.add(w.id || date);
       exMap.set(key, prev);
 
-      const mPrev = muscleAgg.get(meta.muscle) || { sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>(), byWeek: new Map<string, number>() };
+      const mPrev = muscleAgg.get(meta.muscle) || { sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>(), byWeek: new Map<string, number>(), sessions: new Set<string>() };
       mPrev.sets += exSets; mPrev.reps += exReps; mPrev.tonnageKg += exTonnage; mPrev.ex.add(name);
+      mPrev.sessions.add(w.id || date);
       if (wk.from) mPrev.byWeek.set(wk.from, (mPrev.byWeek.get(wk.from) || 0) + exSets);
       muscleAgg.set(meta.muscle, mPrev);
 
@@ -782,6 +789,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exercises: v.ex.size,
         sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
         setsPerSession: sessions > 0 ? Math.round((v.sets / sessions) * 10) / 10 : 0,
+        sessions: v.sessions.size,
+        setsPerMuscleSession: v.sessions.size > 0 ? Math.round((v.sets / v.sessions.size) * 10) / 10 : 0,
+        frequencyPerWeek: muscleWeekKeys.length > 0 ? Math.round((v.sessions.size / muscleWeekKeys.length) * 10) / 10 : 0,
         weeklySets,
         weeklyTrendPct,
       };
@@ -1961,7 +1971,8 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     // Доля подходов честнее тоннажа: тяжёлые ноги забирают тоннаж, но объём
     // для гипертрофии — это подходы.
     const setsShare = Math.round((m.sets / totalSetsForShare) * 100);
-    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов`);
+    const freq = perWeek && m.frequencyPerWeek > 0 ? ` · ${m.frequencyPerWeek}×/нед` : '';
+    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${freq}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов`);
   });
 
   lines.push('');

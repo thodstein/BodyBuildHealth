@@ -79,6 +79,9 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('MEV ');
     expect(html).toContain('Интенсивность');
     expect(html).toContain('инт. ');
+    // Подходы на тренировку с этой мышцей и частота, а не только сумма периода.
+    expect(html).toContain('2/трен');
+    expect(html).toContain('1.5×/нед');
     expect(html).toContain('Только проблемные (2)');
     expect(html).toContain('ниже MEV');
     // Конкретная правка объёма: не только «ниже MEV», но и сколько добавить.
