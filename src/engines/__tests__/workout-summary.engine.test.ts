@@ -70,6 +70,22 @@ describe('workout-summary: сводка по одной тренировке', (
     expect(txt).toContain('Зоны повторов: 1–5 — 2 подх. (33%), 6–12 — 3 (50%), 13+ — 1 (17%)');
   });
 
+  it('раскладывает подходы движения по зонам повторов', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 3, sets: 2 },
+      ]),
+    ]);
+    const press = s.patterns.find(p => p.pattern === 'horizontal_push')!;
+    expect(press.repZones).toEqual({ strength: 0, hypertrophy: 3, endurance: 0 });
+    // Силовая работа своя у каждого движения, а не общая на отчёт.
+    expect(s.patterns.find(p => p.repZones.strength > 0)?.repZones.strength).toBe(2);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('Горизонтальный жим: 3 подх · 24 повт · 1.9 т');
+    expect(txt).toContain('повторы 1–5: 0%, 6–12: 100%, 13+: 0%');
+  });
+
   it('группирует по мышцам и упражнениям', () => {
     const s = buildWorkoutSummary([w]);
     const muscles = s.muscles.map(m => m.muscle);

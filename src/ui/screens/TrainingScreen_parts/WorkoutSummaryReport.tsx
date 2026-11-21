@@ -70,6 +70,20 @@ const fmtDate = (iso: string) => {
     : d.toLocaleDateString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit' });
 };
 
+/** Доминирующая зона повторений движения: «6–12 · 71%». */
+const dominantRepZone = (z?: { strength: number; hypertrophy: number; endurance: number } | null) => {
+  if (!z) return null;
+  const rows = [
+    { label: '1–5', hint: 'сила', n: z.strength },
+    { label: '6–12', hint: 'гипертрофия', n: z.hypertrophy },
+    { label: '13+', hint: 'выносливость', n: z.endurance },
+  ];
+  const total = rows.reduce((s, r) => s + r.n, 0);
+  if (total <= 0) return null;
+  const top = rows.reduce((a, b) => (b.n > a.n ? b : a), rows[0]);
+  return { ...top, total, pct: Math.round((top.n / total) * 100) };
+};
+
 /** Блоки «Итога» плеера по умолчанию: вся глубина отчёта, без дублей на экране. */
 export const PLAYER_REPORT_BLOCKS: ReportBlockId[] = ['totals', 'compare', 'insights', 'muscles', 'plan', 'exercises', 'sets', 'prs'];
 
@@ -928,7 +942,7 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── ДВИЖЕНИЯ ── */}
       {has('movement') && summary.patterns.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · доля подходов · сила и тренд по неделям" />
+          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · доля подходов · сила, зона повторов и тренд по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {summary.patterns.map(p => (
               <div key={p.pattern} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 3 }}>
@@ -950,7 +964,7 @@ export const WorkoutSummaryBody: React.FC<{
                     <Sparkline values={p.weeklySets.slice(-12)} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
                   )}
                 </div>
-                {(p.bestE1RM > 0 || p.e1rmTrendPct != null) && (
+                {(p.bestE1RM > 0 || p.e1rmTrendPct != null || dominantRepZone(p.repZones)) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1, fontSize: 8.5, color: '#fff', opacity: 0.75, flexWrap: 'wrap' }}>
                     {p.bestE1RM > 0 && (
                       <span title={p.bestExercise ? `Лучший e1RM движения сделан в «${p.bestExercise}»` : 'Лучший e1RM движения'}>
@@ -963,6 +977,15 @@ export const WorkoutSummaryBody: React.FC<{
                         {p.e1rmTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.e1rmTrendPct)}% к первой неделе
                       </span>
                     )}
+                    {(() => {
+                      const dz = dominantRepZone(p.repZones);
+                      if (!dz) return null;
+                      return (
+                        <span title={`Зона повторений движения: ${dz.label} — ${dz.hint}, ${dz.n} из ${dz.total} подходов (${dz.pct}%)`}>
+                          повторы <b style={{ color: '#a78bfa' }}>{dz.label}</b> · {dz.pct}%
+                        </span>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

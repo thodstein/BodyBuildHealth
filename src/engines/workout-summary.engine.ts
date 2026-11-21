@@ -301,6 +301,8 @@ export interface SummaryPattern {
   sharePct: number;
   /** Доля подходов периода, % — честная мера объёма. */
   setsSharePct: number;
+  /** Подходы движения по зонам повторений: сила, гипертрофия, выносливость. */
+  repZones: { strength: number; hypertrophy: number; endurance: number };
   /** Подходы по неделям периода (по возрастанию) — для тренда. */
   weeklySets: number[];
   /** Изменение подходов/нед первой недели к последней, % (null — нет базы). */
@@ -481,6 +483,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     bestExercise: string;
     /** Лучший e1RM по неделям — сила движения, а не только её объём. */
     e1rmByWeek: Map<string, number>;
+    /** Подходы по зонам повторений — сила, гипертрофия, выносливость. */
+    zoneStrength: number;
+    zoneHypertrophy: number;
+    zoneEndurance: number;
   }>();
   const sessionRows: SummarySession[] = [];
   const weekAgg = new Map<string, SummaryWeek>();
@@ -557,6 +563,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       let exRpeSum = 0;
       let exRpeN = 0;
       let exWl = 0;
+      // Те же зоны повторений, но в разрезе упражнения — дальше складываются
+      // в зоны движения.
+      let exZoneStrength = 0;
+      let exZoneHyp = 0;
+      let exZoneEnd = 0;
       // Лучший подход по e1RM — именно он идёт в рекорд (вес и повторы из одного сета).
       let exBestSetWeight = 0;
       let exBestSetReps = 0;
@@ -569,9 +580,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exReps += reps;
         exTonnage += weight * reps;
         if (reps > 0) {
-          if (reps <= 5) zoneStrength += 1;
-          else if (reps <= 12) zoneHypertrophy += 1;
-          else zoneEndurance += 1;
+          if (reps <= 5) { zoneStrength += 1; exZoneStrength += 1; }
+          else if (reps <= 12) { zoneHypertrophy += 1; exZoneHyp += 1; }
+          else { zoneEndurance += 1; exZoneEnd += 1; }
         }
         if (weight <= 0) exWl += 1;
         exBestWeight = Math.max(exBestWeight, weight);
@@ -668,8 +679,12 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       const pPrev = patternAgg.get(meta.pattern) || {
         sets: 0, reps: 0, tonnageKg: 0, byWeek: new Map<string, number>(),
         bestE1RM: 0, bestExercise: '', e1rmByWeek: new Map<string, number>(),
+        zoneStrength: 0, zoneHypertrophy: 0, zoneEndurance: 0,
       };
       pPrev.sets += exSets; pPrev.reps += exReps; pPrev.tonnageKg += exTonnage;
+      pPrev.zoneStrength += exZoneStrength;
+      pPrev.zoneHypertrophy += exZoneHyp;
+      pPrev.zoneEndurance += exZoneEnd;
       if (wk.from) pPrev.byWeek.set(wk.from, (pPrev.byWeek.get(wk.from) || 0) + exSets);
       // Сила движения — лучший e1RM за период, и он принадлежит конкретному
       // упражнению: «жим 110» без имени скрывает, чем именно он сделан.
@@ -822,6 +837,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         tonnageKg: Math.round(v.tonnageKg),
         sharePct: totalTonnage > 0 ? Math.round((v.tonnageKg / totalTonnage) * 1000) / 10 : 0,
         setsSharePct: totalSets > 0 ? Math.round((v.sets / totalSets) * 1000) / 10 : 0,
+        repZones: { strength: v.zoneStrength, hypertrophy: v.zoneHypertrophy, endurance: v.zoneEndurance },
         weeklySets,
         weeklyTrendPct: weeklyTrendFrom(weeklySets),
         bestE1RM: Math.round(v.bestE1RM),
@@ -2053,7 +2069,12 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       const strength = p.bestE1RM > 0
         ? ` · e1RM ${p.bestE1RM}${p.e1rmTrendPct != null && p.e1rmTrendPct !== 0 ? ` (${signedPct(p.e1rmTrendPct)} к первой неделе)` : ''}`
         : '';
-      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)} · ${p.setsSharePct}% подходов${strength}${trend}`);
+      const rz = p.repZones;
+      const rzTotal = (rz?.strength || 0) + (rz?.hypertrophy || 0) + (rz?.endurance || 0);
+      const zoneLine = rzTotal > 0
+        ? ` · повторы 1–5: ${Math.round((rz.strength / rzTotal) * 100)}%, 6–12: ${Math.round((rz.hypertrophy / rzTotal) * 100)}%, 13+: ${Math.round((rz.endurance / rzTotal) * 100)}%`
+        : '';
+      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)} · ${p.setsSharePct}% подходов${strength}${trend}${zoneLine}`);
     });
   }
 
