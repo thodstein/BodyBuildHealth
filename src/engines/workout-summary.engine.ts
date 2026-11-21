@@ -283,12 +283,6 @@ export interface SummaryMuscle {
   weeklySets: number[];
   /** Изменение подходов/нед от первой недели к последней, % (null — нет базы). */
   weeklyTrendPct: number | null;
-  /** Лучший e1RM движения за период — сила, а не только объём. */
-  bestE1RM: number;
-  /** Упражнение, которым сделан bestE1RM (пусто, если данных о весе нет). */
-  bestExercise: string;
-  /** Изменение лучшего e1RM по неделям, % (null — меньше двух недель с весом). */
-  e1rmTrendPct: number | null;
 }
 
 export interface SummaryPattern {
@@ -305,6 +299,12 @@ export interface SummaryPattern {
   weeklySets: number[];
   /** Изменение подходов/нед первой недели к последней, % (null — нет базы). */
   weeklyTrendPct: number | null;
+  /** Лучший e1RM движения за период — сила, а не только объём. */
+  bestE1RM: number;
+  /** Упражнение, которым сделан bestE1RM (пусто, если данных о весе нет). */
+  bestExercise: string;
+  /** Изменение лучшего e1RM по неделям, % (null — меньше двух недель с весом). */
+  e1rmTrendPct: number | null;
 }
 
 export interface SummarySession {
@@ -319,6 +319,8 @@ export interface SummarySession {
   prs: number;
   /** кг/мин — плотность тренировки. */
   density: number;
+  /** Неделя мезоцикла из журнала (самая частая в упражнениях); null — не писали. */
+  weekNumber: number | null;
 }
 
 export interface SummaryWeek {
@@ -512,6 +514,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     let sReps = 0;
     let sTonnage = 0;
     let sPRs = 0;
+    // Неделя мезоцикла пишется в упражнениях; в тренировке берём ту, которая
+    // встречается чаще — так одна забытая строка не переставит всю сессию.
+    const weekTally = new Map<number, number>();
 
     for (const ex of exercises) {
       if (!ex) continue;
@@ -578,6 +583,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       }
 
       if (exSets === 0) continue;
+      const wn = Math.round(num((ex as any).weekNumber));
+      if (wn > 0) weekTally.set(wn, (weekTally.get(wn) || 0) + 1);
       uniqueExercises.add(name);
       sSets += exSets;
       sReps += exReps;
@@ -658,6 +665,14 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       tonnageKg: Math.round(sTonnage),
       prs: sPRs,
       density: duration > 0 ? Math.round((sTonnage / duration) * 10) / 10 : 0,
+      weekNumber: (() => {
+        let best: number | null = null;
+        let n = 0;
+        weekTally.forEach((count, week) => {
+          if (count > n) { n = count; best = week; }
+        });
+        return best;
+      })(),
     });
 
     const wkRange = weekRangeFor(date);

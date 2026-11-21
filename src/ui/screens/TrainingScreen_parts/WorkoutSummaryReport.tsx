@@ -890,6 +890,7 @@ export const WorkoutSummaryBody: React.FC<{
                   {s.prs > 0 && <span title="Рекорды" style={{ color: '#f59e0b' }}>🏆{s.prs}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 9, color: '#fff', opacity: 0.72, flexWrap: 'wrap' }}>
+                  {s.weekNumber != null && <span style={{ opacity: 1, color: '#a78bfa' }}>нед. {s.weekNumber}</span>}
                   <span>{s.sets} подх.</span>
                   <span>{s.reps} повт.</span>
                   <span>{s.exercises} упр.</span>

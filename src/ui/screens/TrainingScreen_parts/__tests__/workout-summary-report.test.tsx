@@ -52,6 +52,8 @@ describe('WorkoutSummaryReport', () => {
     // В подсказке недели есть плотность, а не только объём: 3 сессии + 2 недели.
     expect((html.match(/кг\/мин/g) || []).length).toBeGreaterThanOrEqual(5);
     expect(html).toContain('По тренировкам');
+    // Неделя мезоцикла из журнала — в строке тренировки.
+    expect(html).toContain('нед. 1');
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');
     expect(html).toContain('подх/нед');

@@ -114,6 +114,26 @@ describe('workout-summary: период из нескольких трениро
     expect(s.exercises.find(e => e.name.includes('Жим'))?.sessions).toBe(2);
   });
 
+  it('берёт неделю мезоцикла из журнала, а без неё — null', () => {
+    const s = buildWorkoutSummary(workouts);
+    expect(s.sessions.map(x => x.weekNumber)).toEqual([1, 1, 1]);
+    // Неделю не писали — null, а не выдуманная единица.
+    const bare = {
+      ...workouts[0],
+      exercises: workouts[0].exercises.map(e => ({ ...e, weekNumber: undefined as any })),
+    };
+    expect(buildWorkoutSummary([bare]).sessions[0].weekNumber).toBeNull();
+    // Одна устаревшая строка не переставляет сессию: берём самую частую неделю.
+    const mixed = mkWorkout('2026-11-11', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8 },
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5 },
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10 },
+    ]);
+    mixed.exercises.forEach(e => { e.weekNumber = 3; });
+    mixed.exercises[2].weekNumber = 4;
+    expect(buildWorkoutSummary([mixed]).sessions[0].weekNumber).toBe(3);
+  });
+
   it('не падает на пустом наборе и на битых записях', () => {
     expect(buildWorkoutSummary([]).totals.sessions).toBe(0);
     const broken = [{ id: 'x', date: '2026-11-10', duration: 0, exercises: [{} as any], overallRPE: 0, recoveryBefore: 0, split: '' }] as WorkoutLog[];
