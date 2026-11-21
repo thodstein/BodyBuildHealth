@@ -547,45 +547,65 @@ export const WorkoutSummaryBody: React.FC<{
         </div>
       )}
 
+      {/* ── ПЛАН → ФАКТ ── */}
+      {has('plan') && planVsActual && !planVsActual.empty && (() => {
+        const donePct = planVsActual.setsPct;
+        const tone = donePct == null ? '#fff' : donePct >= 95 ? '#22c55e' : donePct >= 75 ? '#f59e0b' : '#ef4444';
+        return (
+          <div style={CARD}>
+            <SectionTitle icon="🎯" title="План → факт" hint={planVsActual.setsPct != null ? `выполнено ${planVsActual.setsPct}% подходов` : 'план и факт'} />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, marginBottom: 6, color: '#fff' }}>
+              <span>План: <b>{planVsActual.plannedSets}</b> подх · {fmtTon(planVsActual.plannedTonnageKg)}</span>
+              <span>Факт: <b style={{ color: tone }}>{planVsActual.actualSets}</b> подх · {fmtTon(planVsActual.actualTonnageKg)}</span>
+              {donePct != null && (
+                <span style={{ color: tone, fontWeight: 800 }}>
+                  выполнено {donePct}% по подходам{planVsActual.tonnagePct != null ? ` · ${planVsActual.tonnagePct}% по тоннажу` : ''}
+                </span>
+              )}
+              {planVsActual.skipped.length > 0 && (
+                <span style={{ color: '#ef4444' }}>пропущено: {planVsActual.skipped.join(', ')}</span>
+              )}
+              {planVsActual.unplanned.length > 0 && (
+                <span style={{ color: '#a78bfa' }}>не по плану: {planVsActual.unplanned.join(', ')}</span>
+              )}
+            </div>
+            {planVsActual.patterns.length > 1 && (
+              <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 4, marginBottom: 6 }}>
+                {planVsActual.patterns.slice(0, compact ? 4 : 8).map(p => {
+                  const color = p.setsDelta === 0 ? 'rgba(255,255,255,0.72)' : p.setsDelta > 0 ? '#22c55e' : '#ef4444';
+                  return (
+                    <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9, background: 'rgba(255,255,255,0.03)', borderRadius: 7, padding: '3px 6px' }}>
+                      <span style={{ flex: 1, minWidth: 40, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
+                      <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.plannedSets} → {p.actualSets}</span>
+                      <span style={{ color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.setsPct != null ? `${p.setsPct}%` : 'не по плану'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {planVsActual.rows.map(r => (
+                <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 2, background: PLAN_ROW_COLOR[r.status], flexShrink: 0 }} />
+                  <span style={{ flex: 1, minWidth: 60, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                  <span style={{ color: PLAN_ROW_COLOR[r.status], fontWeight: 700, whiteSpace: 'nowrap' }}>{PLAN_ROW_LABEL[r.status]}</span>
+                  <span style={{ color: '#fff', opacity: 0.82, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                    {r.plannedSets} → {r.actualSets}{r.setsDelta !== 0 ? ` (${r.setsDelta > 0 ? '+' : ''}${r.setsDelta})` : ''}
+                  </span>
+                  <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {r.setsPct != null ? `${r.setsPct}%` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── УПРАЖНЕНИЯ ── */}
       {has('exercises') && summary.exercises.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🏋️" title="По упражнениям" hint={planVsActual && !planVsActual.empty ? 'план → факт · подходы · тоннаж · e1RM' : 'подходы × повторы · тоннаж · лучший вес / e1RM'} />
-          {planVsActual && !planVsActual.empty && (() => {
-            const donePct = planVsActual.setsPct;
-            const tone = donePct == null ? '#fff' : donePct >= 95 ? '#22c55e' : donePct >= 75 ? '#f59e0b' : '#ef4444';
-            return (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, marginBottom: 6, color: '#fff' }}>
-                <span>План: <b>{planVsActual.plannedSets}</b> подх · {fmtTon(planVsActual.plannedTonnageKg)}</span>
-                <span>Факт: <b style={{ color: tone }}>{planVsActual.actualSets}</b> подх · {fmtTon(planVsActual.actualTonnageKg)}</span>
-                {donePct != null && (
-                  <span style={{ color: tone, fontWeight: 800 }}>
-                    выполнено {donePct}% по подходам{planVsActual.tonnagePct != null ? ` · ${planVsActual.tonnagePct}% по тоннажу` : ''}
-                  </span>
-                )}
-                {planVsActual.skipped.length > 0 && (
-                  <span style={{ color: '#ef4444' }}>пропущено: {planVsActual.skipped.join(', ')}</span>
-                )}
-                {planVsActual.unplanned.length > 0 && (
-                  <span style={{ color: '#a78bfa' }}>не по плану: {planVsActual.unplanned.join(', ')}</span>
-                )}
-              </div>
-            );
-          })()}
-          {planVsActual && !planVsActual.empty && planVsActual.patterns.length > 1 && (
-            <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 4, marginBottom: 6 }}>
-              {planVsActual.patterns.slice(0, compact ? 4 : 8).map(p => {
-                const color = p.setsDelta === 0 ? 'rgba(255,255,255,0.72)' : p.setsDelta > 0 ? '#22c55e' : '#ef4444';
-                return (
-                  <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 9, background: 'rgba(255,255,255,0.03)', borderRadius: 7, padding: '3px 6px' }}>
-                    <span style={{ flex: 1, minWidth: 40, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
-                    <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.plannedSets} → {p.actualSets}</span>
-                    <span style={{ color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.setsPct != null ? `${p.setsPct}%` : 'не по плану'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <SectionTitle icon="🏋️" title="По упражнениям" hint="подходы × повторы · тоннаж · лучший вес / e1RM" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {summary.exercises.map(e => {
               const pvaRow = planVsActual?.rows.find(r => r.key === normalizeExerciseName(e.name));
@@ -616,7 +636,7 @@ export const WorkoutSummaryBody: React.FC<{
                   </div>
                   <Sparkline values={e.e1rmSeries} color={e.progressPct != null && e.progressPct < 0 ? '#ef4444' : ACCENT} />
                 </div>
-                {pvaRow && (
+                {pvaRow && !has('plan') && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, flexWrap: 'wrap', color: PLAN_ROW_COLOR[pvaRow.status] }}>
                     <span style={{ fontWeight: 800 }}>{PLAN_ROW_LABEL[pvaRow.status]}</span>
                     <span style={{ opacity: 0.92 }}>

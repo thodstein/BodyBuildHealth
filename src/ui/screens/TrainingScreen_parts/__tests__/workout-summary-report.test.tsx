@@ -63,11 +63,11 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('/нед до MEV');
   });
 
-  it('сравнивает план с фактом по каждому упражнению', () => {
+  it('блок «План → факт» сравнивает план с фактом по упражнениям', () => {
     const html = renderToStaticMarkup(
       <WorkoutSummaryReport
         workouts={[mkWorkout('2026-11-03')]}
-        blocks={['exercises']}
+        blocks={['plan', 'exercises']}
         plan={[
           { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
           { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
@@ -77,12 +77,29 @@ describe('WorkoutSummaryReport', () => {
     const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
     expect(text).toContain('План: 4 подх');
     expect(text).toContain('выполнено 75% по подходам');
-    expect(text).toContain('план 3 → факт 2 (-1)');
+    expect(text).toContain('3 → 2 (-1)');
     expect(text).toContain('пропущено: Тяга штанги в наклоне');
     expect(text).toContain('не по плану: Приседания со штангой');
+    // С блоком плана строки не дублируются под упражнениями.
+    expect(text).not.toContain('план 3 → факт 2');
     // План → факт свёрнут по движениям: жим недобрал, тяга не сделана.
     expect(text).toContain(`${resolveExerciseMeta({ name: 'Жим штанги лёжа' }).patternLabel}3 → 2`);
     expect(text).toContain(`${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel}1 → 0`);
+  });
+
+  it('без блока «План → факт» строки остаются под упражнениями', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-03')]}
+        blocks={['exercises']}
+        plan={[
+          { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+        ]}
+      />,
+    );
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    expect(text).not.toContain('План: 3 подх');
+    expect(text).toContain('план 3 → факт 2 (-1)');
   });
 
   it('недобор плана виден в выводах', () => {
@@ -176,7 +193,7 @@ describe('WorkoutSummaryReport', () => {
 
   it('ReportBlockPicker рендерит чекбоксы всех блоков', () => {
     const html = renderToStaticMarkup(<ReportBlockPicker value={['totals']} onChange={() => {}} />);
-    ['Общее', 'Выводы', 'Сравнение', 'Объём', 'Мышцы', 'Упражнения', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
+    ['Общее', 'Выводы', 'Сравнение', 'Объём', 'Мышцы', 'Упражнения', 'План → факт', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
       expect(html).toContain(label);
     });
   });

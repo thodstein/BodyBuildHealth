@@ -166,6 +166,7 @@ describe('workout-summary: диапазоны и адаптер сессии', (
     expect(ALL_REPORT_BLOCKS).toContain('muscles');
     expect(ALL_REPORT_BLOCKS).toContain('movement');
     expect(ALL_REPORT_BLOCKS).toContain('insights');
+    expect(ALL_REPORT_BLOCKS).toContain('plan');
   });
 });
 
@@ -712,6 +713,7 @@ describe('workout-summary: план против факта', () => {
     expect(gap!.title).toContain('75%');
     expect(gap!.detail).toContain('не добито: Жим штанги лёжа 2/3');
     expect(gap!.detail).toContain('пропущено: Тяга штанги в наклоне');
+    expect(gap!.detail).toContain(`слабее всего — ${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel} 0/1`);
   });
 
   it('сворачивает план по движениям', () => {

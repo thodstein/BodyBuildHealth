@@ -224,6 +224,7 @@ export const REPORT_BLOCKS = [
   { id: 'volume', label: 'Объём' },
   { id: 'muscles', label: 'Мышцы' },
   { id: 'exercises', label: 'Упражнения' },
+  { id: 'plan', label: 'План → факт' },
   { id: 'sets', label: 'Подходы' },
   { id: 'movement', label: 'Движения' },
   { id: 'sessions', label: 'Тренировки' },
@@ -1111,12 +1112,17 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
     const parts: string[] = [];
     if (under.length) parts.push(`не добито: ${under.join(', ')}`);
     if (plan.skipped.length) parts.push(`пропущено: ${plan.skipped.slice(0, 3).join(', ')}`);
+    // Худшее движение говорит, что просело: не «мало подходов вообще», а
+    // конкретный паттерн, который стоит добрать в первую очередь.
+    const weakest = plan.patterns
+      .filter(p => p.setsDelta < 0 && p.setsPct != null)
+      .sort((a, b) => (a.setsPct as number) - (b.setsPct as number))[0];
     out.push({
       id: 'plan-gap',
       tone: 'warn',
       icon: '📋',
       title: `План по подходам выполнен на ${plan.setsPct}%`,
-      detail: `${parts.join('; ') || 'часть подходов не сделана'}. По плану ${plan.plannedSets} подх, по факту ${plan.actualSets}.`,
+      detail: `${parts.join('; ') || 'часть подходов не сделана'}${weakest ? `; слабее всего — ${weakest.label} ${weakest.actualSets}/${weakest.plannedSets}` : ''}. По плану ${plan.plannedSets} подх, по факту ${plan.actualSets}.`,
     });
   }
 
