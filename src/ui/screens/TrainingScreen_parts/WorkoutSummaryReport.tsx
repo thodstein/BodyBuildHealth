@@ -440,6 +440,9 @@ export const WorkoutSummaryBody: React.FC<{
             {comparison.metrics.intensity && (
               <DeltaChip label="Интенсивность, %" d={comparison.metrics.intensity} unit="%" neutral decimals deltaSuffix="п.п." />
             )}
+            {comparison.metrics.strengthShare && (
+              <DeltaChip label="Силовые подходы, %" d={comparison.metrics.strengthShare} unit="%" neutral decimals deltaSuffix="п.п." />
+            )}
           </div>
 
           {(() => {

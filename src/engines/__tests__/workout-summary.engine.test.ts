@@ -852,6 +852,24 @@ describe('workout-summary: сравнение периодов', () => {
     ]);
     expect(compareWorkoutSummaries(bodyweight, prev).metrics.intensity).toBeNull();
   });
+
+  it('сравнивает долю подходов в силовой зоне', () => {
+    const prev = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]),
+    ]);
+    const cur = buildWorkoutSummary([
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    const c = compareWorkoutSummaries(cur, prev);
+    expect(c.metrics.strengthShare).toEqual({ current: 0, previous: 100, delta: -100, pct: null });
+    const txt = buildWorkoutReportText(cur, { comparison: c });
+    expect(txt).toContain('Силовая работа: 0% подходов в 1–5, -100 п.п.');
+    // Без записанных повторов долю не выдумываем.
+    const noReps = buildWorkoutSummary([
+      mkWorkout('2026-11-16', [{ name: 'Планка', id: 'plank', weight: 0, reps: 0, sets: 2 }]),
+    ]);
+    expect(compareWorkoutSummaries(noReps, prev).metrics.strengthShare).toBeNull();
+  });
 });
 
 describe('workout-summary: рекорды и подходы без веса', () => {

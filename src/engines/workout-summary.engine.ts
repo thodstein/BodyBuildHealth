@@ -1141,6 +1141,8 @@ export interface SummaryComparison {
     rir: MetricDelta | null;
     /** Средняя интенсивность, % от e1RM: null — в одном из периодов нет веса. */
     intensity: MetricDelta | null;
+    /** Доля подходов в силовой зоне 1–5, %: тот же объём может сменить качество. */
+    strengthShare: MetricDelta | null;
   };
   muscles: Array<{ muscle: MuscleKey; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
   patterns: Array<{ pattern: string; label: string; sets: MetricDelta; tonnage: MetricDelta }>;
@@ -1151,6 +1153,13 @@ export interface SummaryComparison {
 const mkDelta = (current: number, previous: number): MetricDelta => {
   const delta = Math.round((current - previous) * 10) / 10;
   return { current, previous, delta, pct: previous > 0 ? Math.round((delta / previous) * 1000) / 10 : null };
+};
+
+/** Доля подходов в зоне 1–5 от всех подходов с повторами, %. null — зон нет. */
+const zoneShare = (z?: { strength: number; hypertrophy: number; endurance: number } | null): number | null => {
+  const total = (z?.strength || 0) + (z?.hypertrophy || 0) + (z?.endurance || 0);
+  if (total <= 0) return null;
+  return Math.round(((z!.strength || 0) / total) * 1000) / 10;
 };
 
 /**
@@ -1182,6 +1191,13 @@ export function compareWorkoutSummaries(current: WorkoutSummary, previous?: Work
     intensity: curIntensity != null && prevIntensity != null
       ? { ...mkDelta(curIntensity, prevIntensity), pct: null }
       : null,
+    // Доля силовых подходов — качество объёма: 20 подходов в 6–12 и 20 в 1–5
+    // это разная работа, хотя подходов столько же.
+    strengthShare: (() => {
+      const c = zoneShare(cur?.repZones);
+      const p = zoneShare(prev?.repZones);
+      return c != null && p != null ? { ...mkDelta(c, p), pct: null } : null;
+    })(),
   };
 
   const prevMuscles = new Map<MuscleKey, SummaryMuscle>((previous?.muscles || []).map(m => [m.muscle, m]));
@@ -2392,6 +2408,10 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     if (cmp.metrics.intensity) {
       const it = cmp.metrics.intensity;
       lines.push(`  Интенсивность: ${fmtDec1(it.current)}% от e1RM, ${it.delta > 0 ? '+' : ''}${fmtDec1(it.delta)} п.п.`);
+    }
+    if (cmp.metrics.strengthShare) {
+      const s = cmp.metrics.strengthShare;
+      lines.push(`  Силовая работа: ${fmtDec1(s.current)}% подходов в 1–5, ${s.delta > 0 ? '+' : ''}${fmtDec1(s.delta)} п.п.`);
     }
     const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
     const grown = muscleRows.filter(m => m.sets.delta > 0).length;

@@ -380,6 +380,24 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('п.п.');
   });
 
+  it('сравнение показывает смену доли силовых подходов', () => {
+    // Прошлый раз был присед на 5 (силовая зона), теперь только жим на 8.
+    const onlyBench = mkWorkout('2026-11-10');
+    onlyBench.exercises = [onlyBench.exercises[0]];
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[onlyBench]}
+        blocks={['compare']}
+        previousWorkouts={[mkWorkout('2026-11-03')]}
+        showSelector={false}
+      />,
+    );
+    expect(html).toContain('Силовые подходы, %');
+    // 0% против 33.3% — минус 33.3 п.п.
+    expect(html).toContain('-33.3');
+    expect(html).toContain('п.п.');
+  });
+
   it('показывает распределение подходов по зонам повторений', () => {
     const html = renderToStaticMarkup(
       <WorkoutSummaryReport workouts={[mkWorkout('2026-11-17')]} blocks={['totals']} showSelector={false} />,
