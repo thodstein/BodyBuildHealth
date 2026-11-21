@@ -27,6 +27,10 @@ import { computeTierAdjustments } from '../lab-tier-recommendations';
 import { RETIC_BAND, getLabNorm } from '../../engines/lab-norms.engine';
 import { flatLabUnit, readFlatLabs } from '../../engines/support-plan/engine-helpers';
 import { LAB_MARKER_MAP, getCorrectionIds } from '../lab-marker-map';
+import { PROBLEM_PANELS } from '../labs-problem-panels';
+import { MECH_LAB_MARKERS, getMiLabStep, clinicalFloorsForLabs } from '../../engines/risk-engine-tz-spec';
+import { calculateRiskFromAnalyses } from '../../engines/risk-calculator-v2.engine';
+import { computeMarkerDeviations } from '../../ui/screens/LabsScreen_parts/lab-marker-risks';
 
 const RETIC = ucumInfo('RETICULOCYTES')!;
 
@@ -179,5 +183,100 @@ describe('проход 193: ретикулоциты — проценты бла
     // Односторонние маркеры фильтр не задевает.
     expect(getCorrectionIds('PLT', 'up').length).toBeGreaterThan(0);
     expect(getCorrectionIds('PLT', 'down').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Проход 195: место ретикулоцитов в контуре.
+ *
+ * Соблазн «добавить в главную модель» выглядит логично: анализ есть в каталоге,
+ * ступени и советы готовы. Но `hem1` — эритроцитоз (HCT/HGB/RBC), а высокие
+ * ретикулоциты означают усиленный эритропоэз: кровопотеря, гемолиз, ответ на
+ * лечение. Это другое состояние, и своей лестницы у него нет. Добавление кода в
+ * `MECH_LAB_MARKERS` без ветки в `switch` дало бы `measured > 0` при
+ * `step: null` — индекс назвал бы анализ учтённым, не сумев его судить.
+ *
+ * Поэтому проверяется не «анализ в модели», а честная граница:
+ *  - в разборе густой крови есть строка с нормой обоих полов из `RETIC_BAND` —
+ *    без смыслов и без пересказа советов правил ступеней (один анализ — один
+ *    совет);
+ *  - механизм-модель ретикулоциты не судит: ни одного кода в `MECH_LAB_MARKERS`,
+ *    ни одной ступени, ни клинического floor, ни вклада в системный риск;
+ *  - при этом анализ не исчезает: экран отклонений называет его по норме
+ *    каталога (и не выдаёт 10⁹/л за проценты).
+ */
+describe('проход 195: ретикулоциты — строка разбора без лестницы модели', () => {
+  const panel = PROBLEM_PANELS.find((p) => p.id === 'polycythemia_workup')!;
+  const row = () => panel.markers.find((m) => m.code === 'RETICULOCYTES')!;
+
+  it('разбор густой крови заказывает анализ с нормой обоих полов', () => {
+    expect(row()).toBeDefined();
+    expect(row().target).toContain(`${RETIC_BAND.low}–${RETIC_BAND.high}%`);
+    expect(row().target).toContain(`♀ ${RETIC_BAND.femaleLow}–${RETIC_BAND.femaleHigh}%`);
+    // Числа — из каталога, а не своя копия: та же пара, что у нормы.
+    expect(RETIC.lln).toBe(RETIC_BAND.low);
+    expect(RETIC.uln).toBe(RETIC_BAND.high);
+  });
+
+  it('строка не пересказывает советы ступеней — совет один', () => {
+    // Смыслов у строки нет: толкование и действия — только в правилах ступеней.
+    expect(row().highMeaning).toBeUndefined();
+    expect(row().lowMeaning).toBeUndefined();
+
+    // Советы реально выдаются правилами (иначе проверка ниже была бы пустой)…
+    const advice = [0.1, 0.7, 3, 5].flatMap((v) =>
+      computeTierAdjustments({ RETICULOCYTES: v }, 'male').nutrition.map((n) => ({ action: n.action, target: n.target })),
+    );
+    expect(advice.length).toBeGreaterThan(0);
+
+    // …и ни один из них не повторён в строке панели.
+    const rowText = JSON.stringify(row()).toLowerCase();
+    for (const { action, target } of advice) {
+      expect(rowText, action).not.toContain(action.toLowerCase());
+      if (target.length > 12) expect(rowText, target).not.toContain(target.toLowerCase());
+    }
+  });
+
+  it('механизм-модель ретикулоциты не читает — и это явно', () => {
+    const readByModel = Object.entries(MECH_LAB_MARKERS)
+      .filter(([, codes]) => codes.includes('RETICULOCYTES'))
+      .map(([mech]) => mech);
+    expect(readByModel).toEqual([]);
+    // Эритроцитоз по-прежнему судится четырьмя маркерами, без нового кода.
+    expect(MECH_LAB_MARKERS.hem1).toEqual(['HCT', 'HGB', 'RBC', 'WBC']);
+
+    // Ни одна ступень не берётся из ретикулоцитов: измерен только он — ступени нет.
+    for (const mech of Object.keys(MECH_LAB_MARKERS)) {
+      expect(getMiLabStep(mech, { RETICULOCYTES: 10 }), mech).toBeUndefined();
+    }
+    // И клинического floor «повышенные ретикулоциты» тоже нет.
+    expect(clinicalFloorsForLabs({ RETICULOCYTES: 10 }, 'male')).toEqual([]);
+  });
+
+  it('системный риск не получает выдуманного веса', () => {
+    const res = calculateRiskFromAnalyses(
+      [{ code: 'RETICULOCYTES', value: 6, unit: '%' }] as never,
+      'male',
+    );
+    const contributions = Object.values(res.systemContributions);
+    expect(contributions.length).toBeGreaterThan(0);
+    expect(contributions.every((v) => v === 0)).toBe(true);
+    expect(res.boundUnproven ?? []).toEqual([]);
+  });
+
+  it('но экран отклонений анализ называет, а не молчит', () => {
+    const high = computeMarkerDeviations([{ code: 'RETICULOCYTES', value: 3, unit: '%' }], 'male');
+    expect(high.markerDeviations.map((d) => d.code)).toEqual(['RETICULOCYTES']);
+    expect(high.markerDeviations[0].side).toBe('high');
+    expect(high.unknownCount).toBe(0);
+
+    // 2.0 % — норма женщины и грань у мужчины: пол решает, а не «выше нормы».
+    expect(computeMarkerDeviations([{ code: 'RETICULOCYTES', value: 2.0, unit: '%' }], 'female').normalCount).toBe(1);
+    expect(computeMarkerDeviations([{ code: 'RETICULOCYTES', value: 2.0, unit: '%' }], 'male').markerDeviations).toHaveLength(1);
+
+    // Абсолютное число в 10⁹/л — «единица не та», а не проценты.
+    const absolute = computeMarkerDeviations([{ code: 'RETICULOCYTES', value: 50, unit: '10⁹/л' }], 'male');
+    expect(absolute.markerDeviations).toEqual([]);
+    expect(absolute.unknown).toEqual([{ code: 'RETICULOCYTES', value: 50, reason: 'unit' }]);
   });
 });

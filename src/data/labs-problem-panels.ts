@@ -10,7 +10,7 @@
  *   - support-calculator: приоритетная коррекция по сценарию
  */
 
-import { FEMALE_HORMONE_BANDS, FT_MALE_BAND, DHT_BAND } from '../engines/lab-norms.engine';
+import { FEMALE_HORMONE_BANDS, FT_MALE_BAND, DHT_BAND, RETIC_BAND } from '../engines/lab-norms.engine';
 
 export type MarkerImportance = 'critical' | 'important' | 'optional';
 
@@ -40,6 +40,20 @@ const DHT_LOW = `↓ <${DHT_BAND.low} пг/мл`;
  * из резолвера (`FEMALE_HORMONE_BANDS`), чтобы не завести второй источник.
  */
 const PROG_PHASES = FEMALE_HORMONE_BANDS.PROG.phases;
+
+/**
+ * Цель ретикулоцитов в панелях — шкала каталога (`UCUM_MAP.RETICULOCYTES`,
+ * проход 193): ♂ 0.67–1.92 %, ♀ 0.59–2.07 % (Хеликс 02-027 / КДЛ).
+ *
+ * Проход 195: в главной модели у ретикулоцитов лестницы нет и быть не должно —
+ * механизм `hem1` судит эритроцитоз по HCT/HGB/RBC, а высокие ретикулоциты
+ * означают усиленный эритропоэз (кровопотеря, гемолиз, ответ на лечение), то
+ * есть другое состояние. Без лестницы анализ не исчезает: в разборе густой крови
+ * у него есть строка с нормой обоих полов. Смыслов у строки нет намеренно:
+ * толкование и действия живут в `TIER_RULES.RETICULOCYTES`, и второй их
+ * пересказ здесь дал бы на один анализ два совета.
+ */
+const RETIC_TARGET = `${RETIC_BAND.low}–${RETIC_BAND.high}% (♀ ${RETIC_BAND.femaleLow}–${RETIC_BAND.femaleHigh}%)`;
 
 export interface ProblemMarker {
   code: string;          // код из UCUM_MAP
@@ -392,6 +406,10 @@ export const PROBLEM_PANELS: ProblemPanel[] = [
       { code: 'HCT', label: 'Гематокрит', importance: 'critical', highMeaning: '>50 (♀ >48) — мониторинг; >54% (♀ >52%) — терапевтическая флеботомия; >60 — опасность', target: '44-49% (♀ 36-48%)' },
       { code: 'HGB', label: 'Гемоглобин', importance: 'critical', highMeaning: '>170 г/л (♀ >150) — полицитемия; >185 (♀ >165) — флеботомия', target: '140-165 г/л (♀ 120-150)' },
       { code: 'RBC', label: 'Эритроциты', importance: 'important', highMeaning: '>5.8 млн/мкл (♀ >5.2) — эритроцитоз', target: '4.5-5.5 млн/мкл (♀ 4.0-5.2)' },
+      // Проход 195: только норма обоих полов. Смыслы и действия — в
+      // `TIER_RULES.RETICULOCYTES` (один анализ — один совет), лестницы в
+      // главной модели нет: эритропоэз не эритроцитоз (правило 26).
+      { code: 'RETICULOCYTES', label: 'Ретикулоциты', importance: 'important', target: RETIC_TARGET },
       { code: 'PLT', label: 'Тромбоциты', importance: 'critical', highMeaning: '>450 — тромбоцитоз (риск тромбоза ×2)', target: '180-380×10⁹/л' },
       { code: 'FERRITIN', label: 'Ферритин', importance: 'critical', lowMeaning: '↓ <30 — железодефицит несмотря на ↑Hb', target: '50-200 мкг/л' },
       { code: 'IRON', label: 'Железо сыв.', importance: 'important', lowMeaning: '↓ дефицит железа; парентеральное?', target: '12-25 мкмоль/л' },

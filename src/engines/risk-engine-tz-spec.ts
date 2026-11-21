@@ -397,6 +397,17 @@ export function getMiLabStep(mechId:string,rawLabValues:Record<string,number>,se
   // анализ учтён. Появятся клинические пороги — появится и чтение канона
   // (`VITD`, `B12`, `FOL`, `P`, `TPO_AB`, `ALDOSTERONE`, `PARATHYROID`, `PSA`,
   // `PSA_FREE`, `DHT`, `PROG`).
+  //
+  // Проход 195: ретикулоцитов здесь нет намеренно. У них есть каталог, ступени и
+  // советы (`RETIC_BAND`, `LAB_TIERS`/`TIER_RULES.RETICULOCYTES`), но лестницы
+  // механизма нет: `hem1` — эритроцитоз по HCT/HGB/RBC (`HCT_STEPS`/`HGB_STEPS`/
+  // `RBC_STEPS`), а высокие ретикулоциты означают усиленный эритропоэз (ответ на
+  // кровопотерю, гемолиз или лечение), то есть другое состояние, а не
+  // повышенную массу эритроцитов.
+  // Добавить `RETICULOCYTES` в `MECH_LAB_MARKERS` без ветки в `switch` нельзя:
+  // `labMechanismIndex` назвал бы маркер измеренным, а ступень осталась бы `null`.
+  // Свойство «выше нормы = хуже» для лестницы тоже не годится — сторона зависит
+  // от причины. Гард `reticulocyte-scale.test.ts` это держит.
 
   // Хелпер: лабораторный m_i → max(default, labValue)
   const labMi = (val:number|undefined, thresholds:[number,number,number]):number|undefined => {
@@ -625,6 +636,8 @@ export function getMiLabStep(mechId:string,rawLabValues:Record<string,number>,se
       // Ступени — из резолвера (проход 126): литералы [170,180,190] и [5.5,6.0,6.5]
       // держали «эритроцитоз» ниже ВГН (RBC 5.5 при норме 5.8) и расходились с
       // каталогом «Анализы» (там уже 5.8/6.2/6.6).
+      // Проход 195: ретикулоцитов в этой лестнице нет — усиленный эритропоэз не
+      // эритроцитоз (см. блок «мёртвых чтений» в начале функции).
       const hemSex = fem ? 'female' : 'male';
       const hctMi = labMi(hct, HCT_STEPS[hemSex]);
       const hgbMi = labMi(hgb, HGB_STEPS[hemSex]);
