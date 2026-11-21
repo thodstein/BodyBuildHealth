@@ -38,6 +38,8 @@ describe('WorkoutSummaryReport', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} storageKey="test_blocks_report" />);
     expect(html).toContain('Общие показатели');
     expect(html).toContain('Распределение объёма');
+    // Доля подходов — отдельная шкала: тоннаж переоценивает тяжёлые упражнения.
+    expect(html).toContain('доля подходов');
     expect(html).toContain('По мышцам');
     expect(html).toContain('По упражнениям');
     expect(html).toContain('Движения (паттерны)');

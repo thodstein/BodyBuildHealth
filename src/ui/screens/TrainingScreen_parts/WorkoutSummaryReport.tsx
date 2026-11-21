@@ -443,24 +443,39 @@ export const WorkoutSummaryBody: React.FC<{
       )}
 
       {/* ── ОБЪЁМ ── */}
-      {has('volume') && summary.muscles.length > 0 && (
-        <div style={CARD}>
-          <SectionTitle icon="🧱" title="Распределение объёма" hint="тоннаж по мышцам, %" />
-          <div style={{ display: 'flex', height: 14, borderRadius: 8, overflow: 'hidden', marginBottom: 6 }}>
-            {summary.muscles.map(m => (
-              <div key={m.muscle} title={`${m.label}: ${m.sharePct}%`} style={{ width: `${Math.max(1.5, m.sharePct)}%`, background: m.color }} />
-            ))}
+      {has('volume') && summary.muscles.length > 0 && (() => {
+        const totalSets = t.sets > 0 ? t.sets : 1;
+        const shareBySets = new Map(summary.muscles.map(m => [m.muscle, Math.round((m.sets / totalSets) * 100)]));
+        return (
+          <div style={CARD}>
+            <SectionTitle icon="🧱" title="Распределение объёма" hint="тоннаж и подходы, %" />
+            <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.65, marginBottom: 2 }}>Тоннаж</div>
+            <div style={{ display: 'flex', height: 12, borderRadius: 8, overflow: 'hidden', marginBottom: 5 }}>
+              {summary.muscles.map(m => (
+                <div key={m.muscle} title={`${m.label}: ${m.sharePct}% тоннажа`} style={{ width: `${Math.max(1.5, m.sharePct)}%`, background: m.color }} />
+              ))}
+            </div>
+            <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.65, marginBottom: 2 }}>Подходы</div>
+            <div style={{ display: 'flex', height: 12, borderRadius: 8, overflow: 'hidden', marginBottom: 6 }}>
+              {summary.muscles.map(m => (
+                <div key={m.muscle} title={`${m.label}: ${shareBySets.get(m.muscle)}% подходов`} style={{ width: `${Math.max(1.5, shareBySets.get(m.muscle) || 0)}%`, background: m.color }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {summary.muscles.map(m => (
+                <span key={m.muscle} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#fff' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 2, background: m.color }} />
+                  {m.label} <b style={{ color: m.color }}>{m.sharePct}%</b> тонн
+                  <span style={{ opacity: 0.55 }}>·</span> <b style={{ color: m.color }}>{shareBySets.get(m.muscle)}%</b> подх
+                </span>
+              ))}
+            </div>
+            <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.55, marginTop: 4, lineHeight: 1.35 }}>
+              Тоннаж переоценивает тяжёлые упражнения; для гипертрофии ориентир — доля подходов.
+            </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {summary.muscles.map(m => (
-              <span key={m.muscle} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, color: '#fff' }}>
-                <span style={{ width: 7, height: 7, borderRadius: 2, background: m.color }} />
-                {m.label} <b style={{ color: m.color }}>{m.sharePct}%</b>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── МЫШЦЫ ── */}
       {has('muscles') && summary.muscles.length > 0 && (

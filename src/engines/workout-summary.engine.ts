@@ -1583,13 +1583,17 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
   const weeksCount = summaryWeeksCount(s);
   const perWeek = s.totals.sessions > 1;
   const weeklyUnit = perWeek ? 'подх/нед' : 'подх за сессию';
+  const totalSetsForShare = s.totals.sets > 0 ? s.totals.sets : 1;
   lines.push('');
   lines.push('По мышцам:');
   s.muscles.forEach(m => {
     const weekly = Math.round(m.sets / weeksCount);
     const trend = m.weeklyTrendPct != null ? ` (${signedPct(m.weeklyTrendPct)} к первой неделе)` : '';
     const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, level), perWeek);
-    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · ${m.sharePct}%`);
+    // Доля подходов честнее тоннажа: тяжёлые ноги забирают тоннаж, но объём
+    // для гипертрофии — это подходы.
+    const setsShare = Math.round((m.sets / totalSetsForShare) * 100);
+    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов`);
   });
 
   lines.push('');

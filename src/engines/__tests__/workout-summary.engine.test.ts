@@ -768,6 +768,7 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt.startsWith('📊 Отчёт: ')).toBe(true);
     expect(txt).toContain('По мышцам:');
     expect(txt).toContain('Грудь');
+    expect(txt).toMatch(/Грудь: 3 подх · .*· доля [\d.]+% тоннажа · 50% подходов/);
     expect(txt).toContain('По упражнениям:');
     expect(txt).toContain('Жим штанги лёжа: 3×8');
     expect(txt).toContain('Движения:');
