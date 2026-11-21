@@ -730,6 +730,25 @@ export const WorkoutSummaryBody: React.FC<{
                 <span style={{ color: '#a78bfa' }}>не по плану: {planVsActual.unplanned.join(', ')}</span>
               )}
             </div>
+            {planVsActual.muscles.length > 1 && (
+              <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 1 }}>По мышцам</div>
+                {planVsActual.muscles.slice(0, compact ? 5 : 10).map(mm => {
+                  const color = mm.setsDelta === 0 ? 'rgba(255,255,255,0.72)' : mm.setsDelta > 0 ? '#22c55e' : '#ef4444';
+                  return (
+                    <div key={mm.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 2, background: MUSCLE_COLORS[mm.muscle] || ACCENT, flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 50, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mm.label}</span>
+                      <div style={{ flex: 1, minWidth: 40, maxWidth: compact ? 60 : 100 }}>
+                        <Bar pct={Math.min(100, mm.setsPct ?? (mm.actualSets > 0 ? 100 : 0))} color={color} height={4} />
+                      </div>
+                      <span style={{ color: '#fff', opacity: 0.8, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{mm.plannedSets} → {mm.actualSets}</span>
+                      <span style={{ color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'right', whiteSpace: 'nowrap' }}>{mm.setsPct != null ? `${mm.setsPct}%` : '—'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {planVsActual.patterns.length > 1 && (
               <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: 4, marginBottom: 6 }}>
                 {planVsActual.patterns.slice(0, compact ? 4 : 8).map(p => {

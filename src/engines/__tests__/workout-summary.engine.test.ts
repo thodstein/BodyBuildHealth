@@ -1071,6 +1071,20 @@ describe('workout-summary: план против факта', () => {
     expect(pva.patterns[0].pattern).toBe(bench);
   });
 
+  it('сворачивает план по мышцам: грудь набрана жимом и разводкой', () => {
+    const pva = comparePlanVsActual([
+      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
+      { name: 'Разводка гантелями', sets: [{ weight: 14, reps: 12 }, { weight: 14, reps: 12 }] },
+      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }, { weight: 100, reps: 5 }] },
+    ], actual());
+    // Факт: жим 2 подх, присед 1 подх. Два упражнения на грудь дают одну строку.
+    expect(pva.muscles.find(m => m.muscle === 'chest')).toMatchObject({ plannedSets: 5, actualSets: 2, setsDelta: -3, setsPct: 40 });
+    expect(pva.muscles.find(m => m.muscle === 'quads')).toMatchObject({ plannedSets: 2, actualSets: 1, setsDelta: -1, setsPct: 50 });
+    // Сортировка: сначала мышца с большим планом.
+    expect(pva.muscles[0].muscle).toBe('chest');
+    expect(pva.muscles[0].label).toBe('Грудь');
+  });
+
   it('лишнее упражнение даёт движение «не по плану» с null-долей', () => {
     const squat = resolveExerciseMeta({ name: 'Приседания со штангой' }).pattern;
     const pva = comparePlanVsActual([
@@ -1297,6 +1311,10 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('Тяга верхнего блока: план 0 → факт 3 (не по плану)');
     expect(txt).toContain('  По движениям:');
     expect(txt).toContain(': 0 → 3 подх (не по плану)');
+    // Те же строки по мышцам: план на грудь недобран, спина сделана сверх плана.
+    expect(txt).toContain('  По мышцам:');
+    expect(txt).toContain('Грудь: 4 → 3 подх (75%)');
+    expect(txt).toContain('Спина: 0 → 3 подх (не по плану)');
     expect(txt).toContain('Подходы:');
     expect(txt).toContain('80×8@2');
   });

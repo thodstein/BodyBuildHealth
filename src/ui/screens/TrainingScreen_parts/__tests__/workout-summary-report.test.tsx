@@ -131,6 +131,10 @@ describe('WorkoutSummaryReport', () => {
     // План → факт свёрнут по движениям: жим недобрал, тяга не сделана.
     expect(text).toContain(`${resolveExerciseMeta({ name: 'Жим штанги лёжа' }).patternLabel}3 → 2`);
     expect(text).toContain(`${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel}1 → 0`);
+    // И та же картина по мышцам: грудь недобрана, спина не сделана вовсе.
+    expect(text).toContain('По мышцам');
+    expect(text).toContain('Грудь3 → 2');
+    expect(text).toContain('Спина1 → 0');
   });
 
   it('блок «План недели» сверяет микроцикл с журналом по мышцам', () => {

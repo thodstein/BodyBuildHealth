@@ -1852,10 +1852,22 @@ export interface PlanPatternRow {
   setsPct: number | null;
 }
 
+export interface PlanMuscleRow {
+  muscle: MuscleKey;
+  label: string;
+  plannedSets: number;
+  actualSets: number;
+  setsDelta: number;
+  /** Доля от плана, % (null — мышцы не было в плане). */
+  setsPct: number | null;
+}
+
 export interface PlanVsActual {
   rows: PlanVsActualRow[];
   /** План → факт, свёрнутый по движениям (паттернам). */
   patterns: PlanPatternRow[];
+  /** План → факт, свёрнутый по мышцам: «грудь 9 → 7». */
+  muscles: PlanMuscleRow[];
   plannedSets: number;
   actualSets: number;
   plannedTonnageKg: number;
@@ -1982,11 +1994,34 @@ export function comparePlanVsActual(
 
   const plannedSets = rows.reduce((s, r) => s + r.plannedSets, 0);
   const actualSets = rows.reduce((s, r) => s + r.actualSets, 0);
+  // Те же строки, свёрнутые по мышцам: вопрос «план по груди выполнен?» не
+  // решается списком упражнений, если грудь набрана жимом и разводкой.
+  const byMuscle = new Map<MuscleKey, { planned: number; actual: number }>();
+  rows.forEach(r => {
+    const meta = resolveExerciseMeta({ name: r.name });
+    const acc = byMuscle.get(meta.muscle) || { planned: 0, actual: 0 };
+    acc.planned += r.plannedSets;
+    acc.actual += r.actualSets;
+    byMuscle.set(meta.muscle, acc);
+  });
+  const muscles: PlanMuscleRow[] = Array.from(byMuscle.entries())
+    .filter(([, v]) => v.planned > 0 || v.actual > 0)
+    .map(([muscle, v]) => ({
+      muscle,
+      label: MUSCLE_LABELS[muscle],
+      plannedSets: v.planned,
+      actualSets: v.actual,
+      setsDelta: v.actual - v.planned,
+      setsPct: pctOf(v.actual, v.planned),
+    }))
+    .sort((a, b) => b.plannedSets - a.plannedSets || b.actualSets - a.actualSets);
+
   const plannedTonnageKg = rows.reduce((s, r) => s + r.plannedTonnageKg, 0);
   const actualTonnageKg = rows.reduce((s, r) => s + r.actualTonnageKg, 0);
   return {
     rows,
     patterns,
+    muscles,
     plannedSets,
     actualSets,
     plannedTonnageKg,
@@ -2254,6 +2289,13 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       lines.push('  По движениям:');
       movedPatterns.forEach(p => lines.push(
         `    ${p.label}: ${p.plannedSets} → ${p.actualSets} подх${p.setsPct != null ? ` (${p.setsPct}%)` : ' (не по плану)'}`,
+      ));
+    }
+    const movedMuscles = pva.muscles.filter(m => m.setsDelta !== 0).slice(0, 6);
+    if (movedMuscles.length) {
+      lines.push('  По мышцам:');
+      movedMuscles.forEach(m => lines.push(
+        `    ${m.label}: ${m.plannedSets} → ${m.actualSets} подх${m.setsPct != null ? ` (${m.setsPct}%)` : ' (не по плану)'}`,
       ));
     }
   }
