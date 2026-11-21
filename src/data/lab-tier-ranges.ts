@@ -14,6 +14,7 @@ import {
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, UA_STAGE_ULN, UA_LLN, NT_PROBNP_STEPS, CK_MB_STEPS, E2_MALE_BAND,
   FT_MALE_BAND,
   DHT_BAND,
+  RETIC_BAND,
 } from '../engines/lab-norms.engine';
 import { ucumInfo } from '../core/constants';
 import { unitsIncommensurable } from '../core/labs-mapping';
@@ -78,7 +79,14 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   PLT:              { marker:'PLT', normal:[150,350], borderline:[350,450], treatment:[450,600], emergencyHigh:600, emergencyLow:100, direction:'both', unit:'10⁹/L', label:'Тромбоциты' },
   RBC:              { marker:'RBC', normal:[4,5.5], borderline:[5.5,6], treatment:[6,6.5], emergencyHigh:6.5, direction:'high', unit:'10¹²/L', label:'Эритроциты' },
   WBC:              { marker:'WBC', normal:[4,10], borderline:[10,12], treatment:[12,20], emergencyHigh:20, emergencyLow:3, direction:'both', unit:'10⁹/L', label:'Лейкоциты' },
-  RETICULOCYTES:    { marker:'RETICULOCYTES', normal:[20,100], borderline:[100,150], treatment:[150,300], emergencyHigh:300, direction:'high', unit:'10⁹/L', label:'Ретикулоциты' },
+  // Проход 193: ретикулоциты — относительное число в процентах, как в РФ-бланке
+  // (`RETIC_BAND`: ♂ 0.67–1.92, ♀ 0.59–2.07; Хеликс 02-027/КДЛ). Прежняя строка
+  // 20–100/100–150/150–300 в 10⁹/л была тем же анализом в ДРУГОЙ величине:
+  // бланк в процентах (1.5) читался как «ниже нормы 20» и получал «лечение».
+  // Ступени — кратности от границ (`halfLow` 0.5·LLN, `doubleHigh` 2×ВГН), новых
+  // клинических порогов нет. Верхней экстренной ступени нет: высокий ответ
+  // эритропоэза — находка, а не повод «STOP COURSE».
+  RETICULOCYTES:    { marker:'RETICULOCYTES', normal:[RETIC_BAND.low, RETIC_BAND.high], borderline:[RETIC_BAND.halfLow, RETIC_BAND.low, RETIC_BAND.high, RETIC_BAND.doubleHigh], treatment:[0, RETIC_BAND.halfLow, RETIC_BAND.doubleHigh, Number.MAX_SAFE_INTEGER], direction:'both', unit:'%', label:'Ретикулоциты' },
 
   // ─── COAGULATION ───
   INR:              { marker:'INR', normal:[0.8,1.2], borderline:[1.2,1.5], treatment:[1.5,3], emergencyHigh:3, emergencyLow:0.7, direction:'both', unit:'', label:'МНО' },
@@ -261,6 +269,15 @@ const FEMALE_TIER_OVERRIDES: Record<string, Partial<LabTierThreshold>> = {
     borderline: [UA_STAGE_ULN.female[0], UA_STAGE_ULN.female[1]],
     treatment: [UA_STAGE_ULN.female[1], 600],
     emergencyHigh: 600,
+  },
+  // Проход 193: у женщины своя норма ретикулоцитов 0.59–2.07 % (Хеликс 02-027/
+  // КДЛ). Мужской ряд 0.67–1.92 делал её 2.0 % «высоким», хотя это её норма.
+  // Ступени — те же кратности от её же границ; экстренной ступени нет, как и у
+  // мужчины.
+  RETICULOCYTES: {
+    normal: [RETIC_BAND.femaleLow, RETIC_BAND.femaleHigh],
+    borderline: [RETIC_BAND.femaleHalfLow, RETIC_BAND.femaleLow, RETIC_BAND.femaleHigh, RETIC_BAND.femaleDoubleHigh],
+    treatment: [0, RETIC_BAND.femaleHalfLow, RETIC_BAND.femaleDoubleHigh, Number.MAX_SAFE_INTEGER],
   },
 };
 

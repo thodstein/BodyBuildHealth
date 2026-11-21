@@ -1521,7 +1521,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           const recs: { trend: LabTrend; corrections: string[] }[] = [];
           for (const t of report.worsened) {
             if (t.significance === 'normal') continue;
-            const ids = getCorrectionIds(t.code);
+            // Проход 193: карта знает, какую сторону лечат её вещества
+            // (`correctionSide`). Ретикулоциты на подъёме — находка (кровопотеря,
+            // гемолиз, ответ на лечение), а не дефицит: железо и B12 на выросшие
+            // ретикулоциты не выдаются.
+            const ids = getCorrectionIds(t.code, t.direction);
             if (ids.length > 0) {
               recs.push({ trend: t, corrections: ids.slice(0, 5) });
             }

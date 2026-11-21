@@ -215,6 +215,16 @@ const CODE_ALIAS: Record<string, string> = {
 };
 
 /**
+ * Надстрочные цифры степеней (проход 193): «10⁹/л» в бланках — то же, что
+ * «10^9/л». Таблица одна на разбор единицы, чтобы показатель степени не
+ * терялся и не превращал «10⁹/л» в «109/л» (это уже другая величина).
+ */
+const SUPERSCRIPT_DIGITS: Record<string, string> = {
+  '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+  '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+};
+
+/**
  * Канонический ключ единицы измерения.
  *
  * Порядок замен критичен: активность (МЕ/мЕд/мкМЕ) разбирается ДО массовых
@@ -250,6 +260,14 @@ function unitKey(unit: string): string {
     .replace(/\?/g, 'u')
     .replace(/mcmol/g, 'umol')
     .replace(/mcg/g, 'ug')
+    // Проход 193: словесная запись промилле — та же единица «‰». Без замены
+    // «6.8 промилле» не разбиралось и читалось как 6.8 % (в десять раз больше).
+    .replace(/промилле|promille/g, '‰')
+    // Проход 193: надстрочная цифра — то же написание показателя степени.
+    // «10⁹/л» и «10^9/л» — одна единица счёта клеток, и без сведения к одному
+    // ключу `sameLabUnit` считал их разными: ретикулоциты в «10⁹/л» шли
+    // пересчитывать в проценты, которых из счёта клеток не получить.
+    .replace(/10([⁰¹²³⁴⁵⁶⁷⁸⁹])/g, (_m, d: string) => '10^' + SUPERSCRIPT_DIGITS[d])
     .replace(/[\s.]/g, '');
 
   // Каталитическая активность (МЕ/кат): в международных бланках ферменты
@@ -367,9 +385,22 @@ const MOLAR_MASS: Record<string, number> = {
   CHROMIUM: 52.0, IODINE: 126.904, LACTATE: 90.08, AMMONIA: 17.031,
 };
 
-type ConcentrationUnit = { kind: 'mass' | 'mole' | 'activity'; perBase: number };
+type ConcentrationUnit = {
+  kind: 'mass' | 'mole' | 'activity' | 'relative' | 'count';
+  perBase: number;
+};
 
-/** Разбор единицы-концентрации вида «мг/дл» / «nmol/L» / «mIU/mL». */
+/**
+ * Разбор единицы-концентрации вида «мг/дл» / «nmol/L» / «mIU/mL».
+ *
+ * Проход 193: сюда же два вида, которые концентрацией не являются, но
+ * сравнивать их с остальными нельзя ровно так же. `%`/`‰` — доля целого
+ * (относительное число), `10^9/л`/`10^12/л` — счёт клеток в объёме
+ * (абсолютное число). Ретикулоциты 1.5 % и 50×10⁹/л — одно состояние в разных
+ * величинах, и пересчитать одно в другое без числа эритроцитов нечем. Пока
+ * оба вида не разбирались, `unitsIncommensurable` отвечал «сравнивать можно»,
+ * и запись в 10⁹/л попадала в шкалу процентов как «50 %».
+ */
 function parseConcentrationUnit(key: string): ConcentrationUnit | null {
   if (!key) return null;
   const mass = key.match(/^(g|mg|ug|ng|pg)\/(l|dl|ml|ul)$/);
@@ -378,6 +409,12 @@ function parseConcentrationUnit(key: string): ConcentrationUnit | null {
   if (mole) return { kind: 'mole', perBase: MOLE_TO_MOL[mole[1]] / VOLUME_TO_LITRE[mole[2]] };
   const activity = key.match(/^(u|iu|mu|miu|uiu)\/(l|dl|ml|ul)$/);
   if (activity) return { kind: 'activity', perBase: ACTIVITY_TO_IU[activity[1]] / VOLUME_TO_LITRE[activity[2]] };
+  // Относительное число: процент и промилле. База — доля целого.
+  const relative = key.match(/^(%|‰)$/);
+  if (relative) return { kind: 'relative', perBase: relative[1] === '%' ? 0.01 : 0.001 };
+  // Счёт клеток: «10^9/л», «×10^12/L» (пробелы и «×» остаются от бланка).
+  const count = key.match(/^[x×]?10\^(\d+)\/(l|dl|ml|ul)$/);
+  if (count) return { kind: 'count', perBase: Math.pow(10, Number(count[1])) / VOLUME_TO_LITRE[count[2]] };
   return null;
 }
 

@@ -5,7 +5,7 @@
 //  automatically makes it appear in recommendations for these markers.
 // ══════════════════════════════════════════════════════════════════════
 
-import { DHT_BAND } from '../engines/lab-norms.engine';
+import { DHT_BAND, RETIC_BAND } from '../engines/lab-norms.engine';
 
 export interface LabMarkerMap {
   marker: string;
@@ -17,6 +17,16 @@ export interface LabMarkerMap {
   defaultValue: number; // threshold
   unit: string;
   correctionIds: string[]; // default support substance IDs
+  /**
+   * Сторона шкалы, которую лечат `correctionIds` (проход 193).
+   *
+   * У двустороннего анализа добавка лечит только одну сторону: ретикулоциты
+   * ниже нормы — нехватка субстрата (железо, B12, фолат), выше нормы —
+   * кровопотеря, гемолиз или ответ на лечение, и добавки «по числу» там не
+   * выдаются. `undefined` — сторона не уточнена, список не фильтруется
+   * (прежнее поведение для односторонних маркеров).
+   */
+  correctionSide?: 'low' | 'high';
 }
 
 export const LAB_MARKER_MAP: LabMarkerMap[] = [
@@ -61,7 +71,13 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'WBC', name:'Лейкоциты', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:9.0, unit:'10^9/л', correctionIds:['vitamin_d3','zinc_sup','probiotic'] },
   { marker:'Neutrophils', name:'Нейтрофилы', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANTIINFLAMMATORY'], higherIsWorse:true, defaultValue:6.5, unit:'10^9/л', correctionIds:['vitamin_d3','zinc_sup','probiotic'] },
   { marker:'Lymphocytes', name:'Лимфоциты', organ:'BLOOD', system:'hematologic', mechanisms:['IMMUNE_MODULATION','ANXIOLYTIC'], higherIsWorse:false, defaultValue:1.5, unit:'10^9/л', correctionIds:['vitamin_d3','zinc_sup','ashwagandha'] },
-  { marker:'RETICULOCYTES', name:'Ретикулоциты', organ:'BLOOD', system:'hematologic', mechanisms:['ERYTHROPOIESIS','HEMOGLOBIN_SYNTHESIS'], higherIsWorse:true, defaultValue:2.5, unit:'%', correctionIds:['iron_supplement','folate','vitamin_b12'] },
+  // Проход 193: порог карты — верх нормы (`RETIC_BAND.high`): высокая сторона и
+  // есть находка. Вещества карты лечат НИЗКУЮ сторону (`correctionSide:'low'`):
+  // субстрат нужен при низких ретикулоцитах, а на высокой стороне добавки «по
+  // числу» не выдаются — кровопотеря, гемолиз и ответ на лечение это причина, а
+  // не дефицит. Поэтому `getCorrectionIds` отдаёт список только на падающем
+  // тренде, а шкала и тексты живут в `LAB_TIERS.RETICULOCYTES`/`TIER_RULES`.
+  { marker:'RETICULOCYTES', name:'Ретикулоциты', organ:'BLOOD', system:'hematologic', mechanisms:['ERYTHROPOIESIS','HEMOGLOBIN_SYNTHESIS'], higherIsWorse:true, defaultValue:RETIC_BAND.high, unit:'%', correctionIds:['iron_supplement','folate','vitamin_b12'], correctionSide:'low' },
   { marker:'ERYTHROPOIETIN', name:'Эритропоэтин', organ:'BLOOD', system:'hematologic', mechanisms:['ERYTHROPOIESIS','IRON_METABOLISM'], higherIsWorse:true, defaultValue:25, unit:'мМЕ/мл', correctionIds:['serrapeptase','nattokinase'] },
   { marker:'HAPTOGLOBIN', name:'Гаптоглобин', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIOXIDANT','HEMOGLOBIN_SYNTHESIS'], higherIsWorse:false, defaultValue:0.5, unit:'г/л', correctionIds:['vitamin_e','curcumin_sup','alpha_lipoic'] },
   { marker:'ESR', name:'СОЭ', organ:'BLOOD', system:'hematologic', mechanisms:['ANTIINFLAMMATORY','NF_KB_INHIBITION','COX2_INHIBITION'], higherIsWorse:true, defaultValue:20, unit:'мм/ч', correctionIds:['curcumin_sup','omega3','ashwagandha'] },
@@ -320,8 +336,21 @@ export function getMarkerMap(marker: string): LabMarkerMap | undefined {
   return LAB_MARKER_MAP_BY_NAME[marker];
 }
 
-export function getCorrectionIds(marker: string): string[] {
-  return LAB_MARKER_MAP_BY_NAME[marker]?.correctionIds || [];
+/**
+ * Вещества карты для маркера. Проход 193: если карта указала сторону, которую
+ * эти вещества лечат (`correctionSide`), то на противоположном тренде список
+ * пуст — совет не выдаётся не на ту сторону шкалы. Без `direction` (старые
+ * вызовы) поведение прежнее: сторона не проверяется.
+ */
+export function getCorrectionIds(
+  marker: string,
+  direction?: 'up' | 'down' | 'stable' | 'unknown',
+): string[] {
+  const entry = LAB_MARKER_MAP_BY_NAME[marker];
+  if (!entry) return [];
+  if (entry.correctionSide === 'low' && direction === 'up') return [];
+  if (entry.correctionSide === 'high' && direction === 'down') return [];
+  return entry.correctionIds;
 }
 
 export function getMarkerOrgan(marker: string): string {

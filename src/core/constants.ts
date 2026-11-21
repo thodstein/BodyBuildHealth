@@ -640,7 +640,12 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'TRANSFERRIN_SAT': { prefUnit: '%', coeff: 1, uln: 45, lln: 20, name: 'Насыщение трансферрина' },
   'IRON': { prefUnit: 'umol/L', coeff: 1, uln: 30, lln: 10, name: 'Железо' },
   'UIBC': { prefUnit: 'umol/L', coeff: 1, uln: 45, lln: 20, name: 'Лат. ЖСС' },
-  'RETICULOCYTES': { prefUnit: '%', coeff: 1, uln: 2.5, lln: 0.5, name: 'Ретикулоциты' },
+  // Проход 193: канон — относительное число в процентах, как печатает РФ-бланк.
+  // Мужчины 0.67–1.92 %, женщины 0.59–2.07 % (Хеликс 02-027 и КДЛ — один текст),
+  // ИНВИТРО №150 даёт то же относительное в промилле (6.8–18.6 ‰ = 0.68–1.86 %),
+  // Medscape для взрослых — 0.5–2 %. Прежние 0.5–2.5 были числами без источника,
+  // а женская граница висит отдельно (`FEMALE_LAB_BOUNDS`/`RETIC_BAND`).
+  'RETICULOCYTES': { prefUnit: '%', coeff: 1, uln: 1.92, lln: 0.67, name: 'Ретикулоциты' },
   'ERYTHROPOIETIN': { prefUnit: 'mIU/mL', coeff: 1, uln: 25, lln: 5, name: 'Эритропоэтин' },
   'HAPTOGLOBIN': { prefUnit: 'g/L', coeff: 1, uln: 3.0, lln: 0.5, name: 'Гаптоглобин' },
   'URIC_ACID': { ...RANGE_UA, name: 'Мочевая кислота' },
