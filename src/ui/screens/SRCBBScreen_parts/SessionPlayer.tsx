@@ -40,8 +40,8 @@ import {
 import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-readiness-adjust.engine';
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
-import { WorkoutSummaryReport } from '../TrainingScreen_parts/WorkoutSummaryReport';
-import { sessionToWorkoutLog, buildWorkoutSummary, buildWorkoutReportText, buildSetDetails, compareWorkoutSummaries, comparePlanVsActual, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput } from '../../../engines/workout-summary.engine';
+import { WorkoutSummaryReport, PLAYER_REPORT_BLOCKS, readReportBlocks } from '../TrainingScreen_parts/WorkoutSummaryReport';
+import { sessionToWorkoutLog, buildWorkoutSummary, buildWorkoutReportText, buildSetDetails, compareWorkoutSummaries, comparePlanVsActual, MUSCLE_LABELS, VOLUME_STATUS_COLOR, VOLUME_STATUS_LABEL, type PlannedExerciseInput, type ReportBlockId } from '../../../engines/workout-summary.engine';
 import { getVolumeLandmarks, checkVolumeStatus, MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
@@ -201,6 +201,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // План завершённой тренировки — снимок на момент финиша. День в плеере
   // можно переключить, а «Итог» должен сравнивать с тем планом, что выполняли.
   const [donePlan, setDonePlan] = useState<PlannedExerciseInput[] | null>(null);
+  // Выбор блоков «Итога» держит сам экран: так строки, которые уже вошли в
+  // выбранные блоки отчёта, не дублируются под ним.
+  const [doneBlocks, setDoneBlocks] = useState<ReportBlockId[]>(() => readReportBlocks('he_workout_done_blocks', PLAYER_REPORT_BLOCKS));
   // История до текущей сессии: нужна для сравнения «с прошлой» и честных
   // рекордов в «Итоге» — сама сессия из базы исключается.
   const doneHistory = useMemo<WorkoutLog[]>(() => {
@@ -2486,7 +2489,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               <span style={{ fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.22)', color: '#fff', whiteSpace: 'nowrap' }}>{done.durationMin} мин</span>
             )}
           </div>
-          <div style={ROW}><span>Сессий записано всего:</span><span style={{ color: ACCENT }}>{getLastSession() ? 'сохранено в дневник' : '—'}</span></div>
 
           {/* Сводный отчёт по проведённой тренировке: общий + по упражнениям и мышцам.
               Блоки включаются чекбоксами, выбор запоминается. */}
@@ -2497,7 +2499,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 title="Сводка тренировки"
                 subtitle={`${done.focus || 'Тренировка'}${done.durationMin ? ` · ${done.durationMin} мин` : ''}`}
                 storageKey="he_workout_done_blocks"
-                defaultBlocks={['totals', 'compare', 'insights', 'muscles', 'plan', 'exercises', 'sets', 'prs']}
+                blocks={doneBlocks}
+                onBlocksChange={setDoneBlocks}
                 previousWorkouts={doneHistory.slice(0, 1)}
                 previousLabel="прошлой тренировкой"
                 baselineWorkouts={doneHistory}
@@ -2513,9 +2516,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           {/* Мобильность: растяжка после тренировки + чек-ин ROM */}
           <MobilityPostPanel sessionId={done?.sessionId} />
 
-          <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
-          <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
-          <div style={{ ...SMALL, marginTop: 8 }}>Реализация объёма: {planned.volume > 0 ? Math.round(factVol.volume / planned.volume * 100) : 0}%</div>
+          {/* План/факт и метрики дублировали блоки отчёта. Показываем их только
+              если соответствующий блок в «Итоге» выключен — экран короче, а
+              информация не теряется. */}
+          {!doneBlocks.includes('plan') && (
+            <>
+              <div style={ROW}><span>Объём факт vs план:</span><span style={{ color: ACCENT }}>{factVol.volume} / {planned.volume} кг·пов</span></div>
+              <div style={ROW}><span>Сеты факт vs план:</span><span style={{ color: ACCENT }}>{factVol.sets} / {planned.sets}</span></div>
+              <div style={{ ...SMALL, marginTop: 8 }}>Реализация объёма: {planned.volume > 0 ? Math.round(factVol.volume / planned.volume * 100) : 0}%</div>
+            </>
+          )}
           {topE1RM.e1rm > 0 && (
             <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>🎯 Оценка 1RM (Epley) по лучшему сету</div>
@@ -2554,10 +2564,14 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           )}
           {lms && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <div style={{ ...LABEL, color: ACCENT }}>📊 Метрики сессии ({lms.exerciseCount} упр.)</div>
+              <div style={{ ...LABEL, color: ACCENT }}>{doneBlocks.includes('totals') ? '📊 Интенсивность сессии' : '📊 Метрики сессии'} ({lms.exerciseCount} упр.)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
-                <div style={SMALL}>Тоннаж: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.tonnage)}</b> кг</div>
-                <div style={SMALL}>КПШ: <b style={{ color: '#fff' }}>{lms.metrics.kpsh}</b></div>
+                {!doneBlocks.includes('totals') && (
+                  <>
+                    <div style={SMALL}>Тоннаж: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.tonnage)}</b> кг</div>
+                    <div style={SMALL}>КПШ: <b style={{ color: '#fff' }}>{lms.metrics.kpsh}</b></div>
+                  </>
+                )}
                 <div style={SMALL}>Инт.отн: <b style={{ color: '#fff' }}>{lms.metrics.relIntensity.toFixed(3)}</b></div>
                 <div style={SMALL}>УОИ: <b style={{ color: '#fff' }}>{lms.metrics.uoi.toFixed(3)}</b></div>
                 <div style={SMALL}>Инт.Ф+Б: <b style={{ color: '#fff' }}>{Math.round(lms.metrics.intFB)}</b></div>
@@ -2565,7 +2579,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               </div>
             </div>
           )}
-           {prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
+           {!doneBlocks.includes('prs') && prs.length > 0 && <div style={{ marginTop: 8 }}><div style={LABEL}>🏆 Последние PR:</div>{prs.map((p, i) => <div key={i} style={SMALL}>• {p.exercise}: {p.weight}кг×{p.reps} ({p.date})</div>)}</div>}
            
            {/* история отдыха */}
            {restHistory.length > 0 && (

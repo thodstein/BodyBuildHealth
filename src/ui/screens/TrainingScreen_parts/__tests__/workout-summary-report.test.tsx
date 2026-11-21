@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { render, fireEvent, screen } from '@testing-library/react';
-import { WorkoutSummaryReport, ReportBlockPicker } from '../WorkoutSummaryReport';
+import { WorkoutSummaryReport, ReportBlockPicker, PLAYER_REPORT_BLOCKS, readReportBlocks } from '../WorkoutSummaryReport';
 import { resolveExerciseMeta } from '../../../../engines/workout-summary.engine';
 import { TrainingDiaryHub } from '../TrainingDiaryHub';
 import type { WorkoutLog, StrengthLogEntry } from '../../../core/types';
@@ -202,6 +202,18 @@ describe('WorkoutSummaryReport', () => {
     ['Общее', 'Выводы', 'Сравнение', 'Объём', 'Мышцы', 'Упражнения', 'План → факт', 'Подходы', 'Движения', 'Тренировки', 'Рекорды'].forEach(label => {
       expect(html).toContain(label);
     });
+  });
+
+  it('«Итог» плеера держит выбор блоков и не оставляет неизвестных', () => {
+    expect(PLAYER_REPORT_BLOCKS).toContain('plan');
+    expect(PLAYER_REPORT_BLOCKS).toContain('prs');
+    expect(new Set(PLAYER_REPORT_BLOCKS).size).toBe(PLAYER_REPORT_BLOCKS.length);
+    localStorage.setItem('he_workout_done_blocks', JSON.stringify(['totals', 'plan', 'bogus']));
+    expect(readReportBlocks('he_workout_done_blocks', PLAYER_REPORT_BLOCKS)).toEqual(['totals', 'plan']);
+    localStorage.setItem('he_workout_done_blocks', JSON.stringify(['bogus']));
+    expect(readReportBlocks('he_workout_done_blocks', PLAYER_REPORT_BLOCKS)).toEqual(PLAYER_REPORT_BLOCKS);
+    localStorage.removeItem('he_workout_done_blocks');
+    expect(readReportBlocks('he_workout_done_blocks', PLAYER_REPORT_BLOCKS)).toEqual(PLAYER_REPORT_BLOCKS);
   });
 
   it('блок сравнения показывает дельты к прошлому периоду', () => {

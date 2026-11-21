@@ -67,7 +67,14 @@ const fmtDate = (iso: string) => {
     : d.toLocaleDateString('ru-RU', { weekday: 'short', day: '2-digit', month: '2-digit' });
 };
 
-function readBlocks(key?: string, fallback?: ReportBlockId[]): ReportBlockId[] {
+/** Блоки «Итога» плеера по умолчанию: вся глубина отчёта, без дублей на экране. */
+export const PLAYER_REPORT_BLOCKS: ReportBlockId[] = ['totals', 'compare', 'insights', 'muscles', 'plan', 'exercises', 'sets', 'prs'];
+
+/**
+ * Выбор блоков из localStorage. Экспортируется, чтобы экран, который держит
+ * отчёт, мог спрятать свои строки, если те уже вошли в выбранные блоки.
+ */
+export function readReportBlocks(key?: string, fallback?: ReportBlockId[]): ReportBlockId[] {
   const def = fallback && fallback.length ? fallback : ALL_REPORT_BLOCKS;
   if (!key || typeof localStorage === 'undefined') return def;
   try {
@@ -740,14 +747,14 @@ export const WorkoutSummaryBody: React.FC<{
                 <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.sharePct}%</span>
                 {p.weeklyTrendPct != null && p.weeklyTrendPct !== 0 && (
                   <span
-                    title={`Подходы по неделям: ${p.weeklySets.join(' · ')}`}
+                    title={`Подходы по неделям${p.weeklySets.length > 12 ? ' (последние 12)' : ''}: ${p.weeklySets.slice(-12).join(' · ')}`}
                     style={{ color: p.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
                   >
                     {p.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.weeklyTrendPct)}%
                   </span>
                 )}
                 {p.weeklySets.filter(x => x > 0).length >= 3 && (
-                  <Sparkline values={p.weeklySets} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
+                  <Sparkline values={p.weeklySets.slice(-12)} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
                 )}
               </div>
             ))}
@@ -815,7 +822,7 @@ export const WorkoutSummaryBody: React.FC<{
                 <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.exercise}</span>
                 <span style={{ color: '#fff', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>{p.weight}кг×{p.reps}</span>
                 <span style={{ color: '#f59e0b', fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 64, textAlign: 'right' }}>e1RM {p.e1rm}</span>
-                {p.deltaPct != null && <span style={{ color: ACCENT, minWidth: 44, textAlign: 'right' }}>+{p.deltaPct}%</span>}
+                {p.deltaPct != null && <span style={{ color: ACCENT, minWidth: 44, textAlign: 'right' }}>{p.deltaPct > 0 && p.deltaPct < 0.1 ? '+<0.1%' : `+${p.deltaPct}%`}</span>}
                 <span style={{ color: '#fff', opacity: 0.6, minWidth: 58, textAlign: 'right' }}>{fmtDate(p.date)}</span>
               </div>
             ))}
@@ -848,7 +855,7 @@ export const WorkoutSummaryReport: React.FC<{
   /** План этих тренировок (targetSets из плеера) — для строк «план → факт». */
   plan?: PlannedExerciseInput[] | null;
 }> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan }) => {
-  const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readBlocks(storageKey, defaultBlocks));
+  const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readReportBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
     if (blocks == null) setLocalBlocks(next);
