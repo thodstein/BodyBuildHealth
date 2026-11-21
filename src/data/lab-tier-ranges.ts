@@ -99,6 +99,14 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   DHT:              { marker:'DHT', normal:[1.0,3.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'nmol/L', label:'ДГТ' },
   DHEA_S:           { marker:'DHEA_S', normal:[200,500], borderline:[150,200], treatment:[100,150], emergencyLow:100, direction:'low', unit:'mcg/dL', label:'ДГЭА-С' },
   SHBG:             { marker:'SHBG', normal:[20,60], borderline:[60,80], treatment:[80,120], emergencyHigh:120, direction:'high', unit:'nmol/L', label:'ГСПГ' },
+  // Проход 190: шкала — пороги ДЕЙСТВИЯ в нг/мл, а не «лабораторная норма».
+  // Верх референса у РФ-лабораторий метод-зависим и расходится почти в 10 раз:
+  // <0.47 нмоль/л (АКСИС, ECLIA), <1.9 (ИНВИТРО >18 лет), 0.159–0.474
+  // (ИНВИТРО/ECLIA Snibe), ≤4.0 нмоль/л (набор ХЕМА, ИФА), 0.2–1.4 нг/мл
+  // (Roche/ECLIA, Krasowski 2014) — пять источников в §4
+  // `docs/LAB-NORMS-SINGLE-SOURCE.md`. В плоский мир число приходит в нг/мл
+  // (`flatLabUnit`), в том числе из каталога `PROGESTERONE` (нмоль/л): поэтому
+  // шкала и второе написание живут в одной единице.
   PROG:             { marker:'PROG', normal:[0.3,1.5], borderline:[1.5,3], treatment:[3,10], emergencyHigh:10, direction:'high', unit:'ng/mL', label:'Прогестерон' },
   IGF1:             { marker:'IGF1', normal:[100,400], borderline:[400,500], treatment:[500,700], emergencyHigh:700, direction:'high', unit:'ng/mL', label:'ИФР-1' },
   AMH:              { marker:'AMH', normal:[1.0,5.0], borderline:[0.5,1.0], treatment:[0.2,0.5], emergencyLow:0.2, direction:'low', unit:'ng/mL', label:'АМГ' },
@@ -155,6 +163,10 @@ const TIER_SAME_ANALYSIS: Record<string, { canon: string; label?: string; /** С
   ESTRADIOL: { canon: 'E2' },
   PROLACTIN: { canon: 'PRL' },
   TOTAL_T: { canon: 'TESTOSTERONE' },
+  // Проход 190: `PROGESTERONE` в каталоге — нмоль/л, а шкала `PROG` — нг/мл.
+  // Строка общая только потому, что плоский мир пересчитывает число в единицу
+  // шкалы (`flatLabUnit` → `readFlatLabs`/`labSliceToValues`); равенство держит
+  // гард `data/__tests__/tier-alias-flat-unit.test.ts`.
   PROGESTERONE: { canon: 'PROG' },
   T3_FREE: { canon: 'FT3' },
   T4_FREE: { canon: 'FT4' },

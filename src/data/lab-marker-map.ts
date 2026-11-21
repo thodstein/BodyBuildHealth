@@ -90,7 +90,11 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'FSH', name:'ФСГ', organ:'PITUITARY', system:'endocrine', mechanisms:['FSH_UP','GNRH_UP'], higherIsWorse:false, defaultValue:1, unit:'мМЕ/мл', correctionIds:['enclomiphene','daa','tamoxifen'] },
   { marker:'SHBG', name:'ГСПГ', organ:'LIVER', system:'endocrine', mechanisms:['SHBG_REGULATION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:60, unit:'нмоль/л', correctionIds:['boron','tongkat_ali','mesterolone'] },
   { marker:'DHT', name:'ДГТ', organ:'PROSTATE', system:'endocrine', mechanisms:['5AR_INHIBITION','DHT_REDUCTION'], higherIsWorse:true, defaultValue:870, unit:'пг/мл', correctionIds:['saw_palmetto','zinc_sup','mesterolone'] },
-  { marker:'PROG', name:'Прогестерон', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:false, defaultValue:0.3, unit:'нг/мл', correctionIds:['vitex','ashwagandha','p5p'] },
+  // Проход 190: направление — как у шкалы (`LAB_TIERS.PROG.direction: 'high'`):
+  // у мужчины значимо ПОВЫШЕНИЕ (адренальный/лекарственный источник), а низкий
+  // прогестерон на подавленной оси — ожидаемое состояние, не «дефицит». Своих
+  // добавок у находки нет: каберголин снижает пролактин, а не прогестерон.
+  { marker:'PROG', name:'Прогестерон', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:true, defaultValue:0.3, unit:'нг/мл', correctionIds:[] },
   { marker:'CORTISOL', name:'Кортизол', organ:'ADRENALS', system:'endocrine', mechanisms:['CORTISOL_REDUCTION','ADAPTOGENIC','GABA_MODULATION'], higherIsWorse:true, defaultValue:550, unit:'нмоль/л', correctionIds:['ashwagandha','phosphatidylserine','magnesium_l_threonate','l_theanine'] },
   { marker:'DHEA_S', name:'ДГЭА-С', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE','ADAPTOGENIC'], higherIsWorse:false, defaultValue:80, unit:'мкг/дл', correctionIds:['ashwagandha','shilajit','pregnenolone'] },
   { marker:'ANDROSTENEDIONE', name:'Андростендион', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE','AROMATASE_INHIBITION'], higherIsWorse:true, defaultValue:6, unit:'нмоль/л', correctionIds:['dim','indinol','zinc_sup'] },
@@ -198,7 +202,10 @@ export const LAB_MARKER_MAP: LabMarkerMap[] = [
   { marker:'INHIBIN_B', name:'Ингибин B', organ:'TESTES', system:'reproductive', mechanisms:['ANTIOXIDANT','GLUTATHIONE_SYNTHESIS'], higherIsWorse:false, defaultValue:80, unit:'пг/мл', correctionIds:['nac','coq10','zinc_sup','selenium_sup'] },
   { marker:'AMH', name:'Антимюллеров гормон', organ:'TESTES', system:'reproductive', mechanisms:['ANTIOXIDANT','HORMONE_BALANCE'], higherIsWorse:false, defaultValue:1.0, unit:'нг/мл', correctionIds:['nac','coq10','ashwagandha','shilajit'] },
   { marker:'ESTRADIOL_SENS', name:'Эстрадиол чувствительный', organ:'BREAST', system:'endocrine', mechanisms:['AROMATASE_INHIBITION','ESTROGEN_MODULATION'], higherIsWorse:true, defaultValue:150, unit:'пмоль/л', correctionIds:['anastrozole','dim','exemestane','indinol'] },
-  { marker:'PROGESTERONE', name:'Прогестерон (UCUM)', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:false, defaultValue:0.3, unit:'нг/мл', correctionIds:['cabergoline','vitex','ashwagandha','p5p'] },
+  // Проход 190: единица — как в каталоге (`UCUM_MAP.PROGESTERONE` — нмоль/л;
+  // прежние «нг/мл» были единицей ДРУГОГО написания `PROG`). Направление и
+  // отсутствие добавок — см. комментарий у `PROG`.
+  { marker:'PROGESTERONE', name:'Прогестерон (UCUM)', organ:'ADRENALS', system:'endocrine', mechanisms:['HORMONE_BALANCE'], higherIsWorse:true, defaultValue:0.3, unit:'нмоль/л', correctionIds:[] },
   { marker:'PREALBUMIN', name:'Преальбумин', organ:'LIVER', system:'hepatic', mechanisms:['PROTEIN_SYNTHESIS','AMINO_ACID_METABOLISM'], higherIsWorse:false, defaultValue:200, unit:'мг/л', correctionIds:['whey_protein','bcaa','leucine','glutamine'] },
   { marker:'UACR', name:'Альбумин/креатинин мочи', organ:'KIDNEYS', system:'renal', mechanisms:['RENOPROTECTION','ANTIOXIDANT'], higherIsWorse:true, defaultValue:30, unit:'мг/г', correctionIds:['telmisartan','astragalus','vitamin_d3','taurine'] },
   { marker:'ECHO_LV_MASS', name:'Масса ЛЖ (эхо)', organ:'HEART', system:'cardio', mechanisms:['BP_REDUCTION','BETA1_BLOCKADE','COENZYME_ELECTRON_TRANSPORT'], higherIsWorse:true, defaultValue:200, unit:'г', correctionIds:['telmisartan','nebivolol','spironolactone','omega3'] },

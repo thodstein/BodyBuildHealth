@@ -578,12 +578,12 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
   ]},
 
   // ─── ЭНДОКРИННАЯ: адренал/гипофиз ───
-  { marker: 'PROG', entries: [
-    { substanceId: 'cabergoline', priority: 1, brandName: 'Каберголин 0.25-0.5 мг', reason: ' ↓ прогестероновой гиперсекре GnRH-завис', minSeverity: 'severe' },
-    { substanceId: 'vitex', priority: 2, brandName: 'Vitex agnus-castus 160-225 мг', reason: 'D2-агонист → ↓ гиперпролактинемии/↑ прогеста', minSeverity: 'moderate' },
-    { substanceId: 'ashwagandha', priority: 3, brandName: 'KSM-66 600 мг', reason: ' ↓ кортизола через HPA влияния на прогестерон', minSeverity: 'moderate' },
-    { substanceId: 'p5p', priority: 4, brandName: 'Пиридоксаль-5-фосфат 50 мг', reason: 'B6 → ↓ эстрогенного компонента, нормализация', minSeverity: 'moderate' },
-  ]},
+  // Проход 190: у повышенного прогестерона у мужчины нет «корректирующей»
+  // добавки и тем более нет препарата. Каберголин — агонист D2 и снижает
+  // ПРОЛАКТИН, а не прогестерон (плюс свои риски), «прогестиновой гинекомастии»
+  // у мужчины нет: грудь растёт от эстрадиола и пролактина. Витекс/ашваганда/П5П
+  // источника на этот анализ не имеют. Находка ведёт к врачу — `TIER_RULES.PROG`.
+  { marker: 'PROG', entries: [] },
   { marker: 'ANDROSTENEDIONE', entries: [
     { substanceId: 'dim', priority: 1, brandName: 'DIM 100-200 мг', reason: 'Индол-3-карбинол → ↓ ароматизация андростен., ↓ E2', minSeverity: 'mild' },
     { substanceId: 'indinol', priority: 2, brandName: 'Индол-3-карбинол 400 мг', reason: ' ↓ CYP19 (ароматаза) → ↓ E2 из андростендиона', minSeverity: 'moderate' },
@@ -870,12 +870,7 @@ export const LAB_PRIORITY_MAP: LabPriorityMap[] = [
     { substanceId: 'exemestane', priority: 3, brandName: 'Экземестан 12.5 мг', reason: 'Стероидный ИА ( irreversible)', minSeverity: 'severe' },
     { substanceId: 'indinol', priority: 4, brandName: 'Индол-3-карбинол 400 мг', reason: 'Аналог DIM', minSeverity: 'moderate' },
   ]},
-  { marker: 'PROGESTERONE', entries: [ // = PROG
-    { substanceId: 'cabergoline', priority: 1, brandName: 'Каберголин', reason: ' ↓ прогестиновой гинекомастии', minSeverity: 'severe' },
-    { substanceId: 'vitex', priority: 2, brandName: 'Vitex', reason: 'D2-агонист', minSeverity: 'moderate' },
-    { substanceId: 'ashwagandha', priority: 3, brandName: 'Ашваганда', reason: ' ↓ HPA', minSeverity: 'moderate' },
-    { substanceId: 'p5p', priority: 4, brandName: 'P5P', reason: 'Модулятор', minSeverity: 'moderate' },
-  ]},
+  { marker: 'PROGESTERONE', entries: [] }, // = PROG; совета нет — см. комментарий у PROG
   { marker: 'PREALBUMIN', entries: [
     { substanceId: 'whey_protein', priority: 1, brandName: 'Сывороточный', reason: 'Субстрат синтеза', minSeverity: 'moderate' },
     { substanceId: 'bcaa', priority: 2, brandName: 'BCAA', reason: 'Синтез белка', minSeverity: 'moderate' },
