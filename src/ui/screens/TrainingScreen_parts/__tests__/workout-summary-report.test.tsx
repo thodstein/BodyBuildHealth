@@ -109,6 +109,16 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('/нед до MEV');
   });
 
+  it('показывает доминирующую зону повторов у мышцы', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['muscles']} showSelector={false} />,
+    );
+    const text = html.replace(/<[^>]+>/g, '').replace(/<!-- -->/g, '');
+    // Жим 2×8 — гипертрофия, присед 1×5 — сила: у каждой мышцы своя зона.
+    expect(text).toContain('· 6–12 · 100%');
+    expect(text).toContain('· 1–5 · 100%');
+  });
+
   it('блок «План → факт» сравнивает план с фактом по упражнениям', () => {
     const html = renderToStaticMarkup(
       <WorkoutSummaryReport

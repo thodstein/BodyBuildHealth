@@ -616,7 +616,7 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── МЫШЦЫ ── */}
       {has('muscles') && summary.muscles.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="💪" title="По мышцам" hint={perWeek ? 'подходы · тоннаж · доля · ориентир MEV/MAV/MRV' : 'за сессию · ориентиры MEV/MAV/MRV недельные'} />
+          <SectionTitle icon="💪" title="По мышцам" hint={perWeek ? 'подходы · тоннаж · доля · зона повторов · MEV/MAV/MRV' : 'за сессию · зона повторов · ориентиры MEV/MAV/MRV недельные'} />
           {muscleRows.some(r => r.lm) && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
               {(['below_mev', 'optimal', 'approaching_mrv', 'exceeding_mrv'] as const).map(st => {
@@ -683,6 +683,18 @@ export const WorkoutSummaryBody: React.FC<{
                             {m.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(m.weeklyTrendPct)}%
                           </span>
                         )}
+                        {(() => {
+                          const z = dominantRepZone(m.repZones);
+                          if (!z) return null;
+                          return (
+                            <span
+                              title={`Зона повторов мышцы: ${z.label} — ${z.hint}, ${z.sets} из ${z.total} подходов (${z.pct}%)`}
+                              style={{ marginLeft: 5, color: '#a78bfa', fontWeight: 600, whiteSpace: 'nowrap' }}
+                            >
+                              · {z.label} · {z.pct}%
+                            </span>
+                          );
+                        })()}
                         {adv && (
                           <span title={adv.hint} style={{ marginLeft: 5, fontWeight: 800, color: VOLUME_STATUS_COLOR[lm.status], whiteSpace: 'nowrap' }}>
                             {adv.chip}

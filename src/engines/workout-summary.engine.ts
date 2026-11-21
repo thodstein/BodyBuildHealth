@@ -295,6 +295,8 @@ export interface SummaryMuscle {
   weeklySets: number[];
   /** Изменение подходов/нед от первой недели к последней, % (null — нет базы). */
   weeklyTrendPct: number | null;
+  /** Подходы мышцы по зонам повторений: сила, гипертрофия, выносливость. */
+  repZones: { strength: number; hypertrophy: number; endurance: number };
 }
 
 export interface SummaryPattern {
@@ -514,7 +516,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     zoneEndurance: number;
   };
   const exMap = new Map<string, ExAgg>();
-  const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number>; sessions: Set<string> }>();
+  const muscleAgg = new Map<MuscleKey, {
+    sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number>; sessions: Set<string>;
+    /** Зоны повторов мышцы: одна и та же грудь бывает силовой и объёмной. */
+    zoneStrength: number; zoneHypertrophy: number; zoneEndurance: number;
+  }>();
   const patternAgg = new Map<string, {
     sets: number;
     reps: number;
@@ -724,8 +730,14 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       prev.sessions.add(w.id || date);
       exMap.set(key, prev);
 
-      const mPrev = muscleAgg.get(meta.muscle) || { sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>(), byWeek: new Map<string, number>(), sessions: new Set<string>() };
+      const mPrev = muscleAgg.get(meta.muscle) || {
+        sets: 0, reps: 0, tonnageKg: 0, ex: new Set<string>(), byWeek: new Map<string, number>(), sessions: new Set<string>(),
+        zoneStrength: 0, zoneHypertrophy: 0, zoneEndurance: 0,
+      };
       mPrev.sets += exSets; mPrev.reps += exReps; mPrev.tonnageKg += exTonnage; mPrev.ex.add(name);
+      mPrev.zoneStrength += exZoneStrength;
+      mPrev.zoneHypertrophy += exZoneHyp;
+      mPrev.zoneEndurance += exZoneEnd;
       mPrev.sessions.add(w.id || date);
       if (wk.from) mPrev.byWeek.set(wk.from, (mPrev.byWeek.get(wk.from) || 0) + exSets);
       muscleAgg.set(meta.muscle, mPrev);
@@ -878,6 +890,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         frequencyPerWeek: muscleWeekKeys.length > 0 ? Math.round((v.sessions.size / muscleWeekKeys.length) * 10) / 10 : 0,
         weeklySets,
         weeklyTrendPct,
+        repZones: { strength: v.zoneStrength, hypertrophy: v.zoneHypertrophy, endurance: v.zoneEndurance },
       };
     })
     .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
@@ -1419,6 +1432,27 @@ export function buildWorkoutInsights(
     }
   }
 
+  // Объём мышцы считается подходами, но подходы в 13+ — это выносливость:
+  // по MEV/MAV/MRV объём «в норме», а стимула для гипертрофии мало.
+  const enduranceHit = (s.muscles || [])
+    .map(m => {
+      const z = dominantRepZone(m.repZones);
+      return z ? { m, z } : null;
+    })
+    .filter((x): x is { m: SummaryMuscle; z: RepZoneShare } => x != null)
+    .filter(x => x.m.sets >= 6 && x.z.label === '13+' && x.z.pct >= 60)
+    .sort((a, b) => b.m.sets - a.m.sets)[0];
+  if (enduranceHit) {
+    const { m, z } = enduranceHit;
+    out.push({
+      id: 'zone-endurance',
+      tone: 'info',
+      icon: '🫁',
+      title: `${m.label}: ${z.pct}% подходов в зоне 13+`,
+      detail: `${m.sets} подходов за период, ${z.sets} из ${z.total} — больше 12 повторов. Это выносливость: для гипертрофии держите 6–12, если 13+ не цель.`,
+    });
+  }
+
   const intensity = s.totals.avgIntensityPct;
   if (intensity != null && s.totals.sessions >= 2) {
     if (intensity < 60) {
@@ -1615,6 +1649,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   'over-mrv': 70,
   'under-mev': 68,
   'split-volume': 66,
+  'zone-endurance': 62,
   trend: 60,
   'muscle-trend': 58,
   rir: 52,
@@ -2216,7 +2251,9 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     // для гипертрофии — это подходы.
     const setsShare = Math.round((m.sets / totalSetsForShare) * 100);
     const freq = perWeek && m.frequencyPerWeek > 0 ? ` · ${m.frequencyPerWeek}×/нед` : '';
-    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${freq}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов`);
+    const mz = dominantRepZone(m.repZones);
+    const zone = mz ? ` · зона ${mz.label} (${mz.pct}%)` : '';
+    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${freq}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов${zone}`);
   });
 
   lines.push('');

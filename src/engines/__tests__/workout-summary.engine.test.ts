@@ -8,6 +8,7 @@ import {
   compareWorkoutSummaries,
   comparePlanVsActual,
   compareWeekPlanVsActual,
+  dominantRepZone,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -178,6 +179,19 @@ describe('workout-summary: период из нескольких трениро
     expect(chest.frequencyPerWeek).toBe(1);
     const txt = buildWorkoutReportText(s);
     expect(txt).toContain('Грудь: 4 подх · 2 подх/нед · 1×/нед');
+  });
+
+  it('раскладывает подходы мышцы по зонам повторов', () => {
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+      mkWorkout('2026-11-04', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 3, sets: 2 }]),
+    ]);
+    const chest = s.muscles.find(m => m.muscle === 'chest')!;
+    expect(chest.repZones).toEqual({ strength: 2, hypertrophy: 3, endurance: 0 });
+    const dz = dominantRepZone(chest.repZones)!;
+    expect(dz).toMatchObject({ label: '6–12', hint: 'гипертрофия', sets: 3, total: 5, pct: 60 });
+    // В тексте у мышцы — доминирующая зона, а не три числа подряд.
+    expect(buildWorkoutReportText(s)).toMatch(/Грудь: 5 подх[^\n]*· зона 6–12 \(60%\)/);
   });
 
   it('не падает на пустом наборе и на битых записях', () => {
@@ -613,6 +627,24 @@ describe('workout-summary: недельная динамика и интенси
     expect(split?.title).toContain('Грудь: 10 подходов за тренировку, 1×/нед');
     expect(split?.detail).toContain('в норме');
     expect(split?.detail).toContain('Две по 5');
+  });
+
+  it('видит мышцу, у которой объём собран в зоне 13+', () => {
+    const s = buildWorkoutSummary([
+      // 8 подходов на грудь, все по 15 повторов: по подходам объём есть,
+      // но это выносливость, а не гипертрофия.
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 15, sets: 4 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 15, sets: 4 }]),
+    ]);
+    const ins = buildWorkoutInsights(s).find(i => i.id === 'zone-endurance');
+    expect(ins?.title).toBe('Грудь: 100% подходов в зоне 13+');
+    expect(ins?.detail).toContain('8 из 8');
+    // 8–12 повторов — целевая зона, подсказки нет.
+    const normal = buildWorkoutSummary([
+      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 70, reps: 10, sets: 4 }]),
+      mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 70, reps: 10, sets: 4 }]),
+    ]);
+    expect(buildWorkoutInsights(normal).some(i => i.id === 'zone-endurance')).toBe(false);
   });
 
   it('не ругает частоту, когда мышца и так тренируется дважды в неделю', () => {
