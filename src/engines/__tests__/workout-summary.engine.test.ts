@@ -797,6 +797,10 @@ describe('workout-summary: текст отчёта для копирования
     const txt = buildWorkoutReportText(s);
     expect(txt).toContain('Движения:');
     expect(txt).toContain('(+100% к первой неделе)');
+    // Недельная динамика в тексте: КПШ и тоннаж по неделям.
+    expect(txt).toContain('По неделям:');
+    expect(txt).toContain('КПШ 16');
+    expect(txt).toContain('КПШ 32');
   });
 
   it('своя шапка и хвост обрамляют отчёт', () => {

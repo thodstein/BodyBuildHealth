@@ -44,6 +44,9 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('По упражнениям');
     expect(html).toContain('Движения (паттерны)');
     expect(html).toContain('тренд по неделям');
+    // Недельная динамика: тоннаж и КПШ рядом.
+    expect(html).toContain('По неделям');
+    expect(html).toContain('● КПШ');
     expect(html).toContain('По тренировкам');
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');

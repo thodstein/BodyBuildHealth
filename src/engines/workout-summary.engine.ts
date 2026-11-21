@@ -1626,6 +1626,14 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     });
   }
 
+  if (s.weeks.length > 1) {
+    lines.push('');
+    lines.push('По неделям:');
+    s.weeks.forEach(w => lines.push(
+      `  ${w.label}: ${w.sessions} трен. · ${w.sets} подх · КПШ ${w.reps} · ${textTon(w.tonnageKg)}`,
+    ));
+  }
+
   if (opts.plan && !opts.plan.empty) {
     const pva = opts.plan;
     lines.push('');

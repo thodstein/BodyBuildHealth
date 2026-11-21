@@ -778,19 +778,30 @@ export const WorkoutSummaryBody: React.FC<{
               </div>
             ))}
           </div>
-          {summary.weeks.length > 1 && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 4 }}>Тоннаж по неделям</div>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
-                {summary.weeks.slice(-10).map((w, i) => (
-                  <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · ${w.sessions} трен. · ${w.reps} повт.`}>
-                    <div style={{ width: '100%', height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
-                    <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
-                  </div>
-                ))}
+          {summary.weeks.length > 1 && (() => {
+            const weeks = summary.weeks.slice(-10);
+            const maxWeekReps = Math.max(1, ...weeks.map(w => w.reps));
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 9, color: '#fff', opacity: 0.8 }}>По неделям</span>
+                  <span style={{ fontSize: 8.5, color: ACCENT }}>● тоннаж</span>
+                  <span style={{ fontSize: 8.5, color: '#60a5fa' }}>● КПШ</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
+                  {weeks.map((w, i) => (
+                    <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · КПШ ${w.reps} · ${w.sessions} трен.`}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, width: '100%', height: 32 }}>
+                        <div style={{ flex: 1, height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
+                        <div style={{ flex: 1, height: Math.max(3, (w.reps / maxWeekReps) * 32), background: 'linear-gradient(180deg, rgba(96,165,250,0.9), rgba(96,165,250,0.35))', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
