@@ -1923,6 +1923,12 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       const fmtRir = (n: number) => String(Math.round(n * 10) / 10);
       lines.push(`  Средний RIR: ${fmtRir(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtRir(r.delta)}`);
     }
+    const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
+    const grown = muscleRows.filter(m => m.sets.delta > 0).length;
+    const fallen = muscleRows.filter(m => m.sets.delta < 0).length;
+    if (muscleRows.length) {
+      lines.push(`  Подходы по мышцам: выросло ${grown}, просело ${fallen}, без изменений ${muscleRows.length - grown - fallen}`);
+    }
     const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
     if (movedMuscles.length) {
       lines.push('  Мышцы:');

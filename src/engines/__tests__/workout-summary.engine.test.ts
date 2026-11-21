@@ -994,6 +994,8 @@ describe('workout-summary: текст отчёта для копирования
     const cmp = compareWorkoutSummaries(s, buildWorkoutSummary([prev]));
     const txt = buildWorkoutReportText(s, { comparison: cmp, comparisonLabel: 'прошлой тренировкой' });
     expect(txt).toContain('Сравнение с прошлой тренировкой:');
+    // Сводка изменений: выросло / просело / без изменений.
+    expect(txt).toContain('Подходы по мышцам: выросло 1, просело 1, без изменений 0');
     expect(txt).toContain('  Мышцы:');
     expect(txt).toContain('  Движения:');
     expect(txt).toContain('  e1RM по упражнениям:');

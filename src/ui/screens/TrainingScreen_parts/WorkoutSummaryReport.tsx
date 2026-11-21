@@ -97,7 +97,9 @@ export const ReportBlockPicker: React.FC<{
   value: ReportBlockId[];
   onChange: (next: ReportBlockId[]) => void;
   compact?: boolean;
-}> = ({ value, onChange, compact }) => {
+  /** Пометка у блока, которого на этом экране нет: «нет плана недели». */
+  hints?: Partial<Record<ReportBlockId, string>>;
+}> = ({ value, onChange, compact, hints }) => {
   const has = (id: ReportBlockId) => value.includes(id);
   const toggle = (id: ReportBlockId) => {
     onChange(has(id) ? value.filter(x => x !== id) : ALL_REPORT_BLOCKS.filter(x => x === id || has(x)));
@@ -152,6 +154,9 @@ export const ReportBlockPicker: React.FC<{
                 background: on ? ACCENT : 'transparent', color: '#000', fontSize: 9, lineHeight: 1,
               }}>{on ? '✓' : ''}</span>
               {b.label}
+              {hints?.[b.id] && (
+                <span style={{ fontSize: 8.5, fontWeight: 600, opacity: 0.6 }}>· {hints[b.id]}</span>
+              )}
             </button>
           );
         })}
@@ -252,8 +257,14 @@ export const WorkoutSummaryBody: React.FC<{
   plan?: PlannedExerciseInput[] | null;
   /** План недели против факта журнала (по мышцам). Считает вызывающий экран. */
   weekPlanVsActual?: WeekPlanVsActual | null;
-}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel, plan, weekPlanVsActual }) => {
+  /** Какая это неделя: «03.11–09.11». Показываем, за что именно считан план. */
+  weekPlanLabel?: string;
+}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel, plan, weekPlanVsActual, weekPlanLabel }) => {
   const [onlyProblems, setOnlyProblems] = React.useState(false);
+  // В сравнении по умолчанию только изменения: «было столько же» — это не
+  // новость. Но иногда важно увидеть, что мышца не просела, — тогда список
+  // раскрывается целиком.
+  const [showUnchanged, setShowUnchanged] = React.useState(false);
   // Список подходов в отчёте длинный: за неделю-месяц это десятки тренировок.
   // Показываем первые SETS_LIMIT и даём раскрыть всё — без «обрезано и всё».
   const [showAllSets, setShowAllSets] = React.useState(false);
@@ -377,26 +388,53 @@ export const WorkoutSummaryBody: React.FC<{
           </div>
 
           {(() => {
-            const rows = comparison.muscles.filter(m => m.sets.delta !== 0).slice(0, compact ? 4 : 8);
-            if (rows.length === 0) return null;
+            // Сводка по всем мышцам периода: сколько выросло, сколько просело
+            // и сколько осталось на месте. Без неё видно только топ-8 строк и
+            // непонятно, «просело две из десяти» или «просело всё».
+            const all = comparison.muscles.filter(m => m.sets.previous + m.sets.current > 0);
+            const grown = all.filter(m => m.sets.delta > 0).length;
+            const fallen = all.filter(m => m.sets.delta < 0).length;
+            const same = all.length - grown - fallen;
+            const changed = all.filter(m => m.sets.delta !== 0);
+            const rows = (showUnchanged ? all : changed)
+              .slice(0, compact ? (showUnchanged ? 8 : 4) : (showUnchanged ? 14 : 8));
             return (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 9, color: '#fff', opacity: 0.8, marginBottom: 3 }}>Подходы по мышцам</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {rows.map(m => {
-                    const color = m.sets.delta > 0 ? '#22c55e' : '#ef4444';
-                    return (
-                      <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: 2, background: MUSCLE_COLORS[m.muscle] || ACCENT, flexShrink: 0 }} />
-                        <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
-                        <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 46, textAlign: 'right' }}>{m.sets.previous} → {m.sets.current}</span>
-                        <span style={{ color, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>
-                          {`${m.sets.delta > 0 ? '+' : ''}${m.sets.delta} подх.`}
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+                  <span style={{ fontSize: 9, color: '#fff', opacity: 0.8 }}>Подходы по мышцам</span>
+                  <span title="Мышц с ростом подходов" style={{ fontSize: 9, fontWeight: 800, color: '#22c55e' }}>▲ {grown}</span>
+                  <span title="Мышц с падением подходов" style={{ fontSize: 9, fontWeight: 800, color: '#ef4444' }}>▼ {fallen}</span>
+                  <span title="Мышц с тем же числом подходов" style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>= {same}</span>
+                  {all.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowUnchanged(v => !v)}
+                      style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}
+                    >
+                      {showUnchanged ? 'Только изменения' : `Все мышцы (${all.length})`}
+                    </button>
+                  )}
                 </div>
+                {rows.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {rows.map(m => {
+                      const flat = m.sets.delta === 0;
+                      const color = flat ? 'rgba(255,255,255,0.55)' : m.sets.delta > 0 ? '#22c55e' : '#ef4444';
+                      return (
+                        <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: 2, background: MUSCLE_COLORS[m.muscle] || ACCENT, flexShrink: 0, opacity: flat ? 0.45 : 1 }} />
+                          <span style={{ flex: 1, color: '#fff', opacity: flat ? 0.7 : 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                          <span style={{ color: '#fff', opacity: 0.65, fontVariantNumeric: 'tabular-nums', minWidth: 46, textAlign: 'right' }}>{m.sets.previous} → {m.sets.current}</span>
+                          <span style={{ color, fontWeight: flat ? 600 : 700, fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>
+                            {flat ? 'без изменений' : `${m.sets.delta > 0 ? '+' : ''}${m.sets.delta} подх.`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>Ни одна мышца не изменила объём — раскройте список, чтобы увидеть все.</div>
+                )}
               </div>
             );
           })()}
@@ -639,8 +677,11 @@ export const WorkoutSummaryBody: React.FC<{
             <SectionTitle
               icon="📅"
               title="План недели → факт"
-              hint={`${weekPlanVsActual.plannedDays} дн. плана · ${weekPlanVsActual.actualSessions} трен. в журнале`}
+              hint={`${weekPlanLabel ? `${weekPlanLabel} · ` : ''}${weekPlanVsActual.plannedDays} дн. плана · ${weekPlanVsActual.actualSessions} трен. в журнале`}
             />
+            <div style={{ fontSize: 8.5, color: '#fff', opacity: 0.6, marginBottom: 6, lineHeight: 1.35 }}>
+              План — targetSets всех дней микроцикла, факт — записанные подходы этой недели. Неделя идёт, поэтому «осталось» — это сколько добрать, а не пропуск.
+            </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, marginBottom: 6, color: '#fff' }}>
               <span>План: <b>{weekPlanVsActual.plannedSets}</b> подх</span>
               <span>Факт: <b style={{ color: tone }}>{weekPlanVsActual.actualSets}</b> подх</span>
@@ -912,7 +953,9 @@ export const WorkoutSummaryReport: React.FC<{
   plan?: PlannedExerciseInput[] | null;
   /** План недели (микроцикл) — для блока «План недели → факт». */
   weekPlan?: WeekPlanDayInput[] | null;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan, weekPlan }) => {
+  /** Подпись недели, за которую взят план: «03.11–09.11». */
+  weekPlanLabel?: string;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan, weekPlan, weekPlanLabel }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readReportBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -945,6 +988,16 @@ export const WorkoutSummaryReport: React.FC<{
     [weekPlan, workouts],
   );
 
+  // Честный выбор блоков: у блока, данных для которого на этом экране нет,
+  // пишем это прямо в списке, а не оставляем мёртвую галочку.
+  const blockHints = React.useMemo<Partial<Record<ReportBlockId, string>>>(() => {
+    const h: Partial<Record<ReportBlockId, string>> = {};
+    if (!weekPlanVsActual || weekPlanVsActual.empty) h.weekplan = 'нет плана недели';
+    if (!(Array.isArray(plan) && plan.length > 0)) h.plan = 'только из плеера';
+    if (!comparison || comparison.empty) h.compare = 'нет прошлого периода';
+    return h;
+  }, [weekPlanVsActual, plan, comparison]);
+
   return (
     <div className="workout-summary-report" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(96,165,250,0.08))', border: '1px solid rgba(0,230,138,0.22)' }}>
@@ -972,11 +1025,11 @@ export const WorkoutSummaryReport: React.FC<{
         </div>
         {showSelector && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} />
+            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} hints={blockHints} />
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} weekPlanVsActual={weekPlanVsActual} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} weekPlanVsActual={weekPlanVsActual} weekPlanLabel={weekPlanLabel} />
     </div>
   );
 };

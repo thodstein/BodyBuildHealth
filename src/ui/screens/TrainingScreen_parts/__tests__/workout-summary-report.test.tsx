@@ -104,6 +104,7 @@ describe('WorkoutSummaryReport', () => {
       <WorkoutSummaryReport
         workouts={[mkWorkout('2026-11-03')]}
         blocks={['weekplan']}
+        weekPlanLabel="03.11–09.11"
         weekPlan={[
           {
             label: 'Верх',
@@ -118,6 +119,9 @@ describe('WorkoutSummaryReport', () => {
     const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
     expect(text).toContain('План недели → факт');
     expect(text).toContain('1 дн. плана');
+    // Видно, за какую неделю и что именно сравнивается.
+    expect(text).toContain('03.11–09.11');
+    expect(text).toContain('План — targetSets всех дней микроцикла');
     expect(text).toContain('План: 6 подх');
     expect(text).toContain('Факт: 3 подх');
     expect(text).toContain('50% · осталось 3 подх');
@@ -129,6 +133,25 @@ describe('WorkoutSummaryReport', () => {
       <WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['weekplan']} showSelector={false} />,
     );
     expect(noPlan).not.toContain('План недели → факт');
+  });
+
+  it('в выборе блоков видно, для какого блока нет данных', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} storageKey="test_blocks_hints" />,
+    );
+    // Дневник не знает targetSets сессии — это блок плеера.
+    expect(html).toContain('только из плеера');
+    expect(html).toContain('нет плана недели');
+    expect(html).toContain('нет прошлого периода');
+    // Когда план недели передан, пометка снимается.
+    const withPlan = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-03')]}
+        storageKey="test_blocks_hints2"
+        weekPlan={[{ label: 'Верх', exercises: [{ name: 'Жим штанги лёжа', targetSets: 4 }] }]}
+      />,
+    );
+    expect(withPlan).not.toContain('нет плана недели');
   });
 
   it('без блока «План → факт» строки остаются под упражнениями', () => {
@@ -283,6 +306,31 @@ describe('WorkoutSummaryReport', () => {
     );
     expect(html).toContain('Подходы по движениям');
     expect(html).toContain('+1 подх.');
+  });
+
+  it('сравнение сводит мышцы в «выросло / просело / без изменений» и раскрывает все', () => {
+    const base = mkWorkout('2026-11-03');
+    const prevOnlyBench = { ...base, exercises: base.exercises.slice(0, 1) };
+    const { container } = render(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-10')]}
+        blocks={['compare']}
+        previousWorkouts={[prevOnlyBench]}
+        previousLabel="прошлой тренировкой"
+        showSelector={false}
+      />,
+    );
+    const txt = () => container.textContent || '';
+    // Жим 2 → 2 (на месте), присед 0 → 1 (рост): по умолчанию виден только рост.
+    expect(txt()).toContain('▲ 1');
+    expect(txt()).toContain('▼ 0');
+    expect(txt()).toContain('= 1');
+    expect(txt()).not.toContain('2 → 2');
+    fireEvent.click(screen.getByText('Все мышцы (2)'));
+    expect(txt()).toContain('2 → 2');
+    expect(txt()).toContain('без изменений');
+    fireEvent.click(screen.getByText('Только изменения'));
+    expect(txt()).not.toContain('2 → 2');
   });
 
   it('без предыдущего периода блок сравнения молчит', () => {

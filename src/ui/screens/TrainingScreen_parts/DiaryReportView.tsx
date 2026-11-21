@@ -342,6 +342,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         previousLabel={previousLabel}
         baselineWorkouts={baselineWorkouts}
         weekPlan={weekPlan}
+        weekPlanLabel={weekRangeFor(today).label}
       />
     </div>
   );
