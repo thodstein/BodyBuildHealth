@@ -6,6 +6,7 @@ import {
   buildSetDetails,
   compareWorkoutSummaries,
   comparePlanVsActual,
+  compareWeekPlanVsActual,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -185,6 +186,7 @@ describe('workout-summary: диапазоны и адаптер сессии', (
     expect(ALL_REPORT_BLOCKS).toContain('movement');
     expect(ALL_REPORT_BLOCKS).toContain('insights');
     expect(ALL_REPORT_BLOCKS).toContain('plan');
+    expect(ALL_REPORT_BLOCKS).toContain('weekplan');
   });
 });
 
@@ -838,6 +840,86 @@ describe('workout-summary: план против факта', () => {
     expect(pva.setsPct).toBe(100);
     expect(buildWorkoutInsights(summary, 'intermediate', null, pva).some(i => i.id === 'plan-gap')).toBe(false);
     expect(buildWorkoutInsights(summary).some(i => i.id === 'plan-gap')).toBe(false);
+  });
+});
+
+describe('workout-summary: план недели (микроцикл) против журнала', () => {
+  const plan = [
+    {
+      label: 'Верх',
+      exercises: [
+        { name: 'Жим штанги лёжа', targetSets: 4 },
+        { name: 'Тяга верхнего блока', targetSets: [{}, {}, {}] },
+      ],
+    },
+    {
+      label: 'Низ',
+      exercises: [{ name: 'Приседания со штангой', targetSets: 4 }],
+    },
+  ];
+
+  it('складывает подходы плана по мышцам и сравнивает с фактом', () => {
+    const week = [
+      mkWorkout('2026-11-03', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 2 },
+      ]),
+    ];
+    const wp = compareWeekPlanVsActual(plan, week);
+    expect(wp.plannedSets).toBe(11);
+    expect(wp.actualSets).toBe(5);
+    expect(wp.setsPct).toBe(45.5);
+    expect(wp.plannedDays).toBe(2);
+    expect(wp.actualSessions).toBe(1);
+    expect(wp.empty).toBe(false);
+    // Числом плана тоже можно: массив подходов и их количество — одно и то же.
+    const chest = wp.rows.find(r => r.muscle === 'chest')!;
+    expect(chest).toMatchObject({ plannedSets: 4, actualSets: 3, setsDelta: -1, setsPct: 75 });
+    const back = wp.rows.find(r => r.muscle === 'back')!;
+    expect(back).toMatchObject({ plannedSets: 3, actualSets: 2, setsPct: 66.7 });
+  });
+
+  it('запланированное без факта — ноль, а не «нет данных»', () => {
+    const wp = compareWeekPlanVsActual(plan, []);
+    const squat = wp.rows.find(r => r.muscle === 'quads')!;
+    expect(squat.plannedSets).toBe(4);
+    expect(squat.actualSets).toBe(0);
+    expect(squat.setsPct).toBe(0);
+    expect(wp.actualSessions).toBe(0);
+    expect(wp.rows.every(r => r.actualSets === 0)).toBe(true);
+  });
+
+  it('без плана блок пуст, а сделанное сверх плана даёт null-долю', () => {
+    const week = [
+      mkWorkout('2026-11-03', [
+        { name: 'Подъём штанги на бицепс', id: 'curl_bar', weight: 30, reps: 12, sets: 2 },
+      ]),
+    ];
+    expect(compareWeekPlanVsActual(null, week).empty).toBe(true);
+    expect(compareWeekPlanVsActual([], week).setsPct).toBeNull();
+    const wp = compareWeekPlanVsActual(plan, week);
+    const extra = wp.rows.find(r => r.muscle === 'biceps')!;
+    expect(extra).toMatchObject({ plannedSets: 0, actualSets: 2, setsDelta: 2, setsPct: null });
+  });
+
+  it('говорит, сколько осталось, не называя это провалом', () => {
+    const week = [
+      mkWorkout('2026-11-03', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+        { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 2 },
+      ]),
+    ];
+    const summary = buildWorkoutSummary(week);
+    const wp = compareWeekPlanVsActual(plan, week);
+    const ins = buildWorkoutInsights(summary, 'intermediate', null, null, wp)
+      .find(i => i.id === 'week-plan')!;
+    expect(ins.title).toContain('5 из 11 подходов (45.5%)');
+    expect(ins.detail).toContain('Осталось 6 подх');
+    expect(ins.tone).toBe('info');
+    // В копируемом отчёте — та же сверка по мышцам.
+    const txt = buildWorkoutReportText(summary, { weekPlan: wp });
+    expect(txt).toContain('План недели: 5 из 11 подх (45.5%)');
+    expect(txt).toContain('план 4 → факт 3');
   });
 });
 

@@ -225,6 +225,7 @@ export const REPORT_BLOCKS = [
   { id: 'muscles', label: 'Мышцы' },
   { id: 'exercises', label: 'Упражнения' },
   { id: 'plan', label: 'План → факт' },
+  { id: 'weekplan', label: 'План недели' },
   { id: 'sets', label: 'Подходы' },
   { id: 'movement', label: 'Движения' },
   { id: 'sessions', label: 'Тренировки' },
@@ -994,7 +995,13 @@ const signedPct = (pct: number): string => `${pct > 0 ? '+' : ''}${pct}%`;
  * выход за MEV/MRV по мышцам, плотность, RIR и рекорды. Правила молчат,
  * если данных мало — лучше пусто, чем выдуманный совет.
  */
-export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', comparison?: SummaryComparison | null, plan?: PlanVsActual | null): SummaryInsight[] {
+export function buildWorkoutInsights(
+  s: WorkoutSummary,
+  level = 'intermediate',
+  comparison?: SummaryComparison | null,
+  plan?: PlanVsActual | null,
+  weekPlan?: WeekPlanVsActual | null,
+): SummaryInsight[] {
   const out: SummaryInsight[] = [];
   if (!s || !s.workouts) return out;
 
@@ -1204,6 +1211,26 @@ export function buildWorkoutInsights(s: WorkoutSummary, level = 'intermediate', 
     });
   }
 
+  // План недели — не недобор, а сколько ещё осталось: неделя в разгаре, и
+  // «сделано 60%» иначе читалось бы как провал. Поэтому тон нейтральный,
+  // пока план не выполнен, и отставание по мышце подаётся как «дальше».
+  if (weekPlan && !weekPlan.empty && weekPlan.setsPct != null) {
+    const left = Math.max(0, weekPlan.plannedSets - weekPlan.actualSets);
+    const done = weekPlan.setsPct >= 100;
+    const behind = weekPlan.rows
+      .filter(r => r.plannedSets > 0 && r.actualSets < r.plannedSets)
+      .sort((a, b) => (a.setsPct as number) - (b.setsPct as number))
+      .slice(0, 3)
+      .map(r => `${r.label} ${r.actualSets}/${r.plannedSets}`);
+    out.push({
+      id: 'week-plan',
+      tone: done ? 'good' : 'info',
+      icon: '📅',
+      title: `План недели: ${weekPlan.actualSets} из ${weekPlan.plannedSets} подходов (${weekPlan.setsPct}%)`,
+      detail: `${done ? 'Неделя закрыта по подходам' : `Осталось ${left} подх`}${behind.length ? `; дальше всего от плана: ${behind.join(', ')}` : ''}. В плане ${weekPlan.plannedDays} дн., в журнале ${weekPlan.actualSessions} трен. этой недели.`,
+    });
+  }
+
   // Сравнение с прошлым равным периодом: объём упал не у одной мышцы, а у
   // большинства — это либо плановая разгрузка, либо потерянные подходы.
   if (comparison && !comparison.empty && comparison.metrics.sets.pct != null) {
@@ -1258,6 +1285,7 @@ const INSIGHT_PRIORITY: Record<string, number> = {
   'pattern-drop': 90,
   deload: 85,
   'mrv-streak': 74,
+  'week-plan': 73,
   'mev-streak': 72,
   'over-mrv': 70,
   'under-mev': 68,
@@ -1634,6 +1662,110 @@ export function comparePlanVsActual(
   };
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// План недели (микроцикл) против факта из журнала
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Упражнение из расписания недели: группа мышц и подходы плана. */
+export interface WeekPlanExerciseInput {
+  name?: string;
+  exerciseId?: string;
+  muscleGroup?: string;
+  /** Массив подходов плана (targetSets из плеера) или их число. */
+  targetSets?: unknown[] | number;
+}
+
+export interface WeekPlanDayInput {
+  label?: string;
+  exercises?: WeekPlanExerciseInput[];
+}
+
+export interface WeekPlanRow {
+  muscle: MuscleKey;
+  label: string;
+  plannedSets: number;
+  actualSets: number;
+  setsDelta: number;
+  setsPct: number | null;
+}
+
+export interface WeekPlanVsActual {
+  rows: WeekPlanRow[];
+  plannedSets: number;
+  actualSets: number;
+  setsPct: number | null;
+  /** Дней в расписании недели — сколько ещё не отработано. */
+  plannedDays: number;
+  /** Тренировок этой недели в журнале. */
+  actualSessions: number;
+  empty: boolean;
+}
+
+/**
+ * Сверка объёма недели с планом микроцикла по мышцам: план — targetSets всех
+ * дней недели, факт — подходы всех тренировок этой недели из журнала.
+ * Запланированное без факта показывается нулём: это недобор, а не «нет данных».
+ */
+export function compareWeekPlanVsActual(
+  plan: WeekPlanDayInput[] | null | undefined,
+  sessions: WorkoutLog[],
+): WeekPlanVsActual {
+  const days = (Array.isArray(plan) ? plan : []).filter(Boolean);
+  const planned = new Map<MuscleKey, number>();
+  for (const day of days) {
+    for (const ex of (Array.isArray(day?.exercises) ? day!.exercises! : [])) {
+      if (!ex) continue;
+      const sets = Array.isArray(ex.targetSets)
+        ? ex.targetSets.length
+        : typeof ex.targetSets === 'number' ? Math.max(0, Math.round(ex.targetSets)) : 0;
+      if (sets <= 0) continue;
+      const meta = resolveExerciseMeta({ exerciseId: ex.exerciseId, name: ex.name, muscleGroup: ex.muscleGroup });
+      planned.set(meta.muscle, (planned.get(meta.muscle) || 0) + sets);
+    }
+  }
+
+  const list = (Array.isArray(sessions) ? sessions : []).filter(Boolean);
+  const actual = new Map<MuscleKey, number>();
+  for (const s of list) {
+    for (const ex of (Array.isArray(s.exercises) ? s.exercises : []) as LooseExercise[]) {
+      if (!ex) continue;
+      const sets = (Array.isArray(ex.sets) ? ex.sets : []) as LooseSet[];
+      const n = sets.filter(st => setWeight(st) > 0 || setReps(st) > 0).length;
+      if (n <= 0) continue;
+      const meta = resolveExerciseMeta(ex as any);
+      actual.set(meta.muscle, (actual.get(meta.muscle) || 0) + n);
+    }
+  }
+
+  const keys = new Set<MuscleKey>([...planned.keys(), ...actual.keys()]);
+  const rows: WeekPlanRow[] = Array.from(keys)
+    .map(muscle => {
+      const p = planned.get(muscle) || 0;
+      const a = actual.get(muscle) || 0;
+      return {
+        muscle,
+        label: MUSCLE_LABELS[muscle] || String(muscle),
+        plannedSets: p,
+        actualSets: a,
+        setsDelta: a - p,
+        setsPct: p > 0 ? Math.round((a / p) * 1000) / 10 : null,
+      };
+    })
+    .sort((x, y) => y.plannedSets - x.plannedSets || y.actualSets - x.actualSets);
+
+  const plannedSets = rows.reduce((s, r) => s + r.plannedSets, 0);
+  const actualSets = rows.reduce((s, r) => s + r.actualSets, 0);
+  return {
+    rows,
+    plannedSets,
+    actualSets,
+    setsPct: plannedSets > 0 ? Math.round((actualSets / plannedSets) * 1000) / 10 : null,
+    plannedDays: days.length,
+    actualSessions: list.length,
+    empty: plannedSets === 0,
+  };
+}
+
 export const PLAN_ROW_LABEL: Record<PlanRowStatus, string> = {
   done: 'по плану',
   under: 'не добито',
@@ -1664,6 +1796,8 @@ export interface WorkoutReportTextOptions {
   comparisonLabel?: string;
   /** План против факта (плеер). */
   plan?: PlanVsActual | null;
+  /** План недели (микроцикл) против факта журнала — по мышцам. */
+  weekPlan?: WeekPlanVsActual | null;
   /** Подходы «как есть» — переданы только для короткого периода. */
   details?: SetDetailSession[] | null;
   /** Своя первая строка (например, «📊 Итог: FullBody — 62 мин»). */
@@ -1750,7 +1884,21 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     }
   }
 
-  const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan);
+  if (opts.weekPlan && !opts.weekPlan.empty) {
+    const wp = opts.weekPlan;
+    lines.push('');
+    lines.push(`План недели: ${wp.actualSets} из ${wp.plannedSets} подх${wp.setsPct != null ? ` (${wp.setsPct}%)` : ''} · ${wp.plannedDays} дн. плана · ${wp.actualSessions} трен.`);
+    wp.rows.forEach(r => {
+      if (r.plannedSets === 0) {
+        lines.push(`  ${r.label}: сверх плана ${r.actualSets} подх`);
+        return;
+      }
+      const tone = r.setsDelta === 0 ? 'ровно' : r.setsDelta > 0 ? `+${r.setsDelta}` : `${r.setsDelta}`;
+      lines.push(`  ${r.label}: план ${r.plannedSets} → факт ${r.actualSets} (${tone}${r.setsPct != null ? `, ${r.setsPct}%` : ''})`);
+    });
+  }
+
+  const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan, opts.weekPlan);
   if (insights.length) {
     lines.push('');
     lines.push('Выводы:');

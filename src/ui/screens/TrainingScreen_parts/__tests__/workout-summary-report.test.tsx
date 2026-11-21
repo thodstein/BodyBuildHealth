@@ -99,6 +99,38 @@ describe('WorkoutSummaryReport', () => {
     expect(text).toContain(`${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel}1 → 0`);
   });
 
+  it('блок «План недели» сверяет микроцикл с журналом по мышцам', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport
+        workouts={[mkWorkout('2026-11-03')]}
+        blocks={['weekplan']}
+        weekPlan={[
+          {
+            label: 'Верх',
+            exercises: [
+              { name: 'Жим штанги лёжа', targetSets: 4 },
+              { name: 'Приседания со штангой', targetSets: 2 },
+            ],
+          },
+        ]}
+      />,
+    );
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    expect(text).toContain('План недели → факт');
+    expect(text).toContain('1 дн. плана');
+    expect(text).toContain('План: 6 подх');
+    expect(text).toContain('Факт: 3 подх');
+    expect(text).toContain('50% · осталось 3 подх');
+    // По мышцам: грудь 4 → 2, квадрицепс 2 → 1.
+    expect(text).toContain('4 → 2');
+    expect(text).toContain('2 → 1');
+    // Без плана микроцикла карточки нет — «план недели» не выдумывается.
+    const noPlan = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={[mkWorkout('2026-11-03')]} blocks={['weekplan']} showSelector={false} />,
+    );
+    expect(noPlan).not.toContain('План недели → факт');
+  });
+
   it('без блока «План → факт» строки остаются под упражнениями', () => {
     const html = renderToStaticMarkup(
       <WorkoutSummaryReport

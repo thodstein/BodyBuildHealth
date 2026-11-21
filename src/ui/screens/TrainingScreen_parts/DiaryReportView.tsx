@@ -13,10 +13,12 @@ import {
   buildWorkoutSummary,
   buildWorkoutReportText,
   buildSetDetails,
+  compareWeekPlanVsActual,
   compareWorkoutSummaries,
   filterWorkoutsByRange,
   monthRange,
   weekRangeFor,
+  type WeekPlanDayInput,
 } from '../../../engines/workout-summary.engine';
 import { WorkoutSummaryReport } from './WorkoutSummaryReport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -116,6 +118,32 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
 
   const summary = React.useMemo(() => buildWorkoutSummary(selected), [selected]);
 
+  /**
+   * План микроцикла есть только для текущей недели — его генерирует экран ББ.
+   * Для других недель сверять нечего, поэтому блок молчит, а не показывает
+   * чужой план как «недобор».
+   */
+  const weekPlan = React.useMemo<WeekPlanDayInput[] | null>(() => {
+    const plan = hub.trainingOutput?.plan;
+    if (scope !== 'week' || !Array.isArray(plan) || plan.length === 0) return null;
+    const thisWeek = weekRangeFor(today).from;
+    if ((weekKey || thisWeek) !== thisWeek) return null;
+    const days: WeekPlanDayInput[] = [];
+    for (const d of plan) {
+      if (!d) continue;
+      const exercises = (Array.isArray(d.exercises) ? d.exercises : [])
+        .map(e => ({
+          name: e?.name,
+          exerciseId: e?.id,
+          muscleGroup: (e as any)?.targetMuscle || e?.group,
+          targetSets: Math.max(0, Math.round(Number(e?.sets) || 0)),
+        }))
+        .filter(e => e.targetSets > 0);
+      if (exercises.length > 0) days.push({ label: d.name, exercises });
+    }
+    return days.length > 0 ? days : null;
+  }, [hub.trainingOutput, scope, weekKey, today]);
+
   const previousWorkouts = React.useMemo<WorkoutLog[]>(() => {
     if (selected.length === 0) return [];
     if (scope === 'session') {
@@ -187,6 +215,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       comparison: cmp,
       comparisonLabel: previousLabel,
       details: summary.workouts <= 3 ? buildSetDetails(selected) : null,
+      weekPlan: weekPlan ? compareWeekPlanVsActual(weekPlan, selected) : null,
     });
     void navigator.clipboard?.writeText(text).then(() => {
       setCopyDone(true);
@@ -312,6 +341,7 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
         previousWorkouts={previousWorkouts}
         previousLabel={previousLabel}
         baselineWorkouts={baselineWorkouts}
+        weekPlan={weekPlan}
       />
     </div>
   );

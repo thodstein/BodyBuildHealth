@@ -21,6 +21,7 @@ import {
   muscleLandmarksFor,
   volumeAdvice,
   comparePlanVsActual,
+  compareWeekPlanVsActual,
   summaryWeeksCount,
   MUSCLE_COLORS,
   PLAN_ROW_COLOR,
@@ -36,6 +37,8 @@ import {
   type SetDetailSession,
   type SummaryComparison,
   type MetricDelta,
+  type WeekPlanDayInput,
+  type WeekPlanVsActual,
   type WorkoutSummary,
 } from '../../../engines/workout-summary.engine';
 import { normalizeExerciseName } from '../../../engines/set-intensity.engine';
@@ -247,7 +250,9 @@ export const WorkoutSummaryBody: React.FC<{
   previousLabel?: string;
   /** План тренировки (targetSets) — строки «план → факт» в упражнениях. */
   plan?: PlannedExerciseInput[] | null;
-}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel, plan }) => {
+  /** План недели против факта журнала (по мышцам). Считает вызывающий экран. */
+  weekPlanVsActual?: WeekPlanVsActual | null;
+}> = ({ summary, blocks, compact, level = 'intermediate', details, comparison, previousLabel, plan, weekPlanVsActual }) => {
   const [onlyProblems, setOnlyProblems] = React.useState(false);
   // Список подходов в отчёте длинный: за неделю-месяц это десятки тренировок.
   // Показываем первые SETS_LIMIT и даём раскрыть всё — без «обрезано и всё».
@@ -270,7 +275,7 @@ export const WorkoutSummaryBody: React.FC<{
   const bestE1RM = summary.exercises.reduce((m, e) => Math.max(m, e.bestE1RM), 0);
   const topExercise = summary.exercises[0] || null;
   const topMuscle = summary.muscles[0] || null;
-  const insights = buildWorkoutInsights(summary, level, comparison, planVsActual);
+  const insights = buildWorkoutInsights(summary, level, comparison, planVsActual, weekPlanVsActual);
   const weeksCount = summaryWeeksCount(summary);
   const maxMuscleTonnage = Math.max(1, ...summary.muscles.map(m => m.tonnageKg));
   const maxExTonnage = Math.max(1, ...summary.exercises.map(e => e.tonnageKg));
@@ -624,6 +629,49 @@ export const WorkoutSummaryBody: React.FC<{
         );
       })()}
 
+      {/* ── ПЛАН НЕДЕЛИ → ФАКТ ── */}
+      {has('weekplan') && weekPlanVsActual && !weekPlanVsActual.empty && (() => {
+        const donePct = weekPlanVsActual.setsPct;
+        const tone = donePct == null ? '#fff' : donePct >= 95 ? '#22c55e' : donePct >= 60 ? '#60a5fa' : '#f59e0b';
+        const left = Math.max(0, weekPlanVsActual.plannedSets - weekPlanVsActual.actualSets);
+        return (
+          <div style={CARD}>
+            <SectionTitle
+              icon="📅"
+              title="План недели → факт"
+              hint={`${weekPlanVsActual.plannedDays} дн. плана · ${weekPlanVsActual.actualSessions} трен. в журнале`}
+            />
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, marginBottom: 6, color: '#fff' }}>
+              <span>План: <b>{weekPlanVsActual.plannedSets}</b> подх</span>
+              <span>Факт: <b style={{ color: tone }}>{weekPlanVsActual.actualSets}</b> подх</span>
+              {donePct != null && (
+                <span style={{ color: tone, fontWeight: 800 }}>
+                  {donePct >= 100 ? `выполнено ${donePct}%` : `${donePct}% · осталось ${left} подх`}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {weekPlanVsActual.rows.slice(0, compact ? 6 : 14).map(r => {
+                const pct = r.setsPct;
+                const color = pct == null ? '#a78bfa' : pct >= 95 ? '#22c55e' : pct >= 60 ? '#60a5fa' : '#f59e0b';
+                return (
+                  <div key={r.muscle} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9.5 }}>
+                    <span style={{ flex: 1, minWidth: 60, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.label}</span>
+                    <div style={{ flex: 1, minWidth: 50, maxWidth: compact ? 70 : 110 }}>
+                      <Bar pct={Math.min(100, pct ?? (r.actualSets > 0 ? 100 : 0))} color={color} height={4} />
+                    </div>
+                    <span style={{ color: '#fff', opacity: 0.85, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{r.plannedSets} → {r.actualSets}</span>
+                    <span style={{ color, fontWeight: 800, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', minWidth: 38, textAlign: 'right' }}>
+                      {pct != null ? `${pct}%` : 'сверх'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── УПРАЖНЕНИЯ ── */}
       {has('exercises') && summary.exercises.length > 0 && (
         <div style={CARD}>
@@ -862,7 +910,9 @@ export const WorkoutSummaryReport: React.FC<{
   baselineWorkouts?: WorkoutLog[];
   /** План этих тренировок (targetSets из плеера) — для строк «план → факт». */
   plan?: PlannedExerciseInput[] | null;
-}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan }) => {
+  /** План недели (микроцикл) — для блока «План недели → факт». */
+  weekPlan?: WeekPlanDayInput[] | null;
+}> = ({ workouts, title, subtitle, blocks, onBlocksChange, storageKey, defaultBlocks, compact, showSelector = true, level, previousWorkouts, previousLabel, baselineWorkouts, plan, weekPlan }) => {
   const [localBlocks, setLocalBlocks] = React.useState<ReportBlockId[]>(() => readReportBlocks(storageKey, defaultBlocks));
   const selected = blocks ?? localBlocks;
   const setSelected = (next: ReportBlockId[]) => {
@@ -886,6 +936,13 @@ export const WorkoutSummaryReport: React.FC<{
       return compareWorkoutSummaries(summary, buildWorkoutSummary(list));
     },
     [summary, previousWorkouts],
+  );
+
+  // План недели сверяем по подходам из журнала: план — targetSets всех дней,
+  // факт — записанные подходы. Считает родитель, отчёт только показывает.
+  const weekPlanVsActual = React.useMemo<WeekPlanVsActual | null>(
+    () => (Array.isArray(weekPlan) && weekPlan.length > 0 ? compareWeekPlanVsActual(weekPlan, workouts) : null),
+    [weekPlan, workouts],
   );
 
   return (
@@ -919,7 +976,7 @@ export const WorkoutSummaryReport: React.FC<{
           </div>
         )}
       </div>
-      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} />
+      <WorkoutSummaryBody summary={summary} blocks={selected} compact={compact} level={level} details={details} comparison={comparison} previousLabel={previousLabel} plan={plan} weekPlanVsActual={weekPlanVsActual} />
     </div>
   );
 };
