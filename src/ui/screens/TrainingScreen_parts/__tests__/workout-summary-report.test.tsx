@@ -408,6 +408,9 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('80×8');
     expect(html).toContain('100×5');
     expect(html).toContain('@2');
+    // Интенсивность подхода — не только вес, но и % от лучшего e1RM.
+    expect(html).toContain('·79%');
+    expect(html).toContain('·85%');
     expect(html).not.toContain('По мышцам');
   });
 

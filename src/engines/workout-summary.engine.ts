@@ -1437,6 +1437,8 @@ export interface SetDetailRow {
   reps: number;
   rir: number | null;
   rpe: number | null;
+  /** Вес подхода в % от лучшего e1RM этого упражнения в тренировке. */
+  pct1RM: number | null;
 }
 
 export interface SetDetailExercise {
@@ -1485,11 +1487,19 @@ export function buildSetDetails(workouts: WorkoutLog[]): SetDetailSession[] {
           reps,
           rir: rirRaw != null && Number.isFinite(Number(rirRaw)) ? Number(rirRaw) : null,
           rpe: rpeRaw != null && Number.isFinite(Number(rpeRaw)) ? Number(rpeRaw) : null,
+          pct1RM: null,
         });
         tonnage += weight * reps;
         if (weight > 0 && reps > 0) best = Math.max(best, epley1RM(weight, reps));
       }
       if (sets.length === 0) continue;
+      // Интенсивность каждого подхода — от лучшего e1RM этой тренировки:
+      // видно, какой подход разминочный, а какой близок к максимуму.
+      if (best > 0) {
+        for (const row of sets) {
+          row.pct1RM = row.weight > 0 ? Math.round((row.weight / best) * 100) : null;
+        }
+      }
       const meta = resolveExerciseMeta(ex as any);
       exercises.push({
         name,
@@ -2124,7 +2134,10 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
       lines.push(`  ${session.date} · ${session.split} · ${textTon(session.tonnageKg)}`);
       session.exercises.forEach(ex => {
         const sets = ex.sets
-          .map(st => `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`)
+          .map(st => {
+            const base = `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`;
+            return st.pct1RM != null ? `${base} (${st.pct1RM}%)` : base;
+          })
           .join(', ');
         lines.push(`    ${ex.name}: ${sets}`);
       });

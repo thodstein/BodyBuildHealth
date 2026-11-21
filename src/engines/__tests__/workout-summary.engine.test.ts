@@ -319,13 +319,28 @@ describe('workout-summary: детализация подходов', () => {
     expect(details.map(d => d.date)).toEqual(['2026-11-09', '2026-11-02']);
     expect(details[0].exercises[0].name).toBe('Тяга верхнего блока');
     expect(details[0].exercises[0].sets).toHaveLength(3);
-    expect(details[0].exercises[0].sets[0]).toEqual({ weight: 60, reps: 10, rir: 1, rpe: 7 });
+    expect(details[0].exercises[0].sets[0]).toEqual({ weight: 60, reps: 10, rir: 1, rpe: 7, pct1RM: 75 });
     expect(details[0].tonnageKg).toBe(60 * 10 * 3);
   });
 
   it('RIR 0 сохраняется как значение, а не как «нет данных»', () => {
     const w = mkWorkout('2026-11-10', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0 }]);
     expect(buildSetDetails([w])[0].exercises[0].sets[0].rir).toBe(0);
+  });
+
+  it('показывает интенсивность каждого подхода в % от лучшего e1RM', () => {
+    const w = mkWorkout('2026-11-12', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 2 }]);
+    w.exercises[0].sets = [
+      { weight: 100, reps: 5, rir: 2, rpe: 8 },
+      { weight: 80, reps: 8, rir: 4, rpe: 6 },
+    ];
+    const row = buildSetDetails([w])[0].exercises[0];
+    // Лучший e1RM тренировки — 100×5 (117 кг), от него и считаем проценты.
+    expect(row.bestE1RM).toBe(117);
+    expect(row.sets.map(s => s.pct1RM)).toEqual([85, 68]);
+    const txt = buildWorkoutReportText(buildWorkoutSummary([w]), { details: buildSetDetails([w]) });
+    expect(txt).toContain('100×5@2 (85%)');
+    expect(txt).toContain('80×8@4 (68%)');
   });
 
   it('устойчив к legacy-записям и мусору', () => {

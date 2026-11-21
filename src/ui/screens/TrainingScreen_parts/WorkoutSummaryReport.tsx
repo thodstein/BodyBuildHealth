@@ -841,12 +841,13 @@ export const WorkoutSummaryBody: React.FC<{
                         {ex.sets.map((st, si) => (
                           <span
                             key={si}
-                            title={st.rir != null ? `RIR ${st.rir}` : st.rpe != null ? `RPE ${st.rpe}` : undefined}
+                            title={`${st.pct1RM != null ? `${st.pct1RM}% от лучшего e1RM · ` : ''}${st.rir != null ? `RIR ${st.rir}` : st.rpe != null ? `RPE ${st.rpe}` : 'RIR не записан'}`}
                             style={{ fontSize: 8.5, padding: '1px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.07)', color: '#fff', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}
                           >
                             {st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}
                             {st.rir != null && <b style={{ color: st.rir <= 0 ? '#ef4444' : st.rir <= 2 ? '#f59e0b' : '#22c55e' }}> @{st.rir}</b>}
                             {st.rir == null && st.rpe != null && <b style={{ color: '#60a5fa' }}> @{st.rpe}RPE</b>}
+                            {st.pct1RM != null && <span style={{ opacity: 0.55 }}> ·{st.pct1RM}%</span>}
                           </span>
                         ))}
                       </span>
