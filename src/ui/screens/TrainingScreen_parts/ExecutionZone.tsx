@@ -11,7 +11,7 @@ import { TimersTab } from './TimersTab';
 import { SessionWidgetsDock } from './SessionWidgetsDock';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
-import { getCachedProgressForExercise, localIsoDate } from '../../../engines/workout-logger.engine';
+import { getCachedProgressForExercise, localIsoDate, loadActiveSession, summarizeActiveSession } from '../../../engines/workout-logger.engine';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } from '../../../engines/warmup.engine';
@@ -156,8 +156,6 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
         <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Док зала: пульт/таймеры/график уколов-БАД (session-widgets-pack, сворачивается). */}
-          <SessionWidgetsDock onOpen={openSession} />
           {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
           {plRuntime && plRuntime.days.length > 0 && (
@@ -271,11 +269,14 @@ export const ExecutionZone: React.FC<Props> = (p) => {
               const dayEx: any[] = day.exercises || [];
               const setsCnt = dayEx.reduce((s: number, e: any) => s + (e.sets || 0), 0);
               const estMin = Math.round((setsCnt * 60 + 300) / 60);
+              // Незавершённая сессия: «Продолжить» не должно стирать записанное,
+              // поэтому открываем плеер (openSession), а не стартуем заново.
+              const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession(), setsCnt); } catch { return null; } })();
               return (
                 <button
                   type="button"
                   data-act="start-session"
-                  onClick={startSession}
+                  onClick={liveSum ? openSession : startSession}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                     padding: '13px 15px', minHeight: 62, marginBottom: 10, borderRadius: 14, border: 'none', cursor: 'pointer',
@@ -287,30 +288,25 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     <NativeIcon name="play" size={15} />
                   </span>
                   <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontSize: 14 }}>Начать тренировку</span>
+                    <span style={{ display: 'block', fontSize: 14 }}>{liveSum ? 'Продолжить тренировку' : 'Начать тренировку'}</span>
                     <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
-                      {day.day || `День ${safeRuntimeDay + 1}`} · {dayEx.length} упр. · {ruCount(setsCnt, RU_APPROACHES)} · ~{estMin} мин
+                      {liveSum
+                        ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
+                        : `${day.day || `День ${safeRuntimeDay + 1}`} · ${dayEx.length} упр. · ${ruCount(setsCnt, RU_APPROACHES)} · ~${estMin} мин`}
                     </span>
                   </span>
                   <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
                 </button>
               );
             })()}
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <span>Схема: {currentMicrocycle.mesocycleType || '—'}</span>
-              <span aria-hidden>·</span>
-              <span>Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'}</span>
-              <span aria-hidden>·</span>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                тоннаж {trainingDaysList[safeRuntimeDay]?.exercises?.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0) || 0} кг
-              </span>
-            </div>
-                  {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
+            {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
                   {(() => {
                     const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
                     if (!dayExercises.length) return null;
                     const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
                     const estMin = Math.round((totalSets * 60 + 300) / 60);
+                    const dayTonnage = dayExercises.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0);
+                    const intensity = trainingDaysList[safeRuntimeDay]?.intensity || 'средняя';
                     return (
                       <div style={{ marginBottom: 8, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                         <div
@@ -321,7 +317,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           aria-label="Детали плана дня"
                         >
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                            📋 План дня — {dayExercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · ~{estMin} мин
+                            📋 План дня — {dayExercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · ~{estMin} мин · интенсивность {intensity} · {dayTonnage.toLocaleString()} кг
                           </span>
                           <span style={{ fontSize: 10, color: '#fff' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
                         </div>
@@ -582,6 +578,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
             </div>
             </>
           )}
+          {/* Док зала (пульт/таймеры/график) — НИЖЕ главного действия: сверху он
+              отодвигал «Начать тренировку» и предлагал свой старт вторым путём.
+              Свёрнут по умолчанию, пульт живой во время сессии. */}
+          <SessionWidgetsDock onOpen={openSession} />
         </div>
         </InfoErrorBoundary>
       )}

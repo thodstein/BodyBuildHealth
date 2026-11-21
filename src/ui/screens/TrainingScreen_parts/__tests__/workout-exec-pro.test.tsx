@@ -20,6 +20,7 @@ import {
 } from '../../../../engines/workout-logger.engine';
 import { WorkoutMiniPult, WorkoutDayCard, WorkoutBigMode, requestQuickSet } from '../WorkoutSessionWidgets';
 import { ExecutionZone } from '../ExecutionZone';
+import { SessionPlayer, type PlayerDay } from '../../SRCBBScreen_parts/SessionPlayer';
 import { RestTimerPill, IntervalTimer, formatTimer } from '../WorkoutTimersPanel';
 
 function mkSession(sets: number, weight = 80): WorkoutSession {
@@ -384,6 +385,45 @@ describe('ExecutionZone: главная кнопка старта', () => {
     expect(start).toBeLessThan(html.indexOf('План дня'));
   });
 
+  it('с живой сессией старт — «Продолжить»: открывает плеер и не стирает записанное', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    saveActiveSession(mkSession(2), 3);
+    const LogProbe: React.FC = () => {
+      const [started, setStarted] = React.useState(false);
+      const [d, setD] = React.useState(0);
+      const [e, setE] = React.useState(0);
+      const [l, setL] = React.useState<Record<string, any>>({ bench: { sets: [{ weight: 80, reps: 8, rpe: 8, rir: 2 }], completed: false } });
+      const [o, setO] = React.useState(false);
+      return (
+        <>
+          <span data-probe="logs">{Object.keys(l).length}</span>
+          <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
+            macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
+            runtimeDay={d} setRuntimeDay={setD} runtimeExIdx={e} setRuntimeExIdx={setE}
+            runtimeLogs={l} setRuntimeLogs={setL}
+            runtimeStarted={started} setRuntimeStarted={setStarted}
+            plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
+            runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
+            runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
+            diary={{} as any} onRefresh={noop} />
+        </>
+      );
+    };
+    const { container, unmount } = render(<LogProbe />);
+    const cta = container.querySelector('[data-act="start-session"]') as HTMLElement;
+    expect(cta.textContent).toContain('Продолжить тренировку');
+    expect(cta.textContent).toContain('2 подх.');
+    expect(cta.textContent).toContain('67%');
+    fireEvent.click(cta);
+    expect((container.querySelector('[data-session="player"]') as HTMLElement).style.display).toBe('block');
+    // openSession (а не startSession) не сбрасывает записанные подходы.
+    expect(container.querySelector('[data-probe="logs"]')!.textContent).toBe('1');
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
+
   it('нажатие на «Начать тренировку» показывает плеер, «Свернуть» его не размонтирует', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
@@ -428,5 +468,53 @@ describe('ExecutionZone: главная кнопка старта', () => {
     expect(html).toContain('Начать тренировку');
     // Старого мелкого «Возобновить» больше нет — именно его не находили.
     expect(html).not.toContain('Возобновить');
+  });
+});
+
+describe('SessionPlayer: кнопки доводят от разминки до итога', () => {
+  const findBtn = (root: ParentNode, text: string) =>
+    Array.from(root.querySelectorAll('button')).find(b => (b.textContent || '').includes(text)) as HTMLElement | undefined;
+
+  it('Начать → К основной части → OK (подход записан) → Итог', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь',
+      exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 }],
+    }];
+    const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
+
+    const start = findBtn(container, 'Начать тренировку');
+    expect(start).toBeTruthy();
+    fireEvent.click(start!);
+    expect(container.textContent).toContain('Разминка');
+
+    const toMain = findBtn(container, 'К основной части');
+    expect(toMain).toBeTruthy();
+    fireEvent.click(toMain!);
+
+    // Основная часть: кнопка «OK» пишет подход в живую сессию.
+    const ok = findBtn(container, 'OK');
+    expect(ok).toBeTruthy();
+    fireEvent.click(ok!);
+    const active = loadActiveSession();
+    expect(active?.exercises?.[0]?.sets?.length).toBe(1);
+
+    // Завершение: вкладка «Итог» -> finish() (фаза заминки), второй раз -> Итог.
+    const doneTab = Array.from(container.querySelectorAll('[role="tab"]'))
+      .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
+    expect(doneTab).toBeTruthy();
+    fireEvent.click(doneTab!);
+    expect(container.textContent).toContain('Заминка: День 1 · Грудь');
+    const doneTab2 = Array.from(container.querySelectorAll('[role="tab"]'))
+      .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
+    fireEvent.click(doneTab2!);
+    expect(container.textContent).toContain('Тренировка завершена');
+
+    confirmSpy.mockRestore();
+    unmount();
+    cleanup();
+    localStorage.clear();
   });
 });

@@ -190,6 +190,11 @@ describe('C календарь (3)', () => {
     };
     const { container, unmount } = render(<Wrapper />);
     expect(container.querySelector('[data-widget="session-dock"]')).not.toBeNull();
+    // Док не должен стоять над главным действием: «Начать тренировку» — первым.
+    const chooser = container.querySelector('[data-session="chooser"]') as HTMLElement;
+    const dock = container.querySelector('[data-widget="session-dock"]') as HTMLElement;
+    expect(chooser).not.toBeNull();
+    expect(chooser.compareDocumentPosition(dock) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     unmount();
   });
   it('все три календаря рендерятся + панель', () => {

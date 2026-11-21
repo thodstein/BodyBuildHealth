@@ -605,8 +605,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = trainingOutput?.plan?.[todayIdx];
             const hasPlan = !!planned && Array.isArray(planned.exercises) && planned.exercises.length > 0;
-            const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession()); } catch { return null; } })();
             const sets = hasPlan ? (planned!.exercises as any[]).reduce((s: number, e: any) => s + (Number(e.sets) || 0), 0) : 0;
+            const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession(), sets); } catch { return null; } })();
             const title = liveSum ? 'Продолжить тренировку' : 'Начать тренировку';
             const subtitle = liveSum
               ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
