@@ -342,6 +342,28 @@ describe('workout-summary: недельная динамика и интенси
     expect(s.muscles[0].weeklyTrendPct).toBeNull();
   });
 
+  it('у движения есть сила: лучший e1RM и его тренд по неделям', () => {
+    const heavy = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 3 }]);
+    const s = buildWorkoutSummary([w1, heavy]);
+    const press = s.patterns.find(p => p.pattern === 'horizontal_push')!;
+    expect(press.bestE1RM).toBe(114);
+    // Сила движения принадлежит конкретному упражнению, а не «паттерну».
+    expect(press.bestExercise).toBe('Жим штанги лёжа');
+    expect(press.e1rmTrendPct).toBe(12.9);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('e1RM 114 (+12.9% к первой неделе)');
+  });
+
+  it('одна неделя даёт силу, но не её тренд', () => {
+    const press = buildWorkoutSummary([w1]).patterns.find(p => p.pattern === 'horizontal_push')!;
+    expect(press.bestE1RM).toBe(101);
+    expect(press.e1rmTrendPct).toBeNull();
+    // Рост объёма без роста веса — это не рост силы: 0, а не «выросло».
+    const press2 = buildWorkoutSummary([w1, w2]).patterns.find(p => p.pattern === 'horizontal_push')!;
+    expect(press2.bestE1RM).toBe(101);
+    expect(press2.e1rmTrendPct).toBe(0);
+  });
+
   it('интенсивность — средний вес в % от лучшего e1RM', () => {
     const s = buildWorkoutSummary([w1]);
     // 80 кг при e1RM 101 → 79.2%
@@ -947,7 +969,8 @@ describe('workout-summary: текст отчёта для копирования
     ]);
     const txt = buildWorkoutReportText(s);
     expect(txt).toContain('Движения:');
-    expect(txt).toContain('100% подходов (+100% к первой неделе)');
+    expect(txt).toContain('100% подходов · e1RM 101');
+    expect(txt).toContain('(+100% к первой неделе)');
     // Недельная динамика в тексте: КПШ и тоннаж по неделям.
     expect(txt).toContain('По неделям:');
     expect(txt).toContain('КПШ 16');

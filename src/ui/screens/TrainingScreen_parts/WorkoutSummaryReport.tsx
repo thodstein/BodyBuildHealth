@@ -833,25 +833,42 @@ export const WorkoutSummaryBody: React.FC<{
       {/* ── ДВИЖЕНИЯ ── */}
       {has('movement') && summary.patterns.length > 0 && (
         <div style={CARD}>
-          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · доля подходов · тренд по неделям" />
+          <SectionTitle icon="🔀" title="Движения (паттерны)" hint="КПШ · подходы · тоннаж · доля подходов · сила и тренд по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {summary.patterns.map(p => (
-              <div key={p.pattern} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
-                <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>КПШ {p.reps}</span>
-                <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{p.sets} подх.</span>
-                <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>{fmtTon(p.tonnageKg)}</span>
-                <span title={`Доля подходов ${p.setsSharePct}% · доля тоннажа ${p.sharePct}%`} style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.setsSharePct}%</span>
-                {p.weeklyTrendPct != null && p.weeklyTrendPct !== 0 && (
-                  <span
-                    title={`Подходы по неделям${p.weeklySets.length > 12 ? ' (последние 12)' : ''}: ${p.weeklySets.slice(-12).join(' · ')}`}
-                    style={{ color: p.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
-                  >
-                    {p.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.weeklyTrendPct)}%
-                  </span>
-                )}
-                {p.weeklySets.filter(x => x > 0).length >= 3 && (
-                  <Sparkline values={p.weeklySets.slice(-12)} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
+              <div key={p.pattern} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 3 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                  <span style={{ flex: 1, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.label}</span>
+                  <span style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>КПШ {p.reps}</span>
+                  <span style={{ color: '#60a5fa', fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right' }}>{p.sets} подх.</span>
+                  <span style={{ color: ACCENT, fontWeight: 700, fontVariantNumeric: 'tabular-nums', minWidth: 62, textAlign: 'right' }}>{fmtTon(p.tonnageKg)}</span>
+                  <span title={`Доля подходов ${p.setsSharePct}% · доля тоннажа ${p.sharePct}%`} style={{ color: '#fff', opacity: 0.7, fontVariantNumeric: 'tabular-nums', minWidth: 40, textAlign: 'right' }}>{p.setsSharePct}%</span>
+                  {p.weeklyTrendPct != null && p.weeklyTrendPct !== 0 && (
+                    <span
+                      title={`Подходы по неделям${p.weeklySets.length > 12 ? ' (последние 12)' : ''}: ${p.weeklySets.slice(-12).join(' · ')}`}
+                      style={{ color: p.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums', minWidth: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
+                    >
+                      {p.weeklyTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.weeklyTrendPct)}%
+                    </span>
+                  )}
+                  {p.weeklySets.filter(x => x > 0).length >= 3 && (
+                    <Sparkline values={p.weeklySets.slice(-12)} color={p.weeklyTrendPct != null && p.weeklyTrendPct < 0 ? '#ef4444' : ACCENT} width={34} height={12} />
+                  )}
+                </div>
+                {(p.bestE1RM > 0 || p.e1rmTrendPct != null) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 1, fontSize: 8.5, color: '#fff', opacity: 0.75, flexWrap: 'wrap' }}>
+                    {p.bestE1RM > 0 && (
+                      <span title={p.bestExercise ? `Лучший e1RM движения сделан в «${p.bestExercise}»` : 'Лучший e1RM движения'}>
+                        сила <b style={{ color: '#f59e0b' }}>e1RM {p.bestE1RM} кг</b>
+                        {p.bestExercise ? ` · ${p.bestExercise}` : ''}
+                      </span>
+                    )}
+                    {p.e1rmTrendPct != null && p.e1rmTrendPct !== 0 && (
+                      <span style={{ color: p.e1rmTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 700, opacity: 1 }}>
+                        {p.e1rmTrendPct > 0 ? '▲' : '▼'} {Math.abs(p.e1rmTrendPct)}% к первой неделе
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

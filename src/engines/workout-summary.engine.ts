@@ -283,6 +283,12 @@ export interface SummaryMuscle {
   weeklySets: number[];
   /** Изменение подходов/нед от первой недели к последней, % (null — нет базы). */
   weeklyTrendPct: number | null;
+  /** Лучший e1RM движения за период — сила, а не только объём. */
+  bestE1RM: number;
+  /** Упражнение, которым сделан bestE1RM (пусто, если данных о весе нет). */
+  bestExercise: string;
+  /** Изменение лучшего e1RM по неделям, % (null — меньше двух недель с весом). */
+  e1rmTrendPct: number | null;
 }
 
 export interface SummaryPattern {
@@ -449,7 +455,17 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number> }>();
-  const patternAgg = new Map<string, { sets: number; reps: number; tonnageKg: number; byWeek: Map<string, number> }>();
+  const patternAgg = new Map<string, {
+    sets: number;
+    reps: number;
+    tonnageKg: number;
+    byWeek: Map<string, number>;
+    /** Лучший e1RM движения и упражнение, которым он сделан. */
+    bestE1RM: number;
+    bestExercise: string;
+    /** Лучший e1RM по неделям — сила движения, а не только её объём. */
+    e1rmByWeek: Map<string, number>;
+  }>();
   const sessionRows: SummarySession[] = [];
   const weekAgg = new Map<string, SummaryWeek>();
   const prs: SummaryPR[] = [];
@@ -609,9 +625,21 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       if (wk.from) mPrev.byWeek.set(wk.from, (mPrev.byWeek.get(wk.from) || 0) + exSets);
       muscleAgg.set(meta.muscle, mPrev);
 
-      const pPrev = patternAgg.get(meta.pattern) || { sets: 0, reps: 0, tonnageKg: 0, byWeek: new Map<string, number>() };
+      const pPrev = patternAgg.get(meta.pattern) || {
+        sets: 0, reps: 0, tonnageKg: 0, byWeek: new Map<string, number>(),
+        bestE1RM: 0, bestExercise: '', e1rmByWeek: new Map<string, number>(),
+      };
       pPrev.sets += exSets; pPrev.reps += exReps; pPrev.tonnageKg += exTonnage;
       if (wk.from) pPrev.byWeek.set(wk.from, (pPrev.byWeek.get(wk.from) || 0) + exSets);
+      // Сила движения — лучший e1RM за период, и он принадлежит конкретному
+      // упражнению: «жим 110» без имени скрывает, чем именно он сделан.
+      if (exBestE1RM > pPrev.bestE1RM) {
+        pPrev.bestE1RM = exBestE1RM;
+        pPrev.bestExercise = name;
+      }
+      if (exBestE1RM > 0 && wk.from) {
+        pPrev.e1rmByWeek.set(wk.from, Math.max(pPrev.e1rmByWeek.get(wk.from) || 0, exBestE1RM));
+      }
       patternAgg.set(meta.pattern, pPrev);
     }
 
@@ -734,6 +762,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   const patternsOut: SummaryPattern[] = Array.from(patternAgg.entries())
     .map(([pattern, v]) => {
       const weeklySets = muscleWeekKeys.map(k => v.byWeek.get(k) || 0);
+      const e1rmWeekly = muscleWeekKeys.map(k => Math.round(v.e1rmByWeek.get(k) || 0));
       return {
         pattern,
         label: PATTERN_LABELS[pattern] || PATTERN_LABELS.other,
@@ -744,6 +773,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         setsSharePct: totalSets > 0 ? Math.round((v.sets / totalSets) * 1000) / 10 : 0,
         weeklySets,
         weeklyTrendPct: weeklyTrendFrom(weeklySets),
+        bestE1RM: Math.round(v.bestE1RM),
+        bestExercise: v.bestExercise,
+        e1rmTrendPct: weeklyTrendFrom(e1rmWeekly),
       };
     })
     .sort((a, b) => b.sets - a.sets || b.tonnageKg - a.tonnageKg);
@@ -1854,7 +1886,10 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     lines.push('Движения:');
     s.patterns.forEach(p => {
       const trend = p.weeklyTrendPct != null ? ` (${signedPct(p.weeklyTrendPct)} к первой неделе)` : '';
-      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)} · ${p.setsSharePct}% подходов${trend}`);
+      const strength = p.bestE1RM > 0
+        ? ` · e1RM ${p.bestE1RM}${p.e1rmTrendPct != null && p.e1rmTrendPct !== 0 ? ` (${signedPct(p.e1rmTrendPct)} к первой неделе)` : ''}`
+        : '';
+      lines.push(`  ${p.label}: ${p.sets} подх · ${p.reps} повт · ${textTon(p.tonnageKg)} · ${p.setsSharePct}% подходов${strength}${trend}`);
     });
   }
 

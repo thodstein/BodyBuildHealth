@@ -338,6 +338,14 @@ describe('WorkoutSummaryReport', () => {
     expect(html).not.toContain('Сравнение периодов');
   });
 
+  it('в строке движения есть сила, а не только объём', () => {
+    const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['movement']} showSelector={false} />);
+    const text = html.replace(/<!-- -->/g, '').replace(/<[^>]+>/g, '');
+    // Лучший e1RM движения и упражнение, которым он сделан.
+    expect(text).toContain('сила e1RM 101 кг');
+    expect(text).toContain('Жим штанги лёжа');
+  });
+
   it('блок «Подходы» показывает каждый подход с весом, повторами и RIR', () => {
     const html = renderToStaticMarkup(<WorkoutSummaryReport workouts={workouts} blocks={['sets']} />);
     expect(html).toContain('Все подходы');
