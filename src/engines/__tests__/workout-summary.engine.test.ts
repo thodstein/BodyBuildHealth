@@ -9,6 +9,7 @@ import {
   comparePlanVsActual,
   compareWeekPlanVsActual,
   dominantRepZone,
+  zoneShiftNote,
   filterWorkoutsByRange,
   formatSummaryPeriod,
   monthRange,
@@ -422,6 +423,16 @@ describe('workout-summary: недельная динамика и интенси
     // Плотность недели: 1920 кг / 60 мин и 3200 кг / 60 мин.
     expect(s.weeks.map(w => w.durationMin)).toEqual([60, 60]);
     expect(s.weeks.map(w => w.densityKgPerMin)).toEqual([32, 53.3]);
+  });
+
+  it('считает зоны повторов по неделям', () => {
+    const heavy = mkWorkout('2026-11-09', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]);
+    const s = buildWorkoutSummary([w1, heavy]);
+    // Первая неделя — три подхода на 8, вторая — три на 5: объём тот же, зона другая.
+    expect(s.weeks.map(w => w.repZones)).toEqual([
+      { strength: 0, hypertrophy: 3, endurance: 0 },
+      { strength: 3, hypertrophy: 0, endurance: 0 },
+    ]);
   });
 
   it('строит подходы по неделям и тренд по мышце', () => {
@@ -864,11 +875,24 @@ describe('workout-summary: сравнение периодов', () => {
     expect(c.metrics.strengthShare).toEqual({ current: 0, previous: 100, delta: -100, pct: null });
     const txt = buildWorkoutReportText(cur, { comparison: c });
     expect(txt).toContain('Силовая работа: 0% подходов в 1–5, -100 п.п.');
+    // И сразу объяснение, куда ушёл объём: подходов столько же, работа другая.
+    expect(txt).toContain('Зона повторов: объём сместился в многоповторку (доля подходов 1–5 -100 п.п.)');
     // Без записанных повторов долю не выдумываем.
     const noReps = buildWorkoutSummary([
       mkWorkout('2026-11-16', [{ name: 'Планка', id: 'plank', weight: 0, reps: 0, sets: 2 }]),
     ]);
     expect(compareWorkoutSummaries(noReps, prev).metrics.strengthShare).toBeNull();
+  });
+
+  it('объясняет сдвиг зоны повторов, но молчит на шуме', () => {
+    expect(zoneShiftNote(null)).toBeNull();
+    // Меньше 10 п.п. — это разброс одной тренировки, а не смена работы.
+    expect(zoneShiftNote({ current: 40, previous: 36, delta: 4, pct: null })).toBeNull();
+    expect(zoneShiftNote({ current: 40, previous: 40, delta: 0, pct: null })).toBeNull();
+    expect(zoneShiftNote({ current: 60, previous: 40, delta: 20, pct: null }))
+      .toBe('объём сместился в силу (доля подходов 1–5 +20 п.п.)');
+    expect(zoneShiftNote({ current: 13.3, previous: 46.6, delta: -33.3, pct: null }))
+      .toBe('объём сместился в многоповторку (доля подходов 1–5 -33.3 п.п.)');
   });
 });
 
@@ -1346,6 +1370,8 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('60 мин');
     expect(txt).toContain('21 кг/мин');
     expect(txt).toContain('43 кг/мин');
+    // Зона недели: обе недели на 8 повторов — гипертрофия целиком.
+    expect(txt).toContain('зона 6–12 100%');
   });
 
   it('своя шапка и хвост обрамляют отчёт', () => {

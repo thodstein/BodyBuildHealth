@@ -24,6 +24,7 @@ import {
   comparePlanVsActual,
   compareWeekPlanVsActual,
   dominantRepZone,
+  zoneShiftNote,
   summaryWeeksCount,
   MUSCLE_COLORS,
   PLAN_ROW_COLOR,
@@ -46,6 +47,12 @@ import {
 import { normalizeExerciseName } from '../../../engines/set-intensity.engine';
 
 const ACCENT = '#00e68a';
+/** Зоны повторов: подписи и цвета одни на весь отчёт (итог, недели, движение). */
+const ZONE_ROWS = [
+  { key: 'strength', label: '1–5', hint: 'сила', color: '#f472b6' },
+  { key: 'hypertrophy', label: '6–12', hint: 'гипертрофия', color: '#60a5fa' },
+  { key: 'endurance', label: '13+', hint: 'выносливость', color: '#a78bfa' },
+] as const;
 /** Сколько тренировок в блоке «Все подходы» показывать до раскрытия. */
 const SETS_LIMIT = 40;
 const CARD: React.CSSProperties = {
@@ -336,11 +343,7 @@ export const WorkoutSummaryBody: React.FC<{
             const z = t.repZones;
             const total = (z?.strength || 0) + (z?.hypertrophy || 0) + (z?.endurance || 0);
             if (!z || total <= 0) return null;
-            const rows = [
-              { key: 'strength', label: '1–5', hint: 'сила', sets: z.strength, color: '#f472b6' },
-              { key: 'hypertrophy', label: '6–12', hint: 'гипертрофия', sets: z.hypertrophy, color: '#60a5fa' },
-              { key: 'endurance', label: '13+', hint: 'выносливость', sets: z.endurance, color: '#a78bfa' },
-            ];
+            const rows = ZONE_ROWS.map(r => ({ ...r, sets: z[r.key] }));
             const pct = (n: number) => Math.round((n / total) * 100);
             return (
               <div style={{ marginTop: 8 }} title="Зоны повторений: 1–5 — сила, 6–12 — гипертрофия, 13+ — выносливость">
@@ -444,6 +447,18 @@ export const WorkoutSummaryBody: React.FC<{
               <DeltaChip label="Силовые подходы, %" d={comparison.metrics.strengthShare} unit="%" neutral decimals deltaSuffix="п.п." />
             )}
           </div>
+
+          {(() => {
+            // Подходов может быть столько же, а работа другой: 20 подходов на 3
+            // и 20 на 10 — разные стимулы, и дельта подходов этого не покажет.
+            const note = zoneShiftNote(comparison.metrics.strengthShare);
+            if (!note) return null;
+            return (
+              <div style={{ marginTop: 6, fontSize: 9, color: '#fff', opacity: 0.85, lineHeight: 1.45 }}>
+                <span style={{ color: ACCENT }}>↪</span> Зона повторов: {note}
+              </div>
+            );
+          })()}
 
           {(() => {
             // Сводка по всем мышцам периода: сколько выросло, сколько просело
@@ -1093,23 +1108,45 @@ export const WorkoutSummaryBody: React.FC<{
           {summary.weeks.length > 1 && (() => {
             const weeks = summary.weeks.slice(-10);
             const maxWeekReps = Math.max(1, ...weeks.map(w => w.reps));
+            /** Подходы недели по зонам: тот же объём, но другая работа. */
+            const zoneSegs = (w: typeof weeks[number]) => {
+              const z = w.repZones;
+              const total = (z?.strength || 0) + (z?.hypertrophy || 0) + (z?.endurance || 0);
+              if (total <= 0) return [];
+              return ZONE_ROWS
+                .map(r => ({ ...r, sets: z[r.key], pct: Math.round((z[r.key] / total) * 100) }))
+                .filter(r => r.sets > 0);
+            };
             return (
               <div style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 9, color: '#fff', opacity: 0.8 }}>По неделям</span>
                   <span style={{ fontSize: 8.5, color: ACCENT }}>● тоннаж</span>
                   <span style={{ fontSize: 8.5, color: '#60a5fa' }}>● КПШ</span>
+                  <span style={{ fontSize: 8.5, color: '#fff', opacity: 0.55 }} title="подходы недели по зонам повторов">● зоны</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 44 }}>
-                  {weeks.map((w, i) => (
-                    <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · КПШ ${w.reps} · ${w.sessions} трен.${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}`}>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, width: '100%', height: 32 }}>
-                        <div style={{ flex: 1, height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
-                        <div style={{ flex: 1, height: Math.max(3, (w.reps / maxWeekReps) * 32), background: 'linear-gradient(180deg, rgba(96,165,250,0.9), rgba(96,165,250,0.35))', borderRadius: 3 }} />
+                  {weeks.map((w, i) => {
+                    const segs = zoneSegs(w);
+                    const zoneTitle = segs.length > 0
+                      ? ` · зоны: ${segs.map(s => `${s.label} ${s.sets} (${s.pct}%)`).join(', ')}`
+                      : '';
+                    return (
+                      <div key={`${w.label}_${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }} title={`${w.label}: ${fmtTon(w.tonnageKg)} · КПШ ${w.reps} · ${w.sessions} трен.${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}${zoneTitle}`}>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, width: '100%', height: 32 }}>
+                          <div style={{ flex: 1, height: Math.max(3, (w.tonnageKg / maxWeekTonnage) * 32), background: 'linear-gradient(180deg, rgba(0,230,138,0.9), rgba(0,230,138,0.35))', borderRadius: 3 }} />
+                          <div style={{ flex: 1, height: Math.max(3, (w.reps / maxWeekReps) * 32), background: 'linear-gradient(180deg, rgba(96,165,250,0.9), rgba(96,165,250,0.35))', borderRadius: 3 }} />
+                        </div>
+                        {/* Полоса зон под столбиками: сразу видно, стала ли неделя «легче». */}
+                        <div style={{ display: 'flex', width: '100%', height: 4, borderRadius: 2, overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
+                          {segs.map(s => (
+                            <div key={s.key} style={{ width: `${Math.max(3, s.pct)}%`, background: s.color }} />
+                          ))}
+                        </div>
+                        <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
                       </div>
-                      <span style={{ fontSize: 7, color: '#fff', opacity: 0.65, whiteSpace: 'nowrap' }}>{w.label}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );

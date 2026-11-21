@@ -350,6 +350,8 @@ export interface SummaryWeek {
   durationMin: number;
   /** кг/мин по неделе — работа за минуту, а не только её объём. */
   densityKgPerMin: number;
+  /** Подходы недели по зонам повторов: видно, когда объём тот же, но «легче». */
+  repZones: { strength: number; hypertrophy: number; endurance: number };
 }
 
 export interface SummaryPR {
@@ -590,6 +592,11 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     let sReps = 0;
     let sTonnage = 0;
     let sPRs = 0;
+    // Зоны повторов этой тренировки: складываем в неделю отдельно от итога —
+    // по ним видно, что объём недели тот же, а работа стала легче.
+    let sZoneStrength = 0;
+    let sZoneHyp = 0;
+    let sZoneEnd = 0;
     // Неделя мезоцикла пишется в упражнениях; в тренировке берём ту, которая
     // встречается чаще — так одна забытая строка не переставит всю сессию.
     const weekTally = new Map<number, number>();
@@ -628,9 +635,9 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exReps += reps;
         exTonnage += weight * reps;
         if (reps > 0) {
-          if (reps <= 5) { zoneStrength += 1; exZoneStrength += 1; }
-          else if (reps <= 12) { zoneHypertrophy += 1; exZoneHyp += 1; }
-          else { zoneEndurance += 1; exZoneEnd += 1; }
+          if (reps <= 5) { zoneStrength += 1; exZoneStrength += 1; sZoneStrength += 1; }
+          else if (reps <= 12) { zoneHypertrophy += 1; exZoneHyp += 1; sZoneHyp += 1; }
+          else { zoneEndurance += 1; exZoneEnd += 1; sZoneEnd += 1; }
         }
         if (weight <= 0) exWl += 1;
         exBestWeight = Math.max(exBestWeight, weight);
@@ -791,9 +798,12 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
 
     const wkRange = weekRangeFor(date);
     if (wkRange.from) {
-      const wPrev = weekAgg.get(wkRange.from) || { label: wkRange.label, sessions: 0, sets: 0, reps: 0, tonnageKg: 0, durationMin: 0, densityKgPerMin: 0 };
+      const wPrev = weekAgg.get(wkRange.from) || { label: wkRange.label, sessions: 0, sets: 0, reps: 0, tonnageKg: 0, durationMin: 0, densityKgPerMin: 0, repZones: { strength: 0, hypertrophy: 0, endurance: 0 } };
       wPrev.sessions += 1; wPrev.sets += sSets; wPrev.reps += sReps; wPrev.tonnageKg += sTonnage;
       wPrev.durationMin += Math.max(0, Math.round(duration));
+      wPrev.repZones.strength += sZoneStrength;
+      wPrev.repZones.hypertrophy += sZoneHyp;
+      wPrev.repZones.endurance += sZoneEnd;
       weekAgg.set(wkRange.from, wPrev);
     }
   }
@@ -928,6 +938,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       durationMin: v.durationMin,
       // Время без записанной длительности даёт шум, а не плотность.
       densityKgPerMin: v.durationMin > 0 ? Math.round((v.tonnageKg / v.durationMin) * 10) / 10 : 0,
+      repZones: { strength: v.repZones.strength, hypertrophy: v.repZones.hypertrophy, endurance: v.repZones.endurance },
     };
   });
 
@@ -1161,6 +1172,18 @@ const zoneShare = (z?: { strength: number; hypertrophy: number; endurance: numbe
   if (total <= 0) return null;
   return Math.round(((z!.strength || 0) / total) * 1000) / 10;
 };
+
+/**
+ * Куда сместился характер объёма между периодами. Подходов может быть столько
+ * же, а работа совсем другой: 20×3 и 20×10 — разные стимулы. Порог 10 п.п.
+ * отсекает шум одной тренировки.
+ */
+export function zoneShiftNote(share?: MetricDelta | null): string | null {
+  if (!share || share.delta === 0 || Math.abs(share.delta) < 10) return null;
+  const abs = Math.round(Math.abs(share.delta) * 10) / 10;
+  const out = share.delta > 0 ? 'объём сместился в силу' : 'объём сместился в многоповторку';
+  return `${out} (доля подходов 1–5 ${share.delta > 0 ? '+' : '-'}${abs} п.п.)`;
+}
 
 /**
  * Сравнение двух сводок (текущий период vs предыдущий равный). Считает дельты
@@ -2320,9 +2343,12 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
   if (s.weeks.length > 1) {
     lines.push('');
     lines.push('По неделям:');
-    s.weeks.forEach(w => lines.push(
-      `  ${w.label}: ${w.sessions} трен.${w.durationMin > 0 ? ` · ${w.durationMin} мин` : ''} · ${w.sets} подх · КПШ ${w.reps} · ${textTon(w.tonnageKg)}${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}`,
-    ));
+    s.weeks.forEach(w => {
+      const wz = dominantRepZone(w.repZones);
+      lines.push(
+        `  ${w.label}: ${w.sessions} трен.${w.durationMin > 0 ? ` · ${w.durationMin} мин` : ''} · ${w.sets} подх · КПШ ${w.reps} · ${textTon(w.tonnageKg)}${w.densityKgPerMin > 0 ? ` · ${Math.round(w.densityKgPerMin)} кг/мин` : ''}${wz ? ` · зона ${wz.label} ${wz.pct}%` : ''}`,
+      );
+    });
   }
 
   if (s.sessions.length > 1) {
@@ -2412,6 +2438,8 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     if (cmp.metrics.strengthShare) {
       const s = cmp.metrics.strengthShare;
       lines.push(`  Силовая работа: ${fmtDec1(s.current)}% подходов в 1–5, ${s.delta > 0 ? '+' : ''}${fmtDec1(s.delta)} п.п.`);
+      const shift = zoneShiftNote(s);
+      if (shift) lines.push(`  Зона повторов: ${shift}`);
     }
     const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
     const grown = muscleRows.filter(m => m.sets.delta > 0).length;

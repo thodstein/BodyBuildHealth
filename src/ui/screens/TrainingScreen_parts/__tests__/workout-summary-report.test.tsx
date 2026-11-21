@@ -396,6 +396,19 @@ describe('WorkoutSummaryReport', () => {
     // 0% против 33.3% — минус 33.3 п.п.
     expect(html).toContain('-33.3');
     expect(html).toContain('п.п.');
+    // И объяснение, куда сместился объём.
+    expect(html).toContain('Зона повторов');
+    expect(html).toContain('объём сместился в многоповторку');
+  });
+
+  it('показывает зоны повторов по неделям', () => {
+    const html = renderToStaticMarkup(
+      <WorkoutSummaryReport workouts={workouts} blocks={['sessions']} showSelector={false} />,
+    );
+    expect(html).toContain('По неделям');
+    expect(html).toContain('● зоны');
+    // В подсказке недели — разбивка подходов по зонам.
+    expect(html).toContain('зоны: ');
   });
 
   it('показывает распределение подходов по зонам повторений', () => {
