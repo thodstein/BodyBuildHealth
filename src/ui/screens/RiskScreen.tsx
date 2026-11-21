@@ -323,6 +323,10 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
   // Проход 153: индекс без измеренных маркеров — `null`. Система с неизвестным
   // индексом не получает «ноль риска», а общий уровень считается по измеренным.
   // Нет ни одного индекса — вклада в риск нет вовсе (а не «всё в норме»).
+  // Проход 194: воспаление — уже процент 0..100 (ступень модели cns2 / 3), как и
+  // остальные значения таблицы. Раньше здесь стояло `× 5` под прежнюю шкалу
+  // «СРБ + ферритин/100», где 8 означало «много»; с процентом это всегда упиралось
+  // в потолок 100.
   const labAnalysisRisk = useMemo(() => {
     if (!labAnalysis) return null;
     const values: Record<string, number | null> = {
@@ -330,7 +334,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string; onNavigate?: (screen
       cardio: labAnalysis.cardioRisk,
       renal: labAnalysis.kidneyStress,
       endocrine: labAnalysis.hormoneScore,
-      hematologic: labAnalysis.inflammation === null ? null : labAnalysis.inflammation * 5,
+      hematologic: labAnalysis.inflammation,
     };
     const present = Object.values(values).filter((v): v is number => v !== null);
     if (!present.length) return null;

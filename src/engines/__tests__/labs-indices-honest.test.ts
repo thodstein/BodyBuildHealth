@@ -57,16 +57,19 @@ describe('проход 149: индекс только из измеренных 
     expect(res.homaIR).toBeNull();
   });
 
-  it('отсутствующий маркер не занижает индекс: ферритин 100 один — это его доля', () => {
-    const alone = computeLabIndices([point('FERRITIN', 100)]);
-    // 100 ферритина при 30–300 — доля 0.259; раньше в одиночку было 0.4 от неё.
-    expect(alone.inflammation!).toBeCloseTo(0.259, 2);
+  it('ферритин 350 один — ступень 1 модели (1/3), второй маркер её не размывает', () => {
+    const alone = computeLabIndices([point('FERRITIN', 350)]);
+    expect(alone.inflammation!).toBeCloseTo(1 / 3, 5);
+    // СРБ 1 в норме (ступень 0) не тянет индекс вниз: модель берёт худшую ступень.
+    const withCrp = computeLabIndices([point('FERRITIN', 350), point('CRP', 1)]);
+    expect(withCrp.inflammation!).toBeCloseTo(1 / 3, 5);
   });
 
   it('детали несут счётчик учтённых маркеров', () => {
     const details = computeLabIndexDetails([point('FERRITIN', 100)]);
     expect(details.inflammation.measured).toBe(1);
-    expect(details.inflammation.total).toBe(2);
+    // cns2 в модели: СРБ, гомоцистеин, ИЛ-6, ФНО-α, ферритин.
+    expect(details.inflammation.total).toBe(5);
     expect(details.inflammation.value).not.toBeNull();
     expect(details.inflammation.interpretation).not.toBe('Нет данных');
     expect(details.metabolism.measured).toBe(0);
@@ -88,7 +91,8 @@ describe('проход 149: «СРБ <5» — не «Воспаление 100%»
   it('то же число без границы — измерение и идёт в индекс', () => {
     const exact = computeLabIndices([point('CRP', 5)]);
     expect(exact.inflammation).not.toBeNull();
-    expect(exact.inflammation!).toBeGreaterThan(0.9);
+    // Проход 194: СРБ 5 — первая ступень модели cns2 → 1/3, а не «доля нормы 1.0».
+    expect(exact.inflammation!).toBeCloseTo(1 / 3, 5);
   });
 
   it('обрезанный HDL не ломает липидный индекс: считается только ЛПНП', () => {

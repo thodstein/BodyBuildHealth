@@ -1,5 +1,7 @@
 import type { LabPoint } from '../core/types';
 import { normalizedRatio, interpretScale } from '../core/labs-mapping';
+import { labStorageCode } from '../core/lab-storage-code';
+import { labMechanismIndex, type LabMechanismIndexRead, type LabMechanismSkip } from './lab-index-model';
 
 export interface LabIndices {
   inflammation: number | null;
@@ -12,6 +14,16 @@ export interface LabIndices {
   renalStress: number | null;
 }
 
+export interface LabIndexMarker {
+  code: string;
+  name: string;
+  value: number;
+  /** Доля нормы (0..1) — для индексов, которые считаются по норме. */
+  ratio: number | null;
+  /** Вес в формуле индекса; у индексов главной модели весов нет. */
+  weight?: number;
+}
+
 export interface LabIndexDetail {
   /** `null` — ни один маркер индекса не измерен; показатель не выдумывается. */
   value: number | null;
@@ -20,9 +32,13 @@ export interface LabIndexDetail {
   mechanism: string;
   /** Сколько маркеров индекса реально вошло в расчёт. */
   measured: number;
-  /** Сколько маркеров индексу нужно (вес > 0 в формуле). */
+  /** Сколько маркеров индексу нужно. */
   total: number;
-  markers: { code: string; name: string; value: number; weight: number; ratio: number | null }[];
+  markers: LabIndexMarker[];
+  /** Записи, которые не пошли в расчёт (чужая единица, недоказанная граница). */
+  skipped?: LabMechanismSkip[];
+  /** Механизмы главной модели, по которым посчитан индекс. */
+  modelMechanisms?: string[];
 }
 
 export interface LabIndicesInterpretation {
@@ -82,10 +98,23 @@ function weighted(parts: { r: number | null; w: number }[], cap?: number): numbe
 /** Обратный маркер (HDL, СКФ, общий белок): доля «плохого» = 1 − доля нормы. */
 const inverted = (r: number | null): number | null => (r === null ? null : 1 - r);
 
+/**
+ * Три индекса считает главная механизм-модель, а не своя формула (проход 194).
+ *
+ * «Воспаление», «стресс печени» и «стресс почек» держали свои веса: СРБ 0.6 +
+ * ферритин 0.4; АЛТ 0.3 + АСТ 0.25 + ГГТ 0.2 + билирубин 0.15 + ЩФ 0.1. Те же
+ * анализы модель судила ступенями (`cns2`, `liv1`/`liv2`, `ren1`), и числа
+ * расходились: нормальный АЛТ 30 при ВГН 40 давал долю 0.667 («Проблемы»), а
+ * модель по нему же — ступень 0. Теперь источник один — `labMechanismIndex`, и
+ * шкала одна: доля = ступень/3, то есть 0 / 0.333 / 0.667 / 1 (m0…m3).
+ *
+ * Остальные индексы (метаболизм, щитовидная, липиды, нейротоксичность, HOMA)
+ * остаются долями нормы: одноимённого механизма в модели у них нет, а вес
+ * считается только по измеренным маркерам.
+ */
 export function computeLabIndices(entries: LabPoint[], sex?: 'male' | 'female'): LabIndices {
   const rf = (codes: string[]) => ratioFrom(entries, codes, sex);
   const crp = rf(['CRP']);
-  const ferritin = rf(['FERRITIN']);
   const glucose = rf(['GLU', 'GLUCOSE']);
   const hba1c = rf(['HbA1c', 'HBA1C']);
   const tsh = rf(['TSH']);
@@ -94,21 +123,16 @@ export function computeLabIndices(entries: LabPoint[], sex?: 'male' | 'female'):
   const ldl = rf(['LDL']);
   const hdl = rf(['HDL']);
   const tg = rf(['TG']);
-
   const alt = rf(['ALT', 'GPT']);
-  const ast = rf(['AST', 'GOT']);
-  const ggt = rf(['GGT']);
-  const bilirubin = rf(['BILIRUBIN_TOTAL', 'BIL_T']);
-  const alp = rf(['ALP']);
-
-  const creatinine = rf(['CREATININE']);
-  const bun = rf(['BUN']);
-  const egfr = rf(['EGFR']);
-  const protein_total = rf(['PROTEIN_TOTAL']);
-
   const prolactin = rf(['PROLACTIN', 'PRL']);
   const cortisol = rf(['CORTISOL']);
   const homocysteine = rf(['HOMOCYSTEINE']);
+
+  // Модельные индексы: ступень даёт `getMiLabStep` (внутри `labMechanismIndex`),
+  // здесь — только её шкала.
+  const liver = labMechanismIndex(entries, ['liv1', 'liv2'], sex);
+  const inflammation = labMechanismIndex(entries, ['cns2'], sex);
+  const renal = labMechanismIndex(entries, ['ren1'], sex);
 
   // HOMA-IR = глюкоза(ммоль/л) × инсулин(мкЕд/мл) / 22.5 (P0: раньше делили на
   // 2025 → ×90 занижение). Проход 149: только когда измерены ОБЕ половины пары
@@ -122,7 +146,7 @@ export function computeLabIndices(entries: LabPoint[], sex?: 'male' | 'female'):
       : null;
 
   return {
-    inflammation: weighted([{ r: crp, w: 0.6 }, { r: ferritin, w: 0.4 }]),
+    inflammation: inflammation.share,
     metabolism: weighted([{ r: glucose, w: 0.5 }, { r: hba1c, w: 0.5 }]),
     thyroid: weighted([{ r: tsh, w: 0.4 }, { r: ft4, w: 0.3 }, { r: ft3, w: 0.3 }]),
     lipids: weighted([{ r: ldl, w: 0.5 }, { r: tg, w: 0.3 }, { r: inverted(hdl), w: 0.2 }]),
@@ -138,25 +162,8 @@ export function computeLabIndices(entries: LabPoint[], sex?: 'male' | 'female'):
       1,
     ),
     homaIR,
-    hepaticStress: weighted(
-      [
-        { r: alt, w: 0.3 },
-        { r: ast, w: 0.25 },
-        { r: ggt, w: 0.2 },
-        { r: bilirubin, w: 0.15 },
-        { r: alp, w: 0.1 },
-      ],
-      1,
-    ),
-    renalStress: weighted(
-      [
-        { r: creatinine, w: 0.35 },
-        { r: bun, w: 0.25 },
-        { r: inverted(egfr), w: 0.25 },
-        { r: inverted(protein_total), w: 0.15 },
-      ],
-      1,
-    ),
+    hepaticStress: liver.share,
+    renalStress: renal.share,
   };
 }
 
@@ -172,7 +179,7 @@ function homaLabel(value: number | null): string {
 
 export function computeLabIndexDetails(entries: LabPoint[], sex?: 'male' | 'female'): Record<string, LabIndexDetail> {
   const indices = computeLabIndices(entries, sex);
-  const mk = (code: string[], w: number) => {
+  const mk = (code: string[], w: number): LabIndexMarker => {
     const point = latestByCode(entries, code);
     const ratio = point && !point.bound ? normalizedRatio(point.code, point.value, point.unit, undefined, sex) : null;
     return { ratio, code: point?.code ?? code[0], name: point?.code ?? code[0], value: point?.value ?? 0, weight: w };
@@ -189,23 +196,39 @@ export function computeLabIndexDetails(entries: LabPoint[], sex?: 'male' | 'fema
   };
   const homaMeasured = (exact(['INSULIN', 'INS']) ? 1 : 0) + (exact(['GLU', 'GLUCOSE']) ? 1 : 0);
 
-  const inflammationMarkers = [mk(['CRP'], 0.6), mk(['FERRITIN'], 0.4)];
+  // Маркеры модельных индексов — из таблицы модели (`MECH_LAB_MARKERS`), а не из
+  // локального списка: иначе карточка назовёт не тот набор, по которому считала.
+  // Проход 194: коды там — канон склада, а серия может прийти под алиасом
+  // (`BILIRUBIN_TOTAL`, `CREAT`), поэтому точку ищем по коду склада.
+  const canonEntries = entries.map((p) => ({ ...p, code: labStorageCode(p.code || p.name || '') }));
+  const modelMarkers = (read: LabMechanismIndexRead): LabIndexMarker[] =>
+    read.markers.map((code) => {
+      const point = latestByCode(canonEntries, [code]);
+      const ratio = point && !point.bound ? normalizedRatio(point.code, point.value, point.unit, undefined, sex) : null;
+      return { code, name: point?.code ?? code, value: point?.value ?? 0, ratio };
+    });
+
+  const liver = labMechanismIndex(entries, ['liv1', 'liv2'], sex);
+  const inflammation = labMechanismIndex(entries, ['cns2'], sex);
+  const renal = labMechanismIndex(entries, ['ren1'], sex);
+
   const metabolismMarkers = [mk(['GLU', 'GLUCOSE'], 0.5), mk(['HbA1c', 'HBA1C'], 0.5)];
   const thyroidMarkers = [mk(['TSH'], 0.4), mk(['FT4'], 0.3), mk(['FT3'], 0.3)];
   const lipidMarkers = [mk(['LDL'], 0.5), mk(['TG'], 0.3), mk(['HDL'], 0.2)];
   const neuroMarkers = [mk(['PROLACTIN', 'PRL'], 0.20), mk(['CORTISOL'], 0.20), mk(['TSH'], 0.15), mk(['CRP'], 0.15), mk(['HOMOCYSTEINE'], 0.15), mk(['ALT', 'GPT'], 0.15)];
   const homaMarkers = [mk(['INSULIN', 'INS'], 0.5), mk(['GLU', 'GLUCOSE'], 0.3), mk(['HbA1c', 'HBA1C'], 0.2)];
-  const hepaticMarkers = [mk(['ALT', 'GPT'], 0.3), mk(['AST', 'GOT'], 0.25), mk(['GGT'], 0.2), mk(['BILIRUBIN_TOTAL', 'BIL_T'], 0.15), mk(['ALP'], 0.1)];
-  const renalMarkers = [mk(['CREATININE'], 0.35), mk(['BUN'], 0.25), mk(['EGFR'], 0.25), mk(['PROTEIN_TOTAL'], 0.15)];
 
   return {
     inflammation: {
       value: indices.inflammation,
-      ...count(inflammationMarkers),
+      measured: inflammation.measured,
+      total: inflammation.total,
       label: 'Воспаление',
       interpretation: scaleOrNull(indices.inflammation),
-      mechanism: 'CRP → NF-κB-каскад → системная воспалительная реакция. Ферритин → острофазовый белок → макрофагальная активация. Хроническое воспаление повреждает эндотелий и ускоряет атерогенез.',
-      markers: inflammationMarkers,
+      mechanism: 'Главная модель, механизм cns2 (системное воспаление и окислительный стресс): СРБ, гомоцистеин, ИЛ-6, ФНО-α, ферритин. Ступень — худшая из измеренных; шкала индекса — та же ступень (0 / 33 / 67 / 100 %). Ферритин — острофазовый белок: при воспалении он завышен независимо от запасов железа.',
+      markers: modelMarkers(inflammation),
+      skipped: inflammation.skipped,
+      modelMechanisms: ['cns2'],
     },
     metabolism: {
       value: indices.metabolism,
@@ -250,19 +273,25 @@ export function computeLabIndexDetails(entries: LabPoint[], sex?: 'male' | 'fema
     },
     hepaticStress: {
       value: indices.hepaticStress,
-      ...count(hepaticMarkers),
+      measured: liver.measured,
+      total: liver.total,
       label: 'Гепатический стресс',
       interpretation: scaleOrNull(indices.hepaticStress),
-      mechanism: 'ALT/AST → цитолиз гепатоцитов → утечка трансаминаз. GGT → холестаз и окислительный стресс. Билирубин → нарушение конъюгации и экскреции. ALP → холестаз / нарушение желчеоттока. Комбинация отражает степень повреждения печени.',
-      markers: hepaticMarkers,
+      mechanism: 'Главная модель, два печёночных механизма: liv1 (АЛТ/АСТ — ВГН своего пола, затем 2× и 3× ВГН) и liv2 (ГГТ — те же кратные; билирубин — ВГН и ×2.3/×3.5). Берётся худшая ступень; шкала индекса — ступень/3.',
+      markers: modelMarkers(liver),
+      skipped: liver.skipped,
+      modelMechanisms: ['liv1', 'liv2'],
     },
     renalStress: {
       value: indices.renalStress,
-      ...count(renalMarkers),
+      measured: renal.measured,
+      total: renal.total,
       label: 'Почечный стресс',
       interpretation: scaleOrNull(indices.renalStress),
-      mechanism: 'Креатинин → снижение СКФ → накопление продуктов метаболизма. Мочевина → нарушение экскреции азотистых шлаков. eGFR → скорость клубочковой фильтрации. Общий белок → онкотическое давление → отёки при протеинурии.',
-      markers: renalMarkers,
+      mechanism: 'Главная модель, механизм ren1: СКФ (90/60/30 мл/мин), креатинин (ВГН/130/200), мочевина (8/12/20), мочевая кислота (ступени UA_STAGE_ULN по полу). Худшая ступень; шкала индекса — ступень/3.',
+      markers: modelMarkers(renal),
+      skipped: renal.skipped,
+      modelMechanisms: ['ren1'],
     },
   };
 }

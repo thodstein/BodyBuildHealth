@@ -107,7 +107,11 @@ describe('normalizeFlatLabs: единица есть — эвристика не
 
 describe('источник: единица применяется на обоих путях чтения', () => {
   const analysis = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
-  const helpers = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
+  // Проход 194: «плоский список анализов» вынесен в `engines/lab-flat.ts`
+  // (индексам здоровья не нужен весь каталог поддержки). `engine-helpers`
+  // ре-экспортирует те же функции, поэтому правило ищется по месту определения.
+  const helpers = readFileSync(resolve(process.cwd(), 'src/engines/lab-flat.ts'), 'utf8');
+  const reexport = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
 
   it('интерпретация читает E2 через e2PgPerMl', () => {
     expect(analysis).toContain("if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };");
@@ -115,5 +119,6 @@ describe('источник: единица применяется на обои�
 
   it('плоский список анализов читает E2 через e2PgPerMl', () => {
     expect(helpers).toContain('e2PgPerMl(l.value, l.unit)');
+    expect(reexport).toContain("from '../lab-flat'");
   });
 });

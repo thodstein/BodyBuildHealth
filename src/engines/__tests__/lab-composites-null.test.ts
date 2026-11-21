@@ -10,6 +10,11 @@
  * Стало: индекс считается только по измеренным маркерам (вес нормируется на
  * присутствующие), нет ни одного — `null`. `computeHealthIndices` — одна формула
  * ASI/HMI/CR на экраны «Анализы» и «Риск», и неизмеренный вход даёт `null`.
+ *
+ * Проход 194: числа для «воспаления», «стресса печени» и «стресса почек» больше не
+ * свои — их даёт главная модель механизмов (`labMechanismIndex` → `getMiLabStep`), и
+ * индекс печатает ступень в процентах: 0 / 33 / 67 / 100. Поэтому ожидания ниже
+ * читаются ступенями модели, а не долями ВГН.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -53,10 +58,10 @@ describe('проход 153: нет анализов — нет индексов'
   });
 });
 
-describe('проход 153: индекс считается по измеренному, а не по норме', () => {
-  it('один АЛТ: стресс печени есть, остальные индексы неизвестны', () => {
+describe('проход 153 / 194: индекс считается по измеренному, а не по норме', () => {
+  it('один АЛТ на ВГН: ступень 1 модели = 33 %, остальные индексы неизвестны', () => {
     const res = interpretLabs([point('ALT', LFT_ULN.ALT.male)], 'male');
-    expect(res.liverStress).toBe(100);
+    expect(res.liverStress).toBe(33);
     expect(res.cardioRisk).toBeNull();
     expect(res.kidneyStress).toBeNull();
     expect(res.inflammation).toBeNull();
@@ -64,29 +69,29 @@ describe('проход 153: индекс считается по измерен�
     expect(computeHealthIndices(res).hmi).toBeNull();
   });
 
-  it('два АЛТ/АСТ — среднее их долей ВГН (АЛТ 80 и АСТ 40 при 40 = 150 %)', () => {
+  it('АЛТ 80 (ступень 2) и АСТ 40 (ступень 1) — берётся худшая: 67 %', () => {
     const res = interpretLabs([point('ALT', 80), point('AST', 40)], 'male');
-    expect(res.liverStress).toBe(150);
+    expect(res.liverStress).toBe(67);
   });
 
-  it('креатинин один: почки считают от ВГН пола, без подставленной мочевины', () => {
+  it('креатинин один: почки берут ступени пола, без подставленной мочевины', () => {
     const male = interpretLabs([point('CREATININE', CREATININE_ULN.male)], 'male');
     const female = interpretLabs([point('CREATININE', CREATININE_ULN.female)], 'female');
-    expect(male.kidneyStress).toBe(100);
-    expect(female.kidneyStress).toBe(100);
+    expect(male.kidneyStress).toBe(33);
+    expect(female.kidneyStress).toBe(33);
   });
 
-  it('мочевина одна: вес 40 нормируется на измеренное, а не на отсутствующий креатинин', () => {
+  it('мочевина одна: ступень читается, отсутствующий креатинин не подставляется', () => {
     const res = interpretLabs([point('UREA', 8.3)]);
-    expect(res.kidneyStress).toBe(100);
+    expect(res.kidneyStress).toBe(33);
   });
 
-  it('СРБ один: воспаление = СРБ, без подставленного ферритина 100', () => {
-    expect(interpretLabs([point('CRP', 2)]).inflammation).toBe(2);
+  it('СРБ 2 ниже первой ступени — воспаления нет (0 %), а не «СРБ»', () => {
+    expect(interpretLabs([point('CRP', 2)]).inflammation).toBe(0);
   });
 
-  it('ферритин один: воспаление = ферритин/100', () => {
-    expect(interpretLabs([point('FERRITIN', 400)]).inflammation).toBe(4);
+  it('ферритин 350 — ступень 1 модели: 33 % (без подставленного СРБ)', () => {
+    expect(interpretLabs([point('FERRITIN', 350)]).inflammation).toBe(33);
   });
 
   it('ЛПНП без ЛПВП кардиоиндекс не даёт: ядро формулы не измерено', () => {
@@ -161,7 +166,10 @@ describe('проход 153: источник — без подставленны
     expect(src).not.toContain("metric(labs, 'LDL', 2.5)");
     expect(src).not.toContain("metric(labs, 'CRP', 1.5)");
     expect(src).not.toContain("metric(labs, 'UREA', 5)");
-    expect(src).toContain('function weightedRatio(');
+    // Проход 194: свои формулы воспаления/печени/почек убраны — числа даёт
+    // главная модель через `labMechanismIndex`.
+    expect(src).toContain('labMechanismIndex(');
+    expect(src).not.toContain('function weightedRatio(');
   });
 
   it('оба экрана берут ASI/HMI/CR из одной формулы', () => {

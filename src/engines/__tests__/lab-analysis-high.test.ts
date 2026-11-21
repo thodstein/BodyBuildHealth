@@ -20,10 +20,12 @@ describe('lab-analysis P0 high threshold', () => {
     expect(alt!.riskPercent).toBe(40);
   });
 
-  it('ALT 30 (в норме) → нет интерпретации', () => {
+  it('ALT 30 (в норме) → нет интерпретации и стресс печени 0', () => {
     const res = interpretLabs([{ code: 'ALT', value: 30 } as any]);
     expect(res.interpretations.find((x) => x.code === 'ALT')).toBeUndefined();
-    expect(res.liverStress).toBeGreaterThan(0);
+    // Проход 194: норма больше не «немного стресса». Раньше доля 30/40 = 0.75
+    // печаталась как 75 %, хотя модель по тому же числу ставит ступень 0.
+    expect(res.liverStress).toBe(0);
   });
 
   it('HCT 53 (>50 high, <54 critical) → high', () => {

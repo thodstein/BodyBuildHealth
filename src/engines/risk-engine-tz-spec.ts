@@ -240,7 +240,9 @@ export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number
 // приходит под `CHOL`/`CREATININE`/`UA`/`EGFR`/`DHEA_S`/`TNF_ALPHA`; старые имена
 // (`TC`, `CREAT`, `URIC`, `eGFR`, `DHEAS`, `TNFA`) приводит мост `canonicalLabValues`.
 // `T3`/`T4` — общие гормоны (nmol/L), здесь стоят `FT3`/`FT4`: пороги cns4 свободные.
-const MECH_LAB_MARKERS:Record<string,string[]>={
+// Проход 194: таблица экспортируется — по ней же индексы здоровья (`lab-index-model`)
+// решают, есть ли у механизма измеренный маркер, прежде чем читать ступень.
+export const MECH_LAB_MARKERS:Record<string,string[]>={
   cv1:['NT_PROBNP','CK'],cv2:['LDL','HDL','TG','CHOL'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
   liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
   ren1:['EGFR','CREATININE','UREA','UA'],ren2:['EGFR'],ren3:['UACR','PROTEIN_URINE'],ren4:['K','NA','MG','CA'],
@@ -352,18 +354,20 @@ export const PROCEDURE_DB: Record<string, Array<{organId:string;mechId:string;k:
 };
 
 // ── m_i из лабораторных значений (таблица T4) + коррекция по дозе ──
-/** Экспортируется для гардов: вклад анализа проверяется напрямую, а не через весь расчёт. */
-export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
-  // Базовые defaults — единый источник M_I_BASE_DEFAULTS (модуль-левел, см. выше)
-  const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
-  const raw = M_I_BASE_DEFAULTS[mechId] ?? 0;
-  // Дозозависимость эритроцитоза: при дозе ≤200 мг/нед (TRT-диапазон)
-  // клинически значимая полицитемия редка (Endocrine Society 2018:
-  // HCT>52% в основном при супрафизиологических дозах) — гарантированный
-  // минимум m_i=1 вместо 2; без анализов индекс не «страшный».
-  const hem1Base = mechId==='hem1' && rawDose !== undefined && rawDose <= 200 ? 1 : raw;
-  const defaults = Math.min(3, Math.round(hem1Base * mult));
-
+/**
+ * Ступень механизма «по бланку» — без базовой ступени препарата (проход 194).
+ *
+ * `getMiFromLab` отвечает на вопрос «какой риск у механизма на курсе»: он
+ * поднимает ступень до базовой (`M_I_BASE_DEFAULTS`: liv1=2, cns2=2) и до
+ * минимума 1 у целевого механизма — это риск препарата, а не показание бланка.
+ * Индексам здоровья нужен именно бланк: при нормальном АЛТ 30 «стресс печени»
+ * обязан быть 0, а не 33 % из-за базовой ступени. Поэтому лестницы живут в одном
+ * месте (`getMiLabStep`), а поверх них — два ответа: «по анализу» и «с курсом».
+ *
+ * Возвращает ступень 0..3 или `undefined`, если ни один маркер механизма не
+ * измерен (`MECH_LAB_MARKERS` называет, какие бывают).
+ */
+export function getMiLabStep(mechId:string,rawLabValues:Record<string,number>,sex?:'male'|'female'):number|undefined{
   // Все доступные лабораторные маркеры.
   // Проход 169: имена приводятся к коду склада один раз на границе (`canonicalLabValues`),
   // дальше читаем только канон — `CHOL`, `CREATININE`, `UA`, `EGFR`, `DHEA_S`, `P`, `FOL`,
@@ -657,6 +661,24 @@ export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,do
       break;
     }
   }
+
+  return labResult;
+}
+
+/** Экспортируется для гардов: вклад анализа проверяется напрямую, а не через весь расчёт. */
+export function getMiFromLab(mechId:string,rawLabValues:Record<string,number>,doseFactor?:number,mechWeight?:number,rawDose?:number,sex?:'male'|'female'):number{
+  // Базовые defaults — единый источник M_I_BASE_DEFAULTS (модуль-левел, см. выше)
+  const mult = doseFactor && doseFactor > 1.0 ? Math.min(1.5, doseFactor) : 1.0;
+  const raw = M_I_BASE_DEFAULTS[mechId] ?? 0;
+  // Дозозависимость эритроцитоза: при дозе ≤200 мг/нед (TRT-диапазон)
+  // клинически значимая полицитемия редка (Endocrine Society 2018:
+  // HCT>52% в основном при супрафизиологических дозах) — гарантированный
+  // минимум m_i=1 вместо 2; без анализов индекс не «страшный».
+  const hem1Base = mechId==='hem1' && rawDose !== undefined && rawDose <= 200 ? 1 : raw;
+  const defaults = Math.min(3, Math.round(hem1Base * mult));
+
+  // Лестницы ступеней — `getMiLabStep` (одно место, проход 194).
+  const labResult = getMiLabStep(mechId, rawLabValues, sex);
 
   // Лабораторное значение имеет приоритет, но не ниже минимума от doseFactor
   if (labResult !== undefined) {

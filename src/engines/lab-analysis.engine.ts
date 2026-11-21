@@ -8,6 +8,7 @@ import {
   HCT_THRESHOLDS, HGB_THRESHOLDS, CREATININE_ULN, FEMALE_HORMONE_ULN, e2PgPerMl, getLabNorm,
 } from './lab-norms.engine';
 import { phaseHormoneBand, phaseUnionBand, type CycleState } from './female-cycle-phase.engine';
+import { labMechanismIndex } from './lab-index-model';
 
 export interface LabInterpretation {
   code: string;
@@ -29,6 +30,11 @@ export interface LabCompositeResult {
    * `interpretLabs([])` выдавал «стресс печени 75», «кардиориск 40», «воспаление
    * 2.5» — то есть отсутствие анализов выглядело как измерение, а экраны
    * показывали ASI/HMI/CR по несуществующим данным.
+   *
+   * Проход 194: `liverStress`, `inflammation` и `kidneyStress` — ступень главной
+   * модели (liv1+liv2, cns2, ren1) в процентах: 0 / 33 / 67 / 100. Одна шкала с
+   * карточкой «Риски» (`labs-indices`), тренерскими и поддержкиными порогами:
+   * 40 — «ступень 2 и выше», 60 — «ступень 3».
    */
   liverStress: number | null;
   cardioRisk: number | null;
@@ -333,21 +339,8 @@ function metric(labs: LabPoint[], code: string, bad: 'high' | 'low' | 'both' = '
 }
 
 /**
- * Среднее долей нормы по измеренным маркерам (проход 153).
- *
- * Вес нормируется на сумму весов присутствующих: отсутствующий маркер не
- * считается «идеально нормальным» (раньше он заменялся нормой и тянул индекс к
- * 75). Нет ни одного — `null`.
+ * Число без границы: «>N» не даёт ни отношения, ни вывода о стороне.
  */
-function weightedRatio(parts: { value: number | null; ref: number; w: number }[]): number | null {
-  const present = parts.filter((p): p is { value: number; ref: number; w: number } => p.value !== null);
-  if (!present.length) return null;
-  const wSum = present.reduce((s, p) => s + p.w, 0);
-  if (wSum <= 0) return null;
-  return present.reduce((s, p) => s + (p.value / p.ref) * p.w, 0) / wSum;
-}
-
-/** Число без границы: «>N» не даёт ни отношения, ни вывода о стороне. */
 function exactOnly(read: { value: number; bound?: LabBound } | null): number | null {
   return read && !read.bound ? read.value : null;
 }
@@ -504,18 +497,11 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
       ? computeHOMA_IR(glucose, insulin)
       : null;
 
-  // Индекс печени — в долях ВГН пациента (♀ 31, ♂ 40). Проход 153: считается
-  // только по измеренным трансаминазам, иначе стресс печени неизвестен, а не 75.
-  const lftBase = fem ? LFT_ULN.ALT.female : LFT_ULN.ALT.male;
-  const alt = metric(labs, 'ALT');
-  const ast = metric(labs, 'AST');
-  const ggt = metric(labs, 'GGT');
-  const liverRatio = weightedRatio([
-    { value: alt, ref: lftBase, w: 1 },
-    { value: ast, ref: lftBase, w: 1 },
-    { value: ggt, ref: lftBase, w: 1 },
-  ]);
-  const liverStress = liverRatio === null ? null : Math.round(liverRatio * 100);
+  // Проход 194: стресс печени — ступень главной модели (liv1 — цитолиз АЛТ/АСТ,
+  // liv2 — холестаз ГГТ/билирубин), а не среднее трансаминаз в долях ВГН. Было:
+  // АЛТ 30 при ВГН 40 давал 75 «стресса», хотя модель по тому же числу ставила
+  // ступень 0, а карточка «Риски» печатала «Проблемы». Число одно на все экраны.
+  const liverStress = labMechanismIndex(labs, ['liv1', 'liv2'], sex).percent;
 
   // Проход 150: для HDL «плохо» — низкое, для остальных липидов — высокое.
   // Проход 153: кардиоиндекс требует ядро формулы — ЛПНП и ЛПВП; АПОБ и ТГ
@@ -530,22 +516,16 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
       ? null
       : Math.round(((ldl + (apob ?? 0) * 3 + (tg ?? 0) / 2) / hdl) * 10);
 
-  // Воспаление — сумма измеренных слагаемых: нет ни СРБ, ни ферритина — `null`.
-  const crp = metric(labs, 'CRP');
-  const ferritin = metric(labs, 'FERRITIN');
-  const inflammation =
-    crp === null && ferritin === null ? null : Math.round((crp ?? 0) + (ferritin ?? 0) / 100);
+  // Проход 194: воспаление — ступень главной модели (cns2: СРБ, гомоцистеин,
+  // ИЛ-6, ФНО-α, ферритин), в процентах шкалы 0/33/67/100. Было «СРБ + ферритин
+  // / 100» — своя формула, чьи числа не совпадали ни с индексом в «Анализах», ни
+  // с риск-моделью. Нет ни одного маркера — `null`.
+  const inflammation = labMechanismIndex(labs, ['cns2'], sex).percent;
 
-  // Индекс почек — от ВГН креатинина пациента (♀ 97, ♂ 110). Проход 153: веса
-  // 60/40 нормируются на измеренные; нет ни креатинина, ни мочевины — `null`.
-  const crBase = fem ? CREATININE_ULN.female : CREATININE_ULN.male;
-  const creatinine = metric(labs, 'CREATININE');
-  const urea = metric(labs, 'UREA');
-  const renalRatio = weightedRatio([
-    { value: creatinine, ref: crBase, w: 60 },
-    { value: urea, ref: 8.3, w: 40 },
-  ]);
-  const kidneyStress = renalRatio === null ? null : Math.round(renalRatio * 100);
+  // Проход 194: почечный стресс — ступень главной модели (ren1: СКФ, креатинин,
+  // мочевина, мочевая кислота), в процентах той же шкалы. Было «креатинин 60 +
+  // мочевина 40 от ВГН» — вторая формула на те же анализы.
+  const kidneyStress = labMechanismIndex(labs, ['ren1'], sex).percent;
 
   // Гормоны штрафуются за обе стороны, поэтому доказанная граница годится в любую
   // сторону; недоказанная — как отсутствие записи (штрафа нет, вывода нет).
@@ -614,11 +594,11 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
 
 /** Три сводных индекса экрана «Анализы → Риски» и «Риск». */
 export interface LabHealthIndices {
-  /** Анаболический синтез: 100 − (гормоны 40% + воспаление 30% + почки 30%). */
+  /** Анаболический синтез: 100 − (гормоны 40% + воспаление 30% + почки 30%), все входы 0..100. */
   asi: number | null;
-  /** Гепатический метаболизм: стресс печени 1.2 + воспаление 0.5. */
+  /** Гепатический метаболизм: стресс печени 1.2 + воспаление 0.5 (оба 0..100, потолок 100). */
   hmi: number | null;
-  /** Кардиориск: кардиоиндекс 1.1 + воспаление 0.6. */
+  /** Кардиориск: кардиоиндекс 1.1 + воспаление 0.6 (потолок 100). */
   cr: number | null;
 }
 
@@ -629,13 +609,19 @@ export interface LabHealthIndices {
  * отсутствующего показателя: без анализов печаталось «ASI 72% Хорошо», «HMI 75»,
  * «CR 45». Здесь вход `null` (индекс не измерен) даёт `null` на выходе — экран
  * пишет «Нет данных», а не оценку по несуществующим числам.
+ *
+ * Проход 194: все входы — проценты одной шкалы (ступень модели 0/33/67/100).
+ * Раньше `inflammation` считался по своей формуле («СРБ + ферритин/100», где 8
+ * уже много), и здесь его делили на 6 и умножали на 50 — коэффициент под чужую
+ * шкалу. Теперь воспаление входит как есть: 67 — это ступень 2 модели, а не
+ * «58 из 100» после пересчёта.
  */
 export function computeHealthIndices(res: LabCompositeResult): LabHealthIndices {
   const { hormoneScore, inflammation, kidneyStress, liverStress, cardioRisk } = res;
   const asI =
     hormoneScore === null || inflammation === null || kidneyStress === null
       ? null
-      : Math.round(100 - (hormoneScore * 0.4 + Math.min(100, (inflammation / 6) * 50) * 0.3 + kidneyStress * 0.3));
+      : Math.round(100 - (hormoneScore * 0.4 + inflammation * 0.3 + kidneyStress * 0.3));
   const hmi =
     liverStress === null || inflammation === null
       ? null

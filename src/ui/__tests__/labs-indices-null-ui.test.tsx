@@ -79,6 +79,8 @@ describe('проход 149: индексы без измерений', () => {
     const container = openRisks();
     const row = container.querySelector('[data-lab-index="inflammation"]') as HTMLElement | null;
     expect(row).not.toBeNull();
-    expect(row!.getAttribute('data-lab-index-partial')).toBe('1/2');
+    // Проход 194: воспаление считает механизм cns2 — пять маркеров в модели
+    // (СРБ, гомоцистеин, ИЛ-6, ФНО-α, ферритин), учтён один.
+    expect(row!.getAttribute('data-lab-index-partial')).toBe('1/5');
   });
 });

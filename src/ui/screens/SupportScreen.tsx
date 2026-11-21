@@ -827,11 +827,14 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     if (labRes) {
       // Проход 153: неизмеренный индекс не отдаётся плану как «ноль стресса» —
       // система просто не получает лабораторной надбавки.
+      // Проход 194: воспаление — процент 0..100 ступени модели (как остальные
+      // надбавки), поэтому `× 5` убрано: раньше оно подгоняло прежнюю шкалу
+      // «СРБ + ферритин/100» и с процентом давало до 500.
       if (labRes.cardioRisk !== null) labStress.cardio = labRes.cardioRisk;
       if (labRes.liverStress !== null) labStress.hepatic = labRes.liverStress;
       if (labRes.kidneyStress !== null) labStress.renal = labRes.kidneyStress;
       if (labRes.hormoneScore !== null) labStress.endocrine = labRes.hormoneScore;
-      if (labRes.inflammation !== null) labStress.hematologic = labRes.inflammation * 5;
+      if (labRes.inflammation !== null) labStress.hematologic = labRes.inflammation;
     }
     const plan = generateWeeklyPlan(allSubs, riskCalcMethod, baseWeights, drugLoads, labStress, calcResultData?.systemSupport ?? {});
     setWeeklyPlan(plan);
