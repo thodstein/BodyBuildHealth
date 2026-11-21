@@ -261,6 +261,10 @@ export interface SummaryExercise {
   e1rmSeries: number[];
   /** Прирост e1RM от первой к последней точке серии, % (null — меньше двух точек). */
   progressPct: number | null;
+  /** Подходы по неделям периода (сплошная шкала; пропущенная неделя — 0). */
+  weeklySets: number[];
+  /** Изменение подходов/нед первой активной недели к последней, % (null — нет базы). */
+  weeklyTrendPct: number | null;
 }
 
 export interface SummaryMuscle {
@@ -439,6 +443,8 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     seriesStamp: string;
     /** Подходы без внешнего веса (свой вес). */
     wlSets: number;
+    /** Подходы по неделям периода — та же сплошная шкала, что у мышц. */
+    byWeek: Map<string, number>;
   };
   const exMap = new Map<string, ExAgg>();
   const muscleAgg = new Map<MuscleKey, { sets: number; reps: number; tonnageKg: number; ex: Set<string>; byWeek: Map<string, number> }>();
@@ -571,6 +577,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         e1rmSeries: [],
         seriesStamp: '',
         wlSets: 0,
+        byWeek: new Map<string, number>(),
       };
       prev.sets += exSets;
       prev.reps += exReps;
@@ -592,6 +599,7 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
       prev.rirSum += exRirSum; prev.rirN += exRirN;
       prev.rpeSum += exRpeSum; prev.rpeN += exRpeN;
       prev.wlSets += exWl;
+      if (wk.from) prev.byWeek.set(wk.from, (prev.byWeek.get(wk.from) || 0) + exSets);
       prev.sessions.add(w.id || date);
       exMap.set(key, prev);
 
@@ -635,44 +643,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
   const dateValues = list.map(w => String(w.date || '').slice(0, 10)).filter(Boolean).sort();
   const sessions = list.length;
 
-  const exercisesOut: SummaryExercise[] = Array.from(exMap.values())
-    .map(e => ({
-      name: e.name,
-      muscle: e.muscle,
-      muscleLabel: e.muscleLabel,
-      pattern: e.pattern,
-      patternLabel: e.patternLabel,
-      sets: e.sets,
-      reps: e.reps,
-      tonnageKg: Math.round(e.tonnageKg),
-      bestWeight: Math.round(e.bestWeight * 10) / 10,
-      bestReps: e.bestReps,
-      bestE1RM: Math.round(e.bestE1RM),
-      avgLoadKg: e.sets > 0 ? Math.round((e.tonnageKg / Math.max(1, e.reps)) * 10) / 10 : 0,
-      avgIntensityPct: e.bestE1RM > 0 && e.reps > 0
-        ? Math.round(((e.tonnageKg / e.reps) / e.bestE1RM) * 1000) / 10
-        : null,
-      avgRepsPerSet: e.sets > 0 ? Math.round((e.reps / e.sets) * 10) / 10 : 0,
-      avgRIR: e.rirN > 0 ? Math.round((e.rirSum / e.rirN) * 10) / 10 : null,
-      avgRPE: e.rpeN > 0 ? Math.round((e.rpeSum / e.rpeN) * 10) / 10 : null,
-      sharePct: totalTonnage > 0 ? Math.round((e.tonnageKg / totalTonnage) * 1000) / 10 : 0,
-      sessions: e.sessions.size,
-      weightlessSets: e.wlSets,
-      e1rmSeries: e.e1rmSeries.slice(-12),
-      progressPct: (() => {
-        const s = e.e1rmSeries.slice(-12);
-        if (s.length < 2) return null;
-        const first = s[0];
-        const last = s[s.length - 1];
-        if (first <= 0) return null;
-        return Math.round(((last - first) / first) * 1000) / 10;
-      })(),
-    }))
-    .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
-
   const activeWeekKeys = Array.from(weekAgg.keys()).sort();
-  // Для динамики мышц нужна сплошная шкала недель: пропущенная неделя — это
-  // ноль, а не отсутствие точки, иначе график склеивает перерыв.
+  // Для динамики мышц, движений и упражнений нужна сплошная шкала недель:
+  // пропущенная неделя — это ноль, а не отсутствие точки, иначе график
+  // склеивает перерыв.
   const muscleWeekKeys: string[] = (() => {
     const first = dateValues[0] ? weekRangeFor(dateValues[0]).from : '';
     const last = dateValues[dateValues.length - 1] ? weekRangeFor(dateValues[dateValues.length - 1]).from : '';
@@ -695,6 +669,46 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
     if (active.length < 2 || active[0] <= 0) return null;
     return Math.round(((active[active.length - 1] - active[0]) / active[0]) * 1000) / 10;
   };
+
+  const exercisesOut: SummaryExercise[] = Array.from(exMap.values())
+    .map(e => {
+      const weeklySets = muscleWeekKeys.map(k => e.byWeek.get(k) || 0);
+      return {
+        name: e.name,
+        muscle: e.muscle,
+        muscleLabel: e.muscleLabel,
+        pattern: e.pattern,
+        patternLabel: e.patternLabel,
+        sets: e.sets,
+        reps: e.reps,
+        tonnageKg: Math.round(e.tonnageKg),
+        bestWeight: Math.round(e.bestWeight * 10) / 10,
+        bestReps: e.bestReps,
+        bestE1RM: Math.round(e.bestE1RM),
+        avgLoadKg: e.sets > 0 ? Math.round((e.tonnageKg / Math.max(1, e.reps)) * 10) / 10 : 0,
+        avgIntensityPct: e.bestE1RM > 0 && e.reps > 0
+          ? Math.round(((e.tonnageKg / e.reps) / e.bestE1RM) * 1000) / 10
+          : null,
+        avgRepsPerSet: e.sets > 0 ? Math.round((e.reps / e.sets) * 10) / 10 : 0,
+        avgRIR: e.rirN > 0 ? Math.round((e.rirSum / e.rirN) * 10) / 10 : null,
+        avgRPE: e.rpeN > 0 ? Math.round((e.rpeSum / e.rpeN) * 10) / 10 : null,
+        sharePct: totalTonnage > 0 ? Math.round((e.tonnageKg / totalTonnage) * 1000) / 10 : 0,
+        sessions: e.sessions.size,
+        weightlessSets: e.wlSets,
+        e1rmSeries: e.e1rmSeries.slice(-12),
+        weeklySets,
+        weeklyTrendPct: weeklyTrendFrom(weeklySets),
+        progressPct: (() => {
+          const s = e.e1rmSeries.slice(-12);
+          if (s.length < 2) return null;
+          const first = s[0];
+          const last = s[s.length - 1];
+          if (first <= 0) return null;
+          return Math.round(((last - first) / first) * 1000) / 10;
+        })(),
+      };
+    })
+    .sort((a, b) => b.tonnageKg - a.tonnageKg || b.sets - a.sets);
 
   const musclesOut: SummaryMuscle[] = Array.from(muscleAgg.entries())
     .map(([muscle, v]) => {
@@ -1691,9 +1705,15 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
 
   lines.push('');
   lines.push('По упражнениям:');
-  s.exercises.forEach(e => lines.push(
-    `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}`,
-  ));
+  s.exercises.forEach(e => {
+    // Подходы по неделям — ответ на «растёт упражнение или выполняется
+    // формально»; перерыв в шкале виден нулём.
+    const weeks = e.weeklySets.filter(v => v > 0).length > 1 ? ` · подх по неделям ${e.weeklySets.join('·')}` : '';
+    const weeksTrend = e.weeklyTrendPct != null ? ` (${signedPct(e.weeklyTrendPct)} к первой неделе)` : '';
+    lines.push(
+      `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${e.bestWeight}кг (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}${weeks}${weeksTrend}`,
+    );
+  });
 
   if (s.patterns.length) {
     lines.push('');

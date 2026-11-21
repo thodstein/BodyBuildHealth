@@ -648,6 +648,14 @@ export const WorkoutSummaryBody: React.FC<{
                   <span>доля <b style={{ color: '#fff' }}>{e.sharePct}%</b></span>
                   {e.avgRIR != null && <span>RIR <b style={{ color: '#fff' }}>{e.avgRIR}</b></span>}
                   {e.sessions > 1 && <span>в {e.sessions} трен.</span>}
+                  {e.weeklySets.filter(v => v > 0).length > 1 && (
+                    <span
+                      title={`Подходы по неделям: ${e.weeklySets.join(' · ')}`}
+                      style={{ color: e.weeklyTrendPct == null || e.weeklyTrendPct === 0 ? '#fff' : e.weeklyTrendPct > 0 ? '#22c55e' : '#ef4444', fontWeight: 700 }}
+                    >
+                      подх {e.weeklySets.slice(-4).join('·')}
+                    </span>
+                  )}
                   {e.progressPct != null && (
                     <span style={{ color: e.progressPct > 0 ? '#22c55e' : e.progressPct < 0 ? '#ef4444' : '#fff', opacity: e.progressPct === 0 ? 0.65 : 1, fontWeight: 700 }}>
                       {`${e.progressPct > 0 ? '▲' : e.progressPct < 0 ? '▼' : '→'} ${Math.abs(e.progressPct)}%`}

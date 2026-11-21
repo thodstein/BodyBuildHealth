@@ -352,6 +352,16 @@ describe('workout-summary: недельная динамика и интенси
     expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');
   });
 
+  it('считает подходы по неделям для упражнения', () => {
+    const s = buildWorkoutSummary([w1, w2]);
+    const bench = s.exercises[0];
+    expect(bench.weeklySets).toEqual([3, 5]);
+    expect(bench.weeklyTrendPct).toBe(66.7);
+    // В копируемом тексте недельная строка упражнения рядом с e1RM.
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('подх по неделям 3·5 (+66.7% к первой неделе)');
+  });
+
   it('называет движение, которое выпало из программы', () => {
     const s = buildWorkoutSummary([
       mkWorkout('2026-11-02', [

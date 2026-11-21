@@ -55,6 +55,8 @@ describe('WorkoutSummaryReport', () => {
     expect(html).toContain('Показать всё');
     expect(html).toContain('Жим штанги лёжа');
     expect(html).toContain('подх/нед');
+    // Упражнение показывает подходы по неделям, а не только суммарные.
+    expect(html).toContain('подх 4·2');
     expect(html).toContain('MEV ');
     expect(html).toContain('Интенсивность');
     expect(html).toContain('инт. ');
