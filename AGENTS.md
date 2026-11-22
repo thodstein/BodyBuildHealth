@@ -20,8 +20,10 @@ Project root instructions (kept intentionally short). Full audit/changelog histo
 ## Agent tooling (`.opencode/`, `opencode.json`)
 
 - Tools `project_verify` (runs type-check + the matching vitest suite + APK markers for the changed files) and `project_apk_preflight` (version/gradle sync, APK guards, local buildability).
-- Commands: `/verify`, `/apk`, `/doctor`. Subagent `reviewer` (read-only review).
-- Skills — release/process: `apk-release`, `supabase-migrations`, `bb-audit`, `asset-sync`; code areas: `bb-engine` (движок и каталог), `ui-design` (UI + APK-маркеры), `data-import` (парсеры), `backend-api` (`api/`, edge functions, auth/env), `testing-workflow` (какой vitest-сьют гонять); research: `research` (PubMed/Europe PMC/OpenAlex, уровни доказательности).
+- Commands: `/do` (задача целиком: план + параллельные агенты + проверки до зелёного), `/verify`, `/apk`, `/doctor`.
+- Agents: `lead` (primary, оркестратор — запускает субагентов), `worker` (правки в заданных файлах), `verifier` (прогон проверок, read-only), `reviewer` (read-only review).
+- Headless-запуск до завершения: `opencode run --agent lead --auto "<задача>"` (в скриптах/CI — ещё `--format json`, `--archived`).
+- Skills — release/process: `apk-release`, `supabase-migrations`, `bb-audit`, `asset-sync`; code areas: `bb-engine` (движок и каталог), `ui-design` (UI + APK-маркеры), `data-import` (парсеры), `backend-api` (`api/`, edge functions, auth/env), `testing-workflow` (какой vitest-сьют гонять); research: `research` (PubMed/Europe PMC/OpenAlex, уровни доказательности); оркестрация: `orchestration` (декомпозиция, параллельные субагенты, цикл проверок).
 - Formatter is on (Prettier, `.prettierrc` + `.prettierignore`); `.env*`, `dist/`, `android/**/build/` edits are denied, `git commit/push` ask.
 - MCP: `browse` (browser), `supabase` (read-only), `context7`, `github`, `pubmed` (PubMed/PMC/Europe PMC full text, iCite, MeSH), `openalex` (270M+ scholarly works, citation graphs). Remote servers need a one-time sign-in via `/mcps`; `pubmed`/`openalex` are keyless and anonymous.
 - Local `java`/`gradle`/`ANDROID_HOME` are absent: APK builds only through `.github/workflows/android-apk.yml`.
