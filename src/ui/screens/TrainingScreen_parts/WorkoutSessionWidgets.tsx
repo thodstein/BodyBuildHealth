@@ -25,9 +25,19 @@ const GHOST_BTN: React.CSSProperties = {
 };
 const TABULAR: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
-/** Событие «записать следующий подход» — слушает SessionPlayer (фаза main). */
-export function requestQuickSet(): void {
-  try { window.dispatchEvent(new Event('he-workout-quick-set')); } catch { /* noop */ }
+/**
+ * Событие «записать следующий подход» — слушает SessionPlayer (фаза main).
+ *
+ * Возвращает true, если подхватил живой плеер. Пульт на главной/в дневнике
+ * стоит и без плеера: там «+ Сет» молча ничего не делал (мёртвая кнопка),
+ * поэтому вызывающий по false открывает проведение — записывать есть куда.
+ */
+export function requestQuickSet(): boolean {
+  let handled = false;
+  try {
+    window.dispatchEvent(new CustomEvent('he-workout-quick-set', { detail: { handled: () => { handled = true; } } }));
+  } catch { /* noop */ }
+  return handled;
 }
 
 /**
@@ -138,7 +148,7 @@ export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOp
           Старт всегда рабочий: событие he-workout-open ловит ExecutionZone,
           поэтому кнопка не мёртвая даже без пропсов. */}
       {live ? (
-        <button type="button" data-act="pult-next" onClick={() => { requestQuickSet(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
+        <button type="button" data-act="pult-next" onClick={() => { if (!requestQuickSet()) requestOpenSession(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
       ) : (
         <button type="button" data-act="pult-start" onClick={() => { requestOpenSession(); onOpen?.(); }} style={{ ...BIG_BTN, minWidth: 108 }} aria-label="Начать проведение тренировки">▶ Начать</button>
       )}

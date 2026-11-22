@@ -1045,11 +1045,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   // ── Быстрый сет из дока/виджета («+ Сет» без прокрутки к подходу) ──
   React.useEffect(() => {
-    const onQuickSet = () => {
+    const onQuickSet = (ev?: Event) => {
       if (phase !== 'main' || !day || !Array.isArray(day.exercises)) return;
       for (let ei = 0; ei < day.exercises.length; ei++) {
         for (let si = 0; si < day.exercises[ei].targetSets.length; si++) {
-          if (!actual[keyFor(ei, si)]) { logOne(ei, si); return; }
+          if (!actual[keyFor(ei, si)]) {
+            logOne(ei, si);
+            // Подтверждаем пульту, что подход записан: иначе он откроет проведение.
+            (ev as CustomEvent | undefined)?.detail?.handled?.();
+            return;
+          }
         }
       }
     };

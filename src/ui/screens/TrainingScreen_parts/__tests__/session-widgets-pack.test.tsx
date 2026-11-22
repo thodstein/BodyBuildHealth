@@ -40,6 +40,52 @@ describe('A проведение (3)', () => {
     unmount();
     cleanup();
   });
+  it('A1d «+ Сет» без открытого плеера открывает проведение (кнопка не мёртвая)', async () => {
+    const { render, fireEvent } = await import('@testing-library/react');
+    const LIVE = {
+      dayLabel: 'Жим',
+      exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }],
+      live: {
+        sessionId: 's1', focus: 'Грудь', date: '2026-09-13', setsDone: 2, setsPlanned: 4,
+        volumeKg: 1200, currentExercise: 'Жим', progressPct: 50,
+      },
+    };
+    let opened = 0;
+    const onOpen = () => { opened += 1; };
+    window.addEventListener('he-workout-open', onOpen);
+    const { container, unmount } = render(<WorkoutMiniPult state={LIVE as never} />);
+    fireEvent.click(container.querySelector('[data-act="pult-next"]') as HTMLElement);
+    // Плеера нет → quick-set никто не подхватил → пульт ведёт в проведение,
+    // иначе подход молча терялся (жалоба «кнопки не работают»).
+    expect(opened).toBe(1);
+    window.removeEventListener('he-workout-open', onOpen);
+    unmount();
+  });
+  it('A1e живой плеер обрабатывает quick-set — пульт не уводит со экрана', async () => {
+    const { render, fireEvent } = await import('@testing-library/react');
+    const { requestQuickSet } = await import('../WorkoutSessionWidgets');
+    const LIVE = {
+      dayLabel: 'Жим',
+      exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }],
+      live: {
+        sessionId: 's1', focus: 'Грудь', date: '2026-09-13', setsDone: 2, setsPlanned: 4,
+        volumeKg: 1200, currentExercise: 'Жим', progressPct: 50,
+      },
+    };
+    // Эмулируем SessionPlayer: обработчик подтверждает, что подход записан.
+    const player = (ev: Event) => { (ev as CustomEvent).detail?.handled?.(); };
+    window.addEventListener('he-workout-quick-set', player);
+    expect(requestQuickSet()).toBe(true);
+    let opened = 0;
+    const onOpen = () => { opened += 1; };
+    window.addEventListener('he-workout-open', onOpen);
+    const { container, unmount } = render(<WorkoutMiniPult state={LIVE as never} />);
+    fireEvent.click(container.querySelector('[data-act="pult-next"]') as HTMLElement);
+    expect(opened).toBe(0);
+    window.removeEventListener('he-workout-quick-set', player);
+    window.removeEventListener('he-workout-open', onOpen);
+    unmount();
+  });
   it('A2 карточка дня: упражнения + старт/пропуск', () => {
     const html = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
     expect(html).toContain('data-widget="workout-daycard"');
