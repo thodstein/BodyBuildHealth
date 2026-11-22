@@ -1831,7 +1831,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   style={{
                     position: 'relative',
                     padding: 6,
-                    paddingRight: 30,
+                    paddingRight: 44,
                     borderRadius: 12,
                     border: '1px solid rgba(255,255,255,0.12)',
                     background: 'rgba(255,255,255,0.04)',
@@ -2238,7 +2238,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                           {photos.map((a) => {
                             const view = media[a.id];
                             return view?.src ? (
-                              <div key={a.id} style={{ position: 'relative', width: 88, height: 88 }}>
+                              <div key={a.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 88 }}>
                                 <button
                                   type="button"
                                   data-notes="photo"
@@ -2248,8 +2248,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                   }
                                   style={{
                                     padding: 0,
-                                    width: '100%',
-                                    height: '100%',
+                                    width: 88,
+                                    height: 88,
                                     border: '1px solid rgba(255,255,255,0.14)',
                                     borderRadius: 12,
                                     background: 'transparent',
@@ -2263,41 +2263,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                   />
                                 </button>
+                                {/* ⤓ не оверлеем: 44px-хитбокс съедал четверть превью и уводил
+                                    случайный тап «открыть фото» в системный шаринг. */}
                                 <button
                                   type="button"
                                   data-notes="share"
                                   aria-label="Поделиться фото"
                                   onClick={() => shareAttachment(a)}
-                                  style={{
-                                    position: 'absolute',
-                                    right: 0,
-                                    bottom: 0,
-                                    width: 44,
-                                    height: 44,
-                                    padding: 0,
-                                    border: 'none',
-                                    background: 'transparent',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    display: 'grid',
-                                    placeItems: 'center',
-                                  }}
+                                  style={{ ...btn('ghost'), minHeight: 44, padding: '4px 6px', fontSize: 11 }}
                                 >
-                                  <span
-                                    aria-hidden="true"
-                                    style={{
-                                      width: 26,
-                                      height: 26,
-                                      borderRadius: 8,
-                                      border: '1px solid rgba(255,255,255,0.18)',
-                                      background: 'rgba(0,0,0,0.55)',
-                                      fontSize: 12,
-                                      lineHeight: '24px',
-                                      textAlign: 'center',
-                                    }}
-                                  >
-                                    ⤓
-                                  </span>
+                                  ⤓ Сохранить
                                 </button>
                               </div>
                             ) : (

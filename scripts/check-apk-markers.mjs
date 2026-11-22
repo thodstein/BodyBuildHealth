@@ -526,11 +526,37 @@ for (const hook of [
   'data-notes="checklist-toggle"',
 ])
   mustContain(NOTES_UI, hook, `notes hook ${hook}`);
-{
-  const text = readFileSync(join(root, NOTES_UI), 'utf8');
-  const small = [];
+
+// Диапазоны JSX-комментариев {/* ... */}. Нужны, чтобы закомментированную кнопку
+// не считать рабочей, и при этом не спотыкаться о "audio/*" внутри атрибутов
+// (наивный поиск /* делал «в комментарии» весь остаток файла).
+function jsxCommentRanges(text) {
+  const ranges = [];
+  let from = text.indexOf('{/*');
+  while (from >= 0) {
+    const close = text.indexOf('*/}', from + 3);
+    const to = close < 0 ? text.length : close + 3;
+    ranges.push([from, to]);
+    from = text.indexOf('{/*', to);
+  }
+  return ranges;
+}
+
+// Сканер тап-таргетов по открывающему тегу <button>/<input>. Тег разбирается
+// целиком (с учётом {} и кавычек), иначе `=>` в onClick обрывает поиск.
+// Размеры — числом или строкой ('32px'): minHeight < 44, height < 44, либо
+// width < 44 при авто-высоте (иконка без паддинга). Чекбокс/радио пропускаем:
+// цель — <label> в 44px вокруг.
+function tapTargetViolations(text) {
+  const violations = [];
+  const comments = jsxCommentRanges(text);
   for (const m of text.matchAll(/<(button|input)\b/g)) {
-    // Открывающий тег целиком: стрелки onClick не должны обрывать разбор.
+    const before = text.slice(0, m.index);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const inComment =
+      comments.some(([from, to]) => m.index >= from && m.index < to) ||
+      before.slice(lineStart).trimStart().startsWith('//');
+    if (inComment) continue;
     let curly = 0;
     let quote = null;
     let end = -1;
@@ -548,23 +574,64 @@ for (const hook of [
         break;
       }
     }
-    if (end < 0) continue;
-    const tag = text.slice(m.index, end);
-    // У нативного чекбокса/радио цель — <label> вокруг, а не сам 18px квадрат.
-    if (/type=["'](checkbox|radio)["']/.test(tag)) continue;
-    const at = text.slice(0, m.index).split('\n').length;
-    const minH = Number(/minHeight:\s*(\d+)/.exec(tag)?.[1] ?? 0);
-    const w = Number(/(?:^|[\s{,])width:\s*(\d+)\b/.exec(tag)?.[1] ?? 0);
-    const h = Number(/(?:^|[\s{,])height:\s*(\d+)\b/.exec(tag)?.[1] ?? 0);
-    if (minH && minH < 44) small.push(`:${at} minHeight ${minH}px`);
-    else if (!minH && w && h && w < 44 && h < 44) {
-      small.push(`:${at} ${w}×${h}px`);
+    const at = before.split('\n').length;
+    if (end < 0) {
+      violations.push(`${at}: тег не разобран`);
+      continue;
     }
+    const tag = text.slice(m.index, end);
+    if (/type=["'](checkbox|radio)["']/.test(tag)) continue;
+    const px = (name) => {
+      const found = new RegExp(`${name}:\\s*['"]?(\\d+)(?:px)?['"]?`).exec(tag);
+      return found ? Number(found[1]) : 0;
+    };
+    const minH = px('minHeight');
+    const h = px('height');
+    const w = px('width');
+    if (minH && minH < 44) violations.push(`${at}: minHeight ${minH}px`);
+    else if (h && h < 44) violations.push(`${at}: height ${h}px`);
+    else if (!h && w && w < 44) violations.push(`${at}: width ${w}px`);
   }
-  if (small.length) {
-    fails.push(`TAP-44 в ${NOTES_UI}: ${small.slice(0, 3).join(', ')}`);
+  return violations;
+}
+
+// Самопроверка: одна строка в парсере не должна тихо отключать гейд, поэтому
+// прогоняем известные регрессы. Последний образец — тот баг, который уже был:
+// "audio/*" в атрибуте выключал весь остаток файла.
+for (const [sample, expectBad, label] of [
+  ['<button style={{ minHeight: 24 }}>x</button>', true, 'minHeight 24'],
+  ["<button style={{ minHeight: '32px' }}>x</button>", true, "minHeight '32px'"],
+  ['<button style={{ width: 44, height: 24 }}>x</button>', true, 'width 44 + height 24'],
+  ["<button style={{ width: '36px', height: '36px' }}>x</button>", true, "width/height '36px'"],
+  ['<button style={{ height: 34 }}>x</button>', true, 'height 34 без width'],
+  ['<button style={{ width: 24 }}>x</button>', true, 'width 24 без height'],
+  ["<button onClick={() => go('x')}>x</button>", false, 'стрелка без размеров'],
+  ["<button style={{ ...btn('ghost'), minHeight: 44 }}>x</button>", false, 'btn + 44'],
+  ['<input type="checkbox" style={{ width: 18, height: 18 }} />', false, 'чекбокс в label'],
+  ['// <button style={{ minHeight: 24 }}>x</button>', false, 'закомментированная кнопка'],
+  ['{/* <button style={{ minHeight: 24 }}>x</button> */}', false, 'JSX-комментарий'],
+  ['<button style={{ width: 44, height: 44 }}>x</button>', false, '44×44'],
+  [
+    '<input accept="audio/*" /><button style={{ minHeight: 24 }}>x</button>',
+    true,
+    'кнопка после "audio/*"',
+  ],
+]) {
+  const flagged = tapTargetViolations(sample).length > 0;
+  if (flagged !== expectBad) {
+    fails.push(`SELFTEST сканера заметок: "${label}" → ${flagged ? 'флаг' : 'пропуск'}`);
   }
 }
+
+if (!existsSync(join(root, NOTES_UI))) {
+  fails.push(`MISS file ${NOTES_UI}`);
+} else {
+  const notesViolations = tapTargetViolations(readFileSync(join(root, NOTES_UI), 'utf8'));
+  if (notesViolations.length) {
+    fails.push(`TAP-44 в ${NOTES_UI} — ${notesViolations.slice(0, 3).join('; ')}`);
+  }
+}
+
 
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
