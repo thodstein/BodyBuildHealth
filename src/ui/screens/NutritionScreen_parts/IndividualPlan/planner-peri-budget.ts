@@ -46,12 +46,21 @@ export interface PeriBudget {
   /** сколько углеводов РЕАЛЬНО несёт окно в рационе (после капов) */
   preCarbG: number;
   postCarbG: number;
-  /** г/ч интра-углеводов (движок переводит в граммы окна по длительности) */
+  /** г/ч интра-углеводов и СУММА за окно (после капа ёмкости по длительности) */
   intraCarbGPerH: number;
+  intraCarbG: number;
+  /** ёмкость интра-окна по длительности сессии (та же формула, что у движка) */
+  intraCapG: number;
   postProteinG: number;
   fluidMl: number;
   /** рекомендация движка ДО капов — показывается рядом, чтобы не «врать» */
-  recommended: { preCarbG: number; postCarbG: number; intraCarbGPerH: number; postProteinG: number };
+  recommended: {
+    preCarbG: number;
+    postCarbG: number;
+    intraCarbGPerH: number;
+    intraCarbG: number;
+    postProteinG: number;
+  };
   /** true, если кап сработал (рекомендация > ёмкости окна) */
   capped: boolean;
   meta: {
@@ -69,6 +78,15 @@ export interface PeriBudget {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Ёмкость интра-окна: 40 г/ч, коридор 30–90 г — ТА ЖЕ формула, что
+ * `mealCarbCapacityG('intra')` в `meal-plan-engine`. Дублируется осознанно:
+ * карточка не тянет движок в бандл, но числа обязаны совпадать.
+ */
+export function intraWindowCapacityG(durationMin: number): number {
+  return Math.round(Math.max(30, Math.min(90, (40 * (durationMin || 75)) / 60)));
+}
 
 function normalizeState(raw: any): PeriSyncState | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -193,21 +211,29 @@ export function resolvePeriBudget(args: ResolvePeriBudgetArgs): PeriBudget | nul
   const preCarbG = Math.min(plan.pre.carbsG, PERI_CAP_PRE_CARB_G);
   const postCarbG = Math.min(plan.post.carbsG, PERI_CAP_POST_CARB_G);
   const postProteinG = clamp(Math.round(plan.post.proteinG), PERI_MIN_POST_PROTEIN_G, PERI_CAP_POST_PROTEIN_G);
+  const _durMin = src.durationMin || 60;
+  const intraCapG = intraWindowCapacityG(_durMin);
+  const intraWantG = Math.round((plan.intra.carbsGPerH * _durMin) / 60);
+  const intraCarbG = Math.min(intraWantG, intraCapG);
   const capped =
     plan.pre.carbsG > PERI_CAP_PRE_CARB_G ||
     plan.post.carbsG > PERI_CAP_POST_CARB_G ||
-    plan.post.proteinG > PERI_CAP_POST_PROTEIN_G;
+    plan.post.proteinG > PERI_CAP_POST_PROTEIN_G ||
+    intraWantG > intraCapG;
 
   return {
     preCarbG: Math.round(preCarbG),
     postCarbG: Math.round(postCarbG),
     intraCarbGPerH: plan.intra.carbsGPerH,
+    intraCarbG,
+    intraCapG,
     postProteinG,
     fluidMl: plan.fluidTotalMl,
     recommended: {
       preCarbG: plan.pre.carbsG,
       postCarbG: plan.post.carbsG,
       intraCarbGPerH: plan.intra.carbsGPerH,
+      intraCarbG: intraWantG,
       postProteinG: plan.post.proteinG,
     },
     capped,
@@ -229,6 +255,8 @@ export interface EnginePeriBudget {
   preCarbG: number;
   postCarbG: number;
   intraCarbGPerH: number;
+  /** сумма углеводов интра-окна за сессию (после капа ёмкости); приоритетнее г/ч */
+  intraCarbG?: number;
   postProteinG: number;
 }
 
@@ -238,6 +266,7 @@ export function periBudgetForEngine(b: PeriBudget | null): EnginePeriBudget | un
     preCarbG: b.preCarbG,
     postCarbG: b.postCarbG,
     intraCarbGPerH: b.intraCarbGPerH,
+    intraCarbG: b.intraCarbG,
     postProteinG: b.postProteinG,
   };
 }

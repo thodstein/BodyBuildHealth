@@ -21,6 +21,7 @@ import {
   clearPeriSync,
   resolvePeriBudget,
   periBudgetForEngine,
+  intraWindowCapacityG,
   PERI_CAP_PRE_CARB_G,
   PERI_CAP_POST_CARB_G,
   PERI_SYNC_KEY,
@@ -162,6 +163,22 @@ describe('planner-peri-budget: единый бюджет пери-окон', () 
     expect(e.postProteinG).toBe(b.postProteinG);
   });
 
+  it('интра-окно: сумма за сессию и ёмкость — как у движка', () => {
+    writePeriSync({ source: 'plan', tonnageKg: 12000, durationMin: 90, intensity: 'high' });
+    const b = resolvePeriBudget({ bodyWeight: 90, goal: 'strength' })!;
+    expect(b.intraCapG).toBe(intraWindowCapacityG(90));
+    expect(b.intraCarbG).toBeLessThanOrEqual(b.intraCapG);
+    expect(b.recommended.intraCarbG).toBeGreaterThanOrEqual(b.intraCarbG);
+    expect(periBudgetForEngine(b)!.intraCarbG).toBe(b.intraCarbG);
+
+    // Длинная сессия: желание протокола упирается в ёмкость окна (≤90 г).
+    writePeriSync({ source: 'plan', tonnageKg: 30000, durationMin: 180, intensity: 'high' });
+    const l = resolvePeriBudget({ bodyWeight: 90, goal: 'strength' })!;
+    expect(l.intraCapG).toBe(intraWindowCapacityG(180));
+    expect(l.intraCarbG).toBeLessThanOrEqual(l.intraCapG);
+    if (l.recommended.intraCarbG > l.intraCapG) expect(l.capped).toBe(true);
+  });
+
   it('нет источника нагрузки → null → движку ничего не передаётся', () => {
     expect(resolvePeriBudget({ bodyWeight: 80 })).toBeNull();
     expect(periBudgetForEngine(null)).toBeUndefined();
@@ -211,6 +228,17 @@ describe('meal-plan-engine: пери-бюджет не ломает ≤3% и с�
     const p = buildDayPlan(withBudget);
     expect(devPct(p.totals?.kcal || 0, withBudget.goalKcal)).toBeLessThanOrEqual(5);
     expect(devPct(p.totals?.p || 0, withBudget.goalProteinG!)).toBeLessThanOrEqual(5);
+  });
+
+  it('интра-окно несёт сумму бюджета (`intraCarbG`), а не пересчёт «сколько выйдет»', () => {
+    const p = buildDayPlan(
+      base({
+        randomSalt: 13,
+        periBudget: { preCarbG: 50, postCarbG: 60, intraCarbGPerH: 40, intraCarbG: 45, postProteinG: 35 },
+      }),
+    );
+    const intra = p.meals.find((m: any) => m.type === 'intra');
+    if (intra) expect(Math.abs(carbOf(intra) - 45)).toBeLessThanOrEqual(8);
   });
 
   it('матрица профилей: с бюджетом и без — углеводы те же, канон 3% держится', () => {

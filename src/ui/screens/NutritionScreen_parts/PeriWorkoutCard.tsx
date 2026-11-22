@@ -213,9 +213,9 @@ export const PeriWorkoutCard: React.FC = () => {
   const dispIntraPerH = budget ? budget.intraCarbGPerH : plan.intra.carbsGPerH;
   const dispVol = overrideVol || (budget?.meta.tonnageKg ?? sessionVolume);
   const dispDur = overrideDur || (budget?.meta.durationMin ?? durationMin);
-  // Движок считает окно «во время» в ГРАММАХ: г/ч × длительность. Сравнивать г/ч
-  // с фактом интра-приёма (граммы) нельзя — это разные единицы.
-  const dispIntraG = Math.round((dispIntraPerH * (dispDur || 60)) / 60);
+  // Движок считает окно «во время» в ГРАММАХ: г/ч × длительность, с капом ёмкости
+  // (40 г/ч, 30–90 г). Бюджет отдаёт уже посчитанную сумму — сравнение честное.
+  const dispIntraG = budget ? budget.intraCarbG : Math.round((dispIntraPerH * (dispDur || 60)) / 60);
 
   const openPopup = useCallback(
     (kind: Exclude<PopupKind, null>) => {
@@ -694,6 +694,12 @@ export const PeriWorkoutCard: React.FC = () => {
                 · {dispIntraPerH} г/ч · {plan.intra.fluidMlPerH} мл/ч
               </span>
             </div>
+            {budget && budget.recommended.intraCarbG > dispIntraG ? (
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                рекомендация протокола {budget.recommended.intraCarbG} г — в окно влезает до {dispIntraG} г (ёмкость{' '}
+                {budget.intraCapG} г при {budget.meta.durationMin} мин)
+              </div>
+            ) : null}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.4 }}>
               {plan.intra.note}
             </div>

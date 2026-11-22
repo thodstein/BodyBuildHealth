@@ -409,15 +409,17 @@ export interface MealPlanInput {
   carbAutoCycle?: boolean;
   /**
    * Пери-бюджет из плана тренировок (`planner-peri-budget.ts`). Задан — окна
-   * до/после несут РОВНО эти граммы (в пределах ёмкости приёма), а разница
-   * остаётся в основных приёмах. Дневная сумма углеводов/белка не меняется —
-   * сходимость КБЖУ ≤3% не задевается. undefined = прежние доли CARB_W
-   * (поведение байт-в-байт для старых вызовов и тестов).
+   * до/во время/после несут РОВНО эти граммы (в пределах ёмкости приёма), а
+   * разница остаётся в основных приёмах. Дневная сумма углеводов/белка не
+   * меняется — сходимость КБЖУ ≤3% не задевается. undefined = прежние доли
+   * CARB_W (поведение байт-в-байт для старых вызовов и тестов).
    */
   periBudget?: {
     preCarbG: number;
     postCarbG: number;
     intraCarbGPerH: number;
+    /** сумма за интра-окно (после капа ёмкости); если задана — приоритетнее г/ч */
+    intraCarbG?: number;
     postProteinG: number;
   };
   /**
@@ -8858,7 +8860,10 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         _targets.postw = Math.min(Math.round(_periOver.postCarbG), _capOf('postw'));
       }
       if (intraEligible && _keep.has('intra')) {
-        const _intraG = Math.round((_periOver.intraCarbGPerH * (input.trainDurationMin ?? 60)) / 60);
+        const _intraG =
+          typeof _periOver.intraCarbG === 'number'
+            ? Math.round(_periOver.intraCarbG)
+            : Math.round((_periOver.intraCarbGPerH * (input.trainDurationMin ?? 60)) / 60);
         if (_intraG > 0) _targets.intra = Math.min(_intraG, _capOf('intra'));
       }
       const _mains = _roles.filter((r) => r === 'breakfast' || r === 'lunch' || r === 'dinner');
