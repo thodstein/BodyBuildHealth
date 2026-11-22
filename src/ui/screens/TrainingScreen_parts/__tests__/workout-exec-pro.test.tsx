@@ -662,6 +662,35 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     localStorage.clear();
   });
 
+  it('основная часть: полный редактор только у текущего упражнения, остальные — шапкой', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь/спина',
+      exercises: [
+        { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }, { weight: 80, reps: 8, rir: 2 }] },
+        { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }, { weight: 60, reps: 10, rir: 2 }] },
+      ],
+    }];
+    const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь/спина" />);
+    fireEvent.click(findBtn(container, 'Начать тренировку')!);
+    fireEvent.click(findBtn(container, 'К основной части')!);
+
+    // Два упражнения, но раскрыто одно: у второго — шапка, цель строкой и «▶ Развернуть».
+    expect(container.querySelectorAll('[data-act="open-exercise"]').length).toBe(1);
+    expect(container.querySelectorAll('[data-pl="set-queue"]').length).toBe(1);
+    expect(container.querySelectorAll('[data-pl="ex-summary"]').length).toBe(1);
+    expect(container.textContent).toContain('цель 2×10 · 60 кг');
+    expect(container.textContent).toContain('Тяга штанги');
+    fireEvent.click(container.querySelector('[data-act="open-exercise"]') as HTMLElement);
+    expect(container.querySelectorAll('[data-act="open-exercise"]').length).toBe(0);
+    expect(container.querySelectorAll('[data-pl="set-queue"]').length).toBe(2);
+
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
+
   it('незавершённая сессия: главное действие — «Продолжить», «Начать заново» с подтверждением', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();

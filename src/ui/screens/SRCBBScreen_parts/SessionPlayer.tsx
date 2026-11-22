@@ -196,6 +196,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [warmupOpen, setWarmupOpen] = useState<Record<number, boolean>>({});
   const [coolOpen, setCoolOpen] = useState<Record<number, boolean>>({});
   const [openSet, setOpenSet] = useState<Record<string, boolean>>({});
+  const [exOpen, setExOpen] = useState<Record<number, boolean>>({});
   const [doneMoreOpen, setDoneMoreOpen] = useState(false);
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
@@ -630,7 +631,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     autoSupersetKeyRef.current = '';
     applyPlanSupersets();
     // Новая сессия — прошлые раскрытия/свёрнутости не переносим.
-    setOpenSet({}); setEditSet({}); setDoneMoreOpen(false); setWarmupOpen({}); setCoolOpen({});
+    setOpenSet({}); setEditSet({}); setDoneMoreOpen(false); setWarmupOpen({}); setCoolOpen({}); setExOpen({});
     
     const riskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
@@ -910,6 +911,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   };
 
   const keyFor = (ei: number, si: number) => `${ei}_${si}`;
+
+  // Какое упражнение идёт сейчас: первое, где остались незаписанные подходы.
+  // Остальные в зале нужны шапкой — полный редактор у них держим свёрнутым.
+  const currentExIdx = useMemo(() => {
+    if (!day || !Array.isArray(day.exercises)) return -1;
+    return day.exercises.findIndex((ex, ei) => (ex.targetSets || []).some((_, si) => !actual[`${ei}_${si}`]));
+  }, [day, actual]);
 
   const logOne = (ei: number, si: number) => {
      if (!session || !day || !Array.isArray(day.exercises)) return;
@@ -1948,9 +1956,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           );
                         })()}
                       </div>
+                      {!(ei === currentExIdx || !!exOpen[ei]) && (
+                        <button type="button" data-act="open-exercise" onClick={() => { hapticImpact('light'); setExOpen(p => ({ ...p, [ei]: true })); }}
+                          style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0, minHeight: 34 }}>
+                          ▶ Развернуть
+                        </button>
+                      )}
                     </div>
                   )}
-                 
+                  
                   {/* индикатор прогресса упражнения */}
                   <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
                     {ex.targetSets.map((_, si) => (
@@ -1964,7 +1978,19 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                        {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
                      </span>
                     </div>
-<MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />
+{(ei === currentExIdx || !!exOpen[ei]) && <MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />}
+                    {/* Свёрнутое упражнение: вместо редакторов — цель одной строкой. */}
+                    {!(ei === currentExIdx || !!exOpen[ei]) && (() => {
+                      const t0 = ex.targetSets[0];
+                      if (!t0) return null;
+                      const tLast = ex.targetSets[ex.targetSets.length - 1];
+                      const w = t0.weight === tLast.weight ? `${t0.weight}` : `${t0.weight}–${tLast.weight}`;
+                      return (
+                        <div data-pl="ex-summary" style={{ fontSize: 10, color: '#fff', opacity: 0.72, marginTop: 3 }}>
+                          цель {ex.targetSets.length}×{t0.reps} · {w} кг
+                        </div>
+                      );
+                    })()}
                     {/* Суперсет/круг — визуальная последовательность и отдых */}
                     {(supersetMode || circuitMode) && supersetExercises.length > 1 && (
                       <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: supersetMode ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)', border: `1px solid ${supersetMode ? 'rgba(245,158,11,0.22)' : 'rgba(139,92,246,0.22)'}` }}>
@@ -1997,7 +2023,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                    // Текущий подход — первый незаписанный (или раскрытый пользователем);
                    // остальные ждут строкой в очереди, а не полным редактором на весь экран.
                    const firstUnlogged = ex.targetSets.findIndex((_, si2) => !actual[keyFor(ei, si2)]);
-                   const isCurrent = si === firstUnlogged || !!openSet[k];
+                   const isCurrent = (ei === currentExIdx || !!exOpen[ei]) && (si === firstUnlogged || !!openSet[k]);
                  const targetRPE = 10 - t.rir;
                  const dW = a.weight - t.weight;
                  const dR = a.reps - t.reps;
@@ -2191,6 +2217,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 })}
               {/* Подходы, до которых ещё не дошли: строка вместо полного редактора. */}
               {(() => {
+                // У свёрнутого упражнения очередь не нужна — оно живёт одной шапкой.
+                if (!(ei === currentExIdx || !!exOpen[ei])) return null;
                 const firstUnlogged = ex.targetSets.findIndex((_, si) => !actual[keyFor(ei, si)]);
                 const queued = ex.targetSets
                   .map((t, si) => ({ t, si, k: keyFor(ei, si) }))
@@ -2764,10 +2792,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 // Итог — конечный экран плеера: явный выход обратно в зону проведения.
                 try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* ignore */ }
               }}>✓ Готово — к тренировкам</button>
-              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setDoneMoreOpen(false); setOpenSet({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
+              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setDoneMoreOpen(false); setOpenSet({}); setExOpen({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
             {days.length > 1 && dayIdx < days.length - 1 && (
               <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
-                setDone(null); setDoneMoreOpen(false); setOpenSet({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
+                setDone(null); setDoneMoreOpen(false); setOpenSet({}); setExOpen({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
                 setPhase('ready'); setDayIdx(dayIdx + 1);
               }}>
                 ➡ Следующий день: {days[dayIdx + 1]?.label} ({dayIdx + 2}/{days.length})
