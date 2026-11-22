@@ -47,4 +47,18 @@ describe('DiaryRecordingForm — «+» на конкретном упражне�
     expect(text).toContain('3 подхода');
     expect(firstBlock).not.toContain('3 подхода');
   });
+
+  it('сохранение доступно в шапке формы, а не только в самом низу', () => {
+    const { container } = renderForm();
+    const top = container.querySelector('[data-act="record-save-top"]');
+    expect(top).not.toBeNull();
+    // Главная кнопка «💾 Сохранить тренировку» остаётся внизу — не дублируем её текст
+    const bottom = Array.from(container.querySelectorAll('button')).find((b) =>
+      (b.textContent || '').includes('Сохранить тренировку'),
+    );
+    expect(bottom).toBeTruthy();
+    expect(container.innerHTML.indexOf('record-save-top')).toBeLessThan(
+      container.innerHTML.indexOf('Сохранить тренировку'),
+    );
+  });
 });

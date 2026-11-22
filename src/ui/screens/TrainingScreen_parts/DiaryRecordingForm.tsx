@@ -397,6 +397,15 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
             <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10 }}>↩</button>
           )}
           {totalSets > 0 && <span style={{ fontSize: 10, color: '#fff' }}>{ruCount(totalSets, RU_SETS)} · {totalVolume.toLocaleString()} кг</span>}
+          {/* Сохранение в шапке: сама кнопка живёт в самом низу формы, до неё
+              надо было проскроллить все упражнения — «непонятно, как сохранить». */}
+          {totalSets > 0 && (
+            <button type="button" data-act="record-save-top" onClick={handleSaveWorkout}
+              title="Сохранить тренировку" aria-label="Быстрое сохранение тренировки"
+              style={{ padding: '4px 10px', minHeight: 32, borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              💾 Сохранить
+            </button>
+          )}
         </div>
       </div>
 
