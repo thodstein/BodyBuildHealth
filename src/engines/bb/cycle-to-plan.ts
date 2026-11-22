@@ -17,6 +17,7 @@ import { isRearDeltExercise, isMobilityRestricted } from './bb-builder.engine';
 import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
 import { PCT_FOR_RIR } from '../rir-table';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { localIsoDate } from '../../core/local-date';
 import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
 import { adaptForPEDs, computeAASEquivDose, type PED, type CourseIntensity } from './bb-ped-adaptation.engine';
@@ -74,7 +75,8 @@ function computeAcwrCyclePlan(): { ratio: number; zone: 'undertrained' | 'optima
 
 function addDaysISO(from: string, days: number): string {
   const d = new Date(from + 'T00:00:00');
-  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  // Проход 200: неразборная дата — сегодняшний календарный день, не UTC-день.
+  if (isNaN(d.getTime())) return localIsoDate();
   d.setDate(d.getDate() + days);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
@@ -1296,7 +1298,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const phases = meta.phases && meta.phases.length > 0 ? meta.phases : undefined;
 
   // Injury exclusions — используем planStartWeek для per-week оценки травм (fix F)
-  const today = (input as any).planStartWeek || new Date().toISOString().slice(0, 10);
+  // Проход 200: без явной даты старта — сегодняшний календарный день, не UTC-день.
+  const today = (input as any).planStartWeek || localIsoDate();
   const excludedMuscles = getExcludedMuscles(injuries, today);
   const gradedInjuries = getGradedInjuries(injuries, today);
 
@@ -2394,7 +2397,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const specSchedule = buildSpecializationSchedule(
     focusGroup, weakPoints, opts.specialization, totalWeeks, opts.specializationSchedule,
   );
-  const _todayProgram = (opts as any).planStartWeek || new Date().toISOString().slice(0, 10);
+  // Проход 200: опорный день для травм — календарный, как и в цикловом пути.
+  const _todayProgram = (opts as any).planStartWeek || localIsoDate();
   const excludedMuscles = getExcludedMuscles(opts.injuries || [], _todayProgram);
   const gradedInjuries = getGradedInjuries(opts.injuries || [], _todayProgram);
   const exclIds = new Set(opts.excludedExercises || []);

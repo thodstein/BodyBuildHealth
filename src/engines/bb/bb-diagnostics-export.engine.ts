@@ -8,6 +8,7 @@ import { auditPlanExercises } from './bb-plan-exercise-audit.engine';
 import { exerciseEffectScore } from './bb-exercise-effect.engine';
 import { auditHeadCoverage } from './bb-stimulus-target.engine';
 import { BB_VERIFICATION_LABEL_RU } from './bb-scoring.engine';
+import { localIsoDate } from '../../core/local-date';
 
 function esc(s: string): string {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -135,7 +136,9 @@ export interface BBDiagnosticsPro2Meta {
 }
 
 export function buildBBDiagnosticsHtml(report: BBDiagnosticsReport, meta?: { date?: string; level?: string; plan?: any; weakHeads?: string[]; weakCauses?: Record<string, { cause: string; confidence: number; evidence: string[]; fix: string }>; specBlock?: { lengthWeeks: number; donors: string[]; rationale: string[]; weeks: Array<{ week: number; targetSets: Record<string, number>; frequency: Record<string, number>; note: string }> } | null } & BBDiagnosticsPro2Meta): string {
-  const date = meta?.date || new Date().toISOString().slice(0, 10);
+  // Проход 200: дата отчёта — календарный день, который видит человек. UTC-день
+  // вечером в UTC+3…+12 давал «вчера» в подписи выгрузки.
+  const date = meta?.date || localIsoDate();
   const level = meta?.level || '';
   const rowsWeak = report.weakCandidates.map(c => `<tr><td>${esc(c.muscle)}</td><td>${esc(c.granular || '')}</td><td>${esc(c.source)}</td><td>${c.deltaPct == null ? 'вручную' : `${c.deltaPct}%`}</td><td>${esc(c.reason)}</td></tr>`).join('') || '<tr><td colspan="5">— баланс</td></tr>';
   const rowsSym = Object.entries(report.symmetry.ratios).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('') || '<tr><td colspan="2">—</td></tr>';

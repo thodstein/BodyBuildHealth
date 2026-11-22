@@ -14,6 +14,7 @@ import { ruCount, RU_SETS } from '../ru-plural';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { bbSessionTagLabel } from './bb-session-tags';
 import { icsProperty } from '../ics-format';
+import { localIsoDate } from '../../core/local-date';
 
 /** Русская подпись мышцы для печати (сырые ключи в печати — дефект: замер
  *  2507/2946 ячеек были ключами `delt_mid`/`back`). Неизвестный ключ не теряем. */
@@ -225,7 +226,9 @@ export function bbWeekDateRanges(plan: BBPlan, opts?: { startDate?: string; refe
     // Без даты — только пометка фазы (диапазоны не вычислимы).
     return plan.weeks.map(w => ({ week: w.week, start: '', end: '', isCurrent: false }));
   }
-  const refStr = ref || new Date().toISOString().slice(0, 10);
+  // Проход 200: опорная дата «текущей недели» — календарный день. Прежний
+  // UTC-день вечером в UTC+10 уже был «вчера» и снимал 📍 с текущей недели.
+  const refStr = ref || localIsoDate();
   return plan.weeks.map(w => {
     const s = addDaysIso(start, (w.week - 1) * 7);
     const e = addDaysIso(start, (w.week - 1) * 7 + 6);

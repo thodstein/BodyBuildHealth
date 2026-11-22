@@ -46,14 +46,6 @@ export interface BBDiaryFeedback {
   perMuscleACWR: Record<string, { ratio: number; zone: string }>;
 }
 
-function weekKey(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return dateStr.slice(0, 10);
-  const day = d.getDay() || 7;
-  d.setDate(d.getDate() - (day - 1));
-  return d.toISOString().slice(0, 10);
-}
-
 function e1rmForSet(w: number, r: number): number {
   return epley1RM(w, r);
 }
@@ -151,7 +143,7 @@ export function computeBBDiaryFeedback(plan: BBPlan | null | undefined, sessions
     weekly.push({ week: w.week, phase: (w as any).phase, plannedSets, completedSets: 0, plannedVolume, completedVolume: 0, adherencePct: null });
   }
 
-  // completed totals by weekKey
+  // completed totals: план без календаря раскладывает сессии по порядку недель
   const completedSessions = sessions.length;
   totalCompletedSets = sessions.reduce((s, sess) => s + (sess.exercises?.reduce((a, e) => a + (e.sets?.length || 0), 0) || 0), 0);
 
