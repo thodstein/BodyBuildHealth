@@ -3303,33 +3303,58 @@ export const IndividualPlanSettings: React.FC = () => {
       {/* ─── Синхронизация с пери-воркаут (по кнопке) ─── */}
       <GlassCard title="Синхронизация с пери-воркаут" icon="🔗" color="#00e68a">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          {/* P3: зона нажатия ≥44px — сам переключатель 36×20 обёрнут в 44×44. */}
           <button
-            onClick={() => setPeriSync(!periSync)}
+            onClick={() => {
+              if (!periSyncState) return;
+              setPeriSync(!periSync);
+            }}
+            disabled={!periSyncState}
             aria-pressed={periSync}
             aria-label="Синхронизировать пери-воркаут с планом тренировок"
+            title={
+              periSyncState
+                ? 'Применять пери-окна из синхронизированного плана тренировок'
+                : 'Сначала синхронизируйте пери-воркаут с планом тренировок'
+            }
             style={{
-              width: 36,
-              height: 20,
-              borderRadius: 10,
-              cursor: 'pointer',
+              width: 44,
+              height: 44,
+              padding: 0,
               border: 'none',
-              background: periSync ? '#00e68a' : 'rgba(255,255,255,0.7)',
-              position: 'relative' as const,
-              transition: 'background 0.2s',
+              background: 'transparent',
+              cursor: periSyncState ? 'pointer' : 'not-allowed',
+              opacity: periSyncState ? 1 : 0.45,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
             }}
           >
-            <div
+            <span
               style={{
-                width: 16,
-                height: 16,
-                borderRadius: '50%',
-                background: '#fff',
-                position: 'absolute',
-                top: 2,
-                left: periSync ? 18 : 2,
-                transition: 'left 0.2s',
+                width: 36,
+                height: 20,
+                borderRadius: 10,
+                background: periSync ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                position: 'relative' as const,
+                display: 'block',
+                transition: 'background 0.2s',
               }}
-            />
+            >
+              <span
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  position: 'absolute',
+                  top: 2,
+                  left: periSync ? 18 : 2,
+                  transition: 'left 0.2s',
+                }}
+              />
+            </span>
           </button>
           <span style={{ fontSize: 10, color: periSync ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
             Брать пери-окна из плана тренировок
@@ -3337,8 +3362,9 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 8 }}>
           Тоннаж и длительность берутся из плана тренировок, окна «до / во время / после» становятся такими же, как в
-          карточке «Пери-воркаут». Синхронизация — только по кнопке: рацион сам не меняется. Дневная сумма углеводов
-          сохраняется (КБЖУ не расходится больше 3%).
+          карточке «Пери-воркаут». Синхронизация — только по кнопке: рацион сам не меняется. Тумблер включается после
+          синка и лишь разрешает рациону брать эти окна. Дневная сумма углеводов сохраняется (КБЖУ не расходится больше
+          3%).
         </div>
         {periSyncState ? (
           <div
@@ -3371,7 +3397,8 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         ) : (
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
-            Синка нет — окна считаются по последней завершённой сессии.
+            Синка нет — рацион пока не перенимает пери-окна (в приёмах обычные доли). Карточка «Пери-воркаут» до синка
+            показывает протокол от последней завершённой сессии.
           </div>
         )}
         <div style={{ display: 'flex', gap: 6 }}>

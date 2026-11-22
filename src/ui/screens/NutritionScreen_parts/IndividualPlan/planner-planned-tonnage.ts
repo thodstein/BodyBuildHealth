@@ -109,6 +109,16 @@ function aggregateDay(day: any, index: number): DayAggregate {
   return { label, tonnage, sets };
 }
 
+/** Сколько дней в текущем плане тренировок (0 — плана нет). */
+export function plannedDayCount(): number {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PL_RUNTIME_KEY) || 'null');
+    return Array.isArray(raw?.days) ? raw.days.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Плановый тоннаж из `he_pl_runtime`.
  * @param opts.dowIndex — день недели (0 = Пн) для выбора дня 7-дневного плана.

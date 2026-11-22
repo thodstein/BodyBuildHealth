@@ -221,11 +221,28 @@ export interface Meal {
   };
 }
 
+/**
+ * Пери-окна, которые движок реально применил в рационе. Карточка «Пери-воркаут»
+ * читает ЭТИ числа (а не свой пересчёт) — иначе окна в карточке и в приёмах
+ * расходились из-за разных веса/цели на входе.
+ */
+export interface AppliedPeriWindows {
+  /** цель окон, которую движок применил (доли бюджета) */
+  preCarbG: number;
+  postCarbG: number;
+  intraCarbG: number;
+  postProteinG: number;
+  /** построено ли окно физически (нет приёма — 0 г и false) */
+  built: { prew: boolean; postw: boolean; intra: boolean };
+  /** ФАКТИЧЕСКАЯ тарелка окон — ровно то, что видно в рационе */
+  actual: { preCarbG: number; postCarbG: number; intraCarbG: number; postProteinG: number };
+}
+
 export interface DayPlanV2 {
   dayIndex: number;
   isTrainingDay: boolean;
   meals: Meal[];
-  totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number };
+  totals: { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number; na?: number };
   mpsSummary: {
     feedings: number;
     avg_leucine_g: number;
@@ -256,6 +273,8 @@ export interface DayPlanV2 {
     variety: number;
     micro: number;
   };
+  /** Применённые пери-окна (см. AppliedPeriWindows). Нет поля — окна не строились. */
+  peri?: AppliedPeriWindows;
 }
 
 export interface MealPlanInput {
@@ -1848,6 +1867,35 @@ function fdDensityMap(): Map<string, any> {
     for (const f of FOOD_DB as any[]) _fdDensityById.set(String(f.id), f);
   }
   return _fdDensityById;
+}
+/**
+ * Натрий позиций = FOOD_DB × ФИНАЛЬНАЯ граммовка.
+ *
+ * `na` ставится один раз в `makeItem`, но порции дальше правят десятки проходов
+ * напрямую (баланс между приёмами, подрезка тарелки, стражи пери-окон, добивки).
+ * Поле оставалось от исходной порции — соль в приёме врала относительно того, что
+ * человек реально съест. Здесь одна точка правды в конце сборки дня.
+ */
+function refreshItemSodium(meals: any[], totals?: any): void {
+  const byId = fdDensityMap();
+  let daySum = 0;
+  for (const m of meals || []) {
+    let sum = 0;
+    for (const it of m?.items || []) {
+      const fd: any = byId.get(String(it?.id));
+      const amount = Number(it?.amount) || 0;
+      if (fd && amount > 0) {
+        const per100 = Number(getMicroFromFood(fd, 'Na')) || 0;
+        // Продукт известен и несёт натрий — пересчитываем по факту порции.
+        if (per100 > 0) it.na = Math.round((per100 * amount) / 100);
+      }
+      const na = Number(it?.na) || 0;
+      if (na > 0) sum += na;
+    }
+    if (m && m.totals) m.totals.na = Math.round(sum);
+    daySum += sum;
+  }
+  if (totals) totals.na = Math.round(daySum);
 }
 function sanitizeItemNutrients(meals: any[]): number {
   const byId = fdDensityMap();
@@ -9000,9 +9048,9 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         : periBudget.postworkoutG;
     let _prewP = _prewP0;
     let _postwP = _postwP0;
-    // Дневная цель белка сохраняется: заменяем ЛИШЬ вклад окон, остальные части
-    // пери-бюджета (интра и пр.) остаются в сумме.
-    let periProteinFixed = periBudget.totalG - periBudget.preworkoutG - periBudget.postworkoutG + _prewP + _postwP;
+    // Дневная цель белка сохраняется: окна несут свои бюджеты, а «прочая» часть
+    // пери-бюджета (интра и пр.) остаётся в дневной сумме как есть.
+    let periProteinFixed = _prewP + _postwP + (periBudget.totalG - periBudget.preworkoutG - periBudget.postworkoutG);
     const evenRegularP = (() => {
       if (regularCount === 0) return 0;
       if (trainWindow) {
@@ -27241,13 +27289,50 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         );
       }
     }
+    // Соль по приёмам — по ФАКТУ финальных порций (см. refreshItemSodium).
+    refreshItemSodium(meals, totals);
     // §8.123: последняя точка обещаний — витрина пери-окна = факт тарелки.
     reconcilePeriPromises123(meals, notes);
+    // Фактическая тарелка окон: карточка показывает её как «что в рационе», а цель
+    // окна (доли бюджета) — отдельно. Иначе «до 55 г» в карточке спорило с приёмом.
+    const _periActualOf = (type: string, key: 'c' | 'p'): number => {
+      const m: any = (meals as any[]).find((x: any) => x.type === type);
+      if (!m) return 0;
+      const its: any[] = Array.isArray(m.items) ? m.items : [];
+      return Math.round(
+        its.length > 0
+          ? its.reduce((s: number, it: any) => s + (Number(it[key]) || 0), 0)
+          : Number(m?.totals?.[key]) || 0,
+      );
+    };
+    const _periActual = {
+      preCarbG: _periActualOf('preworkout', 'c'),
+      postCarbG: _periActualOf('postworkout', 'c'),
+      intraCarbG: _periActualOf('intra', 'c'),
+      postProteinG: _periActualOf('postworkout', 'p'),
+    };
     return {
       dayIndex: input.dayOffset ?? 0,
       isTrainingDay: input.isTrainingDay,
       meals,
       totals,
+      // Пери-окна, которые реально применил движок: карточка «Пери-воркаут» показывает
+      // РОВНО эти числа (без своего пересчёта от другого веса/цели).
+      peri:
+        _periOver && trainWindow
+          ? {
+              preCarbG: _keep.has('prew') ? Math.round(prewCarbG) : 0,
+              postCarbG: _keep.has('postw') ? Math.round(postwCarbG) : 0,
+              intraCarbG: intraEligible && _keep.has('intra') ? Math.round(intraCarbG) : 0,
+              postProteinG: _keep.has('postw') ? Math.round(_postwP) : 0,
+              built: {
+                prew: _keep.has('prew') && prewCarbG > 0,
+                postw: _keep.has('postw') && postwCarbG > 0,
+                intra: !!intraEligible && _keep.has('intra') && intraCarbG > 0,
+              },
+              actual: _periActual,
+            }
+          : undefined,
       mpsSummary,
       diversity: { uniqueFoods: _finalFoodIds.size, categories: _finalCategories },
       microSummary: { coverage: _finalMicro.coverage, topDeficitNutrient: _finalMicro.topDeficitNutrient },

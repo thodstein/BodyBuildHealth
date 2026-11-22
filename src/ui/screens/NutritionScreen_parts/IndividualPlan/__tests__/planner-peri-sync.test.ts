@@ -8,8 +8,11 @@ import {
   sodiumToSaltG,
   sodiumLabel,
   sodiumTargetMg,
+  naAfterResize,
   SODIUM_RDA_MG,
 } from '../planner-meal-sodium';
+import { FOOD_DB } from '../../../../../core/nutrition-database';
+import { getMicroFromFood } from '../planner-micro-reader';
 import {
   readPlannedSession,
   readLastSessionInfo,
@@ -332,5 +335,90 @@ describe('соль по приёмам в готовом рационе', () => 
     expect(src).toContain('нет данных о соли');
     // ранний `return null` при нулевом натрии запрещён — иначе обещание «в каждом приёме» ложно
     expect(src).not.toMatch(/if \(!_na > 0\) return null/);
+  });
+
+  it('соль следует за порцией: naAfterResize (FOOD_DB × новая граммовка, фолбэк — пропорция)', () => {
+    expect(naAfterResize({ id: 'does_not_exist', amount: 100, na: 100 }, 50)).toBe(50);
+    expect(naAfterResize({ id: 'does_not_exist', amount: 100, na: 100 }, 200)).toBe(200);
+    expect(naAfterResize(null, 100)).toBe(0);
+    const salmon: any = FOOD_DB.find((f: any) => f.id === 'salmon');
+    if (salmon) {
+      const per100 = Number(getMicroFromFood(salmon, 'Na')) || 0;
+      if (per100 > 0) {
+        expect(naAfterResize({ id: 'salmon', amount: 100, na: 1 }, 200)).toBe(Math.round(per100 * 2));
+      }
+    }
+  });
+
+  it('движок пересчитывает na по ФИНАЛЬНОЙ порции (а не по исходной)', () => {
+    const p: any = buildDayPlan(base({ randomSalt: 6 }));
+    const items = p.meals.flatMap((m: any) => m.items || []).filter((it: any) => (it.na || 0) > 0);
+    expect(items.length).toBeGreaterThan(0);
+    for (const it of items) {
+      const food: any = FOOD_DB.find((f: any) => f.id === it.id);
+      if (!food) continue;
+      const per100 = Number(getMicroFromFood(food, 'Na')) || 0;
+      if (per100 > 0) expect(it.na).toBe(Math.round((per100 * it.amount) / 100));
+    }
+    // Итог дня по натрию = сумма приёмов
+    const byMeals = p.meals.reduce((s: number, m: any) => s + (m.totals?.na || 0), 0);
+    expect(Math.abs((p.totals?.na || 0) - byMeals)).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('применённые пери-окна: движок отдаёт карточке ровно свои числа', () => {
+  it('peri.* = окна, которые поставил движок (карточке нечего пересчитывать)', () => {
+    const p: any = buildDayPlan(
+      base({ randomSalt: 3, periBudget: { preCarbG: 55, postCarbG: 70, intraCarbGPerH: 45, postProteinG: 40 } }),
+    );
+    expect(p.peri).toBeTruthy();
+    // Цель окна — в пределах ёмкости приёма
+    expect(p.peri.preCarbG).toBeGreaterThan(0);
+    expect(p.peri.preCarbG).toBeLessThanOrEqual(PERI_CAP_PRE_CARB_G);
+    expect(p.peri.postCarbG).toBeGreaterThan(0);
+    expect(p.peri.postCarbG).toBeLessThanOrEqual(PERI_CAP_POST_CARB_G);
+    // Факт тарелки — ровно то, что видит пользователь в приёмах (карточка = рацион)
+    const pre = p.meals.find((m: any) => m.type === 'preworkout');
+    if (pre) expect(p.peri.actual.preCarbG).toBe(carbOf(pre));
+    const post = p.meals.find((m: any) => m.type === 'postworkout');
+    if (post) {
+      expect(p.peri.actual.postCarbG).toBe(carbOf(post));
+      const postP = (post.items || []).reduce((s: number, it: any) => s + (Number(it.p) || 0), 0);
+      expect(p.peri.actual.postProteinG).toBe(Math.round(postP));
+    }
+  });
+
+  it('без синка поля peri нет — старые вызовы не меняются', () => {
+    const p: any = buildDayPlan(base({ randomSalt: 3 }));
+    expect(p.peri).toBeUndefined();
+  });
+
+  it('короткая сессия (<75 мин): интра-окно не строится и в peri его нет', () => {
+    const p: any = buildDayPlan(
+      base({
+        randomSalt: 4,
+        trainDurationMin: 45,
+        periBudget: { preCarbG: 40, postCarbG: 50, intraCarbGPerH: 40, intraCarbG: 30, postProteinG: 30 },
+      }),
+    );
+    expect(p.meals.some((m: any) => m.type === 'intra')).toBe(false);
+    expect(p.peri?.built?.intra).toBe(false);
+    expect(p.peri?.intraCarbG).toBe(0);
+  });
+});
+
+describe('синк не врёт при провале записи', () => {
+  it('writePeriSync → null, если localStorage не пишет (квота)', () => {
+    const orig = localStorage.setItem.bind(localStorage);
+    try {
+      (localStorage as any).setItem = () => {
+        throw new Error('QuotaExceededError');
+      };
+      const st = writePeriSync({ source: 'plan', tonnageKg: 12000, durationMin: 75, intensity: 'high' });
+      expect(st).toBeNull();
+    } finally {
+      (localStorage as any).setItem = orig;
+    }
+    expect(readPeriSync()).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ import { computePeriWorkoutNutrition } from '../../../engines/nutrition-periwork
 import {
   readPeriSync,
   subscribePeriSync,
+  subscribeRationUpdated,
+  requestPeriApply,
   writePeriSync,
   clearPeriSync,
   resolvePeriBudget,
@@ -39,7 +41,9 @@ type PopupKind = null | 'intensity' | 'volume' | 'duration';
 
 export const PeriWorkoutCard: React.FC = () => {
   const linked = useDataLink();
-  const bw = linked.profile?.settings?.weight || 80;
+  // Вес — из тех же данных, что читает планировщик (personal.weight), иначе бюджет
+  // окна считался от другого числа и карточка с рационом расходились.
+  const bw = linked.profile?.settings?.personal?.weight || (linked.profile?.settings as any)?.weight || 80;
   const goal = linked.profile?.settings?.primaryGoal || 'strength';
   const training = linked.profile?.settings?.training;
   const pharma = linked.profile?.settings?.pharma;
@@ -51,11 +55,54 @@ export const PeriWorkoutCard: React.FC = () => {
   // ─── Синхронизация с планом тренировок (he_peri_sync, только по кнопке) ───
   const [syncState, setSyncState] = useState(() => readPeriSync());
   const [rationTick, setRationTick] = useState(0);
-  useEffect(() => subscribePeriSync(() => setSyncState(readPeriSync())), []);
   /** Плановый день из he_pl_runtime — источник кнопки «Взять из плана тренировок». */
-  const planned = useMemo(() => readPlannedSession(), []);
+  const planned = useMemo(() => readPlannedSession(), [rationTick]);
+  const last = useMemo(() => loadSessions()[0], [rationTick]);
+  // P2-fix: `planned`/`last` жили в useMemo([]) — после перегенерации плана карточка
+  // показывала старый тоннаж. Теперь обновляются по событиям синка и перезаписи рациона.
+  useEffect(() => {
+    const onSync = () => {
+      setSyncState(readPeriSync());
+      setRationTick((v) => v + 1);
+    };
+    const un1 = subscribePeriSync(onSync);
+    const un2 = subscribeRationUpdated(() => setRationTick((v) => v + 1));
+    return () => {
+      un1();
+      un2();
+    };
+  }, []);
+  /** Что движок РЕАЛЬНО применил в рационе (he_day_plan.peri) — эталон для чисел. */
+  const applied = useMemo(() => {
+    try {
+      const dp: any = JSON.parse(localStorage.getItem('he_day_plan') || 'null');
+      const p = dp?.peri;
+      if (!p || typeof p !== 'object') return null;
+      const a = p.actual && typeof p.actual === 'object' ? p.actual : {};
+      const n = (v: any) => Math.round(Number(v) || 0);
+      return {
+        preCarbG: n(p.preCarbG),
+        postCarbG: n(p.postCarbG),
+        intraCarbG: n(p.intraCarbG),
+        postProteinG: n(p.postProteinG),
+        built: {
+          prew: !!(p.built && p.built.prew),
+          postw: !!(p.built && p.built.postw),
+          intra: !!(p.built && p.built.intra),
+        },
+        // Факт тарелки того дня, что сохранён (ручные правки обновляют he_day_plan).
+        actual: {
+          preCarbG: n(a.preCarbG),
+          postCarbG: n(a.postCarbG),
+          intraCarbG: n(a.intraCarbG),
+          postProteinG: n(a.postProteinG),
+        },
+      };
+    } catch {
+      return null;
+    }
+  }, [rationTick, syncState]);
 
-  const last = useMemo(() => loadSessions()[0], []);
   const inferredIntensity =
     (last?.avgIntensity || 0) >= 8
       ? 'high'
@@ -192,6 +239,9 @@ export const PeriWorkoutCard: React.FC = () => {
     try {
       writePlannerPrefsPatch({ periSync: true });
     } catch {}
+    // И просим пересобрать рацион в ТЕКУЩЕЙ длине плана: иначе окна в приёмах
+    // остаются от прошлой генерации (карточка показывала ⚠ «перегенерируйте»).
+    requestPeriApply();
     setRationTick((v) => v + 1);
     try {
       (window as any).showToast?.('Пери-воркаут синхронизирован с планом тренировок', 'success');
@@ -206,16 +256,34 @@ export const PeriWorkoutCard: React.FC = () => {
   const syncStale = !!syncState?.signature && !!planned?.signature && syncState.signature !== planned.signature;
   const srcMeta = SOURCE_META[(budget?.meta.source || 'lastSession') as keyof typeof SOURCE_META];
 
-  // Показываем ИМЕННО бюджет окна (после капов) — те же числа, что в рационе.
-  const dispPreCarb = budget ? budget.preCarbG : plan.pre.carbsG;
-  const dispPostCarb = budget ? budget.postCarbG : plan.post.carbsG;
-  const dispPostProtein = budget ? budget.postProteinG : plan.post.proteinG;
+  // Карточка показывает ФАКТ рациона (те же числа, что в приёмах), а цель движка —
+  // в блоке «В рационе сейчас». При ручной правке тоннажа/длительности/интенсивности
+  // честнее пересчёт бюджета — тогда показываем бюджет/протокол.
+  const _sessionEdited = overrideVol > 0 || overrideDur > 0 || (!!syncState && intensity !== syncState.intensity);
+  const appliedNum = applied && !_sessionEdited ? applied : null;
+  // Числа окон = ФАКТ рациона (ровно как в приёмах): карточка и рацион не расходятся.
+  // Пока движок не применил бюджет (applied нет) — показываем бюджет/протокол.
+  const factOf = (k: 'preCarbG' | 'postCarbG' | 'intraCarbG' | 'postProteinG'): number | null => {
+    if (!appliedNum) return null;
+    const live = (inRation as any)?.[k];
+    return inRation.has && typeof live === 'number' ? Math.round(live) : appliedNum.actual[k];
+  };
+  const dispPreCarb = factOf('preCarbG') ?? (budget ? budget.preCarbG : plan.pre.carbsG);
+  const dispPostCarb = factOf('postCarbG') ?? (budget ? budget.postCarbG : plan.post.carbsG);
+  const dispPostProtein = factOf('postProteinG') ?? (budget ? budget.postProteinG : plan.post.proteinG);
   const dispIntraPerH = budget ? budget.intraCarbGPerH : plan.intra.carbsGPerH;
   const dispVol = overrideVol || (budget?.meta.tonnageKg ?? sessionVolume);
   const dispDur = overrideDur || (budget?.meta.durationMin ?? durationMin);
   // Движок считает окно «во время» в ГРАММАХ: г/ч × длительность, с капом ёмкости
   // (40 г/ч, 30–90 г). Бюджет отдаёт уже посчитанную сумму — сравнение честное.
-  const dispIntraG = budget ? budget.intraCarbG : Math.round((dispIntraPerH * (dispDur || 60)) / 60);
+  const dispIntraG =
+    factOf('intraCarbG') ?? (budget ? budget.intraCarbG : Math.round((dispIntraPerH * (dispDur || 60)) / 60));
+  /** Движок не строил интра-окно (короткая сессия / интра выключена) — не обещаем граммы. */
+  const intraNotBuilt = !!appliedNum && !appliedNum.built.intra;
+  // «Сколько влезает в окно» — цель, которую поставил движок (не факт тарелки).
+  const capPre = appliedNum ? appliedNum.preCarbG : dispPreCarb;
+  const capPost = appliedNum ? appliedNum.postCarbG : dispPostCarb;
+  const capIntra = appliedNum ? appliedNum.intraCarbG : dispIntraG;
 
   const openPopup = useCallback(
     (kind: Exclude<PopupKind, null>) => {
@@ -661,9 +729,9 @@ export const PeriWorkoutCard: React.FC = () => {
               {dispPreCarb}г{' '}
               <span style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>углеводов</span>
             </div>
-            {budget && budget.capped && budget.recommended.preCarbG > dispPreCarb ? (
+            {budget && Math.round(budget.recommended.preCarbG) > capPre + 2 ? (
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                рекомендация протокола {budget.recommended.preCarbG} г — в окно влезает до {dispPreCarb} г
+                протокол рекомендует {Math.round(budget.recommended.preCarbG)} г — в окно влезает до {capPre} г
               </div>
             ) : null}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.4 }}>
@@ -688,15 +756,25 @@ export const PeriWorkoutCard: React.FC = () => {
               </span>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>Во время</div>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>
-              {dispIntraPerH > 0 ? `${dispIntraG}г` : 'без углеводов'}{' '}
-              <span style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>
-                · {dispIntraPerH} г/ч · {plan.intra.fluidMlPerH} мл/ч
-              </span>
-            </div>
-            {budget && budget.recommended.intraCarbG > dispIntraG ? (
+            {intraNotBuilt ? (
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa' }}>В рационе интра-окно не строится</div>
+            ) : (
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>
+                {dispIntraPerH > 0 ? `${dispIntraG}г` : 'без углеводов'}{' '}
+                <span style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>
+                  · {dispIntraPerH} г/ч · {plan.intra.fluidMlPerH} мл/ч
+                </span>
+              </div>
+            )}
+            {intraNotBuilt ? (
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                рекомендация протокола {budget.recommended.intraCarbG} г — в окно влезает до {dispIntraG} г (ёмкость{' '}
+                Движок строит окно «во время» только для сессии ≥75 мин при включённом интра-питании — здесь его нет,
+                поэтому и граммов в рационе нет.
+              </div>
+            ) : null}
+            {!intraNotBuilt && budget && budget.recommended.intraCarbG > capIntra ? (
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                рекомендация протокола {budget.recommended.intraCarbG} г — в окно влезает до {capIntra} г (ёмкость{' '}
                 {budget.intraCapG} г при {budget.meta.durationMin} мин)
               </div>
             ) : null}
@@ -741,9 +819,15 @@ export const PeriWorkoutCard: React.FC = () => {
               {dispPostProtein}г{' '}
               <span style={{ fontSize: 10, fontWeight: 500, color: 'rgba(255,255,255,0.5)' }}>белка</span>
             </div>
-            {budget && budget.capped && budget.recommended.postCarbG > dispPostCarb ? (
+            {budget && Math.round(budget.recommended.postCarbG) > capPost + 2 ? (
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                рекомендация протокола {budget.recommended.postCarbG} г — в окно влезает до {dispPostCarb} г
+                протокол рекомендует {Math.round(budget.recommended.postCarbG)} г — в окно влезает до {capPost} г
+              </div>
+            ) : null}
+            {budget && Math.round(budget.recommended.postProteinG) > dispPostProtein + 2 ? (
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                протокол: {Math.round(budget.recommended.postProteinG)} г белка (0.35 г/кг) — в рационе{' '}
+                {dispPostProtein} г, остаток белка в основных приёмах.
               </div>
             ) : null}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.4 }}>
@@ -752,7 +836,7 @@ export const PeriWorkoutCard: React.FC = () => {
           </div>
 
           {/* ─── Что реально стоит в рационе (he_day_plan) ─── */}
-          {inRation.has ? (
+          {inRation.has && syncState && applied ? (
             <div style={{ ...modernCardBg, padding: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 14 }}>🍽️</span>
@@ -762,14 +846,30 @@ export const PeriWorkoutCard: React.FC = () => {
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {compareRow('До тренировки', '⏰', dispPreCarb, inRation.preCarbG, 'г У')}
-                {compareRow('Во время', '💧', dispIntraG, inRation.intraCarbG, 'г У')}
-                {compareRow('После — углеводы', '🔄', dispPostCarb, inRation.postCarbG, 'г У')}
-                {compareRow('После — белок', '🥩', dispPostProtein, inRation.postProteinG, 'г Б')}
+                {applied.built.prew
+                  ? compareRow('До тренировки', '⏰', applied.preCarbG, inRation.preCarbG, 'г У')
+                  : null}
+                {applied.built.intra
+                  ? compareRow('Во время', '💧', applied.intraCarbG, inRation.intraCarbG, 'г У')
+                  : null}
+                {applied.built.postw
+                  ? compareRow('После — углеводы', '🔄', applied.postCarbG, inRation.postCarbG, 'г У')
+                  : null}
+                {applied.built.postw
+                  ? compareRow('После — белок', '🥩', applied.postProteinG, inRation.postProteinG, 'г Б')
+                  : null}
               </div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4, marginTop: 6 }}>
-                Перегенерируйте рацион (кнопка в настройках), чтобы окна совпали с бюджетом: правки приёмов вручную
-                меняют факт.
+                Слева — что поставил движок, справа — фактическая тарелка. Ручные правки порций и подсказки рецептов
+                могут сдвинуть факт: кнопка «Взять из плана тренировок» пересобирает рацион заново.
+              </div>
+            </div>
+          ) : null}
+          {inRation.has && syncState && !applied ? (
+            <div style={{ ...CARD, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)' }}>
+              <div style={{ fontSize: 10, color: '#fbbf24', fontWeight: 700, lineHeight: 1.5 }}>
+                Синк есть, но рацион ещё не пересобран под него — окна в приёмах пока по обычным долям. Нажмите «Взять
+                из плана тренировок» или перегенерируйте план.
               </div>
             </div>
           ) : null}

@@ -42,8 +42,27 @@ export function itemSodiumMg(item: SodiumItemLike | null | undefined): number {
   return (per100 * (Number(item.amount) || 0)) / 100;
 }
 
-/** Натрий приёма в мг (по позициям, с фолбэком на totals). */
-export function mealSodiumMg(meal: SodiumMealLike | null | undefined): number {
+/**
+ * Натрий позиции ПОСЛЕ смены граммовки (ручная правка/ужатие порции).
+ * Приоритет — FOOD_DB × новая граммовка; если продукта в базе нет (коктейли,
+ * составные блюда) — пропорционально прежнему `na`. Иначе соль в приёме остаётся
+ * от старой порции: «порцию уменьшил вдвое, а соли столько же».
+ */
+export function naAfterResize(item: SodiumItemLike | null | undefined, nextAmount: number): number {
+  if (!item) return 0;
+  const amt = Math.max(0, Number(nextAmount) || 0);
+  const food = item.id ? findFoodById(item.id) : null;
+  const per100 = food ? Number(getMicroFromFood(food as any, 'Na')) || 0 : 0;
+  if (per100 > 0) return Math.round((per100 * amt) / 100);
+  const prevAmount = Number(item.amount) || 0;
+  const prevNa = Number(item.na);
+  if (Number.isFinite(prevNa) && prevNa > 0 && prevAmount > 0) return Math.round((prevNa * amt) / prevAmount);
+  return 0;
+}
+
+/** Натрий приёма в мг (по позициям, с фолбэком на totals). */ export function mealSodiumMg(
+  meal: SodiumMealLike | null | undefined,
+): number {
   if (!meal) return 0;
   const items = Array.isArray(meal.items) ? meal.items : [];
   if (items.length === 0) return Math.max(0, Number(meal.totalsNa) || 0);

@@ -57,13 +57,16 @@ import { readPlannerPrefs, writePlannerPrefsPatch } from './planner-prefs';
 import {
   readPeriSync,
   subscribePeriSync,
+  subscribePeriApply,
+  notifyRationUpdated,
   writePeriSync,
   clearPeriSync,
   resolvePeriBudget,
   periBudgetForEngine,
   type PeriSyncState,
 } from './planner-peri-budget';
-import { readPlannedSession, planSignature } from './planner-planned-tonnage';
+import { readPlannedSession, planSignature, todayDowIndex, plannedDayCount } from './planner-planned-tonnage';
+import { naAfterResize } from './planner-meal-sodium';
 import { localIsoDate } from './planner-date-utils';
 import { loadVarietyLedger, saveVarietyLedger, LEDGER_WEEK_FAMILIES_CAP } from './planner-variety-ledger';
 // P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
@@ -786,6 +789,7 @@ export function freeSnackRoomForSecond(
       const factor = Math.max(0, (oldKcal - take) / Math.max(1, oldKcal));
       const newAmount = Math.max(minAmount, Math.round((it.amount || 0) * factor));
       const r = newAmount / Math.max(1, it.amount || 1);
+      it.na = naAfterResize(it, newAmount);
       it.amount = newAmount;
       it.p = Math.round((it.p || 0) * r * 10) / 10;
       it.f = Math.round((it.f || 0) * r * 10) / 10;
@@ -3059,6 +3063,9 @@ export const IndividualPlanProvider: React.FC<{
       if (dayPlan) localStorage.setItem('he_day_plan', JSON.stringify(dayPlan));
       else localStorage.removeItem('he_day_plan');
     } catch {}
+    // Карточка «Пери-воркаут» держит блок «В рационе сейчас» — перечитывает he_day_plan
+    // по этому событию (иначе факт в приёмах оставался бы от прошлой генерации).
+    notifyRationUpdated();
   }, [dayPlan]);
   useEffect(() => {
     try {
@@ -3769,6 +3776,8 @@ export const IndividualPlanProvider: React.FC<{
       c: Math.round((it.c || 0) * ratio),
       fiber: Math.round((it.fiber || 0) * ratio),
       leucine_mg: Math.round((it.leucine_mg || 0) * ratio),
+      // Соль следует за порцией (иначе «уменьшил вдвое — соли столько же»).
+      na: naAfterResize(it, amt),
     };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, (items) => {
@@ -5076,6 +5085,7 @@ export const IndividualPlanProvider: React.FC<{
       return {
         ...it,
         amount,
+        na: naAfterResize(it, amount),
         kcal: Math.round((it.kcal || 0) * r),
         p: Math.round((it.p || 0) * r * 10) / 10,
         f: Math.round((it.f || 0) * r * 10) / 10,
@@ -6288,9 +6298,35 @@ export const IndividualPlanProvider: React.FC<{
               // зовёт generation, состояние ещё не перерисовано. Движок получает окна
               // до/после/интра и переносит разницу в основные приёмы так, что дневная сумма
               // углеводов не меняется (КБЖУ ≤3% держится).
-              periBudget: periSyncRef.current
-                ? periBudgetForEngine(resolvePeriBudget({ bodyWeight: weight || 75, goal }))
-                : undefined,
+              periBudget: (() => {
+                if (!periSyncRef.current) return undefined;
+                const _bw = Math.max(30, weight || 75);
+                const _stored = readPeriSync();
+                if (!_stored) return undefined;
+                // P1-fix «неделя одним тоннажем»: синк из ПЛАНА привязан к дню недели.
+                // В многодневной сборке (3/7 дней) окно считается по плановой сессии
+                // ИМЕННО этого дня, а не по сегодняшней. Синк из сессии/ручной ввод —
+                // один на весь план (другого источника нет).
+                if (_stored.source === 'plan' && offset > 0 && plannedDayCount() === 7) {
+                  const _pd = readPlannedSession({ dowIndex: (todayDowIndex() + offset) % 7 });
+                  if (_pd && (_pd.tonnageKg > 0 || _pd.durationMin > 0)) {
+                    return periBudgetForEngine(
+                      resolvePeriBudget({
+                        bodyWeight: _bw,
+                        goal,
+                        stored: {
+                          ..._stored,
+                          tonnageKg: _pd.tonnageKg,
+                          durationMin: _pd.durationMin,
+                          intensity: _pd.intensity,
+                          dayLabel: _pd.dayLabel,
+                        },
+                      }),
+                    );
+                  }
+                }
+                return periBudgetForEngine(resolvePeriBudget({ bodyWeight: _bw, goal, stored: _stored }));
+              })(),
               // Режим белка «мясо и рыба» (мягкий): обед/ужин предпочитают flesh-белок,
               // завтрак/перекусы остаются яйцами/творогом/сывороткой (MPS-типология).
               proteinSourceMode,
@@ -6846,6 +6882,9 @@ export const IndividualPlanProvider: React.FC<{
               timingScores: [],
               intraWorkout: null,
               mpsSummary: v2.mpsSummary,
+              // Применённые пери-окна (был синк → движок их и поставил): карточка
+              // «Пери-воркаут» показывает РОВНО эти числа, а не свой пересчёт.
+              peri: (v2 as any).peri,
               // P1-фикс: заметки пользователя («Заметки по питанию») больше не write-only —
               // доезжают до плана и печати/экспорта.
               proNotes: [
@@ -7296,14 +7335,35 @@ export const IndividualPlanProvider: React.FC<{
       dayLabel: planned.dayLabel,
       signature: planned.signature,
     });
+    // P2-fix: запись могла провалиться (квота) — не рапортуем синк, которого нет.
+    if (!st) return false;
     setPeriSyncState(st);
     setPeriSync(true);
     periSyncRef.current = true;
     try {
-      void generatePlan(1, undefined, selectedDayIndex);
+      // P1-fix: пересобираем ТЕКУЩУЮ длину плана. Раньше стоял generatePlan(1) —
+      // 7-дневный план молча схлопывался в один день.
+      void generatePlan(planDays as 1 | 3 | 7, undefined, selectedDayIndex);
     } catch {}
-    return !!st;
+    return true;
   };
+  /**
+   * Кнопка в карточке «Пери-воркаут» пишет `he_peri_sync` сама (карточка живёт и без
+   * планировщика), а пересборку рациона просит событием: иначе окна в приёмах оставались
+   * бы от прошлой генерации, и блок «В рационе сейчас» честно показывал ⚠.
+   * Ref — чтобы подписка была одна, а генератор всегда был свежий.
+   */
+  const periApplyRef = useRef<() => void>(() => {});
+  periApplyRef.current = () => {
+    setPeriSync(true);
+    periSyncRef.current = true;
+    const st = readPeriSync();
+    if (st) setPeriSyncState(st);
+    try {
+      void generatePlan(planDays as 1 | 3 | 7, undefined, selectedDayIndex);
+    } catch {}
+  };
+  useEffect(() => subscribePeriApply(() => periApplyRef.current()), []);
   /** Сброс синка (карточка снова считает от последней сессии). */
   const resetPeriSync = () => {
     clearPeriSync();

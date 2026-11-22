@@ -19,6 +19,10 @@ import { safeWriteJSON } from './planner-storage';
 
 export const PERI_SYNC_KEY = 'he_peri_sync';
 export const PERI_SYNC_EVENT = 'he:peri-sync';
+/** «Синк поставлен — пересобери рацион» (карточка → контекст планировщика). */
+export const PERI_APPLY_EVENT = 'he:peri-apply';
+/** «Рацион перезаписан» — карточка перечитывает he_day_plan (факт в приёмах). */
+export const RATION_UPDATED_EVENT = 'he:ration-updated';
 
 /** Физиологические капы пери-окон движка (mealCarbCapacityG): больше — уже не «окно». */
 export const PERI_CAP_PRE_CARB_G = 60;
@@ -123,15 +127,40 @@ export function writePeriSync(
 ): PeriSyncState | null {
   const state = normalizeState({ ...next, v: 1, syncedAt: next.syncedAt ?? Date.now() });
   if (!state) return null;
-  try {
-    safeWriteJSON(PERI_SYNC_KEY, state);
-  } catch {
-    return null;
-  }
+  // P2-fix: провал записи (квота) раньше возвращал «успех» — кнопка рапортовала
+  // синк, а бюджет не сохранялся. safeWriteJSON возвращает boolean.
+  if (!safeWriteJSON(PERI_SYNC_KEY, state)) return null;
   try {
     window.dispatchEvent(new CustomEvent(PERI_SYNC_EVENT));
   } catch {}
   return state;
+}
+
+/** Просьба пересобрать рацион по уже сохранённому синку (кнопка в карточке). */
+export function requestPeriApply(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(PERI_APPLY_EVENT));
+  } catch {}
+}
+
+export function subscribePeriApply(cb: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onApply = () => cb();
+  window.addEventListener(PERI_APPLY_EVENT, onApply);
+  return () => window.removeEventListener(PERI_APPLY_EVENT, onApply);
+}
+
+/** Сообщить, что рацион перезаписан (карточка обновляет «В рационе сейчас»). */
+export function notifyRationUpdated(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(RATION_UPDATED_EVENT));
+  } catch {}
+}
+
+export function subscribeRationUpdated(cb: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(RATION_UPDATED_EVENT, cb);
+  return () => window.removeEventListener(RATION_UPDATED_EVENT, cb);
 }
 
 export function clearPeriSync(): void {
