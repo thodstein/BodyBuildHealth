@@ -81,6 +81,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
   const [dayDetailsOpen, setDayDetailsOpen] = React.useState(false);
+  // Прогресс по упражнениям дня — сетка карточек на 3–4 ряда: по умолчанию строка.
+  const [progressOpen, setProgressOpen] = React.useState(false);
   const [warmupOpen, setWarmupOpen] = React.useState(false);
   const [execWarmupDone, setExecWarmupDone] = React.useState<Record<string, boolean>>({});
   const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
@@ -522,8 +524,17 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       if (!dayExercises.length) return null;
                       return (
                         <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📈 Прогресс по упражнениям дня</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                          <button
+                            type="button"
+                            data-act="day-progress-toggle"
+                            aria-expanded={progressOpen}
+                            onClick={() => setProgressOpen((v) => !v)}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'transparent', border: 'none', padding: 0, marginBottom: progressOpen ? 6 : 0, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            <span>📈 Прогресс по упражнениям дня · {dayExercises.length} упр.</span>
+                            <span style={{ fontSize: 10, opacity: 0.75 }}>{progressOpen ? '▲' : '▼'}</span>
+                          </button>
+                          <div data-pl="day-progress" style={{ display: progressOpen ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
                             {dayExercises.slice(0, 6).map((ex: any, i: number) => {
                               const cached = getCachedProgressForExercise(ex.name || ex.id || '');
                               if (!cached) return (

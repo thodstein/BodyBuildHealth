@@ -80,6 +80,8 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const [mmcOpen, setMmcOpen] = useState<Record<string, boolean>>({});
   const [checkinsOpen, setCheckinsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Быстрые теги заметок: 10 чипов съедали два ряда над упражнениями — прячем в строку.
+  const [notesTagsOpen, setNotesTagsOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Undo history
@@ -443,8 +445,20 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       <div style={{ marginBottom: 8 }}>
         <label style={{ fontSize: 10, color: '#fff' }}>Заметки</label>
         <input type="text" value={logNotes} onChange={e => setLogNotes(e.target.value)} placeholder="Самочувствие, особенности, инвентарь..." style={style.input} />
-        {/* Quick note tags */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+        {/* Quick note tags — свёрнуты: чипы занимали два ряда, а нужны редко. */}
+        <button
+          type="button"
+          data-act="record-tags"
+          aria-expanded={notesTagsOpen}
+          onClick={() => setNotesTagsOpen((v) => !v)}
+          style={{ marginTop: 4, padding: '3px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+        >
+          🏷 Быстрые теги {notesTagsOpen ? '▲' : '▼'}
+        </button>
+        <div
+          data-pl="record-tags"
+          style={{ display: notesTagsOpen ? 'flex' : 'none', gap: 4, flexWrap: 'wrap', marginTop: 4 }}
+        >
           {[
             { tag: 'хорошая разминка', emoji: '🔥' },
             { tag: 'сильная нагрузка', emoji: '💪' },
