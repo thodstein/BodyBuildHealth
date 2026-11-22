@@ -145,6 +145,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // (ПЛ-авто / ББ-авто / Ручной сбор) вместо отдельных вкладок-дублей.
   const [planningTrack, setPlanningTrackState] = useState<PlanningTrack>(getPlanningTrack());
   const [tab, setTab] = useState<TrainingTab>('runtime');
+  // «Готовность» на вкладке проведения свёрнута: карточка на пол-экрана
+  // отодвигала большую кнопку старта ниже первого экрана.
+  const [readinessOpen, setReadinessOpen] = useState(false);
   const [page, setPage] = useState<TrainingPage>('hero');
   // Свежая страница для обработчиков с пустыми зависимостями (storage-события
   // из других окон): им нужно знать, открыто ли сейчас окно конструктора.
@@ -945,12 +948,20 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* Readiness card — only on training tabs, compact for mobile */}
       {readiness && zone === 'training' && (
         <div className="card tp-readiness" style={{ marginBottom: 6, padding: '12px 14px', borderRadius: 16 }}>
-          <div className="tp-readiness-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div className="tp-readiness-head" role="button" tabIndex={0} data-act="readiness-toggle"
+            aria-expanded={readinessOpen} aria-label="Готовность к тренировке: подробности"
+            onClick={() => setReadinessOpen(v => !v)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setReadinessOpen(v => !v); } }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: readinessOpen ? 8 : 0, cursor: 'pointer' }}>
             <h4 style={{ margin: 0, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}><NativeIcon name="chart" size={13} /> Готовность к тренировке</h4>
-            <span className="tp-readiness-val" style={{ fontSize: 13, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 40 ? '#eab308' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-              {Math.round(readiness.recovery)}%
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="tp-readiness-val" style={{ fontSize: 13, color: readiness.recovery >= 70 ? '#22c55e' : readiness.recovery >= 40 ? '#eab308' : '#ef4444', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                {Math.round(readiness.recovery)}%
+              </span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>{readinessOpen ? '▲' : '▼'}</span>
             </span>
           </div>
+          <div data-pl="readiness-body" style={{ display: readinessOpen ? 'block' : 'none' }}>
           <div className="tp-readiness-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
               { label: 'Восст.', value: readiness.recovery, color: readiness.recovery >= 70 ? '#22c55e' : '#eab308' },
@@ -969,6 +980,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             ))}
           </div>
           {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div className="tp-readiness-acwr" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}><span style={{ color: '#fff', minWidth: 52 }}>Нагрузка</span><div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 4 }} /></div><span style={{ fontWeight: 800, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:12, fontVariantNumeric: 'tabular-nums' }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
+          </div>
         </div>
       )}
 
