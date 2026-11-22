@@ -295,12 +295,101 @@ export function serializeCoachNotes(store: CoachNotesStore): string {
   return JSON.stringify({ version: 1, items: store.items });
 }
 
-export function readCoachNotes(storage: { getItem: (k: string) => string | null } | null | undefined): CoachNotesStore {
-  if (!storage) return emptyCoachNotes();
+/**
+ * Сколько сырых строк в значении хранилища: `-1` — разобрать нельзя (битый JSON,
+ * другая версия, не объект). Число нужно, чтобы отличить честный пустой стор от
+ * повреждённого: повреждённое значение нельзя затирать без копии.
+ */
+function rawStoreRows(raw: string): number {
   try {
-    return parseCoachNotes(storage.getItem(COACH_NOTES_KEY));
+    const parsed = JSON.parse(raw) as { version?: unknown; items?: unknown };
+    return parsed && parsed.version === 1 && Array.isArray(parsed.items) ? parsed.items.length : -1;
   } catch {
-    return emptyCoachNotes();
+    return -1;
+  }
+}
+
+/**
+ * Повреждено ли сырое значение хранилища — ОДИН предикат и для чтения, и для
+ * записи. Повреждение: значение не разобрать (битый JSON, другая версия) либо
+ * при нормализации потерялись строки. Во втором случае часть файлов осталась бы
+ * безвладелой, поэтому по такому стору уборка сирот запрещена.
+ */
+function isDamagedRaw(raw: string): boolean {
+  const rows = rawStoreRows(raw);
+  if (rows < 0) return true;
+  return rows > 0 && parseCoachNotes(raw).items.length < rows;
+}
+
+export const COACH_NOTES_DAMAGED_KEY = 'he_coach_notes_damaged';
+
+export interface CoachNotesReadResult {
+  store: CoachNotesStore;
+  /**
+   * В хранилище лежит непустое значение, которое не удалось разобрать (битый
+   * JSON, другая версия, все строки невалидны). Такой стор НЕ доказывает, что
+   * вложений нет: уборка сирот по нему стирала бы живые файлы.
+   */
+  damaged: boolean;
+}
+
+export function readCoachNotesResult(
+  storage: { getItem: (k: string) => string | null } | null | undefined,
+): CoachNotesReadResult {
+  if (!storage) return { store: emptyCoachNotes(), damaged: false };
+  let raw: string | null = null;
+  try {
+    raw = storage.getItem(COACH_NOTES_KEY);
+  } catch {
+    return { store: emptyCoachNotes(), damaged: false };
+  }
+  if (!raw || !raw.trim()) return { store: emptyCoachNotes(), damaged: false };
+  // Честная пустая коллекция (items: []) — не повреждение; всё остальное,
+  // что не разобралось целиком, — повреждение.
+  return { store: parseCoachNotes(raw), damaged: isDamagedRaw(raw) };
+}
+
+export function readCoachNotes(storage: { getItem: (k: string) => string | null } | null | undefined): CoachNotesStore {
+  return readCoachNotesResult(storage).store;
+}
+
+/** Последнее записанное нами значение: повторно его не разбираем. */
+let lastHealthyRaw: string | null = null;
+
+/**
+ * Запись с честным результатом: `false` — localStorage не принял данные
+ * (квота/приватный режим), и вызывающий обязан сказать об этом, а не делать
+ * вид, что заметка сохранена.
+ */
+export function writeCoachNotesChecked(
+  storage: { getItem?: (k: string) => string | null; setItem?: (k: string, v: string) => void } | null | undefined,
+  store: CoachNotesStore,
+): boolean {
+  if (!storage || typeof storage.setItem !== 'function') return false;
+  try {
+    // Повреждённое значение не затираем молча — откладываем копию под отдельным
+    // ключом. Это единственное место записи, поэтому копия появляется и когда
+    // заметки правит режим тренера, а не только вкладка заметок.
+    if (typeof storage.getItem === 'function') {
+      const raw = storage.getItem(COACH_NOTES_KEY);
+      // Своё же значение проверять незачем: разбор всего стора на каждый тап
+      // (закрепить/чек-лист) — лишняя работа на главном потоке WebView.
+      if (raw && raw.trim() && raw !== lastHealthyRaw && isDamagedRaw(raw)) {
+        try {
+          storage.setItem(COACH_NOTES_DAMAGED_KEY, raw);
+        } catch {
+          // Копию не положили — затирать повреждённое значение нельзя: скажем
+          // «не сохранилось» и оставим данные как есть.
+          return false;
+        }
+      }
+    }
+    const payload = serializeCoachNotes(store);
+    storage.setItem(COACH_NOTES_KEY, payload);
+    lastHealthyRaw = payload;
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -308,13 +397,8 @@ export function writeCoachNotes(
   storage: { setItem?: (k: string, v: string) => void } | null | undefined,
   store: CoachNotesStore,
 ): CoachNotesStore {
-  if (storage && typeof storage.setItem === 'function') {
-    try {
-      storage.setItem(COACH_NOTES_KEY, serializeCoachNotes(store));
-    } catch {
-      /* ignore quota */
-    }
-  }
+  // Совместимая обёртка: старые вызовы получают store и не знают про квоту.
+  writeCoachNotesChecked(storage, store);
   return store;
 }
 

@@ -118,7 +118,7 @@ import {
   filterCoachNotes,
   readCoachNotes,
   weekNoteFor,
-  writeCoachNotes,
+  writeCoachNotesChecked,
   type CoachNotesStore,
 } from '../../../engines/coach/coach-notes.engine';
 import { deleteAllNoteMedia } from '../../../engines/note-media-store';
@@ -1367,9 +1367,17 @@ export const ProfileCoachTab: React.FC<{
       const { forgetAllAthletes } = await import('../../../core/data-backup');
       await forgetAllAthletes();
       const storage = ls();
-      writeCoachNotes(storage, emptyCoachNotes());
+      if (!writeCoachNotesChecked(storage, emptyCoachNotes())) {
+        // Заметки остались — их файлы трогать нельзя, иначе живые заметки
+        // ссылались бы на удалённые байты.
+        setForgetBusy(false);
+        setForgetError(
+          'Не хватило места в хранилище: заметки и их вложения не тронуты. Освободите место и повторите.',
+        );
+        return;
+      }
       // Заметки стёрты — их фото/аудио тоже не должны остаться на телефоне.
-      void deleteAllNoteMedia();
+      await deleteAllNoteMedia();
       writeCoachPlanner(storage, emptyCoachPlanner());
       writeCoachLog(storage, emptyCoachLog());
       apply({ ...state, athletes: [], activeAthleteId: null });
@@ -1515,7 +1523,10 @@ export const ProfileCoachTab: React.FC<{
       setWeekError(res.error === 'limit' ? 'Лимит заметок — удалите старые в разделе «Заметки».' : 'Не удалось сохранить.');
       return;
     }
-    writeCoachNotes(ls(), res.store);
+    if (!writeCoachNotesChecked(ls(), res.store)) {
+      setWeekError('Не хватило места в хранилище — комментарий не сохранён. Освободите место и повторите.');
+      return;
+    }
     setNotesRev(v => v + 1);
     setWeekCommentFor(null);
     setWeekDraft('');

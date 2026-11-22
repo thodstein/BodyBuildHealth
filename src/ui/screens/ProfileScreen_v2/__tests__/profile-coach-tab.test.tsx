@@ -875,3 +875,42 @@ describe('недельный вид в вкладке', () => {
     expect(week?.querySelector('[data-coach="reminders-toggle"]')?.textContent).toContain('Напоминать о задачах');
   });
 });
+
+describe('комментарий к неделе', () => {
+  it('нехватка места не съедает комментарий молча', () => {
+    seed(1);
+    const { container } = render(<ProfileCoachTab />);
+
+    fireEvent.click(container.querySelector('[data-coach="week-comment-open"]') as HTMLElement);
+    fireEvent.change(container.querySelector('[data-coach="week-comment-input"]') as HTMLTextAreaElement, {
+      target: { value: 'Сон 6 часов, колено ноет' },
+    });
+
+    // localStorage, который отказывает только на ключе заметок (квота/приватный режим).
+    const real = window.localStorage;
+    const fake = {
+      getItem: (key: string) => real.getItem(key),
+      setItem: (key: string, value: string) => {
+        if (key === COACH_NOTES_KEY) throw new Error('QuotaExceededError');
+        real.setItem(key, value);
+      },
+      removeItem: (key: string) => real.removeItem(key),
+      clear: () => real.clear(),
+      key: (i: number) => real.key(i),
+      get length() {
+        return real.length;
+      },
+    } as unknown as Storage;
+    const spy = vi.spyOn(globalThis, 'localStorage', 'get').mockReturnValue(fake);
+    try {
+      fireEvent.click(container.querySelector('[data-coach="week-comment-save"]') as HTMLElement);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(container.textContent).toContain('Не хватило места');
+    // Заметка не создана и «комментарий есть» не показан — обещаний без записи нет.
+    expect(readCoachNotes(localStorage).items).toHaveLength(0);
+    expect(container.querySelector('[data-coach="week-comment-input"]')).not.toBeNull();
+  });
+});

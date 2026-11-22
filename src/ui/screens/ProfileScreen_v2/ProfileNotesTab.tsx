@@ -43,6 +43,7 @@ import {
   COACH_NOTE_TAG_MAX,
   COACH_NOTE_TAGS_MAX,
   COACH_NOTE_TITLE_MAX,
+  COACH_NOTES_DAMAGED_KEY,
   COACH_NOTES_MAX,
   addCoachNote,
   collectCoachNoteTags,
@@ -53,15 +54,16 @@ import {
   noteAttachments,
   noteChecklistProgress,
   noteTags,
+  parseCoachNotes,
   purgeCoachNote,
   purgeCoachTrash,
-  readCoachNotes,
+  readCoachNotesResult,
   restoreCoachNote,
   toggleCoachNotePin,
   toggleNoteChecklistItem,
   trashCoachNote,
   updateCoachNote,
-  writeCoachNotes,
+  writeCoachNotesChecked,
   type CoachNote,
   type CoachNoteAttachment,
   type CoachNoteAttachmentKind,
@@ -134,6 +136,20 @@ const ls = (): Storage | null => {
     return typeof localStorage !== 'undefined' ? localStorage : null;
   } catch {
     return null;
+  }
+};
+
+/**
+ * Файлы, на которые ссылается резервная копия повреждённого стора. Их нельзя
+ * считать сиротами: иначе «копию можно спасти» означало бы текст без вложений.
+ */
+const damagedBackupAttachmentIds = (): string[] => {
+  try {
+    const raw = ls()?.getItem(COACH_NOTES_DAMAGED_KEY);
+    if (!raw) return [];
+    return parseCoachNotes(raw).items.flatMap((n) => noteAttachmentIds(n));
+  } catch {
+    return [];
   }
 };
 
@@ -295,9 +311,32 @@ type ViewerState = { attachmentId: string; url: string; kind: CoachNoteAttachmen
 
 type DictationState = 'idle' | 'starting' | 'listening' | 'error';
 
+/** Текст о повреждённых данных: нужен и для показа, и чтобы снять его после записи. */
+const DAMAGED_NOTICE =
+  'Сохранённые заметки не читаются (повреждённые данные). Файлы вложений не тронуты, исходный текст отложен в резервную копию. Пока копия на месте, автоматическая уборка файлов выключена.';
+
+/** Отказ записи в localStorage — одно и то же объяснение для списка и редактора. */
+const QUOTA_FAIL =
+  'Не хватило места в хранилище телефона — изменение не сохранено. Освободите место (удалите лишние вложения) и повторите.';
+
 export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initialAthleteId }) => {
   const athletes = useMemo(() => readCoachState(ls()).athletes, []);
-  const [store, setStore] = useState<CoachNotesStore>(() => readCoachNotes(ls()));
+  /** Повреждённое значение в хранилище: пустой стор не доказывает, что файлов нет. */
+  const damagedOnLoadRef = useRef(false);
+  /**
+   * Повреждённый стор: уборка файлов-сирот в этой сессии запрещена. Флаг НЕ
+   * снимается после удачной записи — резервная копия повреждённого значения
+   * ссылается на те же файлы, и они должны остаться на месте.
+   */
+  const attachmentsUnsafeRef = useRef(false);
+  const [store, setStore] = useState<CoachNotesStore>(() => {
+    const read = readCoachNotesResult(ls());
+    damagedOnLoadRef.current = read.damaged;
+    attachmentsUnsafeRef.current = read.damaged;
+    return read.store;
+  });
+  /** Актуальный стор для async-путей: state внутри await уже устарел. */
+  const storeRef = useRef<CoachNotesStore>(store);
   const [query, setQuery] = useState('');
   /** Развёрнутые длинные тексты — по id заметки, чтобы не трогать соседние. */
   const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
@@ -377,9 +416,21 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
    */
   const draftPreview = (a: DraftAttachment): string => a.previewUrl || (a.pending ? '' : (media[a.id]?.src ?? ''));
 
-  const apply = (next: CoachNotesStore) => {
-    writeCoachNotes(ls(), next);
+  const apply = (next: CoachNotesStore): boolean => {
+    // Копию повреждённого значения движок откладывает сам — при любой записи.
+    if (!writeCoachNotesChecked(ls(), next)) {
+      setError(QUOTA_FAIL);
+      // Действия из списка (закрепить/в корзину) не показывают блок ошибки редактора —
+      // поэтому то же сообщение уходит в общий статус.
+      setNotice(QUOTA_FAIL);
+      return false;
+    }
+    storeRef.current = next;
     setStore(next);
+    // Прошлые отказы больше не актуальны: запись состоялась.
+    setError((prev) => (prev === QUOTA_FAIL ? null : prev));
+    setNotice((prev) => (prev === QUOTA_FAIL || prev === DAMAGED_NOTICE ? null : prev));
+    return true;
   };
 
   /** «Сколько занимают файлы» — считаем после каждой записи/удаления. */
@@ -504,7 +555,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /* ── Уборка сирот, постоянное хранилище, нативные возможности ─────── */
   useEffect(() => {
-    void cleanupNoteMedia(new Set(store.items.flatMap((n) => noteAttachmentIds(n))));
+    if (damagedOnLoadRef.current) {
+      // Пустой стор из-за повреждения не должен стирать живые фото/аудио.
+      setNotice(DAMAGED_NOTICE);
+    } else {
+      // Копия повреждённого значения (если она есть) ссылается на свои файлы —
+      // их уборка тоже не должна трогать.
+      const keep = new Set([...store.items.flatMap((n) => noteAttachmentIds(n)), ...damagedBackupAttachmentIds()]);
+      void cleanupNoteMedia(keep);
+    }
     // Без persist ОС вправе вычистить IndexedDB под давлением квоты — тогда
     // фото и голос исчезли бы «сами».
     void ensurePersistentStorage();
@@ -982,15 +1041,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       // сверх лимита не должны доезжать до сохранения незаметно.
       tags: parseTagsText(draft.tagsText),
     };
+    const current = storeRef.current;
     if (draft.id) {
-      const next = updateCoachNote(store, draft.id, payload);
-      if (next === store) {
+      const next = updateCoachNote(current, draft.id, payload);
+      if (next === current) {
         setError('Пустая заметка не сохраняется — заполните заголовок, текст или приложите фото/аудио.');
         return false;
       }
-      apply(next);
+      if (!apply(next)) return false;
     } else {
-      const res = addCoachNote(store, payload, { id: noteId });
+      const res = addCoachNote(current, payload, { id: noteId });
       if (res.error === 'empty') {
         setError('Пустая заметка не сохраняется — заполните заголовок, текст или приложите фото/аудио.');
         return false;
@@ -1001,7 +1061,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         );
         return false;
       }
-      apply(res.store);
+      if (!apply(res.store)) return false;
     }
     setEditor(null);
     setError(null);
@@ -1010,10 +1070,25 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     return true;
   };
 
+  /**
+   * Что оставить в IndexedDB после сохранения: вложения остальных заметок плюс
+   * актуальный набор сохраняемой. Убранные файлы уходят и при синхронном
+   * сохранении, а не только когда дописывались новые.
+   */
+  const keepAfterSave = (items: CoachNote[], noteId: string, attachments: CoachNoteAttachment[]): Set<string> => {
+    const keep = new Set(items.filter((n) => n.id !== noteId).flatMap((n) => noteAttachmentIds(n)));
+    for (const a of attachments) keep.add(a.id);
+    return keep;
+  };
+
+  /** Пока файлы пишутся, второй тап не должен запускать второе сохранение. */
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
   const save = () => {
-    if (!editor) return;
+    if (!editor || savingRef.current) return;
     const draft = editor;
-    const noteId = draft.id ?? `n_${Date.now().toString(36)}_${store.items.length + 1}`;
+    const noteId = draft.id ?? `n_${Date.now().toString(36)}_${storeRef.current.items.length + 1}`;
     const attachments = strippedAttachments(draft);
     const pending = draft.attachments.filter((a) => a.pending && (a.blob || a.bytes));
 
@@ -1038,39 +1113,51 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     };
 
     if (pending.length === 0) {
-      if (commitSave(draft, noteId, attachments)) refreshMediaTotal();
+      if (commitSave(draft, noteId, attachments)) {
+        // Пока стор был повреждён, «лишних» файлов не существует: их id просто
+        // неизвестны, поэтому уборку не запускаем.
+        if (!attachmentsUnsafeRef.current) {
+          void cleanupNoteMedia(keepAfterSave(storeRef.current.items, noteId, attachments));
+        }
+        refreshMediaTotal();
+      }
       return;
     }
+    savingRef.current = true;
+    setSaving(true);
     void (async () => {
-      // Место под всю пачку — до записи, а не «по факту не сохранилось».
-      const need = pending.reduce((sum, a) => sum + (Number.isFinite(a.size) ? a.size : 0), 0);
-      if (!(await hasRoomForBytes(need))) {
-        setError(
-          `В хранилище телефона не хватает места: нужно ${formatBytes(need)}. Удалите лишние вложения и попробуйте снова.`,
-        );
-        return;
-      }
-      const ok = await writeMedia();
-      if (!ok) return;
-      const saved = commitSave(draft, noteId, attachments);
-      if (!saved) {
-        // Заметка не сохранилась (стала пустой) — только что записанные файлы
-        // не должны остаться сиротами в квоте.
-        void deleteNoteMedia(pending.map((a) => a.id));
-        refreshMediaTotal();
-        return;
-      }
-      for (const a of draft.attachments) {
-        if (a.pending) revokeBlobUrl(a.previewUrl);
-      }
-      const keep = new Set(
+      try {
+        // Место под всю пачку — до записи, а не «по факту не сохранилось».
+        const need = pending.reduce((sum, a) => sum + (Number.isFinite(a.size) ? a.size : 0), 0);
+        if (!(await hasRoomForBytes(need))) {
+          setError(
+            `В хранилище телефона не хватает места: нужно ${formatBytes(need)}. Удалите лишние вложения и попробуйте снова.`,
+          );
+          return;
+        }
+        const ok = await writeMedia();
+        if (!ok) return;
+        const saved = commitSave(draft, noteId, attachments);
+        if (!saved) {
+          // Заметка не сохранилась (стала пустой) — только что записанные файлы
+          // не должны остаться сиротами в квоте.
+          void deleteNoteMedia(pending.map((a) => a.id));
+          refreshMediaTotal();
+          return;
+        }
+        for (const a of draft.attachments) {
+          if (a.pending) revokeBlobUrl(a.previewUrl);
+        }
         // Заметку, которую только что сохранили, считаем по новому набору:
         // убранные вложения не должны попасть в «нужное» (иначе файл повиснет).
-        store.items.filter((n) => n.id !== noteId).flatMap((n) => noteAttachmentIds(n)),
-      );
-      for (const a of attachments) keep.add(a.id);
-      void cleanupNoteMedia(keep);
-      refreshMediaTotal();
+        if (!attachmentsUnsafeRef.current) {
+          void cleanupNoteMedia(keepAfterSave(storeRef.current.items, noteId, attachments));
+        }
+        refreshMediaTotal();
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
     })();
   };
 
@@ -1080,8 +1167,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
    */
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
-      apply(trashCoachNote(store, id));
       setConfirmDeleteId(null);
+      if (!apply(trashCoachNote(storeRef.current, id))) return;
       setNotice('Заметка в корзине — её можно вернуть.');
       if (editor?.id === id) closeEditor();
       return;
@@ -1091,14 +1178,14 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /** Вернуть заметку из корзины — текст, теги и файлы на месте. */
   const restoreFromTrash = (id: string) => {
-    const next = restoreCoachNote(store, id);
-    if (next === store) {
+    const next = restoreCoachNote(storeRef.current, id);
+    if (next === storeRef.current) {
       // Движок не даст превысить лимит живых заметок — говорим об этом прямо.
       setNotice(`Лимит ${COACH_NOTES_MAX} живых заметок: освободите место и попробуйте снова.`);
       return;
     }
-    apply(next);
     setConfirmPurgeId(null);
+    if (!apply(next)) return;
     setNotice('Заметка восстановлена.');
   };
 
@@ -1108,9 +1195,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       setConfirmPurgeId(id);
       return;
     }
-    apply(purgeCoachNote(store, id));
-    void deleteNoteMediaForNote(id).then(refreshMediaTotal);
     setConfirmPurgeId(null);
+    if (!apply(purgeCoachNote(storeRef.current, id))) return;
+    void deleteNoteMediaForNote(id).then(refreshMediaTotal);
     setNotice('Заметка удалена навсегда.');
   };
 
@@ -1120,10 +1207,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       setConfirmPurgeTrash(true);
       return;
     }
-    const ids = store.items.filter((n) => isCoachNoteDeleted(n)).map((n) => n.id);
-    apply(purgeCoachTrash(store));
+    const ids = storeRef.current.items.filter((n) => isCoachNoteDeleted(n)).map((n) => n.id);
     setConfirmPurgeTrash(false);
     setConfirmPurgeId(null);
+    if (!apply(purgeCoachTrash(storeRef.current))) return;
     setNotice('Корзина очищена.');
     void Promise.all(ids.map((id) => deleteNoteMediaForNote(id))).then(refreshMediaTotal);
   };
@@ -1138,10 +1225,11 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       return;
     }
     setConfirmClearMedia(false);
+    const current = storeRef.current;
+    const cleaned = current.items.map((n) => (noteAttachments(n).length > 0 ? { ...n, attachments: [] } : n));
+    if (!apply({ ...current, items: cleaned })) return;
     void (async () => {
       await deleteAllNoteMedia();
-      const cleaned = store.items.map((n) => (noteAttachments(n).length > 0 ? { ...n, attachments: [] } : n));
-      apply({ ...store, items: cleaned });
       // Кэш держал файлы в памяти и в blob-URL — отпускаем сразу, а не ждём mount.
       for (const view of mediaCacheRef.current.values()) revokeBlobUrl(view.src ?? '');
       mediaCacheRef.current.clear();
@@ -1974,10 +2062,22 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <button type="button" onClick={save} data-notes="save" style={btn('primary')}>
-              {editor.id ? 'Сохранить' : 'Добавить'}
+            <button
+              type="button"
+              onClick={save}
+              data-notes="save"
+              disabled={saving}
+              style={{ ...btn('primary'), opacity: saving ? 0.6 : 1, cursor: saving ? 'wait' : 'pointer' }}
+            >
+              {saving ? 'Сохраняю…' : editor.id ? 'Сохранить' : 'Добавить'}
             </button>
-            <button type="button" onClick={closeEditor} data-notes="cancel" style={btn('ghost')}>
+            <button
+              type="button"
+              onClick={closeEditor}
+              data-notes="cancel"
+              disabled={saving}
+              style={{ ...btn('ghost'), opacity: saving ? 0.6 : 1 }}
+            >
               Отмена
             </button>
           </div>
@@ -2257,7 +2357,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                 data-checked={c.done}
                                 onClick={() => {
                                   if (viewMode === 'trash') return;
-                                  apply(toggleNoteChecklistItem(store, n.id, c.id));
+                                  apply(toggleNoteChecklistItem(storeRef.current, n.id, c.id));
                                 }}
                                 disabled={viewMode === 'trash'}
                                 aria-pressed={c.done}
@@ -2425,7 +2525,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     <button
                       type="button"
                       data-notes="pin"
-                      onClick={() => apply(toggleCoachNotePin(store, n.id))}
+                      onClick={() => apply(toggleCoachNotePin(storeRef.current, n.id))}
                       style={{ ...btn('ghost'), fontSize: 12 }}
                     >
                       {n.pinned ? 'Открепить' : 'Закрепить'}
@@ -2433,7 +2533,11 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     <button
                       type="button"
                       data-notes="edit"
-                      onClick={() => openEdit(n)}
+                      // Сохранение ещё пишет файл: открытый сейчас редактор оно
+                      // закроет, и новый черновик пропадёт. Ждём завершения.
+                      onClick={() => {
+                        if (!savingRef.current) openEdit(n);
+                      }}
                       style={{ ...btn('ghost'), fontSize: 12 }}
                     >
                       Изменить

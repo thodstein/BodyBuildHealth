@@ -11,6 +11,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  COACH_NOTES_DAMAGED_KEY,
+  COACH_NOTES_KEY,
   COACH_NOTES_MAX,
   COACH_NOTE_TAGS_MAX,
   COACH_NOTE_TAG_MAX,
@@ -26,6 +28,7 @@ import {
   parseCoachNotes,
   purgeCoachNote,
   purgeCoachTrash,
+  readCoachNotesResult,
   restoreCoachNote,
   serializeCoachNotes,
   sortCoachNotes,
@@ -33,6 +36,8 @@ import {
   trashCoachNote,
   updateCoachNote,
   weekNoteFor,
+  writeCoachNotes,
+  writeCoachNotesChecked,
   type CoachNotesStore,
 } from '../coach-notes.engine';
 
@@ -302,5 +307,104 @@ describe('хранение', () => {
     expect(s.items).toHaveLength(COACH_NOTES_MAX + 1);
     expect(countLiveCoachNotes(s)).toBe(COACH_NOTES_MAX);
     expect(s.items.find((n) => n.id === 'trash')?.deletedAt).toBe(NOW);
+  });
+
+  it('writeCoachNotesChecked честно сообщает об отказе записи (квота)', () => {
+    const deny = {
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+    expect(writeCoachNotesChecked(deny, storeWith())).toBe(false);
+    expect(writeCoachNotesChecked(null, storeWith())).toBe(false);
+    // Совместимая обёртка не бросает: старые вызовы получают тот же стор.
+    const s = storeWith();
+    expect(writeCoachNotes(deny, s)).toBe(s);
+    const map = new Map<string, string>();
+    const ok = { setItem: (k: string, v: string) => void map.set(k, v) };
+    expect(writeCoachNotesChecked(ok, s)).toBe(true);
+    expect(map.get(COACH_NOTES_KEY)).toContain('"version":1');
+  });
+
+  it('запись поверх повреждённого значения откладывает копию под отдельным ключом', () => {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+    };
+    map.set(COACH_NOTES_KEY, '{ это не json');
+    expect(writeCoachNotesChecked(storage, storeWith())).toBe(true);
+    expect(map.get(COACH_NOTES_DAMAGED_KEY)).toBe('{ это не json');
+    expect(map.get(COACH_NOTES_KEY)).toContain('"version":1');
+
+    // Валидное значение — не повод плодить копии.
+    map.delete(COACH_NOTES_DAMAGED_KEY);
+    expect(writeCoachNotesChecked(storage, storeWith())).toBe(true);
+    expect(map.has(COACH_NOTES_DAMAGED_KEY)).toBe(false);
+  });
+
+  it('readCoachNotesResult отличает честно пустой стор от повреждённого', () => {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+    };
+
+    expect(readCoachNotesResult(storage)).toEqual({ store: emptyCoachNotes(), damaged: false });
+    storage.setItem(COACH_NOTES_KEY, serializeCoachNotes(emptyCoachNotes()));
+    expect(readCoachNotesResult(storage).damaged).toBe(false);
+    storage.setItem(COACH_NOTES_KEY, serializeCoachNotes(storeWith()));
+    expect(readCoachNotesResult(storage)).toMatchObject({ damaged: false });
+
+    // Битая строка: заметок не прочитали, но это НЕ значит «файлов нет».
+    storage.setItem(COACH_NOTES_KEY, '{ это не json');
+    expect(readCoachNotesResult(storage)).toMatchObject({ damaged: true, store: { items: [] } });
+    // Другая версия хранилища — тоже повод не трогать вложения.
+    storage.setItem(COACH_NOTES_KEY, JSON.stringify({ version: 2, items: [{ id: 'x', title: 'X' }] }));
+    expect(readCoachNotesResult(storage).damaged).toBe(true);
+    // Строки были, но все невалидны — данные потеряны, значит повреждение.
+    storage.setItem(COACH_NOTES_KEY, JSON.stringify({ version: 1, items: [{ id: 'x', title: '', body: '' }] }));
+    expect(readCoachNotesResult(storage).damaged).toBe(true);
+  });
+
+  it('копия пишется и когда все строки невалидны, и при частичной потере строк', () => {
+    const map = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+    };
+
+    // Строки есть, но ни одна не читается — данные потеряны, затирать вслепую нельзя.
+    const allInvalid = JSON.stringify({ version: 1, items: [{ id: 'x', title: '', body: '' }] });
+    map.set(COACH_NOTES_KEY, allInvalid);
+    expect(writeCoachNotesChecked(storage, storeWith())).toBe(true);
+    expect(map.get(COACH_NOTES_DAMAGED_KEY)).toBe(allInvalid);
+
+    // Часть строк потерялась при нормализации: файлы потерянной строки безвладелые,
+    // поэтому чтение тоже считает это повреждением.
+    map.delete(COACH_NOTES_DAMAGED_KEY);
+    const partial = JSON.stringify({ version: 1, items: [{ id: 'a', title: 'A' }, { id: 'b' }] });
+    map.set(COACH_NOTES_KEY, partial);
+    const read = readCoachNotesResult(storage);
+    expect(read.store.items).toHaveLength(1);
+    expect(read.damaged).toBe(true);
+    expect(writeCoachNotesChecked(storage, storeWith())).toBe(true);
+    expect(map.get(COACH_NOTES_DAMAGED_KEY)).toBe(partial);
+  });
+
+  it('если копию не удалось записать, повреждённое значение не затирается', () => {
+    const map = new Map<string, string>();
+    const damagedRaw = '{ это не json';
+    map.set(COACH_NOTES_KEY, damagedRaw);
+    const storage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        if (k === COACH_NOTES_DAMAGED_KEY) throw new Error('QuotaExceededError');
+        map.set(k, v);
+      },
+    };
+
+    expect(writeCoachNotesChecked(storage, storeWith())).toBe(false);
+    expect(map.get(COACH_NOTES_KEY)).toBe(damagedRaw);
   });
 });

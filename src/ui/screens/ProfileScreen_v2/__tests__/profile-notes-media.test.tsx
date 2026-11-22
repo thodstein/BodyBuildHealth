@@ -14,6 +14,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { pickPhoto } from '../../../../core/native-bridge';
 import { ProfileNotesTab } from '../ProfileNotesTab';
 import {
+  COACH_NOTES_KEY,
   addCoachNote,
   emptyCoachNotes,
   readCoachNotes,
@@ -572,5 +573,183 @@ describe('расшифровка записанного аудио', () => {
       expect(container.querySelector('[data-notes="attach-item"][data-kind="audio"]')).not.toBeNull(),
     );
     expect(container.querySelector('[data-notes="audio-no-transcript"]')?.textContent).toContain('надиктовывается');
+  });
+});
+
+describe('файлы не теряются из-за служебных путей', () => {
+  const photo = (id: string) => ({
+    id,
+    kind: 'photo' as const,
+    mime: 'image/jpeg',
+    size: 3,
+    createdAt: '2026-11-17T09:00:00.000Z',
+  });
+  const bytes = () => new Uint8Array([1, 2, 3]).buffer as ArrayBuffer;
+
+  it('снятое из заметки вложение убирается из хранилища и при обычном сохранении', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      { title: 'Два файла', attachments: [photo('m1'), photo('m2')] },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+    for (const id of ['m1', 'm2']) {
+      await saveNoteMedia({
+        id,
+        noteId: 'n1',
+        kind: 'photo',
+        mime: 'image/jpeg',
+        size: 3,
+        createdAt: 1,
+        bytes: bytes(),
+      });
+    }
+
+    const { container } = render(<ProfileNotesTab />);
+    fireEvent.click(container.querySelector('[data-notes="edit"]') as HTMLElement);
+    const remove = container.querySelectorAll('[data-notes="attach-remove"]');
+    expect(remove).toHaveLength(2);
+    fireEvent.click(remove[0] as HTMLElement);
+
+    // Новых файлов нет — сохранение идёт синхронным путём.
+    save(container);
+    await waitFor(() => expect(readCoachNotes(localStorage).items[0].attachments).toHaveLength(1));
+    const kept = readCoachNotes(localStorage).items[0].attachments?.[0]?.id;
+    expect(kept).toBe('m2');
+    // Байты снятого файла не должны остаться в квоте до следующего открытия вкладки.
+    await waitFor(async () => expect((await listNoteMedia())?.map((m) => m.id)).toEqual(['m2']));
+  });
+
+  it('повреждённые данные заметок не стирают файлы, и это сказано пользователю', async () => {
+    await saveNoteMedia({
+      id: 'orphan',
+      noteId: 'gone',
+      kind: 'photo',
+      mime: 'image/jpeg',
+      size: 3,
+      createdAt: 1,
+      bytes: bytes(),
+    });
+    // Битый JSON: прочитать заметки нельзя, но это не доказывает, что файлов нет.
+    localStorage.setItem(COACH_NOTES_KEY, '{ это не json');
+
+    const { container } = render(<ProfileNotesTab />);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('не читаются'),
+    );
+    // Даём уборке шанс сработать (если бы она запускалась) — файл должен быть цел.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await listNoteMedia()).toHaveLength(1);
+  });
+
+  it('сохранение на повреждённом сторе не стирает старые файлы', async () => {
+    await saveNoteMedia({
+      id: 'old',
+      noteId: 'gone',
+      kind: 'photo',
+      mime: 'image/jpeg',
+      size: 3,
+      createdAt: 1,
+      bytes: bytes(),
+    });
+    const damagedRaw = '{ битые данные';
+    localStorage.setItem(COACH_NOTES_KEY, damagedRaw);
+
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'Новая' },
+    });
+    save(container);
+    await waitFor(() => expect(items(container)).toHaveLength(1));
+
+    // Стор вылечен записью, но сессия началась с повреждения: «лишних» файлов
+    // для неё не существует, поэтому старый файл обязан остаться на месте.
+    expect(localStorage.getItem('he_coach_notes_damaged')).toBe(damagedRaw);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await listNoteMedia())?.map((item) => item.id)).toContain('old');
+  });
+
+  it('файл из резервной копии не считается сиротой при открытии вкладки', async () => {
+    await saveNoteMedia({
+      id: 'keepme',
+      noteId: 'old-note',
+      kind: 'photo',
+      mime: 'image/jpeg',
+      size: 3,
+      createdAt: 1,
+      bytes: bytes(),
+    });
+    // Стор вылечен, а резервная копия ссылается на файл старой заметки.
+    const store = addCoachNote(emptyCoachNotes(), { title: 'Новая' }, { id: 'n1' }).store;
+    writeCoachNotes(localStorage, store);
+    localStorage.setItem(
+      'he_coach_notes_damaged',
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'old-note',
+            title: 'Старая',
+            attachments: [{ id: 'keepme', kind: 'photo', mime: 'image/jpeg', size: 3, createdAt: '2026-11-17T09:00:00.000Z' }],
+          },
+        ],
+      }),
+    );
+
+    const { container } = render(<ProfileNotesTab />);
+    await waitFor(() => expect(items(container)).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect((await listNoteMedia())?.map((item) => item.id)).toContain('keepme');
+  });
+});
+
+describe('сохранение и чужие действия', () => {
+  const seedOther = () => {
+    const store = addCoachNote(
+      emptyCoachNotes(),
+      { title: 'Другая заметка' },
+      { id: 'n1', now: '2026-11-17T08:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+  };
+
+  it('пока пишется файл, закрепление другой заметки не откатывается', async () => {
+    seedOther();
+    vi.mocked(pickPhoto).mockResolvedValue({ uri: PHOTO_URI, format: 'jpeg' });
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'С фото' },
+    });
+    fireEvent.click(container.querySelector('[data-notes="add-photo"]') as HTMLElement);
+    await waitFor(() => expect(container.querySelector('[data-notes="attach-item"]')).not.toBeNull());
+
+    // Асинхронный путь: тап по «Сохранить» уходит в await, и до его завершения
+    // успевает прийти чужое действие — закрепление соседней заметки.
+    save(container);
+    fireEvent.click(container.querySelector('[data-note-id="n1"] [data-notes="pin"]') as HTMLElement);
+
+    await waitFor(() => expect(items(container)).toHaveLength(2));
+    const saved = readCoachNotes(localStorage).items;
+    expect(saved.find((n) => n.id === 'n1')?.pinned).toBe(true);
+    expect(saved.find((n) => n.title === 'С фото')).toBeTruthy();
+  });
+
+  it('двойной тап по «Сохранить» не создаёт вторую заметку', async () => {
+    vi.mocked(pickPhoto).mockResolvedValue({ uri: PHOTO_URI, format: 'jpeg' });
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'Одна' },
+    });
+    fireEvent.click(container.querySelector('[data-notes="add-photo"]') as HTMLElement);
+    await waitFor(() => expect(container.querySelector('[data-notes="attach-item"]')).not.toBeNull());
+
+    save(container);
+    save(container);
+    await waitFor(() => expect(items(container)).toHaveLength(1));
+    await waitFor(() => expect(readCoachNotes(localStorage).items).toHaveLength(1));
   });
 });

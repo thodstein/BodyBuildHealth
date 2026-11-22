@@ -5,7 +5,7 @@
  * заметка сохраняется и переживает перерендер, поиск ищет по тексту, закрепление
  * поднимает наверх, удаление — через подтверждение, привязка к атлету видна.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { ProfileNotesTab } from '../ProfileNotesTab';
 import {
@@ -18,6 +18,7 @@ import {
   COACH_NOTE_CHECKLIST_MAX,
   COACH_NOTE_TAGS_MAX,
   COACH_NOTE_TITLE_MAX,
+  COACH_NOTES_KEY,
 } from '../../../../engines/coach/coach-notes.engine';
 import { formatBytes } from '../../../../engines/note-media.engine';
 import {
@@ -599,5 +600,43 @@ describe('теги, сортировка и метаданные вложени�
     const meta = container.querySelector('[data-notes="attach-meta"]');
     expect(meta?.textContent).toContain('колено.jpg');
     expect(meta?.textContent).toContain(formatBytes(2048));
+  });
+});
+
+describe('отказ хранилища', () => {
+  /** localStorage, который отказывает только на ключе заметок (квота/приватный режим). */
+  const refuseNotesWrites = () => {
+    const real = window.localStorage;
+    const fake = {
+      getItem: (key: string) => real.getItem(key),
+      setItem: (key: string, value: string) => {
+        if (key === COACH_NOTES_KEY) throw new Error('QuotaExceededError');
+        real.setItem(key, value);
+      },
+      removeItem: (key: string) => real.removeItem(key),
+      clear: () => real.clear(),
+      key: (i: number) => real.key(i),
+      get length() {
+        return real.length;
+      },
+    } as unknown as Storage;
+    return vi.spyOn(globalThis, 'localStorage', 'get').mockReturnValue(fake);
+  };
+
+  it('закрепление при нехватке места объясняет отказ, а не молчит', () => {
+    const store = addCoachNote(emptyCoachNotes(), { title: 'Колено' }, { id: 'n1' }).store;
+    writeCoachNotes(localStorage, store);
+    const { container } = render(<ProfileNotesTab />);
+
+    const spy = refuseNotesWrites();
+    try {
+      fireEvent.click(container.querySelector('[data-notes="pin"]') as HTMLElement);
+    } finally {
+      spy.mockRestore();
+    }
+
+    // Сообщение видно и вне редактора: раньше блок ошибки жил только в форме.
+    expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('Не хватило места');
+    expect(readCoachNotes(localStorage).items[0].pinned).toBe(false);
   });
 });
