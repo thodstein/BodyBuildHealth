@@ -44,6 +44,8 @@ export interface WorkoutSet {
   techniqueScore?: number;
   /** Пауза на груди (жим) — IPF-стиль, без отбива. */
   pause?: boolean;
+  /** Подход с собственным весом (подтягивания/отжимания): вес 0 допустим. */
+  bodyweight?: boolean;
 }
 
 /** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
@@ -248,14 +250,23 @@ export function logSet(
   const rawVel = Number(set.velocityMs);
   const velocityMs = Number.isFinite(rawVel) && rawVel > 0 && rawVel <= 5 ? Math.round(rawVel * 100) / 100 : undefined;
 
-  if (weightKg <= 0 || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
+  // Подход с собственным весом (вес 0) валиден, если снаряд не предполагает
+  // отягощение: раньше любой BW-подход отклонялся и день с турником нельзя было
+  // записать. Тоннаж такого подхода 0, e1RM/PR для него не считаем.
+  const isBodyweight = set.bodyweight === true && weightKg <= 0 && reps > 0;
+  if ((weightKg <= 0 && !isBodyweight) || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
   if (weightKg > SET_LIMITS.maxWeightKg) return { session, success: false, reason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`, discardReason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг` };
   if (reps > SET_LIMITS.maxReps) return { session, success: false, reason: `Повторения превышают лимит ${SET_LIMITS.maxReps}`, discardReason: `Повторения превышают лимит ${SET_LIMITS.maxReps}` };
 
   const estimated1RM = epley1RM(weightKg, reps);
   // PR по расчётному 1RM (а не только по весу): 80кг×5 (e1RM 93) > 82кг×1 (e1RM 85).
   const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => epley1RM(s.weightKg, s.reps))) : 0;
-  const isPR = estimated1RM > sessionBestE1RM || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight);
+  // PR считаем только против реального базиса: первый подход в истории не PR сам по себе,
+  // иначе каждое первое упражнение каждой сессии «бьёт рекорд».
+  const isPR = !isBodyweight && (
+    (sessionBestE1RM > 0 && estimated1RM > sessionBestE1RM)
+    || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight)
+  );
 
   ex.sets = [...ex.sets, {
     setNumber: set.setNumber,
@@ -273,6 +284,7 @@ export function logSet(
     plannedTempo: set.plannedTempo,
     actualTempo: set.actualTempo,
     pause: set.pause === true ? true : undefined,
+    bodyweight: isBodyweight ? true : undefined,
   }];
   ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
   ex.best1RM = Math.max(ex.best1RM, estimated1RM);
@@ -289,17 +301,37 @@ export function logSet(
   return { session: { ...session, exercises, totalVolume, totalSets, totalReps, avgIntensity: Math.round(avgIntensity * 10) / 10, prCount }, success: true };
 }
 
-export function finishSession(session: WorkoutSession, notes: string = ''): WorkoutSession {
+/** Максимальная правдоподобная длительность сессии: страховка от «стенных» часов,
+ *  когда тренировку начали вчера вечером, а завершили утром следующего дня (иначе
+ *  в историю и в sRPE уезжает ~10 часов). */
+const MAX_SESSION_DURATION_MIN = 360;
+
+export function finishSession(
+  session: WorkoutSession,
+  notes: string = '',
+  durationMinOverride?: number,
+): WorkoutSession {
   const endTime = new Date().toTimeString().slice(0, 5);
   const startParts = session.startTime.split(':').map(Number);
   const endParts = endTime.split(':').map(Number);
   const startMin = startParts[0] * 60 + startParts[1];
   const endMin = endParts[0] * 60 + endParts[1];
-  const durationMin = endMin >= startMin ? endMin - startMin : (1440 - startMin) + endMin;
+  let durationMin = endMin >= startMin ? endMin - startMin : (1440 - startMin) + endMin;
+
+  // Плеер знает реальную длительность по таймеру сессии и передаёт её явно.
+  // Без override (например, завершение из виджета) клампим «стенную» разницу.
+  const override = Number(durationMinOverride);
+  if (Number.isFinite(override) && override > 0) durationMin = Math.round(override);
+  else durationMin = Math.min(durationMin, MAX_SESSION_DURATION_MIN);
+  durationMin = Math.max(0, durationMin);
 
   const finished = { ...session, endTime, durationMin, notes };
   const sessions = loadSessions();
-  sessions.push(finished);
+  // Идемпотентно: одну и ту же сессию могут завершить и виджет, и плеер. Повторная
+  // запись того же sessionId не должна удваивать историю, объём, серии и PR-статистику.
+  const idx = sessions.findIndex(s => s.sessionId === finished.sessionId);
+  if (idx >= 0) sessions[idx] = finished;
+  else sessions.push(finished);
   saveSessions(sessions);
   return finished;
 }

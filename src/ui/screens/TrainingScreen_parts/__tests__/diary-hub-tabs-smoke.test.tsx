@@ -62,7 +62,7 @@ const baseProps = {
 const CASES: [string, string][] = [
   ['record', '⚡ Быстро'],
   ['history', 'История тренировок'],
-  ['analytics', 'Объём/нед'],
+  ['analytics', 'Объём/7 дн.'],
   ['progress', 'Замеры тела'],
   ['tools', 'Экспорт CSV'],
   ['calendar', ''],

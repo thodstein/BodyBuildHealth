@@ -22,15 +22,12 @@ import {
   clearActiveSession,
   type WorkoutSession,
 } from '../../engines/workout-logger.engine';
+import { isBodyweightExercise } from '../../engines/movement-pattern';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { derivePAL } from '../../core/energy-pal';
 import { loadWaterLog, addWater, removeWater } from '../../engines/nutrition-tracker.engine';
-import {
-  readDiaryV2,
-  writeDiaryV2,
-  onDiaryChangeV2,
-} from '../screens/NutritionScreen_parts/diary-storage-v2';
+import { readDiaryV2, writeDiaryV2, onDiaryChangeV2 } from '../screens/NutritionScreen_parts/diary-storage-v2';
 import {
   readPlanTargets,
   PLAN_TARGETS_EVENT,
@@ -146,16 +143,24 @@ export interface WidgetSyncResult {
 }
 
 function collectTraining(): {
-  title: string; subtitle: string; meta: string;
-  progress: number; live: boolean; actionLabel: string; actionTarget: string;
-  nextExercise: string; weekProgress: number; lastSessionDate: string; lastSessionVolume: number;
+  title: string;
+  subtitle: string;
+  meta: string;
+  progress: number;
+  live: boolean;
+  actionLabel: string;
+  actionTarget: string;
+  nextExercise: string;
+  weekProgress: number;
+  lastSessionDate: string;
+  lastSessionVolume: number;
 } {
   const last = safe(() => getLastSession(), null);
   const today = todayLocalISO();
   const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
   const total = safe(() => getWorkoutStats().totalSessions ?? 0, 0);
-  const daysPerWeek = safe(() => Number((getProfile() as any)?.settings?.training?.daysPerWeek) || 4, 4);
-  const weekProgress = Math.max(0, Math.min(100, Math.round((week / Math.max(1, daysPerWeek)) * 100)));
+  const targetDays = weeklyTargetDays();
+  const weekProgress = Math.max(0, Math.min(100, Math.round((week / Math.max(1, targetDays)) * 100)));
 
   // Живая сессия: прогресс по факту подходов + действие «+ Сет».
   try {
@@ -219,16 +224,28 @@ function collectCompliance(): { pct: number; label: string; detail: string } {
       detail: `назначений: ${adherence.activeCount}`,
     };
   }
-  const profile = safe(() => getProfile(), null as never);
-  const settings = (profile as unknown as { settings?: Record<string, Record<string, unknown>> } | null)?.settings;
-  const daysPerWeek = Number((settings?.training as Record<string, unknown> | undefined)?.daysPerWeek) || 3;
+  const targetDays = weeklyTargetDays();
   const today = todayLocalISO();
   const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
   return {
-    pct: Math.max(0, Math.min(100, Math.round((week / Math.max(1, daysPerWeek)) * 100))),
+    pct: Math.max(0, Math.min(100, Math.round((week / Math.max(1, targetDays)) * 100))),
     label: 'Тренировки недели',
-    detail: `${week} из ${daysPerWeek}`,
+    detail: `${week} из ${targetDays}`,
   };
+}
+
+/**
+ * Цель недели по тренировкам — один источник для всех виджетов: число дней
+ * в разрешённом плане (`he_pl_runtime.days`), иначе профильный `daysPerWeek`,
+ * иначе 4. Раньше «Тренировки недели» делились на 3, а прогресс тренировочного
+ * виджета — на 4, поэтому один и тот же прогресс выглядел по-разному.
+ */
+function weeklyTargetDays(): number {
+  const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
+  const fromPlan = Math.round(Number(plan?.planDays) || 0);
+  if (fromPlan > 0) return Math.max(1, Math.min(7, fromPlan));
+  const daysPerWeek = safe(() => Number((getProfile() as any)?.settings?.training?.daysPerWeek) || 0, 0);
+  return Math.max(1, Math.min(7, daysPerWeek || 4));
 }
 
 /**
@@ -244,16 +261,15 @@ function collectTargets(): { kcal: number; protein: number; fats: number; carbs:
   const fallback = { kcal: 2500, protein: 160, fats: 70, carbs: 300, waterMl: 2500 };
   let base = fallback;
   try {
-    const s = (safe(() => getProfile(), null as never) as unknown as {
-      settings?: Record<string, Record<string, number & string>>;
-    } | null)?.settings;
+    const s = (
+      safe(() => getProfile(), null as never) as unknown as {
+        settings?: Record<string, Record<string, number & string>>;
+      } | null
+    )?.settings;
     const p = (s?.personal ?? {}) as Record<string, number & string>;
     const tr = (s?.training ?? {}) as Record<string, number & string>;
     if (p?.weight) {
-      const pal = derivePAL(
-        tr?.daysPerWeek as number | undefined,
-        tr?.minutesPerSession as number | undefined,
-      );
+      const pal = derivePAL(tr?.daysPerWeek as number | undefined, tr?.minutesPerSession as number | undefined);
       const t = calcNutrition({
         weightKg: Number(p.weight),
         heightCm: Number(p.height) || 175,
@@ -488,8 +504,16 @@ function sumPeriod(
 }
 
 export function collectNutrition(): {
-  kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
-  targetKcal: number; targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  waterMl: number;
+  targetKcal: number;
+  targetProtein: number;
+  targetFat: number;
+  targetCarbs: number;
+  waterTargetMl: number;
   /** Последняя запись еды дня — по ней виджет показывает «↩». */
   lastFood?: NutritionLastFood;
   /** Последние 7 дней: итоги и позиции — для листания дат и списка дня. */
@@ -629,11 +653,7 @@ function planLabelForDate(
 }
 
 /** Тренировки по графику: какие дни назначены и что в них делать. */
-function trainingCalendarItems(
-  from: string,
-  to: string,
-  playedDates: Set<string>,
-): CalendarEventItem[] {
+function trainingCalendarItems(from: string, to: string, playedDates: Set<string>): CalendarEventItem[] {
   const out: CalendarEventItem[] = [];
   const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
   const weekly = trainingWeekdays(training);
@@ -685,7 +705,7 @@ function supplementCalendarItems(today: string): CalendarEventItem[] {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     const subs = entry?.substances && typeof entry.substances === 'object' ? entry.substances : {};
     const keys = Object.keys(subs);
-    const taken = keys.filter(k => subs[k]?.taken).length;
+    const taken = keys.filter((k) => subs[k]?.taken).length;
     byDate.set(date, { taken, total: keys.length });
   }
   const out: CalendarEventItem[] = [];
@@ -696,10 +716,7 @@ function supplementCalendarItems(today: string): CalendarEventItem[] {
     const rec = byDate.get(date);
     const total = Math.max(plan.length, rec?.total ?? 0);
     const taken = rec?.taken ?? 0;
-    const title =
-      taken > 0
-        ? `БАДы · принято ${taken}/${total}`
-        : `БАДы · ${plan.length} шт по плану`;
+    const title = taken > 0 ? `БАДы · принято ${taken}/${total}` : `БАДы · ${plan.length} шт по плану`;
     out.push({
       id: `supp:${date}`,
       date,
@@ -718,9 +735,7 @@ function pharmaCalendarItems(from: string, to: string): CalendarEventItem[] {
   const schedule = readJsonArray('he_injection_schedule');
   if (!schedule.length) return [];
   const diary = readJsonArray('he_injection_diary');
-  const doneKeys = new Set(
-    diary.map(e => `${String(e?.date ?? '').slice(0, 10)}|${String(e?.substance ?? '')}`),
-  );
+  const doneKeys = new Set(diary.map((e) => `${String(e?.date ?? '').slice(0, 10)}|${String(e?.substance ?? '')}`));
   const out: CalendarEventItem[] = [];
   for (const item of schedule) {
     if (!item || item.active === false) continue;
@@ -774,10 +789,7 @@ export function collectCalendar(): {
   // сегодняшнего дня, чтобы листать календарь без WebView. Кап — 800 строк,
   // SharedPreferences не резиновые.
   const rangeTasks = safe(() => tasksInRange(store, addDaysIso(today, -90), addDaysIso(today, 365)), []);
-  const playedDates = safe(
-    () => new Set(loadSessions().map(s => String(s.date ?? ''))),
-    new Set<string>(),
-  );
+  const playedDates = safe(() => new Set(loadSessions().map((s) => String(s.date ?? ''))), new Set<string>());
 
   const merged: CalendarEventItem[] = [];
   for (const t of rangeTasks.slice(0, 560)) {
@@ -817,7 +829,7 @@ export function collectCalendar(): {
   return {
     date: today,
     dateLabel,
-    tasks: dayTasks.slice(0, 5).map(t => ({
+    tasks: dayTasks.slice(0, 5).map((t) => ({
       id: t.id,
       title: String(t.title).slice(0, 120),
       time: t.time ?? '',
@@ -826,7 +838,7 @@ export function collectCalendar(): {
       kind: 'task',
     })),
     total: dayTasks.length,
-    done: dayTasks.filter(t => t.done).length,
+    done: dayTasks.filter((t) => t.done).length,
     overdue,
     items: merged.slice(0, 900),
   };
@@ -840,25 +852,26 @@ export function collectCalendar(): {
 export function notesForWidget(store: CoachNotesStore): NotesWidgetSnapshot {
   // Корзина — не «заметки на сегодня»: в виджете её быть не должно,
   // иначе удалённая заметка продолжает висеть на главном экране.
-  const live = store.items.filter(n => !isCoachNoteDeleted(n));
+  const live = store.items.filter((n) => !isCoachNoteDeleted(n));
   const sorted = safe(() => sortCoachNotes(live), []);
   return {
-    notes: sorted.slice(0, 5).map(n => {
+    notes: sorted.slice(0, 5).map((n) => {
       const p = noteChecklistProgress(n);
       const files = noteAttachments(n).length;
       return {
         id: n.id,
         // Заметка без текста, но с фото/аудио — это не «Без названия», а файл.
-        title: String(
-          n.title || n.body.split('\n')[0] || (files > 0 ? 'Заметка с фото/аудио' : 'Без названия'),
-        ).slice(0, 90),
+        title: String(n.title || n.body.split('\n')[0] || (files > 0 ? 'Заметка с фото/аудио' : 'Без названия')).slice(
+          0,
+          90,
+        ),
         done: p.done,
         total: p.total,
         files,
       };
     }),
     total: live.length,
-    pinned: live.filter(n => n.pinned).length,
+    pinned: live.filter((n) => n.pinned).length,
   };
 }
 
@@ -908,6 +921,8 @@ export interface ResolvedWorkoutPlan {
   week: number;
   exercises: PlanExercise[];
   plannedSets: number;
+  /** Сколько дней в плане — цель недели для прогресса виджетов. */
+  planDays: number;
 }
 
 const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -932,11 +947,7 @@ export function trainingWeekdays(training: any): boolean[] {
   const fromList = (list: number[]) => WEEKDAY_LABELS.map((_, i) => list.includes(i));
 
   if (sched && sched.enabled) {
-    if (
-      sched.scheduleType === 'weekly' &&
-      Array.isArray(sched.weeklyDays) &&
-      sched.weeklyDays.length === 7
-    ) {
+    if (sched.scheduleType === 'weekly' && Array.isArray(sched.weeklyDays) && sched.weeklyDays.length === 7) {
       return sched.weeklyDays.map((v: any) => v === true);
     }
     if (sched.scheduleType === 'eod') return fromList([0, 2, 4, 6]);
@@ -983,22 +994,22 @@ function pickPlanDayIndex(iso: string, training: any, planDays: number): number 
     return rotationPlanIndex(planDays, iso);
   }
   const weekly = trainingWeekdays(training);
-  const positions = weekly.map((v, i) => (v ? i : -1)).filter(i => i >= 0);
+  const positions = weekly.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
   if (positions.length === 0) return rotationPlanIndex(planDays, iso);
   const dow = mondayIndex(iso);
   const exact = positions.indexOf(dow);
   if (exact >= 0) return exact % planDays;
   // Сегодня отдых — показываем ближайшую тренировку вперёд (по кругу).
-  const next = positions.find(p => p > dow) ?? positions[0];
+  const next = positions.find((p) => p > dow) ?? positions[0];
   return positions.indexOf(next) % planDays;
 }
 
 /** Строка плана для одного упражнения: «4×8 · 80 кг · RIR 2». */
 export function formatPlanLine(ex: PlanExercise): string {
   if (!ex.sets.length) return 'по самочувствию';
-  const reps = [...new Set(ex.sets.map(s => s.reps))].filter(r => r > 0);
-  const weights = [...new Set(ex.sets.map(s => s.weight))].filter(w => w > 0);
-  const rirs = [...new Set(ex.sets.map(s => s.rir))];
+  const reps = [...new Set(ex.sets.map((s) => s.reps))].filter((r) => r > 0);
+  const weights = [...new Set(ex.sets.map((s) => s.weight))].filter((w) => w > 0);
+  const rirs = [...new Set(ex.sets.map((s) => s.rir))];
   const parts = [`${ex.sets.length}×${reps.length ? reps.join('/') : '—'}`];
   if (weights.length === 1) parts.push(`${weights[0]} кг`);
   else if (weights.length > 1) parts.push(`${Math.min(...weights)}–${Math.max(...weights)} кг`);
@@ -1019,8 +1030,7 @@ function planExerciseFromRuntime(raw: any): PlanExercise {
         rir: Number.isFinite(rirRaw) ? Math.max(0, Math.min(20, Math.round(rirRaw))) : 2,
       };
     }),
-    restSec:
-      Math.max(0, Math.min(600, Math.round(Number(raw?.restSec ?? raw?.rest) || 0))) || 90,
+    restSec: Math.max(0, Math.min(600, Math.round(Number(raw?.restSec ?? raw?.rest) || 0))) || 90,
   };
 }
 
@@ -1038,9 +1048,7 @@ export function resolveWorkoutPlan(dateIso = todayLocalISO()): ResolvedWorkoutPl
   const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
   const dayIndex = pickPlanDayIndex(dateIso, training, days.length);
   const day = days[dayIndex % days.length];
-  const exercises: PlanExercise[] = (day.exercises as any[])
-    .slice(0, 12)
-    .map(planExerciseFromRuntime);
+  const exercises: PlanExercise[] = (day.exercises as any[]).slice(0, 12).map(planExerciseFromRuntime);
   return {
     dayIndex,
     label: String(day.label || runtime?.focus || 'Тренировка').slice(0, 60),
@@ -1048,6 +1056,7 @@ export function resolveWorkoutPlan(dateIso = todayLocalISO()): ResolvedWorkoutPl
     week: Math.max(1, Math.round(Number(runtime?.week) || 1)),
     exercises,
     plannedSets: exercises.reduce((s, e) => s + e.sets.length, 0),
+    planDays: days.length,
   };
 }
 
@@ -1075,12 +1084,19 @@ function ensurePlanExercises(session: WorkoutSession, plan: ResolvedWorkoutPlan 
   if (!plan) return session;
   let next = session;
   for (const ex of plan.exercises) {
-    if (!next.exercises.some(e => e.exerciseName === ex.name)) {
+    if (!next.exercises.some((e) => e.exerciseName === ex.name)) {
       next = addExerciseToSession(next, planExerciseToSessionExercise(ex));
     }
   }
   return next;
 }
+
+/**
+ * Сколько строк показывает нативный виджет «Проведение»: Android рисует
+ * ROW_IDS 1..5. Больше строк мост всё равно не отобразит — лимитируем здесь,
+ * чтобы снапшот не обещал шесть упражнений.
+ */
+export const WORKOUT_WIDGET_ROWS = 5;
 
 /**
  * Снапшот виджета «Проведение тренировки»: упражнения назначенной сессии.
@@ -1113,7 +1129,7 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
   };
 
   for (const planEx of plan?.exercises ?? []) {
-    const sessionEx = active?.exercises.find(e => e.exerciseName === planEx.name) ?? null;
+    const sessionEx = active?.exercises.find((e) => e.exerciseName === planEx.name) ?? null;
     pushExercise(planEx, sessionEx);
   }
   for (const sessionEx of active?.exercises ?? []) {
@@ -1121,26 +1137,20 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
   }
 
   const setsDone = Math.max(0, Number(active?.totalSets) || 0);
-  const setsPlanned = Math.max(
-    plan?.plannedSets ?? 0,
-    Number(active?.plannedSetsTotal) || 0,
-    setsDone,
-  );
+  const setsPlanned = Math.max(plan?.plannedSets ?? 0, Number(active?.plannedSetsTotal) || 0, setsDone);
   const volumeKg = Math.max(0, Math.round(Number(active?.totalVolume) || 0));
-  const progress = setsPlanned > 0
-    ? Math.max(0, Math.min(100, Math.round((setsDone / setsPlanned) * 100)))
-    : setsDone > 0
-      ? 100
-      : 0;
+  const progress =
+    setsPlanned > 0 ? Math.max(0, Math.min(100, Math.round((setsDone / setsPlanned) * 100))) : setsDone > 0 ? 100 : 0;
 
   const live = !!active;
   const titleBase = plan?.label || active?.focus || 'Тренировка';
   const title = live ? `● ${titleBase}` : titleBase;
-  const subtitle = !plan && !active
-    ? 'План не найден — откройте Тренировку'
-    : live
-      ? `${setsDone}/${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)} · ${volumeKg} кг`
-      : `${exercises.length} упр. · ${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)}`;
+  const subtitle =
+    !plan && !active
+      ? 'План не найден — откройте Тренировку'
+      : live
+        ? `${setsDone}/${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)} · ${volumeKg} кг`
+        : `${exercises.length} упр. · ${setsPlanned} ${ruCount(setsPlanned, RU_APPROACHES)}`;
 
   return {
     title,
@@ -1152,16 +1162,27 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
     volumeKg,
     progress,
     dayIndex: plan?.dayIndex ?? 0,
-    exercises: exercises.slice(0, 6),
+    exercises: exercises.slice(0, WORKOUT_WIDGET_ROWS),
   };
 }
 
-/** Только виджет «Проведение» — обновить после записи подхода (APK). */
+/**
+ * Только виджет «Проведение» — дешёвое обновление во время сессии (APK):
+ * пересобирает ТОЛЬКО workout-снапшот и синкает его. Параллельные вызовы
+ * (подход → автосейв → событие, плюс возврат из фона) не гоняются: пока
+ * предыдущий синк в полёте, новый возвращает false. Исключения не вылетают —
+ * виджет необязательный слой.
+ */
+let workoutWidgetPushInFlight = false;
 export async function pushWorkoutWidget(): Promise<boolean> {
+  if (workoutWidgetPushInFlight) return false;
+  workoutWidgetPushInFlight = true;
   try {
     return await syncWorkoutWidget(collectWorkout());
   } catch {
     return false;
+  } finally {
+    workoutWidgetPushInFlight = false;
   }
 }
 
@@ -1191,10 +1212,7 @@ export function normalizeMealKey(raw?: string | null): string {
  * приёма. Один выбор для двух задач — что показать в `lastFood` и что снять
  * кнопкой «↩», иначе виджет мог бы «отменить» не то, что обещал.
  */
-function lastDiaryItem(
-  diary: Record<string, any>,
-  date: string,
-): { meal: string; index: number; item: any } | null {
+function lastDiaryItem(diary: Record<string, any>, date: string): { meal: string; index: number; item: any } | null {
   const meals = diary?.[date]?.meals;
   if (!meals || typeof meals !== 'object') return null;
   let found: { meal: string; index: number; item: any } | null = null;
@@ -1211,6 +1229,15 @@ function lastDiaryItem(
  * еда -> nutrition_diary_v2 в день из метки времени,
  * задача -> статус «сделано» в планшете (he_coach_planner).
  */
+/**
+ * Плеер тренировки, смонтированный в приложении, — единственный писатель `he_workout_active_v1`.
+ * Пока он открыт, подходы из виджета не пишутся в хранилище напрямую (следующий автосейв плеера
+ * затёр бы их), а уходят плееру событием `he-workout-widget-set`.
+ */
+let workoutPlayerActive = false;
+export function setWorkoutPlayerActive(active: boolean): void { workoutPlayerActive = active; }
+const playerActive = (): boolean => workoutPlayerActive && typeof window !== 'undefined';
+
 export function applyWidgetQueue(items: QueuedItem[]): {
   waterMl: number;
   /** Снятая вода («−250» на виджете) — сколько реально убрали. */
@@ -1256,11 +1283,11 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         const ml = Math.max(0, Math.min(2000, Math.round(it.ml ?? 0)));
         if (ml > 0) {
           const today = todayLocalISO();
-          const before = (loadWaterLog() as { date: string; amountMl: number }[])
-            .find((e) => e.date === today)?.amountMl ?? 0;
+          const before =
+            (loadWaterLog() as { date: string; amountMl: number }[]).find((e) => e.date === today)?.amountMl ?? 0;
           removeWater(ml);
-          const after = (loadWaterLog() as { date: string; amountMl: number }[])
-            .find((e) => e.date === today)?.amountMl ?? 0;
+          const after =
+            (loadWaterLog() as { date: string; amountMl: number }[]).find((e) => e.date === today)?.amountMl ?? 0;
           waterRemovedMl += Math.max(0, before - after);
         }
       } else if (it.type === 'food' && it.name) {
@@ -1408,14 +1435,49 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           finishSession(active);
           clearActiveSession();
           workoutsFinished += 1;
+          // Плеер держит эту сессию в состоянии — сообщаем ему, чтобы он не завершил её повторно.
+          try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* noop */ }
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
         const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
         const base = loadActiveSession();
         let session = base ? ensurePlanExercises(base, plan) : sessionFromPlan(plan);
-        const index = session.exercises.findIndex(e => e.exerciseName === name);
+        let index = session.exercises.findIndex((e) => e.exerciseName === name);
+        if (index < 0) {
+          // Подход по упражнению не из плана дня (или вовсе без плана) раньше
+          // молча терялся. Добавляем упражнение в сессию из данных очереди:
+          // запись подхода проверит logSet, при отказе ничего не сохраняем.
+          session = addExerciseToSession(session, {
+            id: name,
+            name,
+            pattern: '',
+            muscleGroup: '',
+          });
+          index = session.exercises.length - 1;
+        }
         if (index >= 0) {
+          // Плеер открыт — он единственный писатель. Передаём подход ему, иначе его автосейв
+          // перезапишет активную сессию без только что добавленных виджетных подходов.
+          if (playerActive()) {
+            const relay = {
+              exerciseName: name,
+              weight: Number(it.weight) || 0,
+              reps: Number(it.reps) || 0,
+              rir: Number(it.rir),
+              rpe: Number(it.rpe),
+              technique: it.technique,
+              notes: it.notes,
+              pause: it.pause === true,
+              handled: false,
+            };
+            try { window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: relay })); } catch { /* noop */ }
+            if (relay.handled) {
+              setsAdded += 1;
+              if (!base) workoutsStarted += 1;
+              continue;
+            }
+          }
           const weight = Math.max(0, Math.min(500, Number(it.weight) || 0));
           const reps = Math.max(0, Math.min(100, Math.round(Number(it.reps) || 0)));
           const rir = Math.max(0, Math.min(20, Math.round(Number(it.rir) || 0)));
@@ -1429,9 +1491,15 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             Number.isFinite(techniqueRaw) && techniqueRaw >= 3 && techniqueRaw <= 5
               ? Math.round(techniqueRaw)
               : undefined;
+          const prevSets = session.exercises[index].sets || [];
+          const nextSetNumber = prevSets.reduce((m, s) => Math.max(m, Number(s.setNumber) || 0), 0) + 1;
+          // Вес 0 — «свой вес» только для упражнений без отягощения (турник/брусья/отжимания).
+          // Для штанги/тренажёра такой подход должен быть отклонён, а не записан с тоннажем 0.
+          const bodyweight = weight <= 0 && isBodyweightExercise({ name });
           const res = logSet(session, index, {
-            setNumber: (session.exercises[index].sets.length || 0) + 1,
+            setNumber: nextSetNumber,
             weightKg: weight,
+            bodyweight,
             reps,
             rpe,
             rir,
@@ -1560,9 +1628,7 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   ]);
   // Каталог продуктов для поиска в нативном редакторе еды: уходит один раз на
   // версию FOOD_DB (иначе каждый синк гонял бы ~700 позиций через мост).
-  void pushNutritionFoods(foodCatalog(), nutritionFoodsVersion(foodCatalog())).catch(
-    () => false,
-  );
+  void pushNutritionFoods(foodCatalog(), nutritionFoodsVersion(foodCatalog())).catch(() => false);
   return {
     drainedWaterMl,
     drainedWaterRemovedMl,

@@ -220,6 +220,8 @@ export const DiaryReportView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
       details: summary.workouts <= 3 ? buildSetDetails(selected) : null,
       weekPlan: weekPlan ? compareWeekPlanVsActual(weekPlan, selected) : null,
       next: chosen.includes('next'),
+      // Текст — только из выбранных блоков: выключенный блок не протекает.
+      blocks: chosen,
     });
     void navigator.clipboard?.writeText(text).then(() => {
       setCopyDone(true);

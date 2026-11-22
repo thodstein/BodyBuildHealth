@@ -47,6 +47,14 @@ describe('SessionPlayer: заминка → итоги', () => {
       fireEvent.click(toMain!);
     });
 
+    // Завершить сессию без единого подхода нельзя: пустая сессия не пишется в историю и
+    // сразу уходит в «не сохранено» (done-empty), минуя заминку. Поэтому сначала пишем подход.
+    const okBtn = byText(container, 'OK');
+    expect(okBtn).toBeTruthy();
+    act(() => {
+      fireEvent.click(okBtn!);
+    });
+
     const finishBtn = byText(container, 'Завершить');
     expect(finishBtn).toBeTruthy();
     act(() => {

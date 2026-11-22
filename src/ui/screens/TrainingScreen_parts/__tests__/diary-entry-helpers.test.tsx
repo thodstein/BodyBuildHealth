@@ -453,7 +453,7 @@ describe('DiarySubnav — сквозная навигация по 10 разде
     fireEvent.click(screen.getByRole('button', { name: '📏 Прогресс' }));
     expect(screen.getByText('📏 Замеры тела')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '📈 Анализ' }));
-    expect(screen.getByText('Объём/нед')).toBeTruthy();
+    expect(screen.getByText('Объём/7 дн.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '🧘 Ритуалы' }));
     expect(screen.getByText('Протокол ещё не собран')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '🛠 Инструменты' }));

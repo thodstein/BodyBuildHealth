@@ -2261,6 +2261,11 @@ export interface WorkoutReportTextOptions {
   details?: SetDetailSession[] | null;
   /** Добавить «Следующая сессия»: цель по каждому упражнению. */
   next?: boolean | null;
+  /**
+   * Выбранные блоки отчёта. Если заданы — в текст попадут только они: иначе
+   * «Копировать» отдавало бы данные блока, который пользователь выключил.
+   */
+  blocks?: ReportBlockId[] | null;
   /** Своя первая строка (например, «📊 Итог: FullBody — 62 мин»). */
   header?: string;
   /** Дополнительные строки в конце (например, прогрессия к следующей сессии). */
@@ -2274,56 +2279,72 @@ export interface WorkoutReportTextOptions {
  */
 export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTextOptions = {}): string {
   const level = opts.level || 'intermediate';
+  // Если экран передал выбор блоков, текст собирается только из них: иначе
+  // «Копировать» отдавало бы то, что пользователь спрятал.
+  const blocks = Array.isArray(opts.blocks) ? opts.blocks : null;
+  const has = (id: ReportBlockId) => blocks == null || blocks.includes(id);
   const lines: string[] = [];
   lines.push(opts.header || `📊 Отчёт: ${formatSummaryPeriod(s)}`);
-  lines.push(`Тренировок: ${s.totals.sessions} · подходов: ${s.totals.sets} · повторов: ${s.totals.reps}`);
-  lines.push(`Тоннаж: ${textTon(s.totals.tonnageKg)} · время: ${s.totals.durationMin} мин · плотность: ${s.totals.densityKgPerMin} кг/мин`);
-  if (s.totals.avgIntensityPct != null) {
-    lines.push(`Средняя интенсивность: ${s.totals.avgIntensityPct}% от e1RM`);
-  }
-  if (s.totals.rirLoggedSets > 0) {
-    const hardShare = Math.round((s.totals.nearFailureSets / s.totals.rirLoggedSets) * 100);
-    lines.push(
-      `RIR ≤ 2: ${s.totals.nearFailureSets} из ${s.totals.rirLoggedSets} подходов (${hardShare}%)`
-      + `${s.totals.avgRIR != null ? ` · средний RIR ${s.totals.avgRIR}` : ''}`,
-    );
+  if (has('totals')) {
+    lines.push(`Тренировок: ${s.totals.sessions} · подходов: ${s.totals.sets} · повторов: ${s.totals.reps}`);
+    // Время не записано — это не «0 минут»: плотность без времени не считается.
+    const timePart = s.totals.durationMin > 0
+      ? ` · время: ${s.totals.durationMin} мин · плотность: ${s.totals.densityKgPerMin} кг/мин`
+      : ' · время не записано';
+    lines.push(`Тоннаж: ${textTon(s.totals.tonnageKg)}${timePart}`);
+    if (s.totals.avgIntensityPct != null) {
+      lines.push(`Средняя интенсивность: ${s.totals.avgIntensityPct}% от e1RM`);
+    }
+    if (s.totals.rirLoggedSets > 0) {
+      const hardShare = Math.round((s.totals.nearFailureSets / s.totals.rirLoggedSets) * 100);
+      lines.push(
+        `RIR ≤ 2: ${s.totals.nearFailureSets} из ${s.totals.rirLoggedSets} подходов (${hardShare}%)`
+        + `${s.totals.avgRIR != null ? ` · средний RIR ${s.totals.avgRIR}` : ''}`,
+      );
+    }
   }
 
   const weeksCount = summaryWeeksCount(s);
   const perWeek = s.totals.sessions > 1;
   const weeklyUnit = perWeek ? 'подх/нед' : 'подх за сессию';
   const totalSetsForShare = s.totals.sets > 0 ? s.totals.sets : 1;
-  lines.push('');
-  lines.push('По мышцам:');
-  s.muscles.forEach(m => {
-    const weekly = Math.round(m.sets / weeksCount);
-    const trend = m.weeklyTrendPct != null ? ` (${signedPct(m.weeklyTrendPct)} к первой неделе)` : '';
-    const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, level), perWeek);
-    // Доля подходов честнее тоннажа: тяжёлые ноги забирают тоннаж, но объём
-    // для гипертрофии — это подходы.
-    const setsShare = Math.round((m.sets / totalSetsForShare) * 100);
-    const freq = perWeek && m.frequencyPerWeek > 0 ? ` · ${m.frequencyPerWeek}×/нед` : '';
-    const mz = dominantRepZone(m.repZones);
-    const zone = mz ? ` · зона ${mz.label} (${mz.pct}%)` : '';
-    lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${freq}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов${zone}`);
-  });
+  if (has('muscles')) {
+    lines.push('');
+    lines.push('По мышцам:');
+    s.muscles.forEach(m => {
+      const weekly = Math.round(m.sets / weeksCount);
+      const trend = m.weeklyTrendPct != null ? ` (${signedPct(m.weeklyTrendPct)} к первой неделе)` : '';
+      const adv = volumeAdvice(muscleLandmarksFor(m.muscle, weekly, level), perWeek);
+      // Доля подходов честнее тоннажа: тяжёлые ноги забирают тоннаж, но объём
+      // для гипертрофии — это подходы.
+      const setsShare = Math.round((m.sets / totalSetsForShare) * 100);
+      const freq = perWeek && m.frequencyPerWeek > 0 ? ` · ${m.frequencyPerWeek}×/нед` : '';
+      const mz = dominantRepZone(m.repZones);
+      const zone = mz ? ` · зона ${mz.label} (${mz.pct}%)` : '';
+      lines.push(`  ${m.label}: ${m.sets} подх · ${weekly} ${weeklyUnit}${freq}${trend}${adv ? ` · ${adv.chip}` : ''} · ${textTon(m.tonnageKg)} · доля ${m.sharePct}% тоннажа · ${setsShare}% подходов${zone}`);
+    });
+  }
 
-  lines.push('');
-  lines.push('По упражнениям:');
-  s.exercises.forEach(e => {
-    // Подходы по неделям — ответ на «растёт упражнение или выполняется
-    // формально»; перерыв в шкале виден нулём.
-    const weeks = e.weeklySets.filter(v => v > 0).length > 1 ? ` · подх по неделям ${e.weeklySets.join('·')}` : '';
-    const weeksTrend = e.weeklyTrendPct != null ? ` (${signedPct(e.weeklyTrendPct)} к первой неделе)` : '';
-    const dz = dominantRepZone(e.repZones);
-    const zone = dz ? ` · зона ${dz.label} (${dz.pct}%)` : '';
-    const bestSet = e.topSetWeight > 0 ? `${e.topSetWeight}×${e.topSetReps}` : `${e.bestWeight}кг`;
-    lines.push(
-      `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${bestSet} (e1RM ${e.bestE1RM})${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}${weeks}${weeksTrend}${zone}`,
-    );
-  });
+  if (has('exercises')) {
+    lines.push('');
+    lines.push('По упражнениям:');
+    s.exercises.forEach(e => {
+      // Подходы по неделям — ответ на «растёт упражнение или выполняется
+      // формально»; перерыв в шкале виден нулём.
+      const weeks = e.weeklySets.filter(v => v > 0).length > 1 ? ` · подх по неделям ${e.weeklySets.join('·')}` : '';
+      const weeksTrend = e.weeklyTrendPct != null ? ` (${signedPct(e.weeklyTrendPct)} к первой неделе)` : '';
+      const dz = dominantRepZone(e.repZones);
+      const zone = dz ? ` · зона ${dz.label} (${dz.pct}%)` : '';
+      // У подхода со своим весом e1RM нет — не печатаем «(e1RM 0)» как факт.
+      const bestSet = e.topSetWeight > 0 ? `${e.topSetWeight}×${e.topSetReps}` : `×${e.bestReps}`;
+      const e1rmPart = e.bestE1RM > 0 ? ` (e1RM ${e.bestE1RM})` : '';
+      lines.push(
+        `  ${e.name}: ${e.sets}×${e.avgRepsPerSet} · ${textTon(e.tonnageKg)} · лучший ${bestSet}${e1rmPart}${e.avgIntensityPct != null ? ` · инт. ${e.avgIntensityPct}%` : ''}${weeks}${weeksTrend}${zone}`,
+      );
+    });
+  }
 
-  if (s.patterns.length) {
+  if (has('movement') && s.patterns.length) {
     lines.push('');
     lines.push('Движения:');
     s.patterns.forEach(p => {
@@ -2340,7 +2361,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     });
   }
 
-  if (s.weeks.length > 1) {
+  if (has('sessions') && s.weeks.length > 1) {
     lines.push('');
     lines.push('По неделям:');
     s.weeks.forEach(w => {
@@ -2351,7 +2372,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     });
   }
 
-  if (s.sessions.length > 1) {
+  if (has('sessions') && s.sessions.length > 1) {
     // Период без построчного списка тренировок не отвечает на «а что было в
     // четверг»: недели и мышцы есть, самих сессий нет.
     lines.push('');
@@ -2367,7 +2388,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     });
   }
 
-  if (opts.plan && !opts.plan.empty) {
+  if (has('plan') && opts.plan && !opts.plan.empty) {
     const pva = opts.plan;
     lines.push('');
     lines.push(`План: ${pva.plannedSets} подх · факт: ${pva.actualSets} подх${pva.setsPct != null ? ` (${pva.setsPct}%)` : ''} · ${textTon(pva.plannedTonnageKg)} → ${textTon(pva.actualTonnageKg)}`);
@@ -2392,7 +2413,7 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     }
   }
 
-  if (opts.weekPlan && !opts.weekPlan.empty) {
+  if (has('weekplan') && opts.weekPlan && !opts.weekPlan.empty) {
     const wp = opts.weekPlan;
     lines.push('');
     lines.push(`План недели: ${wp.actualSets} из ${wp.plannedSets} подх${wp.setsPct != null ? ` (${wp.setsPct}%)` : ''} · ${wp.plannedDays} дн. плана · ${wp.actualSessions} трен.`);
@@ -2406,113 +2427,125 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
     });
   }
 
-  const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan, opts.weekPlan);
-  if (insights.length) {
-    lines.push('');
-    lines.push('Выводы:');
-    insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
-  }
-
-  const cmp = opts.comparison;
-  if (cmp && !cmp.empty) {
-    const fmtDelta = (d: MetricDelta) =>
-      `${d.delta > 0 ? '+' : ''}${textInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
-    const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
-    lines.push('');
-    lines.push(`Сравнение с ${opts.comparisonLabel || 'прошлым периодом'}:`);
-    lines.push(`  Тоннаж: ${textInt(cmp.metrics.tonnage.current)} кг, ${fmtDelta(cmp.metrics.tonnage)}`);
-    lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
-    lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
-    if (cmp.metrics.duration.previous > 0) {
-      lines.push(`  Время: ${textInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
-    }
-    const fmtDec1 = (n: number) => String(Math.round(n * 10) / 10);
-    if (cmp.metrics.rir) {
-      const r = cmp.metrics.rir;
-      lines.push(`  Средний RIR: ${fmtDec1(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtDec1(r.delta)}`);
-    }
-    if (cmp.metrics.intensity) {
-      const it = cmp.metrics.intensity;
-      lines.push(`  Интенсивность: ${fmtDec1(it.current)}% от e1RM, ${it.delta > 0 ? '+' : ''}${fmtDec1(it.delta)} п.п.`);
-    }
-    if (cmp.metrics.strengthShare) {
-      const s = cmp.metrics.strengthShare;
-      lines.push(`  Силовая работа: ${fmtDec1(s.current)}% подходов в 1–5, ${s.delta > 0 ? '+' : ''}${fmtDec1(s.delta)} п.п.`);
-      const shift = zoneShiftNote(s);
-      if (shift) lines.push(`  Зона повторов: ${shift}`);
-    }
-    const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
-    const grown = muscleRows.filter(m => m.sets.delta > 0).length;
-    const fallen = muscleRows.filter(m => m.sets.delta < 0).length;
-    if (muscleRows.length) {
-      lines.push(`  Подходы по мышцам: выросло ${grown}, просело ${fallen}, без изменений ${muscleRows.length - grown - fallen}`);
-    }
-    const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
-    if (movedMuscles.length) {
-      lines.push('  Мышцы:');
-      movedMuscles.forEach(m => lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`));
-    }
-    const patternRows = cmp.patterns.filter(p => p.sets.previous + p.sets.current > 0);
-    const grownPatterns = patternRows.filter(p => p.sets.delta > 0).length;
-    const fallenPatterns = patternRows.filter(p => p.sets.delta < 0).length;
-    if (patternRows.length) {
-      lines.push(`  Подходы по движениям: выросло ${grownPatterns}, просело ${fallenPatterns}, без изменений ${patternRows.length - grownPatterns - fallenPatterns}`);
-    }
-    const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
-    if (movedPatterns.length) {
-      lines.push('  Движения:');
-      movedPatterns.forEach(p => lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`));
-    }
-    const movedSets = cmp.exercises.filter(e => e.sets.delta !== 0).slice(0, 5);
-    if (movedSets.length) {
-      lines.push('  Подходы по упражнениям:');
-      movedSets.forEach(e => lines.push(`    ${e.name}: ${e.sets.previous} → ${e.sets.current} подх. (${signed(e.sets.delta)})`));
-    }
-    const movedE1rm = cmp.exercises.filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0).slice(0, 5);
-    if (movedE1rm.length) {
-      lines.push('  e1RM по упражнениям:');
-      movedE1rm.forEach(e => lines.push(
-        e.e1rm.previous > 0
-          ? `    ${e.name}: ${e.e1rm.previous} → ${e.e1rm.current} кг (${signed(e.e1rm.delta)})`
-          : `    ${e.name}: новое · ${e.e1rm.current} кг`,
-      ));
+  if (has('insights')) {
+    const insights = buildWorkoutInsights(s, level, opts.comparison, opts.plan, opts.weekPlan);
+    if (insights.length) {
+      lines.push('');
+      lines.push('Выводы:');
+      insights.forEach(ins => lines.push(`  ${ins.icon} ${ins.title} — ${ins.detail}`));
     }
   }
 
-  const zones = s.totals.repZones;
-  const zoneTotal = (zones?.strength || 0) + (zones?.hypertrophy || 0) + (zones?.endurance || 0);
-  if (zoneTotal > 0) {
-    const zonePct = (n: number) => Math.round((n / zoneTotal) * 100);
-    lines.push(
-      `Зоны повторов: 1–5 — ${zones.strength} подх. (${zonePct(zones.strength)}%), `
-      + `6–12 — ${zones.hypertrophy} (${zonePct(zones.hypertrophy)}%), `
-      + `13+ — ${zones.endurance} (${zonePct(zones.endurance)}%)`,
-    );
+  if (has('compare')) {
+    const cmp = opts.comparison;
+    if (cmp && !cmp.empty) {
+      const fmtDelta = (d: MetricDelta) =>
+        `${d.delta > 0 ? '+' : ''}${textInt(d.delta)}${d.pct != null ? ` (${d.pct > 0 ? '+' : ''}${d.pct}%)` : ''}`;
+      const signed = (n: number) => `${n > 0 ? '+' : ''}${n}`;
+      lines.push('');
+      lines.push(`Сравнение с ${opts.comparisonLabel || 'прошлым периодом'}:`);
+      // Тоннаж — в тех же единицах, что шапка и плитки: «1.2 т», а не «1200 кг».
+      // Знак ставим сами: textTon берёт модуль, иначе спад печатался бы кг.
+      const tn = cmp.metrics.tonnage;
+      const tnSign = tn.delta > 0 ? '+' : tn.delta < 0 ? '-' : '';
+      lines.push(`  Тоннаж: ${textTon(tn.current)}, ${tnSign}${textTon(Math.abs(tn.delta))}${tn.pct != null ? ` (${tn.pct > 0 ? '+' : ''}${tn.pct}%)` : ''}`);
+      lines.push(`  Подходы: ${cmp.metrics.sets.current}, ${fmtDelta(cmp.metrics.sets)}`);
+      lines.push(`  Повторы: ${cmp.metrics.reps.current}, ${fmtDelta(cmp.metrics.reps)}`);
+      if (cmp.metrics.duration.previous > 0) {
+        lines.push(`  Время: ${textInt(cmp.metrics.duration.current)} мин, ${fmtDelta(cmp.metrics.duration)}`);
+      }
+      const fmtDec1 = (n: number) => String(Math.round(n * 10) / 10);
+      if (cmp.metrics.rir) {
+        const r = cmp.metrics.rir;
+        lines.push(`  Средний RIR: ${fmtDec1(r.current)}, ${r.delta > 0 ? '+' : ''}${fmtDec1(r.delta)}`);
+      }
+      if (cmp.metrics.intensity) {
+        const it = cmp.metrics.intensity;
+        lines.push(`  Интенсивность: ${fmtDec1(it.current)}% от e1RM, ${it.delta > 0 ? '+' : ''}${fmtDec1(it.delta)} п.п.`);
+      }
+      if (cmp.metrics.strengthShare) {
+        const s = cmp.metrics.strengthShare;
+        lines.push(`  Силовая работа: ${fmtDec1(s.current)}% подходов в 1–5, ${s.delta > 0 ? '+' : ''}${fmtDec1(s.delta)} п.п.`);
+        const shift = zoneShiftNote(s);
+        if (shift) lines.push(`  Зона повторов: ${shift}`);
+      }
+      const muscleRows = cmp.muscles.filter(m => m.sets.previous + m.sets.current > 0);
+      const grown = muscleRows.filter(m => m.sets.delta > 0).length;
+      const fallen = muscleRows.filter(m => m.sets.delta < 0).length;
+      if (muscleRows.length) {
+        lines.push(`  Подходы по мышцам: выросло ${grown}, просело ${fallen}, без изменений ${muscleRows.length - grown - fallen}`);
+      }
+      const movedMuscles = cmp.muscles.filter(m => m.sets.delta !== 0).slice(0, 5);
+      if (movedMuscles.length) {
+        lines.push('  Мышцы:');
+        movedMuscles.forEach(m => lines.push(`    ${m.label}: ${m.sets.previous} → ${m.sets.current} подх. (${signed(m.sets.delta)})`));
+      }
+      const patternRows = cmp.patterns.filter(p => p.sets.previous + p.sets.current > 0);
+      const grownPatterns = patternRows.filter(p => p.sets.delta > 0).length;
+      const fallenPatterns = patternRows.filter(p => p.sets.delta < 0).length;
+      if (patternRows.length) {
+        lines.push(`  Подходы по движениям: выросло ${grownPatterns}, просело ${fallenPatterns}, без изменений ${patternRows.length - grownPatterns - fallenPatterns}`);
+      }
+      const movedPatterns = cmp.patterns.filter(p => p.sets.delta !== 0).slice(0, 5);
+      if (movedPatterns.length) {
+        lines.push('  Движения:');
+        movedPatterns.forEach(p => lines.push(`    ${p.label}: ${p.sets.previous} → ${p.sets.current} подх. (${signed(p.sets.delta)})`));
+      }
+      const movedSets = cmp.exercises.filter(e => e.sets.delta !== 0).slice(0, 5);
+      if (movedSets.length) {
+        lines.push('  Подходы по упражнениям:');
+        movedSets.forEach(e => lines.push(`    ${e.name}: ${e.sets.previous} → ${e.sets.current} подх. (${signed(e.sets.delta)})`));
+      }
+      const movedE1rm = cmp.exercises.filter(e => e.e1rm.current > 0 && e.e1rm.delta !== 0).slice(0, 5);
+      if (movedE1rm.length) {
+        lines.push('  e1RM по упражнениям:');
+        movedE1rm.forEach(e => lines.push(
+          e.e1rm.previous > 0
+            ? `    ${e.name}: ${e.e1rm.previous} → ${e.e1rm.current} кг (${signed(e.e1rm.delta)})`
+            : `    ${e.name}: новое · ${e.e1rm.current} кг`,
+        ));
+      }
+    }
   }
 
-  if (s.totals.weightlessSets > 0) {
-    lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${s.totals.weightlessSets} подх.`);
+  if (has('totals')) {
+    const zones = s.totals.repZones;
+    const zoneTotal = (zones?.strength || 0) + (zones?.hypertrophy || 0) + (zones?.endurance || 0);
+    if (zoneTotal > 0) {
+      const zonePct = (n: number) => Math.round((n / zoneTotal) * 100);
+      lines.push(
+        `Зоны повторов: 1–5 — ${zones.strength} подх. (${zonePct(zones.strength)}%), `
+        + `6–12 — ${zones.hypertrophy} (${zonePct(zones.hypertrophy)}%), `
+        + `13+ — ${zones.endurance} (${zonePct(zones.endurance)}%)`,
+      );
+    }
+
+    if (s.totals.weightlessSets > 0) {
+      lines.push(`Без веса (свой вес/резинка, вне тоннажа): ${s.totals.weightlessSets} подх.`);
+    }
   }
 
-  const details = opts.details || [];
-  if (details.length) {
-    lines.push('');
-    lines.push('Подходы:');
-    details.forEach(session => {
-      lines.push(`  ${session.date} · ${session.split} · ${textTon(session.tonnageKg)}`);
-      session.exercises.forEach(ex => {
-        const sets = ex.sets
-          .map(st => {
-            const base = `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`;
-            return st.pct1RM != null ? `${base} (${st.pct1RM}%)` : base;
-          })
-          .join(', ');
-        lines.push(`    ${ex.name}: ${sets}`);
+  if (has('sets')) {
+    const details = opts.details || [];
+    if (details.length) {
+      lines.push('');
+      lines.push('Подходы:');
+      details.forEach(session => {
+        lines.push(`  ${session.date} · ${session.split} · ${textTon(session.tonnageKg)}`);
+        session.exercises.forEach(ex => {
+          const sets = ex.sets
+            .map(st => {
+              const base = `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`;
+              return st.pct1RM != null ? `${base} (${st.pct1RM}%)` : base;
+            })
+            .join(', ');
+          lines.push(`    ${ex.name}: ${sets}`);
+        });
       });
-    });
+    }
   }
 
-  if (opts.next) {
+  if (opts.next && has('next')) {
     // Цель на следующую сессию — конкретная, а не «работай по прогрессии»:
     // тот же вес и +1 повтор или +2.5 кг на верху диапазона.
     const nextPlan = buildNextSessionPlan(s);

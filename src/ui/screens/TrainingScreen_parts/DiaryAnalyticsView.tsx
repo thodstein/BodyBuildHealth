@@ -3,8 +3,6 @@ import React from 'react';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
 import { epley1RM } from '../../../engines/e1rm';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
-import { loadSRPESessions } from '../../../engines/pro/srpe-store';
-import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { Sparkline } from './Sparkline';
 import { RIRCalibrationCard } from './RIRCalibrationCard';
@@ -38,6 +36,14 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     expertRecentVol, expertRirStats, tprofile, mesoLength, level, linked, onRefresh,
     setMode, onGoRecord,
   } = hub;
+  // Реальные входы для скор-карточки: возраст/пол из профиля, минуты — из истории.
+  const personal = (() => { try { return (getProfile().settings as any)?.personal || {}; } catch { return {}; } })();
+  const scoreSex: 'male' | 'female' = personal.sex === 'female' ? 'female' : 'male';
+  const scoreAge = Number(personal.age) || 0;
+  const scoreAvgMinutes = (() => {
+    const durations = historyWorkouts.map(w => Number(w.duration) || 0).filter(d => d > 0);
+    return durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : 0;
+  })();
   if (!analytics) {
     return (
       <div className="train-diaryanalytics" style={style.card}>
@@ -57,10 +63,10 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             <>
               <div className="ta-stats" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <div style={style.card}>
-                  <div style={{ fontSize: 10, color: '#fff' }}>Объём/нед</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Объём/7 дн.</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{analytics.volume.weeklyVolumeKg.toLocaleString()} кг</div>
                   <div style={{ fontSize: 10, color: analytics.volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {analytics.volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(analytics.volume.volumeTrend)}% vs пред.
+                    {analytics.volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(analytics.volume.volumeTrend)}% vs пред. 7 дн.
                   </div>
                 </div>
                 <div style={style.card}>
@@ -714,7 +720,20 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               })()}
               {/* Готовность и риск (перенесены из Инструментов ПЛ-авто) */}
               <ReadinessForecastCard />
-              <TrainingScoreCard workoutsPerWeek={tprofile.daysPerWeek ?? 3} avgMinutes={75} intensity="moderate" goal={(tprofile.goal === 'strength' ? 'strength' : (tprofile.goal === 'mass' || tprofile.goal === 'hypertrophy') ? 'hypertrophy' : tprofile.goal === 'endurance' ? 'endurance' : 'recomposition') as 'strength' | 'hypertrophy' | 'endurance' | 'recomposition'} experience={(tprofile.level === 'novice' ? 'beginner' : tprofile.level === 'intermediate' ? 'intermediate' : 'advanced') as 'beginner' | 'intermediate' | 'advanced'} sleepHours={tprofile.sleepHours ?? 7} stressLevel={Math.round(tprofile.stressLevel ?? 3)} jointPain={[]} deloadWeeksAgo={99} weight={tprofile.bodyWeight || 80} age={30} sex={'male'} />
+              <TrainingScoreCard
+                workoutsPerWeek={tprofile.daysPerWeek ?? 0}
+                avgMinutes={scoreAvgMinutes}
+                intensity="moderate"
+                goal={(tprofile.goal === 'strength' ? 'strength' : (tprofile.goal === 'mass' || tprofile.goal === 'hypertrophy') ? 'hypertrophy' : tprofile.goal === 'endurance' ? 'endurance' : 'recomposition') as 'strength' | 'hypertrophy' | 'endurance' | 'recomposition'}
+                experience={(tprofile.level === 'novice' ? 'beginner' : tprofile.level === 'intermediate' ? 'intermediate' : 'advanced') as 'beginner' | 'intermediate' | 'advanced'}
+                sleepHours={tprofile.sleepHours ?? 0}
+                stressLevel={Math.round(tprofile.stressLevel ?? 0)}
+                jointPain={[]}
+                deloadWeeksAgo={0}
+                weight={tprofile.bodyWeight || 0}
+                age={scoreAge}
+                sex={scoreSex}
+              />
               {/* Training consistency */}
               <SectionHeader icon="📅" title="Регулярность и привычки" hint="серии · частота · плотность" />
               {historyWorkouts.length >= 4 && (() => {

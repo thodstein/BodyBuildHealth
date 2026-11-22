@@ -190,8 +190,18 @@ export const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({
     try { return JSON.parse(localStorage.getItem('he_weekly_targets') || 'null') || { sessions: 4, sets: 80, tonnage: 5000 }; } catch { return { sessions: 4, sets: 80, tonnage: 5000 }; }
   });
   const today = new Date();
-  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - today.getDay() + 1); weekStart.setHours(0, 0, 0, 0);
-  const thisWeek = historyWorkouts.filter(w => new Date(w.date) >= weekStart);
+  const weekStart = new Date(today);
+  // getDay(): 0 = воскресенье. Неделя начинается в пн: в вс отступаем 6 дней, иначе до ближайшего пн.
+  weekStart.setDate(weekStart.getDate() + (today.getDay() === 0 ? -6 : 1 - today.getDay()));
+  weekStart.setHours(0, 0, 0, 0);
+  // Сравниваем строки YYYY-MM-DD: new Date('2026-11-23') — это UTC-полночь, и при отрицательном
+  // смещении понедельничная тренировка выпадала из недели. Верхняя граница — сегодня, чтобы
+  // будущие записи не засчитывались как выполненные.
+  const localIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const thisWeek = historyWorkouts.filter(w => {
+    const d = String(w.date || '').slice(0, 10);
+    return d >= localIso(weekStart) && d <= localIso(today);
+  });
   const actualSessions = thisWeek.length;
   const actualSets = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + (e.sets?.length || 0), 0), 0);
   const actualTonnage = thisWeek.reduce((s: number, w: any) => s + w.exercises.reduce((sum: number, e: any) => sum + e.totalVolume, 0), 0);

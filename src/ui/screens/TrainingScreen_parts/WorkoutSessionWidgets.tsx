@@ -6,22 +6,36 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ruCount, RU_PERCENTS } from '../../../engines/ru-plural';
 import {
-  loadActiveSession, loadSessions, summarizeActiveSession,
+  loadActiveSession,
+  loadSessions,
+  summarizeActiveSession,
   type ActiveSessionSummary,
 } from '../../../engines/workout-logger.engine';
 
 const WHITE = '#fff';
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = {
-  background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)',
-  borderRadius: 18, padding: 12, margin: '8px 0',
+  background: 'var(--glass-bg)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 18,
+  padding: 12,
+  margin: '8px 0',
 };
 const BIG_BTN: React.CSSProperties = {
-  minHeight: 52, borderRadius: 14, border: 'none', fontWeight: 800, fontSize: 15,
-  background: ACCENT, color: '#0a0a0a', padding: '12px 16px',
+  minHeight: 52,
+  borderRadius: 14,
+  border: 'none',
+  fontWeight: 800,
+  fontSize: 15,
+  background: ACCENT,
+  color: '#0a0a0a',
+  padding: '12px 16px',
 };
 const GHOST_BTN: React.CSSProperties = {
-  ...BIG_BTN, background: 'transparent', color: WHITE, border: '1px solid rgba(255,255,255,0.14)',
+  ...BIG_BTN,
+  background: 'transparent',
+  color: WHITE,
+  border: '1px solid rgba(255,255,255,0.14)',
 };
 const TABULAR: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 
@@ -35,8 +49,18 @@ const TABULAR: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 export function requestQuickSet(): boolean {
   let handled = false;
   try {
-    window.dispatchEvent(new CustomEvent('he-workout-quick-set', { detail: { handled: () => { handled = true; } } }));
-  } catch { /* noop */ }
+    window.dispatchEvent(
+      new CustomEvent('he-workout-quick-set', {
+        detail: {
+          handled: () => {
+            handled = true;
+          },
+        },
+      }),
+    );
+  } catch {
+    /* noop */
+  }
   return handled;
 }
 
@@ -46,7 +70,11 @@ export function requestQuickSet(): boolean {
  * кнопка старта обязана что-то делать, иначе это мёртвая кнопка.
  */
 export function requestOpenSession(): void {
-  try { window.dispatchEvent(new Event('he-workout-open')); } catch { /* noop */ }
+  try {
+    window.dispatchEvent(new Event('he-workout-open'));
+  } catch {
+    /* noop */
+  }
 }
 
 /**
@@ -77,7 +105,12 @@ export function useWorkoutLive(): WorkoutWidgetState | null {
   return state;
 }
 
-export interface WidgetExercise { name: string; done: number; total: number; weight?: number }
+export interface WidgetExercise {
+  name: string;
+  done: number;
+  total: number;
+  weight?: number;
+}
 export interface WorkoutWidgetState {
   dayLabel: string;
   exercises: WidgetExercise[];
@@ -86,25 +119,58 @@ export interface WorkoutWidgetState {
   live?: ActiveSessionSummary;
 }
 
+/**
+ * Плановое число подходов по имени упражнения из `he_pl_runtime`.
+ * Виджет на главной не выбирает день плана (это делает движок), но имена
+ * живой сессии — из плана: по ним и берём план, иначе прогресс делился на
+ * уже сделанное (2/2 = 100%, хотя в плане восемь подходов).
+ */
+function plannedSetsByName(): Map<string, number> {
+  const out = new Map<string, number>();
+  try {
+    const raw = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
+    const days = Array.isArray(raw?.days) ? raw.days : [];
+    for (const day of days) {
+      const exercises = Array.isArray(day?.exercises) ? day.exercises : [];
+      for (const ex of exercises) {
+        const name = String(ex?.name ?? ex?.exerciseName ?? '').trim();
+        const sets = Array.isArray(ex?.targetSets) ? ex.targetSets.length : 0;
+        if (!name || sets <= 0) continue;
+        out.set(name, Math.max(out.get(name) ?? 0, sets));
+      }
+    }
+  } catch {
+    /* плана нет — план неизвестен */
+  }
+  return out;
+}
+
 function readLastWorkout(): WorkoutWidgetState | null {
   try {
-    const live = summarizeActiveSession(loadActiveSession());
+    const liveSession = loadActiveSession();
+    const planSets = plannedSetsByName();
+    let plannedTotal = 0;
+    const liveExs: WidgetExercise[] = (liveSession?.exercises ?? []).map((e) => {
+      const done = Array.isArray(e?.sets) ? e.sets.length : 0;
+      const planned = planSets.get(String(e?.exerciseName ?? '')) ?? 0;
+      const total = planned > 0 ? Math.max(done, planned) : done;
+      plannedTotal += total;
+      return {
+        name: String(e?.exerciseName ?? 'Упражнение'),
+        done,
+        total,
+        weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
+      };
+    });
+    // Плановое число подходов плана — второй аргумент сводки: без него
+    // `setsPlanned` падал до сделанного и пульт показывал 100%.
+    const live = summarizeActiveSession(liveSession, plannedTotal);
     const arr = loadSessions();
     const last = Array.isArray(arr) && arr.length > 0 ? arr[0] : null;
     if (live) {
-      const exs: WidgetExercise[] = [];
-      const liveSession = loadActiveSession();
-      (liveSession?.exercises ?? []).slice(0, 6).forEach((e) => {
-        exs.push({
-          name: String(e?.exerciseName ?? 'Упражнение'),
-          done: Array.isArray(e?.sets) ? e.sets.length : 0,
-          total: Math.max(1, Array.isArray(e?.sets) ? e.sets.length : 1),
-          weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
-        });
-      });
       return {
         dayLabel: live.currentExercise || live.focus,
-        exercises: exs,
+        exercises: liveExs.slice(0, 6),
         startedAt: liveSession?.savedAt,
         live,
       };
@@ -112,48 +178,137 @@ function readLastWorkout(): WorkoutWidgetState | null {
     if (!last) return null;
     const exs: WidgetExercise[] = Array.isArray(last?.exercises)
       ? last.exercises.slice(0, 6).map((e: any) => ({
-        name: String(e?.exerciseName ?? 'Упражнение'),
-        done: Array.isArray(e?.sets) ? e.sets.length : 0,
-        total: Array.isArray(e?.sets) ? e.sets.length : 0,
-        weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
-      }))
+          name: String(e?.exerciseName ?? 'Упражнение'),
+          done: Array.isArray(e?.sets) ? e.sets.length : 0,
+          total: Array.isArray(e?.sets) ? e.sets.length : 0,
+          weight: Number(e?.sets?.[0]?.weightKg ?? 0) || undefined,
+        }))
       : [];
     return { dayLabel: String(last?.focus ?? last?.date ?? 'Последняя тренировка'), exercises: exs };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /* ── A1: «Пульт зала» — липкая мини-полоса ─────────────────────────────── */
-export const WorkoutMiniPult: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onNextSet?: () => void }> = ({ state, onOpen, onNextSet }) => {
+export const WorkoutMiniPult: React.FC<{
+  state?: WorkoutWidgetState | null;
+  onOpen?: () => void;
+  onNextSet?: () => void;
+}> = ({ state, onOpen, onNextSet }) => {
   const auto = useWorkoutLive();
   const s = state ?? auto;
   const live = s?.live;
   const done = live ? live.setsDone : (s?.exercises ?? []).reduce((a, e) => a + e.done, 0);
-  const total = live ? Math.max(live.setsDone, live.setsPlanned) : (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
+  const total = live
+    ? Math.max(live.setsDone, live.setsPlanned)
+    : (s?.exercises ?? []).reduce((a, e) => a + e.total, 0);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div data-widget="workout-pult" role="status" aria-label={`Пульт тренировки, выполнено ${ruCount(pct, RU_PERCENTS)}`}
-      style={{ ...CARD, position: 'static', top: 0, zIndex: 20, display: 'flex', gap: 10, alignItems: 'center', borderColor: live ? 'rgba(0,230,138,0.28)' : undefined }}>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(0,230,138,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }} aria-hidden>🏋️</div>
+    <div
+      data-widget="workout-pult"
+      role="status"
+      aria-label={`Пульт тренировки, выполнено ${ruCount(pct, RU_PERCENTS)}`}
+      style={{
+        ...CARD,
+        position: 'static',
+        top: 0,
+        zIndex: 20,
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        borderColor: live ? 'rgba(0,230,138,0.28)' : undefined,
+      }}
+    >
+      <div
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          background: 'rgba(0,230,138,0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 22,
+        }}
+        aria-hidden
+      >
+        🏋️
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: WHITE, fontSize: 13, fontWeight: 800, ...TABULAR, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {live ? `● Идёт · ${live.focus}` : (s?.dayLabel ?? 'Тренировки пока нет')} · {done}/{total}
+        <div
+          style={{
+            color: WHITE,
+            fontSize: 13,
+            fontWeight: 800,
+            ...TABULAR,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {live
+            ? `● Идёт · ${live.focus} · ${done}/${total}`
+            : s
+              ? `${s.dayLabel || 'Тренировка'} · ${done}/${total}`
+              : 'Готов к тренировке'}
         </div>
-        <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
-          style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.10)', marginTop: 6 }}>
+        <div
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.10)', marginTop: 6 }}
+        >
           <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: ACCENT }} />
         </div>
-        {live && <div style={{ color: WHITE, fontSize: 10, marginTop: 4, ...TABULAR }}>{live.volumeKg.toLocaleString()} кг{live.currentExercise ? ` · ${live.currentExercise}` : ''}</div>}
+        {live && (
+          <div style={{ color: WHITE, fontSize: 10, marginTop: 4, ...TABULAR }}>
+            {live.volumeKg.toLocaleString()} кг{live.currentExercise ? ` · ${live.currentExercise}` : ''}
+          </div>
+        )}
+        {!live && !s && <div style={{ color: WHITE, fontSize: 10, marginTop: 4 }}>Сессия не начата</div>}
       </div>
       {/* Без живой сессии «+ Сет» писать некуда — тогда это старт.
           Старт всегда рабочий: событие he-workout-open ловит ExecutionZone,
           поэтому кнопка не мёртвая даже без пропсов. */}
       {live ? (
-        <button type="button" data-act="pult-next" onClick={() => { if (!requestQuickSet()) requestOpenSession(); onNextSet?.(); }} style={{ ...BIG_BTN, minWidth: 96 }} aria-label="Записать следующий сет">+ Сет</button>
+        <button
+          type="button"
+          data-act="pult-next"
+          onClick={() => {
+            if (!requestQuickSet()) requestOpenSession();
+            onNextSet?.();
+          }}
+          style={{ ...BIG_BTN, minWidth: 96 }}
+          aria-label="Записать следующий сет"
+        >
+          + Сет
+        </button>
       ) : (
-        <button type="button" data-act="pult-start" onClick={() => { requestOpenSession(); onOpen?.(); }} style={{ ...BIG_BTN, minWidth: 108 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+        <button
+          type="button"
+          data-act="pult-start"
+          onClick={() => {
+            requestOpenSession();
+            onOpen?.();
+          }}
+          style={{ ...BIG_BTN, minWidth: 108 }}
+          aria-label="Начать проведение тренировки"
+        >
+          ▶ Начать
+        </button>
       )}
       {onOpen && live && (
-        <button type="button" data-act="pult-open" onClick={onOpen} style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }} aria-label="Открыть проведение">↗</button>
+        <button
+          type="button"
+          data-act="pult-open"
+          onClick={onOpen}
+          style={{ ...GHOST_BTN, minWidth: 64, padding: '12px 10px' }}
+          aria-label="Открыть проведение"
+        >
+          ↗
+        </button>
       )}
     </div>
   );
@@ -164,14 +319,28 @@ const DAY_CARD_LIMIT = 4;
 const plurEx = (n: number) => (n === 1 ? 'упражнение' : n < 5 ? 'упражнения' : 'упражнений');
 
 /* ── A2: «Карточка дня» — спокойная карточка на Главную/Дневник ────────── */
-export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpen?: () => void; onSkip?: () => void }> = ({ state, onOpen, onSkip }) => {
+export const WorkoutDayCard: React.FC<{
+  state?: WorkoutWidgetState | null;
+  onOpen?: () => void;
+  onSkip?: () => void;
+}> = ({ state, onOpen, onSkip }) => {
   const auto = useWorkoutLive();
   const s = state ?? auto;
   const live = s?.live;
   return (
     <section data-widget="workout-daycard" aria-label="Тренировка дня" style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <div style={{ color: WHITE, fontSize: 14, fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div
+          style={{
+            color: WHITE,
+            fontSize: 14,
+            fontWeight: 800,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {live ? `● Идёт · ${live.focus}` : `🏋️ ${s?.dayLabel ?? 'Сегодня — отдых или свободная'}`}
         </div>
         <div style={{ color: WHITE, fontSize: 12, ...TABULAR, flexShrink: 0 }}>
@@ -180,26 +349,67 @@ export const WorkoutDayCard: React.FC<{ state?: WorkoutWidgetState | null; onOpe
       </div>
       {(s?.exercises ?? []).length > DAY_CARD_LIMIT && (
         <div data-daycard-more style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, paddingTop: 6 }}>
-          + ещё {(s?.exercises ?? []).length - DAY_CARD_LIMIT} {plurEx((s?.exercises ?? []).length - DAY_CARD_LIMIT)} — в проведении
+          + ещё {(s?.exercises ?? []).length - DAY_CARD_LIMIT} {plurEx((s?.exercises ?? []).length - DAY_CARD_LIMIT)} —
+          в проведении
         </div>
       )}
       {(s?.exercises ?? []).slice(0, DAY_CARD_LIMIT).map((e, i) => (
-        <div key={i} data-ex={e.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 44, alignItems: 'center' }}>
+        <div
+          key={i}
+          data-ex={e.name}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            padding: '8px 0',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            minHeight: 44,
+            alignItems: 'center',
+          }}
+        >
           <span style={{ color: WHITE, fontSize: 13 }}>{e.name}</span>
-          <span style={{ color: WHITE, fontSize: 12, ...TABULAR }}>{live ? `${e.done} подх.${e.weight ? ` · ${e.weight} кг` : ''}` : `${e.done}/${e.total}${e.weight ? ` · ${e.weight} кг` : ''}`}</span>
+          <span style={{ color: WHITE, fontSize: 12, ...TABULAR }}>
+            {live
+              ? `${e.done} подх.${e.weight ? ` · ${e.weight} кг` : ''}`
+              : `${e.done}/${e.total}${e.weight ? ` · ${e.weight} кг` : ''}`}
+          </span>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-        <button type="button" data-act="day-start" onClick={() => { requestOpenSession(); onOpen?.(); }} style={{ ...BIG_BTN, flex: 2 }} aria-label={live ? 'Продолжить проведение тренировки' : 'Начать проведение тренировки'}>{live ? '▶ Продолжить' : '▶ Начать'}</button>
+        <button
+          type="button"
+          data-act="day-start"
+          onClick={() => {
+            requestOpenSession();
+            onOpen?.();
+          }}
+          style={{ ...BIG_BTN, flex: 2 }}
+          aria-label={live ? 'Продолжить проведение тренировки' : 'Начать проведение тренировки'}
+        >
+          {live ? '▶ Продолжить' : '▶ Начать'}
+        </button>
         {/* «Пропуск» без обработчика — мёртвая кнопка: рисуем, только если есть что пропускать. */}
-        {onSkip && <button type="button" data-act="day-skip" onClick={onSkip} style={{ ...GHOST_BTN, flex: 1 }} aria-label="Пропустить тренировку">Пропуск</button>}
+        {onSkip && (
+          <button
+            type="button"
+            data-act="day-skip"
+            onClick={onSkip}
+            style={{ ...GHOST_BTN, flex: 1 }}
+            aria-label="Пропустить тренировку"
+          >
+            Пропуск
+          </button>
+        )}
       </div>
     </section>
   );
 };
 
 /* ── A3: «BIG-режим» — огромные кнопки для зала одной рукой ────────────── */
-export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDoneSet?: (exIdx: number) => void; onFinish?: () => void }> = ({ state, onDoneSet, onFinish }) => {
+export const WorkoutBigMode: React.FC<{
+  state?: WorkoutWidgetState | null;
+  onDoneSet?: (exIdx: number) => void;
+  onFinish?: () => void;
+}> = ({ state, onDoneSet, onFinish }) => {
   const auto = useWorkoutLive();
   const s = state ?? auto;
   const live = s?.live;
@@ -208,31 +418,96 @@ export const WorkoutBigMode: React.FC<{ state?: WorkoutWidgetState | null; onDon
   // День сменился (другая тренировка, короче список) — индекс упирался в конец,
   // и крупная карточка писала «Нет упражнений», хотя упражнения есть.
   const safeIdx = exs.length === 0 ? 0 : Math.min(idx, exs.length - 1);
-  useEffect(() => { if (safeIdx !== idx) setIdx(safeIdx); }, [safeIdx, idx]);
+  useEffect(() => {
+    if (safeIdx !== idx) setIdx(safeIdx);
+  }, [safeIdx, idx]);
   const cur = exs[safeIdx];
   return (
     <section data-widget="workout-big" aria-label="Крупный режим зала" style={{ ...CARD, textAlign: 'center' }}>
-      <div style={{ color: WHITE, fontSize: 12 }}>Упражнение {exs.length ? safeIdx + 1 : 0} из {exs.length}</div>
-      <div style={{ color: WHITE, fontSize: 20, fontWeight: 800, margin: '6px 0' }}>{cur?.name ?? 'Нет упражнений'}</div>
-      <div style={{ color: WHITE, fontSize: 28, fontWeight: 800, ...TABULAR }}>{cur ? (live ? cur.done : `${cur.done}/${cur.total}`) : '—'}</div>
+      <div style={{ color: WHITE, fontSize: 12 }}>
+        Упражнение {exs.length ? safeIdx + 1 : 0} из {exs.length}
+      </div>
+      <div style={{ color: WHITE, fontSize: 20, fontWeight: 800, margin: '6px 0' }}>
+        {cur?.name ?? 'Нет упражнений'}
+      </div>
+      <div style={{ color: WHITE, fontSize: 28, fontWeight: 800, ...TABULAR }}>
+        {cur ? (live ? cur.done : `${cur.done}/${cur.total}`) : '—'}
+      </div>
       {live && cur && <div style={{ color: WHITE, fontSize: 11, marginTop: -2 }}>подходов сделано</div>}
-      {live && <div style={{ color: WHITE, fontSize: 12, marginTop: 2, ...TABULAR }}>{live.setsDone} подх. · {live.volumeKg.toLocaleString()} кг · {live.progressPct}%</div>}
+      {live && (
+        <div style={{ color: WHITE, fontSize: 12, marginTop: 2, ...TABULAR }}>
+          {live.setsDone} подх. · {live.volumeKg.toLocaleString()} кг · {live.progressPct}%
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-        <button type="button" data-act="big-prev" disabled={safeIdx === 0} onClick={() => setIdx(() => Math.max(0, safeIdx - 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Предыдущее упражнение">‹ Назад</button>
-        <button type="button" data-act="big-next" disabled={safeIdx >= exs.length - 1} onClick={() => setIdx(() => Math.min(exs.length - 1, safeIdx + 1))} style={{ ...GHOST_BTN, minHeight: 56 }} aria-label="Следующее упражнение">Далее ›</button>
+        <button
+          type="button"
+          data-act="big-prev"
+          disabled={safeIdx === 0}
+          onClick={() => setIdx(() => Math.max(0, safeIdx - 1))}
+          style={{ ...GHOST_BTN, minHeight: 56 }}
+          aria-label="Предыдущее упражнение"
+        >
+          ‹ Назад
+        </button>
+        <button
+          type="button"
+          data-act="big-next"
+          disabled={safeIdx >= exs.length - 1}
+          onClick={() => setIdx(() => Math.min(exs.length - 1, safeIdx + 1))}
+          style={{ ...GHOST_BTN, minHeight: 56 }}
+          aria-label="Следующее упражнение"
+        >
+          Далее ›
+        </button>
       </div>
       {/* «ГОТОВО» без живой сессии и без обработчика ничего не записывает:
           в этом состоянии главное действие — начать проведение. */}
       {live || onDoneSet ? (
-        <button type="button" data-act="big-done" onClick={() => { if (!requestQuickSet()) requestOpenSession(); if (cur) onDoneSet?.(safeIdx); }} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Готово, записать сет">✅ ГОТОВО</button>
+        <button
+          type="button"
+          data-act="big-done"
+          onClick={() => {
+            if (!requestQuickSet()) requestOpenSession();
+            if (cur) onDoneSet?.(safeIdx);
+          }}
+          style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }}
+          aria-label="Готово, записать сет"
+        >
+          ✅ ГОТОВО
+        </button>
       ) : (
-        <button type="button" data-act="big-start" onClick={requestOpenSession} style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }} aria-label="Начать проведение тренировки">▶ Начать</button>
+        <button
+          type="button"
+          data-act="big-start"
+          onClick={requestOpenSession}
+          style={{ ...BIG_BTN, width: '100%', minHeight: 64, fontSize: 18, marginTop: 8 }}
+          aria-label="Начать проведение тренировки"
+        >
+          ▶ Начать
+        </button>
       )}
       {/* Без onFinish «Завершить» молчала бы — тогда ведём в плеер, где есть завершение. */}
       {onFinish ? (
-        <button type="button" data-act="big-finish" onClick={onFinish} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Завершить тренировку">Завершить</button>
+        <button
+          type="button"
+          data-act="big-finish"
+          onClick={onFinish}
+          style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }}
+          aria-label="Завершить тренировку"
+        >
+          Завершить
+        </button>
       ) : (
-        <button type="button" data-act="big-open" onClick={requestOpenSession} style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }} aria-label="Открыть проведение тренировки">Открыть проведение →</button>
+        <button
+          type="button"
+          data-act="big-open"
+          onClick={requestOpenSession}
+          style={{ ...GHOST_BTN, width: '100%', marginTop: 8 }}
+          aria-label="Открыть проведение тренировки"
+        >
+          Открыть проведение →
+        </button>
       )}
     </section>
   );
@@ -252,9 +527,32 @@ export const WorkoutWidgetsPanel: React.FC<{
   return (
     <section data-widget="workout-panel" aria-label="Виджеты проведения" style={CARD}>
       <div role="tablist" aria-label="Вариант виджета" style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        {([['pult', 'Пульт'], ['day', 'День'], ['big', 'BIG']] as const).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} data-tab={k} onClick={() => setTab(k)}
-            style={{ flex: 1, minHeight: 44, borderRadius: 12, border: tab === k ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)', background: tab === k ? 'rgba(0,230,138,0.12)' : 'transparent', color: WHITE, fontWeight: 800, fontSize: 13 }}>{label}</button>
+        {(
+          [
+            ['pult', 'Пульт'],
+            ['day', 'День'],
+            ['big', 'BIG'],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            data-tab={k}
+            onClick={() => setTab(k)}
+            style={{
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 12,
+              border: tab === k ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.12)',
+              background: tab === k ? 'rgba(0,230,138,0.12)' : 'transparent',
+              color: WHITE,
+              fontWeight: 800,
+              fontSize: 13,
+            }}
+          >
+            {label}
+          </button>
         ))}
       </div>
       {tab === 'pult' && <WorkoutMiniPult state={state} onOpen={onOpen} onNextSet={onNextSet} />}

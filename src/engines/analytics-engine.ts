@@ -24,8 +24,11 @@
 export interface SetLogEntry {
   exerciseId: string;
   exerciseName: string;
+  /** Группа мышц из записи (если источник её знает) — приоритетнее id-маппинга. */
+  muscleGroup?: string;
   reps: number;
   weight: number;
+  /** 0 = RPE не записан (не подставляем фейковое значение). */
   rpe: number;
   rir: number;
   velocity?: number;
@@ -46,6 +49,8 @@ export interface SessionLogEntry {
 export interface AnalyticsInput {
   sessions: SessionLogEntry[];
   weeks: number;
+  /** Опорный момент для «последней недели» (мс). По умолчанию Date.now(). */
+  now?: number;
 }
 
 export interface VolumeMetrics {
@@ -129,7 +134,7 @@ export interface WeeklyBreakdown {
 // Muscle group mapping (exercise → primary group)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const MUSCLE_GROUP_MAP: Record<string, string> = {
+const LEGACY_MUSCLE_GROUP_MAP: Record<string, string> = {
   back_squat: 'quads', front_squat: 'quads', leg_press: 'quads', leg_extension: 'quads',
   bench_press: 'chest', incline_bench: 'chest', dumbbell_bench: 'chest',
   deadlift: 'back', barbell_row: 'back', pull_up: 'back', lat_pulldown: 'back', seated_row: 'back',
@@ -140,7 +145,43 @@ const MUSCLE_GROUP_MAP: Record<string, string> = {
   plank: 'core', hanging_leg_raise: 'core',
 };
 
-const PATTERN_MAP: Record<string, string> = {
+/** Актуальные id каталога (src/core/exercise-catalog.ts). */
+const CATALOG_MUSCLE_GROUP_MAP: Record<string, string> = {
+  bench_bar: 'chest', bench_db: 'chest', incline_bar: 'chest', incline_db: 'chest', dips_chest: 'chest',
+  cable_fly: 'chest', pec_deck: 'chest', machine_chest_press: 'chest', pushup: 'chest',
+  squat: 'quads', hack_squat: 'quads', squat_ssb: 'quads', goblet_squat: 'quads', lunge: 'quads',
+  bulgarian_split: 'quads', walking_lunge: 'quads', leg_ext: 'quads', sissy_squat: 'quads',
+  step_up_glute: 'quads',
+  rdl: 'hamstrings', rdl_db: 'hamstrings', deadlift_romanian: 'hamstrings', good_morning: 'hamstrings',
+  leg_curl_seated: 'hamstrings', leg_curl_standing: 'hamstrings', nordic_curl: 'hamstrings',
+  hip_thrust: 'glutes', b_stance_hip_thrust: 'glutes', hip_abduction_machine: 'glutes',
+  cable_kickback: 'glutes', back_ext_glute: 'glutes',
+  calf_raise_seated: 'calves', calf_raise_standing: 'calves', calf_press_leg: 'calves',
+  donkey_calf_raise: 'calves',
+  pullup: 'back', chinup: 'back', pullup_neutral: 'back', pulldown: 'back', pulldown_rev: 'back',
+  row_bar: 'back', row_tbar: 'back', row_db: 'back', sumo_dl: 'back', straight_pull: 'back',
+  ohp: 'shoulders', ohp_seated: 'shoulders', db_press: 'shoulders', push_press: 'shoulders',
+  rear_delt_fly: 'shoulders', rear_delt_machine: 'shoulders', face_pull_sh: 'shoulders',
+  cable_lateral: 'shoulders', upright_row: 'shoulders',
+  curl_bar: 'arms', curl_db: 'arms', hammer_curl: 'arms', preacher_curl: 'arms', incline_db_curl: 'arms',
+  spider_curl: 'arms', cable_curl: 'arms', tricep_cable: 'arms', tricep_push: 'arms', rope_pushdown: 'arms',
+  overhead_tricep_ext: 'arms', skullcrusher: 'arms', dips_tricep: 'arms', kickback: 'arms',
+  tricep_pushdown_rope: 'arms',
+  ab_rollout_feet: 'core', dragon_flag_v2: 'core', pallof_press_v3: 'core',
+};
+
+const MUSCLE_GROUP_MAP: Record<string, string> = {
+  ...LEGACY_MUSCLE_GROUP_MAP,
+  ...CATALOG_MUSCLE_GROUP_MAP,
+};
+
+function resolveMuscleGroup(set: SetLogEntry): string | null {
+  if (set.muscleGroup) return set.muscleGroup;
+  const id = set.exerciseId || '';
+  return MUSCLE_GROUP_MAP[id] || MUSCLE_GROUP_MAP[id.toLowerCase()] || null;
+}
+
+const LEGACY_PATTERN_MAP: Record<string, string> = {
   back_squat: 'squat', front_squat: 'squat', leg_press: 'squat',
   bench_press: 'horizontal_push', incline_bench: 'horizontal_push', dumbbell_bench: 'horizontal_push',
   deadlift: 'hinge', romanian_deadlift: 'hinge',
@@ -151,6 +192,34 @@ const PATTERN_MAP: Record<string, string> = {
   leg_extension: 'accessory', leg_curl: 'accessory',
   calf_raise: 'accessory', plank: 'accessory',
 };
+
+/** Актуальные id каталога (src/core/exercise-catalog.ts). */
+const CATALOG_PATTERN_MAP: Record<string, string> = {
+  squat: 'squat', hack_squat: 'squat', squat_ssb: 'squat', goblet_squat: 'squat', lunge: 'squat',
+  bulgarian_split: 'squat', walking_lunge: 'squat',
+  bench_bar: 'horizontal_push', bench_db: 'horizontal_push', incline_bar: 'horizontal_push',
+  incline_db: 'horizontal_push', dips_chest: 'horizontal_push', pushup: 'horizontal_push',
+  rdl: 'hinge', rdl_db: 'hinge', sumo_dl: 'hinge', good_morning: 'hinge',
+  row_bar: 'horizontal_pull', row_db: 'horizontal_pull', row_tbar: 'horizontal_pull',
+  pullup: 'vertical_pull', chinup: 'vertical_pull', pulldown: 'vertical_pull', pulldown_rev: 'vertical_pull',
+  ohp: 'vertical_push', ohp_seated: 'vertical_push', db_press: 'vertical_push', push_press: 'vertical_push',
+  leg_ext: 'accessory', leg_curl_seated: 'accessory', leg_curl_standing: 'accessory',
+  calf_raise_seated: 'accessory', hip_thrust: 'accessory', face_pull: 'accessory', face_pull_sh: 'accessory',
+  cable_lateral: 'accessory', rear_delt_fly: 'accessory', upright_row: 'accessory',
+  curl_bar: 'accessory', curl_db: 'accessory', hammer_curl: 'accessory',
+  tricep_cable: 'accessory', tricep_push: 'accessory', rope_pushdown: 'accessory',
+  ab_rollout_feet: 'accessory',
+};
+
+const PATTERN_MAP: Record<string, string> = {
+  ...LEGACY_PATTERN_MAP,
+  ...CATALOG_PATTERN_MAP,
+};
+
+function resolvePattern(set: SetLogEntry): string {
+  const id = set.exerciseId || '';
+  return PATTERN_MAP[id] || PATTERN_MAP[id.toLowerCase()] || 'accessory';
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1RM estimation
@@ -165,10 +234,31 @@ function epley1RM(weight: number, reps: number): number {
 // Volume Analytics
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function computeVolume(sessions: SessionLogEntry[], prevSessions: SessionLogEntry[] = []): VolumeMetrics {
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function setTimestamp(set: SetLogEntry, sessionDate: string): number {
+  // Дата подхода хранится как YYYY-MM-DD, а Date.parse даёт UTC-полночь: в UTC+3 сегодняшние
+  // подходы до 03:00 выпадали из окна, а границы недели съезжали на смещение зоны.
+  // Считаем в локальной зоне — так же, как недельные цели и остальные карточки дневника.
+  const iso = String(set.date || sessionDate || '').slice(0, 10);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return NaN;
+  const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+export function computeVolume(
+  sessions: SessionLogEntry[],
+  prevSessions: SessionLogEntry[] = [],
+  nowMs: number = Date.now(),
+): VolumeMetrics {
+  // «Объём за 7 дней» — честно за последние 7 дней, а не сумма по всей переданной истории.
+  const weekStart = nowMs - WEEK_MS;
+  const prevWeekStart = nowMs - 2 * WEEK_MS;
   let totalVolume = 0;
-  let totalSets = 0;
-  let totalReps = 0;
+  let weekVolume = 0;
+  let weekSets = 0;
+  let weekReps = 0;
   const patternVol: Record<string, number> = {};
   const groupVol: Record<string, number> = {};
 
@@ -176,30 +266,39 @@ export function computeVolume(sessions: SessionLogEntry[], prevSessions: Session
     for (const set of sess.sets) {
       const vol = set.reps * set.weight;
       totalVolume += vol;
-      totalSets++;
-      totalReps += set.reps;
 
-      const pattern = PATTERN_MAP[set.exerciseId] || 'accessory';
+      const t = setTimestamp(set, sess.date);
+      if (Number.isFinite(t) && t > weekStart && t <= nowMs) {
+        weekVolume += vol;
+        weekSets++;
+        weekReps += set.reps;
+      }
+
+      const pattern = resolvePattern(set);
       patternVol[pattern] = (patternVol[pattern] || 0) + vol;
 
-      const group = MUSCLE_GROUP_MAP[set.exerciseId] || 'other';
+      // Неизвестный id не прячем молча в «other»: сначала группа из самой записи.
+      const group = resolveMuscleGroup(set) || 'other';
       groupVol[group] = (groupVol[group] || 0) + vol;
     }
   }
 
-  // Trend: % change vs previous period
+  // Trend: previous 7-day window vs the last 7-day window
   let prevVolume = 0;
   for (const sess of prevSessions) {
     for (const set of sess.sets) {
-      prevVolume += set.reps * set.weight;
+      const t = setTimestamp(set, sess.date);
+      if (Number.isFinite(t) && t > prevWeekStart && t <= weekStart) {
+        prevVolume += set.reps * set.weight;
+      }
     }
   }
-  const volumeTrend = prevVolume > 0 ? ((totalVolume - prevVolume) / prevVolume) * 100 : 0;
+  const volumeTrend = prevVolume > 0 ? ((weekVolume - prevVolume) / prevVolume) * 100 : 0;
 
   return {
-    weeklyVolumeKg: Math.round(totalVolume),
-    weeklySets: totalSets,
-    weeklyReps: totalReps,
+    weeklyVolumeKg: Math.round(weekVolume),
+    weeklySets: weekSets,
+    weeklyReps: weekReps,
     avgVolumePerSession: sessions.length > 0 ? Math.round(totalVolume / sessions.length) : 0,
     volumeByPattern: patternVol,
     volumeByGroup: groupVol,
@@ -467,10 +566,11 @@ export function computeWeeklyBreakdown(sessions: SessionLogEntry[]): WeeklyBreak
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function computeAnalytics(input: AnalyticsInput): AnalyticsSnapshot {
+  const nowMs = input.now ?? Date.now();
   const current = input.sessions.slice(-input.weeks * 7);
   const prev = input.sessions.slice(-input.weeks * 14, -input.weeks * 7);
 
-  const volume = computeVolume(current, prev);
+  const volume = computeVolume(current, prev, nowMs);
   const intensity = computeIntensity(current);
   const strength = computeStrength(current, prev);
   const fatigue = computeFatigue(current);

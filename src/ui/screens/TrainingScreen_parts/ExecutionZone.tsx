@@ -34,12 +34,15 @@ const playerDayFromMicro = (day: any): PlayerDay => {
     const weight = Math.max(0, Number(ex?.weight) || 0);
     const reps = Math.max(1, Math.round(Number(ex?.reps)) || 10);
     const rir = ex?.rir == null ? 2 : Math.max(0, Math.min(6, Math.round(Number(ex.rir))));
-    const bodyweight = isBWExercise(ex) || weight <= 0;
+    // Вес 0 сам по себе не делает упражнение «своим весом»: план, не знающий веса штанги,
+    // не должен превращать жим в BW-подход с тоннажем 0.
+    const bodyweight = isBWExercise(ex) && weight <= 0;
     const targetSets = Array.from({ length: sets }, () => ({ weight: bodyweight ? 0 : weight, reps, rir }));
     return {
       name: ex?.name || `Упражнение ${i + 1}`,
       muscleGroup: String(ex?.muscleGroup || ex?.group || 'other'),
       targetSets,
+      isBodyweight: isBWExercise(ex),
       restSec: Math.max(20, Math.round(Number(ex?.restSec)) || 90),
       // D-3: суперсет-пара из плана, если данные дошли до микроцикла.
       ...(ex?.supersetGroup != null ? { supersetGroup: Number(ex.supersetGroup), supersetSlot: (Number(ex.supersetSlot) === 1 ? 1 : 0) as 0 | 1 } : {}),

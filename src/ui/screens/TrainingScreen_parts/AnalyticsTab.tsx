@@ -40,12 +40,15 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       durationMin: w.duration || 60,
       sets: (w.exercises || []).flatMap((ex: any) =>
         (ex.sets || []).map((s: any, i: number) => ({
-          exerciseId: ex.exerciseId || ex.name || 'unknown',
-          exerciseName: ex.name || 'Exercise',
+          // StrengthLogEntry не имеет поля `name`: реальное имя — exerciseName.
+          exerciseId: ex.exerciseId || ex.exerciseName || 'unknown',
+          exerciseName: ex.exerciseName || ex.exerciseId || 'Exercise',
+          muscleGroup: ex.muscleGroup,
+          // Нет RPE/RIR в записи — не фабрикуем: 0 = «не задано» для движка.
           reps: s.reps || 0,
           weight: s.weight || 0,
-          rpe: s.rpe || 5,
-          rir: s.rir || 3,
+          rpe: typeof s.rpe === 'number' && s.rpe > 0 ? s.rpe : 0,
+          rir: typeof s.rir === 'number' ? s.rir : 0,
           date: w.date,
           setIndex: i,
         }))
@@ -90,10 +93,10 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: '#fff' }}>Объём/нед</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>Объём/7 дн.</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{volume.weeklyVolumeKg.toLocaleString()} кг</div>
           <div style={{ fontSize: 10, color: volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
-            {volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(volume.volumeTrend)}% vs пред.
+            {volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(volume.volumeTrend)}% vs пред. 7 дн.
           </div>
         </div>
         <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>

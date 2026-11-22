@@ -436,8 +436,15 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       const mapped = deferredSafeHistory.map(w => ({
         sessionId: w.id, date: w.date, focus: w.split || 'fullbody', durationMin: w.duration || 60,
         sets: (w.exercises || []).flatMap((ex: any) => (ex.sets || []).map((s: any, i: number) => ({
-          exerciseId: ex.exerciseId || ex.name || 'unknown', exerciseName: ex.name || 'Exercise',
-          reps: s.reps || 0, weight: s.weight || 0, rpe: s.rpe || 5, rir: s.rir || 3, date: w.date, setIndex: i,
+          // StrengthLogEntry не имеет поля `name`: реальное имя — exerciseName.
+          exerciseId: ex.exerciseId || ex.exerciseName || 'unknown',
+          exerciseName: ex.exerciseName || ex.exerciseId || 'Exercise',
+          muscleGroup: ex.muscleGroup,
+          // Нет RPE/RIR в записи — не фабрикуем: 0 = «не задано» для движка.
+          reps: s.reps || 0, weight: s.weight || 0,
+          rpe: typeof s.rpe === 'number' && s.rpe > 0 ? s.rpe : 0,
+          rir: typeof s.rir === 'number' ? s.rir : 0,
+          date: w.date, setIndex: i,
         }))),
       }));
       if (!mapped.some(m => m.sets.length > 0)) return null;
@@ -523,16 +530,21 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const expertAcwr = useMemo(() => expertSrpe.length >= 2 ? acuteChronicRatio(toDailyLoads(expertSrpe)).ratio : 1.0, [expertSrpe]);
   const expertMono = useMemo(() => { try { return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0; } catch { return 0; } }, [expertSrpe]);
   const expertExercises = useMemo(() => {
-    const exMap = new Map<string, { first: number; last: number }>();
+    const exMap = new Map<string, { first: number; last: number; firstDate: string; lastDate: string }>();
     for (const w of deferredSafeHistory) {
       const exs: any[] = (w as any).exercises || [];
       for (const ex of exs) {
-        const nm = ex.name || ex.exerciseId || '?';
-        if (!exMap.has(nm)) exMap.set(nm, { first: 0, last: 0 });
-        const v = epley1RM(ex.weight || 0, ex.reps || 0);
-        const cur = exMap.get(nm)!;
-        if (!cur.first || (v > 0 && v < cur.first)) cur.first = v;
-        if (v > cur.last) cur.last = v;
+        const nm = ex.exerciseName || ex.exerciseId || '?';
+        // Вес/повторы лежат в подходах: берём лучший e1RM по сетам упражнения.
+        const best = (ex.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
+        if (best <= 0) continue;
+        const date = ex.date || w.date || '';
+        const cur = exMap.get(nm);
+        if (!cur) { exMap.set(nm, { first: best, last: best, firstDate: date, lastDate: date }); continue; }
+        if (!cur.firstDate || date < cur.firstDate) { cur.first = best; cur.firstDate = date; }
+        else if (date === cur.firstDate) cur.first = Math.max(cur.first, best);
+        if (!cur.lastDate || date > cur.lastDate) { cur.last = best; cur.lastDate = date; }
+        else if (date === cur.lastDate) cur.last = Math.max(cur.last, best);
       }
     }
     return Array.from(exMap.entries()).filter(([, v]) => v.first > 0 && v.last > 0).slice(0, 10)

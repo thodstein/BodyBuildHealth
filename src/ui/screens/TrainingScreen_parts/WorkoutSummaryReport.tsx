@@ -110,21 +110,34 @@ export const ReportBlockPicker: React.FC<{
   hints?: Partial<Record<ReportBlockId, string>>;
   /** Блоки, которые на этом экране уже показаны отдельно — не дублируем в выборе. */
   hide?: ReportBlockId[];
-}> = ({ value, onChange, compact, hints, hide }) => {
+  /**
+   * Блоки, данных для которых на этом экране нет вовсе (например, «План → факт»
+   * в дневнике: targetSets знает только плеер). Показываем их выключенными с
+   * подписью-причиной, а не живой галочкой, которая ничего не рисует.
+   */
+  disabled?: ReportBlockId[];
+}> = ({ value, onChange, compact, hints, hide, disabled }) => {
   const hidden = hide || [];
+  const off = disabled || [];
   const visibleBlocks = REPORT_BLOCKS.filter(b => !hidden.includes(b.id));
-  const has = (id: ReportBlockId) => value.includes(id);
+  const has = (id: ReportBlockId) => value.includes(id) && !off.includes(id);
   const toggle = (id: ReportBlockId) => {
-    onChange(has(id) ? value.filter(x => x !== id) : ALL_REPORT_BLOCKS.filter(x => x === id || has(x)));
+    if (off.includes(id)) return;
+    onChange(
+      has(id)
+        ? value.filter(x => x !== id)
+        : ALL_REPORT_BLOCKS.filter(x => !off.includes(x) && (x === id || has(x))),
+    );
   };
-  const allOn = visibleBlocks.every(b => has(b.id));
+  // «Показать всё» включает всё, что этот экран вообще может показать.
+  const allOn = visibleBlocks.every(b => off.includes(b.id) || has(b.id));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Что показать</span>
         <button
           type="button"
-          onClick={() => onChange(ALL_REPORT_BLOCKS.filter(id => !hidden.includes(id)))}
+          onClick={() => onChange(ALL_REPORT_BLOCKS.filter(id => !hidden.includes(id) && !off.includes(id)))}
           style={{
             padding: '4px 10px', borderRadius: 999, fontSize: 10, fontWeight: 800, cursor: 'pointer',
             border: allOn ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.14)',
@@ -146,16 +159,20 @@ export const ReportBlockPicker: React.FC<{
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {visibleBlocks.map(b => {
           const on = has(b.id);
+          const offBlock = off.includes(b.id);
           return (
             <button
               key={b.id}
               type="button"
               role="checkbox"
               aria-checked={on}
+              aria-disabled={offBlock || undefined}
+              disabled={offBlock}
               onClick={() => toggle(b.id)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: compact ? '3px 8px' : '5px 10px', borderRadius: 999, cursor: 'pointer',
+                padding: compact ? '3px 8px' : '5px 10px', borderRadius: 999, cursor: offBlock ? 'default' : 'pointer',
+                opacity: offBlock ? 0.5 : 1,
                 border: on ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.12)',
                 background: on ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                 color: on ? ACCENT : '#fff', fontSize: compact ? 10 : 11, fontWeight: 700,
@@ -234,11 +251,15 @@ const Sparkline: React.FC<{ values: number[]; color?: string; width?: number; he
 };
 
 /** Плитка дельты: текущее значение и изменение к прошлому периоду. */
-const DeltaChip: React.FC<{ label: string; d: MetricDelta; unit?: string; neutral?: boolean; decimals?: boolean; deltaSuffix?: string }> = ({ label, d, unit, neutral = false, decimals = false, deltaSuffix }) => {
+const DeltaChip: React.FC<{ label: string; d: MetricDelta; unit?: string; neutral?: boolean; decimals?: boolean; deltaSuffix?: string; tonnage?: boolean }> = ({ label, d, unit, neutral = false, decimals = false, deltaSuffix, tonnage = false }) => {
   const color = d.delta === 0 || neutral
     ? 'rgba(255,255,255,0.7)'
     : d.delta > 0 ? '#22c55e' : '#ef4444';
-  const fmtNum = (n: number) => (decimals ? String(Math.round(n * 10) / 10) : fmtInt(n));
+  // Тоннаж печатаем тем же fmtTon, что и в плитках «Общего»: в одном отчёте
+  // «1.2 т» и «1 200 кг» рядом — это разные цифры на глаз. Знак ставим сами:
+  // fmtTon берёт модуль, иначе спад на 1 920 кг печатался бы килограммами.
+  const fmtNum = (n: number) =>
+    tonnage ? `${n < 0 ? '-' : ''}${fmtTon(Math.abs(n))}` : decimals ? String(Math.round(n * 10) / 10) : fmtInt(n);
   const text = d.delta === 0
     ? '= без изменений'
     : deltaSuffix
@@ -433,7 +454,7 @@ export const WorkoutSummaryBody: React.FC<{
         <div style={CARD}>
           <SectionTitle icon="↔" title="Сравнение периодов" hint={`с ${previousLabel || 'предыдущим равным периодом'}`} />
           <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(auto-fit, minmax(92px, 1fr))', gap: 6 }}>
-            <DeltaChip label="Тоннаж, кг" d={comparison.metrics.tonnage} />
+            <DeltaChip label="Тоннаж" tonnage d={comparison.metrics.tonnage} />
             <DeltaChip label="Подходы" d={comparison.metrics.sets} />
             <DeltaChip label="Повторы" d={comparison.metrics.reps} />
             <DeltaChip label="Тренировки" d={comparison.metrics.sessions} />
@@ -914,9 +935,9 @@ export const WorkoutSummaryBody: React.FC<{
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3, fontSize: 9, color: '#fff', opacity: 0.78, flexWrap: 'wrap' }}>
                   <span title={`Лучший подход по e1RM${e.bestWeight > e.topSetWeight ? `; максимальный вес ${e.bestWeight} кг` : ''}`}>
-                    Лучший <b style={{ color: '#f59e0b' }}>{e.topSetWeight > 0 ? `${e.topSetWeight} кг × ${e.topSetReps}` : `вес — × ${e.bestReps}`}</b>
+                    Лучший <b style={{ color: '#f59e0b' }}>{e.topSetWeight > 0 ? `${e.topSetWeight} кг × ${e.topSetReps}` : `свой вес × ${e.bestReps}`}</b>
                   </span>
-                  <span>e1RM <b style={{ color: '#fff' }}>{e.bestE1RM || '—'}</b> кг</span>
+                  <span>e1RM <b style={{ color: '#fff' }}>{e.bestE1RM || '—'}</b>{e.bestE1RM > 0 ? ' кг' : ''}</span>
                   {(() => {
                     const dz = dominantRepZone(e.repZones);
                     if (!dz) return null;
@@ -1252,6 +1273,15 @@ export const WorkoutSummaryReport: React.FC<{
     return h;
   }, [weekPlanVsActual, plan, comparison, summary]);
 
+  // Блок, который физически не может получить данные на этом экране, гасим в
+  // выборе: «План → факт» берёт targetSets только из плеера.
+  const blockDisabled = React.useMemo<ReportBlockId[]>(() => {
+    const out: ReportBlockId[] = [];
+    if (!(Array.isArray(plan) && plan.length > 0)) out.push('plan');
+    if (!(Array.isArray(weekPlan) && weekPlan.length > 0)) out.push('weekplan');
+    return out;
+  }, [plan, weekPlan]);
+
   return (
     <div className="workout-summary-report" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(96,165,250,0.08))', border: '1px solid rgba(0,230,138,0.22)' }}>
@@ -1279,7 +1309,7 @@ export const WorkoutSummaryReport: React.FC<{
         </div>
         {showSelector && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} hints={blockHints} hide={hide} />
+            <ReportBlockPicker value={selected} onChange={setSelected} compact={compact} hints={blockHints} hide={hide} disabled={blockDisabled} />
           </div>
         )}
       </div>
