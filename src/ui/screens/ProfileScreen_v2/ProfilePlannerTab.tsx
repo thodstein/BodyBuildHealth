@@ -886,6 +886,9 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
     setDetailId(copy.id);
     setDraft(draftFromTask(copy));
     setSubtaskDraft('');
+    // В «Сделано» копия ещё не сделана — список её не покажет. Уходим в её день,
+    // иначе после закрытия карточки она выглядела бы потерянной.
+    if (smart === 'done') selectIso(copy.date);
   };
 
   const moveTomorrow = (t: CoachTask) => {

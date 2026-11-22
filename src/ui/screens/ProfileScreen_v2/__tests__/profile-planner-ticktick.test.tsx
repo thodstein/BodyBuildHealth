@@ -361,6 +361,20 @@ describe('карточка задачи', () => {
     expect(container.querySelector('[data-planner="detail"]')?.getAttribute('data-task-id')).toBe(saved[1].id);
     expect(items(container)).toHaveLength(2);
   });
+
+  it('копия из «Сделано» не теряется: открывается её день', () => {
+    let s = addCoachTask(emptyCoachPlanner(), { title: 'Готово', date: today }, { id: 'a' }).store;
+    s = completeCoachTask(s, 'a');
+    seed(s);
+    const { container } = render(<ProfilePlannerTab />);
+    fireEvent.click(container.querySelector('[data-planner="smart-chip"][data-smart="done"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-planner="open"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-planner="detail-duplicate"]') as HTMLElement);
+
+    expect(container.querySelector('[data-planner="day"]')?.getAttribute('data-smart')).toBe('all');
+    // Закрытая задача и её новая копия — обе на экране.
+    expect(items(container)).toHaveLength(2);
+  });
 });
 
 describe('статистика', () => {
