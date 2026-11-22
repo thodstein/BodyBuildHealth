@@ -57,6 +57,7 @@ import {
   nutritionFoodsVersion,
 } from '../../core/widget-bridge';
 import { resolveFavorites } from '../screens/NutritionScreen_parts/diary/food-favorites';
+import { MEAL_PRESETS } from '../screens/NutritionScreen_parts/diary/hooks/useDiaryMealTypes';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
 import {
@@ -298,6 +299,21 @@ function periodBounds(period: 'week' | 'month', today: string): { from: string; 
 }
 
 /**
+ * Приёмы дня в порядке дневника (Завтрак → … → Поздний перекус), а не в порядке
+ * появления в JSON: иначе виджет показывал бы «Обед» раньше «Завтрака», если
+ * обед записали первым. Незнакомые приёмы — в конце, в исходном порядке.
+ */
+function orderedMeals(meals: Record<string, unknown>): [string, any[]][] {
+  const rank = (meal: string) => {
+    const i = MEAL_PRESETS.indexOf(meal);
+    return i < 0 ? MEAL_PRESETS.length : i;
+  };
+  return (Object.entries(meals) as [string, unknown][])
+    .filter((entry): entry is [string, any[]] => Array.isArray(entry[1]))
+    .sort((a, b) => rank(a[0]) - rank(b[0]));
+}
+
+/**
  * Позиции дня для списка на виджете: порядок как в дневнике (по приёмам),
  * адрес каждой записи — `meal` + `index`. По этому адресу кнопка «✕» удаляет
  * именно эту строку, а не «последнюю вообще».
@@ -307,8 +323,7 @@ function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] 
   if (!meals || typeof meals !== 'object') return [];
   const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
   const out: NutritionDayItem[] = [];
-  for (const [meal, list] of Object.entries(meals as Record<string, any[]>)) {
-    if (!Array.isArray(list)) continue;
+  for (const [meal, list] of orderedMeals(meals)) {
     list.forEach((item, index) => {
       if (!item || !item.name) return;
       const qty = num(item.qty);
@@ -481,6 +496,10 @@ export function collectNutrition(): {
       ? {
           name: String(last.item?.name ?? '').slice(0, 40),
           meal: last.meal,
+          // Адрес записи: «↩» снимет именно её, а не «последнюю вообще» —
+          // иначе отмена в другой приём снесла бы чужую еду.
+          date: today,
+          index: last.index,
           kcal: Math.max(0, Math.round(Number(last.item?.kcal) || 0)),
           protein: Math.max(0, Math.round(Number(last.item?.p) || 0)),
           fat: Math.max(0, Math.round(Number(last.item?.f) || 0)),
@@ -1113,8 +1132,8 @@ function lastDiaryItem(
   const meals = diary?.[date]?.meals;
   if (!meals || typeof meals !== 'object') return null;
   let found: { meal: string; index: number; item: any } | null = null;
-  for (const [meal, items] of Object.entries(meals as Record<string, any>)) {
-    if (!Array.isArray(items) || items.length === 0) continue;
+  for (const [meal, items] of orderedMeals(meals)) {
+    if (items.length === 0) continue;
     const index = items.length - 1;
     found = { meal, index, item: items[index] };
   }

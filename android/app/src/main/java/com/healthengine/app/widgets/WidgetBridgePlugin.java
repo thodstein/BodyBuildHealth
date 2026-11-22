@@ -162,6 +162,11 @@ public class WidgetBridgePlugin extends Plugin {
                     JSONObject clean = new JSONObject();
                     clean.put("name", clip(lname, 40));
                     clean.put("meal", clip(last.optString("meal", ""), 32));
+                    // Адрес записи: по нему «↩» снимает именно её.
+                    String ldate = last.optString("date", "");
+                    if (ISO_DATE.matcher(ldate).matches()) clean.put("date", ldate);
+                    int lindex = last.optInt("index", -1);
+                    if (lindex >= 0) clean.put("index", lindex);
                     clean.put("kcal", clampInt(last.optInt("kcal", 0)));
                     clean.put("protein", clampInt(last.optInt("protein", 0)));
                     clean.put("fat", clampInt(last.optInt("fat", 0)));

@@ -224,39 +224,66 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         if (name == null || name.trim().isEmpty()) return;
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            String date = dayIso(0);
             JSONObject last = new JSONObject();
             last.put("name", name.length() > 40 ? name.substring(0, 40) : name);
             String m = meal == null ? "" : meal;
             last.put("meal", m.length() > 32 ? m.substring(0, 32) : m);
+            last.put("date", date);
             last.put("kcal", Math.max(0, kcal));
             last.put("protein", Math.max(0, p));
             last.put("fat", Math.max(0, f));
             last.put("carbs", Math.max(0, c));
             if (qty > 0) last.put("qty", qty);
+            // Сначала дописываем строку в список дня, потом запоминаем её адрес:
+            // «↩» должен снимать именно эту запись, даже если приём не последний.
+            int index = appendDayItem(d, date, last);
+            if (index >= 0) last.put("index", index);
             d.put("lastFood", last);
-            appendDayItem(d, dayIso(0), last);
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
         } catch (Exception ignored) {}
+    }
+
+    /** Порядок приёмов как в дневнике (`MEAL_PRESETS` на JS-стороне). */
+    private static final String[] MEAL_ORDER = {
+            "Завтрак", "Второй завтрак", "Обед", "Полдник", "Ужин", "Перекус",
+            "До тренировки", "После тренировки", "Поздний перекус"
+    };
+
+    private static int mealRank(String meal) {
+        for (int i = 0; i < MEAL_ORDER.length; i++) {
+            if (MEAL_ORDER[i].equals(meal)) return i;
+        }
+        return MEAL_ORDER.length; // незнакомый приём — в конце списка
     }
 
     /**
      * Дописываем позицию в список дня снапшота — чтобы «✕» и список на столе
      * сразу видели только что добавленное, не дожидаясь синка из WebView.
-     * `index` — число позиций этого приёма (адрес для удаления).
+     *
+     * Ставим её не в конец, а в свой приём (порядок как в дневнике): иначе
+     * «Завтрак», добавленный после «Ужина», прыгал бы в конец списка.
+     * Возвращает `index` внутри приёма — адрес для «✕»/«↩»; −1, если дня нет.
      */
-    private static void appendDayItem(JSONObject d, String date, JSONObject food) {
+    private static int appendDayItem(JSONObject d, String date, JSONObject food) {
         try {
             JSONObject days = d.optJSONObject("days");
-            if (days == null) return;
+            if (days == null) return -1;
             JSONObject day = days.optJSONObject(date);
-            if (day == null) return; // дня в снапшоте нет — синк всё равно его пришлёт
+            if (day == null) return -1; // дня в снапшоте нет — синк всё равно его пришлёт
             JSONArray items = day.optJSONArray("items");
             if (items == null) items = new JSONArray();
             String meal = food.optString("meal", "");
+            int rank = mealRank(meal);
             int index = 0;
+            int insertAt = items.length();
             for (int i = 0; i < items.length(); i++) {
                 JSONObject it = items.optJSONObject(i);
-                if (it != null && meal.equals(it.optString("meal", ""))) index++;
+                if (it == null) continue;
+                if (meal.equals(it.optString("meal", ""))) index++;
+                if (insertAt == items.length() && rank < mealRank(it.optString("meal", ""))) {
+                    insertAt = i;
+                }
             }
             JSONObject item = new JSONObject();
             item.put("name", food.optString("name", ""));
@@ -268,23 +295,31 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             item.put("index", index);
             int qty = food.optInt("qty", 0);
             if (qty > 0) item.put("qty", qty);
-            items.put(item);
-            day.put("items", items);
+            JSONArray next = new JSONArray();
+            for (int i = 0; i < items.length(); i++) {
+                if (i == insertAt) next.put(item);
+                JSONObject it = items.optJSONObject(i);
+                if (it != null) next.put(it);
+            }
+            if (insertAt >= items.length()) next.put(item);
+            day.put("items", next);
             day.put("kcal", Math.max(0, day.optInt("kcal", 0) + item.optInt("kcal", 0)));
             day.put("p", Math.max(0, day.optInt("p", 0) + item.optInt("p", 0)));
             day.put("f", Math.max(0, day.optInt("f", 0) + item.optInt("f", 0)));
             day.put("c", Math.max(0, day.optInt("c", 0) + item.optInt("c", 0)));
             days.put(date, day);
+            return index;
         } catch (Exception ignored) {
             // Список дня — украшение: без него запись всё равно уйдёт в очередь.
+            return -1;
         }
     }
 
     /**
-     * Снимаем последнюю позицию дня из снапшота («↩»): в плоском списке она и
-     * есть последняя запись последнего непустого приёма. Индексы внутри приёма
-     * не сдвигаем — JS вернёт свежий снапшот при следующем синке, а «✕» шлёт
-     * адрес `meal` + `index`, который совпадёт с дневником только после него.
+     * Снимаем последнюю позицию дня из снапшота — путь для старого снапшота без
+     * адреса записи. Плоский список идёт в порядке дневника, поэтому последняя
+     * строка и есть «последняя запись последнего непустого приёма». Индексы
+     * внутри приёма не сдвигаем: свежий снапшот придёт с ближайшим синком.
      */
     private static void removeLastDayItem(JSONObject d, String date) {
         try {
@@ -311,23 +346,47 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
      * «↩»: снимаем последнюю запись еды дня. В дневнике её убирает JS при
      * следующем синке (`type=food_remove`), здесь — сразу уменьшаем круги на
      * её КБЖУ и снимаем `lastFood`, чтобы двойной тап не списал дважды.
+     *
+     * Запись адресуется (день + приём + индекс), как только адрес есть в
+     * `lastFood`: иначе JS снял бы «последнюю запись дня», а кнопка обещала
+     * конкретную — при добавлении в «Завтрак» после «Ужина» это была бы чужая еда.
      */
     static void undoLastFood(Context context) {
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
             JSONObject last = d.optJSONObject("lastFood");
             if (last == null) return;
+            String date = last.optString("date", "");
+            if (date.isEmpty()) date = dayIso(0);
+            String meal = last.optString("meal", "");
+            int index = last.optInt("index", -1);
+            boolean addressed = !meal.isEmpty() && index >= 0;
+
             JSONObject item = new JSONObject();
             item.put("type", "food_remove");
+            item.put("date", date);
+            if (addressed) {
+                item.put("meal", meal);
+                item.put("index", index);
+            }
             item.put("ts", System.currentTimeMillis());
             WidgetStore.enqueue(context, item);
-            applyFoodDelta(context,
-                    -Math.max(0, last.optInt("kcal", 0)),
-                    -Math.max(0, last.optInt("protein", 0)),
-                    -Math.max(0, last.optInt("fat", 0)),
-                    -Math.max(0, last.optInt("carbs", 0)));
+
+            if (addressed) {
+                // Точечно: снимаем ровно ту строку, которую обещала кнопка.
+                optimisticRemoveItem(context, date, meal, index);
+            } else {
+                // Старый снапшот без адреса: снимаем последнюю позицию дня.
+                applyFoodDelta(context,
+                        -Math.max(0, last.optInt("kcal", 0)),
+                        -Math.max(0, last.optInt("protein", 0)),
+                        -Math.max(0, last.optInt("fat", 0)),
+                        -Math.max(0, last.optInt("carbs", 0)));
+                JSONObject next = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+                removeLastDayItem(next, date);
+                WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, next);
+            }
             JSONObject next = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-            removeLastDayItem(next, dayIso(0));
             next.remove("lastFood");
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, next);
             updateAll(context);
@@ -747,6 +806,21 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         v.setOnClickPendingIntent(R.id.w_nut_open, waterCustomAction(context, 43));
         v.setOnClickPendingIntent(R.id.w_nut_root,
                 TrainingWidgetProvider.openApp(context, WidgetStore.TARGET_NUTRITION, 44));
+
+        // TalkBack: подписи кнопок. Без них диктор читает «＋ Еда» и «−250» как
+        // набор символов, а «Свой» вообще непонятно к чему относится.
+        v.setContentDescription(R.id.w_nut_prev, "Предыдущий день");
+        v.setContentDescription(R.id.w_nut_next, "Следующий день");
+        v.setContentDescription(R.id.w_nut_p_day, "Период: день");
+        v.setContentDescription(R.id.w_nut_p_week, "Период: неделя");
+        v.setContentDescription(R.id.w_nut_p_month, "Период: месяц");
+        v.setContentDescription(R.id.w_nut_food, "Добавить еду");
+        v.setContentDescription(R.id.w_nut_scan, "Сканировать штрихкод в приложении");
+        v.setContentDescription(R.id.w_nut_photo, "Сфотографировать этикетку в приложении");
+        v.setContentDescription(R.id.w_nut_water_minus, "Убрать 250 мл воды");
+        v.setContentDescription(R.id.w_nut_water, "Добавить 250 мл воды");
+        v.setContentDescription(R.id.w_nut_water500, "Добавить 500 мл воды");
+        v.setContentDescription(R.id.w_nut_open, "Свой объём воды");
 
         // TalkBack: весь виджет читается одной фразой, а не набором цифр без подписей.
         String scope = periodWord(period);

@@ -769,6 +769,8 @@ describe('аналитика питания: день, неделя, месяц'
     expect(n.lastFood).toEqual({
       name: 'Лосось',
       meal: 'Ужин',
+      date: today,
+      index: 0,
       kcal: 320,
       protein: 34,
       fat: 18,
@@ -946,5 +948,56 @@ describe('аналитика питания: день, неделя, месяц'
     const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
     expect(diary[today].meals['Завтрак'].map((f) => f.name)).toEqual(['Овсянка']);
     expect(diary[today].meals['Обед'].map((f) => f.name)).toEqual(['Курица']);
+  });
+
+  it('45. список дня идёт в порядке дневника, а не в порядке появления приёмов', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    // Ужин записали первым — в JSON он идёт раньше завтрака.
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Ужин': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+          'Завтрак': [
+            { name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 },
+            { name: 'Яйца', kcal: 140, p: 12, f: 10, c: 1, qty: 100 },
+          ],
+        },
+      },
+    } as any);
+
+    const items = collectNutrition().days[today].items;
+    expect(items.map((i) => `${i.meal}:${i.name}`)).toEqual([
+      'Завтрак:Овсянка',
+      'Завтрак:Яйца',
+      'Ужин:Курица',
+    ]);
+    // Адрес внутри приёма не зависит от позиции в плоском списке.
+    expect(items.map((i) => i.index)).toEqual([0, 1, 0]);
+  });
+
+  it('46. «↩» по адресу из lastFood снимает именно её, а не последнюю в дне', async () => {
+    const { writeDiaryV2, readDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          'Ужин': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+        },
+      },
+    } as any);
+
+    // Виджет показал «↩» для завтрака (его только что добавили из редактора),
+    // хотя последняя запись дня — ужин. Очередь несёт адрес этой записи.
+    const res = applyWidgetQueue([
+      { type: 'food_remove', date: today, meal: 'Завтрак', index: 0, ts: Date.now() },
+    ]);
+    expect(res.foodsRemoved).toBe(1);
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
+    expect(diary[today].meals['Завтрак']).toBeUndefined();
+    expect(diary[today].meals['Ужин'].map((f) => f.name)).toEqual(['Курица']);
   });
 });

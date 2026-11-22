@@ -4,6 +4,7 @@
     Высота минимальная — в блоке 40dp видно ~2 строки, остальное скроллится.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/w_nut_item_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"

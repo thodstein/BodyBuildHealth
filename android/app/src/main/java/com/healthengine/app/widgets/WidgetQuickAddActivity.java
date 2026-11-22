@@ -99,6 +99,14 @@ public class WidgetQuickAddActivity extends Activity {
     private EditText searchEt;
     private LinearLayout searchResults;
     private TextView qtyLabel;
+    /**
+     * КБЖУ выбранного из базы продукта **на 100 г**: по нему пересчитываем
+     * значения, когда пользователь правит порцию. null — продукт не выбирали,
+     * и трогать введённые руками цифры нельзя.
+     */
+    private JSONObject catalogPer100;
+    /** true, пока поля заполняет код: вотчеры не должны считать это ручной правкой. */
+    private boolean filling = false;
     private TextView dateLabel;
     private TextView dateToday;
     private TextView dateTomorrow;
@@ -392,6 +400,38 @@ public class WidgetQuickAddActivity extends Activity {
             public void afterTextChanged(Editable s) {
             }
         });
+        // Порция: значения из базы даны на 100 г, поэтому при смене веса
+        // пересчитываем КБЖУ — иначе «200 г» остались бы с калориями за 100 г.
+        qtyEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!filling) scaleCatalogValues();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+        // Ручная правка калорий отменяет пересчёт: дальше цифры — свои,
+        // и подставлять вместо них продукт из базы нельзя.
+        kcalEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!filling) catalogPer100 = null;
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
     }
 
     private JSONArray loadFoodCatalog() {
@@ -435,15 +475,45 @@ public class WidgetQuickAddActivity extends Activity {
     /** Подставляем значения продукта на 100 г в поля порции. */
     private void applyCatalogFood(JSONObject f) {
         String name = f.optString("n", "").trim();
-        if (!name.isEmpty()) titleEt.setText(name);
-        kcalEt.setText(String.valueOf(Math.max(0, f.optInt("k", 0))));
-        proteinEt.setText(String.valueOf(Math.max(0, f.optInt("p", 0))));
-        fatEt.setText(String.valueOf(Math.max(0, f.optInt("f", 0))));
-        carbsEt.setText(String.valueOf(Math.max(0, f.optInt("c", 0))));
-        qtyEt.setText("100");
+        // Пока заполняем поля кодом, вотчеры молчат: это не ручная правка.
+        filling = true;
+        catalogPer100 = null;
+        try {
+            if (!name.isEmpty()) titleEt.setText(name);
+            kcalEt.setText(String.valueOf(Math.max(0, f.optInt("k", 0))));
+            proteinEt.setText(String.valueOf(Math.max(0, f.optInt("p", 0))));
+            fatEt.setText(String.valueOf(Math.max(0, f.optInt("f", 0))));
+            carbsEt.setText(String.valueOf(Math.max(0, f.optInt("c", 0))));
+            qtyEt.setText("100");
+        } finally {
+            filling = false;
+        }
+        // Дальше смена порции пересчитывает КБЖУ от этих значений на 100 г.
+        catalogPer100 = f;
         searchResults.removeAllViews();
         if (searchEt != null) searchEt.setText("");
-        Toast.makeText(this, "Подставлено на 100 г", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Значения на 100 г — укажите свою порцию", Toast.LENGTH_SHORT).show();
+    }
+
+    /** КБЖУ выбранного продукта под текущую порцию: kcal = per100 × г / 100. */
+    private void scaleCatalogValues() {
+        if (catalogPer100 == null) return;
+        int grams = parseQty(qtyEt, 5000);
+        if (grams <= 0) grams = 100;
+        filling = true;
+        try {
+            kcalEt.setText(String.valueOf(scalePer100("k", grams, 5000)));
+            proteinEt.setText(String.valueOf(scalePer100("p", grams, 500)));
+            fatEt.setText(String.valueOf(scalePer100("f", grams, 500)));
+            carbsEt.setText(String.valueOf(scalePer100("c", grams, 500)));
+        } finally {
+            filling = false;
+        }
+    }
+
+    private int scalePer100(String key, int grams, int max) {
+        int base = catalogPer100 == null ? 0 : Math.max(0, catalogPer100.optInt(key, 0));
+        return Math.max(0, Math.min(max, Math.round(base * grams / 100f)));
     }
 
     private int dp(int value) {

@@ -107,6 +107,10 @@ export interface NutritionLastFood {
   name: string;
   /** Подпись приёма пищи, как в дневнике (Завтрак/Обед/Ужин/Перекус). */
   meal: string;
+  /** ISO-дата дня записи: «↩» снимает запись именно этого дня. */
+  date?: string;
+  /** Позиция внутри приёма — точный адрес записи для отмены. */
+  index?: number;
   kcal: number;
   protein: number;
   fat: number;
@@ -544,9 +548,17 @@ function clampLastFood(food?: NutritionLastFood): NutritionLastFood | undefined 
   if (!food || !food.name) return undefined;
   const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
   const qty = num(food.qty);
+  const rawIndex = Number(food.index);
+  const index = food.index !== undefined && Number.isFinite(rawIndex) && rawIndex >= 0
+    ? Math.round(rawIndex)
+    : -1;
+  const date =
+    typeof food.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(food.date) ? food.date : '';
   return {
     name: String(food.name).slice(0, 40),
     meal: String(food.meal || '').slice(0, 32),
+    ...(date ? { date } : {}),
+    ...(index >= 0 ? { index } : {}),
     kcal: num(food.kcal),
     protein: num(food.protein),
     fat: num(food.fat),

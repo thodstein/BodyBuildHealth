@@ -81,11 +81,19 @@ public class NutritionItemsWidgetService extends RemoteViewsService {
 
             String name = it.optString("name", "");
             int kcal = Math.max(0, it.optInt("kcal", 0));
+            int qty = Math.max(0, it.optInt("qty", 0));
             String meal = it.optString("meal", "");
             int index = it.optInt("index", -1);
 
             v.setTextViewText(R.id.w_nut_item_name, NutritionWidgetProvider.clipText(name, 18));
             v.setTextViewText(R.id.w_nut_item_kcal, kcal > 0 ? (kcal + " ккал") : "");
+
+            // TalkBack: строка читается цельной фразой, а не «название, цифра, ✕».
+            StringBuilder row = new StringBuilder(name);
+            if (qty > 0) row.append(", ").append(qty).append(" г");
+            if (kcal > 0) row.append(", ").append(kcal).append(" ккал");
+            if (!meal.isEmpty()) row.append(", ").append(meal);
+            v.setContentDescription(R.id.w_nut_item_root, row.toString());
 
             Intent del = new Intent(ctx, NutritionWidgetProvider.class);
             del.setAction(NutritionWidgetProvider.ACTION_ITEM_DEL);
