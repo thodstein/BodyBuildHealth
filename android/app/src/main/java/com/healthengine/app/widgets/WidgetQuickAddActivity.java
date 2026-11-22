@@ -116,6 +116,12 @@ public class WidgetQuickAddActivity extends Activity {
      * и трогать введённые руками цифры нельзя.
      */
     private JSONObject catalogPer100;
+    /**
+     * id продукта, выбранного в поиске. Живёт отдельно от `catalogPer100`: правка
+     * КБЖУ продукт не меняет, а переписанное руками название — меняет, и тогда
+     * id из базы уже не про эту запись (сбрасывается вотчером названия).
+     */
+    private String pickedFoodId;
     /** true, пока поля заполняет код: вотчеры не должны считать это ручной правкой. */
     private boolean filling = false;
     private TextView dateLabel;
@@ -476,6 +482,22 @@ public class WidgetQuickAddActivity extends Activity {
             public void afterTextChanged(Editable s) {
             }
         });
+        // Название — идентичность продукта: переписал руками — id из базы уже
+        // не про эту запись. Правка КБЖУ id не трогает (это тот же продукт).
+        titleEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!filling) pickedFoodId = null;
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
         // Ручная правка любого значения отменяет пересчёт: дальше цифры — свои,
         // и подставлять вместо них продукт из базы нельзя.
         TextWatcher manual = new TextWatcher() {
@@ -549,6 +571,8 @@ public class WidgetQuickAddActivity extends Activity {
         // Пока заполняем поля кодом, вотчеры молчат: это не ручная правка.
         filling = true;
         catalogPer100 = f;
+        pickedFoodId = f.optString("id", "").trim();
+        if (pickedFoodId.isEmpty()) pickedFoodId = null;
         try {
             if (!name.isEmpty()) titleEt.setText(name);
             qtyEt.setText(String.valueOf(grams));
@@ -650,6 +674,8 @@ public class WidgetQuickAddActivity extends Activity {
         item.put("c", c);
         item.put("qty", qty);
         item.put("meal", meal);
+        // Продукт из каталога: дневник узнает его по id (избранное, состав).
+        if (pickedFoodId != null) item.put("foodId", pickedFoodId);
         item.put("ts", now);
         WidgetStore.enqueue(this, item);
         NutritionWidgetProvider.optimisticFood(this, name, meal, kcal, p, f, c, qty);

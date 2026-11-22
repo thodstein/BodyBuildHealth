@@ -200,6 +200,9 @@ public class WidgetBridgePlugin extends Plugin {
                     String meal = f.optString("meal", "");
                     if (!meal.isEmpty()) cf.put("meal", clip(meal, 32));
                     if (f.optBoolean("fav", false)) cf.put("fav", true);
+                    // id продукта: тап по чипу добавит продукт, а не безымянное блюдо.
+                    String foodId = clip(f.optString("foodId", ""), 64);
+                    if (!foodId.isEmpty()) cf.put("foodId", foodId);
                     cleanQuick.put(cf);
                 }
                 if (cleanQuick.length() > 0) obj.put("quick", cleanQuick);
@@ -290,6 +293,10 @@ public class WidgetBridgePlugin extends Plugin {
                     ci.put("index", Math.max(0, item.optInt("index", 0)));
                     int qty = clampInt(item.optInt("qty", 0));
                     if (qty > 0) ci.put("qty", qty);
+                    // id продукта нужен чипам «недавние» и «✕»: без него запись
+                    // с виджета теряла продукт в дневнике.
+                    String foodId = clip(item.optString("foodId", ""), 64);
+                    if (!foodId.isEmpty()) ci.put("foodId", foodId);
                     cleanItems.put(ci);
                 }
             }
@@ -315,6 +322,10 @@ public class WidgetBridgePlugin extends Plugin {
                 String name = f.optString("name", "").trim();
                 if (name.isEmpty()) continue;
                 JSONObject cf = new JSONObject();
+                // id продукта: редактор положит его в очередь `food`, и дневник
+                // узнает продукт (избранное, состав, «полезность»).
+                String id = clip(f.optString("id", ""), 64);
+                if (!id.isEmpty()) cf.put("id", id);
                 cf.put("n", clip(name, 48));
                 cf.put("k", clampInt(f.optInt("kcal", 0)));
                 cf.put("p", clampInt(f.optInt("p", 0)));

@@ -1075,4 +1075,71 @@ describe('аналитика питания: день, неделя, месяц'
     expect(snap.meals?.filter((m) => m.toLowerCase() === 'завтрак')).toHaveLength(1);
     expect(snap.meals).toHaveLength(20);
   });
+
+  it('51. еда из каталога: foodId доезжает до дневника, без него ключа нет', async () => {
+    const { readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+
+    // Очередь из нативного редактора: продукт, выбранный в поиске каталога.
+    const res = applyWidgetQueue([
+      {
+        type: 'food',
+        name: 'Курица',
+        kcal: 248,
+        p: 47,
+        f: 5,
+        c: 0,
+        qty: 150,
+        meal: 'lunch',
+        foodId: 'chicken_breast',
+        ts: Date.now(),
+      },
+      // Блюдо, набранное руками: продукта в базе нет.
+      { type: 'food', name: 'Своё блюдо', kcal: 300, p: 10, f: 10, c: 20, qty: 250, meal: 'dinner', ts: Date.now() },
+    ]);
+    expect(res.foods).toBe(2);
+
+    const diary = readDiaryV2() as Record<
+      string,
+      { meals: Record<string, { name: string; foodId?: string }[]> }
+    >;
+    expect(diary[today].meals['Обед'][0]).toMatchObject({ name: 'Курица', foodId: 'chicken_breast' });
+    // Пустой foodId в дневник не пишем: «блюдо без продукта» — легальное состояние.
+    expect(diary[today].meals['Ужин'][0]).not.toHaveProperty('foodId');
+
+    // Разбор очереди поле не теряет.
+    expect(parseQueueItems(JSON.stringify([{ type: 'food', name: 'X', foodId: 'f1' }]))[0].foodId).toBe('f1');
+  });
+
+  it('52. foodId продукта доезжает до снапшота: и в дни, и в чипы', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    // Избранное хранит id продукта — чип должен его сохранить.
+    localStorage.setItem('he_food_favs', JSON.stringify(['chicken_breast']));
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Обед': [
+            { name: 'Курица', foodId: 'chicken_breast', kcal: 248, p: 47, f: 5, c: 0, qty: 150 },
+            { name: 'Гречка', foodId: 'buckwheat', kcal: 150, p: 5, f: 1, c: 30, qty: 200 },
+          ],
+        },
+      },
+    } as any);
+
+    const n = collectNutrition();
+    expect(n.days[today].items.map((it) => it.foodId)).toEqual(['chicken_breast', 'buckwheat']);
+    // Избранное идёт первым чипом; «недавнее» из дневника тоже помнит продукт.
+    expect(n.quick[0]).toMatchObject({ foodId: 'chicken_breast', fav: true });
+    expect(n.quick.some((q) => !q.fav && q.foodId === 'buckwheat')).toBe(true);
+
+    await syncNutritionWidget(n);
+    const snap = readFallbackSnapshot('nutrition') as {
+      days?: Record<string, { items: { foodId?: string }[] }>;
+      quick?: { foodId?: string; fav?: boolean }[];
+    };
+    expect(snap.days?.[today].items.map((it) => it.foodId)).toEqual(['chicken_breast', 'buckwheat']);
+    expect(snap.quick?.[0]).toMatchObject({ foodId: 'chicken_breast', fav: true });
+    expect(snap.quick?.some((q) => !q.fav && q.foodId === 'buckwheat')).toBe(true);
+  });
 });

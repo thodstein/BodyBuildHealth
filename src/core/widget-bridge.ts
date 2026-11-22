@@ -46,6 +46,12 @@ export interface QueuedItem {
   meal?: string;
   /** Порция, г (необязательно; по умолчанию 100 — как в дневнике). */
   qty?: number;
+  /**
+   * id продукта из `FOOD_DB` (для type='food'): без него запись, добавленная с
+   * виджета, выглядела в дневнике как блюдо без продукта — избранное, состав и
+   * «полезность» такой записи не узнавали.
+   */
+  foodId?: string;
   /** Для type='food_remove': позиция внутри приёма (кнопка «✕» на виджете). */
   index?: number;
   /** Для type='food_remove' («✕» на виджете) и type='task_add': ISO-дата дня. */
@@ -138,6 +144,8 @@ export interface NutritionDayItem {
   index: number;
   /** Порция, г. */
   qty?: number;
+  /** id продукта в `FOOD_DB`: чип «недавнее» кладёт его в очередь `food`. */
+  foodId?: string;
 }
 
 /** День дневника для виджета: итоги и позиции (список + листание дат). */
@@ -160,6 +168,8 @@ export interface NutritionQuickFood {
   /** Порция, г (по умолчанию 100 — как в дневнике). */
   qty?: number;
   meal?: string;
+  /** id продукта в `FOOD_DB`: тап по чипу добавляет продукт, а не безымянное блюдо. */
+  foodId?: string;
   /** true — из избранного (⭐), false — из недавних записей. */
   fav?: boolean;
 }
@@ -597,6 +607,7 @@ function clampNutritionDays(
           .slice(0, 20)
           .map((it) => {
             const qty = num(it.qty);
+            const foodId = String(it.foodId || '').slice(0, 64);
             return {
               name: String(it.name).slice(0, 40),
               kcal: num(it.kcal),
@@ -606,6 +617,7 @@ function clampNutritionDays(
               meal: String(it.meal || '').slice(0, 32),
               index: num(it.index),
               ...(qty > 0 ? { qty } : {}),
+              ...(foodId ? { foodId } : {}),
             };
           })
       : [];
@@ -631,6 +643,7 @@ function clampQuickFoods(foods?: NutritionQuickFood[]): NutritionQuickFood[] | u
     .map((food) => {
       const qty = num(food.qty);
       const meal = String(food.meal || '').slice(0, 32);
+      const foodId = String(food.foodId || '').slice(0, 64);
       return {
         name: String(food.name).slice(0, 28),
         kcal: num(food.kcal),
@@ -639,6 +652,7 @@ function clampQuickFoods(foods?: NutritionQuickFood[]): NutritionQuickFood[] | u
         c: num(food.c),
         ...(qty > 0 ? { qty } : {}),
         ...(meal ? { meal } : {}),
+        ...(foodId ? { foodId } : {}),
         ...(food.fav ? { fav: true } : {}),
       };
     });
@@ -691,6 +705,8 @@ export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promi
 
 /** Продукт каталога для поиска в нативном редакторе еды (на 100 г). */
 export interface NutritionFoodItem {
+  /** id продукта в `FOOD_DB`: по нему дневник узнаёт продукт (избранное, состав). */
+  id?: string;
   name: string;
   kcal: number;
   p: number;
@@ -726,11 +742,15 @@ export async function pushNutritionFoods(
 /**
  * Версия каталога: длина, края списка и сумма калорий — правка продукта в
  * середине базы тоже меняет отпечаток (одного «первый/последний» мало).
+ *
+ * Префикс `v2` — в каталоге появились id продуктов: каталог, записанный прошлой
+ * версией (без id), надо переслать один раз, иначе записи с виджета так и
+ * остались бы без продукта.
  */
 export function nutritionFoodsVersion(items: NutritionFoodItem[]): string {
   let kcal = 0;
   for (const item of items) kcal += Math.max(0, Math.round(Number(item.kcal) || 0));
-  return `${items.length}|${kcal}|${items[0]?.name ?? ''}|${items[items.length - 1]?.name ?? ''}`;
+  return `v2|${items.length}|${kcal}|${items[0]?.name ?? ''}|${items[items.length - 1]?.name ?? ''}`;
 }
 
 export async function syncCalendarWidget(input: CalendarWidgetSnapshot): Promise<boolean> {

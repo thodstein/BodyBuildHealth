@@ -47,8 +47,10 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_PERIOD = "com.healthengine.app.action.WIDGET_NUT_PERIOD";
     /** Листание дат «‹ ›»: extra `step` = ±1 (per-widget, только «День»). */
     public static final String ACTION_DAY = "com.healthengine.app.action.WIDGET_NUT_DAY";
-    /** Тап по чипу «недавние / избранное»: extra `index` в `quick`. */
+    /** Тап по чипу «недавние / избранное»: в интенте сам продукт и его `index`. */
     public static final String ACTION_QUICK = "com.healthengine.app.action.WIDGET_NUT_QUICK";
+    /** Сам продукт чипа (JSON): тап пишет ровно то, что нарисовано на виджете. */
+    public static final String EXTRA_QUICK_ITEM = "quick_item";
     /** «✕» в списке дня: удалить позицию (date + meal + index). */
     public static final String ACTION_ITEM_DEL = "com.healthengine.app.action.WIDGET_NUT_ITEM_DEL";
     public static final String EXTRA_ML = "ml";
@@ -115,7 +117,8 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                 return;
             }
             if (ACTION_QUICK.equals(action)) {
-                addQuickFood(context, intent.getIntExtra(EXTRA_INDEX, -1));
+                addQuickFood(context, intent.getIntExtra(EXTRA_INDEX, -1),
+                        intent.getStringExtra(EXTRA_QUICK_ITEM));
                 return;
             }
             if (ACTION_ITEM_DEL.equals(action)) {
@@ -441,14 +444,21 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {}
     }
 
-    /** Тап по чипу «недавние / избранное»: пишем блюдо в день без ввода КБЖУ. */
-    static void addQuickFood(Context context, int index) {
-        if (index < 0) return;
-        try {
+    /**
+     * Тап по чипу «недавние / избранное»: пишем блюдо в день без ввода КБЖУ.
+     * `raw` — продукт, который был нарисован на чипе. Если его нет (старый
+     * PendingIntent после обновления APK), берём `quick[index]` из снапшота.
+     */
+    static void addQuickFood(Context context, int index, String raw) {
+        JSONObject q = parseQuickItem(raw);
+        if (q == null) {
+            if (index < 0) return;
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
             JSONArray quick = d.optJSONArray("quick");
-            JSONObject q = quick == null ? null : quick.optJSONObject(index);
-            if (q == null) return;
+            q = quick == null ? null : quick.optJSONObject(index);
+        }
+        if (q == null) return;
+        try {
             String name = q.optString("name", "").trim();
             if (name.isEmpty()) return;
             int kcal = Math.max(0, q.optInt("kcal", 0));
@@ -457,6 +467,7 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             int c = Math.max(0, q.optInt("c", 0));
             int qty = q.optInt("qty", 100);
             if (qty <= 0) qty = 100;
+            if (qty > 5000) qty = 5000;
             String meal = q.optString("meal", "");
             if (meal.isEmpty()) meal = mealForNow();
             JSONObject item = new JSONObject();
@@ -468,11 +479,25 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             item.put("c", c);
             item.put("qty", qty);
             item.put("meal", meal);
+            // Продукт из избранного/дневника: дневник узнает его по id.
+            String foodId = q.optString("foodId", "").trim();
+            if (!foodId.isEmpty()) item.put("foodId", foodId);
             item.put("ts", System.currentTimeMillis());
             WidgetStore.enqueue(context, item);
             optimisticFood(context, name, meal, kcal, p, f, c, qty);
             updateAll(context);
         } catch (Exception ignored) {}
+    }
+
+    /** Продукт чипа из интента; пустой или битый JSON — null (тогда берём индекс). */
+    private static JSONObject parseQuickItem(String raw) {
+        if (raw == null || raw.isEmpty()) return null;
+        try {
+            JSONObject q = new JSONObject(raw);
+            return q.optString("name", "").trim().isEmpty() ? null : q;
+        } catch (JSONException e) {
+            return null;
+        }
     }
 
     /** «✕» в списке дня: удалить позицию (date + meal + index) и пересчитать снапшот. */
@@ -823,7 +848,7 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             v.setTextViewText(quickIds[i], clipText(qname, 14));
             v.setContentDescription(quickIds[i],
                     "Добавить: " + qname + ", " + q.optInt("kcal", 0) + " ккал");
-            v.setOnClickPendingIntent(quickIds[i], quickAddAction(context, i, 63 + i));
+            v.setOnClickPendingIntent(quickIds[i], quickAddAction(context, i, q, 63 + i));
         }
         v.setViewVisibility(R.id.w_nut_quick_row, quickOn ? View.VISIBLE : View.GONE);
 
@@ -1024,10 +1049,17 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
     }
 
     /** Чип «недавнее / избранное»: index в `quick`; action не зависит от виджета. */
-    static PendingIntent quickAddAction(Context context, int index, int code) {
+    /**
+     * Чип «недавнее / избранное»: в интенте лежит сам продукт, а `index` — только
+     * подсказка для обратной совместимости. Раньше тап читал `quick[index]` из
+     * снапшота: если между отрисовкой и тапом снапшот пересобрался (добавили еду,
+     * синк), записывалось другое блюдо — не то, что на чипе.
+     */
+    static PendingIntent quickAddAction(Context context, int index, JSONObject food, int code) {
         Intent i = new Intent(context, NutritionWidgetProvider.class);
         i.setAction(ACTION_QUICK);
         i.putExtra(EXTRA_INDEX, index);
+        if (food != null) i.putExtra(EXTRA_QUICK_ITEM, food.toString());
         return PendingIntent.getBroadcast(context, code, i,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }

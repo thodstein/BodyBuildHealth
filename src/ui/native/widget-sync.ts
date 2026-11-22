@@ -327,6 +327,7 @@ function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] 
     list.forEach((item, index) => {
       if (!item || !item.name) return;
       const qty = num(item.qty);
+      const foodId = typeof item.foodId === 'string' ? item.foodId.trim().slice(0, 64) : '';
       out.push({
         name: String(item.name).slice(0, 40),
         kcal: num(item.kcal),
@@ -336,6 +337,7 @@ function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] 
         meal: String(meal).slice(0, 32),
         index,
         ...(qty > 0 ? { qty } : {}),
+        ...(foodId ? { foodId } : {}),
       });
     });
   }
@@ -363,6 +365,8 @@ function collectQuickFoods(diary: Record<string, any>, today: string): Nutrition
       c: num(fav.carbs),
       qty: 100,
       fav: true,
+      // id продукта: тап по чипу добавит именно его, а не «блюдо без продукта».
+      ...(fav.id ? { foodId: String(fav.id).slice(0, 64) } : {}),
     });
     if (out.length >= 6) return out;
   }
@@ -372,7 +376,15 @@ function collectQuickFoods(diary: Record<string, any>, today: string): Nutrition
       const key = it.name.toLowerCase();
       if (seen.has(key) || it.kcal <= 0) continue;
       seen.add(key);
-      out.push({ name: it.name.slice(0, 28), kcal: it.kcal, p: it.p, f: it.f, c: it.c, qty: it.qty ?? 100 });
+      out.push({
+        name: it.name.slice(0, 28),
+        kcal: it.kcal,
+        p: it.p,
+        f: it.f,
+        c: it.c,
+        qty: it.qty ?? 100,
+        ...(it.foodId ? { foodId: it.foodId } : {}),
+      });
       if (out.length >= 6) break;
     }
   }
@@ -1235,6 +1247,9 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         // Порция из нативного редактора: пустое/битое значение = 100 г, как в
         // дневнике. `Math.max(1, 0)` давал «1 г» — запись выглядела опечаткой.
         const qty = Math.round(Number(it.qty) || 0);
+        // id продукта из каталога: дневник по нему узнаёт продукт (избранное,
+        // состав, «полезность»), поэтому не теряем его по пути с виджета.
+        const foodId = typeof it.foodId === 'string' ? it.foodId.trim().slice(0, 64) : '';
         list.push({
           name: String(it.name).slice(0, 120),
           kcal: Math.max(0, Math.round(it.kcal ?? 0)),
@@ -1242,6 +1257,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           f: Math.max(0, Math.round(it.f ?? 0)),
           c: Math.max(0, Math.round(it.c ?? 0)),
           qty: qty > 0 ? Math.min(5000, qty) : 100,
+          ...(foodId ? { foodId } : {}),
         });
         writeDiaryV2({ ...diary, [date]: { meals: { ...day.meals, [meal]: list } } });
         foods += 1;
@@ -1422,6 +1438,8 @@ function foodCatalog(): NutritionFoodItem[] {
   foodCatalogCache = (FOOD_DB as any[])
     .filter((f) => f && f.name && num(f.kcal) > 0)
     .map((f) => ({
+      // id нужен, чтобы запись с виджета дневник узнавал как тот же продукт.
+      ...(f.id ? { id: String(f.id).slice(0, 64) } : {}),
       name: String(f.name).slice(0, 48),
       kcal: num(f.kcal),
       p: num(f.protein),
