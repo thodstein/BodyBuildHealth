@@ -193,6 +193,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [volOpen, setVolOpen] = useState(false);
   // Записанные подходы свёрнуты; тут — какие пользователь раскрыл для правки.
   const [editSet, setEditSet] = useState<Record<string, boolean>>({});
+  const [warmupOpen, setWarmupOpen] = useState<Record<number, boolean>>({});
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -1471,17 +1472,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                       <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.07)', color: isDone ? '#22c55e' : '#fff', border: `1px solid ${isDone ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}` }}>
                         {done}/{total} пунктов
                       </span>
-                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: isDone ? '#22c55e' : 'linear-gradient(135deg,#f97316,#ea580c)', color: isDone ? '#000' : '#fff' }}>
-                        {pct}%
-                      </span>
-                      <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        ⏱ ~{mins} мин
-                      </span>
-                      {warmupBlocks.some(b => b.notes?.includes('грудь') || b.notes?.includes('спина') || b.notes?.includes('ягодиц')) && (
-                        <span style={{ fontSize: 8, padding: '3px 7px', borderRadius: 20, background: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.22)' }}>
-                          🎯 по группам дня
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div style={{ width: 56, height: 56, borderRadius: 28, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
@@ -1566,6 +1556,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             const done = b.exercises.filter((_, j) => warmupDone[`w_${i}_${j}`]).length;
             const pct = total > 0 ? Math.round(done / total * 100) : 0;
             const allDone = done === total && total > 0;
+            const collapsed = allDone && !warmupOpen[i];
             return (
               <div key={i} style={{
                 position: 'relative', overflow: 'hidden', borderRadius: 14, padding: '10px 10px 8px',
@@ -1585,7 +1576,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     }}>{allDone ? '✓' : meta.icon}</span>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 800, color: allDone ? '#22c55e' : meta.color, lineHeight: 1 }}>{meta.title}</div>
-                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{meta.desc} · {b.durationSec}с</div>
+                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>{meta.desc}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -1595,8 +1586,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: allDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: allDone ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>
                       {done}/{total}
                     </span>
+                    {allDone && (
+                      <button type="button" data-act="warmup-toggle" aria-expanded={!collapsed}
+                        onClick={() => setWarmupOpen(o => ({ ...o, [i]: !o[i] }))}
+                        style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, cursor: 'pointer', background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.10)' }}>
+                        {collapsed ? 'Развернуть' : 'Свернуть'}
+                      </button>
+                    )}
                   </div>
                 </div>
+                {!collapsed && (<>
                 {b.notes && (
                   <div style={{
                     fontSize: 9, color: '#fff', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8,
@@ -1617,7 +1616,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     return (
                       <li key={j} style={{ listStyle: 'none' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-                          <button type="button" aria-pressed={isDone} aria-label={`${label} — ${isDone ? 'выполнено, нажать чтобы отменить' : 'отметить выполнение'}`}
+                          <button type="button" data-warmup-item={`${i}_${j}`} aria-pressed={isDone} aria-label={`${label} — ${isDone ? 'выполнено, нажать чтобы отменить' : 'отметить выполнение'}`}
                             onClick={() => { hapticImpact(isDone ? 'light' : 'medium'); toggleWarmup(i, j); }}
                             style={{
                               flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 0,
@@ -1670,6 +1669,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     );
                   })}
                 </ul>
+                </>)}
                 {total > 1 && (
                   <button type="button" onClick={() => {
                     const all = b.exercises.every((_, j) => warmupDone[`w_${i}_${j}`]);
