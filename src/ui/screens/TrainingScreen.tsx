@@ -1065,7 +1065,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           periodizationType={periodizationType} mesoLength={mesoLength}
           tprofile={tprofile} linked={linked}
           onTabChange={setTab}
-          onGoWorkout={() => { setZone('training'); setPage('tabs'); setTab('runtime'); setRuntimeStarted(true); }}
+          onGoWorkout={() => {
+            // Старт из дневника — тем же событием, что виджеты: обработчик выше сам
+            // решит, открыть карточку плана ПЛ/ББ или выбор дня. Раньше здесь ставился
+            // только runtimeStarted, и при наличии he_pl_runtime человек попадал на
+            // свёрнутую карточку — «кнопка не работает».
+            try { window.dispatchEvent(new Event('he-workout-open')); } catch { /* ignore */ }
+          }}
         />
       )}
 
