@@ -189,6 +189,47 @@ describe('пришли из карточки атлета', () => {
     const { container } = render(<ProfilePlannerTab initialAthleteId="ghost" />);
     expect((container.querySelector('[data-planner="athlete"]') as HTMLSelectElement).value).toBe('');
   });
+
+  it('атлета можно сменить и снять прямо в карточке', () => {
+    let coach = setCoachEnabled(emptyCoachState(), true);
+    coach = addCoachAthlete(coach, { name: 'Иван' }, { id: 'a1' }).state;
+    coach = addCoachAthlete(coach, { name: 'Пётр' }, { id: 'a2' }).state;
+    writeCoachState(localStorage, coach);
+    writeCoachPlanner(
+      localStorage,
+      addCoachTask(emptyCoachPlanner(), { title: 'Созвон', date: today, athleteId: 'a1' }, { id: 't' }).store,
+    );
+
+    const { container } = render(<ProfilePlannerTab />);
+    fireEvent.click(container.querySelector('[data-planner="open"]') as HTMLElement);
+    const select = container.querySelector('[data-planner="detail-athlete"]') as HTMLSelectElement;
+    expect(select.value).toBe('a1');
+
+    fireEvent.change(select, { target: { value: 'a2' } });
+    fireEvent.click(container.querySelector('[data-planner="detail-save"]') as HTMLElement);
+    expect(readCoachPlanner(localStorage).items[0].athleteId).toBe('a2');
+
+    fireEvent.click(container.querySelector('[data-planner="open"]') as HTMLElement);
+    fireEvent.change(container.querySelector('[data-planner="detail-athlete"]') as HTMLSelectElement, {
+      target: { value: '' },
+    });
+    fireEvent.click(container.querySelector('[data-planner="detail-save"]') as HTMLElement);
+    expect(readCoachPlanner(localStorage).items[0].athleteId).toBeNull();
+  });
+
+  it('удалённый атлет виден в карточке, а не «Без атлета»', () => {
+    seedAthlete();
+    writeCoachPlanner(
+      localStorage,
+      addCoachTask(emptyCoachPlanner(), { title: 'Созвон', date: today, athleteId: 'ghost' }, { id: 't' }).store,
+    );
+    const { container } = render(<ProfilePlannerTab />);
+    fireEvent.click(container.querySelector('[data-planner="open"]') as HTMLElement);
+    const select = container.querySelector('[data-planner="detail-athlete"]') as HTMLSelectElement;
+    // Привязка не врёт: показан «атлет удалён», а не пустой выбор.
+    expect(select.value).toBe('ghost');
+    expect(select.textContent).toContain('атлет удалён');
+  });
 });
 
 describe('авто-события из приложения', () => {
@@ -331,7 +372,7 @@ describe('повтор задачи', () => {
       (container.querySelector('[data-planner="repeat"]') as HTMLSelectElement).options,
     ).map(o => o.value);
     expect(options).toEqual(
-      expect.arrayContaining(['none', 'daily', 'eod', 'weekdays', 'weekly', 'biweekly', 'monthly', 'custom']),
+      expect.arrayContaining(['none', 'daily', 'eod', 'weekdays', 'weekly', 'biweekly', 'monthly', 'yearly', 'custom']),
     );
     fireEvent.change(container.querySelector('[data-planner="repeat"]') as HTMLSelectElement, {
       target: { value: 'eod' },
