@@ -25,6 +25,8 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   // величину не пересчитает и назовёт отказ.
   'Cystatin C': 'CYSTATIN_C',
   'Bilirubin': 'BIL', 'Glucose': 'GLU',
+  // Проход 205: ЩФ — Ед/л, как в каталоге и лестнице ступеней.
+  'ALP': 'ALP',
   'CRP': 'CRP', 'IL-6': 'IL6',
   // ── липиды ──
   'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',

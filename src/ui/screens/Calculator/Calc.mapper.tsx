@@ -8,7 +8,7 @@ import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../e
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
-import { getLabEntry } from '../../../data/lab-tier-ranges';
+import { getLabEntry, tierLabView, labValueFrom } from '../../../data/lab-tier-ranges';
 import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
 import { detectActivePedClasses } from '../../../data/ped-class-matrix';
 import type { LabSlice } from '../../../engines/support-plan';
@@ -553,7 +553,7 @@ function buildHematoSymptomsFromState(state: any): Set<string> {
   const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
   const hct = labs['HEMATOCRIT'] || labs['HCT'];
   const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
-  const plt = labs['PLT'];
+  const plt = labValueFrom(labs, 'PLT');
   const fib = labs['FIBRINOGEN'];
   const dd = labs['D_DIMER'];
   const sex = state?.profile?.sex === 'female' ? 'female' : 'male';
@@ -1988,7 +1988,11 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {/* ── Универсальные системные popup-ы: тот же каркас, что у Нейро/Кровь/Суставы ── */}
       {genericEnhancementPopup && GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup] && ReactDOM.createPortal((() => {
         const cfg = GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup];
-        const labs = labSliceToValues(currentLabSlice(state.labs), state.profile.sex);
+        // Проход 205: домены называют анализ кодом склада (`l.K`, `l.HCT`, `l.E2`), а
+        // карта бланка — каноном формы (`POTASSIUM`, `HEMATOCRIT`, `ESTRADIOL`).
+        // `tierLabView` даёт то же число под вторым именем; без моста триггер
+        // сравнивал `undefined` с порогом и домен не включался ни при каком вводе.
+        const labs = tierLabView(labSliceToValues(currentLabSlice(state.labs), state.profile.sex));
         const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
         const activeDomains = domains.filter(d => d.trigger?.(labs, state));
         // Проход 204: «Контрольные маркеры» — это маркеры доменов (то, что решает)
@@ -2502,7 +2506,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
   const labs = labSliceToValues(currentLabSlice(state?.labs), state?.profile?.sex);
           const hct = labs['HEMATOCRIT'] || labs['HCT'];
           const hgb = labs['HEMOGLOBIN'] || labs['HGB'];
-          const plt = labs['PLT'];
+          const plt = labValueFrom(labs, 'PLT');
           const fibrinogen = labs['FIBRINOGEN'];
           const ddimer = labs['D_DIMER'];
           // Risk score — ЕДИНЫЙ источник: механизм-модель (системный риск hematologic).

@@ -160,13 +160,14 @@ describe('проход 204: попап говорит о том, что реша
 
   it('«Механизмы» — подписи доменов, а не рукописный список', () => {
     expect(src).not.toContain('cfg.domains');
-    expect(src).toContain('domains.map(d => d.label)');
+    // Prettier ставит скобки у одиночного параметра — сравнение терпит обе формы.
+    expect(src).toMatch(/domains\.map\(\(?d\)?\s*=>\s*d\.label\)/);
     // Обещанных механизмов без домена больше нет: поле `domains` ушло из конфигов.
     expect(src).not.toMatch(/domains:\s*\[/);
   });
 
   it('«Контрольные маркеры» — домены плюс добавка системы', () => {
-    expect(src).toContain('domains.flatMap(d => d.markers)');
+    expect(src).toMatch(/domains\.flatMap\(\(?d\)?\s*=>\s*d\.markers\)/);
     expect(src).toContain('monitorMarkers.map');
     // АД и ЧСС больше не выдаются за анализы.
     expect(src).not.toContain(`markers:['BP_SYSTOLIC'`);

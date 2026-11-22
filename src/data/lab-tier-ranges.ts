@@ -414,6 +414,77 @@ export function tierMarkerKey(marker: string): string {
   return TIER_MARKER_ALIAS[up] ?? up;
 }
 
+/**
+ * Все написания одного анализа в плоской карте (проход 205).
+ *
+ * Один и тот же анализ приходит из бланка под каноном формы
+ * (`support-plan/mapper-ctx`: `POTASSIUM`, `HEMATOCRIT`, `ESTRADIOL`), а правила
+ * поддержки и домены называют его кодом склада/лестницы (`K`, `HCT`, `E2`).
+ * Пока перевода не было, домены «Ритм/ЧСС», «Электролиты», «Эндотелий/тромбоз»,
+ * «Ароматизация/E2», «Пролактин», «Гипо/гипергликемия» и «Андрогены» читали
+ * `l.K`/`l.HCT`/`l.E2`… из карты, где этих ключей не бывает: анализ введён, а
+ * находки нет. Таблица собирается из тех же источников, что и поиск ступеней
+ * (`LAB_TIERS`, `TIER_MARKER_ALIAS`, `TIER_SAME_ANALYSIS`), — второго списка имён
+ * здесь нет.
+ */
+const TIER_SPELLINGS: Record<string, string[]> = (() => {
+  const out: Record<string, string[]> = {};
+  const add = (canon: string, name: string | undefined) => {
+    if (!name) return;
+    const list = out[canon] ?? (out[canon] = []);
+    if (!list.includes(name)) list.push(name);
+  };
+  for (const [key, row] of Object.entries(LAB_TIERS)) {
+    const canon = tierCanonicalKey(key);
+    add(canon, key);
+    add(canon, row.marker);
+  }
+  for (const [alias, row] of Object.entries(TIER_MARKER_ALIAS)) {
+    const canon = tierCanonicalKey(row);
+    add(canon, alias);
+    add(canon, row);
+  }
+  return out;
+})();
+
+/**
+ * Значение анализа из плоской карты под любым известным именем.
+ * Нет записи — `undefined`, а не 0: «не сдано» не значит «норма».
+ */
+export function labValueFrom(flat: Record<string, number>, marker: string): number | undefined {
+  const direct = flat[marker];
+  if (Number.isFinite(direct)) return direct;
+  const key = tierCanonicalKey(tierMarkerKey(marker));
+  for (const spelling of TIER_SPELLINGS[key] ?? []) {
+    const value = flat[spelling];
+    if (Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+/**
+ * Плоская карта бланка → карта, где анализ виден под своим кодом склада.
+ *
+ * Нужна там, где правила написаны словарём лестниц (`l.K`, `l.HCT`, `l.APOB`), а
+ * источник — карта канонов формы. Значения не пересчитываются и не придумываются:
+ * новое имя получает то же число. Существующие ключи не перезаписываются — если в
+ * карте уже стоят два написания с разными числами, второе не прячется.
+ *
+ * `labCoverage` эту карту не читает: счётчик введённых анализов
+ * (`support-plan/engine-helpers`) по-прежнему считает записи, а не синонимы.
+ */
+export function tierLabView(flat: Record<string, number>): Record<string, number> {
+  const out = { ...flat };
+  for (const [key, value] of Object.entries(flat)) {
+    if (!Number.isFinite(value)) continue;
+    const canon = tierCanonicalKey(tierMarkerKey(key));
+    for (const spelling of TIER_SPELLINGS[canon] ?? []) {
+      if (out[spelling] === undefined) out[spelling] = value;
+    }
+  }
+  return out;
+}
+
 export function deriveTier(marker: string, value: number, sex?: 'male' | 'female'): Tier {
   const key = tierMarkerKey(marker);
   const base = LAB_TIERS[key] || LAB_TIERS[marker.toUpperCase()];
