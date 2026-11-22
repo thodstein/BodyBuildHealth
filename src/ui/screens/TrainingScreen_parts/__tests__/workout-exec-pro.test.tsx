@@ -621,6 +621,37 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     localStorage.clear();
   });
 
+  it('основная часть: полный редактор только у текущего подхода, остальные — строкой очереди', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь',
+      exercises: [{
+        name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90,
+        targetSets: [
+          { weight: 80, reps: 8, rir: 2 },
+          { weight: 82.5, reps: 8, rir: 2 },
+          { weight: 85, reps: 6, rir: 1 },
+        ],
+      }],
+    }];
+    const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
+    fireEvent.click(findBtn(container, 'Начать тренировку')!);
+    fireEvent.click(findBtn(container, 'К основной части')!);
+
+    // В плане три подхода, но экран держит один редактор: остальные ждут строкой.
+    expect(container.querySelectorAll('[data-pl="set-queue"]').length).toBe(1);
+    const openBtns = Array.from(container.querySelectorAll('[data-act="open-set"]')) as HTMLElement[];
+    expect(openBtns.length).toBe(2);
+    expect(container.textContent).toContain('82.5 кг × 8 · RIR 2');
+    fireEvent.click(openBtns[0]);
+    expect(container.querySelectorAll('[data-act="open-set"]').length).toBe(1);
+
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
+
   it('незавершённая сессия: главное действие — «Продолжить», «Начать заново» с подтверждением', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();

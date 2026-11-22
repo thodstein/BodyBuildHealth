@@ -195,6 +195,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [editSet, setEditSet] = useState<Record<string, boolean>>({});
   const [warmupOpen, setWarmupOpen] = useState<Record<number, boolean>>({});
   const [coolOpen, setCoolOpen] = useState<Record<number, boolean>>({});
+  const [openSet, setOpenSet] = useState<Record<string, boolean>>({});
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -1986,6 +1987,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                    const a = actual[k] || { weight: vbtOverride[k] ?? t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
                    const plannedTempo = tempoText(t.tempo);
                    const logged = !!actual[k];
+                   // Текущий подход — первый незаписанный (или раскрытый пользователем);
+                   // остальные ждут строкой в очереди, а не полным редактором на весь экран.
+                   const firstUnlogged = ex.targetSets.findIndex((_, si2) => !actual[keyFor(ei, si2)]);
+                   const isCurrent = si === firstUnlogged || !!openSet[k];
                  const targetRPE = 10 - t.rir;
                  const dW = a.weight - t.weight;
                  const dR = a.reps - t.reps;
@@ -2011,7 +2016,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                      );
                    }
                  return (
-                   <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
+                   <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6, ...(isCurrent ? {} : { display: 'none' }) }}>
                      <span style={{ color: '#fff', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
                      <span style={{ color: '#fff', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
                      {t.technique && (
@@ -2177,6 +2182,28 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                           </div>
                         );
                 })}
+              {/* Подходы, до которых ещё не дошли: строка вместо полного редактора. */}
+              {(() => {
+                const firstUnlogged = ex.targetSets.findIndex((_, si) => !actual[keyFor(ei, si)]);
+                const queued = ex.targetSets
+                  .map((t, si) => ({ t, si, k: keyFor(ei, si) }))
+                  .filter(({ si, k }) => !actual[k] && si !== firstUnlogged && !openSet[k]);
+                if (queued.length === 0) return null;
+                return (
+                  <div data-pl="set-queue" style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
+                    {queued.map(({ t, si, k }) => (
+                      <div key={k} style={{ ...ROW, gap: 8, alignItems: 'center', opacity: 0.82 }}>
+                        <span style={{ color: 'var(--text-faint)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
+                        <span style={{ color: '#fff', fontSize: 11, flex: 1, minWidth: 0 }}>{t.weight} кг × {t.reps} · RIR {t.rir}</span>
+                        <button type="button" data-act="open-set" onClick={() => { hapticImpact('light'); setOpenSet(p => ({ ...p, [k]: true })); }}
+                          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0, minHeight: 34 }}>
+                          ▶ Открыть
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {/* P11 + Фаза 6, п.7: VBT-замкнутый контур — скорость уже сделанных подходов
                   пересчитывает СЛЕДУЮЩИЙ подход. Рекомендация не применяется молча:
                   пользователь видит причину и нажимает «Применить». */}
