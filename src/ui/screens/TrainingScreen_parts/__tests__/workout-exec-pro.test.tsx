@@ -500,6 +500,28 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     // В основной части «Готов» уже никуда не ведёт (сессия не сбрасывается) — гасим.
     expect(tabs().find(t => (t.textContent || '').includes('Готов'))!.disabled).toBe(true);
 
+    // Время сессии и пауза — одна кнопка в строке прогресса (отдельного ряда больше нет).
+    const timerBtn = container.querySelector('[data-act="session-timer"]') as HTMLElement;
+    expect(timerBtn).toBeTruthy();
+    expect(container.textContent).not.toContain('Время сессии:');
+
+    // Аналитика объёма свёрнута: в зале она стояла между шапкой и первым подходом.
+    const volToggle = container.querySelector('[data-act="volume-toggle"]') as HTMLElement;
+    expect(volToggle).toBeTruthy();
+    expect(volToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('прогноз по плану сессии');
+    fireEvent.click(volToggle);
+    expect((container.querySelector('[data-act="volume-toggle"]') as HTMLElement).getAttribute('aria-expanded')).toBe('true');
+    expect(container.textContent).toContain('прогноз по плану сессии');
+    fireEvent.click(container.querySelector('[data-act="volume-toggle"]') as HTMLElement);
+    expect(container.textContent).not.toContain('прогноз по плану сессии');
+
+    // sRPE ушёл под подходы: до первого подхода он только отодвигал работу.
+    const srpeLabel = Array.from(container.querySelectorAll('span')).find(s => (s.textContent || '').trim() === 'sRPE')!;
+    expect(srpeLabel).toBeTruthy();
+    const okBtnEl = findBtn(container, 'OK')!;
+    expect(okBtnEl.compareDocumentPosition(srpeLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
     // Основная часть: кнопка «OK» пишет подход в живую сессию.
     const ok = findBtn(container, 'OK');
     expect(ok).toBeTruthy();

@@ -188,6 +188,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   const [profile] = useTrainingProfile();
 const [dayIdx, setDayIdx] = useState(0);
 const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
+  // Аналитика объёма в основной части свёрнута: в зале она отодвигала подходы.
+  const [volOpen, setVolOpen] = useState(false);
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -1702,16 +1704,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              <button style={BTN} onClick={finish}>⏹ Завершить</button>
            </div>
            
-           {/* таймер сессии */}
-           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-             <span style={{ fontSize: 10, color: '#fff' }}>Время сессии:</span>
-             <span style={{ fontSize: 14, fontWeight: 600, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>
-               {String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}
-             </span>
-             <button onClick={() => { setSessionTimerRunning(!sessionTimerRunning); if (!sessionTimerRunning) setSessionTimerSec(0); }} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: sessionTimerRunning ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.12)', color: sessionTimerRunning ? '#ef4444' : '#00e68a' }}>
-               {sessionTimerRunning ? '⏸ Пауза' : '▶ Старт'}
-             </button>
-           </div>
 
            {/* общий прогресс сессии — «цифра дня» */}
            {(() => {
@@ -1729,7 +1721,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                    </div>
                    <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#fff' }}>
                      <span>⚡ {doneVol.toLocaleString()} / {planned.volume.toLocaleString()} кг</span>
-                     <span>⏱ <b style={{ color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}</b></span>
+                     <button type="button" data-act="session-timer" onClick={() => setSessionTimerRunning(v => !v)}
+                       title={sessionTimerRunning ? 'Пауза' : 'Продолжить'}
+                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 20, cursor: 'pointer', background: 'transparent', color: '#fff', fontSize: 10, fontWeight: 700, border: sessionTimerRunning ? '1px solid rgba(255,255,255,0.16)' : '1px solid rgba(0,230,138,0.28)' }}>
+                       {sessionTimerRunning ? '⏸' : '▶'} <b style={{ fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}</b>
+                     </button>
                    </div>
                  </div>
                  <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 6 }}>
@@ -1738,8 +1734,20 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                </div>
 );
             })()}
-            {/* Объём: план/факт за сессию + недельный ориентир из канонического движка */}
-            {(() => {
+            {/* Объём: план/факт за сессию + недельный ориентир из канонического движка.
+                Свёрнут: в зале важнее первый подход, аналитика не должна отодвигать его. */}
+            <button type="button" data-act="volume-toggle" aria-expanded={volOpen}
+              onClick={() => setVolOpen(v => !v)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                marginBottom: 10, padding: '7px 10px', borderRadius: 10, cursor: 'pointer',
+                background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+                color: '#a78bfa', fontSize: 10, fontWeight: 800,
+              }}>
+              <span>📊 Объём: сессия и ориентир недели</span>
+              <span style={{ opacity: 0.7 }}>{volOpen ? '▲' : '▼'}</span>
+            </button>
+            {volOpen && (() => {
               const muscleSets: Record<string, { plan: number; done: number }> = {};
               day?.exercises?.forEach((ex, ei) => {
                 const g = String(ex.muscleGroup || '').trim();
@@ -1752,7 +1760,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 muscleSets[g] = acc;
               });
               const muscles = Object.keys(muscleSets);
-              if (muscles.length === 0) return null;
+              if (muscles.length === 0) {
+                return (
+                  <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, fontSize: 10, color: '#fff', opacity: 0.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    У упражнений дня не указаны группы мышц — считать объём не по чему.
+                  </div>
+                );
+              }
               // Сколько тренировочных дней в неделю — чтобы честно оценить недельный объём.
               const trainingDays = Math.max(1, (Array.isArray(days) ? days : [])
                 .filter(d => Array.isArray(d?.exercises) && d.exercises.length > 0).length);
@@ -1839,15 +1853,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              ))}
            </div>
 
-           <div style={{ ...SMALL, marginBottom: 6 }}>План: {ruCount(planned.sets, RU_SETS)} / {planned.volume} кг·пов · Факт: {ruCount(factVol.sets, RU_SETS)} / {factVol.volume} кг·пов</div>
-          {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
-           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
-            {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginLeft: 2 }}>·</span>
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>мин</span>
-            <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
-          </div>
+           {/* sRPE — под подходами: перед первым подходом он только мешал */}
           {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
           {plateOpen && (
             <div style={{ ...CARD, marginBottom: 8 }}>
@@ -2323,6 +2329,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                )}
             </div>
           ))}
+          {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
+           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
+            {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginLeft: 2 }}>·</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>мин</span>
+            <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
+          </div>
+
           {/* Раньше из тренировки можно было выйти только тапом по табу фаз
               «Итог» — явной кнопки завершения на экране не было. */}
           <button type="button" data-act="finish-session" onClick={exitSession}
