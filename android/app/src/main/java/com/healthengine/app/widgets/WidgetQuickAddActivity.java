@@ -416,9 +416,9 @@ public class WidgetQuickAddActivity extends Activity {
             public void afterTextChanged(Editable s) {
             }
         });
-        // Ручная правка калорий отменяет пересчёт: дальше цифры — свои,
+        // Ручная правка любого значения отменяет пересчёт: дальше цифры — свои,
         // и подставлять вместо них продукт из базы нельзя.
-        kcalEt.addTextChangedListener(new TextWatcher() {
+        TextWatcher manual = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
             }
@@ -431,7 +431,11 @@ public class WidgetQuickAddActivity extends Activity {
             @Override
             public void afterTextChanged(Editable s) {
             }
-        });
+        };
+        kcalEt.addTextChangedListener(manual);
+        proteinEt.addTextChangedListener(manual);
+        fatEt.addTextChangedListener(manual);
+        carbsEt.addTextChangedListener(manual);
     }
 
     private JSONArray loadFoodCatalog() {
@@ -472,27 +476,32 @@ public class WidgetQuickAddActivity extends Activity {
         }
     }
 
-    /** Подставляем значения продукта на 100 г в поля порции. */
+    /**
+     * Подставляем КБЖУ продукта из базы под текущую порцию (база — на 100 г).
+     *
+     * Если порцию уже ввели (например «200 г»), она остаётся: подставлять
+     * значения за 100 г и молча менять вес на 100 — значит занизить запись.
+     */
     private void applyCatalogFood(JSONObject f) {
         String name = f.optString("n", "").trim();
+        int grams = parseQty(qtyEt, 5000);
+        if (grams <= 0) grams = 100;
         // Пока заполняем поля кодом, вотчеры молчат: это не ручная правка.
         filling = true;
-        catalogPer100 = null;
+        catalogPer100 = f;
         try {
             if (!name.isEmpty()) titleEt.setText(name);
-            kcalEt.setText(String.valueOf(Math.max(0, f.optInt("k", 0))));
-            proteinEt.setText(String.valueOf(Math.max(0, f.optInt("p", 0))));
-            fatEt.setText(String.valueOf(Math.max(0, f.optInt("f", 0))));
-            carbsEt.setText(String.valueOf(Math.max(0, f.optInt("c", 0))));
-            qtyEt.setText("100");
+            qtyEt.setText(String.valueOf(grams));
+            kcalEt.setText(String.valueOf(scalePer100("k", grams, 5000)));
+            proteinEt.setText(String.valueOf(scalePer100("p", grams, 500)));
+            fatEt.setText(String.valueOf(scalePer100("f", grams, 500)));
+            carbsEt.setText(String.valueOf(scalePer100("c", grams, 500)));
         } finally {
             filling = false;
         }
-        // Дальше смена порции пересчитывает КБЖУ от этих значений на 100 г.
-        catalogPer100 = f;
         searchResults.removeAllViews();
         if (searchEt != null) searchEt.setText("");
-        Toast.makeText(this, "Значения на 100 г — укажите свою порцию", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "КБЖУ на " + grams + " г — правьте порцию", Toast.LENGTH_SHORT).show();
     }
 
     /** КБЖУ выбранного продукта под текущую порцию: kcal = per100 × г / 100. */

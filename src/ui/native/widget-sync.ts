@@ -1200,14 +1200,16 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         const day = diary[date] ?? { meals: {} };
         const meal = normalizeMealKey(it.meal);
         const list = [...(day.meals[meal] ?? [])];
+        // Порция из нативного редактора: пустое/битое значение = 100 г, как в
+        // дневнике. `Math.max(1, 0)` давал «1 г» — запись выглядела опечаткой.
+        const qty = Math.round(Number(it.qty) || 0);
         list.push({
           name: String(it.name).slice(0, 120),
           kcal: Math.max(0, Math.round(it.kcal ?? 0)),
           p: Math.max(0, Math.round(it.p ?? 0)),
           f: Math.max(0, Math.round(it.f ?? 0)),
           c: Math.max(0, Math.round(it.c ?? 0)),
-          // Порция из нативного редактора (по умолчанию 100 г, как в дневнике).
-          qty: Math.max(1, Math.round(Number(it.qty) || 0)) || 100,
+          qty: qty > 0 ? Math.min(5000, qty) : 100,
         });
         writeDiaryV2({ ...diary, [date]: { meals: { ...day.meals, [meal]: list } } });
         foods += 1;

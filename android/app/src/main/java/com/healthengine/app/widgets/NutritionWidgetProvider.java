@@ -13,6 +13,7 @@ import android.widget.RemoteViews;
 import com.healthengine.app.R;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
@@ -192,10 +193,17 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
     static void optimisticWater(Context context, int ml) {
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-            int next = Math.max(0, d.optInt("waterMl", 0) + ml);
+            int before = Math.max(0, d.optInt("waterMl", 0));
+            int next = Math.max(0, before + ml);
             d.put("waterMl", next);
             JSONObject periods = d.optJSONObject("periods");
             if (periods != null) {
+                JSONObject dayStats = periods.optJSONObject("day");
+                // Был ли сегодняшний день уже посчитан в среднем недели/месяца.
+                boolean counted = dayStats == null
+                        ? before > 0
+                        : dayStats.optInt("waterDays", 0) > 0;
+                boolean countedNow = next > 0;
                 for (String key : new String[]{"day", "week", "month"}) {
                     JSONObject p = periods.optJSONObject(key);
                     if (p == null) continue;
@@ -204,7 +212,11 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                     if ("day".equals(key)) {
                         // Вода обнулилась — день перестаёт быть «днём с водой»:
                         // иначе среднее за неделю делилось бы на пустой день.
-                        p.put("waterDays", left > 0 ? Math.max(1, p.optInt("waterDays", 0)) : 0);
+                        p.put("waterDays", countedNow ? 1 : 0);
+                    } else if (countedNow && !counted) {
+                        p.put("waterDays", Math.max(0, p.optInt("waterDays", 0) + 1));
+                    } else if (!countedNow && counted) {
+                        p.put("waterDays", Math.max(0, p.optInt("waterDays", 0) - 1));
                     }
                     periods.put(key, p);
                 }
@@ -220,11 +232,15 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
      */
     static void optimisticFood(Context context, String name, String meal,
                                int kcal, int p, int f, int c, int qty) {
-        if (!applyFoodDelta(context, kcal, p, f, c)) return;
         if (name == null || name.trim().isEmpty()) return;
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
             String date = dayIso(0);
+            // Первая запись дня добавляет день в счётчики периодов: иначе среднее
+            // за неделю делилось бы на прежнее число дней и было бы завышено.
+            boolean firstOfDay = dayRecordDays(d) <= 0;
+            applyFoodTotals(d, kcal, p, f, c);
+            if (firstOfDay) shiftPeriodDays(d, 1);
             JSONObject last = new JSONObject();
             last.put("name", name.length() > 40 ? name.substring(0, 40) : name);
             String m = meal == null ? "" : meal;
@@ -242,6 +258,31 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             d.put("lastFood", last);
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
         } catch (Exception ignored) {}
+    }
+
+    /** Дней с записями по счётчику периода «день» — то же число, что считает JS. */
+    private static int dayRecordDays(JSONObject d) {
+        JSONObject periods = d.optJSONObject("periods");
+        JSONObject day = periods == null ? null : periods.optJSONObject("day");
+        return day == null ? 0 : Math.max(0, day.optInt("days", 0));
+    }
+
+    /**
+     * Сдвиг «дней с записями» во всех периодах. Периоды считает JS; между синками
+     * держим их согласованными: без этого первая еда дня не попадала в среднее за
+     * неделю, а снятие последней записи не убирало день из среднего.
+     */
+    private static void shiftPeriodDays(JSONObject d, int delta) throws JSONException {
+        if (delta == 0) return;
+        JSONObject periods = d.optJSONObject("periods");
+        if (periods == null) return;
+        for (String key : new String[]{"day", "week", "month"}) {
+            JSONObject p = periods.optJSONObject(key);
+            if (p == null) continue;
+            p.put("days", Math.max(0, p.optInt("days", 0) + delta));
+            periods.put(key, p);
+        }
+        d.put("periods", periods);
     }
 
     /** Порядок приёмов как в дневнике (`MEAL_PRESETS` на JS-стороне). */
@@ -320,15 +361,18 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
      * адреса записи. Плоский список идёт в порядке дневника, поэтому последняя
      * строка и есть «последняя запись последнего непустого приёма». Индексы
      * внутри приёма не сдвигаем: свежий снапшот придёт с ближайшим синком.
+     *
+     * Возвращает true, если день остался без записей: тогда его надо убрать из
+     * счётчиков периодов.
      */
-    private static void removeLastDayItem(JSONObject d, String date) {
+    private static boolean removeLastDayItem(JSONObject d, String date) {
         try {
             JSONObject days = d.optJSONObject("days");
             JSONObject day = days == null ? null : days.optJSONObject(date);
             JSONArray items = day == null ? null : day.optJSONArray("items");
-            if (items == null || items.length() == 0) return;
+            if (items == null || items.length() == 0) return false;
             JSONObject last = items.optJSONObject(items.length() - 1);
-            if (last == null) return;
+            if (last == null) return false;
             JSONArray next = new JSONArray();
             for (int i = 0; i < items.length() - 1; i++) next.put(items.optJSONObject(i));
             day.put("items", next);
@@ -337,8 +381,10 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             day.put("f", Math.max(0, day.optInt("f", 0) - Math.max(0, last.optInt("f", 0))));
             day.put("c", Math.max(0, day.optInt("c", 0) - Math.max(0, last.optInt("c", 0))));
             days.put(date, day);
+            return next.length() == 0;
         } catch (Exception ignored) {
             // КБЖУ дня уже снято выше — расхождение подтянет ближайший синк.
+            return false;
         }
     }
 
@@ -383,7 +429,9 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                         -Math.max(0, last.optInt("fat", 0)),
                         -Math.max(0, last.optInt("carbs", 0)));
                 JSONObject next = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-                removeLastDayItem(next, date);
+                boolean emptied = removeLastDayItem(next, date);
+                // День остался без записей — убираем его из среднего недели/месяца.
+                if (emptied && date.equals(dayIso(0))) shiftPeriodDays(next, -1);
                 WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, next);
             }
             JSONObject next = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
@@ -506,6 +554,8 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                     }
                     d.put("periods", periods);
                 }
+                // Сняли последнюю запись дня — дня с записями больше нет.
+                if (next.length() == 0) shiftPeriodDays(d, -1);
             }
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
         } catch (Exception ignored) {}
@@ -541,28 +591,37 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         return v.length() > max ? v.substring(0, max - 1) + "…" : v;
     }
 
+    /**
+     * КБЖУ в корне снапшота и в агрегатах периодов: +еда, −отмена. Число дней
+     * с записями не трогает — за него отвечает `shiftPeriodDays` (иначе первая
+     * запись дня и снятие последней расходились с тем, что считает JS).
+     */
+    private static void applyFoodTotals(JSONObject d, int kcal, int p, int f, int c)
+            throws JSONException {
+        d.put("kcal", Math.max(0, d.optInt("kcal", 0) + kcal));
+        d.put("protein", Math.max(0, d.optInt("protein", 0) + p));
+        d.put("fat", Math.max(0, d.optInt("fat", 0) + f));
+        d.put("carbs", Math.max(0, d.optInt("carbs", 0) + c));
+        JSONObject periods = d.optJSONObject("periods");
+        if (periods != null) {
+            for (String key : new String[]{"day", "week", "month"}) {
+                JSONObject period = periods.optJSONObject(key);
+                if (period == null) continue;
+                period.put("kcal", Math.max(0, period.optInt("kcal", 0) + kcal));
+                period.put("protein", Math.max(0, period.optInt("protein", 0) + p));
+                period.put("fat", Math.max(0, period.optInt("fat", 0) + f));
+                period.put("carbs", Math.max(0, period.optInt("carbs", 0) + c));
+                periods.put(key, period);
+            }
+            d.put("periods", periods);
+        }
+    }
+
     /** Сдвиг КБЖУ в снапшоте и агрегатах: положительный — еда, отрицательный — отмена. */
     private static boolean applyFoodDelta(Context context, int kcal, int p, int f, int c) {
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
-            d.put("kcal", Math.max(0, d.optInt("kcal", 0) + kcal));
-            d.put("protein", Math.max(0, d.optInt("protein", 0) + p));
-            d.put("fat", Math.max(0, d.optInt("fat", 0) + f));
-            d.put("carbs", Math.max(0, d.optInt("carbs", 0) + c));
-            JSONObject periods = d.optJSONObject("periods");
-            if (periods != null) {
-                for (String key : new String[]{"day", "week", "month"}) {
-                    JSONObject period = periods.optJSONObject(key);
-                    if (period == null) continue;
-                    period.put("kcal", Math.max(0, period.optInt("kcal", 0) + kcal));
-                    period.put("protein", Math.max(0, period.optInt("protein", 0) + p));
-                    period.put("fat", Math.max(0, period.optInt("fat", 0) + f));
-                    period.put("carbs", Math.max(0, period.optInt("carbs", 0) + c));
-                    if (kcal > 0 && period.optInt("days", 0) <= 0) period.put("days", 1);
-                    periods.put(key, period);
-                }
-                d.put("periods", periods);
-            }
+            applyFoodTotals(d, kcal, p, f, c);
             WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
             return true;
         } catch (Exception ignored) {
@@ -776,6 +835,9 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
             adapter.setData(Uri.parse("he://nut-items/" + widgetId));
             v.setRemoteAdapter(R.id.w_nut_items, adapter);
             v.setEmptyView(R.id.w_nut_items, R.id.w_nut_items_empty);
+            // В прошлом дне кнопок добавления нет — «добавьте еду» там не подсказка.
+            v.setTextViewText(R.id.w_nut_items_empty,
+                    past ? "За этот день записей нет" : "Пока пусто — добавьте еду");
         }
 
         // ---- Действия ----

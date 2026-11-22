@@ -205,7 +205,10 @@ public class NutritionPanelWidgetProvider extends AppWidgetProvider {
         // ---- подпись: остаток дня или сумма и дни за период ----
         String sub;
         if (!has) {
-            sub = "За " + NutritionWidgetProvider.periodWord(period) + " записей нет";
+            // У воды свой счётчик дней: при еде без воды «записей нет» — неправда.
+            sub = "water".equals(metric)
+                    ? ("Вода " + NutritionWidgetProvider.periodWord(period) + " не записана")
+                    : ("За " + NutritionWidgetProvider.periodWord(period) + " записей нет");
         } else if (sum) {
             sub = "Σ " + NutritionWidgetProvider.formatNum(total) + " " + unit + " · " + days + " "
                     + NutritionWidgetProvider.plural(days, "день", "дня", "дней")

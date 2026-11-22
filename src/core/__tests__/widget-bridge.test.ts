@@ -1000,4 +1000,27 @@ describe('аналитика питания: день, неделя, месяц'
     expect(diary[today].meals['Завтрак']).toBeUndefined();
     expect(diary[today].meals['Ужин'].map((f) => f.name)).toEqual(['Курица']);
   });
+
+  it('47. еда из очереди: пустая порция = 100 г, своя порция сохраняется', async () => {
+    const { readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+
+    const res = applyWidgetQueue([
+      // Старый/чужой клиент мог не прислать qty: это 100 г, а не 1 г.
+      { type: 'food', name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, meal: 'breakfast', ts: Date.now() },
+      // Своя порция из редактора не подменяется.
+      { type: 'food', name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 200, meal: 'lunch', ts: Date.now() },
+      // Верхняя граница как у поля «Порция» (5000 г): мусор не растёт в дневнике.
+      { type: 'food', name: 'Арбуз', kcal: 30, p: 1, f: 0, c: 7, qty: 999999, meal: 'snack', ts: Date.now() },
+    ]);
+    expect(res.foods).toBe(3);
+
+    const diary = readDiaryV2() as Record<
+      string,
+      { meals: Record<string, { name: string; qty: number }[]> }
+    >;
+    expect(diary[today].meals['Завтрак'][0]).toMatchObject({ name: 'Овсянка', qty: 100 });
+    expect(diary[today].meals['Обед'][0]).toMatchObject({ name: 'Курица', qty: 200 });
+    expect(diary[today].meals['Перекус'][0]).toMatchObject({ name: 'Арбуз', qty: 5000 });
+  });
 });

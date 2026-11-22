@@ -103,7 +103,9 @@ public class NutritionItemsWidgetService extends RemoteViewsService {
             del.putExtra(NutritionWidgetProvider.EXTRA_INDEX, index);
             // data делает Intent уникальным: PendingIntent сравниваются без
             // extras, и без data «✕» всех строк срабатывал бы как у первой.
-            del.setData(Uri.parse("he://nut-item/" + widgetId + "/" + meal + "/" + index));
+            // Приём кодируем: имя своего приёма может содержать пробел или «/»,
+            // и тогда две строки получили бы одинаковый data.
+            del.setData(Uri.parse("he://nut-item/" + widgetId + "/" + Uri.encode(meal) + "/" + index));
             PendingIntent pi = PendingIntent.getBroadcast(ctx,
                     widgetId * 100 + position, del,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
