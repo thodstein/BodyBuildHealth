@@ -196,6 +196,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [warmupOpen, setWarmupOpen] = useState<Record<number, boolean>>({});
   const [coolOpen, setCoolOpen] = useState<Record<number, boolean>>({});
   const [openSet, setOpenSet] = useState<Record<string, boolean>>({});
+  const [doneMoreOpen, setDoneMoreOpen] = useState(false);
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -628,6 +629,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     // (пользователь мог выключить режим в прошлый раз).
     autoSupersetKeyRef.current = '';
     applyPlanSupersets();
+    // Новая сессия — прошлые раскрытия/свёрнутости не переносим.
+    setOpenSet({}); setEditSet({}); setDoneMoreOpen(false); setWarmupOpen({}); setCoolOpen({});
     
     const riskFlags: Record<string, string> = {};
     if (profile.injuries?.length) {
@@ -1141,6 +1144,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   // Метрики фактической сессии (Тоннаж/КПШ/Инт.отн/УОИ/Инт.Ф+Б) — считаются для done-состояния
   const lms = useMemo(() => computeSessionMetrics(done, day), [done, day]);
+  // «Итог»: подробности (RIR, метрики, PR, отдых, сравнение) — под одним тогглом,
+  // и только если им действительно есть что показать.
+  const hasDoneDetails = (rirFeedback?.exerciseFeedbacks.length ?? 0) > 0 || !!lms || prs.length > 0
+    || restHistory.length > 0 || !!sessionComparison?.older || exerciseBestDeltas.length > 0;
 
   if (days.length === 0) return <div style={SMALL}>Нет дней в плане.</div>;
 
@@ -2609,6 +2616,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               ))}
             </div>
           )}
+          {/* Подробности сессии: RIR-калибровка, метрики, PR, отдых, сравнение.
+              В зале они не нужны сразу — по умолчанию свёрнуты в одну строку. */}
+          {hasDoneDetails && (<button type="button" data-act="done-more" aria-expanded={doneMoreOpen}
+            onClick={() => { hapticImpact('light'); setDoneMoreOpen(v => !v); }}
+            style={{ marginTop: 10, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, fontWeight: 700 }}>
+            <span>📋 Подробности: RIR-калибровка, метрики, отдых, сравнение</span>
+            <span style={{ opacity: 0.7 }}>{doneMoreOpen ? '▲' : '▼'}</span>
+          </button>)}
+          {doneMoreOpen && hasDoneDetails && (<>
           {/* RIR-калибровка: фидбек по каждому упражнению */}
           {rirFeedback && rirFeedback.exerciseFeedbacks.length > 0 && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.06)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', border: '1px solid ' + (rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.2)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.25)' : 'rgba(234,179,8,0.25)') }}>
@@ -2713,6 +2729,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                ))}
              </div>
            )}
+           </>)}
             
              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => {
                if (!done) return;
@@ -2747,10 +2764,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 // Итог — конечный экран плеера: явный выход обратно в зону проведения.
                 try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* ignore */ }
               }}>✓ Готово — к тренировкам</button>
-              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
+              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setDoneMoreOpen(false); setOpenSet({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
             {days.length > 1 && dayIdx < days.length - 1 && (
               <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
-                setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
+                setDone(null); setDoneMoreOpen(false); setOpenSet({}); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;
                 setPhase('ready'); setDayIdx(dayIdx + 1);
               }}>
                 ➡ Следующий день: {days[dayIdx + 1]?.label} ({dayIdx + 2}/{days.length})

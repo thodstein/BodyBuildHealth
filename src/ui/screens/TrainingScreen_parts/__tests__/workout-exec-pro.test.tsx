@@ -606,6 +606,16 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     fireEvent.click(doneTab!);
     expect(container.textContent).toContain('Тренировка завершена');
 
+    // Подробности отчёта (метрики/RIR/отдых/сравнение) свёрнуты: «Итог» и так длинный.
+    const moreBtn = container.querySelector('[data-act="done-more"]') as HTMLElement;
+    expect(moreBtn).toBeTruthy();
+    expect(moreBtn.getAttribute('aria-expanded')).toBe('false');
+    expect(container.textContent).not.toContain('УОИ');
+    fireEvent.click(moreBtn);
+    expect(container.textContent).toContain('УОИ');
+    fireEvent.click(container.querySelector('[data-act="done-more"]') as HTMLElement);
+    expect(container.textContent).not.toContain('УОИ');
+
     // «Итог» — конечный экран плеера: есть явный выход обратно в зону проведения.
     const closeBtn = container.querySelector('[data-act="session-done-close"]') as HTMLElement;
     expect(closeBtn).toBeTruthy();
