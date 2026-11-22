@@ -588,6 +588,18 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     expect(finishBtn).toBeTruthy();
     fireEvent.click(finishBtn!);
     expect(container.textContent).toContain('Заминка: День 1 · Грудь');
+
+    // Заминка: отмеченный целиком блок сворачивается, «Развернуть» возвращает пункты.
+    const coolItems = Array.from(container.querySelectorAll('[data-cool-item]')) as HTMLElement[];
+    expect(coolItems.length).toBeGreaterThan(0);
+    const coolBefore = coolItems.length;
+    const firstCool = coolItems.filter(el => (el.getAttribute('data-cool-item') || '').startsWith('0_'));
+    (firstCool.length ? firstCool : coolItems).forEach(el => fireEvent.click(el));
+    const coolToggle = container.querySelector('[data-act="cool-toggle"]') as HTMLElement;
+    expect(coolToggle).toBeTruthy();
+    expect(container.querySelectorAll('[data-cool-item]').length).toBeLessThan(coolBefore);
+    fireEvent.click(coolToggle);
+    expect(container.querySelectorAll('[data-cool-item]').length).toBe(coolBefore);
     const doneTab = Array.from(container.querySelectorAll('[role="tab"]'))
       .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
     expect(doneTab).toBeTruthy();

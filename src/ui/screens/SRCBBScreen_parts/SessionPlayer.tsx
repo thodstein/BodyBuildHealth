@@ -194,6 +194,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // Записанные подходы свёрнуты; тут — какие пользователь раскрыл для правки.
   const [editSet, setEditSet] = useState<Record<string, boolean>>({});
   const [warmupOpen, setWarmupOpen] = useState<Record<number, boolean>>({});
+  const [coolOpen, setCoolOpen] = useState<Record<number, boolean>>({});
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -2413,6 +2414,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             const cDone = b.exercises.filter((_, j) => cooldownDone[`c_${i}_${j}`]).length;
             const cPct = cTotal > 0 ? Math.round(cDone / cTotal * 100) : 0;
             const cAllDone = cDone === cTotal && cTotal > 0;
+            const cCollapsed = cAllDone && !coolOpen[i];
             return (
               <div key={i} style={{
                 position: 'relative', overflow: 'hidden', borderRadius: 14, padding: '10px 10px 8px', marginBottom: 8,
@@ -2432,11 +2434,19 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     }}>{cAllDone ? '✓' : cMeta.icon}</span>
                     <div>
                       <div style={{ fontSize: 11, fontWeight: 800, color: cAllDone ? '#22c55e' : cMeta.color, lineHeight: 1 }}>{cMeta.title}</div>
-                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>⏱ {b.durationSec}с · {cDone}/{cTotal}</div>
+                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.2 }}>⏱ {b.durationSec}с</div>
                     </div>
                   </div>
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: cAllDone ? '#22c55e' : cMeta.bg, color: cAllDone ? '#000' : cMeta.color, border: `1px solid ${cAllDone ? 'rgba(34,197,94,0.28)' : cMeta.border}` }}>{cPct}%</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: cAllDone ? '#22c55e' : cMeta.bg, color: cAllDone ? '#000' : cMeta.color, border: `1px solid ${cAllDone ? 'rgba(34,197,94,0.28)' : cMeta.border}` }}>{cDone}/{cTotal}</span>
+                  {cAllDone && (
+                    <button type="button" data-act="cool-toggle" aria-expanded={!cCollapsed}
+                      onClick={() => setCoolOpen(o => ({ ...o, [i]: !o[i] }))}
+                      style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, cursor: 'pointer', background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.10)' }}>
+                      {cCollapsed ? 'Развернуть' : 'Свернуть'}
+                    </button>
+                  )}
                 </div>
+                {!cCollapsed && (<>
                 {b.notes && <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><span style={{ color: cMeta.color, fontWeight: 700 }}>ℹ </span>{b.notes}</div>}
                 <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 7 }}>
                   <div style={{ height: '100%', width: `${cPct}%`, borderRadius: 2, background: cAllDone ? '#22c55e' : cMeta.color, transition: 'width 0.3s ease' }} />
@@ -2449,7 +2459,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     return (
                       <li key={j} style={{ listStyle: 'none' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
-                          <button type="button" aria-pressed={isDone} aria-label={`${clabel} — ${isDone ? 'выполнено' : 'отметить'}`}
+                          <button type="button" data-cool-item={`${i}_${j}`} aria-pressed={isDone} aria-label={`${clabel} — ${isDone ? 'выполнено' : 'отметить'}`}
                             onClick={() => { hapticImpact(isDone ? 'light' : 'medium'); toggleCooldown(i, j); }}
                             style={{
                               flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 0,
@@ -2487,6 +2497,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     );
                   })}
                 </ul>
+                </>)}
               </div>
             );
           })}
