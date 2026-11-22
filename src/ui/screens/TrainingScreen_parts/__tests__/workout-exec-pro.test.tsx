@@ -552,4 +552,34 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     cleanup();
     localStorage.clear();
   });
+
+  it('незавершённая сессия: главное действие — «Продолжить», «Начать заново» с подтверждением', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    saveActiveSession(mkSession(2));
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь',
+      exercises: [{ name: 'Жим лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 }],
+    }];
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { container, unmount } = render(<SessionPlayer days={days} weekNumber={3} focus="Грудь" />);
+
+    // Продолжение — главное действие: иначе «Начать тренировку» перекрывала бы его.
+    const cta = findBtn(container, 'Продолжить тренировку');
+    expect(cta).toBeTruthy();
+    expect(cta!.textContent).toContain('2 подх. уже записано');
+    expect(findBtn(container, 'Начать тренировку')).toBeFalsy();
+
+    // «Начать заново» спрашивает подтверждение и стартует пустую сессию.
+    const restart = container.querySelector('[data-act="resume-restart"]') as HTMLElement;
+    expect(restart).toBeTruthy();
+    fireEvent.click(restart);
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(loadActiveSession()?.exercises?.[0]?.sets?.length ?? 0).toBe(0);
+
+    confirmSpy.mockRestore();
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
 });

@@ -1262,14 +1262,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               </div>
             </div>
           )}
-          <button onClick={() => { hapticImpact('medium'); begin(); }} style={{
+          <button onClick={() => { hapticImpact('medium'); if (resumeFrom) resumeSavedSession(resumeFrom); else begin(); }} style={{
             width: '100%', padding: '14px 16px', borderRadius: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
             background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 800, fontSize: 14, boxShadow: '0 6px 20px rgba(0,230,138,0.28)', transition: 'transform 0.15s, boxShadow 0.15s',
           }}>
             <span style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>▶</span>
             <span style={{ flex: 1, textAlign: 'left', lineHeight: 1.2 }}>
-              <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>Начать тренировку</span>
-              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.75 }}>{day.label} · нед {weekNumber} · {day.exercises?.length ?? 0} упр.</span>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>{resumeFrom ? 'Продолжить тренировку' : 'Начать тренировку'}</span>
+              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.75 }}>
+                {resumeFrom
+                  ? `${resumeFrom.focus || 'Тренировка'} · ${(resumeFrom.exercises || []).reduce((sum, e) => sum + (e.sets || []).length, 0)} подх. уже записано`
+                  : `${day.label} · нед ${weekNumber} · ${day.exercises?.length ?? 0} упр.`}
+              </span>
             </span>
             <span style={{ fontSize: 18, opacity: 0.7 }}>→</span>
           </button>
@@ -1296,6 +1300,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                   <button type="button" data-act="resume-go" onClick={() => resumeSavedSession(resumeFrom)} style={{ ...BTN, flex: 2, minHeight: 48 }}>▶ Продолжить</button>
                   <button type="button" data-act="resume-drop" onClick={() => { clearActiveSession(); setResumeFrom(null); }} style={{ ...BTN_GHOST, flex: 1, minHeight: 48 }}>Сбросить</button>
                 </div>
+                <button type="button" data-act="resume-restart" onClick={() => {
+                  if (typeof window !== 'undefined' && !window.confirm('Начать тренировку заново? Записанные подходы этой сессии не сохранятся.')) return;
+                  clearActiveSession(); setResumeFrom(null); begin();
+                }} style={{ ...BTN_GHOST, width: '100%', marginTop: 6, minHeight: 40, fontSize: 10 }}>🔄 Начать заново</button>
               </div>
             );
           })()}
