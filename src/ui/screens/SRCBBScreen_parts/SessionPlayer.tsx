@@ -252,6 +252,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const logOneRef = useRef<(ei: number, si: number) => boolean>(() => false);
   // «+ Сет» из виджета, пришедший до старта сессии: undefined — ожидания нет.
   const pendingQuickRef = useRef<Event | null | undefined>(undefined);
+  // Завершение из виджета, пока плеер открыт: завершить сессию целиком умеет только плеер
+  // (длительность, sRPE, RIR-калибровка, заминка), поэтому виджет только просит его.
+  const finishRef = useRef<() => boolean>(() => false);
+  // Сессия синхронно, без ожидания рендера: подход из виджета и завершение могут прийти
+  // в одном дренаже очереди — finish обязан видеть уже записанный подход.
+  const liveSessionRef = useRef<ActiveSession | null>(null);
+  // Откуда пришло завершение и трогал ли пользователь RPE: sRPE пишем только измеренный.
+  const finishFromWidgetRef = useRef(false);
+  const srpeEditedRef = useRef(false);
   // Троттлинг пушей снапшота на homescreen-виджет (АПК).
   const widgetPushRef = useRef(0);
   const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
@@ -720,6 +729,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     setSessionRPE(7);
     setSessionDur(60);
     durEditedRef.current = false;
+    srpeEditedRef.current = false;
     setRestAddSec(0);
     setTimerRunning(false);
     setTimerSec(0);
@@ -863,24 +873,29 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       setSessionTimerRunning(true);
     };
 
-  const finish = () => {
-    if (!session || !day || !Array.isArray(day.exercises)) return;
+  const finish = (): boolean => {
+    const fromWidget = finishFromWidgetRef.current;
+    finishFromWidgetRef.current = false;
+    // Подход из виджета мог прийти в том же дренаже очереди, что и завершение: берём
+    // сессию из ref, иначе в историю уйдёт версия без только что записанного подхода.
+    const sess = liveSessionRef.current ?? session;
+    if (!sess || !day || !Array.isArray(day.exercises)) return false;
     // Пустую сессию в дневник не пишем: «Завершить» без единого подхода создавало
     // тренировку на 0 сетов и пустой «Итог» без объяснения.
-    if (!session.exercises.some(ex => (ex.sets || []).length > 0)) {
+    if (!sess.exercises.some(ex => (ex.sets || []).length > 0)) {
       clearActiveSession();
       try { localStorage.removeItem('he_workout_rest_timer_v1'); } catch { /* ignore */ }
       setDone(null);
       setDonePlan(null);
       savedRef.current = false;
       setPhase('done');
-      return;
+      return false;
     }
     if (timerSoundSettings.vibrate) hapticNotify('success');
     // Для сессии, начатой сегодня, «стенные» часы точны (и включают паузы). Если её начали
     // вчера и вернулись утром — доверяем таймеру плеера, иначе в историю уедет ~10 часов.
-    const sameDayStart = session.date === localIsoDate();
-    const finished = finishSession(session, `${focus} — ${day?.label}`, sameDayStart ? undefined : sessionDur);
+    const sameDayStart = sess.date === localIsoDate();
+    const finished = finishSession(sess, `${focus} — ${day?.label}`, sameDayStart ? undefined : sessionDur);
     savedRef.current = true;
     try { onSaved?.(); } catch { /* ignore */ }
 
@@ -904,7 +919,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     setCooldownDone({});
     clearActiveSession();
     try { localStorage.removeItem('he_workout_rest_timer_v1'); } catch { /* ignore */ }
-    try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: Math.max(finished.durationMin || 0, sessionDur) }); } catch { /* ignore */ }
+    // sRPE — измеренная нагрузка: при завершении из виджета пользователь слайдер не видел,
+    // поэтому без явного выбора RPE запись не создаём (иначе в ACWR уезжает выдуманная 7/10).
+    if (!(fromWidget && !srpeEditedRef.current)) {
+      try { saveSRPESession({ date: finished.date, sRPE: sessionRPE, durationMin: Math.max(finished.durationMin || 0, sessionDur) }); } catch { /* ignore */ }
+    }
     // RIR-калибровка: записываем фактические RIR по подходам
     try { recordSessionRIR(finished, { exercises: day.exercises.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) }); } catch { /* ignore */ }
     // MMC-трекинг
@@ -928,6 +947,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       sets: (Array.isArray(ex.targetSets) ? ex.targetSets : []).map(t => ({ weight: t.weight, reps: t.reps })),
     })));
     setDone(finished);
+    liveSessionRef.current = null;
     setSession(null);
 
     // Автообновление кэша прогресса после завершённой сессии
@@ -941,7 +961,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       }).filter(Boolean) as CachedProgress[];
       cacheExerciseProgress(progressItems);
     } catch {}
+    return true;
   };
+
+  // Подход из виджета пишется в ref синхронно (onWidgetSet), остальные пути — этим эффектом.
+  React.useEffect(() => { liveSessionRef.current = session; }, [session]);
+  // Событие из виджета читает finish текущего рендера (session/day не из прошлого).
+  finishRef.current = finish;
 
   const exitSession = () => {
     // Подтверждение, чтобы не потерять незаписанные подходы при случайном тапе.
@@ -1263,6 +1289,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       setSessionRPE(7);
       setSessionDur(60);
       durEditedRef.current = false;
+      srpeEditedRef.current = false;
       setTimerRunning(false);
       setTimerSec(0);
       setTimerExIdx(-1);
@@ -1334,6 +1361,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         plannedWeight: planWeight || undefined,
       });
       if (!res.success) return;
+      liveSessionRef.current = res.session;
+      // Пишем сразу: если приложение убьют до автосейва, подход не потеряется.
+      try { saveActiveSession(res.session, ex.targetSets?.length); } catch { /* ignore */ }
       setSession(res.session);
       setExerciseProgress(prev => {
         const total = ex.targetSets?.length || prevSets.length + 1;
@@ -1345,6 +1375,24 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     window.addEventListener('he-workout-widget-set', onWidgetSet as EventListener);
     return () => window.removeEventListener('he-workout-widget-set', onWidgetSet as EventListener);
   }, [phase, session, day]);
+
+  // Завершение из виджета, пока плеер открыт: виджет не завершает сессию сам, иначе теряется
+  // всё, что умеет только плеер — длительность, sRPE, RIR-калибровка, заминка.
+  React.useEffect(() => {
+    const onFinishRequest = (ev: Event) => {
+      const d = (ev as CustomEvent | undefined)?.detail as any;
+      if (!d) return;
+      const live = liveSessionRef.current ?? session;
+      if (!live || !live.exercises.some(ex => (ex.sets || []).length > 0)) return;
+      finishFromWidgetRef.current = true;
+      // handled — только по факту: finish() возвращает false, если завершить не смог,
+      // и тогда виджет завершит сессию сам, а не останется в подвешенном состоянии.
+      d.handled = finishRef.current?.() === true;
+      if (!d.handled) finishFromWidgetRef.current = false;
+    };
+    window.addEventListener('he-workout-finish-request', onFinishRequest as EventListener);
+    return () => window.removeEventListener('he-workout-finish-request', onFinishRequest as EventListener);
+  }, [session]);
 
   // Пока плеер смонтирован, он единственный писатель активной сессии (см. widget-sync).
   React.useEffect(() => {
@@ -2833,7 +2881,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
-            {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
+            {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); srpeEditedRef.current = true; setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
             <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginLeft: 2 }}>·</span>
             <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>мин</span>
             <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => { durEditedRef.current = true; setSessionDur(+e.target.value); }} aria-label="длительность мин" />

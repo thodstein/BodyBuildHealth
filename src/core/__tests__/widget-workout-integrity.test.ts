@@ -4,7 +4,8 @@
  *  - вес 0 для упражнения без отягощения записывается как «свой вес», а не отвергается;
  *  - вес 0 для штанги отвергается (никакого молчаливого тоннажа 0);
  *  - завершение из виджета сообщает плееру, а история не дублируется;
- *  - пока плеер открыт, виджет не пишет в хранилище сам, а отдаёт подход плееру.
+ *  - пока плеер открыт, виджет не пишет в хранилище сам, а отдаёт подход плееру;
+ *  - подход без RPE/RIR не получает выдуманный RPE 10.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyWidgetQueue, setWorkoutPlayerActive } from '../../ui/native/widget-sync';
@@ -131,5 +132,67 @@ describe('виджет: подходы и завершение', () => {
     expect(saveActiveSession).toBeTypeOf('function');
 
     window.removeEventListener('he-workout-widget-set', onSet);
+  });
+
+  it('при открытом плеере завершение отдаётся плееру, а не пишется виджетом', () => {
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.now() }]);
+    setWorkoutPlayerActive(true);
+
+    let requests = 0;
+    let closeEvents = 0;
+    const onClose = () => {
+      closeEvents += 1;
+    };
+    const onFinishRequest = (ev: Event) => {
+      requests += 1;
+      ((ev as CustomEvent).detail as { handled: boolean }).handled = true;
+    };
+    window.addEventListener('he-workout-close', onClose);
+    window.addEventListener('he-workout-finish-request', onFinishRequest);
+
+    const res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
+
+    expect(requests).toBe(1);
+    expect(res.workoutsFinished).toBe(1);
+    // Завершал плеер: виджет не писал историю, не стирал активную сессию и не сбрасывал плеер.
+    expect(loadSessions()).toHaveLength(0);
+    expect(loadActiveSession()).not.toBeNull();
+    expect(closeEvents).toBe(0);
+
+    window.removeEventListener('he-workout-close', onClose);
+    window.removeEventListener('he-workout-finish-request', onFinishRequest);
+  });
+
+  it('если плеер запрос завершения не обработал, виджет завершает сессию сам', () => {
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.now() }]);
+    setWorkoutPlayerActive(true);
+
+    const onFinishRequest = () => {
+      /* handled остаётся false */
+    };
+    window.addEventListener('he-workout-finish-request', onFinishRequest);
+
+    const res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
+
+    expect(res.workoutsFinished).toBe(1);
+    expect(loadSessions()).toHaveLength(1);
+    expect(loadActiveSession()).toBeNull();
+
+    window.removeEventListener('he-workout-finish-request', onFinishRequest);
+  });
+
+  it('подход без RPE и RIR не получает выдуманный RPE 10', () => {
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.now() }]);
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rir).toBe(0);
+    expect(set?.rpe).toBe(0);
+  });
+
+  it('RIR 2 превращается в RPE 8, а явно введённый RPE не перетирается', () => {
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() }]);
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 82.5, reps: 6, rpe: 9.5, ts: Date.now() }]);
+    const sets = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets || [];
+    expect(sets[0]?.rpe).toBe(8);
+    expect(sets[1]?.rpe).toBe(9.5);
   });
 });

@@ -1235,7 +1235,9 @@ function lastDiaryItem(diary: Record<string, any>, date: string): { meal: string
  * затёр бы их), а уходят плееру событием `he-workout-widget-set`.
  */
 let workoutPlayerActive = false;
-export function setWorkoutPlayerActive(active: boolean): void { workoutPlayerActive = active; }
+export function setWorkoutPlayerActive(active: boolean): void {
+  workoutPlayerActive = active;
+}
 const playerActive = (): boolean => workoutPlayerActive && typeof window !== 'undefined';
 
 export function applyWidgetQueue(items: QueuedItem[]): {
@@ -1430,13 +1432,31 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets);
         }
       } else if (it.type === 'workout_finish') {
+        // Плеер открыт — завершить сессию целиком умеет только он (длительность, sRPE,
+        // RIR-калибровка, заминка). Просим плеер; не обработал — завершаем сами.
+        if (playerActive()) {
+          const relay = { handled: false };
+          try {
+            window.dispatchEvent(new CustomEvent('he-workout-finish-request', { detail: relay }));
+          } catch {
+            /* noop */
+          }
+          if (relay.handled) {
+            workoutsFinished += 1;
+            continue;
+          }
+        }
         const active = loadActiveSession();
         if (active) {
           finishSession(active);
           clearActiveSession();
           workoutsFinished += 1;
           // Плеер держит эту сессию в состоянии — сообщаем ему, чтобы он не завершил её повторно.
-          try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* noop */ }
+          try {
+            window.dispatchEvent(new Event('he-workout-close'));
+          } catch {
+            /* noop */
+          }
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
@@ -1471,7 +1491,11 @@ export function applyWidgetQueue(items: QueuedItem[]): {
               pause: it.pause === true,
               handled: false,
             };
-            try { window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: relay })); } catch { /* noop */ }
+            try {
+              window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: relay }));
+            } catch {
+              /* noop */
+            }
             if (relay.handled) {
               setsAdded += 1;
               if (!base) workoutsStarted += 1;
@@ -1480,12 +1504,17 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           }
           const weight = Math.max(0, Math.min(500, Number(it.weight) || 0));
           const reps = Math.max(0, Math.min(100, Math.round(Number(it.reps) || 0)));
-          const rir = Math.max(0, Math.min(20, Math.round(Number(it.rir) || 0)));
+          // RPE/RIR — только измеренное: отсутствующий RIR раньше превращался в 0, а из него
+          // синтезировался RPE 10, и подход без оценки уезжал в нагрузку как максимальный.
+          const rirRaw = Number(it.rir);
+          const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(20, Math.round(rirRaw)) : 0;
           const rpeRaw = Number(it.rpe);
           const rpe =
             Number.isFinite(rpeRaw) && rpeRaw > 0
               ? Math.max(0, Math.min(10, Math.round(rpeRaw * 10) / 10))
-              : Math.max(0, 10 - rir);
+              : rir > 0
+                ? Math.max(0, 10 - rir)
+                : 0;
           const techniqueRaw = Number(it.technique);
           const techniqueScore =
             Number.isFinite(techniqueRaw) && techniqueRaw >= 3 && techniqueRaw <= 5

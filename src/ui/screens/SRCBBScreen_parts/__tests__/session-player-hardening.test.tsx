@@ -7,6 +7,8 @@
  *  4. «Завершить» без единого подхода не пишет тренировку на 0 сетов;
  *  5. «+ Сет» из виджета, пришедший до старта сессии, доводится (а не теряется);
  *  6. закрытие итога («Готово») сбрасывает плеер к старту.
+ *  7. завершение из виджета завершает сессию плеером (sRPE — только измеренная), а подход
+ *     из виджета в том же дренаже очереди не теряется.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render } from '@testing-library/react';
@@ -226,9 +228,7 @@ describe('SessionPlayer — вес 0 и подходы из виджета', () 
   });
 
   it('вес 0 у штанги без ввода — видимая ошибка, подход не записан', () => {
-    const { container, unmount } = render(
-      <SessionPlayer days={[zeroWeightBarbellDay()]} weekNumber={1} focus="PL" />,
-    );
+    const { container, unmount } = render(<SessionPlayer days={[zeroWeightBarbellDay()]} weekNumber={1} focus="PL" />);
     startMain(container);
     fireEvent.click(btn(container, 'OK')!);
 
@@ -276,9 +276,9 @@ describe('SessionPlayer — вес 0 и подходы из виджета', () 
 
     expect(detail.handled).toBe(true);
     const sets = loadActiveSession()?.exercises?.[0]?.sets || [];
-    expect(sets.some(s => s.weightKg === 85 && s.reps === 5)).toBe(true);
+    expect(sets.some((s) => s.weightKg === 85 && s.reps === 5)).toBe(true);
     // Номер подхода продолжает план, а не дублирует уже записанный.
-    expect(new Set(sets.map(s => s.setNumber)).size).toBe(sets.length);
+    expect(new Set(sets.map((s) => s.setNumber)).size).toBe(sets.length);
     unmount();
   });
 });
@@ -306,6 +306,95 @@ describe('SessionPlayer — флаг isBodyweight из плана', () => {
     expect(set?.bodyweight).toBe(true);
     expect(set?.weightKg).toBe(0);
     expect(set?.reps).toBe(6);
+    unmount();
+  });
+});
+
+describe('SessionPlayer — завершение из виджета', () => {
+  // Строка sRPE сессии: div, чей первый ребёнок — метка «sRPE». В основной части есть ещё
+  // RPE отдельного подхода с такими же цифрами — его брать нельзя.
+  const sessionRpeButton = (root: ParentNode, value: number) => {
+    const row = Array.from(root.querySelectorAll('div')).find(
+      (d) => (d.firstElementChild?.textContent || '').trim() === 'sRPE',
+    );
+    if (!row) return undefined;
+    return Array.from(row.querySelectorAll('button')).find((b) => (b.textContent || '').trim() === String(value)) as
+      HTMLButtonElement | undefined;
+  };
+
+  it('запрос из виджета завершает сессию плеером и не пишет выдуманную sRPE', () => {
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    fireEvent.click(btn(container, 'OK')!);
+
+    const detail: { handled?: boolean } = {};
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-finish-request', { detail }));
+    });
+
+    expect(detail.handled).toBe(true);
+    expect(loadSessions()).toHaveLength(1);
+    expect(loadActiveSession()).toBeNull();
+    // RPE пользователь не выбирал: sRPE-запись не создаём (иначе в ACWR уйдёт 7/10).
+    expect(localStorage.getItem('he_srpe_sessions')).toBeNull();
+    unmount();
+  });
+
+  it('подход из виджета и завершение в одном дренаже: подход попадает в историю', () => {
+    const day = plannedDay();
+    const { container, unmount } = render(<SessionPlayer days={[day]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    fireEvent.click(btn(container, 'OK')!);
+
+    // Именно этот порядок выдаёт applyWidgetQueue при сливе очереди: подход, сразу за ним завершение.
+    const setDetail = { exerciseName: day.exercises[0].name, weight: 87.5, reps: 4, rir: 1, handled: false };
+    const finishDetail: { handled?: boolean } = {};
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: setDetail }));
+      window.dispatchEvent(new CustomEvent('he-workout-finish-request', { detail: finishDetail }));
+    });
+
+    expect(setDetail.handled).toBe(true);
+    expect(finishDetail.handled).toBe(true);
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    const sets = saved[0].exercises?.[0]?.sets || [];
+    expect(sets.some((s) => s.weightKg === 87.5 && s.reps === 4)).toBe(true);
+    unmount();
+  });
+
+  it('если RPE выбран в плеере, завершение из виджета пишет эту sRPE', () => {
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    fireEvent.click(btn(container, 'OK')!);
+    const nine = sessionRpeButton(container, 9);
+    expect(nine).toBeTruthy();
+    fireEvent.click(nine!);
+
+    const detail: { handled?: boolean } = {};
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-finish-request', { detail }));
+    });
+
+    expect(detail.handled).toBe(true);
+    const srpe = JSON.parse(localStorage.getItem('he_srpe_sessions') || '[]');
+    expect(srpe).toHaveLength(1);
+    expect(srpe[0].sRPE).toBe(9);
+    unmount();
+  });
+
+  it('пустая сессия на запрос из виджета не завершается и не отвечает handled', () => {
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+
+    const detail: { handled?: boolean } = {};
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-finish-request', { detail }));
+    });
+
+    // handled не выставлен — виджет завершит пустую сессию сам (она просто не попадёт в историю).
+    expect(detail.handled).toBeUndefined();
+    expect(loadSessions()).toHaveLength(0);
     unmount();
   });
 });
