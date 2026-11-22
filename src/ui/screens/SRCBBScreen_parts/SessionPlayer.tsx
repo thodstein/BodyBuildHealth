@@ -2511,6 +2511,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             )}
           </div>
 
+          {/* Отчёт длинный, а сессия уже сохранена: выход — сразу под шапкой итога. */}
+          <button type="button" data-act="session-done-close" onClick={() => {
+            try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* ignore */ }
+          }} style={{ ...BTN, width: '100%', marginBottom: 10 }}>✓ Готово — к тренировкам</button>
+
           {/* Сводный отчёт по проведённой тренировке: общий + по упражнениям и мышцам.
               Блоки включаются чекбоксами, выбор запоминается. */}
           {done && (
