@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-native/
+coverage/
+android/
+public/
+docs/
+scratch/
+tmp_scripts/
+test_dir/
+package-lock.json
+*.min.js
+*.min.css

@@ -7,6 +7,11 @@
  *
  * 8 систем органов, 28 патологий, 100+ биомаркеров, 13 препаратов.
  *
+ * ec50 — точки полумаксимума эвристической модели, а не лабораторные нормы.
+ * У 78 из 79 записей клинического источника нет: это реестровые значения
+ * (правило 26), поэтому UI не должен подавать их как лабораторную норму.
+ * Явные источники собраны в EC50_SOURCED.
+ *
  * @module clinical-pathology-db
  */
 
@@ -21,6 +26,8 @@ export interface ClinicalMarker {
   isInverted: boolean;
   unit: string;
   description: string;
+  /** клинический источник значения ec50; отсутствие = реестровая эвристика (правило 26), не доказанное число */
+  ec50Source?: string;
 }
 
 export interface ClinicalPathology {
@@ -55,6 +62,15 @@ export interface SystemGroup {
 // ═══════════════════════════════════════════════════════════════════════════
 // CLINICAL MARKER DATABASE
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Источники ec50: только маркеры, у которых есть клинический порог из гайдлайна.
+ * Ключи совпадают с ключами CLINICAL_MARKERS; остальные записи — реестровая
+ * эвристика (правило 26), источника у них нет.
+ */
+export const EC50_SOURCED: Record<string, string> = {
+  eGFR: 'KDIGO 2024 CKD guideline: СКФ < 60 мл/мин/1,73 м² — ХБП 3 стадии',
+};
 
 export const CLINICAL_MARKERS: Record<string, ClinicalMarker> = {
   // ── Cardiovascular / Endothelial ──
@@ -116,7 +132,7 @@ export const CLINICAL_MARKERS: Record<string, ClinicalMarker> = {
   Cystatin_C: { code: 'Cystatin_C', name: 'Цистатин С', ec50: 1.2, isInverted: false, unit: 'мг/л', description: 'СКФ маркер' },
   Creatinine: { code: 'Creatinine', name: 'Креатинин', ec50: 120, isInverted: false, unit: 'мкмоль/л', description: 'Функция почек' },
   Urea: { code: 'Urea', name: 'Мочевина', ec50: 8.3, isInverted: false, unit: 'ммоль/л', description: 'Азотистый обмен' },
-  eGFR: { code: 'eGFR', name: 'СКФ (CKD-EPI)', ec50: 60, isInverted: true, unit: 'мл/мин/1.73м²', description: 'Скорость фильтрации (падение = ХПН)' },
+  eGFR: { code: 'eGFR', name: 'СКФ (CKD-EPI)', ec50: 60, isInverted: true, unit: 'мл/мин/1.73м²', description: 'Скорость фильтрации (падение = ХПН)', ec50Source: EC50_SOURCED.eGFR },
   Uric_Acid: { code: 'Uric_Acid', name: 'Мочевая кислота', ec50: 480, isInverted: false, unit: 'мкмоль/л', description: 'Пуриновый обмен' },
   pH_Urine: { code: 'pH_Urine', name: 'pH мочи', ec50: 5.0, isInverted: true, unit: '', description: 'Кислотность мочи (низкий pH = уратные камни)' },
 

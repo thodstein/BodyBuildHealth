@@ -5,6 +5,7 @@ import { IndividualPlanProvider } from "./IndividualPlanContext";
 import { IndividualPlanSettings } from "./IndividualPlanSettings";
 import { IndividualPlanResults } from "./IndividualPlanResults";
 import { MealComposer } from "./MealComposer";
+import { PeriWorkoutCard } from "../PeriWorkoutCard";
 import { OrganLoadCalculator } from "./OrganLoadCalculator";
 import { PeakWeekTab } from "./PeakWeekTab";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -15,7 +16,7 @@ import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedul
 import { localIsoDate } from "./planner-date-utils";
 import { getWeightLog } from "../../../../engines/profile-store";
 
-type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload' | 'peak';
+type PlanTab = 'settings' | 'plan' | 'composer' | 'peri' | 'report' | 'organload' | 'peak';
 
 // ─── Эпик E1: глобальный toast-канал ─────────────────────────────────
 // window.showToast НИГДЕ не определялся: 7+ уведомлений планировщика («Рецепт применён»,
@@ -128,6 +129,7 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
   { key: 'settings', label: 'Настройки', icon: '⚙️' },
   { key: 'plan', label: 'План', icon: '🥗' },
   { key: 'composer', label: 'Компоновщик', icon: '🍳' },
+  { key: 'peri', label: 'Пери-воркаут', icon: '🥤' },
   { key: 'report', label: 'Отчёт', icon: '📊' },
   { key: 'organload', label: 'Нагрузка БЖУ', icon: '🧬' },
   { key: 'peak', label: 'Тапер ББ', icon: '🏁' },
@@ -137,7 +139,8 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
 // minimal (быстрый) — Настройки + План (иначе план не видно и кажется что не генерируется).
 const isTabAllowed = (key: PlanTab, mode: PlannerMode): boolean => {
   if (mode === 'pro') return true;
-  if (mode === 'simple') return key === 'settings' || key === 'plan' || key === 'composer';
+  if (mode === 'simple')
+    return key === 'settings' || key === 'plan' || key === 'composer' || key === 'peri';
   return key === 'settings' || key === 'plan';
 };
 
@@ -149,7 +152,7 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
   // embedded (внутри NutritionScreen): Отчёт/Нагрузка/Тапер живут топ-табами
   // верхнего уровня — во внутренней ленте только ядро рациона.
   // Стендалон (тесты/изоляция): все 6 как было.
-  const visibleTabs = TAB_META.filter(t => isTabAllowed(t.key, plannerMode)).filter(t => !embedded || t.key === 'settings' || t.key === 'plan' || t.key === 'composer');
+  const visibleTabs = TAB_META.filter(t => isTabAllowed(t.key, plannerMode)).filter(t => !embedded || t.key === 'settings' || t.key === 'plan' || t.key === 'composer' || t.key === 'peri');
   // Если активная вкладка скрыта в текущем режиме — рендерим Настройки
   const activeTab: PlanTab = visibleTabs.some(t => t.key === tab) ? tab : 'settings';
 
@@ -186,6 +189,7 @@ const IndividualPlanInner: React.FC<{ embedded?: boolean }> = ({ embedded }) => 
         {activeTab === 'settings' && <IndividualPlanSettings />}
         {activeTab === 'plan' && <IndividualPlanResults />}
         {activeTab === 'composer' && <MealComposer />}
+        {activeTab === 'peri' && <PeriWorkoutCard />}
         {activeTab === 'report' && <ReportTab />}
         {activeTab === 'organload' && <OrganLoadCalculator />}
         {activeTab === 'peak' && <PeakWeekTab />}

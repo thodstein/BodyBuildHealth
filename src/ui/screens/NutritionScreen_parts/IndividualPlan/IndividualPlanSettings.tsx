@@ -3401,6 +3401,23 @@ export const IndividualPlanSettings: React.FC = () => {
             показывает протокол от последней завершённой сессии.
           </div>
         )}
+        <button
+          onClick={() => setPlanTab('peri')}
+          style={{
+            width: '100%',
+            padding: '8px 6px',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontSize: 9,
+            fontWeight: 700,
+            background: '#202023',
+            border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.8)',
+            marginBottom: 8,
+          }}
+        >
+          🥤 Открыть карточку «Пери-воркаут» →
+        </button>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={() => {

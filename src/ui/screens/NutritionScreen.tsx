@@ -27,7 +27,6 @@ import { NutriAdvisor } from './NutritionScreen_parts/NutriAdvisor';
 import { MealVisualizer } from './NutritionScreen_parts/MealVisualizer';
 import { Achievements } from './NutritionScreen_parts/Achievements';
 import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
-import { PeriWorkoutCard } from './NutritionScreen_parts/PeriWorkoutCard';
 import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeeklyComparison';
 import { readDiaryV2, onDiaryChangeV2, addMealEntryV2 } from './NutritionScreen_parts/diary-storage-v2';
 import { BarcodeScanner } from '../components/BarcodeScanner';
@@ -49,19 +48,19 @@ import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'ration' | 'kitchen' | 'analysis' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic' | 'proteinkidney' | 'planreport' | 'organload' | 'peak' | 'periodization';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'metabolic' | 'proteinkidney' | 'planreport' | 'organload' | 'peak' | 'periodization';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
   overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
   analytics: ['charts', 'reports'],
-  diary: ['diary', 'charts', 'reports', 'peri'],
+  diary: ['diary', 'charts', 'reports'],
   planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes', 'restaurant', 'metabolic'],
   // Распил перегруженного «Планирования» (9 чипов) на 3 ленты: рацион / кухня / анализ.
   // planning оставлен legacy-алиасом (диплинки/тесты), в UI-переключателе не показывается.
   ration: ['mealplan', 'favorites', 'cart', 'peak'],
   kitchen: ['catalog', 'recipes', 'restaurant', 'customfood'],
   analysis: ['reference', 'info', 'usefulness', 'metabolic', 'proteinkidney', 'planreport', 'organload', 'periodization'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic', 'proteinkidney'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic', 'proteinkidney'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -77,7 +76,6 @@ const TAB_LABELS: Record<string, string> = {
   visualize: '🍽️ Блюдо',
   achievements: '🏆 Достижения',
   quests: '🎯 Квесты',
-  peri: '🥤 Пери-воркаут',
   metabolic: '⚖️ Метаболика',
   proteinkidney: '🧪 Белок/почки',
   planreport: '📊 Отчёт',
@@ -1532,8 +1530,16 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
   useEffect(() => {
     const handler = (e: Event) => {
       try {
-        const tab = (e as CustomEvent<string>).detail as ActiveTab;
+        let tab = (e as CustomEvent<string>).detail as ActiveTab;
         if (!tab) return;
+        // Пери-воркаут переехал подвкладкой в планировщик (Настройки → План → Пери-воркаут):
+        // старые диплинки открывают «Мой рацион» с уже выставленной подвкладкой.
+        if ((tab as string) === 'peri') {
+          try {
+            localStorage.setItem('he_plan_active_tab', 'peri');
+          } catch {}
+          tab = 'mealplan';
+        }
         setTab(tab);
         setPage('tabs');
         if (tab === 'peak') setNutritionSection('ration');
@@ -1671,7 +1677,6 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       case 'visualize': return <InfoErrorBoundary label="Блюдо"><MealVisualizer items={visualizerItems} /></InfoErrorBoundary>;
       case 'achievements': return <InfoErrorBoundary label="Достижения"><Achievements /></InfoErrorBoundary>;
       case 'quests': return <InfoErrorBoundary label="Квесты"><DailyQuests /></InfoErrorBoundary>;
-      case 'peri': return <InfoErrorBoundary label="Пери-воркаут"><PeriWorkoutCard /></InfoErrorBoundary>;
       case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
       case 'metabolic': return <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>;
       case 'proteinkidney': return <InfoErrorBoundary label="Белок и почки"><ProteinKidneyPanel /></InfoErrorBoundary>;
