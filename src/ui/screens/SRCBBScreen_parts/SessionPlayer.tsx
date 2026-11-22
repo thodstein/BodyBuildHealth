@@ -2700,7 +2700,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                  if (timerSoundSettings.vibrate) hapticNotify('success');
                }).catch(() => {});
              }}>{copyDone ? '✓ Скопировано' : '📋 Копировать сводку'}</button>
-             <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
+             <button type="button" data-act="session-done-close" style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
+                // Итог — конечный экран плеера: явный выход обратно в зону проведения.
+                try { window.dispatchEvent(new Event('he-workout-close')); } catch { /* ignore */ }
+              }}>✓ Готово — к тренировкам</button>
+              <button style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }} onClick={() => { setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false; clearActiveSession(); setPhase('ready'); }}>← Новая тренировка</button>
             {days.length > 1 && dayIdx < days.length - 1 && (
               <button style={{ ...BTN, width: '100%', marginTop: 8 }} onClick={() => {
                 setDone(null); setWarmupBlocks([]); setCooldownBlocks([]); setSession(null); savedRef.current = false;

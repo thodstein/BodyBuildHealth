@@ -547,6 +547,15 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     fireEvent.click(doneTab!);
     expect(container.textContent).toContain('Тренировка завершена');
 
+    // «Итог» — конечный экран плеера: есть явный выход обратно в зону проведения.
+    const closeBtn = container.querySelector('[data-act="session-done-close"]') as HTMLElement;
+    expect(closeBtn).toBeTruthy();
+    const onClose = vi.fn();
+    window.addEventListener('he-workout-close', onClose);
+    fireEvent.click(closeBtn);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    window.removeEventListener('he-workout-close', onClose);
+
     confirmSpy.mockRestore();
     unmount();
     cleanup();

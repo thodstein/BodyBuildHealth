@@ -149,8 +149,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   React.useEffect(() => {
     const onOpen = () => openSession();
     window.addEventListener('he-workout-open', onOpen);
-    return () => window.removeEventListener('he-workout-open', onOpen);
-  }, [openSession]);
+    const onClose = () => setRuntimeStarted(false);
+    window.addEventListener('he-workout-close', onClose);
+    return () => {
+      window.removeEventListener('he-workout-open', onOpen);
+      window.removeEventListener('he-workout-close', onClose);
+    };
+  }, [openSession, setRuntimeStarted]);
   return (
     <>
       {tab === 'runtime' && (

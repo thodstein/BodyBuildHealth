@@ -460,7 +460,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       setZone('training'); setPage('tabs'); setTab('runtime'); setRuntimeStarted(true);
     };
     window.addEventListener('he-workout-open', onOpen);
-    return () => window.removeEventListener('he-workout-open', onOpen);
+    // Плеер завершил сессию («Готово» в «Итоге») — возвращаемся к списку зоны.
+    const onClose = () => setRuntimeStarted(false);
+    window.addEventListener('he-workout-close', onClose);
+    return () => {
+      window.removeEventListener('he-workout-open', onOpen);
+      window.removeEventListener('he-workout-close', onClose);
+    };
   }, []);
   // Запись готовности — дросселировано, не дёргаем localStorage на каждый микро-ререндер (без урезания данных)
   const lastReadinessRef = React.useRef<{ r: number; f: number } | null>(null);
