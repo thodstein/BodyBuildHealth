@@ -40,6 +40,19 @@ vi.mock('../../../../core/apk-share', () => ({
 
 const PHOTO_URI = 'data:image/jpeg;base64,AAAA';
 
+/** Наборы «что оставить», с которыми вызывали cleanupNoteMedia. */
+const cleanupCalls = vi.hoisted(() => ({ keep: [] as Array<Set<string>> }));
+vi.mock('../../../../engines/note-media-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../engines/note-media-store')>();
+  return {
+    ...actual,
+    cleanupNoteMedia: (keep: Set<string>) => {
+      cleanupCalls.keep.push(keep);
+      return actual.cleanupNoteMedia(keep);
+    },
+  };
+});
+
 /** jsdom не умеет objectURL — без него файлы из хранилища «не находятся». */
 const ensureObjectUrl = () => {
   const u = URL as unknown as {
@@ -62,6 +75,7 @@ beforeEach(() => {
   }
   ensureObjectUrl();
   __resetNoteMediaForTests();
+  cleanupCalls.keep.length = 0;
   vi.mocked(pickPhoto).mockReset();
   saveBlobApk.mockClear();
 });
@@ -638,8 +652,8 @@ describe('файлы не теряются из-за служебных путе
     await waitFor(() =>
       expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('не читаются'),
     );
-    // Даём уборке шанс сработать (если бы она запускалась) — файл должен быть цел.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Уборка не запускалась вовсе: пустой стор не доказывает, что файлов нет.
+    expect(cleanupCalls.keep).toHaveLength(0);
     expect(await listNoteMedia()).toHaveLength(1);
   });
 
@@ -667,7 +681,7 @@ describe('файлы не теряются из-за служебных путе
     // Стор вылечен записью, но сессия началась с повреждения: «лишних» файлов
     // для неё не существует, поэтому старый файл обязан остаться на месте.
     expect(localStorage.getItem('he_coach_notes_damaged')).toBe(damagedRaw);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(cleanupCalls.keep).toHaveLength(0);
     expect((await listNoteMedia())?.map((item) => item.id)).toContain('old');
   });
 
@@ -700,7 +714,9 @@ describe('файлы не теряются из-за служебных путе
 
     const { container } = render(<ProfileNotesTab />);
     await waitFor(() => expect(items(container)).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Уборка была, но файл копии попал в «нужное» — иначе копию не спасти.
+    expect(cleanupCalls.keep).toHaveLength(1);
+    expect(cleanupCalls.keep[0].has('keepme')).toBe(true);
     expect((await listNoteMedia())?.map((item) => item.id)).toContain('keepme');
   });
 });
