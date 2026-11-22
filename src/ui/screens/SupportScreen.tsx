@@ -31,7 +31,6 @@ import {
 } from '../../engines/peptide-calculator.engine';
 import {
   interpretLabs, computeRiskByModel, generateMechanismReport,
-  computePharmaAdjustedDose,
   RISK_MODEL_LABELS, type RiskModelType, type LabCompositeResult,
 } from '../../engines/lab-analysis.engine';
 import { cycleStateFromProfile } from '../../engines/female-cycle-phase.engine';
@@ -2879,7 +2878,6 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     computeDilution,
     computeEffectiveDose,
     computePK,
-    computePharmaAdjustedDose,
     computeRiskByModel,
     conflictLookup,
     courseCompounds,

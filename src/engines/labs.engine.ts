@@ -2,21 +2,7 @@ import { LabPoint } from '../core/types';
 import { resolveLabMarker } from '../core/labs-mapping';
 import { UCUM_MAP, ucumInfo } from '../core/constants';
 import { boundProvesSide } from '../core/lab-bound';
-import { db } from '../core/db';
 export { UCUM_MAP };
-
-export interface LabForecast {
-  current: number;
-  w2: number; w4: number; w6: number; w8: number; w12: number;
-  w2_ci_low?: number; w2_ci_high?: number;
-  w4_ci_low?: number; w4_ci_high?: number;
-  w6_ci_low?: number; w6_ci_high?: number;
-  w8_ci_low?: number; w8_ci_high?: number;
-  w12_ci_low?: number; w12_ci_high?: number;
-  slope: number;
-  r2: number;
-  alert?: string;
-}
 
 // ─── LOINC codes mapped to internal marker IDs ───
 export const LOINC_MAP: Record<string, { code: string; name: string }> = {
@@ -93,10 +79,6 @@ const PHASE_ADJUSTED_RANGES: Record<string, Record<LabPhase, PhaseRange>> = {
   },
 };
 
-interface StoredLabPoint extends LabPoint {
-  patientId: string;
-}
-
 /**
  * Normalize a lab value to UCUM units.
  * @param code Lab code (e.g., 'TT', 'E2')
@@ -132,120 +114,6 @@ export function isAbnormal(code: string, value: number, unit: string, phase?: La
   const phaseRef = phase ? PHASE_ADJUSTED_RANGES[code]?.[phase] : undefined;
   const { uln, lln } = phaseRef || ucum;
   return normValue < lln || normValue > uln;
-}
-
-/**
- * Predict future lab values with 95% confidence intervals.
- * Uses linear regression with standard error estimation.
- */
-export function predictLab(points: LabPoint[], code: string, phase?: LabPhase): LabForecast | null {
-  if (points.length < 2) return null;
-
-  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const n = sorted.length;
-
-  // Convert dates to week numbers relative to first point
-  const dates = sorted.map(p => new Date(p.date).getTime());
-  const t0 = dates[0];
-  const weeks = dates.map(d => (d - t0) / (7 * 24 * 3600 * 1000));
-
-  // Linear regression: y = a + b*x
-  const sumX = weeks.reduce((a, v) => a + v, 0);
-  const sumY = sorted.reduce((a, p) => a + p.value, 0);
-  const sumXY = weeks.reduce((a, x, i) => a + x * sorted[i].value, 0);
-  const sumXX = weeks.reduce((a, x) => a + x * x, 0);
-  const sumYY = sorted.reduce((a, p) => a + p.value * p.value, 0);
-
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-
-  // R² goodness of fit
-  const yMean = sumY / n;
-  const ssRes = sorted.reduce((a, p, i) => a + Math.pow(p.value - (intercept + slope * weeks[i]), 2), 0);
-  const ssTot = sumYY - n * yMean * yMean;
-  const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
-
-  // Standard error of prediction
-  const se = Math.sqrt(ssRes / Math.max(1, n - 2));
-
-  const current = sorted[n - 1].value;
-  const lastWeek = weeks[n - 1];
-
-  // Forecast weeks ahead with 95% CI (±1.96 × SE × sqrt(1 + 1/n + (x-meanX)²/Sxx))
-  const meanX = sumX / n;
-  const sxx = sumXX - n * meanX * meanX;
-
-  const forecastAt = (w: number): { val: number; low: number; high: number } => {
-    const x = lastWeek + w;
-    const val = intercept + slope * x;
-    const sePred = se * Math.sqrt(1 + 1 / n + Math.pow(x - meanX, 2) / Math.max(0.01, sxx));
-    return { val, low: val - 1.96 * sePred, high: val + 1.96 * sePred };
-  };
-
-  const w2 = forecastAt(2);
-  const w4 = forecastAt(4);
-  const w6 = forecastAt(6);
-  const w8 = forecastAt(8);
-  const w12 = forecastAt(12);
-
-  // Phase-adjusted ranges for alert
-  let alert: string | undefined;
-  const phaseRanges = phase ? PHASE_ADJUSTED_RANGES[code]?.[phase] : undefined;
-  const ucum = ucumInfo(code);
-  const ref = phaseRanges || ucum;
-  if (ref && w6.val > ref.uln) alert = `⚠️ ${code}: прогноз превышает верхнюю границу (${ref.uln}) через 6 недель`;
-
-  return {
-    current, slope: Math.round(slope * 1000) / 1000, r2: Math.round(r2 * 1000) / 1000,
-    w2: w2.val, w2_ci_low: w2.low, w2_ci_high: w2.high,
-    w4: w4.val, w4_ci_low: w4.low, w4_ci_high: w4.high,
-    w6: w6.val, w6_ci_low: w6.low, w6_ci_high: w6.high,
-    w8: w8.val, w8_ci_low: w8.low, w8_ci_high: w8.high,
-    w12: w12.val, w12_ci_low: w12.low, w12_ci_high: w12.high,
-    alert,
-  };
-}
-
-/**
- * Add a lab point for a patient.
- * @param patientId Patient ID
- * @param point Lab point to add
- */
-export async function addLabPoint(patientId: string, point: LabPoint): Promise<void> {
-  await db.put('labs_log', { ...point, patientId } as StoredLabPoint);
-}
-
-/**
- * Get lab history for a patient and lab code.
- * @param patientId Patient ID
- * @param code Lab code
- * @returns Array of lab points for the given code, sorted by date
- */
-export async function getLabHistory(patientId: string, code: string): Promise<LabPoint[]> {
-  const allPoints = await db.getAll<StoredLabPoint>('labs_log');
-  const points = allPoints
-    .filter(p => p.patientId === patientId && p.code === code)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  return points.map(p => {
-    const { patientId, ...labPoint } = p;
-    return labPoint;
-  });
-}
-
-/**
- * Get lab trend and forecast for a patient and lab code.
- * @param patientId Patient ID
- * @param code Lab code
- * @param weeksAhead Number of weeks to forecast (default 12)
- * @returns Trend object or null if insufficient data
- */
-export async function getLabTrend(patientId: string, code: string, weeksAhead: number = 12): Promise<{ current: number; forecast: number; slope: number; r2: number; alert?: string } | null> {
-  const points = await getLabHistory(patientId, code);
-  if (points.length < 2) return null;
-  const fc = predictLab(points, code);
-  if (!fc) return null;
-  const forecast = fc.current + fc.slope * weeksAhead;
-  return { current: fc.current, forecast: Math.round(forecast * 100) / 100, slope: fc.slope, r2: fc.r2, alert: fc.alert };
 }
 
 /**

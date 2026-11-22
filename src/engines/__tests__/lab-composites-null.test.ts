@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { interpretLabs, computeHealthIndices, computeRiskByModel, computePharmaAdjustedDose } from '../lab-analysis.engine';
+import { interpretLabs, computeHealthIndices, computeRiskByModel } from '../lab-analysis.engine';
 import { generateTrainingRecommendations } from '../training-recommendations.engine';
 import { labTrainingAdjust } from '../../ui/screens/TrainingScreen_parts/lab-training-adjust';
 import { LFT_ULN, CREATININE_ULN } from '../lab-norms.engine';
@@ -219,8 +219,15 @@ describe('проход 153: потребитель не принимает «н�
     expect(recs.some((r) => r.id.startsWith('lab-'))).toBe(false);
   });
 
-  it('снижение дозы без измеренных индексов = базовая доза', () => {
-    expect(computePharmaAdjustedDose(100, null, null, 100).finalDose).toBe(100);
+  it('снижения дозы «по стрессу органов» не осталось ни в движке, ни на экране', () => {
+    // Проход 202: `computePharmaAdjustedDose` не вызывалась ни одним экраном —
+    // в контексте `SupportScreen` лежал неиспользованный вход. Дозу ведут
+    // правила курса, а не выдуманное снижение по индексу стресса: второго
+    // способа нет и он не должен вернуться в контекст экрана.
+    const engine = readFileSync(resolve(process.cwd(), 'src/engines/lab-analysis.engine.ts'), 'utf8');
+    const screen = readFileSync(resolve(process.cwd(), 'src/ui/screens/SupportScreen.tsx'), 'utf8');
+    expect(engine.includes('computePharmaAdjustedDose')).toBe(false);
+    expect(screen.includes('computePharmaAdjustedDose')).toBe(false);
   });
 
   it('SupportScreen не кладёт неизмеренный индекс в лабораторную надбавку', () => {

@@ -711,23 +711,6 @@ export function generateMechanismReport(labResult: LabCompositeResult): {
   return { mechanisms, topRisks };
 }
 
-export function computePharmaAdjustedDose(
-  baseDose: number,
-  liverStress: number | null,
-  kidneyStress: number | null,
-  bioavailability: number,
-): { liverAdjusted: number; kidneyAdjusted: number; finalDose: number } {
-  // Проход 153: неизмеренный индекс не снижает дозу (множитель 1) — «нет данных»
-  // не должно выглядеть как «орган здоров» в тексте, но и выдумывать снижение
-  // не из чего. Экран обязан назвать, что индекс не измерен (см. `labStress`).
-  const liver = liverStress ?? 0;
-  const kidney = kidneyStress ?? 0;
-  const liverAdjusted = baseDose * Math.max(0.3, 1 - liver / 100);
-  const kidneyAdjusted = baseDose * Math.max(0.3, 1 - kidney / 100);
-  const finalDose = Math.round(baseDose * (bioavailability / 100) * Math.max(0.3, 1 - (liver + kidney) / 200));
-  return { liverAdjusted, kidneyAdjusted, finalDose };
-}
-
 export function generateTimedPlan(
   topMechanisms: { name: string; activation: number; organ: string }[],
   goal: string,

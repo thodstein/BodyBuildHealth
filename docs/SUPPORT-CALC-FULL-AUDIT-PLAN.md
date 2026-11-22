@@ -2930,7 +2930,7 @@ P2 — вкладка «Анализы»: отображение и индика
 
 **Прогон.** 12 файлов / 163 зелёных: гард 179, `db-init-resilience`, `db-space-databases`, `labs-profile-sync`, `lab-parser-bound-values`, `ocr-full-cycle`, `lab-diary-mirror-sync`, `lab-diary-dedup`, `labs-apk`, `labs-diary-delete`, `labs-phase-diary-sync`, `labs-archive-filter`. `tsc` чистый.
 
-**Осталось.** Имена каталога в `LAB_TIERS`/`LAB_REF`/`tz-bridge-marker` (`URIC_ACID`/`UA`, `FOLATE`/`FOL`, `ANTI_TPO`/`TPO_AB`, `PTH`/`PARATHYROID`): чтение сведено (169, 174), сами строки пока держат своё написание — это следующий проход (таблица канона, а не подмена чисел). `getLabHistory`/`getLabTrend`/`addLabPoint` (`labs.engine`) сравнивают `p.code === code` точно и не имеют вызовов — мёртвый код, не трогали.
+**Осталось.** Имена каталога в `LAB_TIERS`/`LAB_REF`/`tz-bridge-marker` (`URIC_ACID`/`UA`, `FOLATE`/`FOL`, `ANTI_TPO`/`TPO_AB`, `PTH`/`PARATHYROID`): чтение сведено (169, 174), сами строки пока держат своё написание — это следующий проход (таблица канона, а не подмена чисел). `getLabHistory`/`getLabTrend`/`addLabPoint` (`labs.engine`) сравнивают `p.code === code` точно и не имеют вызовов — мёртвый код, не трогали. **Проход 202** удалил их вместе с мёртвым `predictLab`/`LabForecast` и стором `labs_log` (прогноз остался один — `predictive.engine`).
 
 ### Восьмидесятый проход (код склада находит свою лестницу)
 
@@ -3882,6 +3882,49 @@ production-коде остались только 11 объявленных ме
 
 **Осталось.** Долг календарных дат закрыт: новое date-only место теперь роняет
 ценз, а не пополняет витрину.
+
+### Двести второй проход (мёртвый код лабораторий: один прогноз, один стор)
+
+**Проблема.** В `engines/labs.engine` лежали два независимых куска, которые
+никто не вызывал:
+
+- стор лаборатории — `addLabPoint` / `getLabHistory` / `getLabTrend` писали и
+  читали `labs_log`, но писателя не было ни одного: запись оставалась сиротой,
+  а `getLabHistory` ещё и сравнивал `p.code === code` точно (запись со складским
+  написанием не нашлась бы);
+- прогноз — `predictLab` + `LabForecast` + регрессия с ДИ. Тот же прогноз уже
+  живёт в `predictive.engine.predictLabTrend`, и «Аналитика» читает его: две
+  формулы одной величины дают разные числа, а тест проверял ту, которая на экран
+  не попадает.
+
+В `lab-analysis.engine` тем же образом висела `computePharmaAdjustedDose`:
+снижение дозы по индексам стресса печени/почек. Единственное «использование» —
+неиспользованный вход в объекте контекста `SupportScreen` (`s`), который ни один
+подэкран не читал; вызовов функции не было ни одного.
+
+**Решение.** Мёртвое удалено, а не переписано вторым способом: стор (`labs_log`,
+`StoredLabPoint`, импорт `db`), прогноз (`predictLab`, `LabForecast`) и
+`computePharmaAdjustedDose` вместе с входом в контексте экрана. Прогноз
+лаборатории остался один — `predictive.engine.predictLabTrend`; дозу ведут
+правила курса, а не выдуманное снижение по индексу. `normalizeLab`,
+`isAbnormal`, `toHL7v2OBX` остались: это живые/выгружаемые пути.
+
+**Гарды.** Новый `labs-engine-dead-code.test.ts` (3): в экспортах нет
+`addLabPoint`/`getLabHistory`/`getLabTrend`/`predictLab`, в движке нет ключа
+`labs_log` и импорта `db`, прогноз — в `predictive.engine`, а нормализация и
+OBX на месте. В `lab-composites-null.test.ts` тест «снижение дозы = базовая
+доза» заменён структурным: имени `computePharmaAdjustedDose` нет ни в движке,
+ни в `SupportScreen` — вход не может вернуться в контекст экрана.
+
+**Прогон.** `lab-*` и `support-*` движков — 49 файлов / 1404 зелёных (включая
+новый гард); `labs-engine-dead-code` + `lab-composites-null` + `lab-hl7-obx` +
+`ucum-lookup-single-rule` + `intelligence-contracts-tz` — 5 файлов / 77
+зелёных. `tsc --noEmit` — 0.
+
+**Осталось.** `LOINC_MAP`, FHIR-парсер и мок-HL7-функции в `labs.engine` тоже
+без вызовов, но это заявленный интерфейс выгрузки (проход 142) — удалять их
+отдельным решением, вместе с вопросом о HL7-импорте. `UnifiedLabPanel` живёт
+только в `FertilityPCTScreen` — тот же вопрос одного потребителя.
 
 ### Осознанные отклонения
 - Кураторская база + производный fallback вместо ручного переписывания 12k-строчного каталога. Деривация консервативна и всегда помечена `q='C'` — «правдоподобно», а не «доказано».
