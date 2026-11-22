@@ -694,6 +694,33 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     localStorage.clear();
   });
 
+  it('разминка: «К основной части» видна сразу, не в конце списка блоков', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Ноги',
+      exercises: [{ name: 'Приседания со штангой', muscleGroup: 'legs', restSec: 120, targetSets: [{ weight: 100, reps: 5, rir: 2 }] }],
+    }];
+    try {
+      const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Ноги" />);
+      fireEvent.click(findBtn(container, 'Начать тренировку')!);
+      const cta = container.querySelector('[data-act="warmup-to-main"]') as HTMLElement | null;
+      expect(cta).toBeTruthy();
+      // Кнопка стоит до блоков разминки — до неё не надо листать весь список.
+      const ctaIdx = container.innerHTML.indexOf('data-pl="warmup-cta"');
+      const firstItemIdx = container.innerHTML.indexOf('data-warmup-item');
+      expect(ctaIdx).toBeGreaterThan(-1);
+      if (firstItemIdx > -1) expect(ctaIdx).toBeLessThan(firstItemIdx);
+      fireEvent.click(cta!);
+      // Перешли в основную часть: появились подходы и «Завершить».
+      expect(findBtn(container, '⏹ Завершить')).toBeTruthy();
+      unmount();
+    } finally {
+      cleanup();
+      localStorage.clear();
+    }
+  });
+
   it('основная часть: после последнего подхода экран сам едет к следующему упражнению', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();

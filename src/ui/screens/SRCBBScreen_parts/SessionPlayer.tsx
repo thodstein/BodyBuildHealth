@@ -1592,6 +1592,50 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           })()}
 
           {/* ── Блоки разминки — красивые карточки ── */}
+          {/* Разминка — по желанию: главный шаг — основная часть. Кнопка стояла
+              в самом низу списка блоков, и до неё надо было листать всю разминку. */}
+          <div data-pl="warmup-cta" style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              data-act="warmup-to-main"
+              onClick={startMain}
+              style={{
+                ...BTN,
+                flex: 1,
+                background: 'linear-gradient(135deg,#f97316,#ea580c)',
+                color: '#fff',
+                boxShadow: '0 4px 16px rgba(249,115,22,0.28)',
+              }}
+            >
+              🚀 К основной части
+            </button>
+            <button
+              type="button"
+              data-act="warmup-all-done"
+              onClick={() => {
+                const next: Record<string, boolean> = {};
+                warmupBlocks.forEach((b, i) =>
+                  b.exercises.forEach((_, j) => {
+                    next[`w_${i}_${j}`] = true;
+                  }),
+                );
+                setWarmupDone(next);
+              }}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                background: 'rgba(34,197,94,0.12)',
+                color: '#22c55e',
+                border: '1px solid rgba(34,197,94,0.22)',
+              }}
+            >
+              ✓ Всё готово
+            </button>
+          </div>
           {warmupBlocks.map((b, i) => {
             const meta = b.type === 'general'
               ? { icon: '🏃', title: 'Общая разминка', color: '#06b6d4', bg: 'rgba(6,182,214,0.07)', border: 'rgba(6,182,214,0.24)', desc: 'Пульс + кровоток' }
