@@ -86,6 +86,48 @@ describe('A проведение (3)', () => {
     window.removeEventListener('he-workout-open', onOpen);
     unmount();
   });
+  it('A1f карточка дня не прячет упражнения молча: «+ ещё N»', async () => {
+    const { render } = await import('@testing-library/react');
+    const BIG = {
+      dayLabel: 'День ног',
+      exercises: [
+        { name: 'Присед', done: 0, total: 4 },
+        { name: 'Жим ногами', done: 0, total: 3 },
+        { name: 'Румынская', done: 0, total: 3 },
+        { name: 'Сгибания', done: 0, total: 3 },
+        { name: 'Икры', done: 0, total: 4 },
+        { name: 'Планка', done: 0, total: 2 },
+      ],
+    };
+    const { container, unmount } = render(<WorkoutDayCard state={BIG as never} />);
+    expect(container.querySelectorAll('[data-ex]').length).toBe(4);
+    const more = container.querySelector('[data-daycard-more]') as HTMLElement;
+    expect(more).not.toBeNull();
+    expect(more.textContent).toContain('+ ещё 2 упражнения');
+    unmount();
+  });
+  it('A1g BIG-режим не показывает «Нет упражнений» при смене дня', async () => {
+    const { render, fireEvent } = await import('@testing-library/react');
+    const LONG = {
+      dayLabel: 'День 1',
+      exercises: [
+        { name: 'Жим', done: 1, total: 4 },
+        { name: 'Разводка', done: 0, total: 3 },
+        { name: 'Трицепс', done: 0, total: 3 },
+      ],
+    };
+    const SHORT = { dayLabel: 'День 2', exercises: [{ name: 'Присед', done: 0, total: 5 }] };
+    const { container, rerender, unmount } = render(<WorkoutBigMode state={LONG as never} />);
+    const next = () => fireEvent.click(container.querySelector('[data-act="big-next"]') as HTMLElement);
+    next();
+    next();
+    // Стоим на третьем упражнении, день сменился на одно упражнение.
+    rerender(<WorkoutBigMode state={SHORT as never} />);
+    expect(container.textContent).toContain('Присед');
+    expect(container.textContent).not.toContain('Нет упражнений');
+    expect(container.textContent).toContain('1 из 1');
+    unmount();
+  });
   it('A2 карточка дня: упражнения + старт/пропуск', () => {
     const html = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
     expect(html).toContain('data-widget="workout-daycard"');
