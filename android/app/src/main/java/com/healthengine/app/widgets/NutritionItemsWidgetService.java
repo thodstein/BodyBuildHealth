@@ -98,7 +98,30 @@ public class NutritionItemsWidgetService extends RemoteViewsService {
             if (qty > 0) row.append(", ").append(qty).append(" г");
             if (kcal > 0) row.append(", ").append(kcal).append(" ккал");
             if (!meal.isEmpty()) row.append(", ").append(meal);
-            v.setContentDescription(R.id.w_nut_item_root, row.toString());
+            v.setContentDescription(R.id.w_nut_item_root, row.toString() + ". Изменить порцию");
+
+            // Тап по строке — правка порции: тот же нативный редактор, только
+            // запись уже есть в дневнике (адрес уходит в extras). «✕» остаётся
+            // отдельной кнопкой: случайное касание строки ничего не удаляет.
+            Intent edit = new Intent(ctx, WidgetQuickAddActivity.class);
+            edit.setAction("com.healthengine.app.action.WIDGET_FOOD_EDIT");
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_KIND, WidgetQuickAddActivity.KIND_FOOD);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_EDIT, true);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_DATE, date);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_MEAL, meal);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_ITEM_INDEX, index);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_QTY, qty > 0 ? qty : 100);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_NAME, name);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_KCAL, kcal);
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_P, Math.max(0, it.optInt("p", 0)));
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_F, Math.max(0, it.optInt("f", 0)));
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_C, Math.max(0, it.optInt("c", 0)));
+            edit.putExtra(WidgetQuickAddActivity.EXTRA_FOOD_ID, it.optString("foodId", ""));
+            edit.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            edit.setData(Uri.parse("he://nut-edit/" + widgetId + "/" + position));
+            v.setOnClickPendingIntent(R.id.w_nut_item_root,
+                    PendingIntent.getActivity(ctx, widgetId * 100 + position, edit,
+                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
 
             Intent del = new Intent(ctx, NutritionWidgetProvider.class);
             del.setAction(NutritionWidgetProvider.ACTION_ITEM_DEL);

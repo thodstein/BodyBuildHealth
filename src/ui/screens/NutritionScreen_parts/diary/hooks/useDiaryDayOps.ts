@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { fillMissingMicros, quantityToGrams } from '../../../../../engines/nutrition-ocr-parser';
 import { mergeMealsFromPrevious, previousDateKey } from '../diary-quick-repeat';
-import { scaleDiaryRecipeMeta } from '../recipe-to-diary';
+import { withDiaryItemQty } from '../diary-item-qty';
 
 export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, safeSet }: {
   diaryData: Record<string, any>;
@@ -60,25 +60,9 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
     const items = [...day.meals[editItem.meal]];
     const current = items[editItem.idx];
     if (!current) return;
-    const savedQty = Number.parseFloat(String(current.qty || '100').replace(',', '.')) || 100;
-    const per100 = (value: number) => Number(value || 0) / savedQty * 100;
-    const portion = (value: number, decimals = 1) => {
-      const factor = 10 ** decimals;
-      return Math.round(per100(value) * editQty / 100 * factor) / factor;
-    };
-    const recipeMeta = scaleDiaryRecipeMeta(current.recipe, savedQty > 0 ? editQty / savedQty : 1);
-    items[editItem.idx] = {
-      ...current,
-      qty: editQty,
-      kcal: Math.round(portion(current.kcal, 0)),
-      p: portion(current.p),
-      f: portion(current.f),
-      c: portion(current.c),
-      micros: current.micros
-        ? Object.fromEntries(Object.entries(current.micros).map(([key, value]) => [key, portion(Number(value), 2)]))
-        : current.micros,
-      ...(recipeMeta ? { recipe: recipeMeta } : {}),
-    };
+    // Пересчёт порции живёт в `diary-item-qty`: тем же кодом правит запись
+    // виджет, иначе дневник и домашний экран показывали бы разные числа.
+    items[editItem.idx] = withDiaryItemQty(current, editQty);
     data[selectedDate] = { ...day, meals: { ...day.meals, [editItem.meal]: items } };
     saveDiary(data);
     setEditItem(null);

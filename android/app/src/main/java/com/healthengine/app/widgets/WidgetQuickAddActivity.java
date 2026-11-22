@@ -49,6 +49,16 @@ public class WidgetQuickAddActivity extends Activity {
     public static final String EXTRA_DATE = "quick_date";
     /** Подсказка приёма пищи для еды: приём дневника («Обед», «Полдник», свой). */
     public static final String EXTRA_MEAL = "quick_meal";
+    /** Правка порции записи дневника (тап по строке списка дня на виджете). */
+    public static final String EXTRA_EDIT = "quick_edit";
+    public static final String EXTRA_ITEM_INDEX = "quick_item_index";
+    public static final String EXTRA_QTY = "quick_qty";
+    public static final String EXTRA_NAME = "quick_name";
+    public static final String EXTRA_KCAL = "quick_kcal";
+    public static final String EXTRA_P = "quick_p";
+    public static final String EXTRA_F = "quick_f";
+    public static final String EXTRA_C = "quick_c";
+    public static final String EXTRA_FOOD_ID = "quick_food_id";
     public static final String KIND_TASK = "task";
     public static final String KIND_NOTE = "note";
     public static final String KIND_FOOD = "food";
@@ -124,6 +134,9 @@ public class WidgetQuickAddActivity extends Activity {
     private String pickedFoodId;
     /** true, пока поля заполняет код: вотчеры не должны считать это ручной правкой. */
     private boolean filling = false;
+    /** Правка порции существующей записи: адрес (приём + индекс) и режим сохранения. */
+    private boolean editMode = false;
+    private int editIndex = -1;
     private TextView dateLabel;
     private TextView dateToday;
     private TextView dateTomorrow;
@@ -161,7 +174,11 @@ public class WidgetQuickAddActivity extends Activity {
         String d = intent == null ? null : intent.getStringExtra(EXTRA_DATE);
         selectedDate = isIso(d) ? d : todayIso();
         String m = intent == null ? null : intent.getStringExtra(EXTRA_MEAL);
-        meal = normalizeMeal(m);
+        // Правка порции: тот же редактор еды, но запись уже есть в дневнике.
+        editMode = intent != null && intent.getBooleanExtra(EXTRA_EDIT, false) && KIND_FOOD.equals(kind);
+        // При правке приём — часть адреса записи в дневнике, поэтому берём его как
+        // есть: нормализация укоротила бы длинный свой приём и адрес не сошёлся.
+        meal = editMode && m != null && !m.trim().isEmpty() ? m.trim() : normalizeMeal(m);
         if (intent != null) {
             String ex = intent.getStringExtra(EXTRA_EXERCISE);
             exerciseName = ex == null ? "" : ex.trim();
@@ -222,19 +239,37 @@ public class WidgetQuickAddActivity extends Activity {
             priorityRow.setVisibility(View.GONE);
             dateLabel.setText("Заметка появится в «Заметках» и на виджете");
         } else if (KIND_FOOD.equals(kind)) {
-            titleLabel.setText("Новая еда");
-            titleEt.setHint("Что съели? (например, куриная грудка)");
             dateRow.setVisibility(View.GONE);
             timeView.setVisibility(View.GONE);
             priorityRow.setVisibility(View.GONE);
             foodRow.setVisibility(View.VISIBLE);
             qtyRow.setVisibility(View.VISIBLE);
             qtyLabel.setText("Порция, г");
-            mealLabel.setVisibility(View.VISIBLE);
-            mealRow.setVisibility(View.VISIBLE);
-            buildMealChips(mealChipsRow);
-            wireFoodSearch(searchRow);
-            dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
+            if (editMode) {
+                // Правка порции: название и приём — часть адреса записи в дневнике,
+                // поэтому их не меняем; КБЖУ пересчитываются от порции.
+                prefillFoodEdit(intent);
+                titleLabel.setText("Изменить порцию");
+                titleEt.setHint("Название блюда");
+                // Название — часть адреса записи: меняется только порция.
+                // Выключенный EditText сереет, поэтому гасим ввод, но не цвет.
+                titleEt.setKeyListener(null);
+                titleEt.setFocusable(false);
+                mealLabel.setVisibility(View.GONE);
+                mealRow.setVisibility(View.GONE);
+                searchRow.setVisibility(View.GONE);
+                wireQtyScale();
+                wireManualValues();
+                dateLabel.setText("Правка заменит запись в дневнике за этот день");
+            } else {
+                titleLabel.setText("Новая еда");
+                titleEt.setHint("Что съели? (например, куриная грудка)");
+                mealLabel.setVisibility(View.VISIBLE);
+                mealRow.setVisibility(View.VISIBLE);
+                buildMealChips(mealChipsRow);
+                wireFoodSearch(searchRow);
+                dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
+            }
         } else if (KIND_WATER.equals(kind)) {
             // Свой объём воды: одно поле «мл» вместо названия и КБЖУ.
             titleLabel.setVisibility(View.GONE);
@@ -305,7 +340,11 @@ public class WidgetQuickAddActivity extends Activity {
         updateTechniqueUi();
         if (KIND_SET.equals(kind)) weightEt.requestFocus();
         else if (KIND_WATER.equals(kind)) qtyEt.requestFocus();
-        else titleEt.requestFocus();
+        else if (editMode) {
+            // Правится почти всегда порция — курсор сразу в поле веса.
+            qtyEt.requestFocus();
+            qtyEt.selectAll();
+        } else titleEt.requestFocus();
     }
 
     private static String safeExtra(Intent intent, String key) {
@@ -466,22 +505,7 @@ public class WidgetQuickAddActivity extends Activity {
             public void afterTextChanged(Editable s) {
             }
         });
-        // Порция: значения из базы даны на 100 г, поэтому при смене веса
-        // пересчитываем КБЖУ — иначе «200 г» остались бы с калориями за 100 г.
-        qtyEt.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (!filling) scaleCatalogValues();
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-            }
-        });
+        wireQtyScale();
         // Название — идентичность продукта: переписал руками — id из базы уже
         // не про эту запись. Правка КБЖУ id не трогает (это тот же продукт).
         titleEt.addTextChangedListener(new TextWatcher() {
@@ -500,6 +524,33 @@ public class WidgetQuickAddActivity extends Activity {
         });
         // Ручная правка любого значения отменяет пересчёт: дальше цифры — свои,
         // и подставлять вместо них продукт из базы нельзя.
+        wireManualValues();
+    }
+
+    /**
+     * Порция: значения из базы даны на 100 г, поэтому при смене веса
+     * пересчитываем КБЖУ — иначе «200 г» остались бы с калориями за 100 г.
+     * Нужно и при добавлении, и при правке порции существующей записи.
+     */
+    private void wireQtyScale() {
+        qtyEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!filling) scaleCatalogValues();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+    }
+
+    /** Ручная правка КБЖУ отключает пересчёт от «на 100 г». */
+    private void wireManualValues() {
         TextWatcher manual = new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -604,9 +655,55 @@ public class WidgetQuickAddActivity extends Activity {
         }
     }
 
+    /**
+     * Правка порции: подставляем сохранённые значения записи. КБЖУ полей не
+     * фиксируем — они пересчитываются из «на 100 г» при смене порции, как при
+     * выборе продукта в поиске каталога, поэтому превью совпадает с дневником.
+     */
+    private void prefillFoodEdit(Intent intent) {
+        if (intent == null) {
+            editMode = false;
+            return;
+        }
+        editIndex = intent.getIntExtra(EXTRA_ITEM_INDEX, -1);
+        if (editIndex < 0) {
+            editMode = false;
+            return;
+        }
+        String name = safeExtra(intent, EXTRA_NAME);
+        int qty = Math.max(1, Math.min(5000, intent.getIntExtra(EXTRA_QTY, 100)));
+        int kcal = Math.max(0, intent.getIntExtra(EXTRA_KCAL, 0));
+        int p = Math.max(0, intent.getIntExtra(EXTRA_P, 0));
+        int f = Math.max(0, intent.getIntExtra(EXTRA_F, 0));
+        int c = Math.max(0, intent.getIntExtra(EXTRA_C, 0));
+        filling = true;
+        try {
+            titleEt.setText(name);
+            qtyEt.setText(String.valueOf(qty));
+            kcalEt.setText(String.valueOf(kcal));
+            proteinEt.setText(String.valueOf(p));
+            fatEt.setText(String.valueOf(f));
+            carbsEt.setText(String.valueOf(c));
+            catalogPer100 = new JSONObject();
+            catalogPer100.put("k", kcal * 100.0 / qty);
+            catalogPer100.put("p", p * 100.0 / qty);
+            catalogPer100.put("f", f * 100.0 / qty);
+            catalogPer100.put("c", c * 100.0 / qty);
+        } catch (Exception ignored) {
+            catalogPer100 = null;
+        } finally {
+            filling = false;
+        }
+        String foodId = safeExtra(intent, EXTRA_FOOD_ID);
+        pickedFoodId = foodId.isEmpty() ? null : foodId;
+    }
+
     private int scalePer100(String key, int grams, int max) {
-        int base = catalogPer100 == null ? 0 : Math.max(0, catalogPer100.optInt(key, 0));
-        return Math.max(0, Math.min(max, Math.round(base * grams / 100f)));
+        // double, а не int: при правке порции значения «на 100 г» выводятся из
+        // сохранённой записи (248 ккал за 150 г -> 165,33), и целое отсечение
+        // давало бы 495 ккал вместо 496 при удвоении порции.
+        double base = catalogPer100 == null ? 0 : Math.max(0, catalogPer100.optDouble(key, 0));
+        return Math.max(0, Math.min(max, (int) Math.round(base * grams / 100.0)));
     }
 
     private int dp(int value) {
@@ -654,6 +751,7 @@ public class WidgetQuickAddActivity extends Activity {
 
     /** Еда из виджета «Питание»: запись в очередь `type=food` + оптимистичные круги. */
     private boolean saveFood(String name, long now) throws Exception {
+        if (editMode) return saveFoodQty(now);
         int kcal = parseQty(kcalEt, 5000);
         if (kcal <= 0) {
             showError("Укажите калорийность порции");
@@ -681,6 +779,31 @@ public class WidgetQuickAddActivity extends Activity {
         NutritionWidgetProvider.optimisticFood(this, name, meal, kcal, p, f, c, qty);
         NutritionWidgetProvider.updateAll(this);
         Toast.makeText(this, "Добавлено: " + name, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    /**
+     * Правка порции записи: очередь `food_qty` с адресом (день + приём + индекс).
+     * КБЖУ не отправляем — JS пересчитает их тем же кодом, что диалог порции
+     * дневника (`withDiaryItemQty`), поэтому числа совпадут до последнего знака.
+     */
+    private boolean saveFoodQty(long now) throws Exception {
+        int qty = parseQty(qtyEt, 5000);
+        if (qty <= 0) {
+            showError("Укажите порцию в граммах");
+            return false;
+        }
+        JSONObject item = new JSONObject();
+        item.put("type", "food_qty");
+        item.put("date", selectedDate);
+        item.put("meal", meal);
+        item.put("index", editIndex);
+        item.put("qty", qty);
+        item.put("ts", now);
+        WidgetStore.enqueue(this, item);
+        NutritionWidgetProvider.optimisticFoodEdit(this, selectedDate, meal, editIndex, qty);
+        NutritionWidgetProvider.updateAll(this);
+        Toast.makeText(this, "Порция: " + qty + " г", Toast.LENGTH_SHORT).show();
         return true;
     }
 

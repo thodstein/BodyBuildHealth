@@ -58,6 +58,7 @@ import {
   WIDGET_DAY_ITEMS_CAP,
 } from '../../core/widget-bridge';
 import { resolveFavorites } from '../screens/NutritionScreen_parts/diary/food-favorites';
+import { withDiaryItemQty } from '../screens/NutritionScreen_parts/diary/diary-item-qty';
 import { MEAL_PRESETS } from '../screens/NutritionScreen_parts/diary/hooks/useDiaryMealTypes';
 import { FOOD_DB } from '../../core/nutrition-database';
 import { ruCount, RU_APPROACHES } from '../../engines/ru-plural';
@@ -1213,6 +1214,8 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   foods: number;
   /** Отменённые записи еды («↩» на виджете). */
   foodsRemoved: number;
+  /** Правки порции записи (тап по строке списка дня на виджете). */
+  foodsEdited: number;
   tasks: number;
   tasksAdded: number;
   notesAdded: number;
@@ -1225,6 +1228,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   let waterRemovedMl = 0;
   let foods = 0;
   let foodsRemoved = 0;
+  let foodsEdited = 0;
   let tasks = 0;
   let tasksAdded = 0;
   let notesAdded = 0;
@@ -1305,6 +1309,30 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             else delete meals[targeted.meal];
             writeDiaryV2({ ...diary, [date]: { ...day, meals } });
             foodsRemoved += 1;
+          }
+        }
+      } else if (it.type === 'food_qty') {
+        // Правка порции с виджета (тап по строке списка дня). Адрес обязателен:
+        // дата + приём + индекс. Если он не сошёлся с дневником, не правим
+        // ничего — лучше не применить правку, чем испортить чужую запись.
+        const date = typeof it.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.date) ? it.date : '';
+        const meal = it.meal ? normalizeMealKey(it.meal) : '';
+        const index = Number.isInteger(it.index) ? Number(it.index) : -1;
+        const qty = Math.round(Number(it.qty) || 0);
+        if (date && meal && index >= 0 && qty > 0) {
+          const diary = readDiaryV2();
+          const list = diary[date]?.meals?.[meal];
+          const current = Array.isArray(list) ? list[index] : null;
+          if (current) {
+            const nextList = [...(list as any[])];
+            // Тот же пересчёт, что в диалоге порции дневника: КБЖУ, микро и
+            // состав рецепта пропорционально, остальные поля не трогаем.
+            nextList[index] = withDiaryItemQty(current, Math.min(5000, qty));
+            writeDiaryV2({
+              ...diary,
+              [date]: { ...diary[date], meals: { ...diary[date].meals, [meal]: nextList } },
+            });
+            foodsEdited += 1;
           }
         }
       } else if (it.type === 'task' && it.id) {
@@ -1425,6 +1453,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
     waterRemovedMl,
     foods,
     foodsRemoved,
+    foodsEdited,
     tasks,
     tasksAdded,
     notesAdded,

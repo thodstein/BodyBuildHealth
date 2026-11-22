@@ -263,6 +263,86 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         } catch (Exception ignored) {}
     }
 
+    /**
+     * Правка порции записи (тап по строке списка дня): строка и круги меняются
+     * сразу, не дожидаясь синка. Пропорции те же, что в дневнике
+     * (`withDiaryItemQty` на JS-стороне): КБЖУ от сохранённой порции, поэтому
+     * `old * newQty / oldQty`. Адрес обязан совпасть (дата + приём + индекс) —
+     * иначе не правим ничего.
+     */
+    static void optimisticFoodEdit(Context context, String date, String meal, int index, int qty) {
+        if (date == null || meal == null || index < 0 || qty <= 0) return;
+        try {
+            JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_NUTRITION);
+            JSONObject days = d.optJSONObject("days");
+            JSONObject day = days == null ? null : days.optJSONObject(date);
+            JSONArray items = day == null ? null : day.optJSONArray("items");
+            // Адрес записи — `meal` + `index` (позиция внутри приёма), а не позиция
+            // в плоском списке: в списке дня сначала идут все позиции завтрака,
+            // потом обеда, и `items.optJSONObject(index)` попал бы в чужую строку.
+            int at = -1;
+            JSONObject it = null;
+            for (int i = 0; items != null && i < items.length(); i++) {
+                JSONObject cand = items.optJSONObject(i);
+                if (cand == null) continue;
+                if (meal.equals(cand.optString("meal", "")) && cand.optInt("index", -1) == index) {
+                    it = cand;
+                    at = i;
+                    break;
+                }
+            }
+            if (it == null || at < 0) return;
+
+            int oldQty = Math.max(1, Math.min(5000, it.optInt("qty", 100)));
+            int nextQty = Math.min(5000, qty);
+            float factor = (float) nextQty / oldQty;
+
+            int oldKcal = it.optInt("kcal", 0);
+            int oldP = it.optInt("p", 0);
+            int oldF = it.optInt("f", 0);
+            int oldC = it.optInt("c", 0);
+            int newKcal = Math.max(0, Math.round(oldKcal * factor));
+            int newP = Math.max(0, Math.round(oldP * factor));
+            int newF = Math.max(0, Math.round(oldF * factor));
+            int newC = Math.max(0, Math.round(oldC * factor));
+            int dkcal = newKcal - oldKcal;
+            int dp = newP - oldP;
+            int df = newF - oldF;
+            int dc = newC - oldC;
+
+            applyFoodTotals(d, dkcal, dp, df, dc);
+            it.put("kcal", newKcal);
+            it.put("p", newP);
+            it.put("f", newF);
+            it.put("c", newC);
+            it.put("qty", nextQty);
+            items.put(at, it);
+            day.put("kcal", Math.max(0, day.optInt("kcal", 0) + dkcal));
+            day.put("p", Math.max(0, day.optInt("p", 0) + dp));
+            day.put("f", Math.max(0, day.optInt("f", 0) + df));
+            day.put("c", Math.max(0, day.optInt("c", 0) + dc));
+            day.put("items", items);
+            days.put(date, day);
+            d.put("days", days);
+
+            // «↩» адресует эту же запись — её числа тоже новые, иначе отмена
+            // вычла бы старую порцию.
+            JSONObject last = d.optJSONObject("lastFood");
+            if (last != null
+                    && date.equals(last.optString("date", ""))
+                    && meal.equals(last.optString("meal", ""))
+                    && last.optInt("index", -1) == index) {
+                last.put("kcal", newKcal);
+                last.put("protein", newP);
+                last.put("fat", newF);
+                last.put("carbs", newC);
+                last.put("qty", nextQty);
+                d.put("lastFood", last);
+            }
+            WidgetStore.putJson(context, WidgetStore.KEY_NUTRITION, d);
+        } catch (Exception ignored) {}
+    }
+
     /** Дней с записями по счётчику периода «день» — то же число, что считает JS. */
     private static int dayRecordDays(JSONObject d) {
         JSONObject periods = d.optJSONObject("periods");
@@ -1048,7 +1128,6 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    /** Чип «недавнее / избранное»: index в `quick`; action не зависит от виджета. */
     /**
      * Чип «недавнее / избранное»: в интенте лежит сам продукт, а `index` — только
      * подсказка для обратной совместимости. Раньше тап читал `quick[index]` из

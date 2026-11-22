@@ -31,6 +31,8 @@ export interface QueuedItem {
     | 'water_remove'
     | 'food'
     | 'food_remove'
+    /** Правка порции записи (тап по строке списка дня на виджете). */
+    | 'food_qty'
     | 'task'
     | 'task_add'
     | 'note_add'
@@ -52,7 +54,7 @@ export interface QueuedItem {
    * «полезность» такой записи не узнавали.
    */
   foodId?: string;
-  /** Для type='food_remove': позиция внутри приёма (кнопка «✕» на виджете). */
+  /** Для type='food_remove' и type='food_qty': позиция внутри приёма. */
   index?: number;
   /** Для type='food_remove' («✕» на виджете) и type='task_add': ISO-дата дня. */
   date?: string;
@@ -444,6 +446,7 @@ export function parseQueueItems(raw: string): QueuedItem[] {
           it.type === 'water_remove' ||
           it.type === 'food' ||
           it.type === 'food_remove' ||
+          it.type === 'food_qty' ||
           it.type === 'task' ||
           it.type === 'task_add' ||
           it.type === 'note_add' ||

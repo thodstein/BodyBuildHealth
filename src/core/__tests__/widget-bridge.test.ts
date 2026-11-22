@@ -186,6 +186,7 @@ describe('очередь -> дневники', () => {
       waterRemovedMl: 0,
       foods: 0,
       foodsRemoved: 0,
+      foodsEdited: 0,
       tasks: 0,
       tasksAdded: 0,
       notesAdded: 0,
@@ -209,6 +210,7 @@ describe('очередь -> дневники', () => {
       waterRemovedMl: 0,
       foods: 1,
       foodsRemoved: 0,
+      foodsEdited: 0,
       tasks: 0,
       tasksAdded: 0,
       notesAdded: 0,
@@ -1205,5 +1207,99 @@ describe('аналитика питания: день, неделя, месяц'
     expect(snap.days?.[today].items).toHaveLength(WIDGET_DAY_ITEMS_CAP);
     // Порядок и адреса не смещаются: обрезается только хвост.
     expect(snap.days?.[today].items[49]).toMatchObject({ name: 'Блюдо 49', index: 49 });
+  });
+
+  it('56. правка порции с виджета: пересчёт по адресу, как в дневнике', async () => {
+    const { readDiaryV2, writeDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Обед': [
+            {
+              name: 'Курица',
+              foodId: 'chicken_breast',
+              kcal: 248,
+              p: 47,
+              f: 5,
+              c: 0,
+              qty: 150,
+              micros: { iron_mg: 3 },
+            },
+            { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
+          ],
+        },
+      },
+    } as any);
+
+    const res = applyWidgetQueue([
+      { type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: 300, ts: Date.now() },
+    ]);
+    expect(res.foodsEdited).toBe(1);
+
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
+    const [chicken, rice] = diary[today].meals['Обед'];
+    // 150 г → 300 г: вдвое больше еды, микроэлементы тоже.
+    expect(chicken).toMatchObject({
+      name: 'Курица',
+      foodId: 'chicken_breast',
+      qty: 300,
+      kcal: 496,
+      p: 94,
+      f: 10,
+      c: 0,
+    });
+    expect(chicken.micros.iron_mg).toBe(6);
+    // Соседняя запись дня не тронута.
+    expect(rice).toMatchObject({ name: 'Рис', qty: 150, kcal: 200 });
+  });
+
+  it('57. правка порции: адрес не сошёлся — запись не меняется', async () => {
+    const { readDiaryV2, writeDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: { meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
+    } as any);
+
+    const res = applyWidgetQueue([
+      // Другой приём и индекс за пределами списка: в дневнике ничего не меняем.
+      { type: 'food_qty', date: today, meal: 'Ужин', index: 0, qty: 300, ts: Date.now() },
+      { type: 'food_qty', date: today, meal: 'Обед', index: 5, qty: 300, ts: Date.now() },
+      // Без адреса — тоже ничего: «правку последней» не угадываем.
+      { type: 'food_qty', qty: 300, ts: Date.now() },
+    ]);
+    expect(res.foodsEdited).toBe(0);
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
+    expect(diary[today].meals['Обед']).toHaveLength(1);
+    expect(diary[today].meals['Обед'][0]).toMatchObject({ qty: 150, kcal: 248 });
+    // Очередь такое событие не теряет: нативная сторона шлёт `food_qty`.
+    expect(parseQueueItems(JSON.stringify([{ type: 'food_qty', qty: 100 }]))).toHaveLength(1);
+  });
+
+  it('58. правка порции: битая порция игнорируется, огромная обрезается', async () => {
+    const { readDiaryV2, writeDiaryV2 } = await import(
+      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
+    );
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: { meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
+    } as any);
+
+    const res = applyWidgetQueue([
+      { type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: 0, ts: Date.now() },
+      { type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: -20, ts: Date.now() },
+    ]);
+    expect(res.foodsEdited).toBe(0);
+    let diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
+    expect(diary[today].meals['Обед'][0].qty).toBe(150);
+
+    applyWidgetQueue([{ type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: 99999, ts: Date.now() }]);
+    diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
+    // Потолок тот же, что у поля «Порция» в редакторе.
+    expect(diary[today].meals['Обед'][0].qty).toBe(5000);
   });
 });
