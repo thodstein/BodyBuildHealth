@@ -61,4 +61,13 @@ describe('DiaryRecordingForm — «+» на конкретном упражне�
       container.innerHTML.indexOf('Сохранить тренировку'),
     );
   });
+
+  it('чек-ины практик свёрнуты и раскрываются одной кнопкой', () => {
+    const { container } = renderForm();
+    const body = () => container.querySelector('[data-pl="record-checkins"]') as HTMLElement | null;
+    expect(body()).not.toBeNull();
+    expect(body()!.style.display).toBe('none');
+    fireEvent.click(container.querySelector('[data-act="record-checkins"]') as HTMLElement);
+    expect(body()!.style.display).toBe('flex');
+  });
 });

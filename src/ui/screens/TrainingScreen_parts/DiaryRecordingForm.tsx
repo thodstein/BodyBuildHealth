@@ -78,6 +78,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const [restTimer, setRestTimer] = useState(0);
   const [restTarget, setRestTarget] = useState(90);
   const [mmcOpen, setMmcOpen] = useState<Record<string, boolean>>({});
+  const [checkinsOpen, setCheckinsOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Undo history
@@ -825,24 +826,22 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         </div>
       )}
 
-      {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
+      {/* Чек-ины практик (опционально): четыре карточки между подходами и
+          «Сохранить» растягивали форму — теперь один свёрнутый блок. */}
       {exercises.length > 0 && (
-        <MindsetCheckinInline date={logDate} sessionId={savedWid || undefined} />
-      )}
-
-      {/* Чек-ин мобильности (опционально): рутина/сессия + ROM */}
-      {exercises.length > 0 && (
-        <MobilityCheckinInline date={logDate} sessionId={savedWid || undefined} />
-      )}
-
-      {/* Чек-ин разминки (опционально): выполнена + качество */}
-      {exercises.length > 0 && (
-        <WarmupCheckinInline date={logDate} sessionId={savedWid || undefined} />
-      )}
-
-      {/* Чек-ин заминки (опционально): выполнена + качество */}
-      {exercises.length > 0 && (
-        <CooldownCheckinInline date={logDate} sessionId={savedWid || undefined} />
+        <div style={{ marginBottom: 8 }}>
+          <button type="button" data-act="record-checkins" onClick={() => setCheckinsOpen(v => !v)} aria-expanded={checkinsOpen}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', minHeight: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            <span>🧠 Практики: психо / мобильность / разминка / заминка</span>
+            <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{checkinsOpen ? '▲' : '▼'}</span>
+          </button>
+          <div data-pl="record-checkins" style={{ display: checkinsOpen ? 'flex' : 'none', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+            <MindsetCheckinInline date={logDate} sessionId={savedWid || undefined} />
+            <MobilityCheckinInline date={logDate} sessionId={savedWid || undefined} />
+            <WarmupCheckinInline date={logDate} sessionId={savedWid || undefined} />
+            <CooldownCheckinInline date={logDate} sessionId={savedWid || undefined} />
+          </div>
+        </div>
       )}
 
       {/* Save */}
