@@ -24,6 +24,7 @@
  * Оставляет LimiterCalculatorCard как эксперт-режим (категория-first), данный мастер — lift-first.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import {
   LIMITER_CATEGORIES, limiterOptionsFor, analyzeLimiterOption, limiterOptionById,
   type LimiterOption, type LimiterCategory, type LimiterExerciseItem,
@@ -245,7 +246,7 @@ function loadMasterHistory(): MasterHistoryEntry[] {
  *  Метрики, которых в новом срезе нет (CSV не разбирали), берутся из прежнего среза той же недели. */
 function pushMasterHistory(entry: MasterHistoryEntry): MasterHistoryEntry[] {
   const arr = loadMasterHistory();
-  const isoOf = (ts: number) => new Date(ts).toISOString().slice(0, 10);
+  const isoOf = (ts: number) => localIsoDate(new Date(ts));
   const weekOf = (ts: number) => `${getISOWeekNumber(isoOf(ts))}/${isoOf(ts).slice(0, 4)}`;
   const w = weekOf(entry.ts);
   const idx = arr.findIndex(h => h.lift === entry.lift && weekOf(h.ts) === w);
@@ -1683,7 +1684,7 @@ export const LiftMasterCard: React.FC<{
   // Паузная работа (C1): сеты с флагом pause по лифту за 28 дней (жим/присед/тяга).
   const pauseSets = useMemo(()=>{
     if (!(lift==='bench'||lift==='squat'||lift==='deadlift'||lift==='sumo')) return 0;
-    const cutoff = new Date(Date.now()-28*86400000).toISOString().slice(0,10);
+    const cutoff = localIsoDate(new Date(Date.now()-28*86400000));
     let cnt=0;
     for (const w of sessions) {
       if ((w.date||'') < cutoff) continue;
@@ -1705,7 +1706,7 @@ export const LiftMasterCard: React.FC<{
   const setMeetMax = (key: 'meetMaxS'|'meetMaxB'|'meetMaxD', v: string) => {
     if (key==='meetMaxS') setMeetMaxS(v); else if (key==='meetMaxB') setMeetMaxB(v); else setMeetMaxD(v);
   };
-  const daysToMeet = useMemo(()=> meetDate ? daysBetweenIso(meetDate, new Date().toISOString().slice(0,10)) : null, [meetDate]);
+  const daysToMeet = useMemo(()=> meetDate ? daysBetweenIso(meetDate, localIsoDate()) : null, [meetDate]);
   const meetRows = useMemo(()=>{
     const profilePm: Record<string, number> = { squat: profile?.pmSquat ?? 0, bench: profile?.pmBench ?? 0, deadlift: profile?.pmDead ?? 0 };
     const defs: Array<{ lift:'squat'|'bench'|'deadlift'; label:string; max:string }> = [

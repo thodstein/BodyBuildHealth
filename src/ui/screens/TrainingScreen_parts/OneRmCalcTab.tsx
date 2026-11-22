@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { estimate1RMFormula, estimate1RMByMethod, rmAccuracyNote, type RMFormula, type ConsensusMethod } from '../../../engines/pro/estimate1rm.engine';
 import { rpeFromLoad } from '../../../engines/pro/autoregulation-pro.engine';
 import { rpePctBrzycki } from '../../../engines/pro/rpe-table.engine';
@@ -61,7 +62,7 @@ export const OneRmCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
 
   const pushHist = (lift: string, e1RM: number) => {
     setHist(prev => {
-      const next = [{ date: new Date().toISOString().slice(0, 10), lift, e1RM, weight, reps: clampedReps, method }, ...prev].slice(0, HIST_CAP);
+      const next = [{ date: localIsoDate(), lift, e1RM, weight, reps: clampedReps, method }, ...prev].slice(0, HIST_CAP);
       try { localStorage.setItem(HIST_KEY, JSON.stringify(next)); } catch {}
       return next;
     });

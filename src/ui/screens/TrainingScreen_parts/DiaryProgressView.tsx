@@ -1,5 +1,6 @@
 /** DiaryProgressView.tsx � ����� ��������� ���� �������� (������ + PR, ������� �� TrainingDiaryHub). */
 import React from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { epley1RM } from '../../../engines/e1rm';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { migrateWeightLogLegacy } from '../../../engines/profile-store';
@@ -196,7 +197,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             for (let w = 0; w < weeks; w++) {
               for (let d = 0; d < 7; d++) {
                 const dt = new Date(calStart); dt.setDate(dt.getDate() + w * 7 + d);
-                const ds = dt.toISOString().slice(0, 10);
+                const ds = localIsoDate(dt);
                 days.push({ date: ds, hasPR: prDays.has(ds), dayOfWeek: d, weekIdx: w });
               }
             }

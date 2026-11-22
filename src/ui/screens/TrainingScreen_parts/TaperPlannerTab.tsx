@@ -5,6 +5,7 @@
  * Ранее: TaperPlannerTab + PeakingPanel(PL) + ProPlToolsTab(taper) — теперь всё здесь.
  */
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import {
   taperPlan, warmupSequence, taperWeeksForFatigue,
   type AttemptStrategy, type Lift, type TaperPlan,
@@ -51,7 +52,7 @@ const strategyOpts: { id: AttemptStrategy; label: string; desc: string }[] = [
   { id: 'aggressive', label: 'Агрессивная', desc: 'Опенер 93%, 2-я 97%, 3-я 105%' },
 ];
 
-const addDays = (n: number): string => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const addDays = (n: number): string => { const d = new Date(); d.setDate(d.getDate() + n); return localIsoDate(d); };
 
 function getProfileStrengthBaselines(): { squat: number; bench: number; dead: number } | null {
   try {

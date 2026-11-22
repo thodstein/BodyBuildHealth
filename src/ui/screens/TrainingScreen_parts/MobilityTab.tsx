@@ -267,7 +267,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `mobility_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `mobility_checks_${localIsoDate()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch { /* ignore */ }
@@ -749,7 +749,7 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `mobility_protocol_${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `mobility_protocol_${localIsoDate()}.json`;
             a.click();
             URL.revokeObjectURL(url);
           } catch { /* ignore */ }

@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import {
   readDiaryV2,
   writeDiaryV2,
@@ -54,7 +55,7 @@ export interface UseNutritionDiaryReturn {
 }
 
 export function useNutritionDiary(options: UseNutritionDiaryOptions = {}): UseNutritionDiaryReturn {
-  const { initialDate = new Date().toISOString().split('T')[0], autoSave = true } = options;
+  const { initialDate = localIsoDate(), autoSave = true } = options;
   
   const [diary, setDiary] = useState<DiaryData>(() => readDiaryV2());
   const [currentDate, setCurrentDate] = useState(initialDate);

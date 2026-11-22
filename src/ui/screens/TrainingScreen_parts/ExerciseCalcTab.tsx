@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { EXERCISE_CATALOG, getExerciseById, getExercisesByGroup, getSubstitutes, canReplace } from '../../../core/exercise-catalog';
 import { calcExercisePrescription, assignIntensityTechnique } from '../../../engines/training.engine';
 import { forceVector, lengthenedPartials, prescribeExercises } from '../../../engines/pro/exercise-prescription.engine';
@@ -338,7 +339,7 @@ export const ExerciseCalcTab: React.FC = () => {
   const saveCalc = () => {
     if (!ex || !presc) return;
     try {
-      const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, tempo: manualTempo || presc.tempo, date: new Date().toISOString().slice(0, 10) };
+      const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, tempo: manualTempo || presc.tempo, date: localIsoDate() };
       const arr = JSON.parse(localStorage.getItem('he_excalc_saved') || '[]');
       arr.unshift(item);
       localStorage.setItem('he_excalc_saved', JSON.stringify(arr.slice(0, 30)));

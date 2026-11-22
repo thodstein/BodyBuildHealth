@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import type { WorkoutLog } from '../../../core/types';
 import { loadReadinessHistory } from './readiness-history';
 import { applyToPlanner } from './planner-bridge';
@@ -18,7 +19,7 @@ function computeWeeklyVolume(sessions: WorkoutLog[]): { weekStart: string; volum
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d);
     monday.setDate(diff);
-    const key = monday.toISOString().slice(0, 10);
+    const key = localIsoDate(monday);
     const vol = (w.exercises || []).reduce((s: number, e: any) => {
       return s + (e.sets || []).reduce((ss: number, st: any) => ss + (st.weight || 0) * (st.reps || 0), 0);
     }, 0);
@@ -58,7 +59,7 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
     const points: WeeklyPoint[] = weekly.map(w => {
       const weekEnd = new Date(w.weekStart);
       weekEnd.setDate(weekEnd.getDate() + 7);
-      const endStr = weekEnd.toISOString().slice(0, 10);
+      const endStr = localIsoDate(weekEnd);
       const weekReadiness = history
         .filter(h => h.date >= w.weekStart && h.date < endStr)
         .map(h => h.recovery);

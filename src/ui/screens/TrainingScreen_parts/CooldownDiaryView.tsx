@@ -414,7 +414,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `cooldown_checks_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.download = `cooldown_checks_${localIsoDate()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             } catch { /* ignore */ }

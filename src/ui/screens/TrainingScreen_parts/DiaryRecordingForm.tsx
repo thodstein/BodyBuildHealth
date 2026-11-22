@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { epley1RM } from '../../../engines/e1rm';
@@ -57,7 +58,7 @@ interface DiaryRecordingFormProps {
 }
 
 export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, selectedWeek, onSave, historyWorkouts = [], pendingTemplate = null, templateKey = 0, onTemplateApplied }) => {
-  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
+  const [logDate, setLogDate] = useState(localIsoDate());
   const [logDuration, setLogDuration] = useState(60);
   const [logRPE, setLogRPE] = useState(7);
   const [logRecovery, setLogRecovery] = useState(5);

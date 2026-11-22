@@ -4,6 +4,7 @@
  * рекомендации). Источник данных — sRPE-дневник (localStorage), с возможностью ввода сессий.
  */
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { loadSRPESessions, saveSRPESession, clearSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { trainingLoadReport, sessionLoad } from '../../../engines/pro/training-load.engine';
 import { MetricCard, ExpandableCard, SaveButton, PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
@@ -23,7 +24,7 @@ const ZONE_META: Record<string, { label: string; color: string }> = {
 
 export const TrainingLoadCalculator: React.FC = () => {
   const [sessions, setSessions] = useState<SRPESession[]>(() => loadSRPESessions());
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localIsoDate());
   const [rpe, setRpe] = useState(7);
   const [dur, setDur] = useState(60);
   const [targetChronic, setTargetChronic] = useState(0);

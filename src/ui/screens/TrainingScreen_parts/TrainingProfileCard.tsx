@@ -3,6 +3,7 @@
  * Реальные входные данные, общие для ПЛ/ББ/ручного конструктора/калькуляторов.
  */
 import React, { useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { PopupNumber, PopupSelect, PopupExerciseList } from '../SRCBBScreen_parts/TrainingPopups';
 import { EQUIPMENT_OPTIONS, WEAK_GROUP_OPTIONS, type TrainingProfile } from './training-profile';
 
@@ -126,7 +127,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
             {(profile.injuries || []).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {profile.injuries.map((inj: any, i: number) => {
-                  const today = new Date().toISOString().slice(0, 10);
+                  const today = localIsoDate();
                   const active = (inj.from || '') <= today && (!inj.to || inj.to >= today);
                   const ru = INJ_GROUPS.find(([g]) => g === inj.muscle)?.[1] || inj.muscle;
                   return (

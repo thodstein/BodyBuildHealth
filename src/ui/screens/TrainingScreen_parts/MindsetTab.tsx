@@ -784,7 +784,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `mindset_protocol_${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `mindset_protocol_${localIsoDate()}.json`;
             a.click();
             URL.revokeObjectURL(url);
           } catch { /* ignore */ }

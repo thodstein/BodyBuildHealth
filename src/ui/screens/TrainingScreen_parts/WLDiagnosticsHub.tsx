@@ -483,7 +483,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       return;
     }
     const entry: TAProgressEntry = {
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       bodyweightKg: progCalc.bw, snatchKg: progCalc.sn, cleanJerkKg: progCalc.cj, cycle: progCalc.cycle,
     };
     setProgHist(prev => {
@@ -708,7 +708,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       return;
     }
     const entry: SplitJerkSnapshot = {
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       leftKg: parseFloat(state.jerkLeftFwd), rightKg: parseFloat(state.jerkRightFwd), diffPct: jerkAsym.diffPct,
     };
     setJerkHist(prev => {
@@ -746,7 +746,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    const entry = { date: new Date().toISOString().slice(0, 10), watts: Math.round(w) };
+    const entry = { date: localIsoDate(), watts: Math.round(w) };
     setPowerHist(prev => {
       const next = appendTAPullPower(prev, entry);
       try { saveTAPullPower(next); } catch { /* noop */ }
@@ -760,7 +760,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    const entry: TAPhaseSnapshot = { date: new Date().toISOString().slice(0, 10), weakPoints: [...weakPoints] };
+    const entry: TAPhaseSnapshot = { date: localIsoDate(), weakPoints: [...weakPoints] };
     setPhaseHist(prev => {
       const next = appendTAPhaseSnapshot(prev, entry);
       try { saveTAPhaseHistory(next); } catch { /* noop */ }
@@ -771,7 +771,7 @@ export const WLDiagnosticsHub: React.FC = () => {
   };
   const takeOhsSnapshot = () => {
     const entry: OHSSnapshot = {
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       score: ohs.totalScore, failed: ohs.failed, level: ohs.level,
     };
     setOhsHist(prev => {
@@ -1224,7 +1224,7 @@ export const WLDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2000);
       return;
     }
-    downloadTAIcs(ics, `ta-spec-${new Date().toISOString().slice(0, 10)}.ics`);
+    downloadTAIcs(ics, `ta-spec-${localIsoDate()}.ics`);
     setToast(`✓ ICS календарь (${specPreview.totalWeeks} нед)`);
     setTimeout(() => setToast(''), 2000);
   };
@@ -1874,7 +1874,7 @@ export const WLDiagnosticsHub: React.FC = () => {
                 <button data-wl="lvp-cal" onClick={()=> {
                   const pts = [{pct:0.5, velocity:parseFloat(state.lvp50)}, {pct:0.65, velocity:parseFloat(state.lvp65)}, {pct:0.80, velocity:parseFloat(state.lvp75)}, {pct:0.90, velocity:parseFloat(state.lvp90)}].filter(p=> Number.isFinite(p.velocity) && p.velocity>0) as any;
                   const res = calibrateLVP(state.lvpLift, pts);
-                  if (res) { saveLVPProfile(res); try { const bwNow = state.progBw ? parseFloat(state.progBw) : (profileWeightKg ?? null); localStorage.setItem('he_ta_lvp_calib_meta_v1', JSON.stringify({ date: new Date().toISOString().slice(0, 10), bw: Number.isFinite(bwNow as number) ? bwNow : null })); } catch {} setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
+                  if (res) { saveLVPProfile(res); try { const bwNow = state.progBw ? parseFloat(state.progBw) : (profileWeightKg ?? null); localStorage.setItem('he_ta_lvp_calib_meta_v1', JSON.stringify({ date: localIsoDate(), bw: Number.isFinite(bwNow as number) ? bwNow : null })); } catch {} setState(s=>({...s, lvpResult: `r² ${res.r2} ${res.valid?'✅':'⚠️'} slope ${res.slope} → e1RM 80кг@${res.slope? (80/res.r2).toFixed(0):'—'} | ${velocityTypeForLift(state.lvpLift)}` })); setToast(`✦ LVP ${state.lvpLift} r² ${res.r2} ${res.valid?'✅':'⚠️'}`); setTimeout(()=>setToast(''),2000); }
                   else { setState(s=>({...s, lvpResult: 'Ошибка: нужно ≥3 точки, spread ≥0.2, slope<0' })); }
                 }} style={{ minHeight: 44, padding: '10px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#3b82f6)', color: '#fff', border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Калибровать LVP</button>
                 <span style={{ fontSize:10, color:'#fff', alignSelf:'center' }}>{state.lvpResult}</span>

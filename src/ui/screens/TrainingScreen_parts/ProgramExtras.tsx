@@ -6,6 +6,7 @@
  * Каждая функция — 30-50 строк, без избыточной сложности.
  */
 import React, { useState, useMemo } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
@@ -91,7 +92,7 @@ export const ProgramMetricsCSV: React.FC<{ program: UserProgram; dir: string; on
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `bodybuildhealth-program-${program.meta.title || 'export'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.href = url; a.download = `bodybuildhealth-program-${program.meta.title || 'export'}-${localIsoDate()}.csv`;
       a.click(); URL.revokeObjectURL(url);
       onToast?.('📥 CSV скачан');
     } catch (e) { onToast?.('❌ Ошибка экспорта: ' + (e as Error).message); }

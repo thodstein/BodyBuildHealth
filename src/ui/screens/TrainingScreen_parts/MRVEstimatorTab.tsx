@@ -6,6 +6,7 @@
  * перед устойчивым падением recovery считавается как индивидуальный MRV-оценка.
  */
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, weeklyMonotony, acuteChronicRatio, type DayLoad } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory, type ReadinessHistoryPoint } from './readiness-history';
@@ -37,7 +38,7 @@ const levelOpts = [
 
 function weekStart(dateStr: string): string {
   const d = new Date(dateStr); const day = d.getDay() || 7;
-  d.setDate(d.getDate() - day + 1); return d.toISOString().slice(0, 10);
+  d.setDate(d.getDate() - day + 1); return localIsoDate(d);
 }
 
 /** Алгоритм оценки индивидуального MRV: возвращаем историю {weekStart, volume, meanRecovery, meanFatigue} отсортированно */

@@ -600,7 +600,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const [diffVariantId, setDiffVariantId] = useState<string | null>(null);
   const diffPlan = diffVariantId ? savedPlans.find(v => v.id === diffVariantId)?.plan : null;
   // Фаза 4.23: дата старта мезоцикла → календарные диапазоны недель + «📍 текущая неделя».
-  const [startDateInput, setStartDateInput] = useState<string>(() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } });
+  const [startDateInput, setStartDateInput] = useState<string>(() => { try { return localIsoDate(); } catch { return ''; } });
   // 🔄 «Начать заново»: подтверждение сброса сборки.
   const [resetAsk, setResetAsk] = useState(false);
   // 4.4: a11y inline-модалок (фокус на диалог, Escape закрывает, возврат фокуса).

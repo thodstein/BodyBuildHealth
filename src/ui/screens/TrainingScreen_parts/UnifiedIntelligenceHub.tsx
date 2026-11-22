@@ -1677,7 +1677,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
           <button onClick={()=>{
             try {
-              const html = buildIntelHtml(sessions, { acwr: acwr.ratio.toFixed(2), acwrZone: ZONE_META[acwr.zone].label, recovery: recoveryOut ? `${recoveryOut.overallRecoveryIndex} · ${recoveryOut.readinessLabel}` : '—', pri: `${pri} · ${priThr.label}`, volumeMult: autoReg.volumeMultiplier, rirShift: autoReg.rirShift, deload: autoReg.deload || !!recoveryOut?.deloadRecommended, forecast: forecast ? `${Math.round(forecast.values[0])}` : '—', generatedAt: new Date().toISOString().slice(0,10) });
+              const html = buildIntelHtml(sessions, { acwr: acwr.ratio.toFixed(2), acwrZone: ZONE_META[acwr.zone].label, recovery: recoveryOut ? `${recoveryOut.overallRecoveryIndex} · ${recoveryOut.readinessLabel}` : '—', pri: `${pri} · ${priThr.label}`, volumeMult: autoReg.volumeMultiplier, rirShift: autoReg.rirShift, deload: autoReg.deload || !!recoveryOut?.deloadRecommended, forecast: forecast ? `${Math.round(forecast.values[0])}` : '—', generatedAt: localIsoDate() });
               const w = window.open('', '_blank');
               if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
               else { const t=(window as any).showToast; if(typeof t==='function') t('⚠ Всплывающие окна заблокированы','warning'); }

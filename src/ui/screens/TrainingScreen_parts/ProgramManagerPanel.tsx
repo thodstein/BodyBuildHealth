@@ -15,6 +15,7 @@
  * Сохранение → ProgramStore (localStorage, версионирование через revisions).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { getAllPrograms } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
@@ -1199,7 +1200,7 @@ export const ProgramManagerPanel: React.FC = () => {
             const json = JSON.stringify(programs, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'bodybuildhealth-programs-' + new Date().toISOString().slice(0,10) + '.json';
+            const a = document.createElement('a'); a.href = url; a.download = 'bodybuildhealth-programs-' + localIsoDate() + '.json';
             a.click(); URL.revokeObjectURL(url);
             flash('📤 Экспортировано ' + programs.length + ' программ');
           }} title="Экспорт всех программ в JSON">📤 Экспорт</button>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import {
   generateInterMesocycleProgression,
   generateMesocycleProgression,
@@ -87,7 +88,7 @@ export const MesocycleTrackerTab: React.FC = () => {
     const entry: MesoEntry = {
       id: 'meso_' + Date.now(),
       name: newName.trim(),
-      date: new Date().toISOString().slice(0, 10),
+      date: localIsoDate(),
       goal: newGoal,
       weeks: newWeeks,
       startVolumeSets: newStartVol,

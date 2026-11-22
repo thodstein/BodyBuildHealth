@@ -1,6 +1,7 @@
 ﻿/** StrengthAnalyticsCard.tsx — аналитика силы: процентили (sex-aware), соотношения, MEV/MAV/MRV, тоннаж, динамика из дневника, ACWR, валидация, прогноз.
  * Питается от хаба (snapshot) — единый источник. REUSE performance-analytics + volume-landmarks + training-load + strength-diary. */
 import React, { useState, useMemo, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import {
   getStrengthPercentile as getPctRaw, getStrengthLevel, calculateRatios, analyzeRatios,
   getAllVolumeLandmarks, checkVolumeStatus, trainingAgeLevel, projectedTimeline, holtForecast,
@@ -74,8 +75,8 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot, onHubPatch })
       const now = new Date();
       const cutoff7 = new Date(now); cutoff7.setDate(now.getDate() - 7);
       const cutoff28 = new Date(now); cutoff28.setDate(now.getDate() - 28);
-      const c7 = cutoff7.toISOString().slice(0, 10);
-      const c28 = cutoff28.toISOString().slice(0, 10);
+      const c7 = localIsoDate(cutoff7);
+      const c28 = localIsoDate(cutoff28);
       let t7 = 0, t28 = 0;
       const seriesMap: Record<string, { squat: number; bench: number; dead: number }> = {};
       logs.forEach(l => {

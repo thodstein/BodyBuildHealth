@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { calcExercisePrescription } from '../../../engines/training.engine';
 import { mesocyclePhaseForWeek } from '../../../engines/rir-matrix.engine';
@@ -183,7 +184,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   // Добивка 5: история диагнозов (кап 10, дедуп по упражнению).
   useEffect(() => {
     if (!labDx || !ex) return;
-    const entry = { exId: ex.id, name: ex.name, score: labDx.d.score, flags: [...labDx.d.flags], date: new Date().toISOString().slice(0, 10) };
+    const entry = { exId: ex.id, name: ex.name, score: labDx.d.score, flags: [...labDx.d.flags], date: localIsoDate() };
     setLabHistory(prev => {
       if (prev[0]?.exId === entry.exId && prev[0]?.score === entry.score) return prev;
       const next = [entry, ...prev.filter(h => h.exId !== entry.exId)].slice(0, 10);
@@ -395,7 +396,7 @@ const PrescriptionTab: React.FC<{ selectedId?: string | null; onSelectExercise?:
   const [historyOpen, setHistoryOpen] = useState(false);
   const saveCalc = () => {
     if (!ex || !presc) return;
-    const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, date: new Date().toISOString().slice(0, 10) };
+    const item = { id: Date.now(), name: ex.name, goal, level, week, oneRM, reps: presc.reps, sets: presc.sets, rir: presc.rir, rest: presc.rest, weight: workWeight, date: localIsoDate() };
     const arr: any[] = [item, ...(JSON.parse(localStorage.getItem('he_excalc_saved') || '[]'))];
     localStorage.setItem('he_excalc_saved', JSON.stringify(arr.slice(0, 30)));
     setSavedCalcs(arr.slice(0, 30));

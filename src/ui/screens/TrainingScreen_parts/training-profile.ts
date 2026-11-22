@@ -5,6 +5,7 @@
  * Хранится в localStorage('he_training_profile').
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 
 const KEY = 'he_training_profile';
@@ -208,7 +209,7 @@ function healthInjuriesToTraining(list: unknown): TrainingProfile['injuries'] {
     const severe = limit === 'severe' || limit === 'full_restriction' || (Number.isFinite(pain) && pain >= 8);
     out.push({
       muscle,
-      from: String(r.date || new Date().toISOString().slice(0, 10)),
+      from: String(r.date || localIsoDate()),
       exclude: severe ? true : undefined,
       weightPct: severe ? 0 : 0.7,
       volumePct: severe ? 0 : 0.6,

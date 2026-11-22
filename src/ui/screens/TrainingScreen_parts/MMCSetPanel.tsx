@@ -7,6 +7,7 @@
  * Встраивается в любой список подходов: передать exerciseId/exerciseName/setNumber/date.
  */
 import React, { useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { recordMMCFromPartial, hasMMCValues, type MMCPartial } from '../../../engines/mmc-tracking.engine';
 import { ScalePicker } from '../ProfileScreen_v2/diary-modals';
 
@@ -55,7 +56,7 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
 
   const save = () => {
     const ok = recordMMCFromPartial(
-      date || new Date().toISOString().split('T')[0],
+      date || localIsoDate(),
       exerciseId,
       exerciseName,
       setNumber,

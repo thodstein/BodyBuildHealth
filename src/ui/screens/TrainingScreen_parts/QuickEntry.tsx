@@ -9,6 +9,7 @@
  *  - Минимальное количество полей
  */
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import { epley1RM } from '../../../engines/e1rm';
@@ -242,7 +243,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
 
   const handleSave = useCallback(async () => {
     const wid = `workout_${Date.now()}`;
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = localIsoDate();
     const strengthEntries: StrengthLogEntry[] = [];
 
     for (const ex of exercises) {
@@ -518,7 +519,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                       prevData={setIdx === 0 ? prevData : null}
                       exerciseId={ex.exerciseId}
                       exerciseName={ex.exerciseName}
-                      date={new Date().toISOString().split('T')[0]}
+                      date={localIsoDate()}
                       showPause={/жим.*(леж|груд)|bench|присед|squat|станов|deadlift/i.test(ex.exerciseName)}
                       onComplete={(w, r, rpe, rir, pause) => {
                         setCurrentSetIdx(setIdx);
@@ -656,13 +657,13 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         </button>
         {saveError && <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 4 }}>{saveError}</div>}
         {/* Психо-чек-ин (опционально): уверенность/активация/фокус сессии */}
-        <MindsetCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        <MindsetCheckinInline date={localIsoDate()} sessionId={savedWid || undefined} />
         {/* Чек-ин мобильности (опционально): рутина/сессия + ROM */}
-        <MobilityCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        <MobilityCheckinInline date={localIsoDate()} sessionId={savedWid || undefined} />
         {/* Чек-ин разминки (опционально): выполнена + качество */}
-        <WarmupCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        <WarmupCheckinInline date={localIsoDate()} sessionId={savedWid || undefined} />
         {/* Чек-ин заминки (опционально): выполнена + качество */}
-        <CooldownCheckinInline date={new Date().toISOString().split('T')[0]} sessionId={savedWid || undefined} />
+        <CooldownCheckinInline date={localIsoDate()} sessionId={savedWid || undefined} />
         </>
       )}
     </div>

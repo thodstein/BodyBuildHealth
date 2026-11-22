@@ -4,6 +4,7 @@
  * Использует pro/training-load.engine.
  */
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { loadSRPESessions, type SRPESession } from '../../../engines/pro/srpe-store';
 import { applyToPlanner } from './planner-bridge';
 import {
@@ -53,8 +54,8 @@ function weeklyLoads(dailyLoads: DayLoad[], weeks = 6): { weekIdx: number; load:
   for (let w = weeks; w >= 1; w--) {
     const end = new Date(last); end.setDate(end.getDate() - (w - 1) * 7);
     const start = new Date(end); start.setDate(start.getDate() - 6);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr = end.toISOString().slice(0, 10);
+    const startStr = localIsoDate(start);
+    const endStr = localIsoDate(end);
     const inWeek = sorted.filter(d => d.date >= startStr && d.date <= endStr);
     result.push({ weekIdx: weeks - w + 1, load: inWeek.reduce((s, d) => s + d.load, 0), days: inWeek.length, start: startStr });
   }

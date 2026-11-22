@@ -1,4 +1,5 @@
 import React from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import type { WorkoutLog } from '../../../core/types';
 import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../../engines/log-analytics-progression.engine';
 
@@ -10,7 +11,7 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
   const [mChest, setMChest] = React.useState(100);
   const [mArm, setMArm] = React.useState(38);
   const [mThigh, setMThigh] = React.useState(60);
-  const [mDate, setMDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [mDate, setMDate] = React.useState(localIsoDate());
 
   React.useEffect(() => {
     const m = loadMeasurements();

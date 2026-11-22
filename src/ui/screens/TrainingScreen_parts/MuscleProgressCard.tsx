@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { localIsoDate } from '../../../core/local-date';
 import { getExerciseById } from '../../../core/exercise-catalog';
 import { getVolumeByMuscle } from '../../../engines/training-methodology.engine';
 
@@ -19,7 +20,7 @@ const MuscleProgressCardBase: React.FC<{ sessions: Session[]; level: string }> =
     const weekStart = (d: Date) => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; };
     const starts: Date[] = [];
     for (let i = 5; i >= 0; i--) { const s = weekStart(now); s.setDate(s.getDate() - i * 7); starts.push(s); }
-    starts.forEach((s, i) => { const e = new Date(s); e.setDate(e.getDate() + 6); buckets.push({ label: 'Н' + (i + 1), vol: 0 }); const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10); sessions.forEach(w => { if (w.date >= ss && w.date <= ee) w.exercises.forEach(ex => { const cat = getExerciseById(ex.exerciseId); if (cat && cat.group === group) buckets[i].vol += ex.totalVolume || 0; }); }); });
+    starts.forEach((s, i) => { const e = new Date(s); e.setDate(e.getDate() + 6); buckets.push({ label: 'Н' + (i + 1), vol: 0 }); const ss = localIsoDate(s), ee = localIsoDate(e); sessions.forEach(w => { if (w.date >= ss && w.date <= ee) w.exercises.forEach(ex => { const cat = getExerciseById(ex.exerciseId); if (cat && cat.group === group) buckets[i].vol += ex.totalVolume || 0; }); }); });
     return buckets;
   }, [sessions, group]);
 
