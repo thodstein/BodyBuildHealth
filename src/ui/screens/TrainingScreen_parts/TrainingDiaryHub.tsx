@@ -643,15 +643,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
               Офлайн: данные сохраняются локально и синхронизируются при восстановлении сети
             </div>
           )}
-          {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
-          <BBContestPrepActiveCard onOpen={() => {
-            try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
-            window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }));
-          }} />
-          {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
-          <BBFeedbackCard />
-          {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
-          <CardioDiarySlot />
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
@@ -934,6 +925,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>
+
+          {/* Дополнительные карточки дня — ниже формы: сначала запись, потом контекст */}
+          <div data-pl="record-aux" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
+            <BBContestPrepActiveCard onOpen={() => {
+              try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
+              window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }));
+            }} />
+            {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
+            <BBFeedbackCard />
+            {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
+            <CardioDiarySlot />
+          </div>
         </div>
       )}
 

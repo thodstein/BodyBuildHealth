@@ -186,3 +186,18 @@ describe('Дневник: вход в практики из «Сегодня»',
     localStorage.clear();
   });
 });
+
+describe('Дневник: порядок записи', () => {
+  it('старт → «Сегодня» → форма записи → доп. карточки', () => {
+    const html = renderToStaticMarkup(<TrainingDiaryHub {...baseProps} initialMode="record" onStartSession={() => {}} />);
+    const start = html.indexOf('data-act="diary-start"');
+    const today = html.indexOf('class="td-today"');
+    const form = html.indexOf('⚡ Быстро');
+    const aux = html.indexOf('data-pl="record-aux"');
+    expect(start).toBeGreaterThan(-1);
+    expect(today).toBeGreaterThan(start);
+    // Раньше форма записи была последней: три карточки контекста оттесняли её вниз.
+    expect(form).toBeGreaterThan(today);
+    expect(aux).toBeGreaterThan(form);
+  });
+});
