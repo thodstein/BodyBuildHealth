@@ -244,6 +244,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [barTooltip, setBarTooltip] = useState<{ group: string; sets: number; week: number; x: number; y: number } | null>(null);
   // Режим записи (быстро/подробно) + предзаполнение из плана дня
   const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
+  // «Контекст дня» (привычки, миксы, contest prep, фидбек, кардио) — это
+  // справка, а не запись: пять карточек подряд растягивали вкладку «Запись».
+  const [auxOpen, setAuxOpen] = useState(false);
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
   const [ritualsSub, setRitualsSub] = useState<'mindset'|'mobility'|'warmup'|'cooldown'|'checkin'|'mmc'>('mindset');
   // Разделы практик живут одной вкладкой «Ритуалы». Баннеры и кольца «Сегодня»
@@ -910,6 +913,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
           {/* Дополнительные карточки дня — ниже формы: сначала запись, потом контекст */}
           <div data-pl="record-aux" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button type="button" data-act="record-aux-toggle" aria-expanded={auxOpen}
+              onClick={() => setAuxOpen(v => !v)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', minHeight: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 Контекст дня: привычки, миксы, ББ, кардио</span>
+              <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{auxOpen ? '▲' : '▼'}</span>
+            </button>
+            <div data-pl="record-aux-body" style={{ display: auxOpen ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
             {/* Привычки недели и миксы — контекст, а не запись: не оттесняют форму */}
             <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
             <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
@@ -922,6 +932,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             <BBFeedbackCard />
             {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
             <CardioDiarySlot />
+            </div>
           </div>
         </div>
       )}

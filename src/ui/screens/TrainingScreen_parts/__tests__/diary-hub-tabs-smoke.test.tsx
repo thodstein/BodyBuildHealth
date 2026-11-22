@@ -222,4 +222,31 @@ describe('Дневник: порядок записи', () => {
     // Отдельного дубля «Сегодня / Всего / Последняя» больше нет — эти числа уже в карточке дня
     expect(html).not.toContain('Сводка дневника');
   });
+
+  it('«Контекст дня» — один свёрнутый блок: привычки/миксы/ББ/кардио не растягивают запись', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const { container, unmount } = render(
+      <TrainingDiaryHub
+        {...baseProps}
+        initialMode="record"
+        onStartSession={() => {}}
+        diary={{ checkProgressionAlerts: async () => [] } as any}
+      />
+    );
+    const toggle = container.querySelector('[data-act="record-aux-toggle"]') as HTMLElement | null;
+    expect(toggle).not.toBeNull();
+    expect(toggle!.textContent).toContain('Контекст дня');
+    const body = container.querySelector('[data-pl="record-aux-body"]') as HTMLElement | null;
+    expect(body).not.toBeNull();
+    // По умолчанию справка свёрнута — сначала запись, потом контекст.
+    expect(body!.style.display).toBe('none');
+    expect(body!.querySelector('.hab-week')).not.toBeNull();
+    fireEvent.click(toggle!);
+    expect(body!.style.display).toBe('flex');
+    expect(toggle!.getAttribute('aria-expanded')).toBe('true');
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
 });
