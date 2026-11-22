@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -20,8 +21,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -43,7 +47,7 @@ public class WidgetQuickAddActivity extends Activity {
 
     public static final String EXTRA_KIND = "quick_kind";
     public static final String EXTRA_DATE = "quick_date";
-    /** Подсказка приёма пищи для еды: Завтрак / Обед / Ужин / Перекус. */
+    /** Подсказка приёма пищи для еды: приём дневника («Обед», «Полдник», свой). */
     public static final String EXTRA_MEAL = "quick_meal";
     public static final String KIND_TASK = "task";
     public static final String KIND_NOTE = "note";
@@ -60,7 +64,14 @@ public class WidgetQuickAddActivity extends Activity {
     public static final String EXTRA_SET_NUM = "quick_set_num";
     public static final String EXTRA_REST_SEC = "quick_rest_sec";
 
-    private static final String[] MEALS = {"Завтрак", "Обед", "Ужин", "Перекус"};
+    /**
+     * Приёмы пищи дневника (`MEAL_PRESETS` на JS-стороне) — фолбэк, если снапшот
+     * ещё не принёс список из `collectMealTypes`. Состав и порядок как в дневнике.
+     */
+    private static final String[] DEFAULT_MEALS = {
+            "Завтрак", "Второй завтрак", "Обед", "Полдник", "Ужин", "Перекус",
+            "До тренировки", "После тренировки", "Поздний перекус"
+    };
 
     private static final Pattern TIME_RE = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
     private static final String[] MONTHS_GEN = {
@@ -113,10 +124,8 @@ public class WidgetQuickAddActivity extends Activity {
     private TextView prioNone;
     private TextView prioMedium;
     private TextView prioHigh;
-    private TextView mealBf;
-    private TextView mealLunch;
-    private TextView mealDinner;
-    private TextView mealSnack;
+    /** Чипы приёмов пищи: строятся из списка дневника, поэтому их число не фиксировано. */
+    private final List<TextView> mealChips = new ArrayList<>();
     private TextView tech3;
     private TextView tech4;
     private TextView tech5;
@@ -171,10 +180,6 @@ public class WidgetQuickAddActivity extends Activity {
         prioNone = findViewById(R.id.qa_prio_none);
         prioMedium = findViewById(R.id.qa_prio_medium);
         prioHigh = findViewById(R.id.qa_prio_high);
-        mealBf = findViewById(R.id.qa_meal_bf);
-        mealLunch = findViewById(R.id.qa_meal_lunch);
-        mealDinner = findViewById(R.id.qa_meal_dinner);
-        mealSnack = findViewById(R.id.qa_meal_snack);
         msg = findViewById(R.id.qa_msg);
         weightEt = findViewById(R.id.qa_weight);
         repsEt = findViewById(R.id.qa_reps);
@@ -195,6 +200,7 @@ public class WidgetQuickAddActivity extends Activity {
         View qtyRow = findViewById(R.id.qa_qty_row);
         View mealLabel = findViewById(R.id.qa_meal_label);
         View mealRow = findViewById(R.id.qa_meal_row);
+        LinearLayout mealChipsRow = findViewById(R.id.qa_meal_chips);
         View setRow = findViewById(R.id.qa_set_row);
         View setLabel = findViewById(R.id.qa_set_label);
         View techRow = findViewById(R.id.qa_tech_row);
@@ -220,6 +226,7 @@ public class WidgetQuickAddActivity extends Activity {
             qtyLabel.setText("Порция, г");
             mealLabel.setVisibility(View.VISIBLE);
             mealRow.setVisibility(View.VISIBLE);
+            buildMealChips(mealChipsRow);
             wireFoodSearch(searchRow);
             dateLabel.setText("Порция сразу уйдёт в дневник за сегодня");
         } else if (KIND_WATER.equals(kind)) {
@@ -276,10 +283,6 @@ public class WidgetQuickAddActivity extends Activity {
         prioNone.setOnClickListener(v -> selectPriority("none"));
         prioMedium.setOnClickListener(v -> selectPriority("medium"));
         prioHigh.setOnClickListener(v -> selectPriority("high"));
-        mealBf.setOnClickListener(v -> selectMeal("Завтрак"));
-        mealLunch.setOnClickListener(v -> selectMeal("Обед"));
-        mealDinner.setOnClickListener(v -> selectMeal("Ужин"));
-        mealSnack.setOnClickListener(v -> selectMeal("Перекус"));
         tech3.setOnClickListener(v -> selectTechnique(technique == 3 ? 0 : 3));
         tech4.setOnClickListener(v -> selectTechnique(technique == 4 ? 0 : 4));
         tech5.setOnClickListener(v -> selectTechnique(technique == 5 ? 0 : 5));
@@ -321,24 +324,81 @@ public class WidgetQuickAddActivity extends Activity {
         updateMealUi();
     }
 
+    /**
+     * Приёмы пищи дневника (пресеты + свои) из снапшота виджета: список строит
+     * JS (`collectMealTypes`), поэтому в редакторе те же приёмы, что в дневнике.
+     */
+    private List<String> readMealTypes() {
+        List<String> out = new ArrayList<>();
+        try {
+            JSONObject d = WidgetStore.getJson(this, WidgetStore.KEY_NUTRITION);
+            JSONArray arr = d.optJSONArray("meals");
+            if (arr != null) {
+                for (int i = 0; i < arr.length() && out.size() < 20; i++) {
+                    String m = arr.optString(i, "").trim();
+                    if (!m.isEmpty() && !out.contains(m)) out.add(m);
+                }
+            }
+        } catch (Exception ignored) {}
+        if (out.isEmpty()) out.addAll(Arrays.asList(DEFAULT_MEALS));
+        return out;
+    }
+
+    /**
+     * Чипы приёмов в один прокручиваемый ряд: в дневнике приёмов девять плюс
+     * свои, в четыре кнопки они не влезают. Прежние четыре оставляли «Полдник»
+     * и «До тренировки» недоступными с виджета — запись уезжала в «Перекус».
+     */
+    private void buildMealChips(LinearLayout row) {
+        if (row == null) return;
+        row.removeAllViews();
+        mealChips.clear();
+        List<String> types = readMealTypes();
+        // Текущий приём мог прийти из интента и не попасть в снапшот (свой приём):
+        // показываем его чипом, иначе не видно, куда уйдёт запись.
+        if (!types.contains(meal)) types.add(meal);
+        for (String name : types) {
+            TextView chip = new TextView(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(34));
+            lp.setMarginEnd(dp(5));
+            chip.setLayoutParams(lp);
+            chip.setBackgroundResource(R.drawable.widget_chip);
+            chip.setGravity(Gravity.CENTER);
+            chip.setIncludeFontPadding(false);
+            chip.setPadding(dp(10), 0, dp(10), 0);
+            chip.setMinWidth(dp(52));
+            chip.setSingleLine(true);
+            chip.setText(name);
+            chip.setTextColor(0xFFE2ECFF);
+            chip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10f);
+            chip.setTypeface(chip.getTypeface(), android.graphics.Typeface.BOLD);
+            chip.setOnClickListener(v -> selectMeal(name));
+            row.addView(chip);
+            mealChips.add(chip);
+        }
+    }
+
     private void updateMealUi() {
-        styleChip(mealBf, "Завтрак".equals(meal));
-        styleChip(mealLunch, "Обед".equals(meal));
-        styleChip(mealDinner, "Ужин".equals(meal));
-        styleChip(mealSnack, "Перекус".equals(meal));
+        for (TextView chip : mealChips) {
+            styleChip(chip, chip.getText() != null && meal.contentEquals(chip.getText()));
+        }
     }
 
     /** Английские ключи (breakfast/lunch/dinner/snack) из старых вызовов тоже понимаем. */
     static String normalizeMeal(String value) {
         if (value == null) return "Перекус";
         String v = value.trim();
+        if (v.isEmpty()) return "Перекус";
         if ("breakfast".equalsIgnoreCase(v)) return "Завтрак";
         if ("lunch".equalsIgnoreCase(v)) return "Обед";
         if ("dinner".equalsIgnoreCase(v)) return "Ужин";
-        for (String m : MEALS) {
+        for (String m : DEFAULT_MEALS) {
             if (m.equalsIgnoreCase(v)) return m;
         }
-        return "Перекус";
+        // Свой приём дневника сохраняем как есть: иначе запись молча уехала бы
+        // в «Перекус» и пропала из своего раздела дневника.
+        return v.length() > 32 ? v.substring(0, 32) : v;
     }
 
     private void selectDate(String iso) {

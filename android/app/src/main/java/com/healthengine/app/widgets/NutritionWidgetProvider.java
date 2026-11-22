@@ -969,14 +969,18 @@ public class NutritionWidgetProvider extends AppWidgetProvider {
         return many;
     }
 
-    /** Подсказка приёма пищи по времени суток — как в дневнике. */
+    /**
+     * Приём по времени суток — границы ровно как у дневника (`mealForNow` в
+     * `useDiaryMealTypes`): 5–11 завтрак, 11–16 обед, 16–22 ужин, иначе перекус.
+     * Прежние 11/15/18/23 отправляли еду в 17:00 в «Перекус», а в 2 часа ночи —
+     * в «Завтрак», и блюдо на виджете попадало не в тот приём, что в дневнике.
+     */
     static String mealForNow() {
         try {
             int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
-            if (h < 11) return "Завтрак";
-            if (h < 15) return "Обед";
-            if (h < 18) return "Перекус";
-            if (h < 23) return "Ужин";
+            if (h >= 5 && h < 11) return "Завтрак";
+            if (h < 16) return "Обед";
+            if (h < 22) return "Ужин";
             return "Перекус";
         } catch (Exception e) {
             return "Перекус";

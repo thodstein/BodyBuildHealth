@@ -379,6 +379,35 @@ function collectQuickFoods(diary: Record<string, any>, today: string): Nutrition
   return out;
 }
 
+/**
+ * Приёмы пищи ровно как в дневнике: пресеты плюс свои из `he_custom_meals`
+ * (тот же ключ, что читает `useDiaryMealTypes`). По этому списку нативный
+ * редактор еды строит чипы — иначе с виджета можно было записать только в
+ * четыре приёма из девяти, а «Полдник» или свой приём попадали в «Перекус».
+ */
+function collectMealTypes(): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (value: unknown) => {
+    // Не-строки в `he_custom_meals` — мусор: приёмом может быть только текст.
+    if (typeof value !== 'string') return;
+    const name = value.trim().slice(0, 32);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    out.push(name);
+  };
+  MEAL_PRESETS.forEach(push);
+  try {
+    const raw = localStorageRef()?.getItem('he_custom_meals');
+    const custom = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(custom)) custom.slice(0, 12).forEach(push);
+  } catch {
+    /* своих приёмов нет или битый JSON */
+  }
+  return out.slice(0, 20);
+}
+
 /** Сумма по дневнику еды + воде за диапазон дат (YYYY-MM-DD включительно). */
 function sumPeriod(
   diary: Record<string, any>,
@@ -436,6 +465,8 @@ export function collectNutrition(): {
   days: Record<string, NutritionDaySnapshot>;
   /** Чипы быстрого добавления: избранное и недавние блюда. */
   quick: NutritionQuickFood[];
+  /** Приёмы пищи дневника (пресеты + свои) — чипы в нативном редакторе еды. */
+  meals: string[];
   periods: {
     day: NutritionPeriodStats;
     week: NutritionPeriodStats;
@@ -492,6 +523,7 @@ export function collectNutrition(): {
     waterTargetMl: targets.waterMl,
     days,
     quick: collectQuickFoods(diary, today),
+    meals: collectMealTypes(),
     lastFood: last
       ? {
           name: String(last.item?.name ?? '').slice(0, 40),
@@ -1452,6 +1484,7 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
       lastFood: n.lastFood,
       days: n.days,
       quick: n.quick,
+      meals: n.meals,
       periods: n.periods,
     }).catch(() => false),
     syncCalendarWidget(cal).catch(() => false),

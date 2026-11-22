@@ -193,6 +193,12 @@ export interface NutritionWidgetSnapshot {
   /** Чипы быстрого добавления: избранное и недавние блюда. */
   quick?: NutritionQuickFood[];
   /**
+   * Приёмы пищи дневника: пресеты и свои (`he_custom_meals`). Нативный
+   * редактор еды строит по ним чипы — иначе выбор ограничен четырьмя
+   * приёмами, а «Полдник» или свой приём записать с виджета нельзя.
+   */
+  meals?: string[];
+  /**
    * Готовые агрегаты за день/неделю/месяц: нативный виджет переключает период
    * (и настраивает halves двойного виджета) без обращения к WebView.
    */
@@ -639,12 +645,29 @@ function clampQuickFoods(foods?: NutritionQuickFood[]): NutritionQuickFood[] | u
   return out.length > 0 ? out : undefined;
 }
 
+/** Приёмы пищи для редактора еды: до 20 штук, имя не пустое, без повторов. */
+function clampMealTypes(meals?: string[]): string[] | undefined {
+  if (!Array.isArray(meals)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of meals) {
+    const name = String(raw ?? '').trim().slice(0, 32);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length >= 20) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export async function syncNutritionWidget(input: NutritionWidgetSnapshot): Promise<boolean> {
   const payload: NutritionWidgetSnapshot = {
     ...input,
     lastFood: clampLastFood(input.lastFood),
     days: clampNutritionDays(input.days),
     quick: clampQuickFoods(input.quick),
+    meals: clampMealTypes(input.meals),
     periods: input.periods
       ? {
           day: clampPeriodStats(input.periods.day),

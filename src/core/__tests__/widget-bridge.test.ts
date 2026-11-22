@@ -42,6 +42,9 @@ import {
   watchNutritionForWidgets,
 } from '../../ui/native/widget-sync';
 import { localIsoDate } from '../local-date';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { MEAL_PRESETS } from '../../ui/screens/NutritionScreen_parts/diary/hooks/useDiaryMealTypes';
 
 beforeEach(async () => {
   vi.unstubAllEnvs();
@@ -1022,5 +1025,54 @@ describe('аналитика питания: день, неделя, месяц'
     expect(diary[today].meals['Завтрак'][0]).toMatchObject({ name: 'Овсянка', qty: 100 });
     expect(diary[today].meals['Обед'][0]).toMatchObject({ name: 'Курица', qty: 200 });
     expect(diary[today].meals['Перекус'][0]).toMatchObject({ name: 'Арбуз', qty: 5000 });
+  });
+
+  it('48. приёмы пищи как в дневнике: пресеты + свои, без повторов и мусора', () => {
+    // Тот же ключ, что читает `useDiaryMealTypes`.
+    localStorage.setItem('he_custom_meals', JSON.stringify(['Полдник', '  Свой приём  ', 42]));
+
+    const n = collectNutrition();
+    expect(n.meals.slice(0, MEAL_PRESETS.length)).toEqual(MEAL_PRESETS);
+    // «Полдник» уже есть в пресетах, число 42 — не приём.
+    expect(n.meals).toEqual([...MEAL_PRESETS, 'Свой приём']);
+  });
+
+  it('49. Java-копии порядка приёмов совпадают с MEAL_PRESETS', () => {
+    const widgetDir = 'android/app/src/main/java/com/healthengine/app/widgets';
+    const read = (file: string) => readFileSync(path.resolve(process.cwd(), widgetDir, file), 'utf8');
+    /** Строки массива `marker = { "a", "b" };` — порядок приёмов. */
+    const pick = (src: string, marker: string): string[] => {
+      const at = src.indexOf(marker);
+      const start = at < 0 ? -1 : src.indexOf('{', at);
+      const end = start < 0 ? -1 : src.indexOf('};', start);
+      if (start < 0 || end < 0) throw new Error(`массив не найден: ${marker}`);
+      return [...src.slice(start, end).matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    };
+    // Порядок в Java из TS не выводится — это копия. Тест ловит её расхождение
+    // с единым источником: иначе список дня и `lastFood` на виджете разъедутся.
+    expect(pick(read('NutritionWidgetProvider.java'), 'MEAL_ORDER = {')).toEqual(MEAL_PRESETS);
+    expect(pick(read('WidgetQuickAddActivity.java'), 'DEFAULT_MEALS = {')).toEqual(MEAL_PRESETS);
+  });
+
+  it('50. снапшот чистит приёмы: пустые, повторы и лишние отбрасываются', async () => {
+    await syncNutritionWidget({
+      kcal: 0,
+      targetKcal: 2000,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      targetProtein: 100,
+      targetFat: 60,
+      targetCarbs: 200,
+      waterMl: 0,
+      waterTargetMl: 2000,
+      meals: [' Завтрак ', '', 'завтрак', ...Array.from({ length: 30 }, (_, i) => `Приём ${i}`)],
+    });
+
+    const snap = readFallbackSnapshot('nutrition') as { meals?: string[] };
+    expect(snap.meals?.[0]).toBe('Завтрак');
+    // « завтрак » — тот же приём, в списке он один.
+    expect(snap.meals?.filter((m) => m.toLowerCase() === 'завтрак')).toHaveLength(1);
+    expect(snap.meals).toHaveLength(20);
   });
 });

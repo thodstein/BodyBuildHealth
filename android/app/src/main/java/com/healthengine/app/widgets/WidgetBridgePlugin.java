@@ -204,6 +204,27 @@ public class WidgetBridgePlugin extends Plugin {
                 }
                 if (cleanQuick.length() > 0) obj.put("quick", cleanQuick);
             }
+            // Приёмы пищи дневника (пресеты + свои): по ним редактор еды строит
+            // чипы. Без списка на виджете было только 4 приёма из 9.
+            JSArray mealsRaw = call.getArray("meals");
+            if (mealsRaw != null) {
+                JSONArray meals = new JSONArray(mealsRaw.toString());
+                JSONArray cleanMeals = new JSONArray();
+                for (int i = 0; i < meals.length() && cleanMeals.length() < 20; i++) {
+                    String m = meals.optString(i, "").trim();
+                    if (m.isEmpty()) continue;
+                    String cm = clip(m, 32);
+                    boolean dup = false;
+                    for (int j = 0; j < cleanMeals.length(); j++) {
+                        if (cm.equalsIgnoreCase(cleanMeals.optString(j, ""))) {
+                            dup = true;
+                            break;
+                        }
+                    }
+                    if (!dup) cleanMeals.put(cm);
+                }
+                if (cleanMeals.length() > 0) obj.put("meals", cleanMeals);
+            }
             obj.put("updatedAt", System.currentTimeMillis());
             WidgetStore.putJson(ctx, WidgetStore.KEY_NUTRITION, obj);
             NutritionWidgetProvider.updateAll(ctx);

@@ -346,70 +346,21 @@
             android:textSize="10sp"
             android:visibility="gone" />
 
-        <LinearLayout
+        <HorizontalScrollView
             android:id="@+id/qa_meal_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:baselineAligned="false"
-            android:orientation="horizontal"
+            android:scrollbars="none"
             android:visibility="gone">
 
-            <TextView
-                android:id="@+id/qa_meal_bf"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_marginEnd="5dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="Завтрак"
-                android:textColor="#E2ECFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/qa_meal_lunch"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_marginEnd="5dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="Обед"
-                android:textColor="#E2ECFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/qa_meal_dinner"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_marginEnd="5dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="Ужин"
-                android:textColor="#E2ECFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/qa_meal_snack"
-                android:layout_width="0dp"
-                android:layout_height="34dp"
-                android:layout_weight="1"
-                android:background="@drawable/widget_chip"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="Перекус"
-                android:textColor="#E2ECFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-        </LinearLayout>
+            <LinearLayout
+                android:id="@+id/qa_meal_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
         <!-- Подход (виджет «Проведение»): все параметры, как в проведении тренировки -->
         <LinearLayout
