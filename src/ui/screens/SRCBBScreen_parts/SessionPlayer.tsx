@@ -1148,7 +1148,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     if (p === 'warmup') { if (warmupBlocks.length === 0) begin(); else setPhase('warmup'); return; }
     if (p === 'main') { if (phase === 'warmup') startMain(); else if (phase === 'main') { /* уже там */ } return; }
     if (p === 'cooldown') { if (session) finish(); else setPhase('cooldown'); return; }
-    if (p === 'done') { exitSession(); return; }
+    if (p === 'done') { if (!session && !done) return; exitSession(); return; }
   };
 
   return (
@@ -1219,11 +1219,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           const cur = PHASES.findIndex(x => x.id === phase);
           const active = p.id === phase;
           const doneStep = i < cur;
+          // «Готов» во время сессии и «Итог» до старта — кнопки-пустышки:
+          // переход молча игнорируется, поэтому честно гасим их.
+          const disabled = (p.id === 'ready' && !!session) || (p.id === 'done' && !session && !done);
           return (
             <button key={p.id} type="button" role="tab" aria-selected={active} aria-label={p.label}
               onClick={() => goPhase(p.id)}
+              disabled={disabled}
               style={{
-                flex: 1, minWidth: 56, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                flex: 1, minWidth: 56, padding: '6px 8px', borderRadius: 8, cursor: disabled ? 'default' : 'pointer', fontSize: 9, fontWeight: 700,
+                opacity: disabled ? 0.45 : 1,
                 border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                 background: active ? 'rgba(0,230,138,0.14)' : doneStep ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
                 color: active ? 'var(--accent)' : doneStep ? '#22c55e' : '#fff',
@@ -2318,6 +2323,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                )}
             </div>
           ))}
+          {/* Раньше из тренировки можно было выйти только тапом по табу фаз
+              «Итог» — явной кнопки завершения на экране не было. */}
+          <button type="button" data-act="finish-session" onClick={exitSession}
+            style={{ ...BTN_GHOST, width: '100%', minHeight: 48, marginTop: 12, fontSize: 12, fontWeight: 800 }}>
+            ✓ Завершить тренировку
+          </button>
         </div>
       )}
 

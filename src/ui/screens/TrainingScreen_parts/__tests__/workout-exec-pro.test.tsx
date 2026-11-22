@@ -484,6 +484,10 @@ describe('SessionPlayer: кнопки доводят от разминки до 
       exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 }],
     }];
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
+    const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
+
+    // До старта «Итог» гасим: иначе пустой экран «Тренировка завершена».
+    expect(tabs().find(t => (t.textContent || '').includes('Итог'))!.disabled).toBe(true);
 
     const start = findBtn(container, 'Начать тренировку');
     expect(start).toBeTruthy();
@@ -493,6 +497,8 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const toMain = findBtn(container, 'К основной части');
     expect(toMain).toBeTruthy();
     fireEvent.click(toMain!);
+    // В основной части «Готов» уже никуда не ведёт (сессия не сбрасывается) — гасим.
+    expect(tabs().find(t => (t.textContent || '').includes('Готов'))!.disabled).toBe(true);
 
     // Основная часть: кнопка «OK» пишет подход в живую сессию.
     const ok = findBtn(container, 'OK');
@@ -501,15 +507,15 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const active = loadActiveSession();
     expect(active?.exercises?.[0]?.sets?.length).toBe(1);
 
-    // Завершение: вкладка «Итог» -> finish() (фаза заминки), второй раз -> Итог.
+    // Завершение: явная кнопка «✓ Завершить тренировку» -> заминка -> «Итог».
+    const finishBtn = findBtn(container, 'Завершить тренировку');
+    expect(finishBtn).toBeTruthy();
+    fireEvent.click(finishBtn!);
+    expect(container.textContent).toContain('Заминка: День 1 · Грудь');
     const doneTab = Array.from(container.querySelectorAll('[role="tab"]'))
       .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
     expect(doneTab).toBeTruthy();
     fireEvent.click(doneTab!);
-    expect(container.textContent).toContain('Заминка: День 1 · Грудь');
-    const doneTab2 = Array.from(container.querySelectorAll('[role="tab"]'))
-      .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
-    fireEvent.click(doneTab2!);
     expect(container.textContent).toContain('Тренировка завершена');
 
     confirmSpy.mockRestore();
