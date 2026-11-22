@@ -763,95 +763,85 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                 )}
                 {(() => {
-                  // Психо-чек-ин: сегодня была тренировка, но чек-ин не заполнен
+                  // «Доделать сегодня»: четыре баннера → одна компактная карточка
                   const today = localIsoDate();
                   const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                  if (!trainedToday) return null;
-                  const checkinToday = loadCheckins().some(c => (c.date || '').slice(0, 10) === today);
-                  if (checkinToday) return null;
-                  return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                      <span>🧠 Сегодня тренировка без психо-чек-ина</span>
-                      <button onClick={() => goRitual('mindset')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        Заполнить →
-                      </button>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // Мобильность: ежедневная рутина не выполнена
-                  const today = localIsoDate();
+                  const rows: React.ReactNode[] = [];
+                  const chip = (color: string): React.CSSProperties => ({
+                    padding: '4px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.05)', color, border: `1px solid ${color}`, whiteSpace: 'nowrap',
+                  });
+                  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
+                  const labelStyle = (color: string): React.CSSProperties => ({ flex: '1 1 150px', minWidth: 0, fontSize: 10, color });
+
+                  // Психо-чек-ин: тренировка была, чек-ин не заполнен
+                  if (trainedToday && !loadCheckins().some(c => (c.date || '').slice(0, 10) === today)) {
+                    rows.push(
+                      <div key="checkin" data-todo="checkin" style={rowStyle}>
+                        <span style={labelStyle('#a78bfa')}>🧠 Сегодня тренировка без психо-чек-ина</span>
+                        <button type="button" data-act="todo-checkin" onClick={() => goRitual('mindset')} style={chip('#a78bfa')}>Заполнить</button>
+                      </div>
+                    );
+                  }
+
+                  // Ежедневная рутина мобильности
                   const mobProtocol = loadActiveMobility();
-                  if (!mobProtocol || !hasDailyRoutine(mobProtocol)) return null;
-                  const dailyIds = itemsForSlot(mobProtocol, 'daily').map(it => it.id);
-                  const progress = loadMobilityDayProgress(today);
-                  const doneToday = dailyIds.length > 0 && dailyIds.every(id => progress.doneItems.includes(id));
-                  if (doneToday) return null;
-                  const markDailyDone = () => {
-                    try {
-                      localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
-                    } catch { /* ignore */ }
-                    forceHub(h => h + 1);
-                  };
-                  return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span>🧘 Ежедневная рутина мобильности не выполнена</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={markDailyDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          ✓ Рутина выполнена
-                        </button>
-                        <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          К рутине →
-                        </button>
+                  if (mobProtocol && hasDailyRoutine(mobProtocol)) {
+                    const dailyIds = itemsForSlot(mobProtocol, 'daily').map(it => it.id);
+                    const progress = loadMobilityDayProgress(today);
+                    const doneToday = dailyIds.length > 0 && dailyIds.every(id => progress.doneItems.includes(id));
+                    if (!doneToday) {
+                      const markDailyDone = () => {
+                        try {
+                          localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
+                        } catch { /* ignore */ }
+                        forceHub(h => h + 1);
+                      };
+                      rows.push(
+                        <div key="mobility" data-todo="mobility" style={rowStyle}>
+                          <span style={labelStyle('#60a5fa')}>🧘 Ежедневная рутина мобильности не выполнена</span>
+                          <button type="button" data-act="todo-mobility-done" onClick={markDailyDone} style={chip('#60a5fa')}>✓ Рутина выполнена</button>
+                          <button type="button" data-act="todo-mobility-go" onClick={() => goRitual('mobility')} style={chip('#60a5fa')}>К рутине</button>
+                        </div>
+                      );
+                    }
+                  }
+
+                  // Разминка: тренировка была, разминка не отмечена
+                  if (trainedToday && !warmupLogForDate(today)) {
+                    const markWarmupDone = () => {
+                      upsertWarmupLog({ date: today, done: true, quality: 4 });
+                      forceHub(h => h + 1);
+                    };
+                    rows.push(
+                      <div key="warmup" data-todo="warmup" style={rowStyle}>
+                        <span style={labelStyle('#f97316')}>🔥 Разминка сегодня не отмечена</span>
+                        <button type="button" data-act="todo-warmup-done" onClick={markWarmupDone} style={chip('#f97316')}>✓ Разминка выполнена</button>
+                        <button type="button" data-act="todo-warmup-go" onClick={() => goRitual('warmup')} style={chip('#f97316')}>К разминке</button>
                       </div>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // Разминка: сегодня была тренировка, но разминка не отмечена
-                  const today = localIsoDate();
-                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                  if (!trainedToday) return null;
-                  if (warmupLogForDate(today)) return null;
-                  const markWarmupDone = () => {
-                    upsertWarmupLog({ date: today, done: true, quality: 4 });
-                    forceHub(h => h + 1);
-                  };
-                  return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span>🔥 Разминка сегодня не отмечена</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={markWarmupDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          ✓ Разминка выполнена
-                        </button>
-                        <button onClick={() => goRitual('warmup')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          К разминке →
-                        </button>
+                    );
+                  }
+
+                  // Заминка: тренировка была, заминка не отмечена
+                  if (trainedToday && !cooldownLogForDate(today)) {
+                    const markCooldownDone = () => {
+                      upsertCooldownLog({ date: today, done: true, quality: 4 });
+                      forceHub(h => h + 1);
+                    };
+                    rows.push(
+                      <div key="cooldown" data-todo="cooldown" style={rowStyle}>
+                        <span style={labelStyle('#38bdf8')}>❄️ Заминка сегодня не отмечена</span>
+                        <button type="button" data-act="todo-cooldown-done" onClick={markCooldownDone} style={chip('#38bdf8')}>✓ Заминка выполнена</button>
+                        <button type="button" data-act="todo-cooldown-go" onClick={() => goRitual('cooldown')} style={chip('#38bdf8')}>К заминке</button>
                       </div>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // Заминка: сегодня была тренировка, но заминка не отмечена
-                  const today = localIsoDate();
-                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                  if (!trainedToday) return null;
-                  if (cooldownLogForDate(today)) return null;
-                  const markCooldownDone = () => {
-                    upsertCooldownLog({ date: today, done: true, quality: 4 });
-                    forceHub(h => h + 1);
-                  };
+                    );
+                  }
+
+                  if (rows.length === 0) return null;
                   return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.25)', color: '#38bdf8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span>❄️ Заминка сегодня не отмечена</span>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={markCooldownDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          ✓ Заминка выполнена
-                        </button>
-                        <button onClick={() => goRitual('cooldown')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          К заминке →
-                        </button>
-                      </div>
+                    <div data-pl="todo-today" style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.4, color: ACCENT, textTransform: 'uppercase' }}>Доделать сегодня</div>
+                      {rows}
                     </div>
                   );
                 })()}
@@ -915,13 +905,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           </InfoErrorBoundary>
           <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
-          <InfoErrorBoundary label="Форма записи"><InfoErrorBoundary label="Сводка дневника">
-            <div style={{ ...style.card, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', padding: '10px 12px' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Сегодня: {safeHistoryWorkouts.filter(w => w.date === localIsoDate()).length}</div>
-              <div style={{ fontSize: 11, color: '#fff' }}>Всего: {safeHistoryWorkouts.length}</div>
-              <div style={{ fontSize: 11, color: '#fff' }}>Последняя: {safeHistoryWorkouts[0]?.date || '—'}</div>
-            </div>
-          </InfoErrorBoundary>
+          <InfoErrorBoundary label="Форма записи">
           <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
             pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>

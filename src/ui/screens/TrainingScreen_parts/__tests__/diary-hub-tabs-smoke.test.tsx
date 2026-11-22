@@ -200,4 +200,23 @@ describe('Дневник: порядок записи', () => {
     expect(form).toBeGreaterThan(today);
     expect(aux).toBeGreaterThan(form);
   });
+
+  it('«Доделать сегодня» — одна карточка вместо четырёх баннеров, без дублирующей сводки', () => {
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const html = renderToStaticMarkup(
+      <TrainingDiaryHub {...baseProps} initialMode="record" onStartSession={() => {}}
+        diary={{ checkProgressionAlerts: async () => [] } as any}
+        historyWorkouts={[mkWorkout(iso, 'PPL', 80)]} />
+    );
+    const todo = html.indexOf('data-act="todo-today"') >= 0 ? html.indexOf('data-act="todo-today"') : html.indexOf('data-pl="todo-today"');
+    expect(todo).toBeGreaterThan(-1);
+    // Все действия дня — внутри одной карточки, а не четырьмя отдельными баннерами
+    for (const act of ['todo-checkin', 'todo-warmup-done', 'todo-warmup-go', 'todo-cooldown-done']) {
+      expect(html.indexOf(`data-act="${act}"`)).toBeGreaterThan(todo);
+    }
+    expect(html).toContain('Доделать сегодня');
+    // Отдельного дубля «Сегодня / Всего / Последняя» больше нет — эти числа уже в карточке дня
+    expect(html).not.toContain('Сводка дневника');
+  });
 });
