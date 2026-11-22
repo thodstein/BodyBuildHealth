@@ -919,6 +919,19 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     return day.exercises.findIndex((ex, ei) => (ex.targetSets || []).some((_, si) => !actual[`${ei}_${si}`]));
   }, [day, actual]);
 
+  // В зале, закрыв последний подход упражнения, экран сам едет к следующему:
+  // иначе оно остаётся ниже сгиба и его приходится искать прокруткой.
+  const exHeadRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const prevExIdxRef = useRef<number>(-1);
+  useEffect(() => {
+    if (phase !== 'main' || currentExIdx < 0) { prevExIdxRef.current = currentExIdx; return; }
+    const from = prevExIdxRef.current;
+    prevExIdxRef.current = currentExIdx;
+    // Вход в «Основную» и ручное раскрытие — не повод дёргать экран.
+    if (from < 0 || from === currentExIdx) return;
+    try { exHeadRefs.current[currentExIdx]?.scrollIntoView?.({ block: 'start', behavior: 'smooth' as ScrollBehavior }); } catch { /* jsdom/SSR */ }
+  }, [currentExIdx, phase]);
+
   const logOne = (ei: number, si: number) => {
      if (!session || !day || !Array.isArray(day.exercises)) return;
      hapticImpact('light');
@@ -1901,11 +1914,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             </div>
           )}
           {day.exercises.map((ex, ei) => (
-               <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.04)', 
+               <div key={ei} ref={el => { exHeadRefs.current[ei] = el; }} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.04)', 
                  background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.05)' : 'rgba(139,92,246,0.05)') : 'transparent',
                  borderRadius: supersetExercises.includes(ei) ? 8 : 0,
                  paddingLeft: supersetExercises.includes(ei) ? 8 : 0,
                  paddingRight: supersetExercises.includes(ei) ? 8 : 0,
+                 // Автоскролл к следующему упражнению ставит шапку под липкую полосу фаз.
+                 scrollMarginTop: 56,
                }}>
                   {(supersetMode || circuitMode) ? (
                     <button type="button" aria-pressed={supersetExercises.includes(ei)} aria-label={`${ex.name} — ${supersetExercises.includes(ei) ? 'убрать из' : 'добавить в'} ${supersetMode ? 'суперсет' : 'круг'}`}

@@ -691,6 +691,38 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     localStorage.clear();
   });
 
+  it('основная часть: после последнего подхода экран сам едет к следующему упражнению', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь/спина',
+      exercises: [
+        { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] },
+        { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }] },
+      ],
+    }];
+    const scrollSpy = vi.fn();
+    const proto = Element.prototype as any;
+    const orig = proto.scrollIntoView;
+    proto.scrollIntoView = scrollSpy;
+    try {
+      const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь/спина" />);
+      fireEvent.click(findBtn(container, 'Начать тренировку')!);
+      fireEvent.click(findBtn(container, 'К основной части')!);
+      // Вход в основную часть экран не дёргает.
+      expect(scrollSpy).not.toHaveBeenCalled();
+      const ok = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'OK') as HTMLElement;
+      expect(ok).toBeTruthy();
+      fireEvent.click(ok);
+      expect(scrollSpy).toHaveBeenCalled();
+      unmount();
+    } finally {
+      proto.scrollIntoView = orig;
+      cleanup();
+      localStorage.clear();
+    }
+  });
+
   it('незавершённая сессия: главное действие — «Продолжить», «Начать заново» с подтверждением', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
