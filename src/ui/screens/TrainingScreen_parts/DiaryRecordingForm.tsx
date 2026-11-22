@@ -262,17 +262,24 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     setSearchResults([]);
   }, [exercises, historyWorkouts, pushUndo]);
 
-  const addSet = useCallback(() => {
-    if (!exercises[currentExIdx]) return;
-    const lastSet = exercises[currentExIdx].sets[exercises[currentExIdx].sets.length - 1];
+  /**
+   * Добавить подход. targetIdx — упражнение, чью кнопку «+» нажали: раньше
+   * подход всегда уходил в currentExIdx, и «+» на втором упражнении молча
+   * дописывал сет первому (визуально ничего не менялось).
+   */
+  const addSet = useCallback((targetIdx?: number) => {
+    const ei = typeof targetIdx === 'number' ? targetIdx : currentExIdx;
+    const ex = exercises[ei];
+    if (!ex) return;
+    const lastSet = ex.sets[ex.sets.length - 1];
     const newSet: SetRecord = { weight: lastSet?.weight || 0, reps: lastSet?.reps || 10, rir: lastSet?.rir || 2, rpe: 7, completed: false };
     pushUndo(exercises);
     setExercises(prev => {
       const updated = [...prev];
-      updated[currentExIdx] = { ...updated[currentExIdx], sets: [...updated[currentExIdx].sets, newSet] };
+      updated[ei] = { ...updated[ei], sets: [...updated[ei].sets, newSet] };
       return updated;
     });
-    setCurrentSetIdx(exercises[currentExIdx].sets.length);
+    setCurrentSetIdx(ex.sets.length);
   }, [currentExIdx, exercises, pushUndo]);
 
   // Keyboard shortcut: Enter = add set to current exercise (только в полях подходов),
@@ -585,7 +592,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         const prev = getPreviousWorkoutData(historyWorkouts, ex.exerciseName);
         const isSupersetPaired = ex.isSuperset && ex.supersetGroup;
         return (
-          <div key={exIdx} style={{
+          <div key={exIdx} data-pl="record-ex" data-ex-idx={exIdx} style={{
             borderRadius: 10, overflow: 'hidden', marginBottom: 6,
             background: isCurrent ? 'rgba(0,230,138,0.04)' : 'rgba(255,255,255,0.02)',
             border: `1px solid ${isCurrent ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.04)'}`,
@@ -630,7 +637,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                       cursor: 'pointer', fontSize: 12,
                     }} title="Суперсет с предыдущим">🔗</button>
                 )}
-                <button onClick={e => { e.stopPropagation(); addSet(); }}
+                <button onClick={e => { e.stopPropagation(); setCurrentExIdx(exIdx); setCurrentSetIdx(0); addSet(exIdx); }} title="Добавить подход" aria-label={`Добавить подход: ${cat?.name || ex.exerciseName}`}
                   style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 14 }}>+</button>
                 <button onClick={e => { e.stopPropagation(); removeExercise(exIdx); }}
                   style={{ width: 28, height: 28, borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}>✕</button>
@@ -781,7 +788,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   </React.Fragment>
                 ))}
                 <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                  <button onClick={addSet}
+                  <button onClick={() => addSet()}
                     style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px dashed rgba(0,230,138,0.3)', background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 10 }}>+ Добавить подход</button>
                   <button onClick={() => setRestTimer(restTarget)}
                     style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10 }}>⏱ {restTarget}с</button>
