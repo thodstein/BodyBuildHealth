@@ -8,6 +8,7 @@ import { render, fireEvent, cleanup } from '@testing-library/react';
 import { ProfilePlannerTab } from '../ProfilePlannerTab';
 import { localIsoDate, shiftIsoDate } from '../../../../core/local-date';
 import {
+  COACH_TASK_TITLE_MAX,
   addCoachSubtask,
   addCoachTask,
   completeCoachTask,
@@ -374,6 +375,23 @@ describe('карточка задачи', () => {
     expect(container.querySelector('[data-planner="day"]')?.getAttribute('data-smart')).toBe('all');
     // Закрытая задача и её новая копия — обе на экране.
     expect(items(container)).toHaveLength(2);
+  });
+
+  it('лимит названия виден в карточке, а поле его не пропускает', () => {
+    seed(addCoachTask(emptyCoachPlanner(), { title: 'Задача', date: today }, { id: 't' }).store);
+    const { container } = render(<ProfilePlannerTab />);
+    const quick = container.querySelector('[data-planner="title"]') as HTMLInputElement;
+    expect(quick.maxLength).toBe(COACH_TASK_TITLE_MAX);
+
+    fireEvent.click(container.querySelector('[data-planner="open"]') as HTMLElement);
+    const input = container.querySelector('[data-planner="detail-title"]') as HTMLInputElement;
+    expect(input.maxLength).toBe(COACH_TASK_TITLE_MAX);
+
+    const counter = (): string | null | undefined =>
+      container.querySelector('[data-planner="detail-title-count"]')?.textContent;
+    expect(counter()).toBe(`6/${COACH_TASK_TITLE_MAX}`);
+    fireEvent.change(input, { target: { value: 'Новое название' } });
+    expect(counter()).toBe(`${'Новое название'.length}/${COACH_TASK_TITLE_MAX}`);
   });
 });
 

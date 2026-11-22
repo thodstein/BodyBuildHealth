@@ -49,6 +49,8 @@ import {
   COACH_SUBTASK_TITLE_MAX,
   COACH_TASK_LIST_LABELS,
   COACH_TASK_LISTS,
+  COACH_TASK_NOTE_MAX,
+  COACH_TASK_TITLE_MAX,
   COACH_WEEKDAY_LABELS,
   addCoachSubtask,
   addCoachFilter,
@@ -2029,14 +2031,30 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
               onChange={(e) => setDraft((d) => (d ? { ...d, title: e.target.value } : d))}
               placeholder="Название"
               aria-label="Название задачи в карточке"
+              maxLength={COACH_TASK_TITLE_MAX}
               data-planner="detail-title"
               style={{ ...inputStyle, width: '100%' }}
             />
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                marginTop: -2,
+                fontSize: 10,
+                color: draft.title.trim().length >= COACH_TASK_TITLE_MAX ? colors.danger : colors.textSubtle,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+              data-planner="detail-title-count"
+            >
+              {draft.title.trim().length}/{COACH_TASK_TITLE_MAX}
+            </div>
             <textarea
               value={draft.note}
               onChange={(e) => setDraft((d) => (d ? { ...d, note: e.target.value } : d))}
               placeholder="Заметка"
               aria-label="Заметка задачи"
+              maxLength={COACH_TASK_NOTE_MAX}
               data-planner="detail-note"
               rows={3}
               style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
@@ -2584,6 +2602,7 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
             }}
             placeholder={`Задача на ${fmtHuman(quickTargetDate)}`}
             aria-label="Название задачи"
+            maxLength={COACH_TASK_TITLE_MAX}
             data-planner="title"
             style={{ ...inputStyle, width: '100%' }}
           />
