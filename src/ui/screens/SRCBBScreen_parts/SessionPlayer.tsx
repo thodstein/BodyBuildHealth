@@ -34,6 +34,7 @@ import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel'
 import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
 import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-technique-display';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { isNativeApp } from '../../../core/app-platform';
 import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
 } from '../TrainingScreen_parts/training-ui';
@@ -1842,16 +1843,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
              </div>
 
            {/* подсказки горячих клавиш */}
-           <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-             {[
-               { key: 'Space', label: 'залогировать подход' },
-               { key: 'R', label: 'таймер отдыха' },
-             ].map(h => (
-               <span key={h.key} style={{ fontSize: 8, color: 'var(--text-faint)' }}>
-                 <kbd style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 8, fontFamily: 'monospace' }}>{h.key}</kbd> {h.label}
-               </span>
-             ))}
-           </div>
+           {!isNativeApp() && (
+             <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+               {[
+                 { key: 'Space', label: 'залогировать подход' },
+                 { key: 'R', label: 'таймер отдыха' },
+               ].map(h => (
+                 <span key={h.key} style={{ fontSize: 8, color: 'var(--text-faint)' }}>
+                   <kbd style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 8, fontFamily: 'monospace' }}>{h.key}</kbd> {h.label}
+                 </span>
+               ))}
+             </div>
+           )}
 
            {/* sRPE — под подходами: перед первым подходом он только мешал */}
           {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
