@@ -116,6 +116,17 @@ describe('умные списки', () => {
     expect(items(container)).toHaveLength(1);
   });
 
+  it('в умном списке у строки видна дата, в дне — не дублируется', () => {
+    seed(addCoachTask(emptyCoachPlanner(), { title: 'Своя', date: tomorrow }, { id: 'a' }).store);
+    const { container } = render(<ProfilePlannerTab />);
+    expect(container.querySelector('[data-planner="task-date"]')).toBeNull();
+
+    fireEvent.click(container.querySelector('[data-planner="smart-chip"][data-smart="next7"]') as HTMLElement);
+    const badge = container.querySelector('[data-planner="task-date"]');
+    expect(badge?.textContent).toContain(tomorrow.slice(8, 10));
+    expect(badge?.textContent).toContain(tomorrow.slice(5, 7));
+  });
+
   it('поле быстрого ввода называет день, куда реально уйдёт задача', () => {
     const human = (iso: string): string =>
       new Date(`${iso}T00:00:00`).toLocaleDateString('ru-RU', {

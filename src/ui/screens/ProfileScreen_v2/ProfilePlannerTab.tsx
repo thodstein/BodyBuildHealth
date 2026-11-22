@@ -984,12 +984,31 @@ export const ProfilePlannerTab: React.FC<{ initialAthleteId?: string }> = ({ ini
             )}
             {t.title}
           </div>
-          {(coachTaskList(t) !== 'inbox' ||
+          {(smart !== 'all' ||
+            coachTaskList(t) !== 'inbox' ||
             coachTaskRepeat(t) !== 'none' ||
             tags.length > 0 ||
             sub.total > 0 ||
             t.reminder) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+              {/* В умном списке строки из разных дней — дата обязана быть видна. */}
+              {smart !== 'all' && (
+                <span
+                  data-planner="task-date"
+                  title={fmtHuman(t.date)}
+                  style={{
+                    fontSize: 10,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    color: '#bfdbfe',
+                    background: 'rgba(59,130,246,0.14)',
+                    border: '1px solid rgba(59,130,246,0.32)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {fmtCoachDateLabel(t.date, today)}
+                </span>
+              )}
               {coachTaskList(t) !== 'inbox' && (
                 <span
                   data-planner="task-list"
