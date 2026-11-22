@@ -246,6 +246,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
   const [ritualsSub, setRitualsSub] = useState<'mindset'|'mobility'|'warmup'|'cooldown'|'checkin'|'mmc'>('mindset');
+  // Разделы практик живут одной вкладкой «Ритуалы». Баннеры и кольца «Сегодня»
+  // раньше ставили mode='warmup'/'mindset'/… — такого режима в рендере нет, и
+  // экран под шапкой оставался пустым. Теперь вход открывает rituals с подвкладкой.
+  const goRitual = (sub: 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'checkin' | 'mmc') => {
+    setRitualsSub(sub);
+    setMode('rituals');
+  };
   const [progressSub, setProgressSub] = useState<'progress'|'calendar'>('progress');
   // «Мои тренировки» (перенесено из Библиотеки): рабочий список упражнений
   const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
@@ -694,10 +701,10 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                     const coolPct = coolToday ? (coolToday.done ? 100 : 0) : (trainedToday ? 0 : null);
                     const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
                       { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: trainedToday ? () => setMode('history') : (onStartSession ?? (() => setMode('history'))) },
-                      { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => setMode('mindset') },
-                      { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => setMode('mobility') },
-                      { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => setMode('warmup') },
-                      { label: 'Заминка', pct: coolPct, color: '#38bdf8', onClick: () => setMode('cooldown') },
+                      { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => goRitual('mindset') },
+                      { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => goRitual('mobility') },
+                      { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => goRitual('warmup') },
+                      { label: 'Заминка', pct: coolPct, color: '#38bdf8', onClick: () => goRitual('cooldown') },
                     ];
                     const hasAny = rings.some(r => r.pct !== null);
                     if (!hasAny) return null;
@@ -774,7 +781,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   return (
                     <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                       <span>🧠 Сегодня тренировка без психо-чек-ина</span>
-                      <button onClick={() => setMode('mindset')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => goRitual('mindset')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         Заполнить →
                       </button>
                     </div>
@@ -802,7 +809,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         <button onClick={markDailyDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           ✓ Рутина выполнена
                         </button>
-                        <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(96,165,250,0.2)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           К рутине →
                         </button>
                       </div>
@@ -826,7 +833,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         <button onClick={markWarmupDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           ✓ Разминка выполнена
                         </button>
-                        <button onClick={() => setMode('warmup')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => goRitual('warmup')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.2)', color: '#f97316', border: '1px solid rgba(249,115,22,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           К разминке →
                         </button>
                       </div>
@@ -850,7 +857,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         <button onClick={markCooldownDone} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           ✓ Заминка выполнена
                         </button>
-                        <button onClick={() => setMode('cooldown')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        <button onClick={() => goRitual('cooldown')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(56,189,248,0.2)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           К заминке →
                         </button>
                       </div>
@@ -883,12 +890,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   return (
                     <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {mindPct !== null && (
-                        <button onClick={() => setMode('mindset')} title={dayType === 'all' ? 'Все шаги протокола' : `Шаги для типа дня: ${dayType}`} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => goRitual('mindset')} title={dayType === 'all' ? 'Все шаги протокола' : `Шаги для типа дня: ${dayType}`} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
                           🧠 Психо-протокол: {mindPct}%
                         </button>
                       )}
                       {mobPct !== null && (
-                        <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mobPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(96,165,250,0.12)', color: mobPct === 100 ? '#22c55e' : '#60a5fa', border: `1px solid ${mobPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(96,165,250,0.35)'}`, whiteSpace: 'nowrap' }}>
+                        <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mobPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(96,165,250,0.12)', color: mobPct === 100 ? '#22c55e' : '#60a5fa', border: `1px solid ${mobPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(96,165,250,0.35)'}`, whiteSpace: 'nowrap' }}>
                           🧘 Рутина: {mobPct}%
                         </button>
                       )}
@@ -905,7 +912,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   return (
                     <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span>🧘 Сегодня нет тренировки — день отдыха: выполните сессию мобильности</span>
-                      <button onClick={() => setMode('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         Сессия мобильности →
                       </button>
                     </div>

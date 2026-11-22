@@ -161,3 +161,28 @@ describe('Дневник: старт тренировки', () => {
     expect(html).toContain('7 подх.');
   });
 });
+
+describe('Дневник: вход в практики из «Сегодня»', () => {
+  it('«К разминке» открывает «Ритуалы» → Разминка, а не пустой экран', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const d = new Date();
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const { container, unmount } = render(
+      <TrainingDiaryHub {...baseProps} initialMode="record" onStartSession={() => {}}
+        diary={{ checkProgressionAlerts: async () => [] } as any}
+        historyWorkouts={[mkWorkout(iso, 'PPL', 80)]} />
+    );
+    expect(container.textContent).toContain('Разминка сегодня не отмечена');
+    const toWarmup = Array.from(container.querySelectorAll('button'))
+      .find(b => (b.textContent || '').includes('К разминке')) as HTMLElement | undefined;
+    expect(toWarmup).toBeTruthy();
+    fireEvent.click(toWarmup!);
+    // Раньше здесь ставился несуществующий mode='warmup' — контент под шапкой исчезал.
+    expect(container.textContent).toContain('🧘 Мобильность');
+    expect(container.querySelector('[data-act="diary-start"]')).toBeNull();
+    unmount();
+    cleanup();
+    localStorage.clear();
+  });
+});
