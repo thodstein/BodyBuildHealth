@@ -45,7 +45,9 @@ import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { hctCuts, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
-import { getLabNorm, LFT_ULN, HCT_THRESHOLDS } from '../../../engines/lab-norms.engine';
+import { getLabNorm, LFT_ULN, HCT_THRESHOLDS, HDL_LOW } from '../../../engines/lab-norms.engine';
+import { bpStageCanon, bpStageIsHigh, bpSystolicOfStage, BP_STAGE_LABEL, heartRateOf } from '../../../engines/support-plan/cardio-vitals';
+import { flatLabUnit } from '../../../engines/lab-flat';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
 import { calculateReboundTrajectory, getReboundSummary, type ReboundInput } from '../../../engines/rebound-modeling.engine';
 
@@ -126,11 +128,19 @@ const JOINT_RECOMMENDED_HIGH: Set<string> = new Set(['glucosamine','chondroitin'
 const JOINT_RECOMMENDED_MEDIUM: Set<string> = new Set(['omega3','hyaluronic_acid','curcumin','boswellia']);
 
 type GenericEnhancementConfig = {
-  label: string; icon: string; color: string; markers: string[]; domains: string[];
+  label: string; icon: string; color: string; markers: string[];
   core: string[]; lv2: string[]; lv3: string[]; notes: string;
   presets: { id: string; label: string; level: 1 | 2 | 3; ids: string[] }[];
 };
-type SpecializedDomain = { id: string; label: string; icon: string; markers: string[]; ids: string[]; trigger?: (labs: Record<string, number>, state: CalculatorState) => boolean };
+/**
+ * Домен системы. `note` — данные карточки, а не бланка (проход 204): АД и ЧСС
+ * живут в `state.cardio`, поэтому их нельзя показывать чипом анализа.
+ */
+type SpecializedDomain = {
+  id: string; label: string; icon: string; markers: string[]; ids: string[];
+  note?: (state: CalculatorState) => string;
+  trigger?: (labs: Record<string, number>, state: CalculatorState) => boolean;
+};
 
 /**
  * §6.2 (проход 28): пороги триггеров — из единого резолвера норм (`lab-norms`),
@@ -145,23 +155,51 @@ const normUln = (code: string, state?: { profile?: { sex?: 'male' | 'female' } }
 const hctCorrection = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
   hctSymptomCuts(state?.profile?.sex).correction;
 /**
+ * «Низкий ЛПВП» — по полу (`HDL_LOW`: ♂ 1.0, ♀ 1.2), как на экране анализов и в
+ * рекомендациях (проход 102). Проход 204: домены липидов сравнивали с мужским
+ * литералом 1.0, поэтому женщина с ЛПВП 1.1 не попадала в липидный домен, хотя её
+ * собственная карточка уже была помечена «низко».
+ */
+const hdlLowCut = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
+  HDL_LOW[state?.profile?.sex === 'female' ? 'female' : 'male'];
+/**
  * Границы нормы маркера — из лестницы ступеней (`LAB_TIERS`), а не литералами.
  * Проход 203: триггер «Фильтрация» сравнивал СКФ с 90, которого не было ни у
  * одного маркера в резолвере, а цистатин C — с 1; теперь оба числа читаются из
- * той же таблицы, что и ступени/советы.
+ * той же таблицы, что и ступени/советы. Проход 204: так же читаются остальные
+ * пороги доменов — правка шкалы больше не оставляет триггер со старым числом.
  */
 const labNormalLow = (code: string, fallback = 0): number => getLabEntry(code)?.normal?.[0] ?? fallback;
 const labNormalHigh = (code: string, fallback = 0): number => getLabEntry(code)?.normal?.[1] ?? fallback;
+/**
+ * Верх «грани» односторонней шкалы (`borderline[1]`). Порог включения совета не
+ * всегда верх нормы: пролактин 15–25 — «грань», и совет включается на 25, то есть
+ * на первой ступени действия. Число берётся из той же строки, что и ступени.
+ */
+const labBorderlineHigh = (code: string, fallback = 0): number => {
+  const b = getLabEntry(code)?.borderline;
+  return Array.isArray(b) && b.length === 2 ? b[1] : fallback;
+};
 export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   cardio: [
-    { id:'bp', label:'АД/объём', icon:'🩺', markers:['BP_SYSTOLIC','BP_DIASTOLIC'], ids:['hydration','cardio_aerobic','electrolyte_balance','telmisartan'], trigger:(l)=> (l.BP_SYSTOLIC ?? 0)>130 || (l.BP_DIASTOLIC ?? 0)>85 },
-    { id:'lipids', label:'Липиды', icon:'🫀', markers:['LDL','HDL','TRIGLYCERIDES','APO_B','APOB'], ids:['omega3','bergamot','coq10'], trigger:(l)=> (l.LDL ?? 0)>3 || (l.TRIGLYCERIDES ?? 0)>1.7 || (l.HDL ?? 9)<1 },
-    { id:'rhythm', label:'Ритм/ЧСС', icon:'💓', markers:['HR','K','MG'], ids:['magnesium','taurine','nebivolol'], trigger:(l)=> (l.HR ?? 0)>80 || (l.K ?? 9)<3.5 },
-    { id:'endothelium', label:'Эндотелий/тромбоз', icon:'🩸', markers:['HCT','D_DIMER','FIBRINOGEN'], ids:['hydration','cardio_aerobic','nattokinase','serrapeptase','bromelain'], trigger:(l, state)=> (l.HCT ?? 0)>hctCorrection(state) || (l.D_DIMER ?? 0)>.5 || (l.FIBRINOGEN ?? 0)>4 },
+    // Проход 204: АД и ЧСС — не анализы, а поля карточки (`state.cardio`). Прежний
+    // триггер читал `labs.BP_SYSTOLIC`/`labs.HR`, которых бланк не производит:
+    // домен не включался ни при каком вводе, а «контрольный маркер» в попапе
+    // всегда показывал «нет». Стадия и пульс печатаются словами карточки.
+    { id:'bp', label:'АД/объём', icon:'🩺', markers:[], ids:['hydration','cardio_aerobic','electrolyte_balance','telmisartan'], note:(s)=>`АД: ${BP_STAGE_LABEL[bpStageCanon(s.cardio?.bpStage)]}`, trigger:(_l, s)=>bpStageIsHigh(s.cardio?.bpStage) },
+    { id:'lipids', label:'Липиды', icon:'🫀', markers:['LDL','HDL','TRIGLYCERIDES','APO_B','APOB'], ids:['omega3','bergamot','coq10'], trigger:(l, state)=> (l.LDL ?? 0)>labNormalHigh('LDL',3) || (l.TRIGLYCERIDES ?? 0)>labNormalHigh('TRIGLYCERIDES',1.7) || (l.HDL ?? 9)<hdlLowCut(state) },
+    // ЧСС-ветка читает карточку; электролитная — по-прежнему бланк. Отсутствие
+    // пульса находку не создаёт (`heartRateOf` → undefined), но и не «норма».
+    { id:'rhythm', label:'Ритм/ЧСС', icon:'💓', markers:['K','MG'], ids:['magnesium','taurine','nebivolol'], note:(s)=>`ЧСС: ${heartRateOf(s.cardio) ?? '—'}`, trigger:(l, s)=>{ const hr = heartRateOf(s.cardio); return (hr !== undefined && hr > labNormalHigh('HR',80)) || (l.K ?? 9)<labNormalLow('K',3.5); } },
+    { id:'endothelium', label:'Эндотелий/тромбоз', icon:'🩸', markers:['HCT','D_DIMER','FIBRINOGEN'], ids:['hydration','cardio_aerobic','nattokinase','serrapeptase','bromelain'], trigger:(l, state)=> (l.HCT ?? 0)>hctCorrection(state) || (l.D_DIMER ?? 0)>labNormalHigh('D_DIMER',0.5) || (l.FIBRINOGEN ?? 0)>labNormalHigh('FIBRINOGEN',4) },
   ],
   hepatic: [
     { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l, state)=>(l.ALT??0)>normUln('ALT',state,40)||(l.AST??0)>normUln('AST',state,40) },
     { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l, state)=>(l.GGT??0)>normUln('GGT',state,55)||(l.ALP??0)>normUln('ALP',state,130)||(l.BILIRUBIN??0)>normUln('BIL',state,17.1) },
+    // CRP 5 и ферритин 300 — числа, которых нет в лестнице ступеней (там верх
+    // нормы 3 и 400). Клинического источника на «порог оксидативного стресса» в
+    // проекте нет, поэтому они остаются литералами и названы блокером
+    // (`docs/LAB-NORMS-SINGLE-SOURCE.md`, §4), а не подменяются чужим числом.
     { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
   ],
   renal: [
@@ -171,36 +209,41 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
     // ступеней. Отсутствие записи фильтрацию не включает: без числа «норма» не
     // угадывается (`?? 0` дал бы ложное срабатывание).
     { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','EGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.EGFR!==undefined&&l.EGFR<labNormalLow('EGFR',90))||(l.CYSTATIN_C??0)>labNormalHigh('CYSTATIN_C',1) },
-    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>.15 },
-    { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<3.5||(l.K??4)>5||(l.MG??1)<.75 },
+    // 30 мг/г — порог альбуминурии, строки в `LAB_TIERS` у него нет (там `MICROALB`
+    // в мг/л — другая величина), поэтому число остаётся литералом. Белок мочи —
+    // из лестницы.
+    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>labNormalHigh('PROTEIN_URINE',0.15) },
+    // Магний 0.75 — не граница лестницы (там норма 0.85–1.1), источника нет:
+    // остаётся литералом до клинического решения.
+    { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<labNormalLow('K',3.5)||(l.K??4)>labNormalHigh('K',5)||(l.MG??1)<.75 },
   ],
   endocrine: [
     // Проход 28: 40 пг/мл — мужской порог ароматизации. У женщины E2 40–200 —
     // нормальная фолликулярная/лютеиновая фаза, поэтому домен для неё не включаем
     // (женские гормоны ведёт слой «Женщины», а не мужской AI-триггер).
-    { id:'e2', label:'Ароматизация/E2', icon:'⚖️', markers:['E2','SHBG'], ids:['anastrozole','zinc','vitamin_d3'], trigger:(l, state)=> state.profile.sex !== 'female' && (l.E2??0)>40 },
-    { id:'prl', label:'Пролактин', icon:'🧪', markers:['PRL'], ids:['agmatine','vitex','p5p','cabergoline'], trigger:(l)=>(l.PRL??0)>25 },
-    { id:'hpta', label:'HPTA', icon:'🧬', markers:['LH','FSH','TT','FT'], ids:['hcg','enclomiphene','tamoxifen','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
-    { id:'stress', label:'Кортизол', icon:'🧠', markers:['CORTISOL'], ids:['magnesium_l_threonate','phosphatidylserine','ashwagandha','theanine'], trigger:(l)=>(l.CORTISOL??0)>535 },
+    { id:'e2', label:'Ароматизация/E2', icon:'⚖️', markers:['E2','SHBG'], ids:['anastrozole','zinc','vitamin_d3'], trigger:(l, state)=> state.profile.sex !== 'female' && (l.E2??0)>labNormalHigh('E2',40) },
+    { id:'prl', label:'Пролактин', icon:'🧪', markers:['PRL'], ids:['agmatine','vitex','p5p','cabergoline'], trigger:(l)=>(l.PRL??0)>labBorderlineHigh('PRL',25) },
+    { id:'hpta', label:'HPTA', icon:'🧬', markers:['LH','FSH','TT','FT'], ids:['hcg','enclomiphene','tamoxifen','clomiphene'], trigger:(l)=>(l.LH??9)<labNormalLow('LH',1.7)||(l.FSH??9)<labNormalLow('FSH',1.5) },
+    { id:'stress', label:'Кортизол', icon:'🧠', markers:['CORTISOL'], ids:['magnesium_l_threonate','phosphatidylserine','ashwagandha','theanine'], trigger:(l)=>(l.CORTISOL??0)>labNormalHigh('CORTISOL',535) },
   ],
   reproductive: [
-    { id:'gonadotropins', label:'LH/FSH', icon:'🧬', markers:['LH','FSH'], ids:['hcg','enclomiphene','clomiphene'], trigger:(l)=>(l.LH??9)<1.7||(l.FSH??9)<1.5 },
+    { id:'gonadotropins', label:'LH/FSH', icon:'🧬', markers:['LH','FSH'], ids:['hcg','enclomiphene','clomiphene'], trigger:(l)=>(l.LH??9)<labNormalLow('LH',1.7)||(l.FSH??9)<labNormalLow('FSH',1.5) },
     // Проход 191: нижняя граница свободного T — не литерал 8, а шкала каталога
     // (12.3 пг/мл, референс РФ 18–40 лет). Прежние 8 были ниже любого бланка РФ, и
     // мужчина с 10 пг/мл не попадал в андрогенный домен. Отсутствие записи домен не
     // включает (`?? low` даёт равенство, а не «ниже»).
-    { id:'androgens', label:'TT/FT/SHBG', icon:'⚙️', markers:['TT','FT','SHBG'], ids:['zinc','boron','coq10'], trigger:(l)=>(l.FT??FT_MALE_BAND.low)<FT_MALE_BAND.low||(l.SHBG??0)>60 },
+    { id:'androgens', label:'TT/FT/SHBG', icon:'⚙️', markers:['TT','FT','SHBG'], ids:['zinc','boron','coq10'], trigger:(l)=>(l.FT??FT_MALE_BAND.low)<FT_MALE_BAND.low||(l.SHBG??0)>labNormalHigh('SHBG',60) },
     { id:'fertility', label:'Сперматогенез', icon:'🔬', markers:['LH','FSH'], ids:['hcg','nac','zinc','folate','vitamin_b12'], trigger:(_l,s)=>String(s.pharma.phase)==='fertility' },
   ],
   musculoskeletal: [
     { id:'cartilage', label:'Хрящ', icon:'🦴', markers:['CRP'], ids:['collagen','glucosamine','chondroitin','msm'], trigger:(_l,s)=>s.oda.jointPain!=='none' },
     { id:'tendon', label:'Сухожилия/связки', icon:'🔗', markers:['CK','CRP'], ids:['collagen','vitamin_c','msm','bpc157','tb500'], trigger:(_l,s)=>s.oda.ligamentIssues||s.oda.injuries.length>0 },
-    { id:'inflammation', label:'Воспаление', icon:'🔥', markers:['CRP','CK'], ids:['omega3','curcumin','boswellia'], trigger:(l)=>(l.CRP??0)>3 },
+    { id:'inflammation', label:'Воспаление', icon:'🔥', markers:['CRP','CK'], ids:['omega3','curcumin','boswellia'], trigger:(l)=>(l.CRP??0)>labNormalHigh('CRP',3) },
   ],
   metabolic: [
-    { id:'glucose', label:'Глюкоза/IR', icon:'🍬', markers:['GLU','INS','HBA1C','HOMAIR'], ids:['berberine','alpha_lipoic','magnesium','cardio_aerobic'], trigger:(l)=>(l.GLU??0)>5.6||(l.HOMAIR??0)>2.5 },
-    { id:'hypo', label:'Гипогликемия', icon:'⚠️', markers:['GLU','K','MG'], ids:['taurine','electrolyte_balance','magnesium'], trigger:(l)=>(l.GLU??9)<3.9 },
-    { id:'lipidmet', label:'ТГ/липиды', icon:'🫀', markers:['TRIGLYCERIDES','HDL','LDL'], ids:['omega3','berberine','cardio_aerobic'], trigger:(l)=>(l.TRIGLYCERIDES??0)>1.7||(l.HDL??9)<1 },
+    { id:'glucose', label:'Глюкоза/IR', icon:'🍬', markers:['GLU','INS','HBA1C','HOMAIR'], ids:['berberine','alpha_lipoic','magnesium','cardio_aerobic'], trigger:(l)=>(l.GLU??0)>labNormalHigh('GLU',5.6)||(l.HOMAIR??0)>labNormalHigh('HOMAIR',2.5) },
+    { id:'hypo', label:'Гипогликемия', icon:'⚠️', markers:['GLU','K','MG'], ids:['taurine','electrolyte_balance','magnesium'], trigger:(l)=>(l.GLU??9)<labNormalLow('GLU',3.9) },
+    { id:'lipidmet', label:'ТГ/липиды', icon:'🫀', markers:['TRIGLYCERIDES','HDL','LDL'], ids:['omega3','berberine','cardio_aerobic'], trigger:(l, state)=>(l.TRIGLYCERIDES??0)>labNormalHigh('TRIGLYCERIDES',1.7)||(l.HDL??9)<hdlLowCut(state) },
   ],
 };
 const makePresets = (core: string[], lv2: string[], lv3: string[]) => [
@@ -209,13 +252,13 @@ const makePresets = (core: string[], lv2: string[], lv3: string[]) => [
   { id:'max', label:'Максимум', level:3 as const, ids:[...core, ...lv2, ...lv3] },
 ];
 const rawGenericConfigs: Record<string, Omit<GenericEnhancementConfig, 'presets'>> = {
-  cardio: { label:'ССС', icon:'❤️', color:'#ef4444', markers:['BP_SYSTOLIC','BP_DIASTOLIC','HR','LDL','HDL','TRIGLYCERIDES','APO_B','APOB','NT_PROBNP'], domains:['АД/объём','Липиды','Эндотелий/тромбоз','Ремоделирование','Ритм'], core:['hydration','cardio_aerobic','electrolyte_balance','omega3','coq10','magnesium','taurine'], lv2:['telmisartan','tadalafil','nebivolol','citrulline','pycnogenol','bergamot'], lv3:['atorvastatin','rosuvastatin'], notes:'Кардио-кандидаты выбираются по АД, ЧСС, липидам и фармакологии курса.' },
-  hepatic: { label:'Печень', icon:'🫁', color:'#f59e0b', markers:['ALT','AST','GGT','ALP','BILIRUBIN'], domains:['Цитолиз','Холестаз','Желчеотток','Оксидативный стресс','Фиброзный риск'], core:['nac','milk_thistle','glycine','selenium'], lv2:['tudca','alpha_lipoic','phosphatidylcholine'], lv3:['udca','heptral'], notes:'Для оральных 17α-алкилов приоритет печени повышается независимо от наличия текущих анализов.' },
-  renal: { label:'Почки', icon:'🫘', color:'#60a5fa', markers:['CREATININE','EGFR','CYSTATIN_C','UACR','UREA','K','NA','MG'], domains:['Гемодинамика','Гиперфильтрация','Протеинурия','Тубулярный стресс','Электролиты'], core:['hydration','electrolyte_balance','nac','astragalus','cordyceps','taurine'], lv2:['omega3','coq10','magnesium','telmisartan'], lv3:['potassium','celery_extract'], notes:'Калий и усиление ARB требуют K⁺/eGFR; при отсутствии анализа показывается warning, но базовая поддержка не исчезает.' },
-  endocrine: { label:'Эндокринная', icon:'🧪', color:'#ec4899', markers:['E2','PRL','TT','FT','LH','FSH','SHBG','CORTISOL','TSH'], domains:['Ароматизация/E2','PRL','HPTA','Кортизол','Щитовидная ось'], core:['hcg','magnesium','vitamin_d3','zinc','agmatine'], lv2:['anastrozole','ashwagandha','phosphatidylserine','magnesium_l_threonate'], lv3:['cabergoline','tamoxifen','enclomiphene'], notes:'Анастрозол — контроль E2; каберголин — только подтверждённый PRL и назначение врача.' },
-  reproductive: { label:'Репродуктивная', icon:'🧬', color:'#f472b6', markers:['TT','FT','LH','FSH','E2','PRL','SHBG'], domains:['LH/FSH','Интратестикулярный T','Сперматогенез','E2','ПКТ'], core:['hcg','zinc','magnesium','vitamin_d3','omega3'], lv2:['coq10','nac','ashwagandha','boron'], lv3:['tamoxifen','clomiphene','enclomiphene'], notes:'Состав зависит от course/bridge/pct/fertility; SERM и hCG не смешиваются без фазовой логики.' },
-  musculoskeletal: { label:'ОДА', icon:'🦴', color:'#4ade80', markers:['CRP','CK','CALCIUM','VITD','MG'], domains:['Хрящ','Сухожилия/связки','Кость','Воспаление','Травма'], core:['collagen','vitamin_c','magnesium','omega3'], lv2:['glucosamine','chondroitin','msm','curcumin','boswellia','vitamin_d3'], lv3:['bpc157','tb500','ghk_cu'], notes:'LV3 и пептиды — только отдельный врачебный/исследовательский статус; не обычная база.' },
-  metabolic: { label:'Метаболизм', icon:'🍬', color:'#fb923c', markers:['GLU','INS','HBA1C','HOMAIR','TRIGLYCERIDES','K','MG'], domains:['Глюкоза','Инсулинорезистентность','Гипогликемия','Липиды','Электролиты'], core:['cardio_aerobic','omega3','magnesium','taurine'], lv2:['berberine','alpha_lipoic','chromium'], lv3:['metformin'], notes:'При insulin/GH берберин/ALA/хром требуют отдельного контроля гипогликемии.' },
+  cardio: { label:'ССС', icon:'❤️', color:'#ef4444', markers:['LDL','HDL','TRIGLYCERIDES','APO_B','APOB','NT_PROBNP'], core:['hydration','cardio_aerobic','electrolyte_balance','omega3','coq10','magnesium','taurine'], lv2:['telmisartan','tadalafil','nebivolol','citrulline','pycnogenol','bergamot'], lv3:['atorvastatin','rosuvastatin'], notes:'Кардио-кандидаты выбираются по АД, ЧСС, липидам и фармакологии курса.' },
+  hepatic: { label:'Печень', icon:'🫁', color:'#f59e0b', markers:['ALT','AST','GGT','ALP','BILIRUBIN'], core:['nac','milk_thistle','glycine','selenium'], lv2:['tudca','alpha_lipoic','phosphatidylcholine'], lv3:['udca','heptral'], notes:'Для оральных 17α-алкилов приоритет печени повышается независимо от наличия текущих анализов.' },
+  renal: { label:'Почки', icon:'🫘', color:'#60a5fa', markers:['CREATININE','EGFR','CYSTATIN_C','UACR','UREA','K','NA','MG'], core:['hydration','electrolyte_balance','nac','astragalus','cordyceps','taurine'], lv2:['omega3','coq10','magnesium','telmisartan'], lv3:['potassium','celery_extract'], notes:'Калий и усиление ARB требуют K⁺/eGFR; при отсутствии анализа показывается warning, но базовая поддержка не исчезает.' },
+  endocrine: { label:'Эндокринная', icon:'🧪', color:'#ec4899', markers:['E2','PRL','TT','FT','LH','FSH','SHBG','CORTISOL','TSH'], core:['hcg','magnesium','vitamin_d3','zinc','agmatine'], lv2:['anastrozole','ashwagandha','phosphatidylserine','magnesium_l_threonate'], lv3:['cabergoline','tamoxifen','enclomiphene'], notes:'Анастрозол — контроль E2; каберголин — только подтверждённый PRL и назначение врача.' },
+  reproductive: { label:'Репродуктивная', icon:'🧬', color:'#f472b6', markers:['TT','FT','LH','FSH','E2','PRL','SHBG'], core:['hcg','zinc','magnesium','vitamin_d3','omega3'], lv2:['coq10','nac','ashwagandha','boron'], lv3:['tamoxifen','clomiphene','enclomiphene'], notes:'Состав зависит от course/bridge/pct/fertility; SERM и hCG не смешиваются без фазовой логики.' },
+  musculoskeletal: { label:'ОДА', icon:'🦴', color:'#4ade80', markers:['CRP','CK','CALCIUM','VITD','MG'], core:['collagen','vitamin_c','magnesium','omega3'], lv2:['glucosamine','chondroitin','msm','curcumin','boswellia','vitamin_d3'], lv3:['bpc157','tb500','ghk_cu'], notes:'LV3 и пептиды — только отдельный врачебный/исследовательский статус; не обычная база.' },
+  metabolic: { label:'Метаболизм', icon:'🍬', color:'#fb923c', markers:['GLU','INS','HBA1C','HOMAIR','TRIGLYCERIDES','K','MG'], core:['cardio_aerobic','omega3','magnesium','taurine'], lv2:['berberine','alpha_lipoic','chromium'], lv3:['metformin'], notes:'При insulin/GH берберин/ALA/хром требуют отдельного контроля гипогликемии.' },
 };
 const GENERIC_ENHANCEMENT_CONFIG = Object.fromEntries(Object.entries(rawGenericConfigs).map(([id, cfg]) => [id, { ...cfg, presets: makePresets(cfg.core, cfg.lv2, cfg.lv3) }])) as Record<string, GenericEnhancementConfig>;
 
@@ -1948,7 +1991,14 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
         const labs = labSliceToValues(currentLabSlice(state.labs), state.profile.sex);
         const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
         const activeDomains = domains.filter(d => d.trigger?.(labs, state));
-        const activeMarkers = cfg.markers.filter(m => labs[m] != null);
+        // Проход 204: «Контрольные маркеры» — это маркеры доменов (то, что решает)
+        // плюс добавка системы (то, что наблюдают после выбора). Прежний список был
+        // рукописным и разошёлся: у печени в нём не было СРБ/ферритина, на которых
+        // включается «Оксидативный стресс», а у кардио висели АД/ЧСС, которых бланк
+        // не знает. Число и единица — те же, что у чипов анализов (`flatLabUnit`).
+        const monitorMarkers = Array.from(new Set([...domains.flatMap(d => d.markers), ...cfg.markers]));
+        const labText = (m: string) => { const u = flatLabUnit(m); return u ? `${labs[m]} ${u}` : String(labs[m]); };
+        const activeMarkers = monitorMarkers.filter(m => labs[m] != null);
         const selected = genericEnhancementSelected;
         const activePreset = cfg.presets.find(p => p.ids.every(id => selected.has(id)))?.id || null;
         const autoIds = Array.from(new Set(activeDomains.flatMap(d => d.ids)));
@@ -1970,7 +2020,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                 const checked = selected.has(id) || inPlan;
                 return <button key={id} disabled={inPlan} onClick={() => toggle(id)} style={{ padding:'6px 7px', borderRadius:7, textAlign:'left', cursor:inPlan ? 'default' : 'pointer', background:checked ? `${color}20` : 'rgba(255,255,255,0.03)', border:`1px solid ${checked ? color+'66' : 'rgba(255,255,255,0.08)'}`, color:'#fff', opacity:inPlan ? 0.55 : 1, minWidth:0 }}>
                   <div style={{ fontSize:8, fontWeight:700, overflowWrap:'anywhere' }}>{checked ? '✓ ' : '○ '}{subNameRu(id)}</div>
-                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.3 }}>механизм: {cfg.domains.slice(0,2).join(', ')}</div>
+                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.55)', marginTop:2, lineHeight:1.3 }}>механизм: {domains.slice(0,2).map(d => d.label).join(', ') || '—'}</div>
                 </button>;
               })}
             </div>
@@ -1984,8 +2034,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
             </div>
             <div style={{ overflowY:'auto', padding:'10px 14px', minHeight:0 }}>
               <div style={{ padding:'7px 8px', marginBottom:8, borderRadius:8, background:`${cfg.color}12`, border:`1px solid ${cfg.color}30`, fontSize:8, lineHeight:1.5 }}>
-                <b>Механизмы:</b> {cfg.domains.join(' · ')}<br/>
-                <b>Анализы:</b> {activeMarkers.length ? activeMarkers.map(m => `${m} ${labs[m]}`).join(', ') : 'нет данных — поддержка по фармакологии курса, нужен контроль'}
+                <b>Механизмы:</b> {domains.length ? domains.map(d => d.label).join(' · ') : '—'}<br/>
+                <b>Анализы:</b> {activeMarkers.length ? activeMarkers.map(m => `${m} ${labText(m)}`).join(', ') : 'нет данных — поддержка по фармакологии курса, нужен контроль'}
               </div>
               <CalcSystemPanel
                 risk={systemRiskOf(genericEnhancementPopup)}
@@ -1994,7 +2044,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
               />
               {activeDomains.length > 0 && <button onClick={() => setGenericEnhancementSelected(new Set(autoIds))} style={{ width:'100%', padding:'8px', marginBottom:8, borderRadius:8, border:`1px solid ${cfg.color}66`, background:`${cfg.color}18`, color:'#fff', fontSize:8, fontWeight:800, cursor:'pointer', textAlign:'left' }}>⚡ AUTO по данным: {activeDomains.map(d => d.label).join(' · ')} ({autoIds.length} кандидатов)</button>}
               <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:5 }}>📊 Контрольные маркеры</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:9 }}>{cfg.markers.map(m => <span key={m} style={{ fontSize:7, padding:'2px 5px', borderRadius:4, background:labs[m] != null ? `${cfg.color}25` : 'rgba(255,255,255,0.05)', color:'#fff' }}>{m}{labs[m] != null ? `: ${labs[m]}` : ' · нет'}</span>)}</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:9 }}>{monitorMarkers.map(m => <span key={m} style={{ fontSize:7, padding:'2px 5px', borderRadius:4, background:labs[m] != null ? `${cfg.color}25` : 'rgba(255,255,255,0.05)', color:'#fff' }}>{m}{labs[m] != null ? `: ${labText(m)}` : ' · нет'}</span>)}</div>
               <div style={{ fontSize:9, fontWeight:800, color:'#fff', marginBottom:4 }}>⚡ Быстрые протоколы</div>
               <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:9 }}>
                 {cfg.presets.map(p => <button key={p.id} onClick={() => setGenericEnhancementSelected(new Set(p.ids))} style={{ padding:'7px 4px', borderRadius:7, border:`1px solid ${activePreset === p.id ? cfg.color+'aa' : 'rgba(255,255,255,0.12)'}`, background:activePreset === p.id ? `${cfg.color}25` : 'rgba(255,255,255,0.03)', color:'#fff', fontSize:8, fontWeight:700, cursor:'pointer' }}>LV{p.level} {p.label}</button>)}
@@ -2007,7 +2057,8 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     const next = new Set(prev); d.ids.forEach(id => next.add(id)); return next;
                   })} style={{ padding:'7px', borderRadius:7, textAlign:'left', cursor:'pointer', background:active ? `${cfg.color}20` : 'rgba(255,255,255,0.03)', border:`1px solid ${active ? cfg.color+'77' : 'rgba(255,255,255,0.1)'}`, color:'#fff', minWidth:0 }}>
                     <div style={{ fontSize:8, fontWeight:800 }}>{d.icon} {d.label}</div>
-                    <div style={{ fontSize:6, color:'rgba(255,255,255,0.58)', marginTop:2, lineHeight:1.3 }}>{d.markers.map(m => `${m}${labs[m] != null ? `=${labs[m]}` : ''}`).join(' · ')}</div>
+                    {d.markers.length > 0 && <div style={{ fontSize:6, color:'rgba(255,255,255,0.58)', marginTop:2, lineHeight:1.3 }}>{d.markers.map(m => `${m}${labs[m] != null ? `=${labText(m)}` : ''}`).join(' · ')}</div>}
+                    {d.note && <div style={{ fontSize:6, color:'rgba(255,255,255,0.5)', marginTop:2, lineHeight:1.3 }}>{d.note(state)}</div>}
                     {active && <div style={{ fontSize:6, color:cfg.color, marginTop:2 }}>⚡ активен по данным</div>}
                   </button>;
                 })}

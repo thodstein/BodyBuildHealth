@@ -26,6 +26,7 @@ import type { SupportLevel } from '../tz-bridge-mechanism';
 import { buildMapperCtx, labSliceToValues } from './mapper-ctx';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber } from './lab-field-number';
+import { CARDIO_EMPTY, cardioStateFromCard } from './cardio-vitals';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, CREATININE_ULN, HCT_STEPS,
   CREATININE_FLAG_STEP,
@@ -930,6 +931,17 @@ export function hydrateState(): Partial<CalculatorState> {
           injuries: Array.isArray(health.injuries) ? health.injuries.map((i: any) => typeof i === 'string' ? i : (i?.description || i?.name || '')).filter(Boolean) : [],
         } as any;
       }
+      // ── Cardio: из health.* (проход 204) ──
+      // Карточка «Здоровье» — единственное место, где человек отвечает про АД, пульс
+      // и липиды: своей карточки АД у калькулятора нет. Раньше отсюда читались только
+      // нейро, ОДА, фарма и противопоказания, поэтому `state.cardio` оставался
+      // дефолтом («норма, 70»), и ответ «прегипертония» не влиял ни на риск, ни на
+      // домены. Ключи, которых в карточке нет, не подставляются. Бланк главнее:
+      // числа из анализов перезаписывают слова ниже (блок разбора лаборатории).
+      const cardioCard = cardioStateFromCard(health as Record<string, unknown>);
+      if (Object.keys(cardioCard).length > 0) {
+        result.cardio = { ...CARDIO_EMPTY, ...(result.cardio as any || {}), ...cardioCard } as any;
+      }
       // ── Pharma: из pharma.* с маппингом ──
       if (!result.pharma) {
         // fertility → 'fertility' (было: 'base' — фертильность получала TRT-протокол
@@ -1162,7 +1174,7 @@ export function hydrateState(): Partial<CalculatorState> {
           'Creatinine', creatinine, `<${crUln}`);
       }
 
-      if (!result.cardio) result.cardio = { bpStage: 'normal', heartRate: 70, ldlElevation: 'none', hctElevation: 'none', hdlLow: false, triglycerides: 'normal', previousCVD: false, familyCVD: false } as any;
+      if (!result.cardio) result.cardio = { ...CARDIO_EMPTY } as any;
       const card = result.cardio!;
       if (ldl !== null) {
         card.ldlElevation = ldl < LDL_FLAG_STEPS.mild ? 'none' : ldl < LDL_FLAG_STEPS.moderate ? 'mild' : ldl < LDL_FLAG_STEPS.severe ? 'moderate' : 'severe';
