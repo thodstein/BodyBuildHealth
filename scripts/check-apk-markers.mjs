@@ -513,6 +513,59 @@ mustContain(
   'voice notes: share attachment',
 );
 
+// 7f. Заметки профиля: хитбоксы 44px и хуки в духе TickTick: вид/сортировка/теги/корзина.
+// Тихий откат в shared-worktree уже возвращал 24-26px оверлеи на фото и 32px чек-лист:
+// снаружи это выглядело как рабочая кнопка, а в WebView по ним не попасть.
+const NOTES_UI = 'src/ui/screens/ProfileScreen_v2/ProfileNotesTab.tsx';
+for (const hook of [
+  'data-notes="view"',
+  'data-notes="sort"',
+  'data-notes="note-tag"',
+  'data-notes="restore"',
+  'data-notes="purge-trash"',
+  'data-notes="checklist-toggle"',
+])
+  mustContain(NOTES_UI, hook, `notes hook ${hook}`);
+{
+  const text = readFileSync(join(root, NOTES_UI), 'utf8');
+  const small = [];
+  for (const m of text.matchAll(/<(button|input)\b/g)) {
+    // Открывающий тег целиком: стрелки onClick не должны обрывать разбор.
+    let curly = 0;
+    let quote = null;
+    let end = -1;
+    for (let i = m.index + m[0].length; i < text.length; i++) {
+      const ch = text[i];
+      if (quote) {
+        if (ch === quote && text[i - 1] !== '\\') quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '{') curly++;
+      else if (ch === '}') curly--;
+      else if (ch === '>' && curly === 0) {
+        end = i;
+        break;
+      }
+    }
+    if (end < 0) continue;
+    const tag = text.slice(m.index, end);
+    // У нативного чекбокса/радио цель — <label> вокруг, а не сам 18px квадрат.
+    if (/type=["'](checkbox|radio)["']/.test(tag)) continue;
+    const at = text.slice(0, m.index).split('\n').length;
+    const minH = Number(/minHeight:\s*(\d+)/.exec(tag)?.[1] ?? 0);
+    const w = Number(/(?:^|[\s{,])width:\s*(\d+)\b/.exec(tag)?.[1] ?? 0);
+    const h = Number(/(?:^|[\s{,])height:\s*(\d+)\b/.exec(tag)?.[1] ?? 0);
+    if (minH && minH < 44) small.push(`:${at} minHeight ${minH}px`);
+    else if (!minH && w && h && w < 44 && h < 44) {
+      small.push(`:${at} ${w}×${h}px`);
+    }
+  }
+  if (small.length) {
+    fails.push(`TAP-44 в ${NOTES_UI}: ${small.slice(0, 3).join(', ')}`);
+  }
+}
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',

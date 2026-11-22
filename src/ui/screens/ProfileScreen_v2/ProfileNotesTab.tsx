@@ -1525,7 +1525,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               type="button"
               onClick={resetFilters}
               data-notes="filter-reset"
-              style={{ ...btn('ghost'), minHeight: 34, padding: '4px 10px', fontSize: 11.5 }}
+              style={{ ...btn('ghost'), minHeight: 44, padding: '4px 10px', fontSize: 11.5 }}
             >
               Сбросить фильтры
             </button>
@@ -1879,20 +1879,34 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     data-notes="attach-remove"
                     style={{
                       position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      width: 24,
-                      height: 24,
-                      borderRadius: 8,
-                      border: '1px solid rgba(255,255,255,0.16)',
-                      background: 'rgba(0,0,0,0.45)',
+                      top: 0,
+                      right: 0,
+                      width: 44,
+                      height: 44,
+                      padding: 0,
+                      border: 'none',
+                      background: 'transparent',
                       color: '#fff',
                       cursor: 'pointer',
-                      fontSize: 12,
-                      lineHeight: 1,
+                      display: 'grid',
+                      placeItems: 'center',
                     }}
                   >
-                    ✕
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 8,
+                        border: '1px solid rgba(255,255,255,0.16)',
+                        background: 'rgba(0,0,0,0.45)',
+                        fontSize: 12,
+                        lineHeight: '22px',
+                        textAlign: 'center',
+                      }}
+                    >
+                      ✕
+                    </span>
                   </button>
                 </div>
               ))}
@@ -1968,7 +1982,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   placeholder={`Пункт ${i + 1}`}
                   aria-label={`Пункт чек-листа ${i + 1}`}
                   data-notes="checklist-input"
-                  style={{ ...inputStyle, flex: 1, minHeight: 38, padding: '7px 10px', fontSize: 12.5 }}
+                  style={{ ...inputStyle, flex: 1, minHeight: 44, padding: '7px 10px', fontSize: 12.5 }}
                 />
                 <button
                   type="button"
@@ -1977,7 +1991,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   onClick={() =>
                     setEditor((s) => (s ? { ...s, checklist: s.checklist.filter((_, xi) => xi !== i) } : s))
                   }
-                  style={{ ...btn('ghost'), minHeight: 38, padding: '4px 10px', fontSize: 12 }}
+                  style={{ ...btn('ghost'), minHeight: 44, minWidth: 44, padding: '4px 10px', fontSize: 12 }}
                 >
                   ✕
                 </button>
@@ -2107,7 +2121,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                 type="button"
                 onClick={resetFilters}
                 data-notes="empty-reset"
-                style={{ ...btn('ghost'), minHeight: 36, marginTop: 10, fontSize: 11.5 }}
+                style={{ ...btn('ghost'), minHeight: 44, marginTop: 10, fontSize: 11.5 }}
               >
                 Сбросить фильтры
               </button>
@@ -2200,7 +2214,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                               onClick={() => setExpandedBodies((prev) => ({ ...prev, [n.id]: !open }))}
                               style={{
                                 ...btn('ghost'),
-                                minHeight: 34,
+                                minHeight: 44,
                                 marginTop: 6,
                                 padding: '4px 10px',
                                 fontSize: 11.5,
@@ -2256,20 +2270,34 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                   onClick={() => shareAttachment(a)}
                                   style={{
                                     position: 'absolute',
-                                    right: 3,
-                                    bottom: 3,
-                                    width: 26,
-                                    height: 26,
-                                    borderRadius: 8,
-                                    border: '1px solid rgba(255,255,255,0.18)',
-                                    background: 'rgba(0,0,0,0.55)',
+                                    right: 0,
+                                    bottom: 0,
+                                    width: 44,
+                                    height: 44,
+                                    padding: 0,
+                                    border: 'none',
+                                    background: 'transparent',
                                     color: '#fff',
                                     cursor: 'pointer',
-                                    fontSize: 12,
-                                    lineHeight: 1,
+                                    display: 'grid',
+                                    placeItems: 'center',
                                   }}
                                 >
-                                  ⤓
+                                  <span
+                                    aria-hidden="true"
+                                    style={{
+                                      width: 26,
+                                      height: 26,
+                                      borderRadius: 8,
+                                      border: '1px solid rgba(255,255,255,0.18)',
+                                      background: 'rgba(0,0,0,0.55)',
+                                      fontSize: 12,
+                                      lineHeight: '24px',
+                                      textAlign: 'center',
+                                    }}
+                                  >
+                                    ⤓
+                                  </span>
                                 </button>
                               </div>
                             ) : (
@@ -2306,7 +2334,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                               data-notes="share"
                               aria-label="Поделиться аудио"
                               onClick={() => shareAttachment(a)}
-                              style={{ ...btn('ghost'), minHeight: 34, padding: '4px 10px', fontSize: 11.5 }}
+                              style={{ ...btn('ghost'), minHeight: 44, padding: '4px 10px', fontSize: 11.5 }}
                             >
                               ⤓ Сохранить
                             </button>
@@ -2366,7 +2394,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                   alignItems: 'flex-start',
                                   gap: 8,
                                   textAlign: 'left',
-                                  minHeight: 32,
+                                  minHeight: 44,
                                   padding: '4px 6px',
                                   borderRadius: 8,
                                   cursor: 'pointer',
@@ -2407,7 +2435,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                               onClick={() => setExpandedChecklists((prev) => ({ ...prev, [n.id]: !open }))}
                               style={{
                                 ...btn('ghost'),
-                                minHeight: 34,
+                                minHeight: 44,
                                 marginTop: 6,
                                 padding: '4px 10px',
                                 fontSize: 11.5,
