@@ -376,6 +376,41 @@ describe('DiaryHistoryView — главная карточка истории', 
     expect(container.querySelector('.th-main')).toBeTruthy();
     expect(container.querySelector('.ww-card')).toBeTruthy();
   });
+
+  it('порядок истории: фильтры → недели → аналитика (список не спрятан под сводками)', async () => {
+    const { TrainingDiaryHub } = await import('../TrainingDiaryHub');
+    const w1 = mkHistory()[0];
+    const w2 = { ...w1, id: 'w2', date: '2026-09-03' };
+    const { container } = render(
+      <TrainingDiaryHub
+        initialMode="history"
+        diary={{ checkProgressionAlerts: async () => [] } as never}
+        diaryStats={[]}
+        diaryProgress={[{ week: 36, year: 2026, totalVolume: 5000, workoutCount: 2, compoundWorkouts: 2, isolationWorkouts: 0, total1RM: 100 }]}
+        historyWorkouts={[w1, w2] as never}
+        macrocycle={null}
+        selectedWeek={1}
+        level="intermediate"
+        onRefresh={() => {}}
+        trainingOutput={null}
+        goal="bulk"
+        daysPerWeek={3}
+        splitType="auto"
+        periodizationType="auto"
+        mesoLength={8}
+        tprofile={{ onCourse: false }}
+        linked={{}}
+      />,
+    );
+    const html = container.innerHTML;
+    const filters = html.indexOf('th-filters');
+    const week = html.indexOf('ww-card');
+    const analytics = html.indexOf('data-pl="history-analytics"');
+    expect(filters).toBeGreaterThan(-1);
+    // Раньше «План vs факт» и сводки шли первыми и оттесняли список тренировок вниз
+    expect(week).toBeGreaterThan(filters);
+    expect(analytics).toBeGreaterThan(week);
+  });
 });
 
 describe('DiarySubnav — сквозная навигация по 10 разделам', () => {

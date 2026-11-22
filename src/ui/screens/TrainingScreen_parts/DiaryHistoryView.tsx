@@ -97,6 +97,359 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           )}
 
+          {/* Фильтр по мезоциклу (если записи тегированы mesocycleId) */}
+          {mesoIds.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+              <button onClick={() => setMesoFilter('all')} style={{
+                padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                border: mesoFilter === 'all' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
+                background: mesoFilter === 'all' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                color: mesoFilter === 'all' ? 'var(--accent)' : '#fff',
+              }}>Все мезоциклы</button>
+              {mesoIds.map(id => (
+                <button key={id} onClick={() => setMesoFilter(mesoFilter === id ? 'all' : id)} style={{
+                  padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                  border: mesoFilter === id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
+                  background: mesoFilter === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: mesoFilter === id ? 'var(--accent)' : '#fff',
+                }}>📈 {id}</button>
+              ))}
+            </div>
+          )}
+          {/* Search + group filter — неблокирующий ввод (deferred), декор без изменений */}
+          <div className="th-filters" style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2, opacity: isPending ? 0.85 : 1, transition: 'opacity 0.15s' }} />
+            <button onClick={() => setGroupPickerOpen(true)} style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+              padding: '10px 12px', borderRadius: 10, cursor: 'pointer', minWidth: 0,
+              background: filterGroup !== 'all' ? `${GROUP_COLORS[filterGroup]}1a` : 'rgba(255,255,255,0.06)',
+              border: filterGroup !== 'all' ? `1px solid ${GROUP_COLORS[filterGroup]}66` : '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', fontSize: 12, fontWeight: 600,
+            }}>
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>💪 {filterGroup === 'all' ? 'Все группы' : GRP_RU[filterGroup]}</span>
+              <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+            </button>
+          </div>
+          {groupPickerOpen && (
+            <div className="th-popup-backdrop" onClick={() => setGroupPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+              <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>💪 Выбор по группам</div>
+                  <button onClick={() => setGroupPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  <button onClick={() => { setFilterGroup('all'); setGroupPickerOpen(false); }} style={{
+                    padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    border: filterGroup === 'all' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.12)',
+                    background: filterGroup === 'all' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+                    color: '#fff',
+                  }}>Все группы</button>
+                  {Object.entries(GRP_RU).map(([k, v]) => (
+                    <button key={k} onClick={() => { setFilterGroup(k); setGroupPickerOpen(false); }} style={{
+                      padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      border: filterGroup === k ? `2px solid ${GROUP_COLORS[k]}` : '1px solid rgba(255,255,255,0.12)',
+                      background: filterGroup === k ? `${GROUP_COLORS[k]}1f` : 'rgba(255,255,255,0.04)',
+                      color: '#fff',
+                    }}>{v}{filterGroup === k ? ' ✓' : ''}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Exercise filter (card-button + popup) */}
+          {allExerciseNames.length > 0 && (
+            <>
+              <div style={{ marginBottom: 6 }}>
+                <button onClick={() => { setExSearch(''); setExPickerOpen(true); }} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: historyExerciseFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
+                  border: historyExerciseFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
+                }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏋️ {historyExerciseFilter || 'Все упражнения'}</span>
+                  {historyExerciseFilter ? (
+                    <span onClick={e => { e.stopPropagation(); setHistoryExerciseFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
+                  ) : (
+                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+                  )}
+                </button>
+              </div>
+              {exPickerOpen && (
+                <div className="th-popup-backdrop" onClick={() => setExPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>🏋️ Фильтр по упражнению</div>
+                      <button onClick={() => setExPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                    </div>
+                    <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="🔍 Найти упражнение..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 10, opacity: isPending ? 0.85 : 1 }} />
+                    <div style={{ maxHeight: '50vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {allExerciseNames.filter(n => !deferredExSearch || n.toLowerCase().includes(deferredExSearch.toLowerCase())).map(n => (
+                        <button key={n} onClick={() => { setHistoryExerciseFilter(n); setExPickerOpen(false); }} style={{
+                          width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                          border: historyExerciseFilter === n ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                          background: historyExerciseFilter === n ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                          color: '#fff', fontSize: 12,
+                        }}>{n}{historyExerciseFilter === n ? ' ✓' : ''}</button>
+                      ))}
+                      <button onClick={() => { setHistoryExerciseFilter(''); setExPickerOpen(false); }} style={{
+                        width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                        border: !historyExerciseFilter ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                        background: !historyExerciseFilter ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
+                        color: '#fff', fontSize: 12, fontWeight: 700,
+                      }}>Все упражнения</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {/* Notes filter (card-button + popup) */}
+          {groupedHistory.some(([, ws]) => ws.some(w => w.notes)) && (
+            <>
+              <div style={{ marginBottom: 6 }}>
+                <button onClick={() => setNotesPickerOpen(true)} style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                  background: notesFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
+                  border: notesFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
+                }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📝 {notesFilter || 'Фильтр по заметкам'}</span>
+                  {notesFilter ? (
+                    <span onClick={e => { e.stopPropagation(); setNotesFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
+                  ) : (
+                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
+                  )}
+                </button>
+              </div>
+              {notesPickerOpen && (
+                <div className="th-popup-backdrop" onClick={() => setNotesPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
+                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>📝 Фильтр по заметкам</div>
+                      <button onClick={() => setNotesPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
+                    </div>
+                    <input type="text" value={notesFilter} onChange={e => setNotesFilter(e.target.value)} placeholder="Текст заметки / сплита..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 12 }} />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => { setNotesFilter(''); setNotesPickerOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 600, fontSize: 12 }}>Сбросить</button>
+                      <button onClick={() => setNotesPickerOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12 }}>Готово</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {filteredHistory.length > 0 && (
+            <div className="th-expand" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
+              <button onClick={() => setHistoryExpanded('__all__')} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Развернуть все</button>
+              <button onClick={() => setHistoryExpanded(null)} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Свернуть все</button>
+            </div>
+          )}
+          {/* Exercise-specific stats when filtered */}
+          {historyExerciseFilter && filteredHistoryWorkouts.length > 0 && (() => {
+            const q = historyExerciseFilter.toLowerCase();
+            const exSessions = filteredHistoryWorkouts.flatMap(w => w.exercises.filter((e: any) => (e.exerciseName || '').toLowerCase().includes(q)));
+            const totalVol = exSessions.reduce((s, e) => s + (e.totalVolume || 0), 0);
+            const bestE1RM = Math.max(0, ...exSessions.map((e: any) => e.estimated1RM || 0));
+            const totalSets = exSessions.reduce((s, e) => s + (e.sets?.length || 0), 0);
+            const latestE1RM = exSessions[exSessions.length - 1]?.estimated1RM || 0;
+            const prevE1RM = exSessions.length >= 2 ? exSessions[exSessions.length - 2]?.estimated1RM || 0 : latestE1RM;
+            const delta = prevE1RM > 0 ? Math.round(((latestE1RM - prevE1RM) / prevE1RM) * 100) : 0;
+            return (
+              <div style={style.card}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={style.label}>🏋️ {historyExerciseFilter}</div>
+                  <button onClick={() => setHistoryExerciseFilter('')} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}>✕ сброс</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: '#fff' }}>Объём</div>
+                    <div style={{ fontWeight: 700, color: ACCENT }}>{(totalVol / 1000).toFixed(1)}т кг</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: '#fff' }}>Лучший e1RM</div>
+                    <div style={{ fontWeight: 700, color: '#f59e0b' }}>{Math.round(bestE1RM)} кг</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: '#fff' }}>Сетов</div>
+                    <div style={{ fontWeight: 700, color: '#60a5fa' }}>{totalSets}</div>
+                  </div>
+                </div>
+                {delta !== 0 && (
+                  <div style={{ fontSize: 10, textAlign: 'center', marginTop: 4, color: delta > 0 ? '#22c55e' : '#ef4444' }}>
+                    {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}% к предыдущему e1RM
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {/* Психо-чек-ины: сводка (из вкладки «Психология») — мемоизировано, не дергает localStorage каждый рендер */}
+          {mindsetSummary && (() => {
+            const { checks, adh, trends, last } = mindsetSummary;
+            const avg = (v: number) => v > 0 ? v.toFixed(1) : '—';
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label} >🧠 Психо-чек-ины</div>
+                  <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.8)' }}>последний: {last.date.slice(5).replace('-', '.')} · уверенность {last.confidence}/5</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Чек-инов · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{trends.count}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: adh.pct >= 80 ? '#22c55e' : adh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{adh.total > 0 ? `${adh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Фокус · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{avg(trends.averages.focus)}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Уверенность · 14д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{avg(trends.averages.confidence)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Мобильность: сводка (из вкладки «Мобильность») — мемоизировано */}
+          {mobilitySummary && (() => {
+            const { adh: madh, trends: mtr, last: mlast } = mobilitySummary;
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>🧘 Мобильность</div>
+                  <span style={{ fontSize: 9, color: 'rgba(96,165,250,0.8)' }}>
+                    последний: {mlast.date.slice(5).replace('-', '.')} · ROM {mlast.romScore === null ? '—' : `${mlast.romScore}/5`}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Чек-инов · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{mtr.count}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: madh.pct >= 70 ? '#22c55e' : madh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{madh.total > 0 ? `${madh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Средний ROM</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{mtr.avgRom > 0 ? mtr.avgRom.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{madh.done}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Разминка: сводка (дневник разминки) — мемоизировано */}
+          {warmupSummary && (() => {
+            const { adh: wadh, q: wq, last: wlast } = warmupSummary;
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>🔥 Разминка</div>
+                  <span style={{ fontSize: 9, color: 'rgba(249,115,22,0.8)' }}>
+                    последний: {wlast.date.slice(5).replace('-', '.')} · {wlast.done ? `выполнена${wlast.quality !== null ? `, качество ${wlast.quality}/5` : ''}` : 'пропущена'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316' }}>{wadh.total}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: wadh.pct >= 80 ? '#22c55e' : wadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{wadh.total > 0 ? `${wadh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Ср. качество</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{wq.count > 0 ? wq.avg.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wadh.done}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {/* Заминка: сводка (дневник заминки) — мемоизировано */}
+          {cooldownSummary && (() => {
+            const { adh: cadh, q: cq, last: clast } = cooldownSummary;
+            return (
+              <div style={{ ...style.card, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={style.label}>❄️ Заминка</div>
+                  <span style={{ fontSize: 9, color: 'rgba(56,189,248,0.8)' }}>
+                    последний: {clast.date.slice(5).replace('-', '.')} · {clast.done ? `выполнена${clast.quality !== null ? `, качество ${clast.quality}/5` : ''}` : 'пропущена'}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#38bdf8' }}>{cadh.total}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: cadh.pct >= 80 ? '#22c55e' : cadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{cadh.total > 0 ? `${cadh.pct}%` : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Ср. качество</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{cq.count > 0 ? cq.avg.toFixed(1) : '—'}</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{cadh.done}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          {isPending && <DiarySkeletonCard lines={4} />}
+          {visibleHistory.map(([week, workouts], wi) => (
+            <WorkoutWeekCard
+              key={week}
+              weekLabel={week}
+              workouts={workouts}
+              prevWorkouts={wi < visibleHistory.length - 1 ? visibleHistory[wi + 1][1] : undefined}
+              e1rmSeries={bestE1rmSeriesForWeek(workouts)}
+              level={hub.level}
+              expanded={historyExpanded === '__all__' || historyExpanded === week}
+              onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
+              onEdit={handleEditWorkout}
+              onDelete={w => setConfirmDeleteId(w.id)}
+              confirmDeleteId={confirmDeleteId}
+              onConfirmDelete={handleDeleteWorkout}
+              onCancelDelete={() => setConfirmDeleteId(null)}
+            />
+          ))}
+                     {hasMoreHistory && (
+            <button className="th-more" onClick={() => setHistoryVisibleCount(historyVisibleCount + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+              Показать еще 10 · осталось {filteredHistory.length - visibleHistory.length}
+            </button>
+          )}
+          {filteredHistory.length === 0 && (
+            <DiaryEmptyState
+              icon="📜"
+              title={search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок'}
+              description={search || historyExerciseFilter
+                ? 'Попробуйте изменить поиск или сбросить фильтры.'
+                : 'Запишите первую тренировку — она появится здесь.'}
+              onRecord={!search && !historyExerciseFilter ? () => { setMode('record'); onGoRecord?.(); } : undefined}
+            />
+          )}
+
+          {/* Аналитика и сводки — под списком: сначала тренировки, потом разбор */}
+          <div data-pl="history-analytics" style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 6px' }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.4, color: ACCENT, textTransform: 'uppercase' }}>📊 Аналитика и сводки</span>
+            <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+          </div>
           {/* План vs факт: синхронизация с планом недели */}
           {trainingOutput?.plan && trainingOutput.plan.some((d: any) => (d.exercises || []).length > 0) && (() => {
             const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
@@ -559,353 +912,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             );
           })()}
-          {/* Фильтр по мезоциклу (если записи тегированы mesocycleId) */}
-          {mesoIds.length > 0 && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-              <button onClick={() => setMesoFilter('all')} style={{
-                padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                border: mesoFilter === 'all' ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
-                background: mesoFilter === 'all' ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                color: mesoFilter === 'all' ? 'var(--accent)' : '#fff',
-              }}>Все мезоциклы</button>
-              {mesoIds.map(id => (
-                <button key={id} onClick={() => setMesoFilter(mesoFilter === id ? 'all' : id)} style={{
-                  padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                  border: mesoFilter === id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
-                  background: mesoFilter === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: mesoFilter === id ? 'var(--accent)' : '#fff',
-                }}>📈 {id}</button>
-              ))}
-            </div>
-          )}
-          {/* Search + group filter — неблокирующий ввод (deferred), декор без изменений */}
-          <div className="th-filters" style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'stretch' }}>
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по неделе..." style={{ ...style.input, flex: 2, opacity: isPending ? 0.85 : 1, transition: 'opacity 0.15s' }} />
-            <button onClick={() => setGroupPickerOpen(true)} style={{
-              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-              padding: '10px 12px', borderRadius: 10, cursor: 'pointer', minWidth: 0,
-              background: filterGroup !== 'all' ? `${GROUP_COLORS[filterGroup]}1a` : 'rgba(255,255,255,0.06)',
-              border: filterGroup !== 'all' ? `1px solid ${GROUP_COLORS[filterGroup]}66` : '1px solid rgba(255,255,255,0.12)',
-              color: '#fff', fontSize: 12, fontWeight: 600,
-            }}>
-              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>💪 {filterGroup === 'all' ? 'Все группы' : GRP_RU[filterGroup]}</span>
-              <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
-            </button>
-          </div>
-          {groupPickerOpen && (
-            <div className="th-popup-backdrop" onClick={() => setGroupPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-              <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>💪 Выбор по группам</div>
-                  <button onClick={() => setGroupPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  <button onClick={() => { setFilterGroup('all'); setGroupPickerOpen(false); }} style={{
-                    padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    border: filterGroup === 'all' ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.12)',
-                    background: filterGroup === 'all' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
-                    color: '#fff',
-                  }}>Все группы</button>
-                  {Object.entries(GRP_RU).map(([k, v]) => (
-                    <button key={k} onClick={() => { setFilterGroup(k); setGroupPickerOpen(false); }} style={{
-                      padding: '10px 14px', borderRadius: 12, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      border: filterGroup === k ? `2px solid ${GROUP_COLORS[k]}` : '1px solid rgba(255,255,255,0.12)',
-                      background: filterGroup === k ? `${GROUP_COLORS[k]}1f` : 'rgba(255,255,255,0.04)',
-                      color: '#fff',
-                    }}>{v}{filterGroup === k ? ' ✓' : ''}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-          {/* Exercise filter (card-button + popup) */}
-          {allExerciseNames.length > 0 && (
-            <>
-              <div style={{ marginBottom: 6 }}>
-                <button onClick={() => { setExSearch(''); setExPickerOpen(true); }} style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                  background: historyExerciseFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
-                  border: historyExerciseFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
-                }}>
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🏋️ {historyExerciseFilter || 'Все упражнения'}</span>
-                  {historyExerciseFilter ? (
-                    <span onClick={e => { e.stopPropagation(); setHistoryExerciseFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
-                  ) : (
-                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
-                  )}
-                </button>
-              </div>
-              {exPickerOpen && (
-                <div className="th-popup-backdrop" onClick={() => setExPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>🏋️ Фильтр по упражнению</div>
-                      <button onClick={() => setExPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
-                    </div>
-                    <input type="text" value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder="🔍 Найти упражнение..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 10, opacity: isPending ? 0.85 : 1 }} />
-                    <div style={{ maxHeight: '50vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {allExerciseNames.filter(n => !deferredExSearch || n.toLowerCase().includes(deferredExSearch.toLowerCase())).map(n => (
-                        <button key={n} onClick={() => { setHistoryExerciseFilter(n); setExPickerOpen(false); }} style={{
-                          width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                          border: historyExerciseFilter === n ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                          background: historyExerciseFilter === n ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                          color: '#fff', fontSize: 12,
-                        }}>{n}{historyExerciseFilter === n ? ' ✓' : ''}</button>
-                      ))}
-                      <button onClick={() => { setHistoryExerciseFilter(''); setExPickerOpen(false); }} style={{
-                        width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-                        border: !historyExerciseFilter ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                        background: !historyExerciseFilter ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                        color: '#fff', fontSize: 12, fontWeight: 700,
-                      }}>Все упражнения</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {/* Notes filter (card-button + popup) */}
-          {groupedHistory.some(([, ws]) => ws.some(w => w.notes)) && (
-            <>
-              <div style={{ marginBottom: 6 }}>
-                <button onClick={() => setNotesPickerOpen(true)} style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-                  padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-                  background: notesFilter ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.06)',
-                  border: notesFilter ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                  color: '#fff', fontSize: 12, fontWeight: 600, minHeight: 40,
-                }}>
-                  <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📝 {notesFilter || 'Фильтр по заметкам'}</span>
-                  {notesFilter ? (
-                    <span onClick={e => { e.stopPropagation(); setNotesFilter(''); }} style={{ flexShrink: 0, fontSize: 13, opacity: 0.85 }}>✕</span>
-                  ) : (
-                    <span style={{ fontSize: 10, opacity: 0.85, flexShrink: 0 }}>▾</span>
-                  )}
-                </button>
-              </div>
-              {notesPickerOpen && (
-                <div className="th-popup-backdrop" onClick={() => setNotesPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', padding: 16 }}>
-                  <div className="th-popup-card" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 420, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 48px rgba(0,0,0,0.5)', padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>📝 Фильтр по заметкам</div>
-                      <button onClick={() => setNotesPickerOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1 }}>✕</button>
-                    </div>
-                    <input type="text" value={notesFilter} onChange={e => setNotesFilter(e.target.value)} placeholder="Текст заметки / сплита..." autoFocus style={{ ...style.input, width: '100%', marginBottom: 12 }} />
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button onClick={() => { setNotesFilter(''); setNotesPickerOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 600, fontSize: 12 }}>Сбросить</button>
-                      <button onClick={() => setNotesPickerOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 12 }}>Готово</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-          {filteredHistory.length > 0 && (
-            <div className="th-expand" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6, gap: 6 }}>
-              <button onClick={() => setHistoryExpanded('__all__')} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Развернуть все</button>
-              <button onClick={() => setHistoryExpanded(null)} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Свернуть все</button>
-            </div>
-          )}
-          {/* Exercise-specific stats when filtered */}
-          {historyExerciseFilter && filteredHistoryWorkouts.length > 0 && (() => {
-            const q = historyExerciseFilter.toLowerCase();
-            const exSessions = filteredHistoryWorkouts.flatMap(w => w.exercises.filter((e: any) => (e.exerciseName || '').toLowerCase().includes(q)));
-            const totalVol = exSessions.reduce((s, e) => s + (e.totalVolume || 0), 0);
-            const bestE1RM = Math.max(0, ...exSessions.map((e: any) => e.estimated1RM || 0));
-            const totalSets = exSessions.reduce((s, e) => s + (e.sets?.length || 0), 0);
-            const latestE1RM = exSessions[exSessions.length - 1]?.estimated1RM || 0;
-            const prevE1RM = exSessions.length >= 2 ? exSessions[exSessions.length - 2]?.estimated1RM || 0 : latestE1RM;
-            const delta = prevE1RM > 0 ? Math.round(((latestE1RM - prevE1RM) / prevE1RM) * 100) : 0;
-            return (
-              <div style={style.card}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={style.label}>🏋️ {historyExerciseFilter}</div>
-                  <button onClick={() => setHistoryExerciseFilter('')} style={{ fontSize: 10, color: '#fff', background: 'none', border: 'none', cursor: 'pointer' }}>✕ сброс</button>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: '#fff' }}>Объём</div>
-                    <div style={{ fontWeight: 700, color: ACCENT }}>{(totalVol / 1000).toFixed(1)}т кг</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: '#fff' }}>Лучший e1RM</div>
-                    <div style={{ fontWeight: 700, color: '#f59e0b' }}>{Math.round(bestE1RM)} кг</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: '#fff' }}>Сетов</div>
-                    <div style={{ fontWeight: 700, color: '#60a5fa' }}>{totalSets}</div>
-                  </div>
-                </div>
-                {delta !== 0 && (
-                  <div style={{ fontSize: 10, textAlign: 'center', marginTop: 4, color: delta > 0 ? '#22c55e' : '#ef4444' }}>
-                    {delta > 0 ? '↑' : '↓'} {Math.abs(delta)}% к предыдущему e1RM
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          {/* Психо-чек-ины: сводка (из вкладки «Психология») — мемоизировано, не дергает localStorage каждый рендер */}
-          {mindsetSummary && (() => {
-            const { checks, adh, trends, last } = mindsetSummary;
-            const avg = (v: number) => v > 0 ? v.toFixed(1) : '—';
-            return (
-              <div style={{ ...style.card, border: '1px solid rgba(167,139,250,0.2)', background: 'rgba(167,139,250,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={style.label} >🧠 Психо-чек-ины</div>
-                  <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.8)' }}>последний: {last.date.slice(5).replace('-', '.')} · уверенность {last.confidence}/5</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Чек-инов · 14д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{trends.count}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: adh.pct >= 80 ? '#22c55e' : adh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{adh.total > 0 ? `${adh.pct}%` : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Фокус · 14д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{avg(trends.averages.focus)}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Уверенность · 14д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{avg(trends.averages.confidence)}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          {/* Мобильность: сводка (из вкладки «Мобильность») — мемоизировано */}
-          {mobilitySummary && (() => {
-            const { adh: madh, trends: mtr, last: mlast } = mobilitySummary;
-            return (
-              <div style={{ ...style.card, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={style.label}>🧘 Мобильность</div>
-                  <span style={{ fontSize: 9, color: 'rgba(96,165,250,0.8)' }}>
-                    последний: {mlast.date.slice(5).replace('-', '.')} · ROM {mlast.romScore === null ? '—' : `${mlast.romScore}/5`}
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Чек-инов · 30д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{mtr.count}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: madh.pct >= 70 ? '#22c55e' : madh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{madh.total > 0 ? `${madh.pct}%` : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Средний ROM</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{mtr.avgRom > 0 ? mtr.avgRom.toFixed(1) : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{madh.done}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          {/* Разминка: сводка (дневник разминки) — мемоизировано */}
-          {warmupSummary && (() => {
-            const { adh: wadh, q: wq, last: wlast } = warmupSummary;
-            return (
-              <div style={{ ...style.card, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={style.label}>🔥 Разминка</div>
-                  <span style={{ fontSize: 9, color: 'rgba(249,115,22,0.8)' }}>
-                    последний: {wlast.date.slice(5).replace('-', '.')} · {wlast.done ? `выполнена${wlast.quality !== null ? `, качество ${wlast.quality}/5` : ''}` : 'пропущена'}
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Записей · 30д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316' }}>{wadh.total}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: wadh.pct >= 80 ? '#22c55e' : wadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{wadh.total > 0 ? `${wadh.pct}%` : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Ср. качество</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{wq.count > 0 ? wq.avg.toFixed(1) : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wadh.done}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          {/* Заминка: сводка (дневник заминки) — мемоизировано */}
-          {cooldownSummary && (() => {
-            const { adh: cadh, q: cq, last: clast } = cooldownSummary;
-            return (
-              <div style={{ ...style.card, border: '1px solid rgba(56,189,248,0.2)', background: 'rgba(56,189,248,0.04)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={style.label}>❄️ Заминка</div>
-                  <span style={{ fontSize: 9, color: 'rgba(56,189,248,0.8)' }}>
-                    последний: {clast.date.slice(5).replace('-', '.')} · {clast.done ? `выполнена${clast.quality !== null ? `, качество ${clast.quality}/5` : ''}` : 'пропущена'}
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Записей · 30д</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#38bdf8' }}>{cadh.total}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Приверженность</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: cadh.pct >= 80 ? '#22c55e' : cadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{cadh.total > 0 ? `${cadh.pct}%` : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Ср. качество</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{cq.count > 0 ? cq.avg.toFixed(1) : '—'}</div>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: '#fff' }}>Выполнено дней</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{cadh.done}</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-          {isPending && <DiarySkeletonCard lines={4} />}
-          {visibleHistory.map(([week, workouts], wi) => (
-            <WorkoutWeekCard
-              key={week}
-              weekLabel={week}
-              workouts={workouts}
-              prevWorkouts={wi < visibleHistory.length - 1 ? visibleHistory[wi + 1][1] : undefined}
-              e1rmSeries={bestE1rmSeriesForWeek(workouts)}
-              level={hub.level}
-              expanded={historyExpanded === '__all__' || historyExpanded === week}
-              onToggle={() => setHistoryExpanded((prev: string | null) => prev === week ? null : week)}
-              onEdit={handleEditWorkout}
-              onDelete={w => setConfirmDeleteId(w.id)}
-              confirmDeleteId={confirmDeleteId}
-              onConfirmDelete={handleDeleteWorkout}
-              onCancelDelete={() => setConfirmDeleteId(null)}
-            />
-          ))}
-                     {hasMoreHistory && (
-            <button className="th-more" onClick={() => setHistoryVisibleCount(historyVisibleCount + 10)} style={{ width:'100%', padding:'10px', borderRadius:10, border:'1px solid rgba(168,85,247,0.22)', background:'rgba(168,85,247,0.08)', color:'#a78bfa', fontWeight:700, fontSize:11, cursor:'pointer' }}>
-              Показать еще 10 · осталось {filteredHistory.length - visibleHistory.length}
-            </button>
-          )}
-          {filteredHistory.length === 0 && (
-            <DiaryEmptyState
-              icon="📜"
-              title={search || historyExerciseFilter ? 'Ничего не найдено' : 'Нет тренировок'}
-              description={search || historyExerciseFilter
-                ? 'Попробуйте изменить поиск или сбросить фильтры.'
-                : 'Запишите первую тренировку — она появится здесь.'}
-              onRecord={!search && !historyExerciseFilter ? () => { setMode('record'); onGoRecord?.(); } : undefined}
-            />
-          )}
+
         </div>
   );
 };
