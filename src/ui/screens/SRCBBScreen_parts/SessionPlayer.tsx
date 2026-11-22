@@ -932,6 +932,19 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     try { exHeadRefs.current[currentExIdx]?.scrollIntoView?.({ block: 'start', behavior: 'smooth' as ScrollBehavior }); } catch { /* jsdom/SSR */ }
   }, [currentExIdx, phase]);
 
+  // Сколько подходов дня уже записано — для явного «всё закрыто, к заминке».
+  const mainProgress = useMemo(() => {
+    if (!day || !Array.isArray(day.exercises)) return { totalSets: 0, doneSets: 0 };
+    let totalSets = 0;
+    let doneSets = 0;
+    day.exercises.forEach((ex, ei) => {
+      const sets = ex.targetSets || [];
+      totalSets += sets.length;
+      doneSets += sets.filter((_, si) => !!actual[keyFor(ei, si)]).length;
+    });
+    return { totalSets, doneSets };
+  }, [day, actual]);
+
   const logOne = (ei: number, si: number) => {
      if (!session || !day || !Array.isArray(day.exercises)) return;
      hapticImpact('light');
@@ -1777,6 +1790,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                </div>
 );
             })()}
+            {/* Всё закрыто — следующий шаг виден сразу, искать «Завершить» не нужно. */}
+            {mainProgress.totalSets > 0 && mainProgress.doneSets === mainProgress.totalSets && (
+              <button type="button" data-act="all-sets-done" onClick={() => { hapticImpact('medium'); exitSession(); }}
+                style={{ ...BTN, width: '100%', minHeight: 50, marginBottom: 8, fontSize: 13, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', boxShadow: '0 6px 20px rgba(0,230,138,0.26)' }}>
+                ✓ Все подходы записаны — к заминке
+              </button>
+            )}
             {/* Объём: план/факт за сессию + недельный ориентир из канонического движка.
                 Свёрнут: в зале важнее первый подход, аналитика не должна отодвигать его. */}
             <button type="button" data-act="volume-toggle" aria-expanded={volOpen}

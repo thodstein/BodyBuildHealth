@@ -583,6 +583,9 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     fireEvent.click(container.querySelector('[data-act="edit-set"]') as HTMLElement);
     expect(container.querySelector('[aria-label="вес"]')).toBeTruthy();
 
+    // Все подходы дня закрыты — сверху виден следующий шаг, искать «Завершить» не нужно.
+    expect(container.querySelector('[data-act="all-sets-done"]')).toBeTruthy();
+
     // Завершение: явная кнопка «✓ Завершить тренировку» -> заминка -> «Итог».
     const finishBtn = findBtn(container, 'Завершить тренировку');
     expect(finishBtn).toBeTruthy();
@@ -721,6 +724,32 @@ describe('SessionPlayer: кнопки доводят от разминки до 
       cleanup();
       localStorage.clear();
     }
+  });
+
+  it('основная часть: «Все подходы записаны» ведёт в заминку', async () => {
+    const { render, fireEvent, cleanup } = await import('@testing-library/react');
+    localStorage.clear();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const days: PlayerDay[] = [{
+      label: 'День 1 · Грудь',
+      exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] }],
+    }];
+    const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
+    fireEvent.click(findBtn(container, 'Начать тренировку')!);
+    fireEvent.click(findBtn(container, 'К основной части')!);
+    // Пока подход не записан, шага к заминке нет.
+    expect(container.querySelector('[data-act="all-sets-done"]')).toBeNull();
+    const ok = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'OK') as HTMLElement;
+    expect(ok).toBeTruthy();
+    fireEvent.click(ok);
+    const allDone = container.querySelector('[data-act="all-sets-done"]') as HTMLElement;
+    expect(allDone).toBeTruthy();
+    fireEvent.click(allDone);
+    expect(container.textContent).toContain('Заминка: День 1 · Грудь');
+    confirmSpy.mockRestore();
+    unmount();
+    cleanup();
+    localStorage.clear();
   });
 
   it('незавершённая сессия: главное действие — «Продолжить», «Начать заново» с подтверждением', async () => {
