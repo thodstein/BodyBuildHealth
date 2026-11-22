@@ -191,6 +191,8 @@ const [dayIdx, setDayIdx] = useState(0);
 const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // Аналитика объёма в основной части свёрнута: в зале она отодвигала подходы.
   const [volOpen, setVolOpen] = useState(false);
+  // Записанные подходы свёрнуты; тут — какие пользователь раскрыл для правки.
+  const [editSet, setEditSet] = useState<Record<string, boolean>>({});
   const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'done'>('ready');
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
@@ -943,6 +945,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       setLogError(null);
       setSession(res.session);
       setActual(prev => ({ ...prev, [keyFor(ei, si)]: a }));
+      // Правка сохранена — подход снова сворачивается в одну строку.
+      setEditSet(p => { if (!p[keyFor(ei, si)]) return p; const n = { ...p }; delete n[keyFor(ei, si)]; return n; });
       // обновляем прогресс упражнения (только для ПЕРВОЙ записи сета)
       if (!alreadyLogged) {
         setExerciseProgress(prev => {
@@ -1981,6 +1985,22 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                  const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
                  const bestForEx = exerciseBests.get(normalizeExerciseName(ex.name));
                  const intensity = setIntensity(a.weight, a.reps, bestForEx);
+                   // Записанный подход — одной строкой: степперы уже сделанных подходов
+                   // в зале только удлиняют прокрутку до текущего сета.
+                   if (logged && !editSet[k]) {
+                     return (
+                       <div key={si} style={{ ...ROW, flexWrap: 'nowrap', gap: 8, alignItems: 'center' }}>
+                         <span style={{ color: '#22c55e', fontSize: 11, fontWeight: 800, width: 52 }}>✓ {si + 1}</span>
+                         <span style={{ color: '#fff', fontSize: 11, flex: 1, minWidth: 0 }}>
+                           {a.weight} кг × {a.reps}{a.rir != null ? ` · RIR ${a.rir}` : ''}{a.rpe ? ` · RPE ${a.rpe}` : ''}
+                         </span>
+                         <button type="button" data-act="edit-set" onClick={() => setEditSet(p => ({ ...p, [k]: true }))}
+                           style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                           ✎ Изменить
+                         </button>
+                       </div>
+                     );
+                   }
                  return (
                    <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
                      <span style={{ color: '#fff', fontSize: 11, width: 52 }}>Сет {si + 1}</span>

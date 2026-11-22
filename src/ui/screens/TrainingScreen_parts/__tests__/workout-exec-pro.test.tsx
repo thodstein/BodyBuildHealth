@@ -529,6 +529,13 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const active = loadActiveSession();
     expect(active?.exercises?.[0]?.sets?.length).toBe(1);
 
+    // Записанный подход сворачивается в строку «✓ 1 · 80 кг × 8» с кнопкой правки:
+    // иначе степперы уже сделанных подходов удлиняют прокрутку до текущего сета.
+    expect(container.querySelectorAll('[data-act="edit-set"]').length).toBe(1);
+    expect(container.querySelector('[aria-label="вес"]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-act="edit-set"]') as HTMLElement);
+    expect(container.querySelector('[aria-label="вес"]')).toBeTruthy();
+
     // Завершение: явная кнопка «✓ Завершить тренировку» -> заминка -> «Итог».
     const finishBtn = findBtn(container, 'Завершить тренировку');
     expect(finishBtn).toBeTruthy();
