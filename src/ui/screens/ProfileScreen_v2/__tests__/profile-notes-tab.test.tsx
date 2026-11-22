@@ -14,7 +14,9 @@ import {
   readCoachNotes,
   writeCoachNotes,
   COACH_NOTE_ATTACHMENTS_MAX,
+  COACH_NOTE_BODY_MAX,
   COACH_NOTE_CHECKLIST_MAX,
+  COACH_NOTE_TITLE_MAX,
 } from '../../../../engines/coach/coach-notes.engine';
 import {
   addCoachAthlete,
@@ -88,6 +90,24 @@ describe('создание заметки', () => {
     save(container);
     expect(readCoachNotes(localStorage).items[0].title).toBe('Новое');
     expect(container.querySelector('[data-notes="item"]')?.textContent).toContain('Новое');
+  });
+
+  it('длина заголовка и текста видна в счётчиках', () => {
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    const titleCount = () => container.querySelector('[data-notes="title-count"]')?.textContent;
+    const bodyCount = () => container.querySelector('[data-notes="body-count"]')?.textContent;
+    expect(titleCount()).toBe(`0/${COACH_NOTE_TITLE_MAX}`);
+    expect(bodyCount()).toBe(`0/${COACH_NOTE_BODY_MAX}`);
+
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'Колено' },
+    });
+    fireEvent.change(container.querySelector('[data-notes="body"]') as HTMLTextAreaElement, {
+      target: { value: 'Не грузить' },
+    });
+    expect(titleCount()).toBe(`6/${COACH_NOTE_TITLE_MAX}`);
+    expect(bodyCount()).toBe(`10/${COACH_NOTE_BODY_MAX}`);
   });
 });
 
@@ -173,6 +193,52 @@ describe('поиск, закрепление, удаление', () => {
     expect(readCoachNotes(localStorage).items).toHaveLength(2);
     fireEvent.click(container.querySelector('[data-note-id="n2"] [data-notes="delete"]') as HTMLElement);
     expect(readCoachNotes(localStorage).items.map((n) => n.id)).toEqual(['n1']);
+  });
+
+  it('смена поиска снимает «взведённое» удаление', () => {
+    seed();
+    const { container } = render(<ProfileNotesTab />);
+    const del = () => container.querySelector('[data-note-id="n1"] [data-notes="delete"]') as HTMLElement;
+    fireEvent.click(del());
+    expect(del().textContent).toContain('Точно удалить');
+
+    const search = container.querySelector('[data-notes="search"]') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'Ферритин' } });
+    fireEvent.change(search, { target: { value: '' } });
+    // Заметка вернулась — но подтверждение уже снято, одного тапа мало.
+    expect(del().textContent).toBe('Удалить');
+    fireEvent.click(del());
+    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+  });
+
+  it('«Новая заметка» снимает подтверждение удаления', () => {
+    seed();
+    const { container } = render(<ProfileNotesTab />);
+    fireEvent.click(container.querySelector('[data-note-id="n1"] [data-notes="delete"]') as HTMLElement);
+    openNew(container);
+    fireEvent.click(container.querySelector('[data-notes="cancel"]') as HTMLElement);
+    expect(container.querySelector('[data-note-id="n1"] [data-notes="delete"]')?.textContent).toBe('Удалить');
+    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+  });
+
+  it('длинный чек-лист в списке сначала свёрнут', () => {
+    const checklist = Array.from({ length: 8 }, (_, i) => ({
+      id: `c${i + 1}`,
+      text: `Пункт ${i + 1}`,
+      done: false,
+    }));
+    const s = addCoachNote(emptyCoachNotes(), { title: 'Чек', checklist }, { id: 'n1' }).store;
+    writeCoachNotes(localStorage, s);
+
+    const { container } = render(<ProfileNotesTab />);
+    const toggles = () => container.querySelectorAll('[data-notes="checklist-toggle"]');
+    expect(toggles()).toHaveLength(6);
+    const more = container.querySelector('[data-notes="checklist-more"]') as HTMLElement;
+    expect(more.textContent).toContain('Показать все (8)');
+
+    fireEvent.click(more);
+    expect(toggles()).toHaveLength(8);
+    expect((container.querySelector('[data-notes="checklist-more"]') as HTMLElement).textContent).toContain('Свернуть');
   });
 
   it('длинный текст в списке свёрнут и раскрывается по кнопке', () => {

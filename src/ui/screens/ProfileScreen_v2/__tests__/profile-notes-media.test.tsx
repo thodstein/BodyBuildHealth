@@ -111,6 +111,10 @@ describe('фото в заметке', () => {
     await waitFor(() => expect(container.querySelector('[data-notes="photo"]')).not.toBeNull());
     fireEvent.click(container.querySelector('[data-notes="photo"]') as HTMLElement);
     expect(container.querySelector('[data-notes="viewer"]')).not.toBeNull();
+    // Esc — привычный способ закрыть полноэкранный просмотр.
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(container.querySelector('[data-notes="viewer"]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-notes="photo"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-notes="viewer"]') as HTMLElement);
     expect(container.querySelector('[data-notes="viewer"]')).toBeNull();
   });

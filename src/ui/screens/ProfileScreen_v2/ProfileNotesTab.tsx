@@ -212,6 +212,9 @@ const fmtDate = (iso: string): string => {
  */
 const BODY_PREVIEW_CHARS = 320;
 
+/** Длинный чек-лист в списке показываем первыми пунктами, остальное — по кнопке. */
+const CHECKLIST_PREVIEW_COUNT = 6;
+
 const newAttachmentId = (): string => `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const isBlobUrl = (url: string): boolean => typeof url === 'string' && url.startsWith('blob:');
@@ -246,6 +249,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const [query, setQuery] = useState('');
   /** Развёрнутые длинные тексты — по id заметки, чтобы не трогать соседние. */
   const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
+  /** Развёрнутые длинные чек-листы — тоже по id заметки. */
+  const [expandedChecklists, setExpandedChecklists] = useState<Record<string, boolean>>({});
   // Фильтр по атлету, к которому пришли из режима тренера. Если карточку уже
   // удалили — не показываем пустой список «по несуществующему атлету».
   const [athleteFilter, setAthleteFilter] = useState<string>(() => {
@@ -397,6 +402,23 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     if (editor) setConfirmClearMedia(false);
   }, [editor]);
 
+  /* ── Смена фильтра снимает «взведённое» удаление ──────────────────── */
+  // Иначе скрытая фильтром заметка остаётся с подтверждением, и после
+  // сброса первый же тап по «Удалить» стирает её без второго шага.
+  useEffect(() => {
+    setConfirmDeleteId(null);
+  }, [query, athleteFilter]);
+
+  /* ── Esc закрывает просмотр фото (клавиатура/desktop) ─────────────── */
+  useEffect(() => {
+    if (!viewer) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setViewer(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewer]);
+
   /* ── Уборка сирот, постоянное хранилище, нативные возможности ─────── */
   useEffect(() => {
     void cleanupNoteMedia(new Set(store.items.flatMap((n) => noteAttachmentIds(n))));
@@ -443,6 +465,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   const openNew = () => {
     setEditor({ ...EMPTY_EDITOR, attachments: [] });
+    // Подтверждение удаления, «взведённое» на другой заметке, не должно
+    // переехать на новую форму и ждать там случайного тапа.
+    setConfirmDeleteId(null);
     setError(null);
     setVoiceError(null);
   };
@@ -1204,6 +1229,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             style={inputStyle}
             data-notes="title"
           />
+          <div
+            data-notes="title-count"
+            style={{
+              marginTop: 4,
+              textAlign: 'right',
+              fontSize: 10.5,
+              color: editor.title.length >= COACH_NOTE_TITLE_MAX ? colors.danger : colors.textSubtle,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {editor.title.length}/{COACH_NOTE_TITLE_MAX}
+          </div>
           <label
             style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}
             htmlFor="note-body"
@@ -1220,6 +1257,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }}
             data-notes="body"
           />
+          <div
+            data-notes="body-count"
+            style={{
+              marginTop: 4,
+              textAlign: 'right',
+              fontSize: 10.5,
+              color: editor.body.length >= COACH_NOTE_BODY_MAX ? colors.danger : colors.textSubtle,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {editor.body.length}/{COACH_NOTE_BODY_MAX}
+          </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -1837,7 +1886,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
                   {(n.checklist?.length ?? 0) > 0 &&
                     (() => {
+                      const all = n.checklist ?? [];
                       const prog = noteChecklistProgress(n);
+                      const open = all.length <= CHECKLIST_PREVIEW_COUNT || expandedChecklists[n.id] === true;
+                      const shown = open ? all : all.slice(0, CHECKLIST_PREVIEW_COUNT);
                       return (
                         <div data-notes="checklist" style={{ marginTop: 8 }}>
                           <div
@@ -1851,7 +1903,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                             Чек-лист · {prog.done}/{prog.total}
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            {(n.checklist ?? []).map((c) => (
+                            {shown.map((c) => (
                               <button
                                 key={c.id}
                                 type="button"
@@ -1897,6 +1949,23 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                               </button>
                             ))}
                           </div>
+                          {all.length > CHECKLIST_PREVIEW_COUNT && (
+                            <button
+                              type="button"
+                              data-notes="checklist-more"
+                              aria-expanded={open}
+                              onClick={() => setExpandedChecklists((prev) => ({ ...prev, [n.id]: !open }))}
+                              style={{
+                                ...btn('ghost'),
+                                minHeight: 34,
+                                marginTop: 6,
+                                padding: '4px 10px',
+                                fontSize: 11.5,
+                              }}
+                            >
+                              {open ? 'Свернуть' : `Показать все (${all.length})`}
+                            </button>
+                          )}
                         </div>
                       );
                     })()}
