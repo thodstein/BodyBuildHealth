@@ -465,9 +465,42 @@ describe('ExecutionZone: главная кнопка старта', () => {
     };
     const html = renderToStaticMarkup(<PlanProbe />);
     expect(html).toContain('data-act="session-start"');
-    expect(html).toContain('Начать тренировку');
+    // Две зелёные кнопки в одной зоне — разные действия: эта стартует по плану ПЛ/ББ.
+    expect(html).toContain('Начать по плану ПЛ');
     // Старого мелкого «Возобновить» больше нет — именно его не находили.
     expect(html).not.toContain('Возобновить');
+  });
+
+  it('старт из дневника/виджета при плане ПЛ/ББ открывает именно его проведение', async () => {
+    const { render, cleanup, act } = await import('@testing-library/react');
+    const plRuntime = {
+      track: 'pl', focus: 'Жим', week: 1,
+      days: [{ label: 'День 1 · Грудь', exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }] }],
+    } as any;
+    const PlanProbe: React.FC = () => {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
+          macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
+          runtimeDay={0} setRuntimeDay={noop as any} runtimeExIdx={0} setRuntimeExIdx={noop as any}
+          runtimeLogs={{}} setRuntimeLogs={noop as any}
+          runtimeStarted={false} setRuntimeStarted={noop as any}
+          plRuntime={plRuntime} plRunOpen={open} setPlRunOpen={setOpen}
+          runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
+          runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
+          diary={{} as any} onRefresh={noop} />
+      );
+    };
+    const { container, unmount } = render(<PlanProbe />);
+    // Выбор дня при плане ПЛ/ББ не рендерится вовсе — раньше старт «в никуда».
+    expect(container.querySelector('[data-session="chooser"]')).toBeNull();
+    act(() => { window.dispatchEvent(new Event('he-workout-open')); });
+    expect(container.textContent).toContain('Проведение тренировки · ПЛ');
+    // «Готово» в итоге сворачивает именно карточку плана.
+    act(() => { window.dispatchEvent(new Event('he-workout-close')); });
+    expect(container.textContent).not.toContain('Проведение тренировки · ПЛ');
+    unmount();
+    cleanup();
   });
 });
 
@@ -493,6 +526,20 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     expect(start).toBeTruthy();
     fireEvent.click(start!);
     expect(container.textContent).toContain('Разминка');
+
+    // Разминка длинная: блок, отмеченный целиком, сворачивается в строку «✓ title · 3/3».
+    const warmupItems = () => container.querySelectorAll('[data-warmup-item]').length;
+    const itemsBefore = warmupItems();
+    expect(itemsBefore).toBeGreaterThan(0);
+    fireEvent.click(findBtn(container, 'Отметить весь блок')!);
+    expect(warmupItems()).toBeLessThan(itemsBefore);
+    const warmToggle = container.querySelector('[data-act="warmup-toggle"]') as HTMLElement;
+    expect(warmToggle).toBeTruthy();
+    expect(warmToggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(warmToggle);
+    expect(warmupItems()).toBe(itemsBefore);
+    fireEvent.click(container.querySelector('[data-act="warmup-toggle"]') as HTMLElement);
+    expect(warmupItems()).toBeLessThan(itemsBefore);
 
     const toMain = findBtn(container, 'К основной части');
     expect(toMain).toBeTruthy();

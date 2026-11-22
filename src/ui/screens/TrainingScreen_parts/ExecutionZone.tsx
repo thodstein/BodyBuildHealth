@@ -144,12 +144,16 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
   }, [trainingDaysList, safeRuntimeDay, execWarmupMode, execWarmupDone, setRuntimeStarted, setRuntimeLogs, setRuntimeExIdx]);
   /** Открыть проведение, не стирая записанное: док не должен сбрасывать подходы. */
-  const openSession = React.useCallback(() => setRuntimeStarted(true), [setRuntimeStarted]);
+  const openSession = React.useCallback(() => {
+    // Есть план ПЛ/ББ — проведение живёт в его карточке, а не в выборе дня.
+    if (plRuntime && plRuntime.days.length > 0) setPlRunOpen(true);
+    else setRuntimeStarted(true);
+  }, [plRuntime, setPlRunOpen, setRuntimeStarted]);
   /** Виджет/панель АПК просит открыть проведение — через событие, без десятка пропсов. */
   React.useEffect(() => {
     const onOpen = () => openSession();
     window.addEventListener('he-workout-open', onOpen);
-    const onClose = () => setRuntimeStarted(false);
+    const onClose = () => { setRuntimeStarted(false); setPlRunOpen(false); };
     window.addEventListener('he-workout-close', onClose);
     return () => {
       window.removeEventListener('he-workout-open', onOpen);
@@ -194,9 +198,9 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     <NativeIcon name="play" size={14} />
                   </span>
                   <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontSize: 14 }}>Начать тренировку</span>
+                    <span style={{ display: 'block', fontSize: 14 }}>Начать по плану {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'}</span>
                     <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
-                      {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus} · неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)}
+                      {plRuntime.focus} · неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)}
                     </span>
                   </span>
                   <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
