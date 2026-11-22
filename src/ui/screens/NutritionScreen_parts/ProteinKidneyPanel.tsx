@@ -24,6 +24,7 @@ import { usePlanCtx } from './IndividualPlan/IndividualPlanContext';
 import { readPlanTargets } from './IndividualPlan/plan-targets-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { db } from '../../../core/db';
+import { UACR_MG_MMOL_TO_MG_G } from '../../../core/constants';
 import {
   ALBUMINURIA_LABEL,
   GFR_CATEGORY_LABEL,
@@ -110,10 +111,24 @@ interface PanelState {
 
 /** Лабораторные поля, которые можно подтянуть из профиля (и не затирать ручной ввод). */
 const LAB_KEYS: Array<OptionalNumKey> = [
-  'ureaMmolL', 'creatinineUmolL', 'egfrMeasured', 'cystatinCMgL', 'urineSg', 'urinePh',
-  'urineProteinScore', 'urineProteinGL', 'urineCreatinineMmolL', 'microalbuminMgL',
-  'uacrMgMmol', 'urineVolume24hMl', 'urineLeuPerUl', 'urineEryPerUl',
-  'urineNitriteScore', 'urineGlucoseScore', 'urineKetonesScore', 'urineCastsPerUl',
+  'ureaMmolL',
+  'creatinineUmolL',
+  'egfrMeasured',
+  'cystatinCMgL',
+  'urineSg',
+  'urinePh',
+  'urineProteinScore',
+  'urineProteinGL',
+  'urineCreatinineMmolL',
+  'microalbuminMgL',
+  'uacrMgMmol',
+  'urineVolume24hMl',
+  'urineLeuPerUl',
+  'urineEryPerUl',
+  'urineNitriteScore',
+  'urineGlucoseScore',
+  'urineKetonesScore',
+  'urineCastsPerUl',
 ];
 
 const SCORE_OPTIONS = [
@@ -176,7 +191,11 @@ export function buildRetestIcs(dateIso: string, title: string, description: stri
   const next = new Date(d.getTime() + 86400000);
   const end = `${next.getFullYear()}${String(next.getMonth() + 1).padStart(2, '0')}${String(next.getDate()).padStart(2, '0')}`;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const esc = (s: string): string => s.replace(/\\/g, '\\\\').replace(/[,;]/g, (c) => `\\${c}`).replace(/\r?\n/g, '\\n');
+  const esc = (s: string): string =>
+    s
+      .replace(/\\/g, '\\\\')
+      .replace(/[,;]/g, (c) => `\\${c}`)
+      .replace(/\r?\n/g, '\\n');
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -254,7 +273,9 @@ export function mergeLatestLabs(
 ): Record<string, { value: number; unit?: string }> {
   const out: Record<string, { value: number; unit?: string; date: string }> = {};
   for (const [rawKey, entry] of Object.entries(profileSummary || {})) {
-    const key = String(rawKey || '').trim().toUpperCase();
+    const key = String(rawKey || '')
+      .trim()
+      .toUpperCase();
     const value = Number(entry?.value);
     if (!key || !Number.isFinite(value)) continue;
     out[key] = {
@@ -264,7 +285,9 @@ export function mergeLatestLabs(
     };
   }
   for (const row of entries) {
-    const key = String(row?.code ?? '').trim().toUpperCase();
+    const key = String(row?.code ?? '')
+      .trim()
+      .toUpperCase();
     const value = Number(row?.value);
     if (!key || !Number.isFinite(value)) continue;
     if (row.patientId && row.patientId !== patientId) continue;
@@ -336,20 +359,40 @@ function microalbuminMgL(value: number, unit: string): number {
 function cystatinMgL(value: number, unit: string): number {
   return /mg\/dl/.test(unit) ? value * 10 : value;
 }
-function uacrMgMmol(value: number, unit: string): number {
-  if (/mg\/g|\/g\b/.test(unit) && !/mmol/.test(unit)) return value / 8.84;
-  return value;
+/**
+ * Проход 207: канон приложения — мг/г (`UCUM_MAP.UACR`, поле бланка, шкала
+ * ступеней), поэтому запись БЕЗ единицы тоже читается как мг/г. Раньше она
+ * считалась мг/ммоль: 50 мг/г (A2) превращались в 50 мг/ммоль (A3) — завышение
+ * с ложным «нефролог + ≤1.0 г/кг». Пересчёт — фактор KDIGO 0.113
+ * (`UACR_MG_MMOL_TO_MG_G`), одна константа на всё приложение. Единица с `mmol`
+ * или «ммоль» (в том числе приведённая из «мг/ммоль») остаётся мг/ммоль.
+ */
+export function uacrToMgMmol(value: number, unit: string): number {
+  return /(mmol|ммоль)/.test(unit) ? value : value / UACR_MG_MMOL_TO_MG_G;
 }
 
-const Pep: React.FC<{ children: React.ReactNode; color?: string; onClick?: () => void }> = ({ children, color = '#60a5fa', onClick }) => (
+const Pep: React.FC<{ children: React.ReactNode; color?: string; onClick?: () => void }> = ({
+  children,
+  color = '#60a5fa',
+  onClick,
+}) => (
   <span
     onClick={onClick}
     style={{
-      display: 'inline-block', padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 700,
-      background: `${color}18`, color, border: `1px solid ${color}33`, lineHeight: 1.5,
+      display: 'inline-block',
+      padding: '2px 7px',
+      borderRadius: 6,
+      fontSize: 9,
+      fontWeight: 700,
+      background: `${color}18`,
+      color,
+      border: `1px solid ${color}33`,
+      lineHeight: 1.5,
       ...(onClick ? { cursor: 'pointer' } : {}),
     }}
-  >{children}</span>
+  >
+    {children}
+  </span>
 );
 
 /** Сегментный выбор вместо нативного select. */
@@ -363,7 +406,8 @@ const Segment: React.FC<{
 }> = ({ label, hint, options, value, onChange, accent = '#60a5fa' }) => (
   <div style={{ gridColumn: '1 / -1', marginBottom: 2 }}>
     <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', fontWeight: 600, marginBottom: 4 }}>
-      {label}{hint ? <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.42)' }}> · {hint}</span> : null}
+      {label}
+      {hint ? <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.42)' }}> · {hint}</span> : null}
     </div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {options.map((o) => {
@@ -375,8 +419,13 @@ const Segment: React.FC<{
             aria-pressed={active}
             onClick={() => onChange(o.v)}
             style={{
-              flex: '1 1 45%', minHeight: 44, padding: '7px 9px', borderRadius: 10, cursor: 'pointer',
-              textAlign: 'left', color: '#fff',
+              flex: '1 1 45%',
+              minHeight: 44,
+              padding: '7px 9px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              textAlign: 'left',
+              color: '#fff',
               background: active ? `${accent}1a` : 'rgba(255,255,255,0.03)',
               border: active ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.07)',
             }}
@@ -408,11 +457,18 @@ const ScorePicker: React.FC<{
           onClick={() => onChange(undefined)}
           aria-label={`${label}: очистить`}
           style={{
-            minHeight: 30, padding: '2px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 9,
-            background: 'transparent', color: has ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)',
+            minHeight: 30,
+            padding: '2px 10px',
+            borderRadius: 7,
+            cursor: 'pointer',
+            fontSize: 9,
+            background: 'transparent',
+            color: has ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.3)',
             border: '1px solid rgba(255,255,255,0.09)',
           }}
-        >сброс</button>
+        >
+          сброс
+        </button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
         {options.map((o) => {
@@ -424,13 +480,20 @@ const ScorePicker: React.FC<{
               aria-pressed={active}
               onClick={() => onChange(o.v)}
               style={{
-                flex: '1 1 0', minWidth: 48, minHeight: 44, borderRadius: 9, cursor: 'pointer',
-                fontSize: 10, fontWeight: active ? 800 : 600,
+                flex: '1 1 0',
+                minWidth: 48,
+                minHeight: 44,
+                borderRadius: 9,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: active ? 800 : 600,
                 background: active ? `${accent}22` : 'rgba(255,255,255,0.03)',
                 border: active ? `1px solid ${accent}77` : '1px solid rgba(255,255,255,0.07)',
                 color: active ? accent : 'rgba(255,255,255,0.72)',
               }}
-            >{o.t}</button>
+            >
+              {o.t}
+            </button>
           );
         })}
       </div>
@@ -441,12 +504,19 @@ const ScorePicker: React.FC<{
 /** Мини-график индекса нагрузки по истории. */
 const ScoreSpark: React.FC<{ points: number[]; color: string }> = ({ points, color }) => {
   if (points.length < 2) return null;
-  const W = 260, H = 46, PAD = 4;
+  const W = 260,
+    H = 46,
+    PAD = 4;
   const xs = (i: number): number => PAD + (i * (W - 2 * PAD)) / Math.max(1, points.length - 1);
   const ys = (v: number): number => H - PAD - (Math.min(100, Math.max(0, v)) / 100) * (H - 2 * PAD);
   const pts = points.map((p, i) => `${xs(i).toFixed(1)},${ys(p).toFixed(1)}`).join(' ');
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }} role="img" aria-label="Индекс нагрузки по истории">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', display: 'block' }}
+      role="img"
+      aria-label="Индекс нагрузки по истории"
+    >
       <line x1={PAD} y1={ys(50)} x2={W - PAD} y2={ys(50)} stroke="rgba(255,255,255,0.12)" strokeDasharray="3 3" />
       <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {points.map((p, i) => (
@@ -458,15 +528,28 @@ const ScoreSpark: React.FC<{ points: number[]; color: string }> = ({ points, col
   );
 };
 
-const FlagCard: React.FC<{ severity: 'info' | 'warn' | 'danger'; title: string; detail: string }> = ({ severity, title, detail }) => {
+const FlagCard: React.FC<{ severity: 'info' | 'warn' | 'danger'; title: string; detail: string }> = ({
+  severity,
+  title,
+  detail,
+}) => {
   const color = severity === 'danger' ? '#ef4444' : severity === 'warn' ? '#f59e0b' : '#60a5fa';
   const icon = severity === 'danger' ? '⛔' : severity === 'warn' ? '⚠️' : 'ℹ️';
   return (
-    <div style={{
-      display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 10, marginBottom: 6,
-      background: `${color}10`, border: `1px solid ${color}33`,
-    }}>
-      <span aria-hidden style={{ fontSize: 13, lineHeight: 1.2 }}>{icon}</span>
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        padding: '8px 10px',
+        borderRadius: 10,
+        marginBottom: 6,
+        background: `${color}10`,
+        border: `1px solid ${color}33`,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 13, lineHeight: 1.2 }}>
+        {icon}
+      </span>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color }}>{title}</div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.66)', lineHeight: 1.4 }}>{detail}</div>
@@ -481,10 +564,18 @@ export const ProteinKidneyPanel: React.FC = () => {
   const [state, setState] = useState<PanelState>(() => {
     const saved = safeRead<Partial<PanelState>>(PROTEIN_KIDNEY_INPUT_KEY);
     const planProtein = (() => {
-      try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
+      try {
+        return readPlanTargets()?.protein ?? 0;
+      } catch {
+        return 0;
+      }
     })();
     const profile = (() => {
-      try { return (getProfile()?.settings as any) || {}; } catch { return {}; }
+      try {
+        return (getProfile()?.settings as any) || {};
+      } catch {
+        return {};
+      }
     })();
     const waterL = Number(profile?.lifestyle?.dailyWaterLiters);
 
@@ -521,56 +612,87 @@ export const ProteinKidneyPanel: React.FC = () => {
     setState((s) => ({ ...s, [key]: v }));
   }, []);
 
-  const setRequired = useCallback((key: 'weightKg' | 'heightCm' | 'age' | 'proteinGPerDay' | 'mealsPerDay', v: number | undefined) => {
-    if (v == null || !Number.isFinite(v)) return;
-    if (key === 'proteinGPerDay') manualRef.current.proteinGPerDay = true;
-    setState((s) => ({ ...s, [key]: v }));
-  }, []);
+  const setRequired = useCallback(
+    (key: 'weightKg' | 'heightCm' | 'age' | 'proteinGPerDay' | 'mealsPerDay', v: number | undefined) => {
+      if (v == null || !Number.isFinite(v)) return;
+      if (key === 'proteinGPerDay') manualRef.current.proteinGPerDay = true;
+      setState((s) => ({ ...s, [key]: v }));
+    },
+    [],
+  );
 
   const valuesRef = useRef(state);
-  useEffect(() => { valuesRef.current = state; }, [state]);
+  useEffect(() => {
+    valuesRef.current = state;
+  }, [state]);
 
   /** Раскладываем сводку анализов по полям. Возвращает число применённых. */
-  const applyLabSummary = useCallback((
-    labs: Record<string, { value?: unknown; unit?: unknown }>,
-    force: boolean,
-  ): number => {
-    const cur = valuesRef.current;
-    let applied = 0;
-    const apply = (key: OptionalNumKey, raw: { key: string; value: number; unit: string } | null, convert?: (v: number, u: string, labKey: string) => number) => {
-      if (!raw) return;
-      if (!force && manualRef.current[key]) return;
-      // Не перетираем уже показанное значение (ручное или ранее подтянутое).
-      if (!force && cur[key] != null) return;
-      const value = convert ? convert(raw.value, raw.unit, raw.key) : raw.value;
-      if (!Number.isFinite(value)) return;
-      pulledRef.current[key] = true;
-      // Явное «подтянуть» снимает ручную блокировку: значение снова из анализов.
-      if (force) delete manualRef.current[key];
-      applied += 1;
-      setState((s) => ({ ...s, [key]: value }));
-    };
+  const applyLabSummary = useCallback(
+    (labs: Record<string, { value?: unknown; unit?: unknown }>, force: boolean): number => {
+      const cur = valuesRef.current;
+      let applied = 0;
+      const apply = (
+        key: OptionalNumKey,
+        raw: { key: string; value: number; unit: string } | null,
+        convert?: (v: number, u: string, labKey: string) => number,
+      ) => {
+        if (!raw) return;
+        if (!force && manualRef.current[key]) return;
+        // Не перетираем уже показанное значение (ручное или ранее подтянутое).
+        if (!force && cur[key] != null) return;
+        const value = convert ? convert(raw.value, raw.unit, raw.key) : raw.value;
+        if (!Number.isFinite(value)) return;
+        pulledRef.current[key] = true;
+        // Явное «подтянуть» снимает ручную блокировку: значение снова из анализов.
+        if (force) delete manualRef.current[key];
+        applied += 1;
+        setState((s) => ({ ...s, [key]: value }));
+      };
 
-    apply('ureaMmolL', pickLab(labs, ['UREA', 'Urea', 'urea', 'Мочевина', 'BUN']), ureaMmol);
-    apply('creatinineUmolL', pickLab(labs, ['CREATININE', 'Creatinine', 'creatinine', 'Креатинин']), creatinineUmol);
-    apply('egfrMeasured', pickLab(labs, ['EGFR', 'eGFR', 'GFR', 'gfr', 'СКФ']));
-    apply('cystatinCMgL', pickLab(labs, ['CYSTATIN_C', 'Cystatin C', 'cystatin_c', 'Цистатин C']), cystatinMgL);
-    apply('urineSg', pickLab(labs, ['URINE_SG', 'urine_sg', 'USG', 'sg', 'Плотность мочи']), (v) => specificGravity(v));
-    apply('urinePh', pickLab(labs, ['URINE_PH', 'urine_ph', 'pH мочи']));
-    apply('urineProteinScore', pickLab(labs, ['URINE_PROTEIN_QR', 'PROTEIN_QR', 'urine_protein_qr']), (v) => Math.max(0, Math.min(4, v)));
-    apply('urineProteinGL', pickLab(labs, ['PROTEIN_URINE', 'Protein_urine', 'protein_urine', 'Протеинурия']), proteinGL);
-    apply('urineCreatinineMmolL', pickLab(labs, ['CREATININE_URINE', 'creatinine_urine', 'Креатинин мочи']), urineCreatinineMmol);
-    apply('microalbuminMgL', pickLab(labs, ['MICROALB', 'Microalb', 'microalbumin', 'Микроальбумин']), microalbuminMgL);
-    apply('uacrMgMmol', pickLab(labs, ['UACR', 'uacr', 'Альбумин/креатинин']), uacrMgMmol);
-    apply('urineVolume24hMl', pickLab(labs, ['URINE_VOLUME_24H', 'urine_volume_24h', 'Суточный диурез']));
-    apply('urineLeuPerUl', pickLab(labs, ['URINE_LEU', 'urine_leu', 'Лейкоциты мочи']));
-    apply('urineEryPerUl', pickLab(labs, ['URINE_ERY', 'urine_ery', 'Эритроциты мочи']));
-    apply('urineNitriteScore', pickLab(labs, ['URINE_NITRITE_QR', 'urine_nitrite_qr', 'URINE_NITRITE_Q']), (v) => Math.max(0, Math.min(4, v)));
-    apply('urineGlucoseScore', pickLab(labs, ['URINE_GLUCOSE_QR', 'urine_glucose_qr']), (v) => Math.max(0, Math.min(4, v)));
-    apply('urineKetonesScore', pickLab(labs, ['URINE_KETONES_QR', 'urine_ketones_qr']), (v) => Math.max(0, Math.min(4, v)));
-    apply('urineCastsPerUl', pickLab(labs, ['URINE_CYLINDERS', 'urine_cylinders', 'Цилиндры мочи']));
-    return applied;
-  }, []);
+      apply('ureaMmolL', pickLab(labs, ['UREA', 'Urea', 'urea', 'Мочевина', 'BUN']), ureaMmol);
+      apply('creatinineUmolL', pickLab(labs, ['CREATININE', 'Creatinine', 'creatinine', 'Креатинин']), creatinineUmol);
+      apply('egfrMeasured', pickLab(labs, ['EGFR', 'eGFR', 'GFR', 'gfr', 'СКФ']));
+      apply('cystatinCMgL', pickLab(labs, ['CYSTATIN_C', 'Cystatin C', 'cystatin_c', 'Цистатин C']), cystatinMgL);
+      apply('urineSg', pickLab(labs, ['URINE_SG', 'urine_sg', 'USG', 'sg', 'Плотность мочи']), (v) =>
+        specificGravity(v),
+      );
+      apply('urinePh', pickLab(labs, ['URINE_PH', 'urine_ph', 'pH мочи']));
+      apply('urineProteinScore', pickLab(labs, ['URINE_PROTEIN_QR', 'PROTEIN_QR', 'urine_protein_qr']), (v) =>
+        Math.max(0, Math.min(4, v)),
+      );
+      apply(
+        'urineProteinGL',
+        pickLab(labs, ['PROTEIN_URINE', 'Protein_urine', 'protein_urine', 'Протеинурия']),
+        proteinGL,
+      );
+      apply(
+        'urineCreatinineMmolL',
+        pickLab(labs, ['CREATININE_URINE', 'creatinine_urine', 'Креатинин мочи']),
+        urineCreatinineMmol,
+      );
+      apply(
+        'microalbuminMgL',
+        pickLab(labs, ['MICROALB', 'Microalb', 'microalbumin', 'Микроальбумин']),
+        microalbuminMgL,
+      );
+      apply('uacrMgMmol', pickLab(labs, ['UACR', 'uacr', 'Альбумин/креатинин']), uacrToMgMmol);
+      apply('urineVolume24hMl', pickLab(labs, ['URINE_VOLUME_24H', 'urine_volume_24h', 'Суточный диурез']));
+      apply('urineLeuPerUl', pickLab(labs, ['URINE_LEU', 'urine_leu', 'Лейкоциты мочи']));
+      apply('urineEryPerUl', pickLab(labs, ['URINE_ERY', 'urine_ery', 'Эритроциты мочи']));
+      apply('urineNitriteScore', pickLab(labs, ['URINE_NITRITE_QR', 'urine_nitrite_qr', 'URINE_NITRITE_Q']), (v) =>
+        Math.max(0, Math.min(4, v)),
+      );
+      apply('urineGlucoseScore', pickLab(labs, ['URINE_GLUCOSE_QR', 'urine_glucose_qr']), (v) =>
+        Math.max(0, Math.min(4, v)),
+      );
+      apply('urineKetonesScore', pickLab(labs, ['URINE_KETONES_QR', 'urine_ketones_qr']), (v) =>
+        Math.max(0, Math.min(4, v)),
+      );
+      apply('urineCastsPerUl', pickLab(labs, ['URINE_CYLINDERS', 'urine_cylinders', 'Цилиндры мочи']));
+      return applied;
+    },
+    [],
+  );
 
   const notifyLabs = useCallback((text: string, tone: 'ok' | 'warn') => {
     setLabsNotice({ text, tone });
@@ -578,32 +700,42 @@ export const ProteinKidneyPanel: React.FC = () => {
     labsNoticeTimer.current = setTimeout(() => setLabsNotice(null), 4200);
   }, []);
 
-  useEffect(() => () => {
-    if (labsNoticeTimer.current) clearTimeout(labsNoticeTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (labsNoticeTimer.current) clearTimeout(labsNoticeTimer.current);
+    },
+    [],
+  );
 
   /** Подтягиваем лабы из профиля: ручной ввод и уже показанное не затираем. */
-  const pullLabs = useCallback((force = false) => {
-    let labs: Record<string, { value?: unknown; unit?: unknown }> = {};
-    try {
-      labs = ((getProfile()?.settings as any)?.labs?.summary) || {};
-    } catch {
-      labs = {};
-    }
-    if (!labs || typeof labs !== 'object') return;
-
-    const cur = valuesRef.current;
-    // «Белок сейчас» следует за планом, пока пользователь не поправил его вручную.
-    if (!manualRef.current.proteinGPerDay) {
-      const planProtein = (() => {
-        try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
-      })();
-      if (planProtein > 0 && Math.abs(cur.proteinGPerDay - planProtein) > 1) {
-        setState((s) => ({ ...s, proteinGPerDay: Math.round(planProtein) }));
+  const pullLabs = useCallback(
+    (force = false) => {
+      let labs: Record<string, { value?: unknown; unit?: unknown }> = {};
+      try {
+        labs = (getProfile()?.settings as any)?.labs?.summary || {};
+      } catch {
+        labs = {};
       }
-    }
-    applyLabSummary(labs, force);
-  }, [applyLabSummary]);
+      if (!labs || typeof labs !== 'object') return;
+
+      const cur = valuesRef.current;
+      // «Белок сейчас» следует за планом, пока пользователь не поправил его вручную.
+      if (!manualRef.current.proteinGPerDay) {
+        const planProtein = (() => {
+          try {
+            return readPlanTargets()?.protein ?? 0;
+          } catch {
+            return 0;
+          }
+        })();
+        if (planProtein > 0 && Math.abs(cur.proteinGPerDay - planProtein) > 1) {
+          setState((s) => ({ ...s, proteinGPerDay: Math.round(planProtein) }));
+        }
+      }
+      applyLabSummary(labs, force);
+    },
+    [applyLabSummary],
+  );
 
   /**
    * Кнопка «Из анализов»: читает `labs_log` напрямую (IndexedDB), не дожидаясь
@@ -616,11 +748,19 @@ export const ProteinKidneyPanel: React.FC = () => {
     try {
       const entries = await db.getAll<LabDbRow>('labs_log');
       const profile = (() => {
-        try { return getProfile(); } catch { return null; }
+        try {
+          return getProfile();
+        } catch {
+          return null;
+        }
       })();
       const patientId = profile?.id || 'current-user';
       const profileSummary = (() => {
-        try { return (profile?.settings as any)?.labs?.summary || {}; } catch { return {}; }
+        try {
+          return (profile?.settings as any)?.labs?.summary || {};
+        } catch {
+          return {};
+        }
       })();
       const merged = mergeLatestLabs(profileSummary, Array.isArray(entries) ? entries : [], patientId);
       const applied = applyLabSummary(merged, true);
@@ -635,7 +775,9 @@ export const ProteinKidneyPanel: React.FC = () => {
 
   useEffect(() => {
     pullLabs();
-    const id = setInterval(() => { if (!document.hidden) pullLabs(); }, 8000);
+    const id = setInterval(() => {
+      if (!document.hidden) pullLabs();
+    }, 8000);
     const onStorage = (e: StorageEvent) => {
       if (e.key && (e.key.includes('he_profile') || e.key.includes('he_labs') || e.key.includes('profile'))) pullLabs();
     };
@@ -651,8 +793,16 @@ export const ProteinKidneyPanel: React.FC = () => {
 
   // Персист ввода: переживает перезагрузку и уход на другую вкладку.
   useEffect(() => {
-    try { localStorage.setItem(PROTEIN_KIDNEY_INPUT_KEY, JSON.stringify(state)); } catch { /* quota */ }
-    try { localStorage.setItem(MANUAL_KEY, JSON.stringify(manualRef.current)); } catch { /* quota */ }
+    try {
+      localStorage.setItem(PROTEIN_KIDNEY_INPUT_KEY, JSON.stringify(state));
+    } catch {
+      /* quota */
+    }
+    try {
+      localStorage.setItem(MANUAL_KEY, JSON.stringify(manualRef.current));
+    } catch {
+      /* quota */
+    }
   }, [state]);
 
   const input: ProteinKidneyInput = useMemo(() => ({ ...state }), [state]);
@@ -661,7 +811,9 @@ export const ProteinKidneyPanel: React.FC = () => {
   const statusMeta = STATUS_META[result.status];
   // «Переносится» можно говорить только когда потолок подтверждён анализами.
   const statusText = result.extreme
-    ? result.status === 'above_tolerance' ? 'Выше переносимости' : 'Экстремальный режим'
+    ? result.status === 'above_tolerance'
+      ? 'Выше переносимости'
+      : 'Экстремальный режим'
     : result.status === 'above_benefit' && !result.toleranceVerified
       ? 'Выше пользы'
       : statusMeta.text;
@@ -681,30 +833,47 @@ export const ProteinKidneyPanel: React.FC = () => {
           : `${result.capGPerDay} г/сут · не подтверждено`;
   const toleranceHeadValue = !result.toleranceAssessed
     ? '—'
-    : result.toleranceHeadroomGPerDay > 0 ? `+${result.toleranceHeadroomGPerDay}` : `−${overToleranceG}`;
-  const toleranceHeadSub = result.toleranceAssessed
-    ? result.extreme ? 'г/сут · врач' : 'г/сут'
-    : 'после анализов';
+    : result.toleranceHeadroomGPerDay > 0
+      ? `+${result.toleranceHeadroomGPerDay}`
+      : `−${overToleranceG}`;
+  const toleranceHeadSub = result.toleranceAssessed ? (result.extreme ? 'г/сут · врач' : 'г/сут') : 'после анализов';
   const toleranceHeadColor = !result.toleranceAssessed
     ? '#94a3b8'
     : result.extreme
       ? '#f97316'
-      : result.toleranceHeadroomGPerDay > 0 ? '#22c55e' : '#ef4444';
+      : result.toleranceHeadroomGPerDay > 0
+        ? '#22c55e'
+        : '#ef4444';
   const barMax = Math.max(result.toleranceAssessed ? result.capGPerKg : result.benefitCapGPerKg, result.proteinGPerKg);
-  const planTone = result.increaseAllowed && !result.increasePaused ? '#22c55e'
-    : result.increasePaused ? '#f59e0b'
-      : result.extreme && result.status !== 'above_tolerance' ? '#f97316'
-        : result.canIncreaseToTolerance ? '#eab308' : '#ef4444';
-  const planLabel = result.increaseAllowed && !result.increasePaused ? 'рекомендуется'
-    : result.increasePaused ? 'пауза'
-      : result.extreme && result.status !== 'above_tolerance' ? 'под контролем'
-        : result.canIncreaseToTolerance ? 'только переносимость' : 'нельзя';
+  const planTone =
+    result.increaseAllowed && !result.increasePaused
+      ? '#22c55e'
+      : result.increasePaused
+        ? '#f59e0b'
+        : result.extreme && result.status !== 'above_tolerance'
+          ? '#f97316'
+          : result.canIncreaseToTolerance
+            ? '#eab308'
+            : '#ef4444';
+  const planLabel =
+    result.increaseAllowed && !result.increasePaused
+      ? 'рекомендуется'
+      : result.increasePaused
+        ? 'пауза'
+        : result.extreme && result.status !== 'above_tolerance'
+          ? 'под контролем'
+          : result.canIncreaseToTolerance
+            ? 'только переносимость'
+            : 'нельзя';
   const historyPoints = useMemo(() => history.map((h) => h.score), [history]);
-  const hydrationTone = result.hydrationStatus === 'dehydrated'
-    ? '#ef4444'
-    : result.hydrationStatus === 'borderline'
-      ? '#f59e0b'
-      : result.hydrationStatus === 'good' ? '#22c55e' : 'rgba(255,255,255,0.6)';
+  const hydrationTone =
+    result.hydrationStatus === 'dehydrated'
+      ? '#ef4444'
+      : result.hydrationStatus === 'borderline'
+        ? '#f59e0b'
+        : result.hydrationStatus === 'good'
+          ? '#22c55e'
+          : 'rgba(255,255,255,0.6)';
 
   const onSaveSnapshot = () => {
     const next = saveProteinKidneySnapshot(toSnapshot(input, result));
@@ -759,7 +928,11 @@ export const ProteinKidneyPanel: React.FC = () => {
     manualRef.current = {};
     pulledRef.current = {};
     const planProtein = (() => {
-      try { return readPlanTargets()?.protein ?? 0; } catch { return 0; }
+      try {
+        return readPlanTargets()?.protein ?? 0;
+      } catch {
+        return 0;
+      }
     })();
     setState((s) => ({
       ...s,
@@ -787,15 +960,35 @@ export const ProteinKidneyPanel: React.FC = () => {
   return (
     <div className="pk-panel" data-pk-root="1" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* ── Шапка ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, marginBottom: 8,
-        background: 'linear-gradient(135deg, rgba(56,189,248,0.14), rgba(34,197,94,0.08))',
-        border: '1px solid rgba(56,189,248,0.22)',
-      }}>
-        <span aria-hidden style={{
-          width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 19, background: 'rgba(56,189,248,0.16)', border: '1px solid rgba(56,189,248,0.3)', flexShrink: 0,
-        }}>🧪</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '10px 12px',
+          borderRadius: 14,
+          marginBottom: 8,
+          background: 'linear-gradient(135deg, rgba(56,189,248,0.14), rgba(34,197,94,0.08))',
+          border: '1px solid rgba(56,189,248,0.22)',
+        }}
+      >
+        <span
+          aria-hidden
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 11,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 19,
+            background: 'rgba(56,189,248,0.16)',
+            border: '1px solid rgba(56,189,248,0.3)',
+            flexShrink: 0,
+          }}
+        >
+          🧪
+        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>Белок и почки</div>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.62)', lineHeight: 1.35 }}>
@@ -811,38 +1004,70 @@ export const ProteinKidneyPanel: React.FC = () => {
           onClick={resetFromProfile}
           aria-label="Подтянуть данные из профиля заново"
           style={{
-            flex: 1, minHeight: 44, padding: '0 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff',
+            flex: 1,
+            minHeight: 44,
+            padding: '0 10px',
+            borderRadius: 10,
+            cursor: 'pointer',
+            fontSize: 10,
+            fontWeight: 800,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            color: '#fff',
           }}
-        >↻ Из профиля</button>
+        >
+          ↻ Из профиля
+        </button>
         <button
           type="button"
           onClick={() => void pullLabsFromDb()}
           disabled={labsBusy}
           aria-label="Подтянуть анализы из раздела Анализы"
           style={{
-            flex: 1, minHeight: 44, padding: '0 10px', borderRadius: 10, fontSize: 10, fontWeight: 800,
-            cursor: labsBusy ? 'progress' : 'pointer', opacity: labsBusy ? 0.65 : 1,
-            background: 'rgba(56,189,248,0.14)', border: '1px solid rgba(56,189,248,0.32)', color: '#7dd3fc',
+            flex: 1,
+            minHeight: 44,
+            padding: '0 10px',
+            borderRadius: 10,
+            fontSize: 10,
+            fontWeight: 800,
+            cursor: labsBusy ? 'progress' : 'pointer',
+            opacity: labsBusy ? 0.65 : 1,
+            background: 'rgba(56,189,248,0.14)',
+            border: '1px solid rgba(56,189,248,0.32)',
+            color: '#7dd3fc',
           }}
-        >{labsBusy ? 'Читаю анализы…' : '↻ Из анализов'}</button>
+        >
+          {labsBusy ? 'Читаю анализы…' : '↻ Из анализов'}
+        </button>
       </div>
       {labsNotice && (
         <div
           role="status"
           aria-live="polite"
           style={{
-            marginTop: -2, marginBottom: 8, padding: '0 2px', fontSize: 9, lineHeight: 1.4,
+            marginTop: -2,
+            marginBottom: 8,
+            padding: '0 2px',
+            fontSize: 9,
+            lineHeight: 1.4,
             color: labsNotice.tone === 'ok' ? '#22c55e' : '#f59e0b',
           }}
-        >{labsNotice.text}</div>
+        >
+          {labsNotice.text}
+        </div>
       )}
 
       {result.dataIssues.length > 0 && (
-        <div role="alert" style={{
-          marginBottom: 8, padding: '9px 11px', borderRadius: 12,
-          background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)',
-        }}>
+        <div
+          role="alert"
+          style={{
+            marginBottom: 8,
+            padding: '9px 11px',
+            borderRadius: 12,
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.3)',
+          }}
+        >
           <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
             Проверьте единицы — иначе вывод будет неверным
           </div>
@@ -857,22 +1082,86 @@ export const ProteinKidneyPanel: React.FC = () => {
       {/* ── Тело и белок ──────────────────────────────────────────────────── */}
       <MhSection icon="⚖️" title="Тело и белок" hint="Отсюда берётся знаменатель для г/кг" accent="#60a5fa">
         <MhGrid>
-          <MhNum label="Вес" value={state.weightKg} min={30} max={250} suffix=" кг" onChange={(v) => setRequired('weightKg', v)} />
-          <MhNum label="Рост" value={state.heightCm} min={120} max={230} suffix=" см" onChange={(v) => setRequired('heightCm', v)} />
-          <MhNum label="Возраст" value={state.age} min={14} max={100} suffix=" лет" onChange={(v) => setRequired('age', v)} />
-          <MhNum label="Белок сейчас" value={state.proteinGPerDay} min={0} max={1500} suffix=" г/сут" hint="до 5 г/кг; выше 3.2 — под контролем врача" onChange={(v) => setRequired('proteinGPerDay', v)} />
-          <MhNum label="Приёмов пищи" value={state.mealsPerDay} min={1} max={8} suffix="" onChange={(v) => setRequired('mealsPerDay', v)} />
+          <MhNum
+            label="Вес"
+            value={state.weightKg}
+            min={30}
+            max={250}
+            suffix=" кг"
+            onChange={(v) => setRequired('weightKg', v)}
+          />
+          <MhNum
+            label="Рост"
+            value={state.heightCm}
+            min={120}
+            max={230}
+            suffix=" см"
+            onChange={(v) => setRequired('heightCm', v)}
+          />
+          <MhNum
+            label="Возраст"
+            value={state.age}
+            min={14}
+            max={100}
+            suffix=" лет"
+            onChange={(v) => setRequired('age', v)}
+          />
+          <MhNum
+            label="Белок сейчас"
+            value={state.proteinGPerDay}
+            min={0}
+            max={1500}
+            suffix=" г/сут"
+            hint="до 5 г/кг; выше 3.2 — под контролем врача"
+            onChange={(v) => setRequired('proteinGPerDay', v)}
+          />
+          <MhNum
+            label="Приёмов пищи"
+            value={state.mealsPerDay}
+            min={1}
+            max={8}
+            suffix=""
+            onChange={(v) => setRequired('mealsPerDay', v)}
+          />
           <MhNum label="% жира (необяз.)" {...numberProps('bodyFatPct')} min={3} max={60} suffix=" %" optional />
-          <MhNum label="Вода (необяз.)" {...numberProps('waterMlPerDay')} min={0} max={8000} step={100} suffix=" мл/сут" optional />
-          <MhNum label="Натрий рациона" {...numberProps('dietarySodiumG')} min={0} max={15} step={0.1} suffix=" г" optional hint="Поваренная соль ×0.4 = натрий" />
-          <MhNum label="Калий рациона" {...numberProps('dietaryPotassiumG')} min={0} max={12} step={0.1} suffix=" г" optional />
+          <MhNum
+            label="Вода (необяз.)"
+            {...numberProps('waterMlPerDay')}
+            min={0}
+            max={8000}
+            step={100}
+            suffix=" мл/сут"
+            optional
+          />
+          <MhNum
+            label="Натрий рациона"
+            {...numberProps('dietarySodiumG')}
+            min={0}
+            max={15}
+            step={0.1}
+            suffix=" г"
+            optional
+            hint="Поваренная соль ×0.4 = натрий"
+          />
+          <MhNum
+            label="Калий рациона"
+            {...numberProps('dietaryPotassiumG')}
+            min={0}
+            max={12}
+            step={0.1}
+            suffix=" г"
+            optional
+          />
         </MhGrid>
 
         <div style={{ marginTop: 8 }}>
           <Segment
             label="Пол"
             hint="нужен для CKD-EPI 2021"
-            options={[{ v: 'male', t: 'Мужской' }, { v: 'female', t: 'Женский' }]}
+            options={[
+              { v: 'male', t: 'Мужской' },
+              { v: 'female', t: 'Женский' },
+            ]}
             value={state.sex}
             onChange={(v) => setState((s) => ({ ...s, sex: v as PkSex }))}
             accent="#a78bfa"
@@ -900,17 +1189,26 @@ export const ProteinKidneyPanel: React.FC = () => {
           <Pep color="#60a5fa">{`${result.proteinGPerKg} г/кг сейчас`}</Pep>
           {result.bmi != null && <Pep color="#94a3b8">{`ИМТ ${result.bmi}`}</Pep>}
           {result.leanMassKg != null && <Pep color="#a78bfa">{`Тощая масса ≈${result.leanMassKg} кг`}</Pep>}
-          {result.proteinGPerKgLbm != null && <Pep color="#a78bfa">{`${result.proteinGPerKgLbm} г/кг тощей массы`}</Pep>}
-          {result.benefitCapLbmGPerKg != null && <Pep color="#60a5fa">{`польза ≈ до ${result.benefitCapLbmGPerKg} г/кг LBM`}</Pep>}
-          {result.toleranceCapLbmGPerKg != null && <Pep color="#22c55e">{`переносимость ≈ до ${result.toleranceCapLbmGPerKg} г/кг LBM`}</Pep>}
+          {result.proteinGPerKgLbm != null && (
+            <Pep color="#a78bfa">{`${result.proteinGPerKgLbm} г/кг тощей массы`}</Pep>
+          )}
+          {result.benefitCapLbmGPerKg != null && (
+            <Pep color="#60a5fa">{`польза ≈ до ${result.benefitCapLbmGPerKg} г/кг LBM`}</Pep>
+          )}
+          {result.toleranceCapLbmGPerKg != null && (
+            <Pep color="#22c55e">{`переносимость ≈ до ${result.toleranceCapLbmGPerKg} г/кг LBM`}</Pep>
+          )}
           {state.aasUse && <Pep color="#f97316">ААС: СКФ подтверждать цистатином C</Pep>}
         </div>
 
         <div style={{ marginTop: 8, fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
-          Калькулятор оценивает белок до 5 г/кг. Выше 3.2 г/кг доказанной переносимости нет — такие режимы только под наблюдением врача и с контролем анализов каждые 7–14 дней.
+          Калькулятор оценивает белок до 5 г/кг. Выше 3.2 г/кг доказанной переносимости нет — такие режимы только под
+          наблюдением врача и с контролем анализов каждые 7–14 дней.
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, marginTop: 8 }}>
+        <div
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 6, marginTop: 8 }}
+        >
           <MhToggle
             checked={state.creatineUse}
             onChange={(v) => setState((s) => ({ ...s, creatineUse: v }))}
@@ -970,18 +1268,49 @@ export const ProteinKidneyPanel: React.FC = () => {
       {/* ── Кровь ─────────────────────────────────────────────────────────── */}
       <MhSection icon="🩸" title="Кровь" hint="CKD-EPI 2021; цистатин C точнее на ААС/креатине" accent="#f97316">
         <MhGrid cols={3}>
-          <MhNum label="Мочевина" {...numberProps('ureaMmolL')} min={0} max={60} step={0.1} suffix=" ммоль/л" optional />
-          <MhNum label="Креатинин" {...numberProps('creatinineUmolL')} min={0} max={2000} step={1} suffix=" мкмоль/л" optional />
-          <MhNum label="Цистатин C" {...numberProps('cystatinCMgL')} min={0.2} max={10} step={0.01} suffix=" мг/л" optional hint="если есть в бланке" />
+          <MhNum
+            label="Мочевина"
+            {...numberProps('ureaMmolL')}
+            min={0}
+            max={60}
+            step={0.1}
+            suffix=" ммоль/л"
+            optional
+          />
+          <MhNum
+            label="Креатинин"
+            {...numberProps('creatinineUmolL')}
+            min={0}
+            max={2000}
+            step={1}
+            suffix=" мкмоль/л"
+            optional
+          />
+          <MhNum
+            label="Цистатин C"
+            {...numberProps('cystatinCMgL')}
+            min={0.2}
+            max={10}
+            step={0.01}
+            suffix=" мг/л"
+            optional
+            hint="если есть в бланке"
+          />
           <MhNum label="СКФ (из лабы)" {...numberProps('egfrMeasured')} min={0} max={200} suffix=" мл/мин" optional />
         </MhGrid>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
           <Pep color="#a78bfa">{`СКФ: ${result.egfr != null ? `${result.egfr} · ${GFR_CATEGORY_LABEL[result.gfrCategory]}` : 'нужен креатинин'}`}</Pep>
           <Pep color={result.egfrSource === 'measured' ? '#22c55e' : '#60a5fa'}>
-            {result.egfrSource === 'measured' ? 'из лаборатории' : result.egfrSource === 'ckd-epi' ? 'CKD-EPI 2021' : 'нет данных'}
+            {result.egfrSource === 'measured'
+              ? 'из лаборатории'
+              : result.egfrSource === 'ckd-epi'
+                ? 'CKD-EPI 2021'
+                : 'нет данных'}
           </Pep>
           {result.bunCreatinineRatio != null && (
-            <Pep color={result.bunCrPattern === 'high' ? '#f59e0b' : result.bunCrPattern === 'low' ? '#60a5fa' : '#22c55e'}>
+            <Pep
+              color={result.bunCrPattern === 'high' ? '#f59e0b' : result.bunCrPattern === 'low' ? '#60a5fa' : '#22c55e'}
+            >
               {`BUN/Cr ${result.bunCreatinineRatio}`}
             </Pep>
           )}
@@ -989,18 +1318,72 @@ export const ProteinKidneyPanel: React.FC = () => {
       </MhSection>
 
       {/* ── ОАМ ───────────────────────────────────────────────────────────── */}
-      <MhSection icon="🧫" title="Общий анализ мочи" hint="Плотность, белок, осадок — главные данные для вывода" accent="#22c55e">
+      <MhSection
+        icon="🧫"
+        title="Общий анализ мочи"
+        hint="Плотность, белок, осадок — главные данные для вывода"
+        accent="#22c55e"
+      >
         <MhGrid cols={3}>
-          <MhNum label="Плотность (SG)" {...numberProps('urineSg')} min={1} max={1.06} step={0.001} optional hint="Например 1.020" />
+          <MhNum
+            label="Плотность (SG)"
+            {...numberProps('urineSg')}
+            min={1}
+            max={1.06}
+            step={0.001}
+            optional
+            hint="Например 1.020"
+          />
           <MhNum label="pH мочи" {...numberProps('urinePh')} min={4} max={9} step={0.1} optional />
-          <MhNum label="Белок мочи" {...numberProps('urineProteinGL')} min={0} max={20} step={0.01} suffix=" г/л" optional />
-          <MhNum label="Микроальбумин" {...numberProps('microalbuminMgL')} min={0} max={5000} step={1} suffix=" мг/л" optional />
-          <MhNum label="Креатинин мочи" {...numberProps('urineCreatinineMmolL')} min={0} max={60} step={0.1} suffix=" ммоль/л" optional hint="нужен для UACR" />
-          <MhNum label="UACR" {...numberProps('uacrMgMmol')} min={0} max={1000} step={0.1} suffix=" мг/ммоль" optional />
+          <MhNum
+            label="Белок мочи"
+            {...numberProps('urineProteinGL')}
+            min={0}
+            max={20}
+            step={0.01}
+            suffix=" г/л"
+            optional
+          />
+          <MhNum
+            label="Микроальбумин"
+            {...numberProps('microalbuminMgL')}
+            min={0}
+            max={5000}
+            step={1}
+            suffix=" мг/л"
+            optional
+          />
+          <MhNum
+            label="Креатинин мочи"
+            {...numberProps('urineCreatinineMmolL')}
+            min={0}
+            max={60}
+            step={0.1}
+            suffix=" ммоль/л"
+            optional
+            hint="нужен для UACR"
+          />
+          <MhNum
+            label="UACR"
+            {...numberProps('uacrMgMmol')}
+            min={0}
+            max={1000}
+            step={0.1}
+            suffix=" мг/ммоль"
+            optional
+          />
           <MhNum label="Лейкоциты мочи" {...numberProps('urineLeuPerUl')} min={0} max={5000} suffix=" /мкл" optional />
           <MhNum label="Эритроциты мочи" {...numberProps('urineEryPerUl')} min={0} max={5000} suffix=" /мкл" optional />
           <MhNum label="Цилиндры" {...numberProps('urineCastsPerUl')} min={0} max={500} suffix=" /мкл" optional />
-          <MhNum label="Суточный диурез" {...numberProps('urineVolume24hMl')} min={0} max={6000} step={50} suffix=" мл" optional />
+          <MhNum
+            label="Суточный диурез"
+            {...numberProps('urineVolume24hMl')}
+            min={0}
+            max={6000}
+            step={50}
+            suffix=" мл"
+            optional
+          />
         </MhGrid>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
           <Pep color="#22c55e">{`Белок мочи: ${ALBUMINURIA_LABEL[result.albuminuriaCategory]}`}</Pep>
@@ -1010,22 +1393,39 @@ export const ProteinKidneyPanel: React.FC = () => {
           )}
         </div>
         <div style={{ marginTop: 10 }}>
-          <ScorePicker label="Белок в тест-полоске" value={state.urineProteinScore} onChange={(v) => setOptional('urineProteinScore', v)} />
+          <ScorePicker
+            label="Белок в тест-полоске"
+            value={state.urineProteinScore}
+            onChange={(v) => setOptional('urineProteinScore', v)}
+          />
         </div>
         <div style={{ marginTop: 8 }}>
           <ScorePicker
             label="Нитриты"
             value={state.urineNitriteScore}
             onChange={(v) => setOptional('urineNitriteScore', v)}
-            options={[{ v: 0, t: 'отр' }, { v: 1, t: 'полож.' }]}
+            options={[
+              { v: 0, t: 'отр' },
+              { v: 1, t: 'полож.' },
+            ]}
             accent="#ef4444"
           />
         </div>
         <div style={{ marginTop: 8 }}>
-          <ScorePicker label="Глюкоза мочи" value={state.urineGlucoseScore} onChange={(v) => setOptional('urineGlucoseScore', v)} accent="#eab308" />
+          <ScorePicker
+            label="Глюкоза мочи"
+            value={state.urineGlucoseScore}
+            onChange={(v) => setOptional('urineGlucoseScore', v)}
+            accent="#eab308"
+          />
         </div>
         <div style={{ marginTop: 8 }}>
-          <ScorePicker label="Кетоны мочи" value={state.urineKetonesScore} onChange={(v) => setOptional('urineKetonesScore', v)} accent="#a78bfa" />
+          <ScorePicker
+            label="Кетоны мочи"
+            value={state.urineKetonesScore}
+            onChange={(v) => setOptional('urineKetonesScore', v)}
+            accent="#a78bfa"
+          />
         </div>
       </MhSection>
 
@@ -1035,24 +1435,41 @@ export const ProteinKidneyPanel: React.FC = () => {
         title="Усваивается ли белок"
         hint="Ответ по мочевине, креатинину/СКФ и белку мочи"
         accent={util.color}
-        right={<Pep color={util.color}>
-          {util.confidence === 'high' ? 'данных достаточно' : util.confidence === 'medium' ? 'частичные данные' : 'мало данных'}
-        </Pep>}
+        right={
+          <Pep color={util.color}>
+            {util.confidence === 'high'
+              ? 'данных достаточно'
+              : util.confidence === 'medium'
+                ? 'частичные данные'
+                : 'мало данных'}
+          </Pep>
+        }
       >
-        <div style={{
-          padding: '10px 12px', borderRadius: 12,
-          background: `${util.color}12`, border: `1px solid ${util.color}44`,
-        }}>
+        <div
+          style={{
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: `${util.color}12`,
+            border: `1px solid ${util.color}44`,
+          }}
+        >
           <div style={{ fontSize: 15, fontWeight: 900, color: util.color, lineHeight: 1.25 }}>{util.label}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.78)', lineHeight: 1.5, marginTop: 4 }}>{util.detail}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.78)', lineHeight: 1.5, marginTop: 4 }}>
+            {util.detail}
+          </div>
           {util.markers.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
-              {util.markers.map((m) => <Pep key={m} color={util.color}>{m}</Pep>)}
+              {util.markers.map((m) => (
+                <Pep key={m} color={util.color}>
+                  {m}
+                </Pep>
+              ))}
             </div>
           )}
         </div>
         <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45, marginTop: 6 }}>
-          Честная рамка: ни ОАМ, ни мочевина не измеряют всасывание или синтез в мышцах. Они показывают, как выводится азот из белка: норма = нагрузка переносится, рост мочевины = избыток окисляется.
+          Честная рамка: ни ОАМ, ни мочевина не измеряют всасывание или синтез в мышцах. Они показывают, как выводится
+          азот из белка: норма = нагрузка переносится, рост мочевины = избыток окисляется.
         </div>
       </MhSection>
 
@@ -1066,8 +1483,20 @@ export const ProteinKidneyPanel: React.FC = () => {
       >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6 }}>
           <MhTile label="Индекс" value={result.score} sub="из 100" color={result.color} accent={result.color} />
-          <MhTile label="Польза" value={`${result.benefitCapGPerKg}`} sub={`${result.benefitCapGPerDay} г/сут`} color="#fff" accent="#60a5fa" />
-          <MhTile label="Переносимость" value={toleranceValue} sub={toleranceSub} color="#fff" accent={result.extreme ? '#f97316' : '#a78bfa'} />
+          <MhTile
+            label="Польза"
+            value={`${result.benefitCapGPerKg}`}
+            sub={`${result.benefitCapGPerDay} г/сут`}
+            color="#fff"
+            accent="#60a5fa"
+          />
+          <MhTile
+            label="Переносимость"
+            value={toleranceValue}
+            sub={toleranceSub}
+            color="#fff"
+            accent={result.extreme ? '#f97316' : '#a78bfa'}
+          />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 6, marginTop: 6 }}>
           <MhTile
@@ -1087,31 +1516,43 @@ export const ProteinKidneyPanel: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 6px' }}>
-          <MhBar v={result.proteinGPerKg} max={barMax} color={statusColor} label={`Сейчас ${result.proteinGPerKg} г/кг`} />
+          <MhBar
+            v={result.proteinGPerKg}
+            max={barMax}
+            color={statusColor}
+            label={`Сейчас ${result.proteinGPerKg} г/кг`}
+          />
           <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
             {result.toleranceAssessed ? `переносимость ${result.capGPerKg}` : `польза ${result.benefitCapGPerKg}`}
           </span>
         </div>
 
-        <div style={{
-          padding: '8px 10px', borderRadius: 10, fontSize: 10, lineHeight: 1.45,
-          background: `${statusColor}10`, border: `1px solid ${statusColor}33`, color: '#fff',
-        }}>
-          <strong style={{ color: statusColor }}>{statusText}.</strong>{' '}
-          Сейчас {result.proteinGPerDay} г/сут ({result.proteinGPerKg} г/кг).
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: 10,
+            fontSize: 10,
+            lineHeight: 1.45,
+            background: `${statusColor}10`,
+            border: `1px solid ${statusColor}33`,
+            color: '#fff',
+          }}
+        >
+          <strong style={{ color: statusColor }}>{statusText}.</strong> Сейчас {result.proteinGPerDay} г/сут (
+          {result.proteinGPerKg} г/кг).
           {result.extreme
             ? ` Это выше 3.2 г/кг — вне доказанной переносимости. 5 г/кг — верхняя граница калькулятора, а не безопасная норма: нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней.${result.status === 'above_tolerance' ? ` При этом белок на ${overToleranceG} г/сут выше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение до него.` : ''}`
             : result.status === 'above_tolerance'
-            ? ` Это на ${overToleranceG} г/сут больше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение, потом любые прибавки.`
-            : result.status === 'above_benefit'
-              ? result.aasEgfrUnverified
-                ? ' Выше ориентира пользы. Снижать до потолка не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но наращивать можно только после цистатина C.'
-                : result.toleranceVerified
-                  ? ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), но переносимость позволяет до ${result.capGPerDay} г/сут.`
-                  : ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), а переносимость выше не подтверждена — для роста нужны чистые анализы.`
-              : result.status === 'within'
-                ? ` В пределах ориентира пользы — до ${result.benefitCapGPerDay} г/сут.`
-                : ' Ниже физиологичного минимума: сначала доберите базовый белок.'}
+              ? ` Это на ${overToleranceG} г/сут больше потолка переносимости ${result.capGPerDay} г/сут — сначала снижение, потом любые прибавки.`
+              : result.status === 'above_benefit'
+                ? result.aasEgfrUnverified
+                  ? ' Выше ориентира пользы. Снижать до потолка не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но наращивать можно только после цистатина C.'
+                  : result.toleranceVerified
+                    ? ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), но переносимость позволяет до ${result.capGPerDay} г/сут.`
+                    : ` Дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано (лишние ${overBenefitG} г/сут), а переносимость выше не подтверждена — для роста нужны чистые анализы.`
+                : result.status === 'within'
+                  ? ` В пределах ориентира пользы — до ${result.benefitCapGPerDay} г/сут.`
+                  : ' Ниже физиологичного минимума: сначала доберите базовый белок.'}
           {result.increaseAllowed && !result.increasePaused
             ? ` Прибавка рекомендуется: +${result.headroomGPerDay} г/сут шагами по 5–15 г.`
             : result.increasePaused
@@ -1122,24 +1563,49 @@ export const ProteinKidneyPanel: React.FC = () => {
                   : ' Дальше — только под наблюдением врача и с контролем каждые 7–14 дней.'
                 : result.canIncreaseToTolerance
                   ? ` По переносимости можно до ${result.capGPerDay} г/сут (+${result.toleranceHeadroomGPerDay} г), но дополнительного прироста это в среднем не даёт.`
-                  : result.status === 'above_tolerance' ? ' Сначала вернитесь к потолку.' : ' Прибавка сейчас не рекомендуется.'}
+                  : result.status === 'above_tolerance'
+                    ? ' Сначала вернитесь к потолку.'
+                    : ' Прибавка сейчас не рекомендуется.'}
         </div>
 
         {result.capReasons.length > 1 && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+            <div
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.55)',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+                letterSpacing: 0.3,
+              }}
+            >
               Почему потолки такие
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {result.capReasons.map((r, i) => <Pep key={i} color={i === 0 ? '#60a5fa' : '#f59e0b'}>{r}</Pep>)}
+              {result.capReasons.map((r, i) => (
+                <Pep key={i} color={i === 0 ? '#60a5fa' : '#f59e0b'}>
+                  {r}
+                </Pep>
+              ))}
             </div>
           </div>
         )}
-        <div style={{
-          marginTop: 8, padding: '8px 10px', borderRadius: 10, fontSize: 9, lineHeight: 1.5,
-          background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', color: 'rgba(255,255,255,0.68)',
-        }}>
-          <strong style={{ color: '#60a5fa' }}>Откуда «потолок пользы».</strong> {result.benefitBasis}. Это не «белок вреден выше» — это среднее плато дозы: прирост мышц перестаёт ускоряться. Индивидуально выше проверяется только анализами (переносимость).
+        <div
+          style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            borderRadius: 10,
+            fontSize: 9,
+            lineHeight: 1.5,
+            background: 'rgba(96,165,250,0.06)',
+            border: '1px solid rgba(96,165,250,0.2)',
+            color: 'rgba(255,255,255,0.68)',
+          }}
+        >
+          <strong style={{ color: '#60a5fa' }}>Откуда «потолок пользы».</strong> {result.benefitBasis}. Это не «белок
+          вреден выше» — это среднее плато дозы: прирост мышц перестаёт ускоряться. Индивидуально выше проверяется
+          только анализами (переносимость).
         </div>
       </MhSection>
 
@@ -1149,14 +1615,26 @@ export const ProteinKidneyPanel: React.FC = () => {
         title="Когда пересдать анализы"
         hint="Дата уже посчитана — от неё зависит следующий шаг с белком"
         accent={result.retest.color}
-        right={<Pep color={result.retest.color}>
-          {result.retest.afterDays === 0 ? 'сейчас' : `через ${result.retest.afterDays} дн.`}
-        </Pep>}
+        right={
+          <Pep color={result.retest.color}>
+            {result.retest.afterDays === 0 ? 'сейчас' : `через ${result.retest.afterDays} дн.`}
+          </Pep>
+        }
       >
-        <div style={{
-          display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, padding: '10px 12px', borderRadius: 12,
-          background: `${result.retest.color}10`, border: `1px solid ${result.retest.color}38`,
-        }} role="status" aria-live="polite">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            flexWrap: 'wrap',
+            gap: 8,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: `${result.retest.color}10`,
+            border: `1px solid ${result.retest.color}38`,
+          }}
+          role="status"
+          aria-live="polite"
+        >
           <div style={{ fontSize: 20, fontWeight: 900, color: result.retest.color, letterSpacing: -0.3 }}>
             {formatRuDate(result.retest.date)}
           </div>
@@ -1166,25 +1644,47 @@ export const ProteinKidneyPanel: React.FC = () => {
           {result.retest.reason}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 7 }}>
-          {result.retest.items.map((it) => <Pep key={it} color={result.retest.color}>{it}</Pep>)}
+          {result.retest.items.map((it) => (
+            <Pep key={it} color={result.retest.color}>
+              {it}
+            </Pep>
+          ))}
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={onCopySummary}
             style={{
-              flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
-              background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.35)', color: '#93c5fd',
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 800,
+              background: 'rgba(96,165,250,0.14)',
+              border: '1px solid rgba(96,165,250,0.35)',
+              color: '#93c5fd',
             }}
-          >Скопировать для врача</button>
+          >
+            Скопировать для врача
+          </button>
           <button
             type="button"
             onClick={onDownloadIcs}
             style={{
-              flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
-              background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.28)', color: '#cbd5e1',
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 800,
+              background: 'rgba(148,163,184,0.12)',
+              border: '1px solid rgba(148,163,184,0.28)',
+              color: '#cbd5e1',
             }}
-          >В календарь (.ics)</button>
+          >
+            В календарь (.ics)
+          </button>
         </div>
         {savedMsg && (
           <div role="status" aria-live="polite" style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
@@ -1194,7 +1694,12 @@ export const ProteinKidneyPanel: React.FC = () => {
       </MhSection>
 
       {/* ── Сигналы ───────────────────────────────────────────────────────── */}
-      <MhSection icon="📊" title="Из чего сложился индекс" hint="Чем выше балл, тем осторожнее с белком" accent="#a78bfa">
+      <MhSection
+        icon="📊"
+        title="Из чего сложился индекс"
+        hint="Чем выше балл, тем осторожнее с белком"
+        accent="#a78bfa"
+      >
         {result.signals.map((s) => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
             <div style={{ minWidth: 84 }}>
@@ -1202,7 +1707,9 @@ export const ProteinKidneyPanel: React.FC = () => {
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>{s.value}</div>
             </div>
             <MhBar v={s.points} max={s.max} color={s.color} />
-            <span style={{ fontSize: 9, fontWeight: 800, color: s.color, minWidth: 34, textAlign: 'right' }}>{s.points}/{s.max}</span>
+            <span style={{ fontSize: 9, fontWeight: 800, color: s.color, minWidth: 34, textAlign: 'right' }}>
+              {s.points}/{s.max}
+            </span>
           </div>
         ))}
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.42)', lineHeight: 1.4, marginTop: 2 }}>
@@ -1211,7 +1718,12 @@ export const ProteinKidneyPanel: React.FC = () => {
       </MhSection>
 
       {/* ── Вода и осмолярная нагрузка ────────────────────────────────────── */}
-      <MhSection icon="💧" title="Вода и осмолярная нагрузка" hint="RSL: ~5.8 мОсм на 1 г белка + электролиты" accent="#38bdf8">
+      <MhSection
+        icon="💧"
+        title="Вода и осмолярная нагрузка"
+        hint="RSL: ~5.8 мОсм на 1 г белка + электролиты"
+        accent="#38bdf8"
+      >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 6 }}>
           <MhTile label="RSL" value={result.rslMOsmPerDay} sub="мОсм/сут" accent="#38bdf8" />
           <MhTile label="Моча нужна" value={result.urineVolumeNeededMl} sub="мл/сут при 600 мОсм/кг" accent="#38bdf8" />
@@ -1219,7 +1731,15 @@ export const ProteinKidneyPanel: React.FC = () => {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
           <Pep color={hydrationTone}>{`Гидратация: ${HYDRATION_LABEL[result.hydrationStatus]}`}</Pep>
-          <Pep color={result.concentrationRisk === 'high' ? '#ef4444' : result.concentrationRisk === 'moderate' ? '#f59e0b' : '#22c55e'}>
+          <Pep
+            color={
+              result.concentrationRisk === 'high'
+                ? '#ef4444'
+                : result.concentrationRisk === 'moderate'
+                  ? '#f59e0b'
+                  : '#22c55e'
+            }
+          >
             {`Концентрация: ${RISK_LABEL[result.concentrationRisk]}`}
           </Pep>
           {result.waterDeficitMl != null && result.waterDeficitMl > 0 && (
@@ -1238,7 +1758,11 @@ export const ProteinKidneyPanel: React.FC = () => {
       <MhSection
         icon="🪜"
         title="План прибавки"
-        hint={result.canIncreaseToTolerance && !result.increaseAllowed ? 'Выше пользы — только по переносимости, с контролем' : 'Шаг 5–15 г/сут, контроль через 10–14 дней'}
+        hint={
+          result.canIncreaseToTolerance && !result.increaseAllowed
+            ? 'Выше пользы — только по переносимости, с контролем'
+            : 'Шаг 5–15 г/сут, контроль через 10–14 дней'
+        }
         accent={planTone}
         right={<Pep color={planTone}>{planLabel}</Pep>}
       >
@@ -1248,24 +1772,44 @@ export const ProteinKidneyPanel: React.FC = () => {
         {result.steps.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {result.steps.map((st, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', borderRadius: 9,
-                background: st.beyondBenefit ? 'rgba(234,179,8,0.06)' : 'rgba(34,197,94,0.06)',
-                border: `1px solid ${st.beyondBenefit ? 'rgba(234,179,8,0.20)' : 'rgba(34,197,94,0.18)'}`,
-              }}>
-                <span style={{
-                  width: 22, height: 22, borderRadius: 7, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, fontWeight: 800,
-                  background: st.beyondBenefit ? 'rgba(234,179,8,0.18)' : 'rgba(34,197,94,0.18)',
-                  color: st.beyondBenefit ? '#eab308' : '#22c55e',
-                }}>{i + 1}</span>
+              <div
+                key={i}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 9px',
+                  borderRadius: 9,
+                  background: st.beyondBenefit ? 'rgba(234,179,8,0.06)' : 'rgba(34,197,94,0.06)',
+                  border: `1px solid ${st.beyondBenefit ? 'rgba(234,179,8,0.20)' : 'rgba(34,197,94,0.18)'}`,
+                }}
+              >
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 7,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    background: st.beyondBenefit ? 'rgba(234,179,8,0.18)' : 'rgba(34,197,94,0.18)',
+                    color: st.beyondBenefit ? '#eab308' : '#22c55e',
+                  }}
+                >
+                  {i + 1}
+                </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
                     {st.totalProteinG} г/сут · {st.gPerKg} г/кг
                   </div>
                   <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{st.note}</div>
                 </div>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>день {st.afterDays}</span>
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', whiteSpace: 'nowrap' }}>
+                  день {st.afterDays}
+                </span>
               </div>
             ))}
           </div>
@@ -1290,23 +1834,31 @@ export const ProteinKidneyPanel: React.FC = () => {
             suffix=" г/сут"
             optional
           />
-          {result.planned && (() => {
-            const withinBoth = result.planned.withinBenefit && result.planned.withinTolerance;
-            const tone = withinBoth ? '#22c55e' : result.planned.withinTolerance ? '#eab308' : '#ef4444';
-            return (
-              <div style={{
-                marginTop: 6, padding: '7px 9px', borderRadius: 9, fontSize: 10, lineHeight: 1.45,
-                background: `${tone}14`, border: `1px solid ${tone}40`,
-              }}>
-                Итого {result.planned.totalG} г/сут · {result.planned.gPerKg} г/кг.{' '}
-                {!result.planned.withinTolerance
-                  ? 'Выше потолка переносимости — так делать не стоит до повторных анализов.'
-                  : result.planned.withinBenefit
-                    ? `Влезает в потолок пользы. Добавьте ~${result.planned.extraWaterMl} мл воды, чтобы вывести новые осмоли.`
-                    : `Переносимость это позволяет, но дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано: мышцам добавка ничего не даст, только лишний азот. Только при реальной причине и с контролем анализов.`}
-              </div>
-            );
-          })()}
+          {result.planned &&
+            (() => {
+              const withinBoth = result.planned.withinBenefit && result.planned.withinTolerance;
+              const tone = withinBoth ? '#22c55e' : result.planned.withinTolerance ? '#eab308' : '#ef4444';
+              return (
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '7px 9px',
+                    borderRadius: 9,
+                    fontSize: 10,
+                    lineHeight: 1.45,
+                    background: `${tone}14`,
+                    border: `1px solid ${tone}40`,
+                  }}
+                >
+                  Итого {result.planned.totalG} г/сут · {result.planned.gPerKg} г/кг.{' '}
+                  {!result.planned.withinTolerance
+                    ? 'Выше потолка переносимости — так делать не стоит до повторных анализов.'
+                    : result.planned.withinBenefit
+                      ? `Влезает в потолок пользы. Добавьте ~${result.planned.extraWaterMl} мл воды, чтобы вывести новые осмоли.`
+                      : `Переносимость это позволяет, но дополнительной пользы сверх ${result.benefitCapGPerKg} г/кг в среднем не доказано: мышцам добавка ничего не даст, только лишний азот. Только при реальной причине и с контролем анализов.`}
+                </div>
+              );
+            })()}
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
@@ -1318,9 +1870,13 @@ export const ProteinKidneyPanel: React.FC = () => {
 
       {/* ── Флаги и рекомендации ──────────────────────────────────────────── */}
       <MhSection icon="🩺" title="Что требует внимания" hint="Сначала безопасность, потом прибавка" accent="#ef4444">
-        {result.flags.length > 0
-          ? result.flags.map((f) => <FlagCard key={f.code} severity={f.severity} title={f.title} detail={f.detail} />)
-          : <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Критичных отклонений по введённым данным нет.</div>}
+        {result.flags.length > 0 ? (
+          result.flags.map((f) => <FlagCard key={f.code} severity={f.severity} title={f.title} detail={f.detail} />)
+        ) : (
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+            Критичных отклонений по введённым данным нет.
+          </div>
+        )}
 
         <div style={{ marginTop: 8 }}>
           {result.recommendations.map((r, i) => (
@@ -1350,48 +1906,103 @@ export const ProteinKidneyPanel: React.FC = () => {
             type="button"
             onClick={onSaveSnapshot}
             style={{
-              flex: 1, minHeight: 44, borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 800,
-              background: 'linear-gradient(135deg,#f59e0b,#d97706)', border: 'none', color: '#000',
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 800,
+              background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+              border: 'none',
+              color: '#000',
             }}
-          >Сохранить замер</button>
+          >
+            Сохранить замер
+          </button>
           <button
             type="button"
             onClick={onClearHistory}
             style={{
-              minHeight: 44, padding: '0 14px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700,
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.65)',
+              minHeight: 44,
+              padding: '0 14px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 10,
+              fontWeight: 700,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.65)',
             }}
-          >Очистить</button>
+          >
+            Очистить
+          </button>
         </div>
         {savedMsg && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 6 }}>{savedMsg}</div>}
 
         {history.length > 0 && (
           <div style={{ marginTop: 8 }}>
-            {[...history].reverse().slice(0, 6).map((h) => {
-              const prev = history.filter((x) => x.date < h.date).slice(-1)[0];
-              const delta = prev ? h.score - prev.score : 0;
-              return (
-                <div key={h.date} style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, marginBottom: 4,
-                  background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)',
-                }}>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', minWidth: 58 }}>{h.date.slice(5)}</span>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', minWidth: 58 }}>{h.proteinGPerKg} г/кг</span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', flex: 1 }}>
-                    {h.egfr != null ? `СКФ ${h.egfr}` : 'СКФ —'}{h.ureaMmolL != null ? ` · мочевина ${h.ureaMmolL}` : ''}{h.creatinineUmolL != null ? ` · креатинин ${h.creatinineUmolL}` : ''}{h.urineSg != null ? ` · SG ${h.urineSg}` : ''}{h.uacrMgMmol != null ? ` · UACR ${h.uacrMgMmol}` : ''}
-                  </span>
-                  <span style={{
-                    fontSize: 9, fontWeight: 800,
-                    color: h.level === 'low' ? '#22c55e' : h.level === 'moderate' ? '#eab308' : h.level === 'elevated' ? '#f59e0b' : '#ef4444',
-                  }}>{h.score}</span>
-                  {prev && delta !== 0 && (
-                    <span style={{ fontSize: 8, color: delta > 0 ? '#ef4444' : '#22c55e', minWidth: 26, textAlign: 'right' }}>
-                      {delta > 0 ? `+${delta}` : delta}
+            {[...history]
+              .reverse()
+              .slice(0, 6)
+              .map((h) => {
+                const prev = history.filter((x) => x.date < h.date).slice(-1)[0];
+                const delta = prev ? h.score - prev.score : 0;
+                return (
+                  <div
+                    key={h.date}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      marginBottom: 4,
+                      background: 'rgba(255,255,255,0.025)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                    }}
+                  >
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', minWidth: 58 }}>{h.date.slice(5)}</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: '#fff', minWidth: 58 }}>
+                      {h.proteinGPerKg} г/кг
                     </span>
-                  )}
-                </div>
-              );
-            })}
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', flex: 1 }}>
+                      {h.egfr != null ? `СКФ ${h.egfr}` : 'СКФ —'}
+                      {h.ureaMmolL != null ? ` · мочевина ${h.ureaMmolL}` : ''}
+                      {h.creatinineUmolL != null ? ` · креатинин ${h.creatinineUmolL}` : ''}
+                      {h.urineSg != null ? ` · SG ${h.urineSg}` : ''}
+                      {h.uacrMgMmol != null ? ` · UACR ${h.uacrMgMmol}` : ''}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        color:
+                          h.level === 'low'
+                            ? '#22c55e'
+                            : h.level === 'moderate'
+                              ? '#eab308'
+                              : h.level === 'elevated'
+                                ? '#f59e0b'
+                                : '#ef4444',
+                      }}
+                    >
+                      {h.score}
+                    </span>
+                    {prev && delta !== 0 && (
+                      <span
+                        style={{
+                          fontSize: 8,
+                          color: delta > 0 ? '#ef4444' : '#22c55e',
+                          minWidth: 26,
+                          textAlign: 'right',
+                        }}
+                      >
+                        {delta > 0 ? `+${delta}` : delta}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </MhSection>
@@ -1402,31 +2013,55 @@ export const ProteinKidneyPanel: React.FC = () => {
         title="Методика и источники"
         hint="Что именно считает калькулятор и где он не работает"
         accent="#94a3b8"
-        right={<Pep color="#94a3b8" onClick={() => setShowMethod((v) => !v)}>{showMethod ? 'скрыть' : 'показать'}</Pep>}
+        right={
+          <Pep color="#94a3b8" onClick={() => setShowMethod((v) => !v)}>
+            {showMethod ? 'скрыть' : 'показать'}
+          </Pep>
+        }
       >
         {showMethod && (
           <div>
             {result.evidence.map((e) => (
               <div key={e.id} style={{ display: 'flex', gap: 7, marginBottom: 6 }}>
-                <span style={{
-                  flexShrink: 0, width: 18, height: 18, borderRadius: 5, fontSize: 9, fontWeight: 800,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(148,163,184,0.16)', color: '#cbd5e1', border: '1px solid rgba(148,163,184,0.3)',
-                }}>{e.grade}</span>
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 5,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(148,163,184,0.16)',
+                    color: '#cbd5e1',
+                    border: '1px solid rgba(148,163,184,0.3)',
+                  }}
+                >
+                  {e.grade}
+                </span>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45 }}>{e.text}</span>
               </div>
             ))}
             <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45, marginTop: 4 }}>
-              Уровни: A — руководства/крупные исследования, B — физиология и валидированные формулы,
-              C — приближения, E — экспертное мнение. Оценка по SG ломается при глюкозе, контрасте и массивной протеинурии.
+              Уровни: A — руководства/крупные исследования, B — физиология и валидированные формулы, C — приближения, E
+              — экспертное мнение. Оценка по SG ломается при глюкозе, контрасте и массивной протеинурии.
             </div>
           </div>
         )}
-        <div style={{
-          marginTop: showMethod ? 8 : 0, padding: '8px 10px', borderRadius: 10,
-          background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
-          fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45,
-        }}>
+        <div
+          style={{
+            marginTop: showMethod ? 8 : 0,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(239,68,68,0.06)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.7)',
+            lineHeight: 1.45,
+          }}
+        >
           {result.disclaimer}
         </div>
       </MhSection>

@@ -603,6 +603,25 @@ export interface LabHealthIndices {
 }
 
 /**
+ * Проход 207: веса трёх композитных индексов названы и объяснены.
+ *
+ * ASI/HMI/CR — индексы этого приложения, а не клинические шкалы: ни один вес
+ * не имеет опубликованного источника (правило 26), это эвристика на
+ * процентной шкале ступеней модели (0/33/67/100). До прохода 207 веса жили
+ * литералами внутри формулы, и «ASI 72 %» читался как клиническая оценка:
+ * экран не мог показать, из чего собран процент, а следующая правка формулы
+ * меняла число молча. Теперь веса — именованные константы, а оба экрана
+ * подписывают индексы «индекс приложения» (LabsScreen, RiskScreen).
+ *
+ * Сумма весов ASI = 1.0 (гормоны + воспаление + почки). HMI и CR — не доли:
+ * стресс печени / кардиоиндекс входят с весом > 1 (потолок 100), воспаление —
+ * добавка.
+ */
+export const ASI_WEIGHTS = { hormones: 0.4, inflammation: 0.3, kidney: 0.3 } as const;
+export const HMI_WEIGHTS = { liver: 1.2, inflammation: 0.5 } as const;
+export const CR_WEIGHTS = { cardio: 1.1, inflammation: 0.6 } as const;
+
+/**
  * ASI / HMI / CR — одна формула на оба экрана (проход 153).
  *
  * Раньше каждый экран считал их сам из `interpretLabs`, подставляя `|| 0` для
@@ -621,15 +640,30 @@ export function computeHealthIndices(res: LabCompositeResult): LabHealthIndices 
   const asI =
     hormoneScore === null || inflammation === null || kidneyStress === null
       ? null
-      : Math.round(100 - (hormoneScore * 0.4 + inflammation * 0.3 + kidneyStress * 0.3));
+      : Math.round(
+          100 -
+            (hormoneScore * ASI_WEIGHTS.hormones +
+              inflammation * ASI_WEIGHTS.inflammation +
+              kidneyStress * ASI_WEIGHTS.kidney),
+        );
   const hmi =
     liverStress === null || inflammation === null
       ? null
-      : Math.round(Math.min(100, liverStress * 1.2 + inflammation * 0.5));
+      : Math.round(
+          Math.min(
+            100,
+            liverStress * HMI_WEIGHTS.liver + inflammation * HMI_WEIGHTS.inflammation,
+          ),
+        );
   const cr =
     cardioRisk === null || inflammation === null
       ? null
-      : Math.round(Math.min(100, cardioRisk * 1.1 + inflammation * 0.6));
+      : Math.round(
+          Math.min(
+            100,
+            cardioRisk * CR_WEIGHTS.cardio + inflammation * CR_WEIGHTS.inflammation,
+          ),
+        );
   return {
     asi: asI === null ? null : Math.max(0, Math.min(100, asI)),
     hmi,

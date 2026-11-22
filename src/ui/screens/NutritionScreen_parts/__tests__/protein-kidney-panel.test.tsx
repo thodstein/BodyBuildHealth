@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { uacrToMgMmol } from '../ProteinKidneyPanel';
 import { ProteinKidneyPanel, buildRetestIcs, mergeLatestLabs } from '../ProteinKidneyPanel';
 import { NutritionScreen } from '../../NutritionScreen';
 import { PROTEIN_KIDNEY_INPUT_KEY } from '../../../../engines/protein-kidney-tolerance.engine';
@@ -21,13 +22,19 @@ function pickScore(label: string, option: string) {
 }
 
 beforeEach(() => {
-  try { localStorage.clear(); } catch { /* ignore */ }
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
 });
-afterEach(() => { cleanup(); });
+afterEach(() => {
+  cleanup();
+});
 
 /** Ввести число в MhNum так, как это делает пользователь (попап → число → OK). */
 function setNumber(label: string, value: number) {
-  const btn = Array.from(document.querySelectorAll('button')).find(b => {
+  const btn = Array.from(document.querySelectorAll('button')).find((b) => {
     if (b.closest('[role="dialog"]') || b.closest('.mh-popupoverlay')) return false;
     return (b.textContent || '').trim().startsWith(label);
   });
@@ -40,7 +47,7 @@ function setNumber(label: string, value: number) {
   expect(input, `в попапе «${label}» нет input`).toBeTruthy();
   fireEvent.change(input, { target: { value: String(value) } });
 
-  const ok = Array.from(area.querySelectorAll('button')).find(b => (b.textContent || '').trim() === 'OK');
+  const ok = Array.from(area.querySelectorAll('button')).find((b) => (b.textContent || '').trim() === 'OK');
   expect(ok, `в попапе «${label}» нет OK`).toBeTruthy();
   fireEvent.click(ok as HTMLElement);
 }
@@ -54,13 +61,17 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     const burger = container.querySelector('[aria-label="Меню питания"]') as HTMLElement | null;
     if (burger) fireEvent.click(burger);
 
-    const chips = Array.from(container.querySelectorAll('.nutrition-chip')).map(c => (c.textContent || '').trim());
-    const metabolic = chips.findIndex(c => c.includes('Метаболика'));
-    const kidney = chips.findIndex(c => c.includes('Белок/почки'));
+    const chips = Array.from(container.querySelectorAll('.nutrition-chip')).map((c) => (c.textContent || '').trim());
+    const metabolic = chips.findIndex((c) => c.includes('Метаболика'));
+    const kidney = chips.findIndex((c) => c.includes('Белок/почки'));
     expect(metabolic).toBeGreaterThanOrEqual(0);
     expect(kidney).toBe(metabolic + 1);
 
-    fireEvent.click(Array.from(container.querySelectorAll('.nutrition-chip')).find(c => (c.textContent || '').includes('Белок/почки')) as HTMLElement);
+    fireEvent.click(
+      Array.from(container.querySelectorAll('.nutrition-chip')).find((c) =>
+        (c.textContent || '').includes('Белок/почки'),
+      ) as HTMLElement,
+    );
     expect(bodyText()).toContain('Белок и почки');
     expect(bodyText()).toContain('Вердикт');
   });
@@ -173,7 +184,9 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
 
   it('11. сушка + % жира поднимает ориентир пользы по тощей массе', () => {
     render(<ProteinKidneyPanel />);
-    fireEvent.click(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Сушка') as HTMLElement);
+    fireEvent.click(
+      Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Сушка') as HTMLElement,
+    );
     setNumber('% жира (необяз.)', 10);
     // 80 кг, 10% жира → 72 кг LBM × 3.0 = 216 г → 2.7 г/кг массы.
     expect(bodyText()).toContain('2.7');
@@ -219,13 +232,25 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
   it('15. кнопка «Из анализов» тянет labs_log, а не только профиль', async () => {
     await db.clear('labs_log');
     await db.put('labs_log', {
-      id: 'pk-urea', code: 'UREA', value: 7.4, unit: 'ммоль/л', date: '2026-11-10', patientId: 'current-user',
+      id: 'pk-urea',
+      code: 'UREA',
+      value: 7.4,
+      unit: 'ммоль/л',
+      date: '2026-11-10',
+      patientId: 'current-user',
     });
     await db.put('labs_log', {
-      id: 'pk-creat', code: 'CREATININE', value: 92, unit: 'мкмоль/л', date: '2026-11-10', patientId: 'current-user',
+      id: 'pk-creat',
+      code: 'CREATININE',
+      value: 92,
+      unit: 'мкмоль/л',
+      date: '2026-11-10',
+      patientId: 'current-user',
     });
     render(<ProteinKidneyPanel />);
-    const btn = document.querySelector('button[aria-label="Подтянуть анализы из раздела Анализы"]') as HTMLElement | null;
+    const btn = document.querySelector(
+      'button[aria-label="Подтянуть анализы из раздела Анализы"]',
+    ) as HTMLElement | null;
     expect(btn).toBeTruthy();
     fireEvent.click(btn as HTMLElement);
     await waitFor(() => expect(bodyText()).toContain('Подтянуто из анализов: 2'));
@@ -256,5 +281,14 @@ describe('ProteinKidneyPanel: вкладка и ввод', () => {
     setNumber('Белок сейчас', 420); // 5.25 г/кг при 80 кг
     expect(bodyText()).toContain('выше предела калькулятора 5 г/кг');
     expect(bodyText()).toContain('Проверьте единицы');
+  });
+  it('18. UACR без единицы читается как мг/г (канон), а не мг/ммоль', () => {
+    // Проход 207: 50 мг/г — A2. Раньше запись без единицы считалась мг/ммоль,
+    // то есть 50 → A3 (завышение в разы). Фактор KDIGO 0.113: 50 × 0.113 = 5.65.
+    expect(uacrToMgMmol(50, '')).toBeCloseTo(5.65, 2);
+    expect(uacrToMgMmol(50, 'мг/г')).toBeCloseTo(5.65, 2);
+    expect(uacrToMgMmol(50, 'mg/g')).toBeCloseTo(5.65, 2);
+    expect(uacrToMgMmol(5, 'мг/ммоль')).toBe(5);
+    expect(uacrToMgMmol(5, 'mg/mmol')).toBe(5);
   });
 });

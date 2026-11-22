@@ -1,7 +1,7 @@
 // Механизм-ориентированная модель риска — UI (качественное оформление)
 // Данные курса → из linked.course (Фарма), анализы → из linked.labs, поддержка → из калькулятора
 import React, { useState, useEffect, useMemo } from 'react';
-import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, mechanismCoverageOf, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, DRUG_CLASSES, getCategoryLabel, mechanismCoverageOf, riskLabCoverage, RISK_LAB_MARKERS, LAB_COVERAGE_BASE, LAB_COVERAGE_STEP, type TzSpecInput, type TzSpecResult, type TzSpecOrganResult, type TzSpecMechanismResult } from '../../../engines/risk-engine-tz-spec';
 import { buildTzInputCore, flatLabUnit, readFlatLabs } from '../../../engines/support-plan/engine-helpers';
 // Проход 169: одно имя анализа — мост «легаси-имя/подпись поля → код склада» (движок и верификация).
 import { canonicalLabValues, LEGACY_LAB_CODES } from '../../../engines/lab-code-bridge';
@@ -15,6 +15,8 @@ import { courseSignature, readCalcSnapshot as readCalcSnapshotShared } from '../
 import { RiskVerificationList } from './RiskVerificationList';
 
 const ACCENT = '#00e68a';
+/** Пустая карта анализов: стабильная ссылка, чтобы мемо таймлайна не рвалось на каждом рендере. */
+const NO_LABS: Record<string, number> = {};
 
 const SYSTEM_COLORS: Record<string, { accent: string; bg: string; border: string }> = {
   cardio:       { accent: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.20)' },
@@ -174,10 +176,6 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     return out;
   }, [labMap]);
   const labCount = Object.keys(displayLabs).length;
-  const REQUIRED_LAB_CODES = ['LDL','HDL','TG','HCT','ALT','AST','GGT','CREATININE','EGFR','GLU','LH','FSH','TT','E2','K','NA'];
-  const presentCount = REQUIRED_LAB_CODES.filter(c => labMap[c] !== undefined).length;
-  const rawDcov = labCount > 0 ? presentCount / REQUIRED_LAB_CODES.length : 0.1;
-  const dCov = forceNoLabs ? 0.1 : Math.max(0.1, rawDcov);
 
   // ── Авто-расчёт (useMemo) — результат вычисляется при изменении любых входных данных ──
   // ЕДИНЫЙ строитель входа (buildTzInputCore) с калькулятором поддержки: та же
@@ -205,7 +203,14 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
     };
   }, []);
   const buildInputs = useMemo((): TzSpecInput | null => {
-    if (calcSnapshot) return calcSnapshot;
+    // Ревью P2-1: «Без анализов» обязан работать и в ветке снапшота. Раньше
+    // кнопка меняла только вид, а модель продолжала считать по анализам
+    // калькулятора — рядом стояли «Штраф активирован» и штраф из снапшота.
+    if (calcSnapshot) {
+      return forceNoLabs
+        ? { ...calcSnapshot, labValues: {}, labCoverage: riskLabCoverage(NO_LABS) }
+        : calcSnapshot;
+    }
     if (!courseSummary) return null;
     const drugs = course.length > 0 ? course.map(c => {
       const m = classifyCourseDrug(c.substanceId || '');
@@ -243,12 +248,30 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
       training,
       nutrition,
     }, supportIds);
-  }, [courseSummary, course, dCov, forceNoLabs, labMap, supportIds, calcSnapshot, linked.profile]);
+  }, [courseSummary, course, forceNoLabs, labMap, supportIds, calcSnapshot, linked.profile]);
 
   const result = useMemo<TzSpecResult | null>(() => {
     if (!buildInputs) return null;
     return calculateTzSpecRisk(buildInputs);
   }, [buildInputs]);
+
+  // Проход 207: «покрытие анализами» — то же число, что у модели. Раньше здесь
+  // жил свой список 16 кодов: три анализа из него давали
+  // 19 %, пока модель на той же карточке считала 0.3 + 0.04 × 3 = 0.42, и
+  // недельная динамика шла по экранному числу — два счётчика одной величины.
+  // Проход 207 (ревью P1): карта берётся из того, что ушло В МОДЕЛЬ, а не из
+  // живого бланка: в ветке снапшота калькулятора к `labValues` уже добавлены
+  // производные `HOMA`/`EGFR`, и подпись обязана считать их же.
+  const inputLabs = buildInputs?.labValues ?? (forceNoLabs ? NO_LABS : labMap);
+  // Ключи снапшота могут быть легаси-написаниями (`eGFR`, `TC`): модель их
+  // канонизирует, поэтому счётчик считает по той же канонической карте.
+  const modelLabs = canonicalLabValues(inputLabs);
+  const presentCount = RISK_LAB_MARKERS.filter((c) => modelLabs[c] !== undefined).length;
+  /** Сколько маркеров нужно, чтобы вес покрытия упёрся в 1 (формула модели). */
+  const covSaturatesAt = Math.ceil((1 - LAB_COVERAGE_BASE) / LAB_COVERAGE_STEP);
+  // Покрытие берём у модели: снапшот несёт свой `labCoverage`, собранный над его
+  // картой, и пересчёт на экране мог бы разойтись с `U_i` на той же карточке.
+  const dCov = result?.d_cov ?? riskLabCoverage(inputLabs);
 
   // ── Понедельная динамика ──
   const weeklyData = useMemo(() => {
@@ -286,13 +309,13 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
       const wi: TzSpecInput = {
         drugClass: courseSummary.drugClass, drugName: 'weekly', dose: 1, duration: Math.max(w, 1),
         form: courseSummary.form, combinations: courseSummary.combos,
-        labCoverage: dCov, labValues: forceNoLabs ? {} : labMap, supportSubstances: supportIds,
+        labCoverage: dCov, labValues: inputLabs, supportSubstances: supportIds,
         drugs: weeklyDrugs.length > 0 ? weeklyDrugs : undefined,
       };
       data.push({ week: w, risk: calculateTzSpecRisk(wi).overallAfter });
     }
     return data;
-  }, [course, courseSummary, result, dCov, forceNoLabs, labMap, supportIds]);
+  }, [course, courseSummary, result, dCov, inputLabs, supportIds]);
 
   // ── Анализы (верификация) — не зависит от курса ──
   if (subTab === 'analyses') {
@@ -335,7 +358,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
           <div style={{ fontSize: 12, color: '#fff', fontFamily: 'monospace', lineHeight: 1.4 }}>
             R = Σ(w × m × E × U × Π(1−k*)) · агрегация: union (нелинейно)
           </div>
-          {calcSnapshot && (
+          {calcSnapshot && !forceNoLabs && (
             <div style={{ marginTop: 8, fontSize: 12, color: '#fff', fontWeight: 700, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.22)', borderRadius:8, padding:'6px 10px' }}>
               ⚡ Цифры идентичны калькулятору поддержки (единый вход: поддержка, фаза, анализы, питание)
             </div>
@@ -606,7 +629,7 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', gap: 6, fontSize: 12, fontWeight:700 }}>
               <span style={{ color: '#fff', padding:'4px 9px', borderRadius:999, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.22)' }}>{courseSummary.count} преп.</span>
-              <span style={{ color: '#fff', padding:'4px 9px', borderRadius:999, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.22)' }}>{labCount} марк.</span>
+              <span style={{ color: '#fff', padding:'4px 9px', borderRadius:999, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.22)' }}>{presentCount} марк.</span>
               <span style={{ color: '#fff', padding:'4px 9px', borderRadius:999, background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.22)' }}>{supportIds.length} поддерж.</span>
             </div>
             <span style={{ fontSize: 12, color: '#fff', width:32, height:32, borderRadius:999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)' }}>{showInputs ? '▲' : '▼'}</span>
@@ -647,8 +670,11 @@ export const RiskSpecMethod: React.FC<{ subTab?: string }> = ({ subTab }) => {
                 }}>
                   {forceNoLabs ? 'Штраф активирован' : 'Без анализов'}
                 </button>
-                <span style={{ fontSize: 12, color: '#fff', fontWeight:600 }}>
-                  {labCount} маркеров · Покрытие {Math.round(dCov * 100)}%
+                <span
+                  style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}
+                  title={`Покрытие модели (d_cov) = ${Math.round(dCov * 100)} %: вес насыщается на ${covSaturatesAt} маркерах, поэтому 100 % не значит «все ${RISK_LAB_MARKERS.length} сданы»`}
+                >
+                  {`${presentCount} из ${RISK_LAB_MARKERS.length} маркеров модели · штраф неопределённости ×${(result?.u_i ?? 1 + 0.25 * (1 - dCov)).toFixed(2)}`}
                 </span>
               </div>
               {labCount > 0 && !forceNoLabs && (

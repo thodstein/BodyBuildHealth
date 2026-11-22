@@ -20,7 +20,7 @@ export const FULL_PANELS: { key: keyof LabSlice; label: string; color: string; m
   { key:'panelAdrenal', label:'Надпочечники / Андрогены', color:'#8b5cf6', markers:['DHEA-S','Androstenedione','3a-ADG','Aldosterone','Renin','PTH'] },
   { key:'panelMineral', label:'Минералы / Электролиты', color:'#06b6d4', markers:['Calcium','Phosphorus','Magnesium','Sodium','Potassium','Chloride'] },
   { key:'panelTumor', label:'Онкомаркеры', color:'#be123c', markers:['PSA total','PSA free','CA-125','CEA','AFP'] },
-  { key:'panelUrinalysis', label:'Общий анализ мочи', color:'#65a30d', markers:['pH','Protein','Glucose','Ketones','Leukocytes','Nitrite'] },
+  { key:'panelUrinalysis', label:'Общий анализ мочи', color:'#65a30d', markers:['pH','Protein','Glucose','Ketones','Leukocytes','Nitrite','UACR'] },
 ];
 
 export const LAB_MARKER_RU: Record<string, string> = {
@@ -53,6 +53,8 @@ export const LAB_MARKER_RU: Record<string, string> = {
   Calcium:'Кальций', Phosphorus:'Фосфор', Magnesium:'Магний', Sodium:'Натрий', Potassium:'Калий', Chloride:'Хлориды',
   'PSA total':'ПСА общий', 'PSA free':'ПСА своб.', 'CA-125':'CA-125', CEA:'РЭА', AFP:'АФП',
   pH:'pH', Protein:'Белок', Ketones:'Кетоны', Leukocytes:'Лейкоциты', Nitrite:'Нитриты',
+  // Проход 207: UACR — альбумин/креатинин мочи, мг/г (как в каталоге и шкале).
+  UACR:'Альбумин/креатинин мочи',
 };
 export const ruMarker = (m: string) => LAB_MARKER_RU[m] || m;
 

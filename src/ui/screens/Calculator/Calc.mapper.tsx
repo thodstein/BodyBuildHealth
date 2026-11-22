@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { buildTzInput } from '../../../engines/support-plan/engine-helpers';
 import { FT_MALE_BAND } from '../../../engines/lab-norms.engine';
 import { ruCount, RU_ELEMENTS, RU_STACKS, RU_SUPPLEMENTS } from '../../../engines/ru-plural';
-import { calculateTzSpecRisk, mechanismCoverageOf, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, mechanismCoverageOf, MG_DEFICIT_STEPS, type TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../engines/tz-snapshot';
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
@@ -226,15 +226,22 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
     // ступеней. Отсутствие записи фильтрацию не включает: без числа «норма» не
     // угадывается (`?? 0` дал бы ложное срабатывание).
     { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','EGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.EGFR!==undefined&&l.EGFR<labNormalLow('EGFR',90))||(l.CYSTATIN_C??0)>labNormalHigh('CYSTATIN_C',1) },
-    // Проход 206: 30 мг/г — верх нормы каталога (`UCUM_MAP.UACR`), а не литерал;
-    // строки в `LAB_TIERS` у альбумин/креатинина нет (там `MICROALB` в мг/л —
-    // другая величина), поэтому лестница здесь не читается. Белок мочи — из
-    // лестницы. Поля UACR в бланке по-прежнему нет: ветка ждёт второго читателя,
-    // который мог бы отдать это число (см. §4).
-    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>catalogUln('UACR',30)||(l.PROTEIN_URINE??0)>labNormalHigh('PROTEIN_URINE',0.15) },
-    // Магний 0.75 — не граница лестницы (там норма 0.85–1.1), источника нет:
-    // остаётся литералом до клинического решения.
-    { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<labNormalLow('K',3.5)||(l.K??4)>labNormalHigh('K',5)||(l.MG??1)<.75 },
+    // Проход 207: 30 мг/г — верх нормы лестницы (`LAB_TIERS.UACR` = верх A1 по
+    // KDIGO 2024, PMID 38490803); то же число стоит в каталоге (`UCUM_MAP.UACR.uln`),
+    // и равенство двух таблиц держит гард. Поле `UACR` заведено в
+    // `panelUrinalysis`, поэтому ветка достижима (мост `ren3` читает то же число).
+    // `MICROALB` в мг/л — отдельная величина, концентрация без нормировки на
+    // креатинин. Белок мочи — из лестницы.
+    // Проход 207 (ревью P2): `>=`, не `>` — верх нормы лестницы уже относится к
+    // следующей ступени (полуинтервалы `[lo, hi)`): 30 мг/г = A2, как в `labMi`.
+    // То же у белка мочи: `deriveTier('PROTEIN_URINE', 0.15)` = 1 (ревью P2-2).
+    // Поле бланка «Белок» числовое (г/л и мг/л, `labMarkerCanon('Protein',
+    // 'panelUrinalysis') = 'PROTEIN_URINE'`), качественные «1+» отбрасывает
+    // `labFieldNumber`; 150 мг/л = 0.15 г/л включает домен.
+    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>=labNormalHigh('UACR',30)||(l.PROTEIN_URINE??0)>=labNormalHigh('PROTEIN_URINE',0.15) },
+    // Проход 207: порог магния — первая ступень модели (`MG_DEFICIT_STEPS[0]`):
+    // 0.75 — верх CLMD (PMID 29387426), лабораторная норма 0.85–1.1 (`LAB_TIERS.MAGNESIUM`).
+    { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<labNormalLow('K',3.5)||(l.K??4)>labNormalHigh('K',5)||(l.MG??1)<MG_DEFICIT_STEPS[0] },
   ],
   endocrine: [
     // Проход 28: 40 пг/мл — мужской порог ароматизации. У женщины E2 40–200 —

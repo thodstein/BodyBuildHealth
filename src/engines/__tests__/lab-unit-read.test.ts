@@ -81,8 +81,9 @@ describe('проход 106: выбор единицы на месте, эври�
     // проход 118: прогестерон; 119: свободный тестостерон; 120: свободные Т3/Т4;
     // 121–123: витамин D, фолат, B12 — везде единицы расходятся, догадка не работает;
     // 130: белок мочи (г/л против мг/л — в 1000 раз); 192: ДГТ (пг/мл против нмоль/л);
-    // 196: ретикулоциты (проценты против промилле — в 10 раз).
-    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'DHT', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12', 'Protein', 'Reticulocytes']);
+    // 196: ретикулоциты (проценты против промилле — в 10 раз); 207: UACR
+    // (мг/г против мг/ммоль — в 8.85 раз, и без единицы 5.65 прочлось бы как норма).
+    expect(Object.keys(LAB_UNIT_CHOICES)).toEqual(['E2', 'Prolactin', 'Total T', 'Cortisol', 'DHEA-S', 'Progesterone', 'Free T', 'DHT', 'T3 free', 'T4 free', 'Vitamin D (25-OH)', 'Folate', 'B12', 'Protein', 'Reticulocytes', 'UACR']);
     // Проход 127: у свободных Т3/Т4 три варианта — пмоль/л (канон), пг/мл и нг/дл (США).
     expect(LAB_UNIT_CHOICES['T3 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);
     expect(LAB_UNIT_CHOICES['T4 free']).toEqual(['пмоль/л', 'пг/мл', 'нг/дл']);

@@ -4,7 +4,8 @@ import { DRUG_DB, STACK_DB, TZ_MECH_LABELS, TZ_SYSTEM_LABELS, TZ_SYSTEM_ICONS, T
 import { getSupportMechIndex, getSupportMechs, canonSupportId, isSupportSubstanceId, DERIVED_SOURCE } from '../data/support-db/mech-map';
 import { resolvePedAlias } from '../data/ped-alias-map';
 import { HCT_THRESHOLDS, HCT_STEPS, HGB_STEPS, RBC_STEPS, LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN, UA_STAGE_ULN,
-  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS, E2_MALE_BAND, NT_PROBNP_STEPS } from './lab-norms.engine';
+  BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS, E2_MALE_BAND, NT_PROBNP_STEPS,
+  MG_DEFICIT_STEPS } from './lab-norms.engine';
 import { canonicalLabValues } from './lab-code-bridge';
 
 const Q_MAP: Record<string, number> = { A: 1.0, B: 0.7, C: 0.4 };
@@ -242,6 +243,11 @@ export function applyMechanismSynergies(mechs:Array<{id:string;rawPercent:number
 // `T3`/`T4` — общие гормоны (nmol/L), здесь стоят `FT3`/`FT4`: пороги cns4 свободные.
 // Проход 194: таблица экспортируется — по ней же индексы здоровья (`lab-index-model`)
 // решают, есть ли у механизма измеренный маркер, прежде чем читать ступень.
+// Проход 207: ступени дефицита магния — одна константа на модель, домен «Электролиты»
+// и каталог верификации. Определение — в листовом резолвере норм (`lab-norms.engine`),
+// чтобы каталог «Анализы» не тянул весь `DRUG_DB`/`STACK_DB` ради трёх чисел.
+export { MG_DEFICIT_STEPS };
+
 export const MECH_LAB_MARKERS:Record<string,string[]>={
   cv1:['NT_PROBNP','CK'],cv2:['LDL','HDL','TG','CHOL'],cv3:['NA'],cv4:['HCT','D_DIMER','FIBRINOGEN','PLT'],cv5:['K','HCT'],
   liv1:['ALT','AST'],liv2:['GGT','BIL'],liv3:['ALT','AST','GGT'],
@@ -267,11 +273,15 @@ export const RISK_LAB_MARKERS: readonly string[] = Array.from(
   new Set(Object.values(MECH_LAB_MARKERS).flat()),
 );
 
+/** Базовая доля покрытия и шаг за маркер: `d_cov = min(1, BASE + STEP × n)`. */
+export const LAB_COVERAGE_BASE = 0.3;
+export const LAB_COVERAGE_STEP = 0.04;
+
 /** Доля маркеров модели, которые есть в карте: `0.3 + 0.04 × n` — как было. */
 export function riskLabCoverage(flat: Record<string, number>): number {
   let present = 0;
   for (const marker of RISK_LAB_MARKERS) if (flat[marker] !== undefined) present++;
-  return Math.min(1, 0.3 + present * 0.04);
+  return Math.min(1, LAB_COVERAGE_BASE + present * LAB_COVERAGE_STEP);
 }
 
 // ── Покрытие механизмов (честная метрика) ──
@@ -340,8 +350,15 @@ export function clinicalFloorsForLabs(rawLabValues:Record<string,number>, sex?:'
   push(v('LDL')!==undefined&&v('LDL')!>=3.4,'cardio','LDL ≥ 3.4 ммоль/л',25);
   push(v('EGFR')!==undefined&&v('EGFR')!<30,'renal','eGFR < 30 — ХБП G4',75);
   push(v('EGFR')!==undefined&&v('EGFR')!<60,'renal','eGFR < 60 — ХБП G3',50);
-  push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3',50);
-  push(v('UACR')!==undefined&&v('UACR')!>30,'renal','UACR > 30 — альбуминурия A2',25);
+  // Проход 207 (ревью P2/P3): ярлык якоря называет категорию KDIGO, поэтому границы
+  // разные: A2 начинается с 30 включительно, A3 — строго выше 300 (таблица CGA,
+  // PMID 38490803). Прежние `>30`/`>300` давали на ровно 30 «плато» без флага;
+  // теперь на 30 срабатывает A2, а на ровно 300 — A2-ярлык (молчания нет), тогда
+  // как шкала ступеней (`labMi(uacr,[30,300,1000])`) уже считает 300 ступенью 2.
+  push(v('UACR')!==undefined&&v('UACR')!>300,'renal','UACR > 300 — альбуминурия A3 (KDIGO)',50);
+  // Верхняя граница ярлыка названа: на 1000 мг/г пациент уже A3, и печатать
+  // рядом «A2» значило бы два ответа на одном числе (ревью P3).
+  push(v('UACR')!==undefined&&v('UACR')!>=30&&v('UACR')!<=300,'renal','UACR 30–300 — альбуминурия A2',25);
   // ALT/AST: три ступени `LFT_STAGE_ULN` (2× — снизить/пересмотреть орал, 3× — отмена
   // оралов, 5× — отмена всего). Раньше у мужчины были ступени 2×/5×, у женщины
   // 2×/3× — один и тот же симптом оценивался по разным шкалам (проход 57).
@@ -568,7 +585,7 @@ export function getMiLabStep(mechId:string,rawLabValues:Record<string,number>,se
     case'ren4': { // водно-электролитный: K, Na, Mg, Ca
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
       const naMi = labMiInv(na,[135,130,125]);
-      const mgMi = labMiInv(mg,[0.75,0.65,0.5]);
+      const mgMi = labMiInv(mg,MG_DEFICIT_STEPS);
       const caMi = labMiInv(ca,[2.2,2.0,1.75]);
       const vals = [kMi,naMi,mgMi,caMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);
@@ -690,7 +707,7 @@ export function getMiLabStep(mechId:string,rawLabValues:Record<string,number>,se
     case'hem5': { // водно-электролитный сдвиг: K, Na, Mg, Ca
       const kMi = labMiInv(k,[3.5,3.0,2.5]);
       const naMi = labMiInv(na,[135,130,125]);
-      const mgMi = labMiInv(mg,[0.75,0.65,0.5]);
+      const mgMi = labMiInv(mg,MG_DEFICIT_STEPS);
       const caMi = labMiInv(ca,[2.2,2.0,1.75]);
       const vals = [kMi,naMi,mgMi,caMi].filter(v=>v!==undefined) as number[];
       if (vals.length > 0) labResult = Math.max(...vals);

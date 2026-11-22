@@ -6,6 +6,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import * as storage from '../diary-storage-v2';
 import { useNutritionDiary, useFrequentFoods, useDailyTotals } from '../useNutritionDiary';
+import { localIsoDate } from '../../../../core/local-date';
 import {
   writeDiaryV2,
   clearDiaryV2,
@@ -44,7 +45,8 @@ describe('useNutritionDiary', () => {
   describe('initialization', () => {
     it('should initialize with current date as default', () => {
       const { result } = renderHook(() => useNutritionDiary());
-      const today = new Date().toISOString().split('T')[0];
+      // Дата приложения — локальная, не UTC.
+      const today = localIsoDate();
       expect(result.current.currentDate).toBe(today);
     });
 

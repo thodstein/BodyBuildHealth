@@ -43,6 +43,15 @@ describe('проход 182: единица бланка переводится �
     expect(normalizeFlatLabs([{ code: 'FT', value: 30, unit: 'пмоль/л' }]).FT).toBeCloseTo(8.65, 2);
   });
 
+  it('альбуминурия мг/ммоль приводится к мг/г (проход 207)', () => {
+    // 5.65 мг/ммоль = 50 мг/г (A2 по KDIGO). Раньше число шло в модель как
+    // 5.65 мг/г, то есть «норма», и альбуминурия исчезала из находок.
+    expect(normalizeFlatLabs([{ code: 'UACR', value: 5.65, unit: 'мг/ммоль' }]).UACR).toBeCloseTo(50, 6);
+    expect(normalizeFlatLabs([{ code: 'UACR', value: 5.65, unit: 'mg/mmol' }]).UACR).toBeCloseTo(50, 6);
+    // канон не пересчитывается и не округляется
+    expect(normalizeFlatLabs([{ code: 'UACR', value: 50, unit: 'мг/г' }]).UACR).toBe(50);
+  });
+
   it('шесть гормонов остаются в единице норм, а не каталога', () => {
     // Каталог знает общий тестостерон в ng/dL, а норма приложения — 12–33 нмоль/л.
     expect(flatLabUnit('TT')).toBe('nmol/L');

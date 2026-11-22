@@ -21,7 +21,7 @@ import { NativeIcon, type NativeIconName } from '../native/NativeIcons';
 // а механизм-модель считается ниже по фактическим препаратам курса (`calculateTzSpecRisk`).
 import { getRiskColor } from '../../core/utils/risk-colors';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
-import { calculateTzSpecRisk, type TzSpecResult, type TzSpecOrganResult } from '../../engines/risk-engine-tz-spec';
+import { calculateTzSpecRisk, riskLabCoverage, type TzSpecResult, type TzSpecOrganResult } from '../../engines/risk-engine-tz-spec';
 import { canonicalLabValues } from '../../engines/lab-code-bridge';
 import { db } from '../../core/db';
 import { LabsResults } from './LabsScreen_parts/LabsResults';
@@ -519,10 +519,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const tzSpecResult = useMemo<TzSpecResult | null>(() => {
     if (!hasLabs) return null;
     const m = tzLabValues;
-    // покрытие T4
-    const t4 = ['LDL','HDL','TG','HCT','HGB','ALT','AST','GGT','ALP','BIL','BILIRUBIN','EGFR','UACR','K','NA','GLU','HBA1C','LH','FSH','TT','E2','PRL'];
-    const p = t4.filter(c => m[c] !== undefined || m[c.toUpperCase()] !== undefined).length;
-    const cov = t4.length > 0 ? p / t4.length : 0.1;
+    // Проход 207 (ревью P2): покрытие — одно на приложение, как у вкладки
+    // «Риски» и калькулятора. Свой список 22 кодов давал 3/22 = 0.14 там, где
+    // модель по своим 46 маркерам считала 0.42, и штраф неопределённости ×1.22
+    // против ×1.15 на тех же анализах; на 18 маркерах модель уже ×1.00, а
+    // карточка печатала ×1.05.
+    const cov = riskLabCoverage(m);
     // курс
     const course = linked.course || [];
     // Механизм-модель описывает риск ПРЕПАРАТОВ. Без курса все веса = 0, и
@@ -2010,9 +2012,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </button>
               {riskSections.indices && (<div style={{ padding:'0 12px 12px' }}><div style={{ display:'grid', gap:8 }}>
                 {[
-                  { label: 'ASI (Анаболический синтез)', desc: 'Способность к анаболизму', val: ASI, inv: true },
-                  { label: 'HMI (Гепатический метаболизм)', desc: 'Стресс печени', val: HMI, inv: false },
-                  { label: 'CR (Кардиориск)', desc: 'Липиды + воспаление', val: CR, inv: false },
+                  // Проход 207: подпись «индекс приложения» — веса композита
+                  // эвристические (`ASI_WEIGHTS`/`HMI_WEIGHTS`/`CR_WEIGHTS`),
+                  // клинической шкалы за процентом нет.
+                  { label: 'ASI (Анаболический синтез)', desc: 'Способность к анаболизму · индекс приложения', val: ASI, inv: true },
+                  { label: 'HMI (Гепатический метаболизм)', desc: 'Стресс печени · индекс приложения', val: HMI, inv: false },
+                  { label: 'CR (Кардиориск)', desc: 'Липиды + воспаление · индекс приложения', val: CR, inv: false },
                 ].map(item => (
                   <div key={item.label} style={{
                     padding:12, borderRadius:14, minHeight:72,
@@ -2267,7 +2272,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       })}
                     </div>
                     <div style={{ fontSize:11, color:'#fff', textAlign:'center', marginTop:8 }}>
-                      Из фазы «{PHASE_LABELS[selectedPhase]}» · покрытие {Math.round(tzSpecResult.d_cov * 100)}%
+                      Из фазы «{PHASE_LABELS[selectedPhase]}» · покрытие модели {Math.round(tzSpecResult.d_cov * 100)}%
                     </div>
                   </>
                 ) : (

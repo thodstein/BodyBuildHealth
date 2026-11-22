@@ -1323,7 +1323,9 @@ export const MDSSRiskDisplay: React.FC = () => {
             Нажмите кнопку для запуска анализа. Можно без ввода данных — использует консервативные значения.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap:'wrap' }}>
-            <button onClick={() => { setAutoRun(true); setTimeout(handleRun, 50); }} style={{
+            {/* Авто-режим включает эффект по autoRun: setTimeout захватил бы handleRun
+                первого рендера со старыми tWeeks и затёр свежий расчёт. */}
+            <button onClick={() => setAutoRun(true)} style={{
               minHeight:48, padding: '12px 24px', borderRadius: 999, border: 'none', cursor: 'pointer',
               background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 800, fontSize: 14, boxShadow:'0 0 18px rgba(139,92,246,0.40)',
             }}>▶ Запустить анализ</button>
@@ -1903,7 +1905,9 @@ export const LabsRisksTab: React.FC = () => {
             </div><div style={{color:'#fff',fontSize:12,marginTop:4,lineHeight:1.5}}>{a.recommendation}</div></div>)}</div> :
           <div style={{fontSize:12,color:'#fff',textAlign:'center',padding:'14px 0'}}>{hasLabs?'Не обнаружены':'Нет данных анализов — показаны базовые риски'}</div>},
         {key:'indices',icon:'grid' as NativeIconName,title:'Композитные индексы здоровья',
-         body:<div style={{display:'grid',gap:8}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление',val:CR,inv:false}].map(item=>
+         // Проход 207: подпись «индекс приложения» — веса композита эвристические
+         // (`ASI_WEIGHTS`/`HMI_WEIGHTS`/`CR_WEIGHTS`), клинической шкалы за процентом нет.
+         body:<div style={{display:'grid',gap:8}}>{[{label:'ASI (Анаболический синтез)',desc:'Способность к анаболизму · индекс приложения',val:ASI,inv:true},{label:'HMI (Гепатический метаболизм)',desc:'Стресс печени · индекс приложения',val:HMI,inv:false},{label:'CR (Кардиориск)',desc:'Липиды + воспаление · индекс приложения',val:CR,inv:false}].map(item=>
           <div key={item.label} data-health-index={item.label.slice(0, item.label.indexOf(' '))} data-health-index-value={item.val === null ? 'none' : item.val} style={{padding:'12px',borderRadius:14,background:item.val!==null?`rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.08)`:'rgba(255,255,255,0.04)',border:item.val!==null?`1px solid rgba(${item.inv?(item.val>=70?'34,197,94':item.val>=40?'234,179,8':'239,68,68'):(item.val<=30?'34,197,94':item.val<=60?'234,179,8':'239,68,68')},0.24)`:'1px solid rgba(255,255,255,0.09)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
               <div><div style={{fontSize:13,fontWeight:800,color:'#fff'}}>{item.label}</div><div style={{fontSize:11,color:'#fff',marginTop:3}}>{item.desc}</div></div>

@@ -22,7 +22,7 @@ import { DEFAULT_STATE } from '../Calc.types';
 import { FULL_PANELS } from '../Calc.lab';
 import { SPECIALIZED_DOMAINS } from '../Calc.mapper';
 import { labSliceToValues, labValuesForEngine } from '../../../../engines/support-plan/mapper-ctx';
-import { tierLabView } from '../../../../data/lab-tier-ranges';
+import { tierLabView, deriveTier } from '../../../../data/lab-tier-ranges';
 import type { CalculatorState } from '../../../../engines/support-plan/types';
 
 const slice = (panel: string, markers: Record<string, string>, units?: Record<string, string>) =>
@@ -126,6 +126,47 @@ describe('проход 206: производные доходят до доме�
   });
 });
 
+describe('проход 207: магний судится первой ступенью модели', () => {
+  it('Mg 0.7 включает «Электролиты», 0.9 — нет', () => {
+    const low = blankLabs('panelMineral', { Magnesium: '0.7' });
+    expect(low['MG']).toBe(0.7);
+    expect(on('renal', 'electrolytes', low)).toBe(true);
+    expect(on('renal', 'electrolytes', blankLabs('panelMineral', { Magnesium: '0.9' }))).toBe(false);
+  });
+
+  it('порог домена — постоянная модели, а не литерал попапа', () => {
+    const mapperSrc = readFileSync(resolve(process.cwd(), 'src/ui/screens/Calculator/Calc.mapper.tsx'), 'utf8');
+    expect(mapperSrc).toContain('MG_DEFICIT_STEPS[0]');
+    expect(mapperSrc).not.toMatch(/\(l\.MG\?\?1\)<\.75/);
+  });
+});
+
+describe('проход 207: UACR — поле бланка и границы ступеней', () => {
+  it('UACR 31 мг/г включает «Протеинурию», 29 — нет', () => {
+    const high = blankLabs('panelUrinalysis', { UACR: '31' });
+    expect(high['UACR']).toBe(31);
+    expect(on('renal', 'proteinuria', high)).toBe(true);
+    expect(on('renal', 'proteinuria', blankLabs('panelUrinalysis', { UACR: '29' }))).toBe(false);
+  });
+
+  it('граница 30 мг/г — уже A2, как в шкале и в модели', () => {
+    // Проход 207 (ревью P2): было `>`, и ровно 30 не включало домен, хотя
+    // `deriveTier('UACR', 30)` = 1 и `labMi(uacr,[30,300,1000])` = 1.
+    expect(on('renal', 'proteinuria', blankLabs('panelUrinalysis', { UACR: '30' }))).toBe(true);
+    expect(on('renal', 'proteinuria', blankLabs('panelUrinalysis', { UACR: '29.9' }))).toBe(false);
+    expect(deriveTier('UACR', 30)).toBe(1);
+    expect(deriveTier('UACR', 300)).toBe(2);
+  });
+
+  it('граница 0.15 г/л у белка мочи — уже ступень 1, как в шкале', () => {
+    // Ревью P2-2: в том же домене белок остался с `>`, хотя
+    // `deriveTier('PROTEIN_URINE', 0.15)` = 1 и `labMi` на этой границе = 1.
+    expect(deriveTier('PROTEIN_URINE', 0.15)).toBe(1);
+    expect(on('renal', 'proteinuria', { PROTEIN_URINE: 0.15 })).toBe(true);
+    expect(on('renal', 'proteinuria', { PROTEIN_URINE: 0.14 })).toBe(false);
+  });
+});
+
 describe('проход 205: попап переводит карту до решения', () => {
   const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/Calculator/Calc.mapper.tsx'), 'utf8');
 
@@ -135,10 +176,7 @@ describe('проход 205: попап переводит карту до реш
   // зовёт общий читатель, а общий читатель переводит написания.
   it('домены получают карту написаний, а не сырую карту формы', () => {
     expect(src).toContain('labValuesForEngine(currentLabSlice(state.labs)');
-    const engineSrc = readFileSync(
-      resolve(process.cwd(), 'src/engines/support-plan/mapper-ctx.ts'),
-      'utf8',
-    );
+    const engineSrc = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/mapper-ctx.ts'), 'utf8');
     expect(engineSrc).toContain('tierLabView(labSliceToValues(');
     expect(src).not.toMatch(
       /const labs = labSliceToValues\(currentLabSlice\(state\.labs\), state\.profile\.sex\);\s*\n\s*const domains = SPECIALIZED_DOMAINS/,

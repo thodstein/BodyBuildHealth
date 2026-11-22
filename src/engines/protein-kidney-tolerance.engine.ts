@@ -30,6 +30,9 @@
  * ВАЖНО: это не диагноз. Движок не назначает лечение и не заменяет врача.
  */
 import { localIsoDate, localIsoDateOffset } from '../core/local-date';
+// Проход 207: UACR «мг/г ↔ мг/ммоль» — одна константа KDIGO на всё приложение
+// (здесь стояла вторая копия числа — деление на молярную массу креатинина).
+import { UACR_MG_MMOL_TO_MG_G } from '../core/constants';
 // Проход 166: СКФ по креатинину — один расчёт на приложение (`lab-norms`).
 // Здесь жила третья копия CKD-EPI 2021; цистатиновые варианты остаются местными,
 // потому что общего расчёта по цистатину C в репозитории нет.
@@ -352,8 +355,10 @@ const EXTREME_CAP: Record<PkTraining, number> = {
 const BENEFIT_BASIS: Record<PkTraining, string> = {
   sedentary: '1.6 г/кг — верх общей рекомендации (ISSN 2017: 1.4–2.0 г/кг)',
   recreational: '1.8 г/кг — тренировки без цели гипертрофии (ISSN 2017: 1.4–2.0 г/кг)',
-  resistance: '2.2 г/кг — верх плато дозы для гипертрофии (Morton 2018: перелом ~1.6 г/кг, 95% CI до 2.2; ISSN 2017: 1.6–2.2)',
-  athlete: '2.2 г/кг — верх плато дозы для гипертрофии (Morton 2018: перелом ~1.6 г/кг, 95% CI до 2.2; ISSN 2017: 1.6–2.2)',
+  resistance:
+    '2.2 г/кг — верх плато дозы для гипертрофии (Morton 2018: перелом ~1.6 г/кг, 95% CI до 2.2; ISSN 2017: 1.6–2.2)',
+  athlete:
+    '2.2 г/кг — верх плато дозы для гипертрофии (Morton 2018: перелом ~1.6 г/кг, 95% CI до 2.2; ISSN 2017: 1.6–2.2)',
 };
 
 /**
@@ -378,12 +383,11 @@ const BENEFIT_LBM_BULK: Record<PkTraining, number> = {
  * Потолок пользы с поправкой на цель и тощую массу.
  * Без % жира или для «поддержания» остаётся базовый ориентир по массе тела.
  */
-export function benefitCapFor(args: {
-  training: PkTraining;
-  goal: PkGoal;
-  weightKg: number;
-  leanMassKg?: number;
-}): { cap: number; goalAdjusted: boolean; basis: string } {
+export function benefitCapFor(args: { training: PkTraining; goal: PkGoal; weightKg: number; leanMassKg?: number }): {
+  cap: number;
+  goalAdjusted: boolean;
+  basis: string;
+} {
   const base = BASE_CAP[args.training] ?? 2.2;
   const lean = args.leanMassKg;
   if (args.goal === 'maintain' || args.training === 'sedentary' || lean == null || lean <= 0) {
@@ -434,25 +438,19 @@ export function ckdEpi2021Cys(cystatinCMgL: number, age: number, sex: PkSex): nu
   const s = cystatinCMgL / 0.8;
   const femaleFactor = sex === 'female' ? 0.932 : 1;
   return (
-    133 *
-    Math.pow(Math.min(s, 1), -0.499) *
-    Math.pow(Math.max(s, 1), -1.328) *
-    Math.pow(0.996, age) *
-    femaleFactor
+    133 * Math.pow(Math.min(s, 1), -0.499) * Math.pow(Math.max(s, 1), -1.328) * Math.pow(0.996, age) * femaleFactor
   );
 }
 
 /** CKD-EPI 2021 креатинин–цистатин C: точнее при нестандартной мышечной массе (ААС, креатин). */
-export function ckdEpi2021CrCys(
-  creatinineUmolL: number,
-  cystatinCMgL: number,
-  age: number,
-  sex: PkSex,
-): number {
+export function ckdEpi2021CrCys(creatinineUmolL: number, cystatinCMgL: number, age: number, sex: PkSex): number {
   if (
-    !Number.isFinite(creatinineUmolL) || creatinineUmolL <= 0 ||
-    !Number.isFinite(cystatinCMgL) || cystatinCMgL <= 0 ||
-    !Number.isFinite(age) || age <= 0
+    !Number.isFinite(creatinineUmolL) ||
+    creatinineUmolL <= 0 ||
+    !Number.isFinite(cystatinCMgL) ||
+    cystatinCMgL <= 0 ||
+    !Number.isFinite(age) ||
+    age <= 0
   ) {
     return NaN;
   }
@@ -509,7 +507,7 @@ export function classifyAlbuminuria(uacrMgMmol?: number): AlbuminuriaCategory {
 
 /** Оценка осмолярности мочи по удельному весу: (SG−1)×40 000, диапазон ±15%. */
 export function estimateUrineOsmolality(urineSg?: number): { value?: number; range?: [number, number] } {
-  if (urineSg == null || !Number.isFinite(urineSg) || urineSg < 1.000 || urineSg > 1.060) return {};
+  if (urineSg == null || !Number.isFinite(urineSg) || urineSg < 1.0 || urineSg > 1.06) return {};
   const value = (urineSg - 1.0) * 40000;
   return { value: r0(value), range: [r0(value * 0.85), r0(value * 1.15)] };
 }
@@ -528,9 +526,7 @@ export function renalSoluteLoad(args: {
   const proteinPart = Math.max(0, args.proteinGPerDay) * 5.8;
   const na = args.dietarySodiumG != null ? Math.max(0, args.dietarySodiumG) * 43.5 : null;
   const k = args.dietaryPotassiumG != null ? Math.max(0, args.dietaryPotassiumG) * 25.6 : null;
-  const cl = args.dietaryChlorideG != null
-    ? Math.max(0, args.dietaryChlorideG) * 28.2
-    : (na != null ? na : null);
+  const cl = args.dietaryChlorideG != null ? Math.max(0, args.dietaryChlorideG) * 28.2 : na != null ? na : null;
   const electrolytePart = (na ?? 0) + (k ?? 0) + (cl ?? 0);
   return {
     total: r0(proteinPart + electrolytePart),
@@ -630,8 +626,13 @@ export function proteinToleranceCap(args: {
     args.renalDataOk !== false &&
     args.hasProteinuriaData === true &&
     args.nsaidDehydrated !== true &&
-    egfr != null && Number.isFinite(egfr) && egfr >= egfrFloor &&
-    urea != null && Number.isFinite(urea) && urea >= 1 && urea <= 8.3 &&
+    egfr != null &&
+    Number.isFinite(egfr) &&
+    egfr >= egfrFloor &&
+    urea != null &&
+    Number.isFinite(urea) &&
+    urea >= 1 &&
+    urea <= 8.3 &&
     (args.albuminuria == null || args.albuminuria === 'A1' || args.albuminuria === 'unknown') &&
     (score == null || score < 0.5) &&
     (args.urineProteinGL == null || args.urineProteinGL < 0.3) &&
@@ -654,11 +655,15 @@ export function proteinToleranceCap(args: {
       cap = ext;
       verified = true;
       if (ext > PROTEIN_EVIDENCE_MAX_G_PER_KG + 1e-9) {
-        reasons.push(`3.2–${r1(ext)} г/кг — экстремальный диапазон: доказанной переносимости нет, только под наблюдением врача и с контролем каждые 7–14 дней`);
+        reasons.push(
+          `3.2–${r1(ext)} г/кг — экстремальный диапазон: доказанной переносимости нет, только под наблюдением врача и с контролем каждые 7–14 дней`,
+        );
       }
-      reasons.push(args.aasUse
-        ? `ААС + чистые анализы: переносимость до ${r1(ext)} г/кг${args.aasCreatinineOnly ? ' (без цистатина C — 2.8, не 3.2)' : ''}`
-        : `Почки без отклонений: переносимость до ${r1(ext)} г/кг (здоровые тренированные; сверх ${r1(benefit)} пользы не добавляет)`);
+      reasons.push(
+        args.aasUse
+          ? `ААС + чистые анализы: переносимость до ${r1(ext)} г/кг${args.aasCreatinineOnly ? ' (без цистатина C — 2.8, не 3.2)' : ''}`
+          : `Почки без отклонений: переносимость до ${r1(ext)} г/кг (здоровые тренированные; сверх ${r1(benefit)} пользы не добавляет)`,
+      );
     } else {
       // Анализы чистые, но потолок пользы уже выше расширенного: переносимость подтверждена.
       verified = true;
@@ -717,7 +722,8 @@ function buildUtilization(args: {
     return {
       status: 'unknown',
       label: 'Сначала проверьте данные',
-      detail: 'Одно или несколько значений вне физиологического диапазона — обычно это другие единицы или опечатка. Пока данные не исправлены, вывод об усвоении и переносимости строить нельзя.',
+      detail:
+        'Одно или несколько значений вне физиологического диапазона — обычно это другие единицы или опечатка. Пока данные не исправлены, вывод об усвоении и переносимости строить нельзя.',
       color: '#f59e0b',
       confidence: 'low',
       markers,
@@ -728,7 +734,8 @@ function buildUtilization(args: {
     return {
       status: 'unknown',
       label: 'Нужны детские нормы',
-      detail: 'CKD-EPI 2021 — взрослая формула; до 18 лет она не применяется. Для подростка расчёт СКФ и потолок белка — по детским формулам и с педиатром/нефрологом.',
+      detail:
+        'CKD-EPI 2021 — взрослая формула; до 18 лет она не применяется. Для подростка расчёт СКФ и потолок белка — по детским формулам и с педиатром/нефрологом.',
       color: '#94a3b8',
       confidence: 'low',
       markers,
@@ -738,14 +745,21 @@ function buildUtilization(args: {
   const urea = args.ureaMmolL;
   const confident = urea != null && args.egfr != null;
   const confidence: PkUtilization['confidence'] = args.aasCreatinineEgfr
-    ? (confident ? 'medium' : 'low')
-    : confident ? 'high' : urea != null ? 'medium' : 'low';
+    ? confident
+      ? 'medium'
+      : 'low'
+    : confident
+      ? 'high'
+      : urea != null
+        ? 'medium'
+        : 'low';
 
   if (urea == null) {
     return {
       status: 'unknown',
       label: 'Нужна мочевина',
-      detail: 'ОАМ и креатинин показывают почки, но не то, как выводится азот от белка. Чтобы ответить «усваивается или нет», введите мочевину крови (лучше вместе с креатинином).',
+      detail:
+        'ОАМ и креатинин показывают почки, но не то, как выводится азот от белка. Чтобы ответить «усваивается или нет», введите мочевину крови (лучше вместе с креатинином).',
       color: '#94a3b8',
       confidence: 'low',
       markers,
@@ -813,8 +827,7 @@ function buildUtilization(args: {
   // Белок выше подтверждённого потолка (например, возраст 65+ или ААС без
   // цистатина C): «переносится» здесь противоречило бы вердикту.
   const cap = args.toleranceCapGPerKg;
-  const capConfirmed = args.toleranceVerified === true ||
-    (cap != null && cap < args.benefitCapGPerKg - 1e-9);
+  const capConfirmed = args.toleranceVerified === true || (cap != null && cap < args.benefitCapGPerKg - 1e-9);
   if (cap != null && capConfirmed && args.proteinGkg > cap + 1e-9) {
     return {
       status: 'excess',
@@ -860,18 +873,20 @@ function buildUtilization(args: {
     };
   }
 
-  const waterNote = args.hydrationStatus === 'borderline'
-    ? ' Моча концентрированная — добавьте воды, это улучшит выведение азота.'
-    : args.hydrationStatus === 'dehydrated'
-      ? ' Есть дефицит воды: сначала гидратация, иначе оценка занижена.'
-      : '';
+  const waterNote =
+    args.hydrationStatus === 'borderline'
+      ? ' Моча концентрированная — добавьте воды, это улучшит выведение азота.'
+      : args.hydrationStatus === 'dehydrated'
+        ? ' Есть дефицит воды: сначала гидратация, иначе оценка занижена.'
+        : '';
   const aasNote = args.aasCreatinineEgfr
     ? ' СКФ здесь по креатинину: на ААС она может быть занижена мышцами — для точности сдайте цистатин C.'
     : '';
   const benefit = r1(args.benefitCapGPerKg);
-  const beyondBenefit = args.proteinGkg > args.benefitCapGPerKg
-    ? ` Сверх ~${benefit} г/кг массы дополнительная мышечная польза в среднем не доказана (плато дозы): лишний белок окисляется. Поднимать выше есть смысл только при очень больших объёмах/дефиците калорий и с контролем анализов.`
-    : '';
+  const beyondBenefit =
+    args.proteinGkg > args.benefitCapGPerKg
+      ? ` Сверх ~${benefit} г/кг массы дополнительная мышечная польза в среднем не доказана (плато дозы): лишний белок окисляется. Поднимать выше есть смысл только при очень больших объёмах/дефиците калорий и с контролем анализов.`
+      : '';
 
   // 3.2–5 г/кг: маркеры могут быть нормальными, но доказанной переносимости
   // здесь нет. Не пишем «переносится» — это было бы ложным подтверждением.
@@ -943,36 +958,94 @@ function buildRetest(args: {
   });
 
   if (args.dataSuspect) {
-    return make(0, 'Проверьте единицы и пересдайте', 'Значения вне физиологического диапазона — чаще это мг/дл вместо мкмоль/л или опечатка. Исправьте ввод; если единицы верные, пересдайте анализ и покажите врачу.', '#f59e0b');
+    return make(
+      0,
+      'Проверьте единицы и пересдайте',
+      'Значения вне физиологического диапазона — чаще это мг/дл вместо мкмоль/л или опечатка. Исправьте ввод; если единицы верные, пересдайте анализ и покажите врачу.',
+      '#f59e0b',
+    );
   }
   if (!args.hasBaseLabs) {
-    return make(0, 'Сдать сейчас', 'Без мочевины и креатинина переносимость белка не оценить: ОАМ сам по себе не показывает выведение азота.', '#60a5fa');
+    return make(
+      0,
+      'Сдать сейчас',
+      'Без мочевины и креатинина переносимость белка не оценить: ОАМ сам по себе не показывает выведение азота.',
+      '#60a5fa',
+    );
   }
   if (args.ureaHigh) {
-    return make(3, 'Пересдать через 2–3 дня', 'Мочевина >12: исключить ошибку анализа и ухудшение. Кровь — утром, без тяжёлой тренировки и большого белка накануне.', '#ef4444', true);
+    return make(
+      3,
+      'Пересдать через 2–3 дня',
+      'Мочевина >12: исключить ошибку анализа и ухудшение. Кровь — утром, без тяжёлой тренировки и большого белка накануне.',
+      '#ef4444',
+      true,
+    );
   }
   if (args.hardStop) {
-    return make(14, 'Контроль через 2 недели', 'Пока белок не наращиваем: проверяем, стойкое ли отклонение, и не появилось ли новых признаков.', '#f97316', true);
+    return make(
+      14,
+      'Контроль через 2 недели',
+      'Пока белок не наращиваем: проверяем, стойкое ли отклонение, и не появилось ли новых признаков.',
+      '#f97316',
+      true,
+    );
   }
   if (args.extremeProtein) {
-    return make(7, 'Экстремальный белок: контроль через 7 дней', 'Выше 3.2 г/кг доказанной переносимости нет. Нужны врач (нефролог/спортмедицина) и контроль мочевины, креатинина, СКФ, ОАМ, UACR, электролитов и АД каждые 7–14 дней.', '#ef4444', true);
+    return make(
+      7,
+      'Экстремальный белок: контроль через 7 дней',
+      'Выше 3.2 г/кг доказанной переносимости нет. Нужны врач (нефролог/спортмедицина) и контроль мочевины, креатинина, СКФ, ОАМ, UACR, электролитов и АД каждые 7–14 дней.',
+      '#ef4444',
+      true,
+    );
   }
   if (args.missingUrineProtein) {
-    return make(14, 'Досдать ОАМ с белком', 'Мочевина и креатинин есть, но без белка/альбумина мочи нельзя подтвердить переносимость. ОАМ с белком закрывает этот пробел.', '#60a5fa');
+    return make(
+      14,
+      'Досдать ОАМ с белком',
+      'Мочевина и креатинин есть, но без белка/альбумина мочи нельзя подтвердить переносимость. ОАМ с белком закрывает этот пробел.',
+      '#60a5fa',
+    );
   }
   if (args.increasePaused) {
-    return make(7, 'Через 3–7 дней, после воды', 'Обезвоживание/инфекция завышают мочевину и белок мочи: сначала вода или лечение, потом анализ.', '#f59e0b');
+    return make(
+      7,
+      'Через 3–7 дней, после воды',
+      'Обезвоживание/инфекция завышают мочевину и белок мочи: сначала вода или лечение, потом анализ.',
+      '#f59e0b',
+    );
   }
   if (args.stepsPlanned) {
-    return make(14, 'Через 14 дней после первого шага', 'Проверяем, как почки отвечают на новый объём белка. Без этого шага прибавку не продолжаем.', '#22c55e');
+    return make(
+      14,
+      'Через 14 дней после первого шага',
+      'Проверяем, как почки отвечают на новый объём белка. Без этого шага прибавку не продолжаем.',
+      '#22c55e',
+    );
   }
   if (args.status === 'above_tolerance') {
-    return make(14, 'Через 14 дней после снижения', 'Убеждаемся, что мочевина и ОАМ вернулись к норме, прежде чем обсуждать любой рост белка.', '#f97316');
+    return make(
+      14,
+      'Через 14 дней после снижения',
+      'Убеждаемся, что мочевина и ОАМ вернулись к норме, прежде чем обсуждать любой рост белка.',
+      '#f97316',
+    );
   }
   if (args.status === 'above_benefit') {
-    return make(30, 'Через месяц', 'Выше ориентира пользы: проверяем переносимость на текущем объёме, затем — раз в 3 месяца.', '#eab308');
+    return make(
+      30,
+      'Через месяц',
+      'Выше ориентира пользы: проверяем переносимость на текущем объёме, затем — раз в 3 месяца.',
+      '#eab308',
+    );
   }
-  return make(90, 'Плановый контроль через 3 месяца', 'Стабильный режим: смотрим динамику мочевины, креатинина и ОАМ; UACR — раз в 6–12 месяцев.', '#22c55e');
+  return make(
+    90,
+    'Плановый контроль через 3 месяца',
+    'Стабильный режим: смотрим динамику мочевины, креатинина и ОАМ; UACR — раз в 6–12 месяцев.',
+    '#22c55e',
+  );
 }
 
 /** Основной расчёт. Все входы необязательны, кроме веса/возраста/белка. */
@@ -996,7 +1069,11 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const ureaRaw = input.ureaMmolL;
   const ureaOk = inRange(ureaRaw, 1, 80);
   if (!ureaOk) {
-    issue('urea', `Мочевина ${ureaRaw} вне диапазона 1–80 ммоль/л`, 'Если это BUN в mg/dL — умножьте на 0.357; если мочевина в mg/dL — на 0.167.');
+    issue(
+      'urea',
+      `Мочевина ${ureaRaw} вне диапазона 1–80 ммоль/л`,
+      'Если это BUN в mg/dL — умножьте на 0.357; если мочевина в mg/dL — на 0.167.',
+    );
   }
   const creatRaw = input.creatinineUmolL;
   const creatOk = inRange(creatRaw, 20, 3000);
@@ -1005,14 +1082,24 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   }
   const cysRaw = input.cystatinCMgL;
   const cysOk = inRange(cysRaw, 0.2, 10);
-  if (!cysOk) issue('cystatin', `Цистатин C ${cysRaw} вне диапазона 0.2–10 мг/л`, 'Проверьте единицы: мг/л и мг/дл отличаются в 10 раз.');
+  if (!cysOk)
+    issue(
+      'cystatin',
+      `Цистатин C ${cysRaw} вне диапазона 0.2–10 мг/л`,
+      'Проверьте единицы: мг/л и мг/дл отличаются в 10 раз.',
+    );
   const egfrMeasRaw = input.egfrMeasured;
   const egfrMeasOk = inRange(egfrMeasRaw, 1, 200);
-  if (!egfrMeasOk) issue('egfr', `СКФ ${egfrMeasRaw} вне диапазона 1–200 мл/мин`, 'Проверьте, не перепутаны ли мл/мин и мл/с.');
+  if (!egfrMeasOk)
+    issue('egfr', `СКФ ${egfrMeasRaw} вне диапазона 1–200 мл/мин`, 'Проверьте, не перепутаны ли мл/мин и мл/с.');
   const sgRaw = input.urineSg;
   const sgOk = inRange(sgRaw, 1.0, 1.06);
   if (!sgOk) {
-    issue('urine_sg', `Плотность мочи ${sgRaw} вне диапазона 1.000–1.060`, 'Плотность 1015 — это 1.015; 0.5 или 20 — почти наверняка ошибка ввода.');
+    issue(
+      'urine_sg',
+      `Плотность мочи ${sgRaw} вне диапазона 1.000–1.060`,
+      'Плотность 1015 — это 1.015; 0.5 или 20 — почти наверняка ошибка ввода.',
+    );
   }
   const phRaw = input.urinePh;
   const phOk = inRange(phRaw, 4, 9);
@@ -1020,20 +1107,39 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const upRaw = input.urineProteinGL;
   const upOk = inRange(upRaw, 0, 50);
   if (!upOk) {
-    issue('urine_protein', `Белок мочи ${upRaw} г/л вне диапазона 0–50`, 'Если бланк в mg/dL — разделите на 100; если в mg/L — на 1000.');
+    issue(
+      'urine_protein',
+      `Белок мочи ${upRaw} г/л вне диапазона 0–50`,
+      'Если бланк в mg/dL — разделите на 100; если в mg/L — на 1000.',
+    );
   }
   const microRaw = input.microalbuminMgL;
   const microOk = inRange(microRaw, 0, 10000);
-  if (!microOk) issue('microalbumin', `Микроальбумин ${microRaw} мг/л вне диапазона 0–10000`, 'Если бланк в mg/dL — умножьте на 10.');
+  if (!microOk)
+    issue(
+      'microalbumin',
+      `Микроальбумин ${microRaw} мг/л вне диапазона 0–10000`,
+      'Если бланк в mg/dL — умножьте на 10.',
+    );
   const ucrRaw = input.urineCreatinineMmolL;
   const ucrOk = inRange(ucrRaw, 0, 100);
-  if (!ucrOk) issue('urine_creatinine', `Креатинин мочи ${ucrRaw} ммоль/л вне диапазона 0–100`, 'mg/dL × 0.0884 = ммоль/л; µmol/L ÷ 1000.');
+  if (!ucrOk)
+    issue(
+      'urine_creatinine',
+      `Креатинин мочи ${ucrRaw} ммоль/л вне диапазона 0–100`,
+      'mg/dL × 0.0884 = ммоль/л; µmol/L ÷ 1000.',
+    );
   const uacrRaw = input.uacrMgMmol;
   const uacrOk = inRange(uacrRaw, 0, 5000);
-  if (!uacrOk) issue('uacr', `UACR ${uacrRaw} мг/ммоль вне диапазона 0–5000`, 'mg/g ÷ 8.84 = мг/ммоль.');
+  if (!uacrOk) issue('uacr', `UACR ${uacrRaw} мг/ммоль вне диапазона 0–5000`, 'мг/г × 0.113 = мг/ммоль.');
   const waterRaw = input.waterMlPerDay;
   const waterOk = inRange(waterRaw, 0, 15000);
-  if (!waterOk) issue('water', `Вода ${waterRaw} мл/сут вне диапазона 0–15000`, 'Проверьте, не указаны ли литры вместо миллилитров.');
+  if (!waterOk)
+    issue(
+      'water',
+      `Вода ${waterRaw} мл/сут вне диапазона 0–15000`,
+      'Проверьте, не указаны ли литры вместо миллилитров.',
+    );
   const bfRaw = input.bodyFatPct;
   const bfOk = inRange(bfRaw, 3, 70);
   if (!bfOk) issue('body_fat', `% жира ${bfRaw} вне диапазона 3–70`, 'Проверьте значение.');
@@ -1058,16 +1164,16 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   if (!eryOk) issue('urine_ery', `Эритроциты ${eryRaw}/мкл вне диапазона`, 'Проверьте единицы: /мкл, не /поле зрения.');
   const scoreRaw = input.urineProteinScore;
   const scoreOk = inRange(scoreRaw, 0, 4);
-  if (!scoreOk) issue('urine_protein_score', `Тест-полоска ${scoreRaw} вне шкалы 0–4`, '0=отр, 0.5=следы, 1–4 = плюсы.');
+  if (!scoreOk)
+    issue('urine_protein_score', `Тест-полоска ${scoreRaw} вне шкалы 0–4`, '0=отр, 0.5=следы, 1–4 = плюсы.');
   const volumeRaw = input.urineVolume24hMl;
   const volumeOk = inRange(volumeRaw, 0, 15000);
-  if (!volumeOk) issue('urine_volume', `Суточный диурез ${volumeRaw} мл вне диапазона 0–15000`, 'Проверьте, не указаны ли литры.');
+  if (!volumeOk)
+    issue('urine_volume', `Суточный диурез ${volumeRaw} мл вне диапазона 0–15000`, 'Проверьте, не указаны ли литры.');
 
   const height = heightOk && heightRaw != null && heightRaw > 0 ? heightRaw : undefined;
   const bmi = height ? weight / Math.pow(height / 100, 2) : undefined;
-  const leanMassKg = bfOk && bfRaw != null && bfRaw >= 3 && bfRaw < 60
-    ? weight * (1 - bfRaw / 100)
-    : undefined;
+  const leanMassKg = bfOk && bfRaw != null && bfRaw >= 3 && bfRaw < 60 ? weight * (1 - bfRaw / 100) : undefined;
 
   // Значения, которые можно использовать в расчёте. Испорченное — не используем.
   const urea = ureaOk ? ureaRaw : undefined;
@@ -1085,37 +1191,37 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const volume24h = volumeOk ? volumeRaw : undefined;
   const renalDataOk = dataIssues.length === 0;
 
-  const egfrFromCr = creatinine != null && creatinine > 0
-    ? ckdEpi2021(creatinine, age, input.sex)
-    : undefined;
-  const egfrFromCys = cystatinC != null && cystatinC > 0
-    ? ckdEpi2021Cys(cystatinC, age, input.sex)
-    : undefined;
-  const egfrFromCrCys = creatinine != null && creatinine > 0 && cystatinC != null && cystatinC > 0
-    ? ckdEpi2021CrCys(creatinine, cystatinC, age, input.sex)
-    : undefined;
+  const egfrFromCr = creatinine != null && creatinine > 0 ? ckdEpi2021(creatinine, age, input.sex) : undefined;
+  const egfrFromCys = cystatinC != null && cystatinC > 0 ? ckdEpi2021Cys(cystatinC, age, input.sex) : undefined;
+  const egfrFromCrCys =
+    creatinine != null && creatinine > 0 && cystatinC != null && cystatinC > 0
+      ? ckdEpi2021CrCys(creatinine, cystatinC, age, input.sex)
+      : undefined;
   const egfrCalc = egfrFromCrCys ?? egfrFromCys ?? egfrFromCr;
-  const egfr = egfrMeasured != null && egfrMeasured > 0
-    ? egfrMeasured
-    : (egfrCalc != null && Number.isFinite(egfrCalc) ? r0(egfrCalc) : undefined);
+  const egfr =
+    egfrMeasured != null && egfrMeasured > 0
+      ? egfrMeasured
+      : egfrCalc != null && Number.isFinite(egfrCalc)
+        ? r0(egfrCalc)
+        : undefined;
   const egfrSource: ProteinKidneyResult['egfrSource'] =
-    egfrMeasured != null && egfrMeasured > 0 ? 'measured'
-      : egfrFromCrCys != null && Number.isFinite(egfrFromCrCys) ? 'ckd-epi-cr-cys'
-        : egfrFromCys != null && Number.isFinite(egfrFromCys) ? 'ckd-epi-cys'
-          : egfrFromCr != null && Number.isFinite(egfrFromCr) ? 'ckd-epi'
+    egfrMeasured != null && egfrMeasured > 0
+      ? 'measured'
+      : egfrFromCrCys != null && Number.isFinite(egfrFromCrCys)
+        ? 'ckd-epi-cr-cys'
+        : egfrFromCys != null && Number.isFinite(egfrFromCys)
+          ? 'ckd-epi-cys'
+          : egfrFromCr != null && Number.isFinite(egfrFromCr)
+            ? 'ckd-epi'
             : 'none';
   const gfrCategory = gfrCategoryOf(egfr);
 
   const bunMgDl = urea != null && urea > 0 ? r1(urea * 2.8) : undefined;
-  const creatinineMgDl = creatinine != null && creatinine > 0
-    ? creatinine / 88.4
-    : undefined;
-  const bunCr = bunMgDl != null && creatinineMgDl != null && creatinineMgDl > 0
-    ? r1(bunMgDl / creatinineMgDl)
-    : undefined;
-  const bunCrPattern: 'low' | 'normal' | 'high' | 'unknown' = bunCr == null
-    ? 'unknown'
-    : bunCr < 10 ? 'low' : bunCr > 20 ? 'high' : 'normal';
+  const creatinineMgDl = creatinine != null && creatinine > 0 ? creatinine / 88.4 : undefined;
+  const bunCr =
+    bunMgDl != null && creatinineMgDl != null && creatinineMgDl > 0 ? r1(bunMgDl / creatinineMgDl) : undefined;
+  const bunCrPattern: 'low' | 'normal' | 'high' | 'unknown' =
+    bunCr == null ? 'unknown' : bunCr < 10 ? 'low' : bunCr > 20 ? 'high' : 'normal';
 
   // ── Альбуминурия / протеинурия ───────────────────────────────────────────
   let uacrMgMmol = uacrInput;
@@ -1134,12 +1240,10 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     // По тест-полоске категорию A ставить нельзя (нет креатинина мочи),
     // но сам факт протеинурии уже ограничивает потолок белка.
     albuminuriaSource = 'dipstick';
-    albuminuriaCategory = proteinuriaScore >= 3 ? 'A3'
-      : proteinuriaScore >= 1 ? 'A2'
-        : 'unknown';
+    albuminuriaCategory = proteinuriaScore >= 3 ? 'A3' : proteinuriaScore >= 1 ? 'A2' : 'unknown';
   }
   const hasProteinuriaData = albuminuriaSource !== 'none' || proteinuriaScore != null;
-  const uacrMgG = uacrMgMmol != null ? r1(uacrMgMmol * 8.84) : undefined;
+  const uacrMgG = uacrMgMmol != null ? r1(uacrMgMmol * UACR_MG_MMOL_TO_MG_G) : undefined;
 
   // ── Осмолярность мочи / вода ─────────────────────────────────────────────
   const osm = estimateUrineOsmolality(urineSg);
@@ -1158,11 +1262,14 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const waterDeficitMl = waterActualMl != null ? Math.max(0, waterTargetMl - waterActualMl) : undefined;
 
   const hydrationRank: Record<'unknown' | 'good' | 'borderline' | 'dehydrated', number> = {
-    unknown: 0, good: 1, borderline: 2, dehydrated: 3,
+    unknown: 0,
+    good: 1,
+    borderline: 2,
+    dehydrated: 3,
   };
   let hydrationBySg: 'unknown' | 'good' | 'borderline' | 'dehydrated' = 'unknown';
   if (urineSg != null && Number.isFinite(urineSg)) {
-    if (urineSg <= 1.020) hydrationBySg = 'good';
+    if (urineSg <= 1.02) hydrationBySg = 'good';
     else if (urineSg <= 1.025) hydrationBySg = 'borderline';
     else hydrationBySg = 'dehydrated';
   }
@@ -1171,12 +1278,12 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     hydrationByWater = waterDeficitMl > 1000 ? 'dehydrated' : waterDeficitMl > 500 ? 'borderline' : 'good';
   }
   // Берём худшую оценку: SG не должен «отменять» реальный дефицит воды.
-  const hydrationStatus = hydrationRank[hydrationBySg] >= hydrationRank[hydrationByWater]
-    ? hydrationBySg : hydrationByWater;
+  const hydrationStatus =
+    hydrationRank[hydrationBySg] >= hydrationRank[hydrationByWater] ? hydrationBySg : hydrationByWater;
 
   let concentrationRisk: 'low' | 'moderate' | 'high' = 'low';
-  if (urineSg != null && urineSg > 1.030) concentrationRisk = 'high';
-  else if (urineSg != null && urineSg > 1.020) concentrationRisk = 'moderate';
+  if (urineSg != null && urineSg > 1.03) concentrationRisk = 'high';
+  else if (urineSg != null && urineSg > 1.02) concentrationRisk = 'moderate';
   else if (waterDeficitMl != null && waterDeficitMl > 700) concentrationRisk = 'high';
   else if (waterDeficitMl != null && waterDeficitMl > 300) concentrationRisk = 'moderate';
   if (rsl.total > 0 && osm.value != null && osm.value > 800) concentrationRisk = 'high';
@@ -1196,111 +1303,269 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     addFlag(`data_${d.code}`, 'warn', d.title, d.hint);
   }
   if (pediatric) {
-    addFlag('pediatric', 'warn', 'Возраст до 18 лет', 'CKD-EPI 2021 — взрослая формула: для подростка СКФ и потолок белка считаются по детским нормам. Потолок переносимости не расширяем, нужен педиатр/нефролог.');
+    addFlag(
+      'pediatric',
+      'warn',
+      'Возраст до 18 лет',
+      'CKD-EPI 2021 — взрослая формула: для подростка СКФ и потолок белка считаются по детским нормам. Потолок переносимости не расширяем, нужен педиатр/нефролог.',
+    );
   }
   if (extreme) {
-    addFlag('extreme_protein', 'danger', 'Экстремальный белок (>3.2 г/кг)', `Сейчас ${r1(proteinGkg)} г/кг. Выше 3.2 г/кг доказанной переносимости нет — это не «безопасная норма». Нужны врач (нефролог/спортмедицина) и контроль крови/ОАМ каждые 7–14 дней: мочевина, креатинин, СКФ, ОАМ, UACR, электролиты, АД. При симптомах или ухудшении анализов — снижать.`);
+    addFlag(
+      'extreme_protein',
+      'danger',
+      'Экстремальный белок (>3.2 г/кг)',
+      `Сейчас ${r1(proteinGkg)} г/кг. Выше 3.2 г/кг доказанной переносимости нет — это не «безопасная норма». Нужны врач (нефролог/спортмедицина) и контроль крови/ОАМ каждые 7–14 дней: мочевина, креатинин, СКФ, ОАМ, UACR, электролиты, АД. При симптомах или ухудшении анализов — снижать.`,
+    );
   }
 
   if (egfr != null && egfr < 30) {
-    addFlag('egfr_critical', 'danger', 'СКФ ниже 30', 'Это стадия G4–G5. Наращивание белка и высокобелковые диеты — только после нефролога. Срочно обсудите тактику.');
+    addFlag(
+      'egfr_critical',
+      'danger',
+      'СКФ ниже 30',
+      'Это стадия G4–G5. Наращивание белка и высокобелковые диеты — только после нефролога. Срочно обсудите тактику.',
+    );
   } else if (egfr != null && egfr < 60) {
-    addFlag('egfr_low', 'warn', 'СКФ ниже 60', 'Почечная фильтрация снижена. KDIGO 2024: белок 0.8 г/кг при G3–G5, избегать >1.3 г/кг. Нужен нефролог/диетолог.');
+    addFlag(
+      'egfr_low',
+      'warn',
+      'СКФ ниже 60',
+      'Почечная фильтрация снижена. KDIGO 2024: белок 0.8 г/кг при G3–G5, избегать >1.3 г/кг. Нужен нефролог/диетолог.',
+    );
   }
 
   if (albuminuriaCategory === 'A3') {
-    addFlag('albuminuria_a3', 'danger', 'Выраженная альбуминурия/протеинурия', 'UACR >30 мг/ммоль (или белок ≥3+). Не наращивайте белок до повторного анализа и консультации нефролога.');
+    addFlag(
+      'albuminuria_a3',
+      'danger',
+      'Выраженная альбуминурия/протеинурия',
+      'UACR >30 мг/ммоль (или белок ≥3+). Не наращивайте белок до повторного анализа и консультации нефролога.',
+    );
   } else if (albuminuriaCategory === 'A2') {
-    addFlag('albuminuria_a2', 'warn', 'Умеренная альбуминурия/протеинурия', 'UACR 3–30 мг/ммоль или белок 1–2+. Повторите анализ утром, исключите инфекцию и нагрузку; при стойкости — нефролог.');
+    addFlag(
+      'albuminuria_a2',
+      'warn',
+      'Умеренная альбуминурия/протеинурия',
+      'UACR 3–30 мг/ммоль или белок 1–2+. Повторите анализ утром, исключите инфекцию и нагрузку; при стойкости — нефролог.',
+    );
   }
 
-  const hematuria = (input.urineEryPerUl != null && input.urineEryPerUl > 3);
+  const hematuria = input.urineEryPerUl != null && input.urineEryPerUl > 3;
   if (hematuria && (albuminuriaCategory === 'A2' || albuminuriaCategory === 'A3' || (proteinuriaScore ?? 0) >= 1)) {
-    addFlag('hematuria_proteinuria', 'danger', 'Кровь + белок в моче', 'Такое сочетание требует очного осмотра и нефролога; не объясняйте его только тренировками.');
+    addFlag(
+      'hematuria_proteinuria',
+      'danger',
+      'Кровь + белок в моче',
+      'Такое сочетание требует очного осмотра и нефролога; не объясняйте его только тренировками.',
+    );
   } else if (hematuria) {
-    addFlag('hematuria', 'warn', 'Эритроциты в моче', 'Изолированная гематурия бывает после нагрузки, но её нужно перепроверить и исключить урологическую причину.');
+    addFlag(
+      'hematuria',
+      'warn',
+      'Эритроциты в моче',
+      'Изолированная гематурия бывает после нагрузки, но её нужно перепроверить и исключить урологическую причину.',
+    );
   }
 
-  const infectionSigns = (input.urineNitriteScore ?? 0) >= 1 &&
+  const infectionSigns =
+    (input.urineNitriteScore ?? 0) >= 1 &&
     ((input.urineLeuPerUl ?? 0) > 10 || (input.urineLeuPerUl == null && (input.urineNitriteScore ?? 0) >= 1));
   if (infectionSigns) {
-    addFlag('uti', 'warn', 'Возможна инфекция мочевых путей', 'Нитриты/лейкоциты могут давать ложную протеинурию. Повторите ОАМ после лечения и перед выводами о почках.');
+    addFlag(
+      'uti',
+      'warn',
+      'Возможна инфекция мочевых путей',
+      'Нитриты/лейкоциты могут давать ложную протеинурию. Повторите ОАМ после лечения и перед выводами о почках.',
+    );
   }
 
   if (urea != null && urea > 20) {
-    addFlag('urea_critical', 'danger', 'Мочевина >20 ммоль/л', 'Это не «просто высокий белок». Нужен срочный врачебный разбор: обезвоживание, кровотечение, почечная недостаточность.');
+    addFlag(
+      'urea_critical',
+      'danger',
+      'Мочевина >20 ммоль/л',
+      'Это не «просто высокий белок». Нужен срочный врачебный разбор: обезвоживание, кровотечение, почечная недостаточность.',
+    );
   } else if (urea != null && urea > 12) {
-    addFlag('urea_high', 'warn', 'Мочевина >12 ммоль/л', 'Проверьте гидратацию, тренировки и белок. Повторите urea/creatinine через 2–3 дня; при сохранении — врач.');
+    addFlag(
+      'urea_high',
+      'warn',
+      'Мочевина >12 ммоль/л',
+      'Проверьте гидратацию, тренировки и белок. Повторите urea/creatinine через 2–3 дня; при сохранении — врач.',
+    );
   } else if (urea != null && urea > 8.3) {
-    addFlag('urea_borderline', 'warn', 'Мочевина выше нормы', 'Часто это высокая белковая нагрузка или дефицит воды, а не болезнь почек. Сначала вода и повтор анализа, потом прибавка белка.');
+    addFlag(
+      'urea_borderline',
+      'warn',
+      'Мочевина выше нормы',
+      'Часто это высокая белковая нагрузка или дефицит воды, а не болезнь почек. Сначала вода и повтор анализа, потом прибавка белка.',
+    );
   }
 
   if (bunCrPattern === 'high') {
-    addFlag('bun_cr_high', 'info', 'BUN/креатинин >20', 'Преренальный паттерн: дегидратация, высокий белок, катаболизм или ЖК-кровотечение. Сам по себе не диагноз, но прибавку белка лучше отложить до повтора.');
+    addFlag(
+      'bun_cr_high',
+      'info',
+      'BUN/креатинин >20',
+      'Преренальный паттерн: дегидратация, высокий белок, катаболизм или ЖК-кровотечение. Сам по себе не диагноз, но прибавку белка лучше отложить до повтора.',
+    );
   } else if (bunCrPattern === 'low') {
-    addFlag('bun_cr_low', 'info', 'BUN/креатинин <10', 'Бывает при низком белке, болезни печени, высоком креатинине или большой мышечной массе. Смотрите на СКФ и ОАМ, а не на ratio.');
+    addFlag(
+      'bun_cr_low',
+      'info',
+      'BUN/креатинин <10',
+      'Бывает при низком белке, болезни печени, высоком креатинине или большой мышечной массе. Смотрите на СКФ и ОАМ, а не на ratio.',
+    );
   }
 
-  if (urineSg != null && urineSg > 1.030) {
-    addFlag('concentrated_urine', 'warn', 'Очень концентрированная моча', `SG ${urineSg.toFixed(3)}. Это признак дефицита воды; на таком фоне высокий белок и камни рискованны. Сначала гидратация.`);
+  if (urineSg != null && urineSg > 1.03) {
+    addFlag(
+      'concentrated_urine',
+      'warn',
+      'Очень концентрированная моча',
+      `SG ${urineSg.toFixed(3)}. Это признак дефицита воды; на таком фоне высокий белок и камни рискованны. Сначала гидратация.`,
+    );
   }
 
   if ((input.urineGlucoseScore ?? 0) >= 1) {
-    addFlag('glycosuria', 'warn', 'Глюкоза в моче', 'Проверьте глюкозу крови/HbA1c. Глюкоза завышает SG и может искажать оценку концентрации.');
+    addFlag(
+      'glycosuria',
+      'warn',
+      'Глюкоза в моче',
+      'Проверьте глюкозу крови/HbA1c. Глюкоза завышает SG и может искажать оценку концентрации.',
+    );
   }
   if ((input.urineKetonesScore ?? 0) >= 2) {
-    addFlag('ketonuria', 'info', 'Кетоны в моче', 'На низкоуглеводной диете это ожидаемо; при высоком уровне глюкозы крови — срочно к врачу.');
+    addFlag(
+      'ketonuria',
+      'info',
+      'Кетоны в моче',
+      'На низкоуглеводной диете это ожидаемо; при высоком уровне глюкозы крови — срочно к врачу.',
+    );
   }
   if ((input.urineCastsPerUl ?? 0) > 2) {
-    addFlag('casts', 'warn', 'Цилиндры в моче', 'Гиалиновые цилиндры бывают после нагрузки; зернистые/эритроцитарные — повод для очного разбора.');
+    addFlag(
+      'casts',
+      'warn',
+      'Цилиндры в моче',
+      'Гиалиновые цилиндры бывают после нагрузки; зернистые/эритроцитарные — повод для очного разбора.',
+    );
   }
 
   if (input.knownCkd) {
-    addFlag('known_ckd', 'warn', 'Известная ХБП', 'Целевой белок 0.8 г/кг (KDIGO 2024). Любое повышение — только с нефрологом/диетологом.');
+    addFlag(
+      'known_ckd',
+      'warn',
+      'Известная ХБП',
+      'Целевой белок 0.8 г/кг (KDIGO 2024). Любое повышение — только с нефрологом/диетологом.',
+    );
   }
   if (input.creatineUse) {
-    addFlag('creatine', 'info', 'Креатин влияет на креатинин', 'Креатин может поднимать креатинин без повреждения почек. Оценивайте СКФ в динамике и не пугайтесь одного числа.');
+    addFlag(
+      'creatine',
+      'info',
+      'Креатин влияет на креатинин',
+      'Креатин может поднимать креатинин без повреждения почек. Оценивайте СКФ в динамике и не пугайтесь одного числа.',
+    );
   }
   if (input.aasUse) {
-    addFlag('aas', 'info', 'ААС: как читать анализы',
-      'Креатинин завышен мышечной массой — CKD-EPI может занижать СКФ: подтвердите цистатин C (eGFR-cys) или измеренную СКФ. Потолок 3.2 г/кг — только при подтверждённой СКФ и чистых мочевине/моче. Контроль на ААС: АД, гематокрит, липиды, ОАМ + UACR каждые 3–6 мес.');
+    addFlag(
+      'aas',
+      'info',
+      'ААС: как читать анализы',
+      'Креатинин завышен мышечной массой — CKD-EPI может занижать СКФ: подтвердите цистатин C (eGFR-cys) или измеренную СКФ. Потолок 3.2 г/кг — только при подтверждённой СКФ и чистых мочевине/моче. Контроль на ААС: АД, гематокрит, липиды, ОАМ + UACR каждые 3–6 мес.',
+    );
     if (egfrSource === 'ckd-epi') {
-      addFlag('aas_creatinine_only', egfr != null && egfr < 90 ? 'warn' : 'info',
+      addFlag(
+        'aas_creatinine_only',
+        egfr != null && egfr < 90 ? 'warn' : 'info',
         'СКФ на ААС — только по креатинину',
-        `CKD-EPI по креатинину ${egfr != null ? r0(egfr) : '—'}: на ААС это может быть артефакт мышц, а не снижение фильтрации. Для 3.2 г/кг и решения о снижении нужен цистатин C (eGFR-cys) или измеренная СКФ.`);
+        `CKD-EPI по креатинину ${egfr != null ? r0(egfr) : '—'}: на ААС это может быть артефакт мышц, а не снижение фильтрации. Для 3.2 г/кг и решения о снижении нужен цистатин C (eGFR-cys) или измеренная СКФ.`,
+      );
     }
   }
 
   if (urinePh != null && urinePh > 0 && urinePh <= 5.3) {
-    addFlag('acid_urine', 'info', 'Кислая моча (pH ≤5.3)', 'Кислая среда повышает риск уратных камней. Это не про белок напрямую, но вместе с дефицитом воды — повод пить больше и пересмотреть рацион.');
+    addFlag(
+      'acid_urine',
+      'info',
+      'Кислая моча (pH ≤5.3)',
+      'Кислая среда повышает риск уратных камней. Это не про белок напрямую, но вместе с дефицитом воды — повод пить больше и пересмотреть рацион.',
+    );
   } else if (urinePh != null && urinePh >= 7.5) {
-    addFlag('alkaline_urine', 'info', 'Щелочная моча (pH ≥7.5)', 'Бывает при инфекции, растительной диете или ошибке хранения пробы. Если есть нитриты/лейкоциты — сначала исключите ИМП.');
+    addFlag(
+      'alkaline_urine',
+      'info',
+      'Щелочная моча (pH ≥7.5)',
+      'Бывает при инфекции, растительной диете или ошибке хранения пробы. Если есть нитриты/лейкоциты — сначала исключите ИМП.',
+    );
   }
   const vol24 = volume24h != null && volume24h > 0 ? volume24h : undefined;
   if (vol24 != null && vol24 < 800) {
-    addFlag('low_diuresis', 'warn', 'Мало мочи за сутки', `Диурез ${vol24} мл/сут — моча концентрируется, растёт риск камней. Проверьте воду и повторите оценку.`);
+    addFlag(
+      'low_diuresis',
+      'warn',
+      'Мало мочи за сутки',
+      `Диурез ${vol24} мл/сут — моча концентрируется, растёт риск камней. Проверьте воду и повторите оценку.`,
+    );
   } else if (vol24 != null && vol24 > 4000) {
-    addFlag('polyuria', 'info', 'Полиурия (>4 л/сут)', 'Проверьте глюкозу крови и объём выпитой воды; на высоком белке это может быть компенсаторно.');
+    addFlag(
+      'polyuria',
+      'info',
+      'Полиурия (>4 л/сут)',
+      'Проверьте глюкозу крови и объём выпитой воды; на высоком белке это может быть компенсаторно.',
+    );
   }
 
   if (input.hypertension) {
-    addFlag('hypertension', 'warn', 'Артериальная гипертензия', 'Цель <130/80. Высокий белок сам по себе не повышает давление, но соль и вес — да. Контролируйте АД и не используйте НПВС.');
+    addFlag(
+      'hypertension',
+      'warn',
+      'Артериальная гипертензия',
+      'Цель <130/80. Высокий белок сам по себе не повышает давление, но соль и вес — да. Контролируйте АД и не используйте НПВС.',
+    );
   }
   if (input.diabetes) {
-    addFlag('diabetes', 'warn', 'Диабет', 'UACR — минимум раз в год даже при нормальной СКФ: альбуминурия появляется раньше снижения фильтрации.');
+    addFlag(
+      'diabetes',
+      'warn',
+      'Диабет',
+      'UACR — минимум раз в год даже при нормальной СКФ: альбуминурия появляется раньше снижения фильтрации.',
+    );
   }
   if (input.nsaidUse) {
-    addFlag('nsaid', 'warn', 'НПВС', 'Ибупрофен/напроксен снижают почечный кровоток. На высоком белке и при обезвоживании риск особенно высок — избегайте или согласуйте с врачом.');
+    addFlag(
+      'nsaid',
+      'warn',
+      'НПВС',
+      'Ибупрофен/напроксен снижают почечный кровоток. На высоком белке и при обезвоживании риск особенно высок — избегайте или согласуйте с врачом.',
+    );
   }
   if (nsaidDehydrated) {
-    addFlag('nsaid_dehydrated', 'danger', 'НПВС + обезвоживание', 'Сочетание опасно для почек: сначала вода, затем решение о НПВС и белке. Потолок переносимости не расширяем.');
+    addFlag(
+      'nsaid_dehydrated',
+      'danger',
+      'НПВС + обезвоживание',
+      'Сочетание опасно для почек: сначала вода, затем решение о НПВС и белке. Потолок переносимости не расширяем.',
+    );
   }
 
   if (!hasProteinuriaData && egfr != null && urea != null) {
-    addFlag('urine_protein_missing', 'info', 'ОАМ без белка не сдан', 'Переносимость подтверждается только вместе с белком мочи. Пока его нет, потолок остаётся на уровне пользы — это не «всё чисто», а «не проверено».');
+    addFlag(
+      'urine_protein_missing',
+      'info',
+      'ОАМ без белка не сдан',
+      'Переносимость подтверждается только вместе с белком мочи. Пока его нет, потолок остаётся на уровне пользы — это не «всё чисто», а «не проверено».',
+    );
   }
   if (input.knownCkd && waterTargetRaw > 2500) {
-    addFlag('water_ckd', 'info', 'Вода при ХБП', `Расчётная цель ${waterTargetRaw} мл ограничена 2500 мл: при ХБП объём воды индивидуален. Согласуйте с нефрологом.`);
+    addFlag(
+      'water_ckd',
+      'info',
+      'Вода при ХБП',
+      `Расчётная цель ${waterTargetRaw} мл ограничена 2500 мл: при ХБП объём воды индивидуален. Согласуйте с нефрологом.`,
+    );
   }
 
   // ── Потолки и прибавка ───────────────────────────────────────────────────
@@ -1343,7 +1608,8 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const overTolerance = Math.max(0, r0((proteinGkg - capGkg) * weight));
   const overBenefit = Math.max(0, r0((proteinGkg - benefitCapGkg) * weight));
 
-  const hardStop = (egfr != null && egfr < 60) ||
+  const hardStop =
+    (egfr != null && egfr < 60) ||
     input.knownCkd === true ||
     albuminuriaCategory === 'A3' ||
     (proteinuriaScore ?? 0) >= 2 ||
@@ -1355,24 +1621,30 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const pausedByInfection = infectionSigns;
   const increasePaused = !hardStop && (pausedByHydration || pausedByUrea || pausedByInfection);
   const increaseRecommended = !hardStop && !increasePaused && headroom >= 5;
-  const canIncreaseToTolerance = !hardStop && !increasePaused && !extreme && toleranceVerified && toleranceHeadroom >= 5;
+  const canIncreaseToTolerance =
+    !hardStop && !increasePaused && !extreme && toleranceVerified && toleranceHeadroom >= 5;
   const increaseAllowed = increaseRecommended;
   const pauseReason = increasePaused
-    ? (pausedByHydration
+    ? pausedByHydration
       ? 'Сначала вода: моча концентрированная. Наращивание белка на обезвоживании только увеличит осмолярную нагрузку.'
       : pausedByInfection
         ? 'Сначала лечение/повтор ОАМ: инфекция искажает белок мочи.'
-        : 'Сначала нормализуйте мочевину/гидратацию и повторите анализ — потом прибавка белка.')
+        : 'Сначала нормализуйте мочевину/гидратацию и повторите анализ — потом прибавка белка.'
     : undefined;
 
   // Если потолок равен пользе, «выше потолка» — это ещё не «выше
   // переносимости»: почки просто не проверены. Не пугаем снижением.
   const capAtBenefit = Math.abs(capGkg - benefitCapGkg) < 1e-9;
-  const status: PkStatus = proteinGkg > capGkg + 1e-9
-    ? (capAtBenefit ? 'above_benefit' : 'above_tolerance')
-    : proteinGkg > benefitCapGkg + 1e-9 ? 'above_benefit'
-      : proteinGkg < Math.min(1.2, benefitCapGkg) ? 'below_min'
-        : 'within';
+  const status: PkStatus =
+    proteinGkg > capGkg + 1e-9
+      ? capAtBenefit
+        ? 'above_benefit'
+        : 'above_tolerance'
+      : proteinGkg > benefitCapGkg + 1e-9
+        ? 'above_benefit'
+        : proteinGkg < Math.min(1.2, benefitCapGkg)
+          ? 'below_min'
+          : 'within';
 
   // ── Усвоение / переносимость ─────────────────────────────────────────────
   const aasCreatinineEgfr = input.aasUse === true && egfrSource === 'ckd-epi';
@@ -1402,11 +1674,10 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   // позволяет — показываем «серые» шаги выше пользы (по запросу пользователя).
   const steps: PkStep[] = [];
   // На стопе или паузе шагов нет вообще: сначала безопасность, потом прибавка.
-  const targetHeadroom = (hardStop || increasePaused)
-    ? 0
-    : headroom >= 5 ? headroom : (canIncreaseToTolerance ? toleranceHeadroom : 0);
+  const targetHeadroom =
+    hardStop || increasePaused ? 0 : headroom >= 5 ? headroom : canIncreaseToTolerance ? toleranceHeadroom : 0;
   if (targetHeadroom >= 5) {
-    const step = clamp(r0((targetHeadroom / 3) / 5) * 5, 5, 15);
+    const step = clamp(r0(targetHeadroom / 3 / 5) * 5, 5, 15);
     let cur = proteinG;
     for (let i = 1; i <= 8 && cur < proteinG + targetHeadroom; i++) {
       cur = Math.min(proteinG + targetHeadroom, cur + step);
@@ -1445,45 +1716,93 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
 
   // ── Индекс нагрузки ──────────────────────────────────────────────────────
   const signals: PkSignal[] = [];
-  const addSignal = (key: string, label: string, value: string, points: number, max: number, color: string, note?: string) => {
+  const addSignal = (
+    key: string,
+    label: string,
+    value: string,
+    points: number,
+    max: number,
+    color: string,
+    note?: string,
+  ) => {
     signals.push({ key, label, value, points, max, color, note });
   };
 
   // СКФ
   {
     const p = egfr == null ? 0 : egfr < 15 ? 50 : egfr < 30 ? 38 : egfr < 45 ? 26 : egfr < 60 ? 16 : egfr < 90 ? 5 : 0;
-    addSignal('egfr', 'СКФ', egfr == null ? 'нет' : `${r0(egfr)} · ${gfrCategory}`, p, 50,
+    addSignal(
+      'egfr',
+      'СКФ',
+      egfr == null ? 'нет' : `${r0(egfr)} · ${gfrCategory}`,
+      p,
+      50,
       p >= 26 ? '#ef4444' : p >= 16 ? '#f97316' : p > 0 ? '#eab308' : '#22c55e',
-      egfrSource === 'ckd-epi' ? 'рассчитана по CKD-EPI 2021' : egfrSource === 'measured' ? 'из лаборатории' : 'нужен креатинин');
+      egfrSource === 'ckd-epi'
+        ? 'рассчитана по CKD-EPI 2021'
+        : egfrSource === 'measured'
+          ? 'из лаборатории'
+          : 'нужен креатинин',
+    );
   }
   // Мочевина
   {
     const u = urea;
     const p = u == null ? 0 : u > 20 ? 30 : u > 12 ? 22 : u > 8.3 ? 13 : u > 6.5 ? 5 : 0;
-    addSignal('urea', 'Мочевина', u == null ? 'нет' : `${r1(u)} ммоль/л`, p, 30,
+    addSignal(
+      'urea',
+      'Мочевина',
+      u == null ? 'нет' : `${r1(u)} ммоль/л`,
+      p,
+      30,
       p >= 22 ? '#ef4444' : p >= 13 ? '#f97316' : p > 0 ? '#eab308' : '#22c55e',
-      'высокий белок/дегидратация тоже поднимают');
+      'высокий белок/дегидратация тоже поднимают',
+    );
   }
   // Альбуминурия/белок
   {
-    const p = albuminuriaCategory === 'A3' ? 35 : albuminuriaCategory === 'A2' ? 16 : albuminuriaCategory === 'A1' ? 0 : 0;
-    addSignal('albuminuria', 'Белок мочи', ALBUMINURIA_LABEL[albuminuriaCategory], p, 35,
+    const p =
+      albuminuriaCategory === 'A3' ? 35 : albuminuriaCategory === 'A2' ? 16 : albuminuriaCategory === 'A1' ? 0 : 0;
+    addSignal(
+      'albuminuria',
+      'Белок мочи',
+      ALBUMINURIA_LABEL[albuminuriaCategory],
+      p,
+      35,
       p >= 35 ? '#ef4444' : p >= 16 ? '#f97316' : '#22c55e',
-      uacrMgMmol != null ? `UACR ${r1(uacrMgMmol)} мг/ммоль` : albuminuriaSource === 'dipstick' ? 'по тест-полоске' : 'нужен UACR/UPCR');
+      uacrMgMmol != null
+        ? `UACR ${r1(uacrMgMmol)} мг/ммоль`
+        : albuminuriaSource === 'dipstick'
+          ? 'по тест-полоске'
+          : 'нужен UACR/UPCR',
+    );
   }
   // Концентрация
   {
-    const p = urineSg == null ? 0 : urineSg > 1.030 ? 20 : urineSg > 1.025 ? 14 : urineSg > 1.020 ? 8 : urineSg > 1.015 ? 3 : 0;
-    addSignal('sg', 'Концентрация', urineSg == null ? 'нет' : urineSg.toFixed(3), p, 20,
+    const p =
+      urineSg == null ? 0 : urineSg > 1.03 ? 20 : urineSg > 1.025 ? 14 : urineSg > 1.02 ? 8 : urineSg > 1.015 ? 3 : 0;
+    addSignal(
+      'sg',
+      'Концентрация',
+      urineSg == null ? 'нет' : urineSg.toFixed(3),
+      p,
+      20,
       p >= 14 ? '#f97316' : p >= 8 ? '#eab308' : '#22c55e',
-      osm.value != null ? `≈${osm.value} мОсм/кг (оценка)` : 'SG из ОАМ');
+      osm.value != null ? `≈${osm.value} мОсм/кг (оценка)` : 'SG из ОАМ',
+    );
   }
   // Текущая нагрузка
   {
     const p = proteinGkg > 3.2 ? 24 : proteinGkg > 2.6 ? 16 : proteinGkg > 2.2 ? 9 : proteinGkg > 1.6 ? 4 : 0;
-    addSignal('load', 'Белок сейчас', `${r1(proteinGkg)} г/кг`, p, 24,
+    addSignal(
+      'load',
+      'Белок сейчас',
+      `${r1(proteinGkg)} г/кг`,
+      p,
+      24,
       p >= 16 ? '#f97316' : p >= 9 ? '#eab308' : '#22c55e',
-      `${r0(proteinG)} г/сут`);
+      `${r0(proteinG)} г/сут`,
+    );
   }
   // Воспаление/кровь/цилиндры
   {
@@ -1491,9 +1810,15 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     if (hematuria) p += 6;
     if (infectionSigns) p += 8;
     if ((input.urineCastsPerUl ?? 0) > 2) p += 6;
-    addSignal('sediment', 'Осадок мочи', hematuria || infectionSigns || (input.urineCastsPerUl ?? 0) > 2 ? 'есть отклонения' : 'без отклонений', p, 20,
+    addSignal(
+      'sediment',
+      'Осадок мочи',
+      hematuria || infectionSigns || (input.urineCastsPerUl ?? 0) > 2 ? 'есть отклонения' : 'без отклонений',
+      p,
+      20,
       p >= 12 ? '#ef4444' : p > 0 ? '#f59e0b' : '#22c55e',
-      'эритроциты/лейкоциты/цилиндры');
+      'эритроциты/лейкоциты/цилиндры',
+    );
   }
 
   const rawScore = signals.reduce((s, x) => s + x.points, 0);
@@ -1503,50 +1828,78 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   // ── Рекомендации ─────────────────────────────────────────────────────────
   const recs: string[] = [];
   if (dataIssues.length > 0) {
-    recs.push('Проверьте единицы ввода: есть значения вне физиологического диапазона. Пока они не исправлены, вывод о переносимости не строится.');
+    recs.push(
+      'Проверьте единицы ввода: есть значения вне физиологического диапазона. Пока они не исправлены, вывод о переносимости не строится.',
+    );
   }
   if (pediatric) {
     recs.push('До 18 лет СКФ и потолок белка считаются по детским нормам — обсудите с педиатром/нефрологом.');
   }
   if (extreme) {
-    recs.push(`Белок ${r1(proteinGkg)} г/кг — экстремальный режим: выше 3.2 г/кг доказанной переносимости нет. 5 г/кг — верхняя граница калькулятора, а не безопасная норма. Нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней; при росте мочевины/креатинина, белка мочи, отёках или ухудшении самочувствия — снижайте.`);
+    recs.push(
+      `Белок ${r1(proteinGkg)} г/кг — экстремальный режим: выше 3.2 г/кг доказанной переносимости нет. 5 г/кг — верхняя граница калькулятора, а не безопасная норма. Нужны врач (нефролог/спортмедицина) и контроль анализов каждые 7–14 дней; при росте мочевины/креатинина, белка мочи, отёках или ухудшении самочувствия — снижайте.`,
+    );
   }
   if (utilization.status === 'excess') {
-    recs.push(`Признаки перегрузки: ${utilization.label.toLowerCase()}. Сначала снизьте белок до ${capGday} г/сут, добавьте воду и повторите анализы.`);
+    recs.push(
+      `Признаки перегрузки: ${utilization.label.toLowerCase()}. Сначала снизьте белок до ${capGday} г/сут, добавьте воду и повторите анализы.`,
+    );
   } else if (utilization.status === 'partial') {
-    recs.push(`Ограничение по переносимости: ${utilization.label.toLowerCase()}. ${extreme ? 'Контроль — каждые 7–14 дней и под наблюдением врача.' : 'Прибавка — только после повторного анализа (2–3 дня) и нормализации воды.'}`);
+    recs.push(
+      `Ограничение по переносимости: ${utilization.label.toLowerCase()}. ${extreme ? 'Контроль — каждые 7–14 дней и под наблюдением врача.' : 'Прибавка — только после повторного анализа (2–3 дня) и нормализации воды.'}`,
+    );
   } else if (utilization.status === 'handled' && proteinGkg > benefitCapGkg && status !== 'above_tolerance') {
-    recs.push(`Анализы в норме: ${r1(proteinGkg)} г/кг переносятся. Но дополнительной пользы сверх ${r1(benefitCapGkg)} г/кг в среднем не доказано — прибавка имеет смысл только по причине (дефицит, очень большие объёмы) и с контролем.`);
+    recs.push(
+      `Анализы в норме: ${r1(proteinGkg)} г/кг переносятся. Но дополнительной пользы сверх ${r1(benefitCapGkg)} г/кг в среднем не доказано — прибавка имеет смысл только по причине (дефицит, очень большие объёмы) и с контролем.`,
+    );
   }
   if (status === 'above_tolerance') {
-    recs.push(`Сейчас белка на ${overTolerance} г/сут больше потолка переносимости (${r1(capGkg)} г/кг). Снизьте до ${capGday} г/сут и повторите urea/creatinine/ОАМ через 2–3 недели.`);
+    recs.push(
+      `Сейчас белка на ${overTolerance} г/сут больше потолка переносимости (${r1(capGkg)} г/кг). Снизьте до ${capGday} г/сут и повторите urea/creatinine/ОАМ через 2–3 недели.`,
+    );
   } else if (status === 'above_benefit' && !extreme) {
     if (aasEgfrUnverified) {
-      recs.push(`Сейчас ${r1(proteinGkg)} г/кг — выше ориентира пользы. Снижать до ${r1(benefitCapGkg)} не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но и наращивать нельзя, пока не сдадите цистатин C (eGFR-cys).`);
+      recs.push(
+        `Сейчас ${r1(proteinGkg)} г/кг — выше ориентира пользы. Снижать до ${r1(benefitCapGkg)} не обязательно: СКФ по креатинину на ААС может быть занижена мышцами. Но и наращивать нельзя, пока не сдадите цистатин C (eGFR-cys).`,
+      );
     } else {
-      recs.push(`Сейчас ${r1(proteinGkg)} г/кг — выше ориентира пользы на ${overBenefit} г/сут. ${toleranceVerified ? `Переносимость позволяет до ${r1(capGkg)} г/кг (${capGday} г/сут), но ` : 'Переносимость выше не подтверждена. '}Сверх ${r1(benefitCapGkg)} г/кг прирост в среднем не ускоряется: держите объём, если он нужен по другим причинам.`);
+      recs.push(
+        `Сейчас ${r1(proteinGkg)} г/кг — выше ориентира пользы на ${overBenefit} г/сут. ${toleranceVerified ? `Переносимость позволяет до ${r1(capGkg)} г/кг (${capGday} г/сут), но ` : 'Переносимость выше не подтверждена. '}Сверх ${r1(benefitCapGkg)} г/кг прирост в среднем не ускоряется: держите объём, если он нужен по другим причинам.`,
+      );
     }
   } else if (increaseRecommended) {
-    recs.push(`Потенциал прибавки: +${headroom} г/сут до ${r1(benefitCapGkg)} г/кг (${benefitCapGday} г/сут). Шаг — 5–15 г/сут за 10–14 дней.`);
+    recs.push(
+      `Потенциал прибавки: +${headroom} г/сут до ${r1(benefitCapGkg)} г/кг (${benefitCapGday} г/сут). Шаг — 5–15 г/сут за 10–14 дней.`,
+    );
   } else if (hardStop) {
-    recs.push(`Наращивание белка не рекомендуется: сначала врач/нефролог. Потолок для расчёта — ${r1(capGkg)} г/кг (${capGday} г/сут).`);
+    recs.push(
+      `Наращивание белка не рекомендуется: сначала врач/нефролог. Потолок для расчёта — ${r1(capGkg)} г/кг (${capGday} г/сут).`,
+    );
   }
   if (increasePaused && pauseReason) recs.push(`Пауза на прибавку: ${pauseReason}`);
-  recs.push(`Вода: цель ~${waterTargetMl} мл/сут (35 мл/кг и не меньше объёма для выведения осмолей${input.knownCkd ? '; при ХБП ограничено 2.5 л' : ''}). ${waterActualMl != null ? `Сейчас ${waterActualMl} мл${waterDeficitMl ? `, не хватает ~${waterDeficitMl} мл` : ''}.` : 'Введите фактическое потребление воды для точной оценки.'}`);
-  recs.push(`Белок дробить: ~${r0(proteinG / Math.max(1, input.mealsPerDay ?? 4))} г/приём, ориентир 0.4 г/кг (${r1(0.4 * weight)} г), верхний предел 0.55 г/кг (${r1(0.55 * weight)} г).`);
+  recs.push(
+    `Вода: цель ~${waterTargetMl} мл/сут (35 мл/кг и не меньше объёма для выведения осмолей${input.knownCkd ? '; при ХБП ограничено 2.5 л' : ''}). ${waterActualMl != null ? `Сейчас ${waterActualMl} мл${waterDeficitMl ? `, не хватает ~${waterDeficitMl} мл` : ''}.` : 'Введите фактическое потребление воды для точной оценки.'}`,
+  );
+  recs.push(
+    `Белок дробить: ~${r0(proteinG / Math.max(1, input.mealsPerDay ?? 4))} г/приём, ориентир 0.4 г/кг (${r1(0.4 * weight)} г), верхний предел 0.55 г/кг (${r1(0.55 * weight)} г).`,
+  );
   if (
     (albuminuriaCategory !== 'A1' && albuminuriaCategory !== 'unknown') ||
     (proteinuriaScore ?? 0) >= 1 ||
     (egfr != null && egfr < 60)
   ) {
-    recs.push('Ограничьте соль до <2 г натрия/сут; НПВС (ибупрофен, напроксен) — избегать. При стойкой протеинурии обсудите нефропротекцию с врачом.');
+    recs.push(
+      'Ограничьте соль до <2 г натрия/сут; НПВС (ибупрофен, напроксен) — избегать. При стойкой протеинурии обсудите нефропротекцию с врачом.',
+    );
   }
   recs.push(`Пересдать ${ruDate(retest.date)} (${retest.title.toLowerCase()}): ${retest.items.join(', ')}.`);
   if (input.aasUse) {
     recs.push('На ААС: цистатин C вместо оценки только по креатинину; АД, гематокрит и липиды — раз в 3–6 месяцев.');
   }
   if (leanMassKg != null) {
-    recs.push(`Белок на тощую массу: ${r1(proteinG / leanMassKg)} г/кг LBM (ориентир 2.0–2.8 г/кг LBM для силовых, но потолок по почкам выше приоритета).`);
+    recs.push(
+      `Белок на тощую массу: ${r1(proteinG / leanMassKg)} г/кг LBM (ориентир 2.0–2.8 г/кг LBM для силовых, но потолок по почкам выше приоритета).`,
+    );
   }
 
   // ── What-if ──────────────────────────────────────────────────────────────
@@ -1562,7 +1915,7 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
       withinCap: gkg <= capGkg + 0.001 && !hardStop,
       withinBenefit: gkg <= benefitCapGkg + 0.001,
       withinTolerance: gkg <= capGkg + 0.001 && !hardStop,
-      extraWaterMl: r0((inc * 5.8 / 600) * 1000),
+      extraWaterMl: r0(((inc * 5.8) / 600) * 1000),
     };
   }
 
@@ -1570,28 +1923,79 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
   const maxPerMealProteinG = r1(0.55 * weight);
   const recommendedMeals = clamp(r0(proteinG / Math.max(1, 0.4 * weight)), 3, 6);
   const proteinGPerKgLbm = leanMassKg != null && leanMassKg > 0 ? r1(proteinG / leanMassKg) : undefined;
-  const benefitCapLbmGPerKg = leanMassKg != null && leanMassKg > 0 ? r1((benefitCapGkg * weight) / leanMassKg) : undefined;
+  const benefitCapLbmGPerKg =
+    leanMassKg != null && leanMassKg > 0 ? r1((benefitCapGkg * weight) / leanMassKg) : undefined;
   const toleranceCapLbmGPerKg = leanMassKg != null && leanMassKg > 0 ? r1((capGkg * weight) / leanMassKg) : undefined;
-  const benefitBasis = `${BENEFIT_BASIS[input.training]}${benefitInfo.basis ? ` ${benefitInfo.basis}` : ''}${input.aasUse
-    ? ' На ААС отдельных RCT по белку нет: ориентир пользы тот же, а переносимость считается по тощей массе.'
-    : ''}`;
+  const benefitBasis = `${BENEFIT_BASIS[input.training]}${benefitInfo.basis ? ` ${benefitInfo.basis}` : ''}${
+    input.aasUse
+      ? ' На ААС отдельных RCT по белку нет: ориентир пользы тот же, а переносимость считается по тощей массе.'
+      : ''
+  }`;
 
   const evidence: PkEvidence[] = [
-    { id: 'kdigo-2024', text: 'KDIGO 2024: при G3–G5 белок 0.8 г/кг/сут; избегать >1.3 г/кг при риске прогрессии.', grade: 'A' },
+    {
+      id: 'kdigo-2024',
+      text: 'KDIGO 2024: при G3–G5 белок 0.8 г/кг/сут; избегать >1.3 г/кг при риске прогрессии.',
+      grade: 'A',
+    },
     { id: 'ckd-epi', text: 'CKD-EPI 2021 (race-free) — расчёт СКФ по креатинину, возрасту и полу.', grade: 'A' },
-    { id: 'ckd-epi-cys', text: 'CKD-EPI 2021 по цистатину C и креатинин–цистатин C: точнее при нестандартной мышечной массе (ААС, креатин, ампутации).', grade: 'A' },
-    { id: 'issn', text: 'ISSN/Helms: силовой тренинг 1.6–2.2 г/кг/сут; 0.4 г/кг за приём для максимальной стимуляции синтеза белка.', grade: 'A' },
-    { id: 'helms-cut', text: 'Helms 2014: в дефиците калорий для сохранения тощей массы 2.3–3.1 г/кг LBM; в наборе ориентир ниже. Это про состав тела, а не про «чем больше, тем лучше».', grade: 'B' },
-    { id: 'antonio-2016', text: 'Antonio et al. 2016 (J Nutr Metab): 2.5–3.3 г/кг белка год у тренированных мужчин — без изменений функции почек. Это про переносимость, не про пользу: выше ~2.2 г/кг прирост мышц не ускоряется.', grade: 'B' },
-    { id: 'morton-2018', text: 'Morton et al. 2018 (Br J Sports Med), мета-анализ 49 RCT: плато дозы белка для гипертрофии ~1.6 г/кг/сут, верхняя граница 95% CI ~2.2 г/кг. Отсюда «потолок пользы», а не из запрета.', grade: 'A' },
-    { id: 'aas', text: 'Отдельных RCT «доза белка у людей на ААС» нет. ААС увеличивают тощую массу и задержку азота, поэтому переносимость считаем по LBM, а СКФ по креатинину подтверждаем цистатином C.', grade: 'E' },
-    { id: 'utilization', text: 'Мочевина и BUN/креатинин отражают выведение азотистой нагрузки, а не долю белка, ушедшую в мышцы. Норма при высоком белке = нагрузка переносится; рост мочевины = избыток окисляется.', grade: 'B' },
+    {
+      id: 'ckd-epi-cys',
+      text: 'CKD-EPI 2021 по цистатину C и креатинин–цистатин C: точнее при нестандартной мышечной массе (ААС, креатин, ампутации).',
+      grade: 'A',
+    },
+    {
+      id: 'issn',
+      text: 'ISSN/Helms: силовой тренинг 1.6–2.2 г/кг/сут; 0.4 г/кг за приём для максимальной стимуляции синтеза белка.',
+      grade: 'A',
+    },
+    {
+      id: 'helms-cut',
+      text: 'Helms 2014: в дефиците калорий для сохранения тощей массы 2.3–3.1 г/кг LBM; в наборе ориентир ниже. Это про состав тела, а не про «чем больше, тем лучше».',
+      grade: 'B',
+    },
+    {
+      id: 'antonio-2016',
+      text: 'Antonio et al. 2016 (J Nutr Metab): 2.5–3.3 г/кг белка год у тренированных мужчин — без изменений функции почек. Это про переносимость, не про пользу: выше ~2.2 г/кг прирост мышц не ускоряется.',
+      grade: 'B',
+    },
+    {
+      id: 'morton-2018',
+      text: 'Morton et al. 2018 (Br J Sports Med), мета-анализ 49 RCT: плато дозы белка для гипертрофии ~1.6 г/кг/сут, верхняя граница 95% CI ~2.2 г/кг. Отсюда «потолок пользы», а не из запрета.',
+      grade: 'A',
+    },
+    {
+      id: 'aas',
+      text: 'Отдельных RCT «доза белка у людей на ААС» нет. ААС увеличивают тощую массу и задержку азота, поэтому переносимость считаем по LBM, а СКФ по креатинину подтверждаем цистатином C.',
+      grade: 'E',
+    },
+    {
+      id: 'utilization',
+      text: 'Мочевина и BUN/креатинин отражают выведение азотистой нагрузки, а не долю белка, ушедшую в мышцы. Норма при высоком белке = нагрузка переносится; рост мочевины = избыток окисляется.',
+      grade: 'B',
+    },
     { id: 'uacr', text: 'KDIGO: альбуминурия A1 <3, A2 3–30, A3 >30 мг/ммоль (30/300 мг/г).', grade: 'A' },
     { id: 'rsl', text: 'Осмолярная нагрузка взрослых: ~5.8 мОсм на 1 г белка + Na + K + Cl (мЭкв).', grade: 'B' },
-    { id: 'sg-osm', text: 'Оценка осмолярности мочи по SG: (SG−1)×40 000 — приближение, ломается при глюкозе/протеинурии.', grade: 'C' },
-    { id: 'bun-cr', text: 'BUN/креатинин 10–20 — ориентир, а не диагноз: высокий белок и дегидратация дают тот же сдвиг.', grade: 'B' },
-    { id: 'pediatric', text: 'CKD-EPI 2021 валидирована у взрослых; до 18 лет применяются детские уравнения и нормы, поэтому расширение потолка у подростков заблокировано.', grade: 'A' },
-    { id: 'extreme-5', text: '3.2–5 г/кг — верхняя граница калькулятора, а не доказанная норма: прямых данных о безопасности 4–5 г/кг у людей нет. Такие режимы допустимы только под наблюдением врача и с частым контролем функции почек.', grade: 'E' },
+    {
+      id: 'sg-osm',
+      text: 'Оценка осмолярности мочи по SG: (SG−1)×40 000 — приближение, ломается при глюкозе/протеинурии.',
+      grade: 'C',
+    },
+    {
+      id: 'bun-cr',
+      text: 'BUN/креатинин 10–20 — ориентир, а не диагноз: высокий белок и дегидратация дают тот же сдвиг.',
+      grade: 'B',
+    },
+    {
+      id: 'pediatric',
+      text: 'CKD-EPI 2021 валидирована у взрослых; до 18 лет применяются детские уравнения и нормы, поэтому расширение потолка у подростков заблокировано.',
+      grade: 'A',
+    },
+    {
+      id: 'extreme-5',
+      text: '3.2–5 г/кг — верхняя граница калькулятора, а не доказанная норма: прямых данных о безопасности 4–5 г/кг у людей нет. Такие режимы допустимы только под наблюдением врача и с частым контролем функции почек.',
+      grade: 'E',
+    },
   ];
 
   return {
@@ -1666,7 +2070,8 @@ export function calcProteinKidney(input: ProteinKidneyInput): ProteinKidneyResul
     planned,
 
     evidence,
-    disclaimer: 'Инструмент для самонаблюдения и планирования, не диагноз. При СКФ <60, стойкой протеинурии, гематурии, мочевине >12 или любых симптомах — врач/нефролог. Не отменяйте назначения самостоятельно.',
+    disclaimer:
+      'Инструмент для самонаблюдения и планирования, не диагноз. При СКФ <60, стойкой протеинурии, гематурии, мочевине >12 или любых симптомах — врач/нефролог. Не отменяйте назначения самостоятельно.',
   };
 }
 
@@ -1694,7 +2099,11 @@ export interface ProteinKidneySnapshot {
 export const PROTEIN_KIDNEY_HISTORY_KEY = 'he_protein_kidney_history_v1';
 export const PROTEIN_KIDNEY_INPUT_KEY = 'he_protein_kidney_input_v1';
 
-export function toSnapshot(input: ProteinKidneyInput, result: ProteinKidneyResult, date = localIsoDate()): ProteinKidneySnapshot {
+export function toSnapshot(
+  input: ProteinKidneyInput,
+  result: ProteinKidneyResult,
+  date = localIsoDate(),
+): ProteinKidneySnapshot {
   return {
     date,
     proteinGPerKg: result.proteinGPerKg,
@@ -1722,12 +2131,16 @@ export function loadProteinKidneyHistory(): ProteinKidneySnapshot[] {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
     // Битые записи не должны ломать график (NaN в SVG).
-    return arr.filter((x): x is ProteinKidneySnapshot =>
-      !!x && typeof x === 'object' &&
-      typeof x.date === 'string' &&
-      Number.isFinite(x.score) &&
-      Number.isFinite(x.proteinGPerKg),
-    ).slice(-30);
+    return arr
+      .filter(
+        (x): x is ProteinKidneySnapshot =>
+          !!x &&
+          typeof x === 'object' &&
+          typeof x.date === 'string' &&
+          Number.isFinite(x.score) &&
+          Number.isFinite(x.proteinGPerKg),
+      )
+      .slice(-30);
   } catch {
     return [];
   }
@@ -1747,11 +2160,7 @@ export function saveProteinKidneySnapshot(s: ProteinKidneySnapshot): ProteinKidn
 }
 
 /** Текстовая сводка для врача/чата — без localStorage, чтобы её можно было тестировать. */
-export function buildDoctorSummary(
-  input: ProteinKidneyInput,
-  r: ProteinKidneyResult,
-  today = localIsoDate(),
-): string {
+export function buildDoctorSummary(input: ProteinKidneyInput, r: ProteinKidneyResult, today = localIsoDate()): string {
   const tol = r.toleranceAssessed
     ? `${r.capGPerKg} г/кг (${r.capGPerDay} г/сут)${r.toleranceVerified ? '' : ' — расширение не подтверждено чистыми анализами'}${r.extreme ? ' — верхняя граница калькулятора, не доказанная норма' : ''}`
     : 'не оценена (нужны мочевина + СКФ)';
@@ -1759,7 +2168,11 @@ export function buildDoctorSummary(
     `Белок и почки — сводка от ${ruDate(today)}`,
     `Вес ${r.weightKg} кг, рост ${input.heightCm ?? '—'}, возраст ${input.age}, пол ${input.sex === 'female' ? 'женский' : 'мужской'}, тренировки: ${input.training}, цель: ${input.goal}`,
     `Белок: ${r.proteinGPerDay} г/сут (${r.proteinGPerKg} г/кг)`,
-    ...(r.extreme ? ['Экстремальный белок >3.2 г/кг: доказанной переносимости нет; только под наблюдением врача и с контролем анализов каждые 7–14 дней.'] : []),
+    ...(r.extreme
+      ? [
+          'Экстремальный белок >3.2 г/кг: доказанной переносимости нет; только под наблюдением врача и с контролем анализов каждые 7–14 дней.',
+        ]
+      : []),
     `Потолок пользы: ${r.benefitCapGPerKg} г/кг (${r.benefitCapGPerDay} г/сут)`,
     `Потолок переносимости: ${tol}`,
     `СКФ: ${r.egfr ?? '—'} (${r.egfrSource}), категория ${r.gfrCategory}; мочевина ${input.ureaMmolL ?? '—'} ммоль/л; креатинин ${input.creatinineUmolL ?? '—'} мкмоль/л; цистатин C ${input.cystatinCMgL ?? '—'} мг/л`,

@@ -18,6 +18,7 @@ import {
   COMPUTED_CODES,
   type VerifMarker,
 } from '../risk-verification.engine';
+import { MG_DEFICIT_STEPS } from '../risk-engine-tz-spec';
 
 describe('каталог верификации', () => {
   it('6 систем с именами/иконками/цветами', () => {
@@ -69,7 +70,7 @@ describe('каталог верификации', () => {
     for (const s of VERIFICATION_SYSTEMS) {
       for (const f of s.floors) {
         expect(allCodes.has(f.code)).toBe(true);
-        expect(f.op === '>=' || f.op === '<=').toBe(true);
+        expect(f.op === '>=' || f.op === '<=' || f.op === '>').toBe(true);
         expect(f.label.length).toBeGreaterThan(0);
         expect(f.risk).toBeGreaterThan(0);
       }
@@ -196,6 +197,30 @@ describe('buildVerificationReport', () => {
     expect(ren.floorHits.map(f => f.code)).toEqual(['EGFR', 'EGFR']);
     // HCT 55 ≥ 54 (risk 50) и ≥ 51 (risk 25) — два якоря, HCT-якорь расширен женским порогом 48/52
     expect(rep.floorsCount).toBe(4);
+  });
+
+  it('UACR: A2 с 30 включительно, A3 — строго выше 300 мг/г', () => {
+    // Проход 207: категория A3 у KDIGO строгая сверху, поэтому в каталоге
+    // стоит `>`. Проверка ловит и обратный дефект: при неизвестном операторе
+    // движок уходил в ветку `<=` и срабатывал на 300 наоборот. Якорь A2
+    // заведён, чтобы вкладка «Анализы» не показывала «0 якорей» на 100 мг/г.
+    const hits = (v: number) => buildVerificationReport({ UACR: v }).systems.find(s => s.id === 'renal')!.floorHits;
+    expect(hits(29)).toEqual([]);
+    expect(hits(100).map(f => f.label)).toEqual(['Альбуминурия ≥ 30 мг/г — порог A2']);
+    expect(hits(300).map(f => f.label)).toEqual(['Альбуминурия ≥ 30 мг/г — порог A2']);
+    // Якоря — пересечённые пороги (как HCT 51 и 54), поэтому на 301 видно оба:
+    // «перешли A3» и «перешли A2». Категорию называет карточка риска, а не список.
+    expect(hits(301).map(f => f.label)).toEqual(['Альбуминурия > 300 мг/г', 'Альбуминурия ≥ 30 мг/г — порог A2']);
+  });
+
+  it('ступени магния в каталоге — константа риск-модели', () => {
+    // Вторая копия чисел разъезжалась бы молча: правка `MG_DEFICIT_STEPS`
+    // оставляла бы вкладку «Анализы» на старых порогах (проход 207, ревью).
+    const mg = VERIFICATION_SYSTEMS.flatMap((s) => s.mechanisms)
+      .flatMap((m) => m.markers)
+      .filter((m) => m.code === 'MG');
+    expect(mg.length).toBeGreaterThan(1);
+    for (const m of mg) expect([...m.thresholds]).toEqual([...MG_DEFICIT_STEPS]);
   });
 
   it('флоры не срабатывают без значения', () => {

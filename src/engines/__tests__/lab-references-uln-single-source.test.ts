@@ -54,23 +54,31 @@ const DERIVED: Record<string, [code: string, scale?: number]> = {
  * Пары, где модель и каталог намеренно расходятся. Число слева — модельный
  * порог (z-терм/порог модели), справа — норма лаборатории. Выравнивание —
  * отдельное клиническое решение с обновлением §4, а не правка ради единообразия.
+ *
+ * Проход 207: у каждой пары теперь записан смысл расхождения. До этого список
+ * был просто «здесь не сводим», и по нему нельзя было понять, что именно
+ * осталось за моделью — приходилось читать §4 документа. Смысл у всех 15
+ * записей — выбор шкалы (порог действия/риска против лабораторного верха), а не
+ * опечатка; числа в тексте обязаны совпадать с обеими строками, иначе гард падает
+ * на проверке «повод не спрятался в комментарий».
  */
-const DIVERGENT: Array<[marker: string, code: string]> = [
-  ['WBC', 'WBC'],
-  ['LDL', 'LDL'],
-  ['HDL', 'HDL'],
-  ['Glucose', 'GLU'],
-  ['K', 'K'],
-  ['Mg', 'MG'],
-  ['Prolactin', 'PRL'],
-  ['SBP', 'BP_SYSTOLIC'],
-  ['DBP', 'BP_DIASTOLIC'],
-  ['Insulin', 'INS'],
-  ['HOMA_IR', 'HOMA'],
-  ['Cortisol', 'CORTISOL'],
-  ['IGF1', 'IGF1'],
-  ['Transferrin', 'TRANSFERRIN'],
-  ['Haptoglobin', 'HAPTOGLOBIN'],
+const DIVERGENT: Array<[marker: string, code: string, reason: string]> = [
+  // Модель держит пороги действия/риска, каталог — лабораторный верх.
+  ['WBC', 'WBC', 'модель: лейкоцитоз от 11.0 (порог воспаления); каталог: лабораторный верх 9.0'],
+  ['LDL', 'LDL', 'модель: порог риска 3.4; каталог: лабораторный верх 3.0'],
+  ['HDL', 'HDL', 'модель: верх шкалы 2.0; каталог: лабораторный верх 1.5 (низ у обоих 1.0)'],
+  ['Glucose', 'GLU', 'модель: порог 5.8; каталог: верх 5.6 (тиры: грань 5.6–6.1)'],
+  ['K', 'K', 'модель: верх 5.0; каталог: верх 5.1'],
+  ['Mg', 'MG', 'модель: верх 1.0; каталог: верх 1.07 (ИНВИТРО/Helix 0.66–1.07)'],
+  ['Prolactin', 'PRL', 'модель: верх 20; каталог: верх 15'],
+  ['SBP', 'BP_SYSTOLIC', 'модель: порог гипертонии 140; каталог: верх 130'],
+  ['DBP', 'BP_DIASTOLIC', 'модель: порог гипертонии 90; каталог: верх 85'],
+  ['Insulin', 'INS', 'модель: верх 25; каталог: верх 17'],
+  ['HOMA_IR', 'HOMA', 'модель: верх 2.5 (порог инсулинорезистентности); каталог: верх 2.7'],
+  ['Cortisol', 'CORTISOL', 'модель: верх 600; каталог: верх 550'],
+  ['IGF1', 'IGF1', 'модель: верх 350; каталог: верх 250'],
+  ['Transferrin', 'TRANSFERRIN', 'модель: верх 3.5; каталог: верх 3.8'],
+  ['Haptoglobin', 'HAPTOGLOBIN', 'модель: верх 2.0; каталог: верх 3.0'],
 ];
 
 describe('проход 176: верх V7-референса — из каталога', () => {
@@ -80,7 +88,7 @@ describe('проход 176: верх V7-референса — из катало
       const info = ucumInfo(code);
       expect(row, `нет строки ${marker}`).toBeTruthy();
       expect(info, `нет записи каталога ${code}`).toBeTruthy();
-      expect(row.uln, `${marker} ≠ UCUM_MAP.${code}.uln`).toBeCloseTo((info!.uln) * (scale ?? 1), 10);
+      expect(row.uln, `${marker} ≠ UCUM_MAP.${code}.uln`).toBeCloseTo(info!.uln * (scale ?? 1), 10);
     }
   });
 
@@ -99,8 +107,28 @@ describe('проход 176: верх V7-референса — из катало
       const info = ucumInfo(code);
       expect(row, `нет строки ${marker}`).toBeTruthy();
       if (!info) continue; // пары без каталожной записи — только документация
-      expect(row.uln, `${marker}: пара сходится — обнови §4 и этот список осознанно`)
-        .not.toBe(info.uln);
+      expect(row.uln, `${marker}: пара сходится — обнови §4 и этот список осознанно`).not.toBe(info.uln);
+    }
+  });
+
+  it('у каждой расходящейся пары записан смысл, и числа в нём — те же', () => {
+    // Без текста список — просто «здесь не сводим»: следующий агент не может
+    // отличить клиническое решение от забытой опечатки. Текст обязан называть
+    // оба числа: если кто-то двинет порог модели или каталог, причина станет
+    // врать — и гард это покажет.
+    // Ревью P3: сравнение по подстроке проходило на чужом числе — «1.0» лежит
+    // внутри «1.07» (магний), «3» — внутри «3.5». Сравниваем ЧИСЛА из текста.
+    expect(DIVERGENT).toHaveLength(15);
+    const numbersIn = (text: string): number[] => (text.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+    for (const [marker, code, reason] of DIVERGENT) {
+      const row = LAB_REFERENCES[marker];
+      const info = ucumInfo(code);
+      expect(reason.length, `${marker}: повод не записан`).toBeGreaterThan(30);
+      const numbers = numbersIn(reason);
+      expect(numbers, `${marker}: повод не называет модельное число ${row.uln}`).toContain(row.uln);
+      if (info) {
+        expect(numbers, `${marker}: повод не называет каталожное число ${info.uln}`).toContain(info.uln);
+      }
     }
   });
 
@@ -124,10 +152,10 @@ describe('проход 176: верх V7-референса — из катало
 const RANGE_DERIVED: Record<string, { code: string; lowFromUcum?: boolean }> = {
   ESTRADIOL: { code: 'E2', lowFromUcum: true },
   TSH: { code: 'TSH', lowFromUcum: true },
-  LDL: { code: 'LDL' },                    // низ 1.5 — цель, не лабораторный низ
-  TRIGLYCERIDES: { code: 'TG' },           // низ 0.5 — свой
-  FERRITIN: { code: 'FERRITIN' },          // низ 20 — свой (WHO/дефицит)
-  ERYTHROCYTES: { code: 'RBC' },           // низ 4.2 — свой
+  LDL: { code: 'LDL' }, // низ 1.5 — цель, не лабораторный низ
+  TRIGLYCERIDES: { code: 'TG' }, // низ 0.5 — свой
+  FERRITIN: { code: 'FERRITIN' }, // низ 20 — свой (WHO/дефицит)
+  ERYTHROCYTES: { code: 'RBC' }, // низ 4.2 — свой
   THROMBOCYTES: { code: 'PLT', lowFromUcum: true },
   POTASSIUM: { code: 'POTASSIUM', lowFromUcum: true },
   SODIUM: { code: 'SODIUM', lowFromUcum: true },
@@ -177,8 +205,7 @@ describe('проход 176: границы разбора — из катало�
       const info = ucumInfo(code);
       expect(row, `нет строки ${marker}`).toBeTruthy();
       if (!info) continue;
-      expect(row.high, `${marker}: пара сходится — обнови §4 и этот список осознанно`)
-        .not.toBe(info.uln);
+      expect(row.high, `${marker}: пара сходится — обнови §4 и этот список осознанно`).not.toBe(info.uln);
     }
   });
 });

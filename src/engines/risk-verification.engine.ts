@@ -7,6 +7,8 @@ import { canonicalLabValues } from './lab-code-bridge';
 import {
   LFT_ULN, LFT_STAGE_ULN, GGT_ULN, GGT_STAGE_ULN,
   HCT_STEPS, HGB_STEPS, RBC_STEPS, UA_STAGE_ULN,
+  // Проход 207: ступени магния — константа резолвера норм, а не вторая копия чисел.
+  MG_DEFICIT_STEPS,
   BILIRUBIN_FLAG_STEPS, CREATININE_STEPS, FERRITIN_STEPS, FT_STEPS, PRL_STEPS, PROTEINURIA_STEPS,
   NT_PROBNP_STEPS, E2_MALE_BAND,
 } from './lab-norms.engine';
@@ -27,7 +29,8 @@ export interface VerifMarker {
 
 export interface VerifFloor {
   code: string;
-  op: '>=' | '<=';
+  /** `>` нужен там, где категория гайдлайна строгая (UACR A3 — выше 300 мг/г, проход 207). */
+  op: '>=' | '>' | '<=';
   value: number;
   label: string;
   risk: number;
@@ -182,14 +185,22 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       { id: 'ren4', weight: 0.7, markers: [
         M('K', 'Калий', 'ммоль/л', 'low', [3.5, 3.0, 2.5]),
         M('NA', 'Натрий', 'ммоль/л', 'low', [135, 130, 125]),
-        M('MG', 'Магний', 'ммоль/л', 'low', [0.75, 0.65, 0.5]),
+        M('MG', 'Магний', 'ммоль/л', 'low', MG_DEFICIT_STEPS),
         M('CA', 'Кальций', 'ммоль/л', 'low', [2.2, 2.0, 1.75]),
       ] },
     ],
     floors: [
       { code: 'EGFR', op: '<=', value: 60, label: 'СКФ < 60 мл/мин — ХБП', risk: 50 },
       { code: 'EGFR', op: '<=', value: 30, label: 'СКФ < 30 мл/мин — тяжёлая ХБП', risk: 75 },
-      { code: 'UACR', op: '>=', value: 300, label: 'Альбуминурия > 300 мг/г', risk: 50 },
+      // Проход 207 (ревью P3-7): категория A3 у KDIGO — строго выше 300 мг/г
+      // (PMID 38490803), поэтому оператор совпадает с подписью («> 300»), как и у
+      // якорей риск-модели (`clinicalFloorsForLabs`).
+      { code: 'UACR', op: '>', value: 300, label: 'Альбуминурия > 300 мг/г', risk: 50 },
+      // A2 начинается с 30 включительно — тот же порог, что у риск-модели; без
+      // него вкладка «Анализы» на 100 мг/г показывала «якорей: 0». Подпись
+      // называет ПОРОГ, а не категорию: якоря — пересечённые пороги (как HCT 51
+      // и 54), поэтому на 1000 мг/г видны оба, а категорию печатает карточка.
+      { code: 'UACR', op: '>=', value: 30, label: 'Альбуминурия ≥ 30 мг/г — порог A2', risk: 25 },
     ],
   },
   {
@@ -290,7 +301,7 @@ export const VERIFICATION_SYSTEMS: VerifSystem[] = [
       { id: 'hem5', weight: 0.4, markers: [
         M('K', 'Калий', 'ммоль/л', 'low', [3.5, 3.0, 2.5]),
         M('NA', 'Натрий', 'ммоль/л', 'low', [135, 130, 125]),
-        M('MG', 'Магний', 'ммоль/л', 'low', [0.75, 0.65, 0.5]),
+        M('MG', 'Магний', 'ммоль/л', 'low', MG_DEFICIT_STEPS),
         M('CA', 'Кальций', 'ммоль/л', 'low', [2.2, 2.0, 1.75]),
       ] },
     ],
@@ -423,7 +434,9 @@ export function buildVerificationReport(rawLabMap: Record<string, number>, sex?:
       const v = labMap[f.code];
       if (v === undefined) return false;
       const thr = female && f.femaleValue !== undefined ? f.femaleValue : f.value;
-      return f.op === '>=' ? v >= thr : v <= thr;
+      if (f.op === '>=') return v >= thr;
+      if (f.op === '>') return v > thr;
+      return v <= thr;
     });
     return { ...sys, mechanisms, presentCount, total: mechanisms.length, verification, floorHits };
   });

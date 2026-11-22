@@ -70,6 +70,20 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   URIC_ACID:        { marker:'URIC_ACID', normal:[UA_LLN.male, UA_STAGE_ULN.male[0]], borderline:[UA_STAGE_ULN.male[0], UA_STAGE_ULN.male[1]], treatment:[UA_STAGE_ULN.male[1], 600], emergencyHigh:600, direction:'high', unit:'mcmol/L', label:'Мочевая кислота' },
   PROTEIN_URINE:    { marker:'PROTEIN_URINE', normal:[0,0.15], borderline:[0.15,0.5], treatment:[0.5,1.0], emergencyHigh:1.0, direction:'high', unit:'g/L', label:'Протеинурия' },
   MICROALB:         { marker:'MICROALB', normal:[0,20], borderline:[20,30], treatment:[30,300], emergencyHigh:300, direction:'high', unit:'mg/L', label:'Микроальбумин' },
+  // Проход 207: UACR — альбумин/креатинин мочи в мг/г. Ступени — категории
+  // альбуминурии KDIGO 2024 (таблицы CGA, S126–S127; Kidney Int 2024;
+  // 105(4S):S117–S314, PMID 38490803): A1 <30 мг/г (<3 мг/ммоль), A2 30–300 мг/г
+  // (3–30 мг/ммоль), A3 >300 мг/г (>30 мг/ммоль). Пересчёт мг/г ↔ мг/ммоль —
+  // официальный фактор KDIGO: мг/г × 0.113 = мг/ммоль (S127). Та же шкала стоит
+  // в риск-модели (`labMi(uacr,[30,300,1000])`); 1000 — уже существующая третья
+  // ступень модели, не новая цифра. KDIGO требует подтверждать A2+ повторным
+  // анализом утренней мочи (2 из 3 проб за 3–6 мес) — это и говорит совет tier1.
+  // Проход 207 (ревью P2): границы — полуинтервалы `[lo, hi)` (правило 39): 30 мг/г
+  // уже A2, 300 — уже ступень `treatment` (`deriveTier` = 2), а не A2. Категория
+  // гайдлайна A3 по KDIGO начинается строго выше 300, поэтому ярлык якоря A3 —
+  // `> 300`, а домен «Протеинурия» сравнивает `>=` с верхом нормы (30): на ровно
+  // 30 срабатывает A2, как в `labMi`.
+  UACR:             { marker:'UACR', normal:[0,30], borderline:[30,300], treatment:[300,1000], emergencyHigh:1000, direction:'high', unit:'mg/g', label:'Альбумин/креатинин мочи' },
   NGAL:             { marker:'NGAL', normal:[0,100], borderline:[100,200], treatment:[200,500], emergencyHigh:500, direction:'high', unit:'ng/mL', label:'NGAL' },
   KIM1:             { marker:'KIM1', normal:[0,1.5], borderline:[1.5,3], treatment:[3,6], emergencyHigh:6, direction:'high', unit:'ng/mL', label:'KIM-1' },
 

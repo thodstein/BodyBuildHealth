@@ -133,6 +133,16 @@ describe('проход 112: единица импорта приводится �
     expect(p.units!.panelSex.Prolactin).toBe('мМЕ/л');
   });
 
+  it('альбуминурия: мг/ммоль едут единицей бланка, пересчёт — на чтении', () => {
+    // проход 207: у UACR появился выбор единицы, поэтому импорт больше не
+    // приводит число к мг/г сам (в мосте UCUM его нет): 5.65 мг/ммоль
+    // прочитается как 50 мг/г — A2, а не «норма» 5.65 мг/г.
+    const u = point('UACR', 5.65, 'mg/mmol')!;
+    expect(u.panelUrinalysis!.UACR).toBe('5.65');
+    expect(u.units!.panelUrinalysis.UACR).toBe('мг/ммоль');
+    expect(readLabValue('UACR', 5.65, 'мг/ммоль').value).toBeCloseTo(50, 6);
+  });
+
   it('в таблице пересчёта только настоящие маркеры бланка', () => {
     const markers = new Set(FULL_PANELS.flatMap(p => p.markers));
     for (const marker of Object.keys(MARKER_TO_UCUM)) {

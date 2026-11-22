@@ -1,5 +1,5 @@
 import synonyms from '../data/labs-synonyms.json';
-import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL, DHT_NMOL_TO_PG, ucumInfo, ucumKey } from './constants';
+import { UCUM_MAP, DYNAMIC_REFS, TT_NMOL_TO_NG_DL, DHT_NMOL_TO_PG, UACR_MG_MMOL_TO_MG_G, ucumInfo, ucumKey } from './constants';
 import { getLabNorm, E2_PG_TO_PMOL, PRL_NG_TO_MIU, PROG_NG_TO_NMOL } from '../engines/lab-norms.engine';
 
 const SYNONYM_MAP = synonyms as Record<string, string>;
@@ -503,6 +503,11 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     case 'PROG': if (from.includes('nmol')) { factor = 1 / PROG_NG_TO_NMOL; converted = true; } break;
     case 'DHEA_S': if (from.includes('umol')) { factor = 36.84; converted = true; } break;
     case 'IRON': if (from.includes('ug/dl')) { factor = 0.1791; converted = true; } break;
+    // Проход 207: альбуминурия печатается и в мг/ммоль (KDIGO 2024, S127:
+    // мг/г × 0.113 = мг/ммоль). 5.65 мг/ммоль — это 50 мг/г (A2), а не норма;
+    // фактор — та же константа, что у выбора единицы в бланке (`LAB_UNIT_READ`),
+    // иначе один анализ получил бы два разных пересчёта.
+    case 'UACR': if (from.includes('mmol')) { factor = UACR_MG_MMOL_TO_MG_G; converted = true; } break;
     default: break;
   }
 

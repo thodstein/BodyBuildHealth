@@ -10,7 +10,7 @@
  * Если подпись не совпадает с текущим курсом, снапшот игнорируется.
  * Снапшоты без `sig` (старый формат) принимаются — обратная совместимость.
  */
-import type { TzSpecInput } from './risk-engine-tz-spec';
+import { riskLabCoverage, type TzSpecInput } from './risk-engine-tz-spec';
 import { resolvePedAlias } from '../data/ped-alias-map';
 
 export const TZ_INPUT_KEY = 'he_calc_tz_input';
@@ -64,7 +64,15 @@ export function readCalcSnapshot(expectedSig?: string): TzSpecInput | null {
     if (Date.now() - (d.ts || 0) > SNAPSHOT_TTL_MS) return null;
     // Старый формат (без sig) — принимаем; новый — только при совпадении курса.
     if (d.sig && expectedSig && d.sig !== expectedSig) return null;
-    return d.input as TzSpecInput;
+    const input = { ...(d.input as TzSpecInput) };
+    // Проход 207: покрытие — производная от `labValues`, а не хранимое поле.
+    // Снапшот, записанный до смены формулы, отдавал своё `labCoverage`, и карточка
+    // печатала «5 из 46 · ×1.05» рядом с «×1.15» из модели. Пересчёт на чтении
+    // оставляет один источник чисел и не зависит от возраста снапшота.
+    // `labValues` может отсутствовать (снапшот старого формата или ручная правка
+    // localStorage): без карты покрытие — база, а не исключение внутри try/catch.
+    input.labCoverage = riskLabCoverage(input.labValues ?? {});
+    return input;
   } catch {
     return null;
   }
