@@ -2563,6 +2563,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               </div>
             );
           })()}
+          {/* Заминка необязательна: раньше кнопка «Завершить и выйти» была
+              в самом низу списка блоков — до неё надо было прокрутить всю заминку. */}
+          <button type="button" data-act="cooldown-to-done" onClick={exitSession}
+            style={{ ...BTN_GHOST, width: '100%', minHeight: 44, marginBottom: 10, fontSize: 12, fontWeight: 800, color: '#00e68a', borderColor: 'rgba(0,230,138,0.30)' }}>
+            ✓ К итогам тренировки
+          </button>
           {cooldownBlocks.map((b, i) => {
             const cMeta = b.type === 'cardio' ? { icon: '🏃', title: 'Лёгкое кардио', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
               : b.type === 'stretch' ? { icon: '🧘', title: 'Стретчинг', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' }
