@@ -86,7 +86,12 @@ public class NutritionItemsWidgetService extends RemoteViewsService {
             int index = it.optInt("index", -1);
 
             v.setTextViewText(R.id.w_nut_item_name, NutritionWidgetProvider.clipText(name, 18));
-            v.setTextViewText(R.id.w_nut_item_kcal, kcal > 0 ? (kcal + " ккал") : "");
+            // Порция в строке — как в дневнике («150 г · 248 ккал»). Раньше вес
+            // был только в TalkBack: в списке не было видно, сколько добавлено.
+            String amount = qty > 0
+                    ? (kcal > 0 ? qty + " г · " + kcal + " ккал" : qty + " г")
+                    : (kcal > 0 ? kcal + " ккал" : "");
+            v.setTextViewText(R.id.w_nut_item_kcal, amount);
 
             // TalkBack: строка читается цельной фразой, а не «название, цифра, ✕».
             StringBuilder row = new StringBuilder(name);

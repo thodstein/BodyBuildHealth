@@ -55,6 +55,7 @@ import {
   type NutritionFoodItem,
   pushNutritionFoods,
   nutritionFoodsVersion,
+  WIDGET_DAY_ITEMS_CAP,
 } from '../../core/widget-bridge';
 import { resolveFavorites } from '../screens/NutritionScreen_parts/diary/food-favorites';
 import { MEAL_PRESETS } from '../screens/NutritionScreen_parts/diary/hooks/useDiaryMealTypes';
@@ -314,6 +315,22 @@ function orderedMeals(meals: Record<string, unknown>): [string, any[]][] {
 }
 
 /**
+ * Порция в граммах. В дневнике `qty` бывает числом и строкой («150 г»,
+ * «100,5»): `Number('150 г')` — NaN, и виджет терял вес, который дневник
+ * показывает в строке. Поэтому разбираем как дневник (`qtyLabel`).
+ */
+function qtyGrams(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  }
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value.replace(',', '.'));
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+  }
+  return 0;
+}
+
+/**
  * Позиции дня для списка на виджете: порядок как в дневнике (по приёмам),
  * адрес каждой записи — `meal` + `index`. По этому адресу кнопка «✕» удаляет
  * именно эту строку, а не «последнюю вообще».
@@ -326,7 +343,7 @@ function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] 
   for (const [meal, list] of orderedMeals(meals)) {
     list.forEach((item, index) => {
       if (!item || !item.name) return;
-      const qty = num(item.qty);
+      const qty = qtyGrams(item.qty);
       const foodId = typeof item.foodId === 'string' ? item.foodId.trim().slice(0, 64) : '';
       out.push({
         name: String(item.name).slice(0, 40),
@@ -341,7 +358,7 @@ function dayItems(diary: Record<string, any>, date: string): NutritionDayItem[] 
       });
     });
   }
-  return out.slice(0, 20);
+  return out.slice(0, WIDGET_DAY_ITEMS_CAP);
 }
 
 /**
@@ -548,7 +565,7 @@ export function collectNutrition(): {
           protein: Math.max(0, Math.round(Number(last.item?.p) || 0)),
           fat: Math.max(0, Math.round(Number(last.item?.f) || 0)),
           carbs: Math.max(0, Math.round(Number(last.item?.c) || 0)),
-          qty: Math.max(0, Math.round(Number(last.item?.qty) || 0)) || undefined,
+          qty: qtyGrams(last.item?.qty) || undefined,
         }
       : undefined,
     periods: { day, week, month },

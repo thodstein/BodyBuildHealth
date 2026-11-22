@@ -28,6 +28,7 @@ import {
   widgetOpacity,
   setWidgetOpacity,
   WIDGET_OPACITIES,
+  WIDGET_DAY_ITEMS_CAP,
 } from '../widget-bridge';
 import {
   applyWidgetQueue,
@@ -1141,5 +1142,68 @@ describe('аналитика питания: день, неделя, месяц'
     expect(snap.days?.[today].items.map((it) => it.foodId)).toEqual(['chicken_breast', 'buckwheat']);
     expect(snap.quick?.[0]).toMatchObject({ foodId: 'chicken_breast', fav: true });
     expect(snap.quick?.some((q) => !q.fav && q.foodId === 'buckwheat')).toBe(true);
+  });
+
+  it('53. предел позиций дня в снапшоте совпадает с Java-мостом', () => {
+    const src = readFileSync(
+      path.resolve(
+        process.cwd(),
+        'android/app/src/main/java/com/healthengine/app/widgets/WidgetBridgePlugin.java',
+      ),
+      'utf8',
+    );
+    // Предел живёт в двух местах (JS и Java) — третий раз он уже расходился.
+    const m = /cleanItems\.length\(\)\s*<\s*(\d+)/.exec(src);
+    expect(m).not.toBeNull();
+    expect(Number(m?.[1])).toBe(WIDGET_DAY_ITEMS_CAP);
+  });
+
+  it('54. порция из дневника «150 г» доезжает в снапшот числом', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    // Старые записи хранят вес строкой — `Number('150 г')` даёт NaN, и виджет
+    // терял порцию, которую дневник показывает в строке.
+    writeDiaryV2({
+      [today]: {
+        meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: '150 г' as any }] },
+      },
+    } as any);
+
+    const n = collectNutrition();
+    expect(n.days[today].items[0].qty).toBe(150);
+    expect(n.lastFood?.qty).toBe(150);
+  });
+
+  it('55. активный день не теряет хвост списка: предел 50 позиций', async () => {
+    const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
+    const today = localIsoDate();
+    writeDiaryV2({
+      [today]: {
+        meals: {
+          'Обед': Array.from({ length: 60 }, (_, i) => ({
+            name: `Блюдо ${i}`,
+            kcal: 100,
+            p: 10,
+            f: 5,
+            c: 20,
+            qty: 100,
+          })),
+        },
+      },
+    } as any);
+
+    // Сборка списка и чистка в мосте режут одинаково: иначе запись была бы
+    // видна до синка и пропадала после.
+    const n = collectNutrition();
+    expect(n.days[today].items).toHaveLength(WIDGET_DAY_ITEMS_CAP);
+    expect(n.days[today].items[49]).toMatchObject({ name: 'Блюдо 49', index: 49 });
+
+    await syncNutritionWidget(n);
+    const snap = readFallbackSnapshot('nutrition') as {
+      days?: Record<string, { items: { name: string; index: number }[] }>;
+    };
+    expect(snap.days?.[today].items).toHaveLength(WIDGET_DAY_ITEMS_CAP);
+    // Порядок и адреса не смещаются: обрезается только хвост.
+    expect(snap.days?.[today].items[49]).toMatchObject({ name: 'Блюдо 49', index: 49 });
   });
 });

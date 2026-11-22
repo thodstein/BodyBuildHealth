@@ -126,6 +126,16 @@ export interface NutritionLastFood {
 }
 
 /**
+ * Сколько позиций дня попадает в снапшот (и в список на виджете).
+ *
+ * Дневник показывает все записи. Прежний предел 20 молча отрезал хвост дня:
+ * у тех, кто пишет по 10–12 позиций за приём, 21-я запись (обычно новые блюда
+ * ужина) пропадала из виджета, оставаясь в дневнике. 50 — с запасом, при этом
+ * снапшот остаётся компактным (7 дней × 50 строк).
+ */
+export const WIDGET_DAY_ITEMS_CAP = 50;
+
+/**
  * Позиция дня для списка на виджете «Питание».
  *
  * `meal` + `index` — адрес записи в `nutrition_diary_v2` (массив приёма), по
@@ -604,7 +614,7 @@ function clampNutritionDays(
     const items = Array.isArray(day.items)
       ? day.items
           .filter((it) => it && typeof it.name === 'string' && it.name.trim())
-          .slice(0, 20)
+          .slice(0, WIDGET_DAY_ITEMS_CAP)
           .map((it) => {
             const qty = num(it.qty);
             const foodId = String(it.foodId || '').slice(0, 64);

@@ -253,7 +253,8 @@ public class WidgetBridgePlugin extends Plugin {
 
     /**
      * Дни дневника для виджета: только ISO-ключи, 7 самых свежих, позиции
-     * обрезаны по 20. Мусор из моста в префы не попадает — widget читает JSON
+     * обрезаны по 50 (как `WIDGET_DAY_ITEMS_CAP` в widget-bridge.ts — сверяет
+     * тест №53). Мусор из моста в префы не попадает — widget читает JSON
      * напрямую и на неожиданных типах падает в пустой виджет.
      */
     private static JSONObject cleanDays(JSONObject days) throws JSONException {
@@ -278,7 +279,7 @@ public class WidgetBridgePlugin extends Plugin {
             JSONArray items = day.optJSONArray("items");
             JSONArray cleanItems = new JSONArray();
             if (items != null) {
-                for (int j = 0; j < items.length() && cleanItems.length() < 20; j++) {
+                for (int j = 0; j < items.length() && cleanItems.length() < 50; j++) {
                     JSONObject item = items.optJSONObject(j);
                     if (item == null) continue;
                     String name = item.optString("name", "").trim();
