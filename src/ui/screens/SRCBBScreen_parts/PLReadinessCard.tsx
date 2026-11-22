@@ -27,6 +27,8 @@ export interface PLReadinessCardProps {
   onNote?: (msg: string) => void;
   /** Первый день сегодняшней недели — для предпросмотра «что изменится». */
   previewDay?: PLReadinessPreviewExercise[] | null;
+  /** P2-11: превью относится к этому дню (обычно тот, с которого откроется плеер). */
+  previewDayLabel?: string | null;
 }
 
 const LEVEL_COLOR: Record<'green' | 'yellow' | 'red', string> = {
@@ -46,7 +48,7 @@ const INPUT_STYLE: React.CSSProperties = {
   color: '#fff', fontSize: 13, fontWeight: 700, boxSizing: 'border-box',
 };
 
-export const PLReadinessCard: React.FC<PLReadinessCardProps> = ({ onNote, previewDay }) => {
+export const PLReadinessCard: React.FC<PLReadinessCardProps> = ({ onNote, previewDay, previewDayLabel }) => {
   const stored = React.useMemo(() => readPLCheckin(typeof localStorage === 'undefined' ? null : localStorage), []);
   const [sleepHours, setSleepHours] = React.useState(stored?.checkin.sleepHours ?? 8);
   const [hrvPct, setHrvPct] = React.useState(Math.round((stored?.checkin.hrvRatio ?? 1) * 100));
@@ -156,7 +158,12 @@ export const PLReadinessCard: React.FC<PLReadinessCardProps> = ({ onNote, previe
         )}
         {preview.length > 0 && (
           <div data-pl="pl-checkin-preview" style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, marginBottom: 2 }}>Что изменится в первом дне недели:</div>
+            <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, marginBottom: 2 }}>
+              Что изменится в {previewDayLabel ? `«${previewDayLabel}»` : 'первом дне недели'}:
+            </div>
+            <div style={{ fontSize: 9, color: '#fff', opacity: 0.65, marginBottom: 3 }}>
+              Плеер применит это к тому дню, который открыт; остальные дни недели чек-ин не меняет.
+            </div>
             {preview.map(p => (
               <div key={p.name} style={{ fontSize: 10, color: p.changed ? color : '#fff', opacity: p.changed ? 1 : 0.75 }}>
                 {p.name}: {p.before} → {p.after}{p.changed ? '' : ' (без изменений)'}

@@ -18,13 +18,15 @@ const mkStorage = (init: Record<string, string> = {}) => {
   return {
     map,
     getItem: (k: string) => (map.has(k) ? map.get(k)! : null),
-    setItem: (k: string, v: string) => { map.set(k, v); },
+    setItem: (k: string, v: string) => {
+      map.set(k, v);
+    },
   };
 };
 
 describe('PL-бэкап сессии', () => {
   it('собирает только существующие ключи белого списка', () => {
-    const s = mkStorage({ he_pl_session: '{"a":1}', he_pl_meet_log: '{"1:Присед":[]}', 'чужой': 'x' });
+    const s = mkStorage({ he_pl_session: '{"a":1}', he_pl_meet_log: '{"1:Присед":[]}', чужой: 'x' });
     const b = collectPLBackup(s, () => '2026-11-03T10:00:00.000Z');
     expect(b).not.toBeNull();
     expect(b!.version).toBe(PL_BACKUP_VERSION);
@@ -40,6 +42,58 @@ describe('PL-бэкап сессии', () => {
     const s = mkStorage({ he_pl_session: 'x'.repeat(PL_BACKUP_VALUE_MAX_CHARS + 1), he_pl_macro: '{"m":1}' });
     const b = collectPLBackup(s);
     expect(Object.keys(b!.keys)).toEqual(['he_pl_macro']);
+  });
+
+  it('P2-19: пропущенное по размеру видно вызывающему коду, а не теряется молча', () => {
+    const s = mkStorage({ he_pl_session: 'x'.repeat(PL_BACKUP_VALUE_MAX_CHARS + 1), he_pl_macro: '{"m":1}' });
+    const b = collectPLBackup(s);
+    expect(b!.oversize).toEqual(['he_pl_session']);
+    // когда всё влезло — поля нет (бэкап не «шумит»)
+    expect(collectPLBackup(mkStorage({ he_pl_macro: '{}' }))!.oversize).toBeUndefined();
+  });
+
+  it('P1-5: чек-ин и видео подходов переносятся (бэкап → восстановление)', () => {
+    const src = mkStorage({
+      he_pl_session: '{"plan":1}',
+      he_pl_checkin: '{"date":"2026-11-22","verdict":{"level":"green"}}',
+      he_pl_set_video: '{"1:Присед:0":"data:video/mp4;base64,AA"}',
+    });
+    const backup = collectPLBackup(src)!;
+    expect(Object.keys(backup.keys).sort()).toEqual(['he_pl_checkin', 'he_pl_session', 'he_pl_set_video']);
+    const parsed = parsePLBackup(JSON.stringify(backup));
+    expect(parsed.error).toBeNull();
+    const dst = mkStorage();
+    const res = restorePLBackup(parsed.backup!, dst);
+    expect(res.error).toBeNull();
+    expect(dst.getItem('he_pl_checkin')).toBe(src.getItem('he_pl_checkin'));
+    expect(dst.getItem('he_pl_set_video')).toBe(src.getItem('he_pl_set_video'));
+  });
+
+  it('P2-19: карточки-мосты (диагностика/лимитеры) входят в бэкап', () => {
+    const src = mkStorage({
+      he_pl_diagnostic_card_v1: '{"lift":"squat"}',
+      he_pl_limiter_card_v1: '{"lift":"bench"}',
+    });
+    const backup = collectPLBackup(src)!;
+    expect(Object.keys(backup.keys).sort()).toEqual(['he_pl_diagnostic_card_v1', 'he_pl_limiter_card_v1']);
+    const dst = mkStorage();
+    restorePLBackup(parsePLBackup(JSON.stringify(backup)).backup!, dst);
+    expect(dst.getItem('he_pl_diagnostic_card_v1')).toBe('{"lift":"squat"}');
+    expect(dst.getItem('he_pl_limiter_card_v1')).toBe('{"lift":"bench"}');
+  });
+
+  it('старый бэкап без новых ключей читается как раньше (обратная совместимость)', () => {
+    const parsed = parsePLBackup(
+      JSON.stringify({
+        app: 'bodybuildhealth',
+        kind: 'pl-backup',
+        version: PL_BACKUP_VERSION,
+        createdAt: 'x',
+        keys: { he_pl_session: '{"a":1}' },
+      }),
+    );
+    expect(parsed.error).toBeNull();
+    expect(Object.keys(parsed.backup!.keys)).toEqual(['he_pl_session']);
   });
 
   it('round-trip: собрали → разобрали → восстановили', () => {
@@ -67,16 +121,23 @@ describe('PL-бэкап сессии', () => {
   });
 
   it('неподдерживаемая версия → ошибка', () => {
-    const r = parsePLBackup(JSON.stringify({ app: 'bodybuildhealth', kind: 'pl-backup', version: 99, keys: { he_pl_session: '{}' } }));
+    const r = parsePLBackup(
+      JSON.stringify({ app: 'bodybuildhealth', kind: 'pl-backup', version: 99, keys: { he_pl_session: '{}' } }),
+    );
     expect(r.backup).toBeNull();
     expect(r.error).toMatch(/Версия/);
   });
 
   it('неизвестные ключи в файле игнорируются, а не пишутся в приложение', () => {
-    const r = parsePLBackup(JSON.stringify({
-      app: 'bodybuildhealth', kind: 'pl-backup', version: PL_BACKUP_VERSION, createdAt: 'x',
-      keys: { he_pl_session: '{"a":1}', auth_token: 'hack' },
-    }));
+    const r = parsePLBackup(
+      JSON.stringify({
+        app: 'bodybuildhealth',
+        kind: 'pl-backup',
+        version: PL_BACKUP_VERSION,
+        createdAt: 'x',
+        keys: { he_pl_session: '{"a":1}', auth_token: 'hack' },
+      }),
+    );
     expect(r.error).toBeNull();
     expect(Object.keys(r.backup!.keys)).toEqual(['he_pl_session']);
     const dst = mkStorage();
@@ -87,11 +148,16 @@ describe('PL-бэкап сессии', () => {
 
   it('переполнение хранилища → ошибка и список пропущенного', () => {
     const backup = {
-      app: 'bodybuildhealth' as const, kind: 'pl-backup' as const, version: PL_BACKUP_VERSION, createdAt: '',
+      app: 'bodybuildhealth' as const,
+      kind: 'pl-backup' as const,
+      version: PL_BACKUP_VERSION,
+      createdAt: '',
       keys: { he_pl_session: '{}', he_pl_macro: '{}' },
     };
     const dst = {
-      setItem: (k: string) => { if (k === 'he_pl_macro') throw new Error('quota'); },
+      setItem: (k: string) => {
+        if (k === 'he_pl_macro') throw new Error('quota');
+      },
     };
     const res = restorePLBackup(backup, dst);
     expect(res.restored).toEqual(['he_pl_session']);

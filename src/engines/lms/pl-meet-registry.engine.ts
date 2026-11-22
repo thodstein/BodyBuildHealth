@@ -61,20 +61,38 @@ export function weeksToStartFromDate(dateIso: string, todayIso: string): number 
 }
 
 /**
- * Дата старта из «недель до старта» (неделя 1 = today).
+ * НАЧАЛО недели старта из «недель до старта» (неделя 1 = today).
  * Канон недель: `weeksToStart = N` ⇔ старт в НЕДЕЛЕ N плана (её начало = today +
  * (N-1)×7). Ровно та же разметка, что у buildPLSeasonPeaks (compIdx = N-1) —
  * раньше годовой план и сезон ПЛ расходились ровно на неделю.
+ *
+ * Это геометрия недели, а НЕ дата соревнования — для второй см.
+ * `meetDayFromWeeksToStart` (канон аудита 2026-11, P2-3).
  */
 export function dateFromWeeksToStart(weeksToStart: number, todayIso: string): string {
   const w = Number.isFinite(weeksToStart) ? Math.max(0, Math.round(weeksToStart)) : 0;
   return isoAddDays(todayIso, Math.max(0, w - 1) * 7) ?? todayIso;
 }
 
-/** Дата события: явная `date`, иначе из `week` (неделя 1 = today). null — нет данных. */
+/**
+ * ДЕНЬ СОРЕВНОВАНИЯ из «недель до старта» — единственный канон даты старта
+ * (аудит 2026-11, P2-3).
+ *
+ * Соревнование проводится в последний день недели старта: `dateWeeksBackward`
+ * кладёт `weekEnd = meetIso`, плеер и `weeksToStartFromDate` считают неделю по
+ * этой дате. Раньше UI отдавал начало недели как «дату старта» и подпись
+ * «неделя старта заканчивается» врала на 6 дней.
+ */
+export function meetDayFromWeeksToStart(weeksToStart: number, todayIso: string): string {
+  const start = dateFromWeeksToStart(weeksToStart, todayIso);
+  return isoAddDays(start, 6) ?? start;
+}
+
+/** Дата события: явная `date`, иначе из `week` (неделя 1 = today). null — нет данных.
+ *  Канон P2-3: дата события — ДЕНЬ СОРЕВНОВАНИЯ (последний день недели), не её начало. */
 export function dateForCompetition(ev: CompetitionEvent, todayIso: string): string | null {
   if (ev.date && toLocalNoonUtc(ev.date) != null) return ev.date.slice(0, 10);
-  if (Number.isFinite(ev.week) && ev.week >= 1) return dateFromWeeksToStart(ev.week, todayIso);
+  if (Number.isFinite(ev.week) && ev.week >= 1) return meetDayFromWeeksToStart(ev.week, todayIso);
   return null;
 }
 
@@ -102,13 +120,13 @@ export interface MergeMeetRegistryResult {
  */
 export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegistryResult {
   const { todayIso } = input;
-  const competitions = input.competitions.map(c => ({ ...c }));
+  const competitions = input.competitions.map((c) => ({ ...c }));
   const legacyMeets = Array.isArray(input.legacyMeets) ? input.legacyMeets : [];
   const notes: string[] = [];
   let changed = false;
 
-  const byId = new Map(competitions.map(c => [c.id, c] as const));
-  const byName = new Map(competitions.map(c => [c.name.trim().toLowerCase(), c] as const));
+  const byId = new Map(competitions.map((c) => [c.id, c] as const));
+  const byName = new Map(competitions.map((c) => [c.name.trim().toLowerCase(), c] as const));
   const usedEventIds = new Set<string>();
   const meets: PLMeetLike[] = [];
 
@@ -117,24 +135,31 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
     if (ev) {
       usedEventIds.add(ev.id);
       // Гармонизация канона со стартом ПЛ (имя/дата/приоритет).
-      const date = dateForCompetition(ev, todayIso) ?? dateFromWeeksToStart(legacy.weeksToStart, todayIso);
+      const date = dateForCompetition(ev, todayIso) ?? meetDayFromWeeksToStart(legacy.weeksToStart, todayIso);
       // `week` — АБСОЛЮТНАЯ неделя годового плана: фиксируется при создании/правке старта
       // и НЕ пересчитывается от «сегодня». Раньше здесь стоял macroWeekForDateIso(date, todayIso),
       // из-за чего каждые сутки старт «переезжал» на неделю раньше относительно сохранённого
       // годового плана (buildMacrocycleMulti трактует week как неделю макроцикла).
       // Пере-привязка к новой неделе 1 делается только при ПЕРЕСБОРКЕ плана
       // (reanchorCompetitionWeeks в MacrocyclePanel.build).
-      const week = Number.isFinite(ev.week) && ev.week >= 1
-        ? Math.max(1, Math.round(ev.week))
-        : macroWeekForDateIso(date, todayIso);
-      const priority: CompetitionEvent['priority'] = legacy.id === input.mainMeetId || ev.id === input.mainMeetId ? 'A' : (ev.priority ?? 'B');
+      const week =
+        Number.isFinite(ev.week) && ev.week >= 1
+          ? Math.max(1, Math.round(ev.week))
+          : macroWeekForDateIso(date, todayIso);
+      const priority: CompetitionEvent['priority'] =
+        legacy.id === input.mainMeetId || ev.id === input.mainMeetId ? 'A' : (ev.priority ?? 'B');
       const nextName = legacy.name || ev.name;
       if (ev.name !== nextName || ev.date !== date || ev.week !== week || ev.priority !== priority) {
-        ev.name = nextName; ev.date = date; ev.week = week; ev.priority = priority;
+        ev.name = nextName;
+        ev.date = date;
+        ev.week = week;
+        ev.priority = priority;
         changed = true;
       }
       meets.push({
-        id: ev.id, name: nextName, weeksToStart: weeksToStartFromDate(date, todayIso),
+        id: ev.id,
+        name: nextName,
+        weeksToStart: weeksToStartFromDate(date, todayIso),
         fed: legacy.fed ?? DEFAULT_EXTRAS.fed,
         plannedPm: legacy.plannedPm ?? {},
         strategy: legacy.strategy ?? DEFAULT_EXTRAS.strategy,
@@ -142,7 +167,8 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
     } else {
       // Легаси-старт без события года → создаём событие (миграция).
       // Контракт недель: weeksToStart = N ⇔ старт в неделе N (как в сезоне ПЛ).
-      const date = dateFromWeeksToStart(legacy.weeksToStart, todayIso);
+      // P2-3: в реестр пишется ДЕНЬ СОРЕВНОВАНИЯ (конец недели N), не её понедельник.
+      const date = meetDayFromWeeksToStart(legacy.weeksToStart, todayIso);
       const ev: CompetitionEvent = {
         id: legacy.id,
         name: legacy.name || 'Соревнование',
@@ -165,10 +191,18 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
     // от своей даты: buildMacrocycleMulti отвергает week < 1 целиком.
     if (date && !(Number.isFinite(ev.week) && ev.week >= 1)) {
       const week = macroWeekForDateIso(date, todayIso);
-      if (ev.week !== week) { ev.week = week; changed = true; notes.push(`📅 «${ev.name}»: неделя старта рассчитана по дате`); }
+      if (ev.week !== week) {
+        ev.week = week;
+        changed = true;
+        notes.push(`📅 «${ev.name}»: неделя старта рассчитана по дате`);
+      }
     }
     // Контракт недель: старт в неделе ev.week ⇔ ev.week недель до старта.
-    const weeksToStart = date ? weeksToStartFromDate(date, todayIso) : (Number.isFinite(ev.week) ? Math.max(1, Math.round(ev.week)) : 1);
+    const weeksToStart = date
+      ? weeksToStartFromDate(date, todayIso)
+      : Number.isFinite(ev.week)
+        ? Math.max(1, Math.round(ev.week))
+        : 1;
     meets.push({ id: ev.id, name: ev.name, weeksToStart, ...DEFAULT_EXTRAS, plannedPm: {}, strategy: 'balanced' });
     usedEventIds.add(ev.id);
   }
@@ -176,8 +210,8 @@ export function mergeMeetRegistry(input: MergeMeetRegistryInput): MergeMeetRegis
   meets.sort((a, b) => a.weeksToStart - b.weeksToStart || a.name.localeCompare(b.name));
 
   let mainMeetId = input.mainMeetId;
-  if (!meets.some(m => m.id === mainMeetId)) {
-    const mainEvent = competitions.find(c => c.priority === 'A' && usedEventIds.has(c.id));
+  if (!meets.some((m) => m.id === mainMeetId)) {
+    const mainEvent = competitions.find((c) => c.priority === 'A' && usedEventIds.has(c.id));
     mainMeetId = mainEvent?.id ?? meets[0]?.id ?? '';
   }
 
@@ -193,20 +227,29 @@ export function syncCompetitionsFromMeets(
   meets: PLMeetLike[],
   opts: { mainMeetId: string; todayIso: string },
 ): CompetitionEvent[] {
-  const byId = new Map(competitions.map(c => [c.id, c] as const));
+  const byId = new Map(competitions.map((c) => [c.id, c] as const));
   const result: CompetitionEvent[] = [];
   for (const meet of meets) {
     const prev = byId.get(meet.id);
     const weeks = Math.max(1, Math.round(meet.weeksToStart));
-    const date = dateFromWeeksToStart(weeks, opts.todayIso);
-    const priority: CompetitionEvent['priority'] = meet.id === opts.mainMeetId
-      ? 'A'
-      : (prev?.priority === 'A' ? 'B' : (prev?.priority ?? 'B'));
+    // P0-1: ДАТА — источник истины, а не countdown. Раньше здесь она каждый раз
+    // пересчитывалась из `weeksToStart`, и остаток дней внутри недели терялся:
+    // старт «съезжал» к началу недели, каждый день ещё на ~6 дней назад.
+    // Теперь сохранённая валидная дата сохраняется как есть (week выводится из неё),
+    // а пересчёт происходит только если даты нет или пользователь осознанно сдвинул
+    // окно — тогда `weeksToStart` из ПЛ-списка ≠ countdown от сохранённой даты.
+    const prevDate = prev && prev.date && toLocalNoonUtc(prev.date) != null ? prev.date.slice(0, 10) : null;
+    const derivedWeeks = prevDate ? weeksToStartFromDate(prevDate, opts.todayIso) : null;
+    const rescheduled = prevDate != null && derivedWeeks !== weeks;
+    const date = prevDate && !rescheduled ? prevDate : meetDayFromWeeksToStart(weeks, opts.todayIso);
+    const week = prevDate && !rescheduled && derivedWeeks != null ? Math.max(1, derivedWeeks) : weeks;
+    const priority: CompetitionEvent['priority'] =
+      meet.id === opts.mainMeetId ? 'A' : prev?.priority === 'A' ? 'B' : (prev?.priority ?? 'B');
     result.push({
       ...(prev ?? {}),
       id: meet.id,
       name: meet.name || prev?.name || 'Соревнование',
-      week: weeks,
+      week,
       date,
       priority,
     });
@@ -225,11 +268,8 @@ export function syncCompetitionsFromMeets(
  *
  * События без валидной даты возвращаются как есть.
  */
-export function reanchorCompetitionWeeks(
-  competitions: CompetitionEvent[],
-  todayIso: string,
-): CompetitionEvent[] {
-  return (Array.isArray(competitions) ? competitions : []).map(c => {
+export function reanchorCompetitionWeeks(competitions: CompetitionEvent[], todayIso: string): CompetitionEvent[] {
+  return (Array.isArray(competitions) ? competitions : []).map((c) => {
     const date = c && c.date && toLocalNoonUtc(c.date) != null ? c.date.slice(0, 10) : null;
     if (!date) return c;
     const week = macroWeekForDateIso(date, todayIso);

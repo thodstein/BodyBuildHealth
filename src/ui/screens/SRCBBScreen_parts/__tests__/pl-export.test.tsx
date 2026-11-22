@@ -42,7 +42,7 @@ const plan = (): LMSBuildOutput => ({
 
 const api = (): PLPlanViewApi => ({
   builtSrc: plan() as never,
-  setBuiltSrc: () => {}, srcWeek: 1, setSrcWeek: () => {},
+  srcWeek: 1, setSrcWeek: () => {},
   srcEdits: {}, setSrcEdits: () => {}, srcAdditions: {}, setSrcAdditions: () => {},
   editMode: false, setEditMode: () => {},
   setKey: () => '', effSet: (_w, _d, _e, _s, ws) => ws, dayKey: () => '', addExToDay: () => {},
@@ -50,7 +50,7 @@ const api = (): PLPlanViewApi => ({
   pickerExName: '', setPickerExName: () => {}, pickerScheme: { sets: 3, reps: 8, weight: 40 }, setPickerScheme: () => {},
   days: 3, calendarView: 'tapered', setCalendarView: () => {},
   bridgeSessions: [], setBridgeWeek: () => {}, bridgeWeek: 1,
-  onNote: () => {}, buildSrc: () => {},
+  onNote: () => {},
   selectedCycleId: 'cycle-01', cycleWeeks: 8, goal: 'strength', level: 'II-KMS',
   peds: [], pedDoses: {}, pedAuto: false, courseIntensity: 'moderate',
   autoRegMode: 'off', setAutoRegMode: () => {}, autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,

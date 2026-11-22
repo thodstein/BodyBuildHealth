@@ -54,8 +54,7 @@ export interface PLReadinessVerdict {
   summary: string;
 }
 
-const clamp = (v: number, lo: number, hi: number): number =>
-  Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
+const clamp = (v: number, lo: number, hi: number): number => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo);
 
 /**
  * Оценка готовности на сегодня. Возвращает готовые модификаторы сессии.
@@ -75,22 +74,45 @@ export function evaluatePLReadiness(checkin: PLMorningCheckin): PLReadinessVerdi
   const reasons: string[] = [];
   let score = 100;
 
-  if (sleepHours < 6) { score -= 25; reasons.push(`Сон ${sleepHours.toFixed(1)} ч < 6 ч (−25)`); }
-  else if (sleepHours < 7) { score -= 12; reasons.push(`Сон ${sleepHours.toFixed(1)} ч < 7 ч (−12)`); }
+  if (sleepHours < 6) {
+    score -= 25;
+    reasons.push(`Сон ${sleepHours.toFixed(1)} ч < 6 ч (−25)`);
+  } else if (sleepHours < 7) {
+    score -= 12;
+    reasons.push(`Сон ${sleepHours.toFixed(1)} ч < 7 ч (−12)`);
+  }
 
-  if (hrvRatio < 0.8) { score -= 25; reasons.push(`HRV ${Math.round(hrvRatio * 100)} % от базы < 80 % (−25)`); }
-  else if (hrvRatio < 0.9) { score -= 12; reasons.push(`HRV ${Math.round(hrvRatio * 100)} % от базы < 90 % (−12)`); }
+  if (hrvRatio < 0.8) {
+    score -= 25;
+    reasons.push(`HRV ${Math.round(hrvRatio * 100)} % от базы < 80 % (−25)`);
+  } else if (hrvRatio < 0.9) {
+    score -= 12;
+    reasons.push(`HRV ${Math.round(hrvRatio * 100)} % от базы < 90 % (−12)`);
+  }
 
-  if (doms > 3) { const p = (doms - 3) * 3; score -= p; reasons.push(`Мышечная боль ${doms}/10 (−${p})`); }
-  if (stress > 3) { const p = (stress - 3) * 3; score -= p; reasons.push(`Стресс ${stress}/10 (−${p})`); }
+  if (doms > 3) {
+    const p = (doms - 3) * 3;
+    score -= p;
+    reasons.push(`Мышечная боль ${doms}/10 (−${p})`);
+  }
+  if (stress > 3) {
+    const p = (stress - 3) * 3;
+    score -= p;
+    reasons.push(`Стресс ${stress}/10 (−${p})`);
+  }
 
   const bw = checkin.bodyWeightKg;
   const base = checkin.baselineWeightKg;
   let dropPct = 0;
   if (Number.isFinite(bw) && Number.isFinite(base) && (base as number) > 0 && (bw as number) > 0) {
     dropPct = Math.max(0, ((base as number) - (bw as number)) / (base as number)) * 100;
-    if (dropPct > 2.5) { score -= 20; reasons.push(`Вес ниже базы на ${dropPct.toFixed(1)} % > 2.5 % (−20)`); }
-    else if (dropPct > 1.5) { score -= 10; reasons.push(`Вес ниже базы на ${dropPct.toFixed(1)} % (−10)`); }
+    if (dropPct > 2.5) {
+      score -= 20;
+      reasons.push(`Вес ниже базы на ${dropPct.toFixed(1)} % > 2.5 % (−20)`);
+    } else if (dropPct > 1.5) {
+      score -= 10;
+      reasons.push(`Вес ниже базы на ${dropPct.toFixed(1)} % (−10)`);
+    }
   }
 
   score = Math.round(Math.min(100, Math.max(0, score)));
@@ -102,14 +124,17 @@ export function evaluatePLReadiness(checkin: PLMorningCheckin): PLReadinessVerdi
     'Это ориентир по самочувствию, а не медицинская оценка: при плохом самочувствии лучше снизить нагрузку, чем «дотерпеть».',
   ];
   if (dropPct > 2.5) {
-    notes.push('Резкое падение веса — часто обезвоживание/недоед. Проверьте питьё и калории до тренировки; на сгонке к категории чек-ин не заменяет протокол восстановления.');
+    notes.push(
+      'Резкое падение веса — часто обезвоживание/недоед. Проверьте питьё и калории до тренировки; на сгонке к категории чек-ин не заменяет протокол восстановления.',
+    );
   }
 
-  const summary = level === 'green'
-    ? `Готовность ${score}/100 — зелёная зона: тренировка по плану без изменений.`
-    : level === 'yellow'
-      ? `Готовность ${score}/100 — жёлтая зона: объём ×${0.85.toFixed(2)}, RIR +1 (на повтор легче).`
-      : `Готовность ${score}/100 — красная зона: объём ×${0.6.toFixed(2)}, вес ×${0.95.toFixed(2)}, RIR +2, без отказа.`;
+  const summary =
+    level === 'green'
+      ? `Готовность ${score}/100 — зелёная зона: тренировка по плану без изменений.`
+      : level === 'yellow'
+        ? `Готовность ${score}/100 — жёлтая зона: объём ×${(0.85).toFixed(2)}, RIR +1 (на повтор легче).`
+        : `Готовность ${score}/100 — красная зона: объём ×${(0.6).toFixed(2)}, вес ×${(0.95).toFixed(2)}, RIR +2, без отказа.`;
 
   return {
     score,
@@ -144,7 +169,7 @@ export function adjustSetsForReadiness<T extends PLAdjustableSet>(sets: T[], ver
   // Убираем С КОНЦА: в PL последние подходы — дожимы/бэкоффы, первые (топ-сет) важнее.
   const kept = sets.slice(0, keep);
 
-  return kept.map(s => {
+  return kept.map((s) => {
     const scaled = verdict.loadMultiplier === 1 ? s.weight : roundPlate(s.weight * verdict.loadMultiplier);
     const weight = Math.min(s.weight, Math.max(0, scaled));
     const rirRaw = (Number.isFinite(s.rir) ? s.rir : 2) + verdict.rirShift;
@@ -162,14 +187,18 @@ export function applyReadinessToDay<T extends { targetSets: PLAdjustableSet[] }>
   verdict: PLReadinessVerdict,
 ): T[] {
   if (!Array.isArray(exercises) || verdict.level === 'green') return exercises;
-  return exercises.map(ex => ({ ...ex, targetSets: adjustSetsForReadiness(ex.targetSets ?? [], verdict) }));
+  return exercises.map((ex) => ({ ...ex, targetSets: adjustSetsForReadiness(ex.targetSets ?? [], verdict) }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Хранение: только «сегодняшний» чек-ин имеет силу.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type CheckinStorage = { getItem: (k: string) => string | null; setItem?: (k: string, v: string) => void; removeItem?: (k: string) => void };
+type CheckinStorage = {
+  getItem: (k: string) => string | null;
+  setItem?: (k: string, v: string) => void;
+  removeItem?: (k: string) => void;
+};
 
 export interface PLStoredCheckin {
   date: string;
@@ -178,10 +207,17 @@ export interface PLStoredCheckin {
 }
 
 /** Прочитать чек-ин, если он за СЕГОДНЯ. Иначе null (вчерашний не действует). */
-export function readPLCheckin(storage: CheckinStorage | null | undefined, today: string = localIsoDate()): PLStoredCheckin | null {
+export function readPLCheckin(
+  storage: CheckinStorage | null | undefined,
+  today: string = localIsoDate(),
+): PLStoredCheckin | null {
   if (!storage) return null;
   let raw: string | null = null;
-  try { raw = storage.getItem(PL_CHECKIN_KEY); } catch { return null; }
+  try {
+    raw = storage.getItem(PL_CHECKIN_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<PLStoredCheckin>;
@@ -189,8 +225,30 @@ export function readPLCheckin(storage: CheckinStorage | null | undefined, today:
     if (parsed.date !== today) return null;
     if (!parsed.checkin || typeof parsed.checkin !== 'object') return null;
     // Вердикт пересчитываем из чек-ина: сохранённый мог быть от старой версии порогов.
-    return { date: today, checkin: parsed.checkin as PLMorningCheckin, verdict: evaluatePLReadiness(parsed.checkin as PLMorningCheckin) };
-  } catch { return null; }
+    return {
+      date: today,
+      checkin: parsed.checkin as PLMorningCheckin,
+      verdict: evaluatePLReadiness(parsed.checkin as PLMorningCheckin),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Событие «чек-ин сохранён/сброшен»: плеер тренировки живёт не размонтируясь и
+ * должен пересчитать коррекцию объёма/RIR для уже открытой сессии (P1-6).
+ */
+export const PL_CHECKIN_EVENT = 'he-pl-checkin-updated';
+
+function notifyCheckinUpdated(): void {
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new Event(PL_CHECKIN_EVENT));
+    }
+  } catch {
+    /* SSR/среда без Event — экраны перечитают чек-ин при следующем монтировании */
+  }
 }
 
 /** Сохранить чек-ин на дату (по умолчанию — сегодня). */
@@ -202,12 +260,22 @@ export function writePLCheckin(
   if (!storage || typeof storage.setItem !== 'function') return null;
   const verdict = evaluatePLReadiness(checkin);
   const record: PLStoredCheckin = { date: today, checkin, verdict };
-  try { storage.setItem(PL_CHECKIN_KEY, JSON.stringify(record)); } catch { return null; }
+  try {
+    storage.setItem(PL_CHECKIN_KEY, JSON.stringify(record));
+  } catch {
+    return null;
+  }
+  notifyCheckinUpdated();
   return record;
 }
 
 /** Убрать чек-ин (тренировка снова идёт по плану). */
 export function clearPLCheckin(storage: CheckinStorage | null | undefined): void {
   if (!storage || typeof storage.removeItem !== 'function') return;
-  try { storage.removeItem(PL_CHECKIN_KEY); } catch { /* ignore */ }
+  try {
+    storage.removeItem(PL_CHECKIN_KEY);
+  } catch {
+    /* ignore */
+  }
+  notifyCheckinUpdated();
 }

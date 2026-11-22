@@ -56,9 +56,9 @@ describe('ПЛ-авто: делод по кнопке — проводка (sour
     // Aудит P0: снимок — ПЛАН ЦЕЛИКОМ с fingerprint'ом (ключ he_pl_prev_plan_v1),
     // иначе откат возвращал weeks при отчётах тапер-плана, а пересборка цикла
     // подкладывала устаревший снимок вместо свежего плана.
-    expect(compTab).toContain("he_pl_prev_plan_v1");
+    expect(compTab).toContain('he_pl_prev_plan_v1');
     expect(compTab).toContain('Убрать тапер из плана');
-    expect(compTab).toContain('sessionStorage.setItem(TAPER_PREV_KEY');
+    expect(compTab).toMatch(/sessionStorage\.setItem\(\s*TAPER_PREV_KEY/);
     expect(compTab).toContain('planFingerprint');
   });
 });

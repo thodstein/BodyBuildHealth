@@ -25,9 +25,16 @@ export const PL_BACKUP_KEYS = [
   'he_pl_meet_log',
   'myTrainingPlans',
   'he_opl_history',
+  // P1-5: утренний чек-ин (готовность) и видео подходов раньше не переносились,
+  // хотя UI рапортовал об успешном бэкапе.
+  'he_pl_checkin',
+  'he_pl_set_video',
+  // P2-19: состояние карточек-мостов, из которых заполняются day-карты.
+  'he_pl_diagnostic_card_v1',
+  'he_pl_limiter_card_v1',
 ] as const;
 
-export type PLBackupKey = typeof PL_BACKUP_KEYS[number];
+export type PLBackupKey = (typeof PL_BACKUP_KEYS)[number];
 
 /** Лимит одного значения (1.5 МБ) — как у персиста тапер-плана. */
 export const PL_BACKUP_VALUE_MAX_CHARS = 1_500_000;
@@ -40,23 +47,45 @@ export interface PLBackup {
   createdAt: string;
   /** Ключ → JSON-строка значения. */
   keys: Partial<Record<PLBackupKey, string>>;
+  /** P2-19: ключи, которые есть в хранилище, но не вошли (слишком большие) —
+   *  UI обязан это показать, а не молча потерять данные. */
+  oversize?: PLBackupKey[];
 }
 
 type ReadStorage = { getItem: (key: string) => string | null };
 type WriteStorage = { setItem: (key: string, value: string) => void };
 
 /** Собрать бэкап из хранилища. null — если PL-данных нет вовсе. */
-export function collectPLBackup(storage: ReadStorage, now: () => string = () => new Date().toISOString()): PLBackup | null {
+export function collectPLBackup(
+  storage: ReadStorage,
+  now: () => string = () => new Date().toISOString(),
+): PLBackup | null {
   const keys: Partial<Record<PLBackupKey, string>> = {};
+  const oversize: PLBackupKey[] = [];
   for (const key of PL_BACKUP_KEYS) {
     let value: string | null = null;
-    try { value = storage.getItem(key); } catch { value = null; }
+    try {
+      value = storage.getItem(key);
+    } catch {
+      value = null;
+    }
     if (typeof value !== 'string' || value.length === 0) continue;
-    if (value.length > PL_BACKUP_VALUE_MAX_CHARS) continue; // слишком большой — не рискуем квотой
+    if (value.length > PL_BACKUP_VALUE_MAX_CHARS) {
+      oversize.push(key); // квоту не рискуем, но и не теряем молча (P2-19)
+      continue;
+    }
     keys[key] = value;
   }
   if (Object.keys(keys).length === 0) return null;
-  return { app: 'bodybuildhealth', kind: PL_BACKUP_KIND, version: PL_BACKUP_VERSION, createdAt: now(), keys };
+  const backup: PLBackup = {
+    app: 'bodybuildhealth',
+    kind: PL_BACKUP_KIND,
+    version: PL_BACKUP_VERSION,
+    createdAt: now(),
+    keys,
+  };
+  if (oversize.length > 0) backup.oversize = oversize;
+  return backup;
 }
 
 export interface PLBackupParseResult {
@@ -68,14 +97,22 @@ export interface PLBackupParseResult {
 export function parsePLBackup(text: string): PLBackupParseResult {
   if (!text || !text.trim()) return { backup: null, error: 'Пустой бэкап.' };
   let raw: unknown;
-  try { raw = JSON.parse(text); } catch { return { backup: null, error: 'Это не JSON — проверьте, что скопировали файл бэкапа целиком.' }; }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { backup: null, error: 'Неверная структура бэкапа.' };
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { backup: null, error: 'Это не JSON — проверьте, что скопировали файл бэкапа целиком.' };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return { backup: null, error: 'Неверная структура бэкапа.' };
   const obj = raw as Partial<PLBackup>;
   if (obj.app !== 'bodybuildhealth' || obj.kind !== PL_BACKUP_KIND) {
     return { backup: null, error: 'Это не бэкап PL-сессии (другой тип файла).' };
   }
   if (obj.version !== PL_BACKUP_VERSION) {
-    return { backup: null, error: `Версия бэкапа ${String(obj.version)} не поддерживается (нужна ${PL_BACKUP_VERSION}).` };
+    return {
+      backup: null,
+      error: `Версия бэкапа ${String(obj.version)} не поддерживается (нужна ${PL_BACKUP_VERSION}).`,
+    };
   }
   if (!obj.keys || typeof obj.keys !== 'object' || Array.isArray(obj.keys)) {
     return { backup: null, error: 'В бэкапе нет данных (поле keys).' };
@@ -88,7 +125,8 @@ export function parsePLBackup(text: string): PLBackupParseResult {
     JSON.parse(JSON.stringify(value)); // гарантия, что значение сериализуемо как есть
     keys[key as PLBackupKey] = value;
   }
-  if (Object.keys(keys).length === 0) return { backup: null, error: 'В бэкапе нет ни одного известного ключа PL-сессии.' };
+  if (Object.keys(keys).length === 0)
+    return { backup: null, error: 'В бэкапе нет ни одного известного ключа PL-сессии.' };
   return {
     backup: {
       app: 'bodybuildhealth',
@@ -136,4 +174,8 @@ export const PL_BACKUP_KEY_LABEL: Record<PLBackupKey, string> = {
   he_pl_meet_log: 'Факты попыток старта',
   myTrainingPlans: 'Сохранённые планы',
   he_opl_history: 'История OpenPowerlifting',
+  he_pl_checkin: 'Утренний чек-ин (готовность)',
+  he_pl_set_video: 'Видео подходов',
+  he_pl_diagnostic_card_v1: 'Карточка «Диагностика движения»',
+  he_pl_limiter_card_v1: 'Карточка «Лимитирующие факторы»',
 };

@@ -42,6 +42,10 @@ export interface MacroTaperOpts {
   wholeWindowAsTaper?: boolean;
   /** Пиковый цикл ПЛ (period=peak) — если задан, кривая берётся ИЗ цикла (интеграция пиковых циклов). */
   peakCycleId?: string;
+  /** P1-7: множитель авторегуляции, уже вшитый в веса базовых недель (подтверждённый
+   *  конфиг `plAutoRegCfg`). Прикиды соревнований считаются от немасштабированного
+   *  `pmRow`, поэтому без этого множителя попытки «прыгали» бы обратно к плану. */
+  autoRegMult?: number;
 }
 
 export interface MacroTaperResult {
@@ -53,9 +57,13 @@ const isMain = (e: { load?: string }) => e.load === 'main' || e.load === 'Тяж
 
 /** Пересчёт метрик сессии после трансформации сетов. */
 function remeasure(day: LMSPlanWeek['days'][number]): LMSPlanWeek['days'][number] {
-  const metricsEx: SRExercise[] = day.exercises.map(pe => ({
-    name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-    sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+  const metricsEx: SRExercise[] = day.exercises.map((pe) => ({
+    name: pe.name,
+    group: pe.group,
+    coef: pe.coef,
+    mnosz: pe.mnosz,
+    pm: pe.pm,
+    sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
   }));
   return { ...day, metrics: calcSessionMetrics(metricsEx) };
 }
@@ -65,8 +73,8 @@ function applyCurvePoint(wk: LMSPlanWeek, pt: TaperCurvePoint, strategy: MeetStr
   // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
   // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
   const protocolFinal = isLast && pt.warmupOnly === true;
-  const days = wk.days.map(d => {
-    const exercises = d.exercises.map(e => {
+  const days = wk.days.map((d) => {
+    const exercises = d.exercises.map((e) => {
       if (isMain(e)) {
         if (protocolFinal) {
           const warmup = [
@@ -76,13 +84,13 @@ function applyCurvePoint(wk: LMSPlanWeek, pt: TaperCurvePoint, strategy: MeetStr
           ];
           return { ...e, rir: pt.rirTarget ?? 0, workSets: warmup };
         }
-        const pct = pt.intensityMode === 'set_pct' && pt.intensityPct > 0 ? pt.intensityPct : e.workSets[0]?.pct ?? 1;
-        const reps = pt.singles ? 1 : e.workSets[0]?.reps ?? 1;
+        const pct = pt.intensityMode === 'set_pct' && pt.intensityPct > 0 ? pt.intensityPct : (e.workSets[0]?.pct ?? 1);
+        const reps = pt.singles ? 1 : (e.workSets[0]?.reps ?? 1);
         const weight = Math.round(workWeight(e.pm, pct) * 10) / 10;
         return {
           ...e,
           rir: pt.rirTarget != null ? pt.rirTarget : e.rir + pt.rirShift,
-          workSets: e.workSets.map(ws => ({
+          workSets: e.workSets.map((ws) => ({
             ...ws,
             pct,
             reps,
@@ -94,7 +102,7 @@ function applyCurvePoint(wk: LMSPlanWeek, pt: TaperCurvePoint, strategy: MeetStr
       return {
         ...e,
         rir: e.rir + pt.rirShift,
-        workSets: e.workSets.map(ws => ({
+        workSets: e.workSets.map((ws) => ({
           ...ws,
           sets: Math.max(1, Math.round(ws.sets * pt.volumePct)),
           rir: ws.rir + pt.rirShift,
@@ -112,40 +120,76 @@ function applyCurvePoint(wk: LMSPlanWeek, pt: TaperCurvePoint, strategy: MeetStr
 }
 
 /** Превратить неделю в неделю прикидов (mock meet или соревнования). */
-function toAttemptsWeek(wk: LMSPlanWeek, kind: 'mock' | 'meet', strategy: MeetStrategy): LMSPlanWeek | null {
-  const attempts = computeMeetAttemptsFromPmRow(wk.pmRow, strategy);
-  if (!attempts) return null;
-  const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
+function toAttemptsWeek(
+  wk: LMSPlanWeek,
+  kind: 'mock' | 'meet',
+  strategy: MeetStrategy,
+  autoRegMult = 1,
+): LMSPlanWeek | null {
+  // P1-7: попытки считаются от НЕмасштабированного `pmRow`, а тренировочные веса
+  // недели уже несут множитель авторегуляции. Берём множитель из самой недели
+  // (если он вшит), иначе — из опций сезона, иначе 1.
+  const mult =
+    Number.isFinite(wk.attemptAutoRegMult) && (wk.attemptAutoRegMult as number) > 0
+      ? (wk.attemptAutoRegMult as number)
+      : Number.isFinite(autoRegMult) && autoRegMult > 0
+        ? autoRegMult
+        : 1;
+  const raw = computeMeetAttemptsFromPmRow(wk.pmRow, strategy);
+  if (!raw) return null;
+  const sc = (v: number) => Math.round(v * mult * 10) / 10;
+  const attempts: MeetAttemptsInfo =
+    mult === 1
+      ? raw
+      : {
+          ...raw,
+          lifts: raw.lifts.map((l) => ({
+            ...l,
+            opener: sc(l.opener),
+            second: sc(l.second),
+            third: sc(l.third),
+            target: sc(l.target),
+            warmup: l.warmup.map((w) => ({ ...w, weight: sc(w.weight) })),
+          })),
+        };
+  const liftByName = new Map(attempts.lifts.map((l) => [norm(l.name), l]));
   const matchLift = (name: string) => {
     const exact = liftByName.get(norm(name));
     if (exact) return exact;
     const n = norm(name);
-    if (/присед|сквот/.test(n)) return attempts.lifts.find(l => /присед|сквот/.test(norm(l.name)));
-    if (/жим.*леж|леж.*жим/.test(n)) return attempts.lifts.find(l => /жим.*леж|леж.*жим/.test(norm(l.name)));
-    if (/станов/.test(n)) return attempts.lifts.find(l => /станов/.test(norm(l.name)));
+    if (/присед|сквот/.test(n)) return attempts.lifts.find((l) => /присед|сквот/.test(norm(l.name)));
+    if (/жим.*леж|леж.*жим/.test(n)) return attempts.lifts.find((l) => /жим.*леж|леж.*жим/.test(norm(l.name)));
+    if (/станов/.test(n)) return attempts.lifts.find((l) => /станов/.test(norm(l.name)));
     return undefined;
   };
-  const days = wk.days.map(d => {
-    const exercises = d.exercises.map(e => {
+  const days = wk.days.map((d) => {
+    const exercises = d.exercises.map((e) => {
       const lift = matchLift(e.name);
       if (lift) {
         const mk = (weight: number, rir: number) => ({
           pct: Math.round((weight / Math.max(1, wk.pmRow[e.name] ?? e.pm)) * 1000) / 1000,
-          reps: 1, sets: 1, weight, rir,
+          reps: 1,
+          sets: 1,
+          weight,
+          rir,
         });
         // 🔥 Прайминг за 1-2 дня до старта (только в неделе соревнований).
-        const priming = kind === 'meet'
-          ? [
-              { sets: 1, reps: 1, weight: Math.round(workWeight(wk.pmRow[e.name] ?? e.pm, 0.6) * 10) / 10, rir: 3, pct: 0.6 },
-              { sets: 1, reps: 1, weight: Math.round(workWeight(wk.pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 3, pct: 0.7 },
-            ]
-          : [];
+        // P1-7: прайминг считается от немасштабированного `pmRow`, поэтому множитель
+        // авторегуляции применяется и к нему (как к весам подходов ниже).
+        const primingWeight = (pct: number) => Math.round(workWeight(wk.pmRow[e.name] ?? e.pm, pct) * mult * 10) / 10;
+        const priming =
+          kind === 'meet'
+            ? [
+                { sets: 1, reps: 1, weight: primingWeight(0.6), rir: 3, pct: 0.6 },
+                { sets: 1, reps: 1, weight: primingWeight(0.7), rir: 3, pct: 0.7 },
+              ]
+            : [];
         return { ...e, rir: 1, workSets: [...priming, mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
       }
       return {
         ...e,
         rir: e.rir + 1,
-        workSets: e.workSets.map(ws => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * 0.5)) })),
+        workSets: e.workSets.map((ws) => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * 0.5)) })),
       };
     });
     return remeasure({ ...d, exercises });
@@ -155,19 +199,29 @@ function toAttemptsWeek(wk: LMSPlanWeek, kind: 'mock' | 'meet', strategy: MeetSt
     days,
     [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
     meetAttempts: attempts,
-    taperNote: kind === 'mock'
-      ? '🎯 Имитация соревнований (mock meet): прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0), аксессуары ×0.5.'
-      : '🏁 Соревнования: прикиды (опенер/вторая/третья ×1) как подходы дня старта + 🔥 прайминг-синглы 60/70% за 1-2 дня, аксессуары ×0.5.',
+    // P1-7: база прикидов — НЕмасштабированный pmRow недели, множитель — отдельным
+    // полем. «🔄 Обновить прикиды» (refreshMeetAttempts) пересчитает от той же базы
+    // и вернёт те же веса, а не «сырой» план.
+    attemptPmRow: wk.pmRow,
+    ...(mult !== 1 ? { attemptAutoRegMult: mult } : {}),
+    taperNote:
+      kind === 'mock'
+        ? '🎯 Имитация соревнований (mock meet): прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0), аксессуары ×0.5.'
+        : '🏁 Соревнования: прикиды (опенер/вторая/третья ×1) как подходы дня старта + 🔥 прайминг-синглы 60/70% за 1-2 дня, аксессуары ×0.5.',
   };
 }
 
 /** Пост-соревновательная неделя: объём ×0.5, RIR +3. */
 function toPostMeetWeek(wk: LMSPlanWeek, volumeMult = 0.5): LMSPlanWeek {
-  const days = wk.days.map(d => {
-    const exercises = d.exercises.map(e => ({
+  const days = wk.days.map((d) => {
+    const exercises = d.exercises.map((e) => ({
       ...e,
       rir: e.rir + 3,
-      workSets: e.workSets.map(ws => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * volumeMult)), rir: ws.rir + 3 })),
+      workSets: e.workSets.map((ws) => ({
+        ...ws,
+        sets: Math.max(1, Math.round(ws.sets * volumeMult)),
+        rir: ws.rir + 3,
+      })),
     }));
     return remeasure({ ...d, exercises });
   });
@@ -194,20 +248,25 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
   const taperWeeks = Math.max(1, Math.min(3, opts?.taperWeeksPerBlock ?? 2));
   // A1: если задано окно до старта — кривая блока = вход в пик + глубокий тапер
   // (lms-peak-block.engine). Иначе — только taperWeeks глубокого тапера (legacy).
-  const layout = opts?.windowWeeks != null ? buildPLPeakBlockLayout({
-    windowWeeks: opts.windowWeeks,
-    taperWeeks,
-    mode,
-    weightGoal,
-    mockMeet: opts?.mockMeet,
-    meetWeek: true,
-    postMeet: opts?.postMeet,
-    wholeWindowAsTaper: opts?.wholeWindowAsTaper,
-  }) : null;
-  const curve = layout ? layout.curve : buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts?.peakCycleId });
+  const layout =
+    opts?.windowWeeks != null
+      ? buildPLPeakBlockLayout({
+          windowWeeks: opts.windowWeeks,
+          taperWeeks,
+          mode,
+          weightGoal,
+          mockMeet: opts?.mockMeet,
+          meetWeek: true,
+          postMeet: opts?.postMeet,
+          wholeWindowAsTaper: opts?.wholeWindowAsTaper,
+        })
+      : null;
+  const curve = layout
+    ? layout.curve
+    : buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts?.peakCycleId });
   if (!Array.isArray(weeks) || weeks.length === 0) return { weeks, notes };
 
-  const out = weeks.map(w => ({ ...w }));
+  const out = weeks.map((w) => ({ ...w }));
   const alreadyMarked = (w: LMSPlanWeek) => !!(w.taperWeek || w.mockMeet || w.meetWeek || w.postMeet);
 
   for (let ci = 0; ci < out.length; ci++) {
@@ -216,7 +275,7 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     if (alreadyMarked(meetWk)) continue;
 
     // ── 1. Meet-неделя: прикиды + разминка, аксессуары ×0.5 ──
-    const meet = toAttemptsWeek(meetWk, 'meet', strategy);
+    const meet = toAttemptsWeek(meetWk, 'meet', strategy, opts?.autoRegMult);
     if (!meet) continue;
     out[ci] = meet;
     notes.push(`🏁 Соревнование (нед ${meet.week}): прикиды ${strategy}, аксессуары ×0.5.`);
@@ -235,21 +294,29 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
       if (alreadyMarked(out[idx])) continue;
       out[idx] = applyCurvePoint(out[idx], curve[curveOffset + t], strategy, t === applyCount - 1);
     }
-    if (applyCount > 0) notes.push(`📉 Тапер (${mode}): нед ${peakIdx.slice(-applyCount).map(i => out[i].week).join(', ')} — объём ↓, RIR ↑.`);
+    if (applyCount > 0)
+      notes.push(
+        `📉 Тапер (${mode}): нед ${peakIdx
+          .slice(-applyCount)
+          .map((i) => out[i].week)
+          .join(', ')} — объём ↓, RIR ↑.`,
+      );
 
     // A2-fix: старт ровно после предыдущего соревнования — недель под тапер/пик нет
     // (цикл поиска peak-недель останавливается на предыдущем competition). Это крайний,
     // но реальный кейс спаренных стартов; тапер физически негде разместить — честно
     // предупреждаем, чтобы спортсмен снизил объём вручную.
     if (applyCount === 0 && ci > 0 && out[ci - 1].macroPhase === 'competition') {
-      notes.push(`⚠ Старт (нед ${meet.week}) идёт сразу после предыдущего соревнования — нет недель для тапера/пика; при спаренных стартах снизьте объём вручную.`);
+      notes.push(
+        `⚠ Старт (нед ${meet.week}) идёт сразу после предыдущего соревнования — нет недель для тапера/пика; при спаренных стартах снизьте объём вручную.`,
+      );
     }
 
     // ── 3. Mock meet: неделя ЗА (applyCount+1) до старта (последняя перед peak-блоком) ──
     if (opts?.mockMeet) {
       const mockIdx = ci - applyCount - 1;
       if (mockIdx >= 0 && !alreadyMarked(out[mockIdx]) && out[mockIdx].macroPhase !== 'competition') {
-        const mock = toAttemptsWeek(out[mockIdx], 'mock', strategy);
+        const mock = toAttemptsWeek(out[mockIdx], 'mock', strategy, opts?.autoRegMult);
         if (mock) {
           out[mockIdx] = mock;
           notes.push(`🎯 Mock meet (нед ${mock.week}) — имитация прикидок за 10-14 дней до старта.`);
@@ -304,15 +371,18 @@ export function buildPLSeasonPeaks(
   opts?: PLSeasonPeaksOpts,
 ): PLSeasonPeaksResult {
   const sorted = (meets ?? [])
-    .filter(m => Number.isFinite(m.weeksToStart) && m.weeksToStart >= 1)
+    .filter((m) => Number.isFinite(m.weeksToStart) && m.weeksToStart >= 1)
     .sort((a, b) => a.weeksToStart - b.weeksToStart);
   if (sorted.length === 0) return { weeks: baseWeeks ?? [], notes: ['⚠ Сезон пуст — пик-блоки не построены.'] };
   const base = baseWeeks ?? [];
   if (base.length === 0) return { weeks: [], notes: ['⚠ Нет базового плана — сезон не построен.'] };
 
   const postW = opts?.postMeet ? 1 : 0;
-  const maxWeek = Math.max(...sorted.map(m => m.weeksToStart));
-  const total = maxWeek + 1 + postW;
+  const maxWeek = Math.max(...sorted.map((m) => m.weeksToStart));
+  // Неделя соревнования уже входит в maxWeek (compIdx = weeksToStart - 1), поэтому
+  // +1 сверху давал «фантомную» неделю после последнего старта: без macroPhase,
+  // без прикидов и тапера (P2-14). Длина = неделя последнего старта (+1 на пост-старт).
+  const total = maxWeek + postW;
 
   // Продлеваем базовые недели до длины сезона (повтор последней как наполнитель).
   // ВАЖНО: копии НЕ наследуют пик-разметку — иначе уже размеченные недели
@@ -354,13 +424,14 @@ export function buildPLSeasonPeaks(
     windowWeeks: opts?.windowWeeks,
     wholeWindowAsTaper: opts?.wholeWindowAsTaper,
     peakCycleId: opts?.peakCycleId,
+    autoRegMult: opts?.autoRegMult,
   });
 
   // P2-6: календарная разметка вперёд от начала сезона.
   const weeks = opts?.seasonStart ? dateWeeksForward(res.weeks, opts.seasonStart) : res.weeks;
 
   const notes = [
-    `📅 Сезон: ${sorted.map(m => `«${m.name}» нед ${m.weeksToStart}`).join(' · ')} → план на ${total} нед.`,
+    `📅 Сезон: ${sorted.map((m) => `«${m.name}» нед ${m.weeksToStart}`).join(' · ')} → план на ${total} нед.`,
     ...res.notes,
   ];
   return { weeks, notes };

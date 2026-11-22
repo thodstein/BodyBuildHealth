@@ -33,7 +33,6 @@ import { buildPLTaperCurve, buildPeakCycleTaperCurve } from './lms-taper.engine'
 // buildPeakCycleTaperCurve; ре-экспорт сохраняет старый API для потребителей).
 export { buildPeakCycleTaperCurve };
 
-export type PeakTaperMode = TaperMode;
 
 /** Все ПЛ-пиковые циклы (period=peak, direction не BB). Единый реестр для UI и движка. */
 export function getPeakCycles(): SRCycleTemplate[] {

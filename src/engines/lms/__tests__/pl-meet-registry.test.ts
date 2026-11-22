@@ -7,15 +7,26 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  dateFromWeeksToStart, weeksToStartFromDate, macroWeekForDateIso,
-  mergeMeetRegistry, syncCompetitionsFromMeets,
+  dateFromWeeksToStart,
+  meetDayFromWeeksToStart,
+  weeksToStartFromDate,
+  macroWeekForDateIso,
+  mergeMeetRegistry,
+  syncCompetitionsFromMeets,
   type PLMeetLike,
 } from '../pl-meet-registry.engine';
 import type { CompetitionEvent } from '../macrocycle.engine';
+import { shiftIsoDate } from '../../../core/local-date';
 
 const TODAY = '2026-09-22';
 const meet = (over: Partial<PLMeetLike> = {}): PLMeetLike => ({
-  id: 'm1', name: 'Кубок', weeksToStart: 8, fed: 'fpr', plannedPm: { 'Присед': 200 }, strategy: 'balanced', ...over,
+  id: 'm1',
+  name: 'Кубок',
+  weeksToStart: 8,
+  fed: 'fpr',
+  plannedPm: { Присед: 200 },
+  strategy: 'balanced',
+  ...over,
 });
 
 describe('pl-meet-registry: даты ↔ недели', () => {
@@ -33,6 +44,27 @@ describe('pl-meet-registry: даты ↔ недели', () => {
   });
 });
 
+describe('pl-meet-registry: P2-3 — канон «дата = день соревнования»', () => {
+  it('meetDayFromWeeksToStart = последний день недели N, неделя считается той же', () => {
+    const start = dateFromWeeksToStart(8, TODAY);
+    const day = meetDayFromWeeksToStart(8, TODAY);
+    expect(day).toBe(shiftIsoDate(start, 6));
+    expect(weeksToStartFromDate(day, TODAY)).toBe(8);
+  });
+
+  it('дата легаси-старта (без события года) — день соревнования, а не понедельник', () => {
+    const res = mergeMeetRegistry({
+      competitions: [],
+      legacyMeets: [meet({ id: 'm1', weeksToStart: 8 })],
+      mainMeetId: 'm1',
+      todayIso: TODAY,
+    });
+    expect(res.competitions[0].date).toBe(meetDayFromWeeksToStart(8, TODAY));
+    expect(res.competitions[0].date).not.toBe(dateFromWeeksToStart(8, TODAY));
+    expect(res.competitions[0].week).toBe(8);
+  });
+});
+
 describe('pl-meet-registry: слияние', () => {
   it('пусто с обеих сторон → без изменений', () => {
     const res = mergeMeetRegistry({ competitions: [], legacyMeets: [], mainMeetId: '', todayIso: TODAY });
@@ -47,9 +79,9 @@ describe('pl-meet-registry: слияние', () => {
     expect(res.competitions).toHaveLength(1);
     const ev = res.competitions[0];
     expect(ev.id).toBe('m1');
-    // weeksToStart 8 ⇔ старт в неделе 8: её начало = today + 7×7 (2026-11-10).
-    // Было today + 8×7 (2026-11-17) и неделя года 9 — расхождение с сезоном ПЛ.
-    expect(ev.date).toBe('2026-11-10');
+    // weeksToStart 8 ⇔ старт в неделе 8. P2-3: в событие года пишется ДЕНЬ
+    // СОРЕВНОВАНИЯ — последний день недели старта (2026-11-16), а не её понедельник.
+    expect(ev.date).toBe('2026-11-16');
     expect(ev.week).toBe(8);
     expect(macroWeekForDateIso(ev.date, TODAY)).toBe(8);
     expect(ev.priority).toBe('A');
@@ -60,13 +92,26 @@ describe('pl-meet-registry: слияние', () => {
   });
 
   it('событие+старт с одним id: надстройка сохраняется, канон (неделя года) главнее', () => {
-    const comp: CompetitionEvent = { id: 'm1', name: 'Старое имя', week: 3, priority: 'B', notes: 'выезд', cycleId: 'cycle-01' };
-    const res = mergeMeetRegistry({ competitions: [comp], legacyMeets: [meet({ name: 'Кубок области' })], mainMeetId: 'm1', todayIso: TODAY });
+    const comp: CompetitionEvent = {
+      id: 'm1',
+      name: 'Старое имя',
+      week: 3,
+      priority: 'B',
+      notes: 'выезд',
+      cycleId: 'cycle-01',
+    };
+    const res = mergeMeetRegistry({
+      competitions: [comp],
+      legacyMeets: [meet({ name: 'Кубок области' })],
+      mainMeetId: 'm1',
+      todayIso: TODAY,
+    });
     expect(res.changed).toBe(true);
     expect(res.competitions[0].name).toBe('Кубок области');
     // Неделя года канонична: старт переезжает на week 3 (было 8 недель до старта).
     expect(res.competitions[0].week).toBe(3);
-    expect(res.competitions[0].date).toBe('2026-10-06');
+    // P2-3: неделя 3 без явной даты → день соревнования = 2026-10-12 (конец недели 3).
+    expect(res.competitions[0].date).toBe('2026-10-12');
     expect(res.competitions[0].priority).toBe('A');
     // Поля года, не входящие в старт, целы.
     expect(res.competitions[0].notes).toBe('выезд');
@@ -79,7 +124,12 @@ describe('pl-meet-registry: слияние', () => {
 
   it('совпадение по имени тоже склеивает (id события выигрывает)', () => {
     const comp: CompetitionEvent = { id: 'ev-7', name: 'Кубок', week: 8, date: '2026-11-17', priority: 'B' };
-    const res = mergeMeetRegistry({ competitions: [comp], legacyMeets: [meet({ id: 'legacy-1' })], mainMeetId: 'legacy-1', todayIso: TODAY });
+    const res = mergeMeetRegistry({
+      competitions: [comp],
+      legacyMeets: [meet({ id: 'legacy-1' })],
+      mainMeetId: 'legacy-1',
+      todayIso: TODAY,
+    });
     expect(res.meets).toHaveLength(1);
     expect(res.meets[0].id).toBe('ev-7');
     expect(res.mainMeetId).toBe('ev-7');
@@ -87,9 +137,14 @@ describe('pl-meet-registry: слияние', () => {
 
   it('событие года без старта получает старт с дефолтной надстройкой', () => {
     const comp: CompetitionEvent = { id: 'ev-9', name: 'Первенство', week: 5, priority: 'A' };
-    const res = mergeMeetRegistry({ competitions: [comp], legacyMeets: [meet({ id: 'm2', weeksToStart: 20 })], mainMeetId: 'm2', todayIso: TODAY });
-    expect(res.meets.map(m => m.id).sort()).toEqual(['ev-9', 'm2']);
-    const fromEvent = res.meets.find(m => m.id === 'ev-9')!;
+    const res = mergeMeetRegistry({
+      competitions: [comp],
+      legacyMeets: [meet({ id: 'm2', weeksToStart: 20 })],
+      mainMeetId: 'm2',
+      todayIso: TODAY,
+    });
+    expect(res.meets.map((m) => m.id).sort()).toEqual(['ev-9', 'm2']);
+    const fromEvent = res.meets.find((m) => m.id === 'ev-9')!;
     // Контракт недель: week 5 ⇔ 5 недель до старта (было week−1 = 4).
     expect(fromEvent.weeksToStart).toBe(5);
     expect(fromEvent.fed).toBe('fpr');
@@ -97,9 +152,22 @@ describe('pl-meet-registry: слияние', () => {
   });
 
   it('идемпотентность: merge → sync → merge не меняет события', () => {
-    const first = mergeMeetRegistry({ competitions: [], legacyMeets: [meet(), meet({ id: 'm2', name: 'Второй', weeksToStart: 14 })], mainMeetId: 'm1', todayIso: TODAY });
-    const synced = syncCompetitionsFromMeets(first.competitions, first.meets, { mainMeetId: first.mainMeetId, todayIso: TODAY });
-    const second = mergeMeetRegistry({ competitions: synced, legacyMeets: first.meets, mainMeetId: first.mainMeetId, todayIso: TODAY });
+    const first = mergeMeetRegistry({
+      competitions: [],
+      legacyMeets: [meet(), meet({ id: 'm2', name: 'Второй', weeksToStart: 14 })],
+      mainMeetId: 'm1',
+      todayIso: TODAY,
+    });
+    const synced = syncCompetitionsFromMeets(first.competitions, first.meets, {
+      mainMeetId: first.mainMeetId,
+      todayIso: TODAY,
+    });
+    const second = mergeMeetRegistry({
+      competitions: synced,
+      legacyMeets: first.meets,
+      mainMeetId: first.mainMeetId,
+      todayIso: TODAY,
+    });
     expect(second.changed).toBe(false);
     expect(second.competitions).toEqual(synced);
     expect(second.meets).toEqual(first.meets);
@@ -112,18 +180,64 @@ describe('pl-meet-registry: обратная синхронизация стар
       { id: 'm1', name: 'Старое', week: 1, date: '2026-09-22', priority: 'A', notes: 'выезд', cycleId: 'cycle-01' },
       { id: 'gone', name: 'Удалённый', week: 9, priority: 'C', cycleIds: ['x'] },
     ];
-    const synced = syncCompetitionsFromMeets(comps, [meet({ id: 'm1', name: 'Кубок', weeksToStart: 8 }), meet({ id: 'm2', name: 'Новый', weeksToStart: 12 })], { mainMeetId: 'm1', todayIso: TODAY });
-    expect(synced.map(c => c.id).sort()).toEqual(['m1', 'm2']);
-    const m1 = synced.find(c => c.id === 'm1')!;
+    const synced = syncCompetitionsFromMeets(
+      comps,
+      [meet({ id: 'm1', name: 'Кубок', weeksToStart: 8 }), meet({ id: 'm2', name: 'Новый', weeksToStart: 12 })],
+      { mainMeetId: 'm1', todayIso: TODAY },
+    );
+    expect(synced.map((c) => c.id).sort()).toEqual(['m1', 'm2']);
+    const m1 = synced.find((c) => c.id === 'm1')!;
     expect(m1.name).toBe('Кубок');
-    // weeksToStart 8 ⇔ старт в неделе 8: today + 7×7 (было today + 8×7 = 2026-11-17).
-    expect(m1.date).toBe('2026-11-10');
+    // weeksToStart 8 ⇔ старт в неделе 8; P2-3: дата = день соревнования (конец недели 8).
+    expect(m1.date).toBe('2026-11-16');
     expect(m1.week).toBe(8);
     expect(m1.priority).toBe('A');
     expect(m1.notes).toBe('выезд');
     expect(m1.cycleId).toBe('cycle-01');
-    const m2 = synced.find(c => c.id === 'm2')!;
+    const m2 = synced.find((c) => c.id === 'm2')!;
     expect(m2.priority).toBe('B');
     expect(m2.week).toBe(12);
+  });
+});
+
+describe('pl-meet-registry: P0-1 дата старта не дрейфует', () => {
+  // Дат-канон проекта (без `new Date(` в тесте — ценз `pl-date-census`).
+  const addDays = (iso: string, n: number): string => shiftIsoDate(iso, n);
+
+  it('merge → sync за 10 дней подряд сохраняет дату; неделя = countdown от неё', () => {
+    let today = '2026-11-22';
+    let merged = mergeMeetRegistry({
+      competitions: [],
+      legacyMeets: [meet({ id: 'm1', weeksToStart: 8 })],
+      mainMeetId: 'm1',
+      todayIso: today,
+    });
+    let synced = syncCompetitionsFromMeets(merged.competitions, merged.meets, { mainMeetId: 'm1', todayIso: today });
+    const date0 = synced[0].date;
+    expect(date0).toBe(meetDayFromWeeksToStart(8, today));
+    for (let d = 1; d <= 10; d++) {
+      today = addDays('2026-11-22', d);
+      merged = mergeMeetRegistry({
+        competitions: synced,
+        legacyMeets: merged.meets,
+        mainMeetId: 'm1',
+        todayIso: today,
+      });
+      // Реестр старта отдаёт countdown от сохранённой даты, а не наоборот.
+      expect(merged.competitions[0].date).toBe(date0);
+      synced = syncCompetitionsFromMeets(merged.competitions, merged.meets, { mainMeetId: 'm1', todayIso: today });
+      expect(synced[0].date).toBe(date0);
+      expect(synced[0].week).toBe(weeksToStartFromDate(date0, today));
+    }
+  });
+
+  it('осознанный сдвиг окна (weeksToStart ≠ countdown) пересчитывает дату', () => {
+    const comps: CompetitionEvent[] = [{ id: 'm1', name: 'Кубок', week: 8, date: '2026-11-10', priority: 'A' }];
+    const synced = syncCompetitionsFromMeets(comps, [meet({ id: 'm1', weeksToStart: 4 })], {
+      mainMeetId: 'm1',
+      todayIso: TODAY,
+    });
+    expect(synced[0].date).toBe(meetDayFromWeeksToStart(4, TODAY));
+    expect(synced[0].week).toBe(4);
   });
 });

@@ -50,12 +50,6 @@ export interface PLSetVideoStore {
   items: PLSetVideoRef[];
 }
 
-export const PL_VIDEO_NOTES: string[] = [
-  'Видео — файл в памяти приложения; в приложении-вебе файл живёт только до перезагрузки страницы.',
-  'Ссылки чистятся автоматически: старше 60 дней и сверх 200 записей — чтобы не занимать память телефона.',
-  'Запись видео с экрана плеера — для разбора техники тренером. Это не замер и не доказательство выполнения подхода.',
-];
-
 export function emptySetVideoStore(): PLSetVideoStore {
   return { version: 1, items: [] };
 }

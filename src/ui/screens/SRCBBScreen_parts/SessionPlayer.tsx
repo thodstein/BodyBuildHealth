@@ -21,6 +21,7 @@ import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import { velocityLoss, velocityLossZone, type VBTIntent } from '../../../engines/pro/vbt.engine';
 import { calculatePlates } from '../../../engines/gym-competition.engine';
+import { isBodyweightExercise } from '../../../engines/movement-pattern';
 import { widgetTimerCommand } from '../../../core/widget-bridge';
 import { saveSRPESession } from '../../../engines/pro/srpe-store';
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
@@ -38,7 +39,7 @@ import { isNativeApp } from '../../../core/app-platform';
 import {
   CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
 } from '../TrainingScreen_parts/training-ui';
-import { readPLCheckin, applyReadinessToDay } from '../../../engines/lms/pl-readiness-adjust.engine';
+import { readPLCheckin, applyReadinessToDay, PL_CHECKIN_EVENT } from '../../../engines/lms/pl-readiness-adjust.engine';
 import { adviseVBTNextSet, type VBTSetSample } from '../../../engines/lms/pl-vbt-loop.engine';
 import { PLSetVideoButton } from './PLSetVideoButton';
 import { WorkoutSummaryReport, PLAYER_REPORT_BLOCKS, readReportBlocks } from '../TrainingScreen_parts/WorkoutSummaryReport';
@@ -152,8 +153,22 @@ export interface PlayerExercise {
   supersetGroup?: number;
   /** Позиция в паре: 0 = A, 1 = B. */
   supersetSlot?: 0 | 1;
+  /** Упражнение без отягощения (турник/брусья/отжимания) — из каталога, не из планового веса. */
+  isBodyweight?: boolean;
 }
 export interface PlayerDay { label: string; exercises: PlayerExercise[] }
+
+/**
+ * Плановый вес 0 — это «свой вес», только если упражнение действительно без отягощения
+ * (турник, брусья, отжимания). Если план молча отдал 0 для штанги, подход без введённого
+ * веса должен упасть с видимой ошибкой, а не записаться как BW с тоннажем 0.
+ */
+const planIsBodyweight = (ex: PlayerExercise, planWeight: number): boolean =>
+  ex.isBodyweight === true
+  || (Number(planWeight) <= 0 && isBodyweightExercise({ name: ex.name }));
+
+/** Значения подхода в редакторе плеера: вес/повторы/RPE/RIR/темп. */
+export type SessionSetValue = { weight: number; reps: number; rpe: number; rir?: number; tempo?: string };
 
 /**
  * Убрать из сессии подход с указанным `setNumber` (перед повторной записью того же сета).
@@ -232,6 +247,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   });
   // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)
   const savedRef = useRef(false);
+  // Хоткеи Space/Enter объявлены выше logOne и подписаны один раз: держим
+  // актуальную функцию в ref, иначе обработчик логирует вес из прошлого рендера.
+  const logOneRef = useRef<(ei: number, si: number) => boolean>(() => false);
+  // «+ Сет» из виджета, пришедший до старта сессии: undefined — ожидания нет.
+  const pendingQuickRef = useRef<Event | null | undefined>(undefined);
   // Троттлинг пушей снапшота на homescreen-виджет (АПК).
   const widgetPushRef = useRef(0);
   const [warmupBlocks, setWarmupBlocks] = useState<WarmupBlock[]>([]);
@@ -241,7 +261,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [warmupMode, setWarmupMode] = useState<WarmupMode>(() => {
     try { const v = localStorage.getItem('he_warmup_mode') as WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
   });
-  const [warmupQuality, setWarmupQuality] = useState<number | null>(null);
   const [warmupTimer, setWarmupTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
   // Таймер растяжки в фазе заминки (обратный отсчёт и автопроверка)
   const [coolTimer, setCoolTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
@@ -274,9 +293,37 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     return () => window.clearInterval(t);
   }, [warmupTimer ? `${warmupTimer.i}_${warmupTimer.j}` : null]);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
-  const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }>>({});
+  // «actual» — то, что пользователь ввёл/подтвердил сам.
+  // «prefill» — ПОДСКАЗКА из прошлой сессии (вес/повторы), а не запись подхода (P0-2).
+  const [actual, setActual] = useState<Record<string, SessionSetValue>>({});
+  const [prefill, setPrefill] = useState<Record<string, SessionSetValue>>({});
+
+  // «Подход записан» = он реально лежит в живой сессии с этим setNumber.
+  // Раньше признаком было наличие ключа в actual, а туда же складывалось
+  // предзаполнение весов из прошлой тренировки → весь день выглядел выполненным,
+  // ни один подход не открывался, а «Все подходы записаны» закрывал сессию
+  // без сохранения (P0-2). Теперь подсказка живёт в отдельном prefill.
+  const loggedSet = useMemo(() => {
+    const map: Record<string, true> = {};
+    (session?.exercises || []).forEach((ex, ei) => {
+      (ex.sets || []).forEach((st, i) => {
+        const sn = Number(st.setNumber);
+        const setNumber = Number.isFinite(sn) && sn > 0 ? sn : i + 1;
+        map[ei + '_' + (setNumber - 1)] = true;
+      });
+    });
+    return map;
+  }, [session]);
+
+  // Что показывать в редакторе подхода: введённое/подтверждённое поверх подсказки.
+  const vals = useMemo(
+    () => (Object.keys(prefill).length ? { ...prefill, ...actual } : actual),
+    [prefill, actual],
+  );
    const [exDone, setExDone] = useState<Record<string, boolean>>({});
    const [interExTimerSec, setInterExTimerSec] = useState<number>(0);
+   // Сколько длится текущий переход между упражнениями — для прогресс-бара.
+   const [interExTotalSec, setInterExTotalSec] = useState<number>(120);
    const [interExTimerRunning, setInterExTimerRunning] = useState<boolean>(false);
     const interExTimerRef = useRef<number | null>(null);
     // Причина пропуска разминки/заминки (устанавливается кнопкой «⏭ Пропустить»)
@@ -293,7 +340,26 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     const [plateOpen, setPlateOpen] = useState<boolean>(false);
     // Разворачиваемая техника упражнения (по имени упражнения)
     const [techOpen, setTechOpen] = useState<Record<string, boolean>>({});
-    const [autoStartRest, setAutoStartRest] = useState<boolean>(true);
+    // P2-1: настройки таймера отдыха ЧИТАЮТСЯ из he_timer_settings (раньше писались
+    // и никогда не читались: после перезапуска снова 90 с и авто-старт). Одна
+    // валидирующая точка-парсер — битые/чужие значения не ломают плеер.
+    const timerSettingsSaved: { preset: 'compound' | 'isolation' | 'pump' | 'custom'; customRest: number; autoStart: boolean } = (() => {
+      try {
+        const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem('he_timer_settings');
+        const parsed = raw ? JSON.parse(raw) : null;
+        const preset: 'compound' | 'isolation' | 'pump' | 'custom' =
+          parsed?.preset === 'isolation' || parsed?.preset === 'pump' || parsed?.preset === 'custom'
+            ? parsed.preset
+            : 'compound';
+        const n = Number(parsed?.customRest);
+        const customRest = Number.isFinite(n) ? Math.max(30, Math.min(300, Math.round(n))) : 90;
+        const autoStart = typeof parsed?.autoStart === 'boolean' ? parsed.autoStart : true;
+        return { preset, customRest, autoStart };
+      } catch {
+        return { preset: 'compound' as const, customRest: 90, autoStart: true };
+      }
+    })();
+    const [autoStartRest, setAutoStartRest] = useState<boolean>(timerSettingsSaved.autoStart);
   // Настройки уведомлений таймера (P2-1): звук/вибрация/голос. Хранятся в localStorage.
   const [timerSoundSettings, setTimerSoundSettings] = useState<{ sound: boolean; vibrate: boolean; voice: boolean }>(() => {
     try {
@@ -310,18 +376,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   }, [timerSoundSettings]);
     const [exerciseProgress, setExerciseProgress] = useState<Record<string, { completed: number; total: number }>>({});
     const [restHistory, setRestHistory] = useState<{ exercise: string; duration: number; timestamp: string }[]>([]);
-   const [timerSettings, setTimerSettings] = useState<{
-     preset: 'compound' | 'isolation' | 'pump' | 'custom';
-     customRest: number;
-     autoStart: boolean;
-   }>(() => {
-     try {
-       const saved = localStorage.getItem('he_timer_settings');
-       if (saved) return JSON.parse(saved);
-     } catch {}
-     return { preset: 'compound' as const, customRest: 90, autoStart: true };
-   });
-
     // P11: VBT-ввод скорости штанги (м/с) на сет + авторегуляция по потере скорости
   const [vel, setVel] = useState<Record<string, number>>({});
   /** Фаза 6, п.10: сообщение по видео подхода (показывается только у своего сета). */
@@ -334,18 +388,28 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const [vbtOverride, setVbtOverride] = useState<Record<string, number>>({});
   const [sessionRPE, setSessionRPE] = useState<number>(7);
   const [sessionDur, setSessionDur] = useState<number>(60);
+  // Пользователь ввёл минуты сам — не перетираем их таймером сессии.
+  const durEditedRef = useRef(false);
   // авто-таймер отдыха
    const [timerSec, setTimerSec] = useState<number>(0);
    const [timerRunning, setTimerRunning] = useState<boolean>(false);
    const [timerExIdx, setTimerExIdx] = useState<number>(-1);
-   const [timerPreset, setTimerPreset] = useState<'compound' | 'isolation' | 'pump' | 'custom'>('compound');
-   const [customRestSec, setCustomRestSec] = useState<number>(90);
+   const [timerPreset, setTimerPreset] = useState<'compound' | 'isolation' | 'pump' | 'custom'>(timerSettingsSaved.preset);
+   const [customRestSec, setCustomRestSec] = useState<number>(timerSettingsSaved.customRest);
    // Ручная добавка к отдыху («+15с» в зале) — план-цель не переписываем.
    const [restAddSec, setRestAddSec] = useState<number>(0);
    const timerRef = useRef<number | null>(null);
    const [sessionTimerSec, setSessionTimerSec] = useState<number>(0);
    const [sessionTimerRunning, setSessionTimerRunning] = useState<boolean>(false);
     const sessionTimerRef = useRef<number | null>(null);
+  // Длительность для sRPE: пока не введена вручную — реальный таймер сессии.
+  // Раньше всегда уходило 60 минут, и ACWR/нагрузка считались по выдуманной
+  // длительности даже для 25-минутной тренировки.
+  React.useEffect(() => {
+    if (phase !== 'main' || durEditedRef.current) return;
+    const m = Math.max(1, Math.round(sessionTimerSec / 60));
+    setSessionDur(prev => (prev === m ? prev : m));
+  }, [phase, sessionTimerSec]);
 
    // Сохранение настроек таймера при изменении
    useEffect(() => {
@@ -361,10 +425,22 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
    const plannedDay = days[dayIdx] || days[0];
   // 🌅 Фаза 6, п.6: утренний чек-ин меняет ТОЛЬКО сегодняшнюю сессию
   // (объём/RIR, в красной зоне — вес). Нет чек-ина на сегодня → план как есть.
-  const readinessToday = useMemo(
-    () => (typeof localStorage === 'undefined' ? null : readPLCheckin(localStorage)),
-    [],
-  );
+  // Плеер не размонтируется между «свернул/развернул», поэтому чек-ин
+  // перечитываем на событие сохранения (P1-6): иначе снимок остаётся от момента
+  // монтирования и «скорректировано на сегодня» — неправда до перезагрузки.
+  const readCheckin = () => {
+    try {
+      return typeof localStorage === 'undefined' ? null : readPLCheckin(localStorage);
+    } catch {
+      return null;
+    }
+  };
+  const [readinessToday, setReadinessToday] = useState(() => readCheckin());
+  useEffect(() => {
+    const onUpdated = () => setReadinessToday(readCheckin());
+    window.addEventListener(PL_CHECKIN_EVENT, onUpdated);
+    return () => window.removeEventListener(PL_CHECKIN_EVENT, onUpdated);
+  }, []);
   const day = useMemo(() => {
     if (!plannedDay) return plannedDay;
     if (!readinessToday || readinessToday.verdict.level === 'green') return plannedDay;
@@ -420,7 +496,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
          if (prev <= 1) { 
            setTimerRunning(false); 
            // Уведомление при завершении таймера
-           if (timerSoundSettings.vibrate) if (timerSoundSettings.vibrate) hapticNotify('success');
+           if (timerSoundSettings.vibrate) hapticNotify('success');
            // Вибрация: паттерн зависит от типа таймера
            if (timerSoundSettings.vibrate && navigator.vibrate) {
              if (timerExIdx >= 0) {
@@ -537,6 +613,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
          const currentIdx = supersetExercises.indexOf(ei);
          const isLastInSuperset = currentIdx === supersetExercises.length - 1;
          if (!isLastInSuperset) {
+           setRestAddSec(0);
            // Ещё не все упражнения суперсета выполнены - короткий отдых или без отдыха
            const rest = circuitMode ? 0 : getSupersetRestTime();
            if (rest > 0) {
@@ -566,6 +643,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   const startInterExTimer = useCallback((restSec: number = 120) => {
     setInterExTimerSec(restSec);
+    setInterExTotalSec(Math.max(1, restSec));
     setInterExTimerRunning(true);
   }, []);
 
@@ -626,6 +704,31 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   const begin = () => {
     if (!day || !Array.isArray(day.exercises)) return;
+    // Старт — последний момент перечитать чек-ин (могли заполнить до входа в плеер).
+    setReadinessToday(readCheckin());
+    // Новая тренировка начинается с чистого листа: скорость, VBT-пересчёт, MMC,
+    // прогресс прошлой сессии и таймеры не переезжают в неё (иначе VBT-панель
+    // сразу показывала совет по вчерашним подходам).
+    setVel({});
+    setVbtOverride({});
+    setMMCVals({});
+    setExerciseProgress({});
+    setExDone({});
+    setRestHistory([]);
+    setVideoNote(null);
+    setLogError(null);
+    setSessionRPE(7);
+    setSessionDur(60);
+    durEditedRef.current = false;
+    setRestAddSec(0);
+    setTimerRunning(false);
+    setTimerSec(0);
+    setTimerExIdx(-1);
+    setWarmupDone({});
+    setWarmupTimer(null);
+    setCooldownDone({});
+    setCoolTimer(null);
+    savedRef.current = false;
     // Новый старт сессии — заново применяем разметку суперсетов из плана
     // (пользователь мог выключить режим в прошлый раз).
     autoSupersetKeyRef.current = '';
@@ -689,7 +792,26 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
        });
        skipWarmupReasonRef.current = null;
      } catch { /* дневник разминки недоступен — не блокируем переход */ }
-     let s = startSession(focus || day.label, weekNumber);
+     // Новая сессия — чистый ввод; веса прошлой тренировки придут подсказкой (prefill).
+     // Виджет мог записать подходы до старта (queued set_add при возврате в приложение), и может
+     // быть незавершённая тренировка за сегодня. Подхватываем её: старт «с чистого листа»
+     // затёр бы эти подходы автосейвом пустой сессии.
+     try {
+       const activeSession = loadActiveSession();
+       // Только своя сессия: тот же день и тот же состав упражнений. Иначе подходы чужого дня
+       // «приклеятся» к индексам текущей программы и попадут не в те упражнения.
+       const sameDay = !!activeSession && activeSession.date === localIsoDate();
+       const samePlan = sameDay && (activeSession!.exercises || []).every(
+         (ex, i) => !day.exercises[i] || ex.exerciseName === day.exercises[i].name,
+       );
+       if (samePlan && (activeSession!.exercises || []).some(ex => (ex.sets || []).length > 0)) {
+         resumeSavedSession(activeSession!);
+         return;
+       }
+     } catch { /* ignore */ }
+    setActual({});
+    setPrefill({});
+    let s = startSession(focus || day.label, weekNumber);
      day.exercises.forEach(ex => {
        s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
      });
@@ -704,7 +826,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
           prevSession = getLastSession();
         }
         if (!prevSession || prevSession.exercises.length === 0) {
-          setActual({});
+          setPrefill({});
           return;
         }
         const prevMap: Record<string, { weightKg: number; reps: number; rir: number; tempo?: string }[]> = {};
@@ -718,7 +840,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             }));
           }
         });
-        const prefilled: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
+        const prefilled: Record<string, SessionSetValue> = {};
         day.exercises.forEach((ex, ei) => {
           const prevSets = prevMap[ex.name.toLowerCase()];
           if (prevSets && prevSets.length > 0) {
@@ -730,7 +852,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             });
           }
         });
-        setActual(prefilled);
+        setPrefill(prefilled);
       };
       void hydratePrevious();
       setExDone({});
@@ -743,8 +865,22 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
 
   const finish = () => {
     if (!session || !day || !Array.isArray(day.exercises)) return;
+    // Пустую сессию в дневник не пишем: «Завершить» без единого подхода создавало
+    // тренировку на 0 сетов и пустой «Итог» без объяснения.
+    if (!session.exercises.some(ex => (ex.sets || []).length > 0)) {
+      clearActiveSession();
+      try { localStorage.removeItem('he_workout_rest_timer_v1'); } catch { /* ignore */ }
+      setDone(null);
+      setDonePlan(null);
+      savedRef.current = false;
+      setPhase('done');
+      return;
+    }
     if (timerSoundSettings.vibrate) hapticNotify('success');
-    const finished = finishSession(session, `${focus} — ${day?.label}`);
+    // Для сессии, начатой сегодня, «стенные» часы точны (и включают паузы). Если её начали
+    // вчера и вернулись утром — доверяем таймеру плеера, иначе в историю уедет ~10 часов.
+    const sameDayStart = session.date === localIsoDate();
+    const finished = finishSession(session, `${focus} — ${day?.label}`, sameDayStart ? undefined : sessionDur);
     savedRef.current = true;
     try { onSaved?.(); } catch { /* ignore */ }
 
@@ -845,16 +981,22 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
        if (e.key === ' ' || e.key === 'Enter') {
          e.preventDefault();
-         // найти первый незалогированный сет и залогировать
-         if (!day || !Array.isArray(day.exercises)) return;
-         for (let ei = 0; ei < day.exercises.length; ei++) {
-           for (let si = 0; si < day.exercises[ei].targetSets.length; si++) {
-             if (!actual[keyFor(ei, si)]) {
-               logOne(ei, si);
-               return;
-             }
-           }
-         }
+         // Space/Enter записывает подход ОТКРЫТОГО упражнения (если там ещё есть
+          // неподтверждённые подходы), иначе первый по дню. Функцию берём из ref:
+          // эффект подписан один раз и не должен держать прошлый ввод.
+          if (!day || !Array.isArray(day.exercises)) return;
+          const order: number[] = [];
+          if (currentExIdx >= 0 && currentExIdx < day.exercises.length) order.push(currentExIdx);
+          for (let i = 0; i < day.exercises.length; i++) if (i !== currentExIdx) order.push(i);
+          for (const ei of order) {
+            const sets = day.exercises[ei]?.targetSets || [];
+            for (let si = 0; si < sets.length; si++) {
+              if (!loggedSet[keyFor(ei, si)]) {
+                logOneRef.current(ei, si);
+                return;
+              }
+            }
+          }
        }
        if (e.key === 'r' || e.key === 'R') {
          e.preventDefault();
@@ -864,7 +1006,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
      };
       window.addEventListener('keydown', handler);
       return () => window.removeEventListener('keydown', handler);
-  }, [phase, day, actual, timerRunning, timerExIdx]);
+  }, [phase, day, loggedSet, timerRunning, timerExIdx]);
 
   // Живая сессия: автосейв каждого подхода (переживает закрытие приложения).
   React.useEffect(() => {
@@ -878,7 +1020,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     if (now - widgetPushRef.current > 5000) {
       widgetPushRef.current = now;
       void import('../../native/widget-sync')
-        .then(m => m.pushTrainingWidget())
+        .then(m => { void m.pushTrainingWidget(); void m.pushWorkoutWidget(); })
         .catch(() => { /* web/TG — виджетов нет */ });
     }
   }, [phase, session]);
@@ -916,8 +1058,8 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // Остальные в зале нужны шапкой — полный редактор у них держим свёрнутым.
   const currentExIdx = useMemo(() => {
     if (!day || !Array.isArray(day.exercises)) return -1;
-    return day.exercises.findIndex((ex, ei) => (ex.targetSets || []).some((_, si) => !actual[`${ei}_${si}`]));
-  }, [day, actual]);
+    return day.exercises.findIndex((ex, ei) => (ex.targetSets || []).some((_, si) => !loggedSet[`${ei}_${si}`]));
+  }, [day, loggedSet]);
 
   // В зале, закрыв последний подход упражнения, экран сам едет к следующему:
   // иначе оно остаётся ниже сгиба и его приходится искать прокруткой.
@@ -940,32 +1082,42 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
     day.exercises.forEach((ex, ei) => {
       const sets = ex.targetSets || [];
       totalSets += sets.length;
-      doneSets += sets.filter((_, si) => !!actual[keyFor(ei, si)]).length;
+      doneSets += sets.filter((_, si) => !!loggedSet[keyFor(ei, si)]).length;
     });
     return { totalSets, doneSets };
-  }, [day, actual]);
+  }, [day, loggedSet]);
 
-  const logOne = (ei: number, si: number) => {
-     if (!session || !day || !Array.isArray(day.exercises)) return;
+  const logOne = (ei: number, si: number): boolean => {
+     if (!session || !day || !Array.isArray(day.exercises)) return false;
      hapticImpact('light');
      const ex = day.exercises[ei];
-     if (!ex) return;
+     if (!ex) return false;
      const ts = Array.isArray(ex.targetSets) ? ex.targetSets[si] : null;
       const t = ts || { weight: weightFor(ex) || 60, reps: repsFor(ex) || 10, rir: rirFor(ex) ?? 2, tempo: undefined as string | undefined };
       const plannedTempo = tempoText(t.tempo);
-      const a0 = actual[keyFor(ei, si)] || { weight: vbtOverride[keyFor(ei, si)] ?? t.weight, reps: t.reps, rpe: 0 };
+      const a0 = vals[keyFor(ei, si)] || { weight: vbtOverride[keyFor(ei, si)] ?? t.weight, reps: t.reps, rpe: 0 };
       const a = { ...a0, rir: a0.rir ?? (a0.rpe > 0 ? Math.max(0, 10 - a0.rpe) : t.rir) };
+      // RPE пишем только измеренный: явно введённый или пересчитанный из ВВЕДЁННОГО RIR.
+      // Плановый RIR — прескрипция, а не факт: из него RPE не выдумываем.
+      const enteredRaw = vals[keyFor(ei, si)];
+      const enteredRpe = Number(enteredRaw?.rpe) || 0;
+      const enteredRir = typeof enteredRaw?.rir === 'number' ? enteredRaw.rir : undefined;
+      const measuredRpe = enteredRpe > 0
+        ? enteredRpe
+        : (enteredRir != null && enteredRir <= 10 ? Math.max(0, 10 - enteredRir) : 0);
+      const previousBestWeight = getCachedProgressForExercise(ex.name)?.bestWeight || undefined;
       // Повторное «✓» по тому же сету = ПРАВКА подхода, а не второй подход:
       // сначала убираем прежнюю запись с этим setNumber, потом пишем новую.
       // (logSet всегда append — без этого двойной тап удваивал подход и объём.)
-      const alreadyLogged = !!actual[keyFor(ei, si)];
+      const alreadyLogged = !!loggedSet[keyFor(ei, si)];
       const base = alreadyLogged ? withoutSetNumber(session, ei, si + 1) : session;
       const res = logSet(base, ei, {
         setNumber: si + 1,
         weightKg: a.weight,
+        bodyweight: planIsBodyweight(ex, t.weight) && !(Number(a.weight) > 0),
         reps: a.reps,
-        rpe: a.rpe || Math.max(1, 10 - t.rir),
-        rir: a.rir,
+        rpe: measuredRpe,
+        rir: enteredRir ?? 0,
         // VBT-факт: скорость штанги этого подхода (м/с) — пишется в дневник,
         // чтобы отчёты «план vs факт» считали потерю скорости ПО ФАКТУ.
         velocityMs: vel[keyFor(ei, si)],
@@ -975,12 +1127,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
         plannedRir: t.rir,
          plannedTempo,
          actualTempo: a.tempo?.trim() || undefined,
-      });
+      }, previousBestWeight);
       // Валидация движка (вес 0, вес/повторы сверх лимитов) больше не глотается:
       // иначе подход выглядел записанным, а в сессию не попадал.
       if (!res.success) {
         setLogError({ key: keyFor(ei, si), msg: res.reason || 'Подход не записан' });
-        return;
+        return false;
       }
       setLogError(null);
       setSession(res.session);
@@ -999,13 +1151,21 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       if (autoStartRest) {
         startRestTimer(ei);
       }
-    };
+      return true;
+      };
+
+  // logOne объявлен ниже обработчика хоткеев — держим актуальную версию в ref.
+  logOneRef.current = logOne;
 
   /** Продолжить автосохранённую тренировку: восстанавливаем подходы и таймер. */
   const resumeSavedSession = (saved: WorkoutSession) => {
     const rebuilt: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
     (saved.exercises || []).forEach((ex, ei) => {
-      (ex.sets || []).forEach((st, si) => {
+      (ex.sets || []).forEach((st, i) => {
+        const sn = Number(st.setNumber);
+        const si = Number.isFinite(sn) && sn > 0 ? sn - 1 : i;
+        // Ключ — по setNumber, а не по индексу массива: иначе после правки сета
+        // (withoutSetNumber → порядок меняется) значения попадают к чужому подходу.
         rebuilt[keyFor(ei, si)] = {
           weight: st.weightKg, reps: st.reps, rpe: st.rpe,
           rir: st.rir, tempo: st.actualTempo || st.plannedTempo,
@@ -1046,55 +1206,206 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // ── Быстрый сет из дока/виджета («+ Сет» без прокрутки к подходу) ──
   React.useEffect(() => {
     const onQuickSet = (ev?: Event) => {
-      if (phase !== 'main' || !day || !Array.isArray(day.exercises)) return;
+      if (!day || !Array.isArray(day.exercises)) return;
+      if (phase !== 'main') {
+        // «＋ Сет» с нативного виджета может прийти в фазу ready (сессия ещё не
+        // начата) — раньше запрос молча терялся. Стартуем основную часть и
+        // доводим подход, когда сессия появится.
+        if (phase === 'ready' && pendingQuickRef.current === undefined) {
+          pendingQuickRef.current = ev ?? null;
+          startMain();
+        }
+        return;
+      }
       for (let ei = 0; ei < day.exercises.length; ei++) {
         for (let si = 0; si < day.exercises[ei].targetSets.length; si++) {
-          if (!actual[keyFor(ei, si)]) {
-            logOne(ei, si);
-            // Подтверждаем пульту, что подход записан: иначе он откроет проведение.
-            (ev as CustomEvent | undefined)?.detail?.handled?.();
+          if (!loggedSet[keyFor(ei, si)]) {
+            // Пульту отвечаем только при реальной записи: отказ движка (лимит веса,
+            // нулевой вес) раньше считался успехом и виджет показывал фантомный сет.
+            const ok = logOne(ei, si);
+            (ev as CustomEvent | undefined)?.detail?.handled?.(ok);
             return;
           }
         }
       }
+      // Свободных подходов не осталось — отвечаем явным отказом, иначе виджет
+      // считает, что запрос не дошёл, и открывает сессию повторно.
+      (ev as CustomEvent | undefined)?.detail?.handled?.(false);
     };
     window.addEventListener('he-workout-quick-set', onQuickSet as EventListener);
     return () => window.removeEventListener('he-workout-quick-set', onQuickSet as EventListener);
-  }, [phase, day, actual, logOne]);
+  }, [phase, day, loggedSet, logOne]);
 
-  // batch skip: залогировать все подходы упражнения плановыми весами
+  // «Готово»/закрытие карточки: плеер не размонтируется (прячется display:none),
+  // поэтому итог прошлой тренировки надо сбросить самим — иначе следующее
+  // открытие показывало старый отчёт вместо кнопки старта.
+  React.useEffect(() => {
+    const onClose = () => {
+      setPhase('ready');
+      setDone(null);
+      setDonePlan(null);
+      setSession(null);
+      pendingQuickRef.current = undefined;
+      setActual({});
+      setPrefill({});
+      setVel({});
+      setVbtOverride({});
+      setMMCVals({});
+      setExerciseProgress({});
+      setExDone({});
+      setRestHistory([]);
+      setVideoNote(null);
+      setLogError(null);
+      setWarmupDone({});
+      setCooldownDone({});
+      setWarmupTimer(null);
+      setCoolTimer(null);
+      setSessionRPE(7);
+      setSessionDur(60);
+      durEditedRef.current = false;
+      setTimerRunning(false);
+      setTimerSec(0);
+      setTimerExIdx(-1);
+      setRestAddSec(0);
+      setSessionTimerRunning(false);
+      setSessionTimerSec(0);
+      savedRef.current = false;
+      try { setResumeFrom(loadActiveSession()); } catch { setResumeFrom(null); }
+    };
+    window.addEventListener('he-workout-close', onClose);
+    return () => window.removeEventListener('he-workout-close', onClose);
+  }, []);
+
+  // Отложенный «+ Сет» (пришёл до старта сессии): записываем первый
+  // незаписанный подход, как только сессия реально появилась, и только тогда
+  // подтверждаем пульту, что запрос обработан.
+  React.useEffect(() => {
+    if (phase !== 'main' || !session || pendingQuickRef.current === undefined) return;
+    const ev = pendingQuickRef.current;
+    pendingQuickRef.current = undefined;
+    if (!day || !Array.isArray(day.exercises)) return;
+    for (let ei = 0; ei < day.exercises.length; ei++) {
+      const sets = day.exercises[ei]?.targetSets || [];
+      for (let si = 0; si < sets.length; si++) {
+        if (!loggedSet[keyFor(ei, si)]) {
+          const ok = logOne(ei, si);
+          (ev as CustomEvent | undefined)?.detail?.handled?.(ok);
+          return;
+        }
+      }
+    }
+    (ev as CustomEvent | undefined)?.detail?.handled?.(false);
+  }, [phase, session, day, loggedSet, logOne]);
+
+  // Подход из нативного виджета, пока плеер открыт: виджет не пишет в хранилище сам,
+  // а просит плеер записать подход — иначе следующий автосейв плеера сотрёт его.
+  React.useEffect(() => {
+    const onWidgetSet = (ev: Event) => {
+      const d = (ev as CustomEvent | undefined)?.detail as any;
+      if (!d || !d.exerciseName) return;
+      if (phase !== 'main' || !session || !day || !Array.isArray(day.exercises)) return;
+      const want = normalizeExerciseName(String(d.exerciseName));
+      const ei = day.exercises.findIndex(ex => normalizeExerciseName(ex.name) === want);
+      if (ei < 0) return;
+      const ex = day.exercises[ei];
+      const prevSets = session.exercises[ei]?.sets || [];
+      const nextNum = prevSets.reduce((m, s) => Math.max(m, Number(s.setNumber) || 0), 0) + 1;
+      const weight = Math.max(0, Number(d.weight) || 0);
+      const reps = Math.max(0, Math.round(Number(d.reps) || 0));
+      const rirRaw = Number(d.rir);
+      const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(20, rirRaw) : 0;
+      const rpeRaw = Number(d.rpe);
+      const rpe = Number.isFinite(rpeRaw) && rpeRaw > 0
+        ? Math.min(10, rpeRaw)
+        : (rir > 0 ? Math.max(0, 10 - rir) : 0);
+      const techRaw = Number(d.technique);
+      const techniqueScore = Number.isFinite(techRaw) && techRaw >= 3 && techRaw <= 5 ? Math.round(techRaw) : undefined;
+      const planWeight = Number(ex.targetSets?.[0]?.weight) || 0;
+      const res = logSet(session, ei, {
+        setNumber: nextNum,
+        weightKg: weight,
+        bodyweight: planIsBodyweight(ex, planWeight) && weight <= 0,
+        reps,
+        rpe,
+        rir,
+        notes: String(d.notes ?? '').slice(0, 200),
+        techniqueScore,
+        pause: d.pause === true,
+        plannedWeight: planWeight || undefined,
+      });
+      if (!res.success) return;
+      setSession(res.session);
+      setExerciseProgress(prev => {
+        const total = ex.targetSets?.length || prevSets.length + 1;
+        const completed = Math.min(prevSets.length + 1, total);
+        return { ...prev, [String(ei)]: { completed, total } };
+      });
+      d.handled = true;
+    };
+    window.addEventListener('he-workout-widget-set', onWidgetSet as EventListener);
+    return () => window.removeEventListener('he-workout-widget-set', onWidgetSet as EventListener);
+  }, [phase, session, day]);
+
+  // Пока плеер смонтирован, он единственный писатель активной сессии (см. widget-sync).
+  React.useEffect(() => {
+    let mod: any = null;
+    let alive = true;
+    void import('../../native/widget-sync')
+      .then(m => { mod = m; if (alive) m.setWorkoutPlayerActive?.(true); })
+      .catch(() => { /* web: моста нет */ });
+    return () => {
+      alive = false;
+      try { mod?.setWorkoutPlayerActive?.(false); } catch { /* ignore */ }
+    };
+  }, []);
+
+  // batch skip: залогировать планом ОСТАВШИЕСЯ подходы упражнения.
+  // Раньше через logSet прогонялись ВСЕ targetSets, а logSet append-only →
+  // уже записанные подходы дублировались (1,2,3,1,2) и завышали подходы,
+  // тоннаж и 1ПМ (P0-3). Теперь записанный подход не трогаем, введённые
+  // вес/повторы сохраняем, планом добиваем только пустые.
   const skipExercise = useCallback((ei: number) => {
     if (!session || !day || !Array.isArray(day.exercises)) return;
     const ex = day.exercises[ei];
     if (!ex || !Array.isArray(ex.targetSets)) return;
     hapticImpact('light');
     let s = session;
-    const newActual: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
-     ex.targetSets.forEach((t, si) => {
-       const plannedTempo = tempoText(t.tempo);
-       const a = { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir), rir: t.rir, tempo: plannedTempo };
+    const newActual: Record<string, SessionSetValue> = {};
+    ex.targetSets.forEach((t, si) => {
+      const k = keyFor(ei, si);
+      if (loggedSet[k]) return;
+      const plannedTempo = tempoText(t.tempo);
+      const entered = actual[k];
+      const a = {
+        weight: entered?.weight ?? t.weight,
+        reps: entered?.reps ?? t.reps,
+        rpe: entered?.rpe || Math.max(1, 10 - t.rir),
+        rir: entered?.rir ?? t.rir,
+        tempo: entered?.tempo ?? plannedTempo,
+      };
       // Массовый пропуск тоже уважает валидацию движка: сет, который он отверг
       // (вес 0 / сверх лимита), не помечается выполненным.
       const r = logSet(s, ei, {
         setNumber: si + 1,
         weightKg: a.weight,
+        bodyweight: planIsBodyweight(ex, t.weight) && !(Number(a.weight) > 0),
         reps: a.reps,
-        rpe: a.rpe,
-        rir: t.rir,
+        rpe: entered?.rpe && entered.rpe > 0 ? entered.rpe : 0,
+        rir: entered?.rir ?? 0,
         notes: '',
         plannedWeight: t.weight,
         plannedReps: t.reps,
         plannedRir: t.rir,
-         plannedTempo,
-         actualTempo: plannedTempo,
+        plannedTempo,
+        actualTempo: a.tempo,
       });
       if (!r.success) return;
       s = r.session;
-      newActual[keyFor(ei, si)] = a;
+      newActual[k] = a;
     });
     setSession(s);
     setActual(prev => ({ ...prev, ...newActual }));
-  }, [session, day]);
+  }, [session, day, loggedSet, actual]);
 
   // Fallback helpers when targetSets is missing (legacy cache)
   const weightFor = (ex: any) => ex?.targetSets?.[0]?.weight ?? ex?.weight ?? 60;
@@ -1112,13 +1423,13 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
       const next = { ...prev };
       (Array.isArray(ex.targetSets) ? ex.targetSets : []).forEach((t, si) => {
         const k = keyFor(ei, si);
-        const existing = next[k];
-        if (existing && existing.rpe > 0) return; // сет уже залогирован
+        if (loggedSet[k]) return; // подход уже записан
+        const existing = next[k] ?? prefill[k];
         next[k] = { weight: w, reps: existing?.reps ?? t.reps, rpe: 0 };
       });
       return next;
     });
-  }, [day]);
+  }, [day, loggedSet, prefill]);
 
   // Плановые метрики дня
   const planned = useMemo(() => {
@@ -1201,9 +1512,19 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   const goPhase = (p: typeof phase) => {
     if (p === phase) return;
     if (p === 'ready') { if (!session) setPhase('ready'); return; }
-    if (p === 'warmup') { if (warmupBlocks.length === 0) begin(); else setPhase('warmup'); return; }
+    // Назад в разминку при живой сессии нельзя: «К основной части» тогда
+    // стартовало бы сессию заново и стёрло записанные подходы.
+    if (p === 'warmup') { if (session) return; if (warmupBlocks.length === 0) begin(); else setPhase('warmup'); return; }
     if (p === 'main') { if (phase === 'warmup') startMain(); else if (phase === 'main') { /* уже там */ } return; }
-    if (p === 'cooldown') { if (session) finish(); else setPhase('cooldown'); return; }
+    // Пустую сессию (ни одного подхода) в дневник не пишем: раньше заминка из
+    // «Итога» без данных сохраняла тренировку на 0 сетов.
+    if (p === 'cooldown') {
+      const hasSets = !!session && session.exercises.some(ex => (ex.sets || []).length > 0);
+      if (hasSets) finish();
+      else if (phase === 'ready') return;
+      else setPhase('cooldown');
+      return;
+    }
     if (p === 'done') { if (!session && !done) return; exitSession(); return; }
   };
 
@@ -1780,21 +2101,6 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             );
           })}
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-            <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', boxShadow: '0 4px 16px rgba(249,115,22,0.28)' }} onClick={startMain}>
-              🚀 К основной части
-            </button>
-            <button type="button" onClick={() => {
-              const next: Record<string, boolean> = {};
-              warmupBlocks.forEach((b, i) => b.exercises.forEach((_, j) => { next[`w_${i}_${j}`] = true; }));
-              setWarmupDone(next);
-            }} style={{
-              padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
-              background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.22)',
-            }}>
-              ✓ Всё готово
-            </button>
-          </div>
           <SkipBar reasons={WARMUP_SKIP_REASONS} label="разминку" onSkip={reason => { skipWarmupReasonRef.current = reason; startMain(); }} />
           <div style={{ fontSize: 9, color: '#fff', textAlign: 'center', lineHeight: 1.3, marginTop: 2 }}>
             Активация подбирается под группы дня — каждая рабочая мышца получает мобильность и «включение» · без ленты — bodyweight-замены уже включены · подводящие — с весом в подсказке (~кг)
@@ -1814,9 +2120,9 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
            {(() => {
              if (!day || !Array.isArray(day.exercises)) return null;
              const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
-             const doneSets = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.filter((_, si) => !!actual[keyFor(ei, si)]).length, 0);
+             const doneSets = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.filter((_, si) => !!loggedSet[keyFor(ei, si)]).length, 0);
              const pct = totalSets > 0 ? Math.round(doneSets / totalSets * 100) : 0;
-             const doneVol = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.reduce((ss, t, si) => ss + (actual[keyFor(ei, si)] ? t.weight * t.reps : 0), 0), 0);
+             const doneVol = day.exercises.reduce((s, ex, ei) => s + ex.targetSets.reduce((ss, t, si) => ss + (loggedSet[keyFor(ei, si)] ? t.weight * t.reps : 0), 0), 0);
              return (
                <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.15)' }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1879,7 +2185,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 const acc = muscleSets[g] || { plan: 0, done: 0 };
                 ex.targetSets.forEach((_, si) => {
                   acc.plan += 1;
-                  if (actual[keyFor(ei, si)]) acc.done += 1;
+                  if (loggedSet[keyFor(ei, si)]) acc.done += 1;
                 });
                 muscleSets[g] = acc;
               });
@@ -2066,15 +2372,15 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     {ex.targetSets.map((_, si) => (
                       <div key={si} style={{ 
                         width: 24, height: 8, borderRadius: 4,
-                        background: actual[keyFor(ei, si)] ? '#00e68a' : 'rgba(255,255,255,0.1)',
+                        background: loggedSet[keyFor(ei, si)] ? '#00e68a' : 'rgba(255,255,255,0.1)',
                         transition: 'background 0.3s ease'
                       }} />
                     ))}
                      <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>
-                       {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
+                       {ex.targetSets.filter((_, si) => loggedSet[keyFor(ei, si)]).length}/{ex.targetSets.length}
                      </span>
                     </div>
-{(ei === currentExIdx || !!exOpen[ei]) && <MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />}
+{(ei === currentExIdx || !!exOpen[ei]) && <MindsetApproachHint focus={focus} exerciseStarted={ex.targetSets.some((_, si) => !!loggedSet[keyFor(ei, si)])} />}
                     {/* Свёрнутое упражнение: вместо редакторов — цель одной строкой. */}
                     {!(ei === currentExIdx || !!exOpen[ei]) && (() => {
                       const t0 = ex.targetSets[0];
@@ -2113,12 +2419,12 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                     )}
                   {ex.targetSets.map((t, si) => {
                  const k = keyFor(ei, si);
-                   const a = actual[k] || { weight: vbtOverride[k] ?? t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
+                   const a = vals[k] || { weight: vbtOverride[k] ?? t.weight, reps: t.reps, rpe: 0, rir: undefined, tempo: undefined };
                    const plannedTempo = tempoText(t.tempo);
-                   const logged = !!actual[k];
+                   const logged = !!loggedSet[k];
                    // Текущий подход — первый незаписанный (или раскрытый пользователем);
                    // остальные ждут строкой в очереди, а не полным редактором на весь экран.
-                   const firstUnlogged = ex.targetSets.findIndex((_, si2) => !actual[keyFor(ei, si2)]);
+                   const firstUnlogged = ex.targetSets.findIndex((_, si2) => !loggedSet[keyFor(ei, si2)]);
                    const isCurrent = (ei === currentExIdx || !!exOpen[ei]) && (si === firstUnlogged || !!openSet[k]);
                  const targetRPE = 10 - t.rir;
                  const dW = a.weight - t.weight;
@@ -2194,6 +2500,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                             <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { ...a, reps: a.reps + 1 } })); }} style={{ width: 44, height: 44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
                           </div>
                         </div>
+                        {!loggedSet[k] && prefill[k] && prefill[k].weight !== t.weight && (
+                          <div data-pl="set-prefill" style={{ fontSize: 10, color: '#60a5fa', paddingLeft: 2 }}>
+                            ↺ из прошлой тренировки: {prefill[k].weight} кг × {prefill[k].reps} — подтвердите «OK»
+                          </div>
+                        )}
                         {/* Сколько это от личного лучшего: абсолютный вес без базы не читается */}
                         {intensity.pct !== null && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
@@ -2253,7 +2564,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                       </div>
                       {/* кнопка пропуска упражнения */}
                       {(() => {
-                        const allLogged = ex.targetSets.every((_, si) => !!actual[keyFor(ei, si)]);
+                        const allLogged = ex.targetSets.every((_, si) => !!loggedSet[keyFor(ei, si)]);
                         if (allLogged || ex.targetSets.length === 0) return null;
                         return (
                           <button style={{ width: '100%', marginTop: 4, minHeight: 40, padding: '10px 0', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.12)', background: 'transparent', color: 'var(--text-faint)', fontSize: 11, cursor: 'pointer' }} onClick={() => skipExercise(ei)}>
@@ -2315,10 +2626,10 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
               {(() => {
                 // У свёрнутого упражнения очередь не нужна — оно живёт одной шапкой.
                 if (!(ei === currentExIdx || !!exOpen[ei])) return null;
-                const firstUnlogged = ex.targetSets.findIndex((_, si) => !actual[keyFor(ei, si)]);
+                const firstUnlogged = ex.targetSets.findIndex((_, si) => !loggedSet[keyFor(ei, si)]);
                 const queued = ex.targetSets
                   .map((t, si) => ({ t, si, k: keyFor(ei, si) }))
-                  .filter(({ si, k }) => !actual[k] && si !== firstUnlogged && !openSet[k]);
+                  .filter(({ si, k }) => !loggedSet[k] && si !== firstUnlogged && !openSet[k]);
                 if (queued.length === 0) return null;
                 return (
                   <div data-pl="set-queue" style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
@@ -2343,11 +2654,11 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                 ex.targetSets.forEach((t, si) => {
                   const v = vel[keyFor(ei, si)];
                   if (!v || v <= 0) return;
-                  const av = actual[keyFor(ei, si)];
+                  const av = vals[keyFor(ei, si)];
                   samples.push({ weight: av?.weight ?? t.weight, reps: av?.reps ?? t.reps, velocity: v });
                 });
                 if (samples.length === 0) return null;
-                const nextIdx = ex.targetSets.findIndex((_, si) => !actual[keyFor(ei, si)] && !(vel[keyFor(ei, si)] > 0));
+                const nextIdx = ex.targetSets.findIndex((_, si) => !loggedSet[keyFor(ei, si)] && !(vel[keyFor(ei, si)] > 0));
                 const plannedNext = nextIdx >= 0 ? ex.targetSets[nextIdx].weight : 0;
                 const advice = adviseVBTNextSet({ samples, plannedNextWeight: plannedNext, intent: vbtIntent });
                 const thr = advice.thresholdPct;
@@ -2513,7 +2824,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                      <button onClick={skipInterExTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
                    </div>
                    <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                     <div style={{ height: '100%', width: `${Math.min(100, (120 - interExTimerSec) / 120 * 100)}%`, borderRadius: 2, background: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa', transition: 'width 1s linear' }} />
+                     <div style={{ height: '100%', width: `${Math.min(100, (Math.max(1, interExTotalSec) - interExTimerSec) / Math.max(1, interExTotalSec) * 100)}%`, borderRadius: 2, background: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa', transition: 'width 1s linear' }} />
                    </div>
                  </div>
                )}
@@ -2525,7 +2836,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
             <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginLeft: 2 }}>·</span>
             <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>мин</span>
-            <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
+            <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => { durEditedRef.current = true; setSessionDur(+e.target.value); }} aria-label="длительность мин" />
           </div>
 
           {/* Раньше из тренировки можно было выйти только тапом по табу фаз
@@ -2683,8 +2994,16 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             </div>
             {done && done.durationMin > 0 && (
               <span style={{ fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.22)', color: '#fff', whiteSpace: 'nowrap' }}>{done.durationMin} мин</span>
-            )}
+              )}
           </div>
+
+          {!done && (
+            <div data-pl="done-empty" style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Подходы не записаны</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, lineHeight: 1.4, marginBottom: 8 }}>Тренировка закрыта без единого подхода — в дневник ничего не попало.</div>
+              <button type="button" data-act="done-back-to-start" onClick={() => { setPhase('ready'); setDone(null); }} style={{ ...BTN, width: '100%', background: 'transparent', border: '1px solid rgba(255,255,255,0.18)' }}>← Вернуться к старту</button>
+            </div>
+          )}
 
           {/* Отчёт длинный, а сессия уже сохранена: выход — сразу под шапкой итога. */}
           <button type="button" data-act="session-done-close" onClick={() => {

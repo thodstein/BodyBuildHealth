@@ -12,31 +12,38 @@ import { buildLMSPlan, appendPLTaperWeeks, type LMSBuildOutput } from '../lms-bu
 import { CYCLE_01 } from '../../../data/lms-cycles/cycle-01';
 import { mergeMeetRegistry, reanchorCompetitionWeeks, type CompetitionEvent } from '../pl-meet-registry.engine';
 
-const pmMap = { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 };
+const pmMap = { Присед: 180, 'Жим лежа': 120, 'Становая тяга': 220 };
 
 function buildWithTaper(opts: { meetWeek?: boolean; postMeet?: boolean } = {}): LMSBuildOutput {
   const base = buildLMSPlan({
-    template: CYCLE_01 as never, pmMap, fallbackPm: 80, mode: 'natural', weeksOverride: 6, faithful: true,
+    template: CYCLE_01 as never,
+    pmMap,
+    fallbackPm: 80,
+    mode: 'natural',
+    weeksOverride: 6,
+    faithful: true,
   } as never);
   return appendPLTaperWeeks(base, 2, {
-    windowWeeks: 6, meetWeek: opts.meetWeek !== false, postMeet: opts.postMeet !== false,
+    windowWeeks: 6,
+    meetWeek: opts.meetWeek !== false,
+    postMeet: opts.postMeet !== false,
   });
 }
 
 describe('P0-2: пост-стартовая неделя не копирует соревновательные веса', () => {
   it('в неделе прикидов действительно есть синглы (предпосылка теста)', () => {
     const out = buildWithTaper();
-    const meet = out.weeks.find(w => w.meetWeek)!;
+    const meet = out.weeks.find((w) => w.meetWeek)!;
     expect(meet).toBeTruthy();
-    const singles = meet.days.flatMap(d => d.exercises.flatMap(e => e.workSets.filter(ws => ws.reps === 1)));
+    const singles = meet.days.flatMap((d) => d.exercises.flatMap((e) => e.workSets.filter((ws) => ws.reps === 1)));
     expect(singles.length).toBeGreaterThan(0);
     // и они тяжёлые — 90 %+ ПМ
-    expect(singles.some(ws => (ws.pct ?? 0) >= 0.9)).toBe(true);
+    expect(singles.some((ws) => (ws.pct ?? 0) >= 0.9)).toBe(true);
   });
 
   it('пост-старт: ≤70 % ПМ, без синглов, RIR ≥3 по каждому подходу', () => {
     const out = buildWithTaper();
-    const post = out.weeks.find(w => w.postMeet)!;
+    const post = out.weeks.find((w) => w.postMeet)!;
     expect(post).toBeTruthy();
     let checked = 0;
     for (const day of post.days) {
@@ -57,29 +64,83 @@ describe('P0-2: пост-стартовая неделя не копирует �
 
   it('пост-старт остаётся разгрузкой: объём не больше половины рабочей недели-базы', () => {
     const out = buildWithTaper();
-    const post = out.weeks.find(w => w.postMeet)!;
+    const post = out.weeks.find((w) => w.postMeet)!;
     // База пост-недели — последняя НЕ-таперная/не-прикидочная неделя плана.
-    const working = [...out.weeks].reverse().find(w => !w.taperWeek && !w.mockMeet && !w.meetWeek && !w.postMeet)!;
+    const working = [...out.weeks].reverse().find((w) => !w.taperWeek && !w.mockMeet && !w.meetWeek && !w.postMeet)!;
     expect(working).toBeTruthy();
-    const setsOf = (w: typeof post) => w.days.reduce((s, d) => s + d.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0), 0);
+    const setsOf = (w: typeof post) =>
+      w.days.reduce((s, d) => s + d.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0), 0);
     expect(setsOf(post)).toBeLessThanOrEqual(Math.max(1, Math.round(setsOf(working) * 0.55)));
   });
 
   it('без недели соревнований пост-старт всё равно строится от рабочей недели (не от тапера)', () => {
     const out = buildWithTaper({ meetWeek: false });
-    const post = out.weeks.find(w => w.postMeet)!;
+    const post = out.weeks.find((w) => w.postMeet)!;
     expect(post).toBeTruthy();
-    for (const day of post.days) for (const ex of day.exercises) for (const ws of ex.workSets) {
-      expect(ws.reps).toBeGreaterThan(1);
-      expect(ws.pct).toBeLessThanOrEqual(0.7);
+    for (const day of post.days)
+      for (const ex of day.exercises)
+        for (const ws of ex.workSets) {
+          expect(ws.reps).toBeGreaterThan(1);
+          expect(ws.pct).toBeLessThanOrEqual(0.7);
+        }
+  });
+});
+
+describe('P2-13: RIR пост-старта = базовый + 3 (таблица и подпись согласованы)', () => {
+  it('базовый RIR 2 → в неделе восстановления 5 (а не жёсткая 4)', () => {
+    const base = buildLMSPlan({
+      template: CYCLE_01 as never,
+      pmMap,
+      fallbackPm: 80,
+      mode: 'natural',
+      faithful: true,
+    } as never);
+    const trimmed: LMSBuildOutput = { ...base, weeks: base.weeks.slice(0, 3) };
+    const out = appendPLTaperWeeks(trimmed, 2, { meetWeek: true, postMeet: true });
+    const post = out.weeks.find((w) => w.postMeet)!;
+    expect(post).toBeTruthy();
+    let checked = 0;
+    for (const day of post.days) {
+      for (const ex of day.exercises) {
+        checked++;
+        expect(ex.rir).toBe(5);
+        for (const ws of ex.workSets) expect(ws.rir).toBe(5);
+      }
     }
+    expect(checked).toBeGreaterThan(0);
+    expect(post.taperNote).toContain('RIR 5');
+  });
+
+  it('RIR каждого упражнения недели = RIR последней рабочей недели + 3', () => {
+    const out = buildWithTaper();
+    const post = out.weeks.find((w) => w.postMeet)!;
+    const working = [...out.weeks].reverse().find((w) => !w.taperWeek && !w.mockMeet && !w.meetWeek && !w.postMeet)!;
+    const baseRir = new Map<string, number>();
+    for (const d of working.days) for (const e of d.exercises) baseRir.set(e.name, e.rir ?? 2);
+    let checked = 0;
+    for (const d of post.days) {
+      for (const e of d.exercises) {
+        const b = baseRir.get(e.name);
+        if (b == null) continue;
+        checked++;
+        expect(e.rir).toBe(Math.min(10, b + 3));
+        for (const ws of e.workSets) expect(ws.rir).toBe(e.rir);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('подпись недели показывает фактический RIR, а не константу', () => {
+    const out = buildWithTaper();
+    const post = out.weeks.find((w) => w.postMeet)!;
+    const rirs = [...new Set(post.days.flatMap((d) => d.exercises.map((e) => e.rir ?? 0)))].sort((a, b) => a - b);
+    const label = rirs.length === 1 ? String(rirs[0]) : `${rirs[0]}–${rirs[rirs.length - 1]}`;
+    expect(post.taperNote).toContain(`RIR ${label}`);
   });
 });
 
 describe('P0-5: недели стартов не дрейфуют при гидрации', () => {
-  const comps = (): CompetitionEvent[] => [
-    { id: 'c1', name: 'Кубок', week: 5, date: '2026-12-20', priority: 'A' },
-  ];
+  const comps = (): CompetitionEvent[] => [{ id: 'c1', name: 'Кубок', week: 5, date: '2026-12-20', priority: 'A' }];
 
   it('mergeMeetRegistry не переписывает week, когда дата задана', () => {
     const input = { competitions: comps(), legacyMeets: [], mainMeetId: 'c1', todayIso: '2026-11-02' };
@@ -92,7 +153,12 @@ describe('P0-5: недели стартов не дрейфуют при гид�
   });
 
   it('события без валидной недели получают её один раз (миграция)', () => {
-    const input = { competitions: [{ id: 'c2', name: 'Первенство', week: 0, date: '2026-12-20', priority: 'B' as const }], legacyMeets: [], mainMeetId: '', todayIso: '2026-11-02' };
+    const input = {
+      competitions: [{ id: 'c2', name: 'Первенство', week: 0, date: '2026-12-20', priority: 'B' as const }],
+      legacyMeets: [],
+      mainMeetId: '',
+      todayIso: '2026-11-02',
+    };
     const r = mergeMeetRegistry(input);
     expect(r.competitions[0].week).toBe(7); // 49 дней → неделя 7
   });

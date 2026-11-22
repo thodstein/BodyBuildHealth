@@ -9,25 +9,48 @@
 import React, { useState } from 'react';
 import { getCycleById, LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
-import { originalCycleWeeks, getPLWeakPointRecommendations, computeMeetAttemptsFromPmRow, getPLVolumeBreakdown, getPLVolumeLandmarksByMuscle, type LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
+import {
+  originalCycleWeeks,
+  getPLWeakPointRecommendations,
+  getPLVolumeBreakdown,
+  getPLVolumeLandmarksByMuscle,
+  type LMSBuildOutput,
+} from '../../../engines/lms/lms-builder.engine';
 import { mesocyclePhaseForWeek, type MesocyclePhase } from '../../../engines/rir-matrix.engine';
 import { macroPhaseToLmsPhase } from '../../../engines/periodization/phase-bridge';
 import { shouldTrainToday, type AutoRegOutput } from '../../../engines/pro/autoregulation-pro.engine';
+import type { PLAutoRegCfg } from './pl-autoreg-cfg';
+import { samePLAutoReg } from './pl-autoreg-cfg';
 import { LAST_HEAVY_DAYS } from '../../../engines/pro/taper.engine';
-import { meetAttemptsFor, MEET_STRATEGY_LABEL, MEET_STRATEGY_PCT, MEET_STRATEGY_PCT_LABEL } from '../../../engines/lms/competition-attempts';
+import {
+  meetAttemptsFor,
+  MEET_STRATEGY_LABEL,
+  MEET_STRATEGY_PCT_LABEL,
+} from '../../../engines/lms/competition-attempts';
 import { adaptForPEDs, type PED } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { modeMismatchWarning } from '../../../engines/lms/lms-selector.engine';
 import { getExercisesByGroup, EXERCISE_CATALOG } from '../../../core/exercise-catalog';
-import { calcCycleMetrics, type SRExercise } from '../../../engines/lms/lms-metrics.engine';
-import { parseProgressionRationale, progressionTiles, splitDescriptionPoints } from '../TrainingScreen_parts/plan-card-helpers';
 import {
-  MesocycleProgressionCard, SOURCE_PHASE_LABEL, SOURCE_PHASE_ORIGIN_LABEL,
-  sourceWeekColor, summarizeSourceCycleWeeks,
+  parseProgressionRationale,
+  progressionTiles,
+  splitDescriptionPoints,
+} from '../TrainingScreen_parts/plan-card-helpers';
+import {
+  MesocycleProgressionCard,
+  SOURCE_PHASE_LABEL,
+  SOURCE_PHASE_ORIGIN_LABEL,
+  sourceWeekColor,
+  summarizeSourceCycleWeeks,
 } from '../TrainingScreen_parts/MesocycleProgressionCard';
 import {
-  CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
-  BbCard, BbFoldCard,
+  CARD as TRAIN_CARD,
+  SMALL as TRAIN_SMALL,
+  BTN as TRAIN_BTN,
+  BTN_GHOST as TRAIN_BTN_GHOST,
+  IN as TRAIN_IN,
+  BbCard,
+  BbFoldCard,
 } from '../TrainingScreen_parts/training-ui';
 // 4.4: единый a11y-паттерн inline-диалогов (Escape + фокус/возврат) — без него
 // полноэкранные попапы плана закрывались только тапом по ✕/фону.
@@ -43,12 +66,30 @@ import type { Lift, WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import type { AutoRegMode, DiaryAutoregResult } from '../../../engines/pro/diary-autoreg.engine';
 import type { WorkoutLog } from '../../../core/types';
 import {
-  plWeeklyCompliance, plWeeklyComplianceByDays, planFactDriftWarnings, driftWarningLine,
-  plIntensityAdvisory, buildPLComplianceCsv, buildPLComplianceHtml,
+  plWeeklyCompliance,
+  plWeeklyComplianceByDays,
+  planFactDriftWarnings,
+  driftWarningLine,
+  plIntensityAdvisory,
+  buildPLComplianceCsv,
+  buildPLComplianceHtml,
 } from '../../../engines/lms/pl-season-pro.engine';
 import { saveCsvApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
-import { plBlockGroups, plExportRows, buildPLExcelWorkbook, downloadPLExcel, buildPLPrintHtml, printPLHtml, plShareDigest, plTelegramAppUrl, openPLShare, PL_BLOCK_LABEL, type PLBlockId, type PLBlockGroup } from './pl-export';
+import {
+  plBlockGroups,
+  plExportRows,
+  buildPLExcelWorkbook,
+  downloadPLExcel,
+  buildPLPrintHtml,
+  printPLHtml,
+  plShareDigest,
+  plTelegramAppUrl,
+  openPLShare,
+  PL_BLOCK_LABEL,
+  type PLBlockId,
+  type PLBlockGroup,
+} from './pl-export';
 import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 import { ruAdjCount, ruCount, RU_ADJ_WORKING, RU_EXERCISES, RU_SETS } from '../../../engines/ru-plural';
 
@@ -57,41 +98,106 @@ const CARD = TRAIN_CARD;
 const SMALL = TRAIN_SMALL;
 const BTN = TRAIN_BTN;
 const BTN_GHOST = TRAIN_BTN_GHOST;
-const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px', minHeight: 38 };
+const SEL: React.CSSProperties = {
+  background: '#18181b',
+  color: '#fff',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 6,
+  padding: '8px',
+  minHeight: 38,
+};
 const IN = TRAIN_IN;
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 const CAT_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
-const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
+const GRP_RU: Record<string, string> = {
+  chest: 'Грудь',
+  back: 'Спина',
+  legs: 'Ноги',
+  shoulders: 'Плечи',
+  arms: 'Руки',
+  core: 'Кор',
+};
 const PL_WEAKPOINT_LABELS: Record<string, string> = {
-  lockout: 'Замок (дожим)', off_chest: 'Срыв с груди', mid: 'Середина', off_floor: 'Срыв с пола', sticking: 'Мёртвая точка', weak_quads: 'Слабые квадрицепсы', weak_hams: 'Слабые бицепсы бедра', weak_glutes: 'Слабые ягодицы', weak_back: 'Слабая спина', weak_grip: 'Слабый хват', weak_pause: 'Слабый пауза-присед', weak_lockout: 'Слабый замок', weak_upper_back: 'Слабый верх спины',
+  lockout: 'Замок (дожим)',
+  off_chest: 'Срыв с груди',
+  mid: 'Середина',
+  off_floor: 'Срыв с пола',
+  sticking: 'Мёртвая точка',
+  weak_quads: 'Слабые квадрицепсы',
+  weak_hams: 'Слабые бицепсы бедра',
+  weak_glutes: 'Слабые ягодицы',
+  weak_back: 'Слабая спина',
+  weak_grip: 'Слабый хват',
+  weak_pause: 'Слабый пауза-присед',
+  weak_lockout: 'Слабый замок',
+  weak_upper_back: 'Слабый верх спины',
   // Полный словарь фаз WEAK_POINTS_BY_LIFT (7 движений × старт/середина/замок + сумо/головки):
-  start: 'Старт/отрыв', bottom: 'Низ (дно)',
-  sumo_start: 'Сумо: срыв с пола', sumo_mid: 'Сумо: середина', sumo_lockout: 'Сумо: замыкание (бёдра)',
-  ohp_start: 'Жим стоя: срыв с груди', ohp_mid: 'Жим стоя: середина', ohp_lockout: 'Жим стоя: дожим',
-  row_start: 'Тяга в наклоне: срыв', row_mid: 'Тяга в наклоне: середина', row_squeeze: 'Тяга в наклоне: сжатие лопаток',
-  pd_top: 'Верхний блок: верх (старт)', pd_mid: 'Верхний блок: середина', pd_squeeze: 'Верхний блок: сжатие лопаток',
-  inc_off: 'Наклонный жим: срыв с груди', inc_mid: 'Наклонный жим: середина', inc_lockout: 'Наклонный жим: дожим',
-  biceps_start: 'Бицепс: старт (низ)', biceps_mid: 'Бицепс: середина', biceps_top: 'Бицепс: пиковое сокращение',
-  triceps_start: 'Трицепс: старт (разгибание)', triceps_mid: 'Трицепс: середина', triceps_lockout: 'Трицепс: замок',
-  calf_bottom: 'Икры: низ (растяжка)', calf_mid: 'Икры: середина', calf_top: 'Икры: пик',
-  shrug_start: 'Трапеции: старт', shrug_mid: 'Трапеции: середина', shrug_top: 'Трапеции: пик',
+  start: 'Старт/отрыв',
+  bottom: 'Низ (дно)',
+  sumo_start: 'Сумо: срыв с пола',
+  sumo_mid: 'Сумо: середина',
+  sumo_lockout: 'Сумо: замыкание (бёдра)',
+  ohp_start: 'Жим стоя: срыв с груди',
+  ohp_mid: 'Жим стоя: середина',
+  ohp_lockout: 'Жим стоя: дожим',
+  row_start: 'Тяга в наклоне: срыв',
+  row_mid: 'Тяга в наклоне: середина',
+  row_squeeze: 'Тяга в наклоне: сжатие лопаток',
+  pd_top: 'Верхний блок: верх (старт)',
+  pd_mid: 'Верхний блок: середина',
+  pd_squeeze: 'Верхний блок: сжатие лопаток',
+  inc_off: 'Наклонный жим: срыв с груди',
+  inc_mid: 'Наклонный жим: середина',
+  inc_lockout: 'Наклонный жим: дожим',
+  biceps_start: 'Бицепс: старт (низ)',
+  biceps_mid: 'Бицепс: середина',
+  biceps_top: 'Бицепс: пиковое сокращение',
+  triceps_start: 'Трицепс: старт (разгибание)',
+  triceps_mid: 'Трицепс: середина',
+  triceps_lockout: 'Трицепс: замок',
+  calf_bottom: 'Икры: низ (растяжка)',
+  calf_mid: 'Икры: середина',
+  calf_top: 'Икры: пик',
+  shrug_start: 'Трапеции: старт',
+  shrug_mid: 'Трапеции: середина',
+  shrug_top: 'Трапеции: пик',
 };
 
 export interface PLPlanViewApi {
   builtSrc: LMSBuildOutput;
   effectiveSrc: LMSBuildOutput | null;
-  setBuiltSrc: (p: LMSBuildOutput) => void;
   srcWeek: number;
   setSrcWeek: (n: number) => void;
-  srcEdits: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>;
-  setSrcEdits: React.Dispatch<React.SetStateAction<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>>>;
-  srcAdditions: Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>;
-  setSrcAdditions: React.Dispatch<React.SetStateAction<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>>;
+  srcEdits: Record<
+    string,
+    { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }
+  >;
+  setSrcEdits: React.Dispatch<
+    React.SetStateAction<
+      Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>
+    >
+  >;
+  srcAdditions: Record<
+    string,
+    { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]
+  >;
+  setSrcAdditions: React.Dispatch<
+    React.SetStateAction<
+      Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>
+    >
+  >;
   editMode: boolean;
   setEditMode: React.Dispatch<React.SetStateAction<boolean>>;
   setKey: (w: number, di: number, ei: number, si: number) => string;
-  effSet: (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number; rir?: number }, exerciseName?: string) => { sets: number; reps: number; weight: number; pct: number; rir?: number };
+  effSet: (
+    w: number,
+    di: number,
+    ei: number,
+    si: number,
+    ws: { sets: number; reps: number; weight: number; pct: number; rir?: number },
+    exerciseName?: string,
+  ) => { sets: number; reps: number; weight: number; pct: number; rir?: number };
   dayKey: (w: number, di: number) => string;
   addExToDay: (dk: string) => void;
   pickerDay: string | null;
@@ -106,7 +212,6 @@ export interface PLPlanViewApi {
   calendarView: 'original' | 'tapered';
   setCalendarView: (v: 'original' | 'tapered') => void;
   onNote: (m: string) => void;
-  buildSrc: () => void;
   // Параметры спортсмена/курса
   selectedCycleId: string;
   cycleWeeks: number;
@@ -119,13 +224,21 @@ export interface PLPlanViewApi {
   autoRegMode: 'off' | 'auto' | 'diary';
   setAutoRegMode: (m: 'off' | 'auto' | 'diary') => void;
   autoRegResult: AutoRegOutput;
+  /** P0-4: подтверждённый пользователем конфиг авторегуляции (уже применён к плану). */
+  autoRegCfg?: PLAutoRegCfg | null;
+  /** Применить предпросмотр «Авто» РОВНО ОДИН РАЗ к плану (кнопка «Применить»). */
+  onApplyAutoReg?: () => void;
+  /** Снять авторегуляцию с плана (план пересобирается без неё). */
+  onResetAutoReg?: () => void;
   pmAutoRegMode: PMAutoRegMode;
   setPmAutoRegMode: (m: PMAutoRegMode) => void;
   periodizationMode: 'linear' | 'dup';
   setPeriodizationMode: (m: 'linear' | 'dup') => void;
   pmDiary: { multiplier: Record<string, number>; decisions: string[]; adjusted: number; noData: number } | null;
   bridgeRir: number;
-  pmSquat: number; pmBench: number; pmDead: number;
+  pmSquat: number;
+  pmBench: number;
+  pmDead: number;
   best: any;
   plWeakPoints: { lift: Lift; weakPoint: WeakPoint }[];
   // Дневник/прогресс
@@ -155,21 +268,86 @@ export interface PLPlanViewApi {
 
 export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   const {
-    builtSrc, effectiveSrc, setBuiltSrc, srcWeek, setSrcWeek, srcEdits, setSrcEdits, srcAdditions, setSrcAdditions,
-    editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
-    pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
-    pickerScheme, setPickerScheme, days, calendarView, setCalendarView,
-    onNote, buildSrc,
-    selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
-    autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead, best,
-    pmAutoRegMode, setPmAutoRegMode, periodizationMode, setPeriodizationMode, pmDiary,
-    plWeakPoints, linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
-    historyWorkouts, currentWeek,
-    e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
-    tempoStr, getTempo, hasDeload, onRemoveDeload,
+    builtSrc,
+    effectiveSrc,
+    srcWeek,
+    setSrcWeek,
+    srcEdits,
+    setSrcEdits,
+    srcAdditions,
+    setSrcAdditions,
+    editMode,
+    setEditMode,
+    setKey,
+    effSet,
+    dayKey,
+    addExToDay,
+    pickerDay,
+    setPickerDay,
+    pickerGroup,
+    setPickerGroup,
+    pickerExName,
+    setPickerExName,
+    pickerScheme,
+    setPickerScheme,
+    days,
+    calendarView,
+    setCalendarView,
+    onNote,
+    selectedCycleId,
+    cycleWeeks,
+    goal,
+    level,
+    peds,
+    pedDoses,
+    pedAuto,
+    courseIntensity,
+    autoRegMode,
+    setAutoRegMode,
+    autoRegResult,
+    autoRegCfg,
+    onApplyAutoReg,
+    onResetAutoReg,
+    bridgeRir,
+    pmSquat,
+    pmBench,
+    pmDead,
+    best,
+    pmAutoRegMode,
+    setPmAutoRegMode,
+    periodizationMode,
+    setPeriodizationMode,
+    pmDiary,
+    plWeakPoints,
+    linked,
+    runFocus,
+    diaryAutoreg,
+    calibratePmFromDiary,
+    applyPmFromCycle,
+    historyWorkouts,
+    currentWeek,
+    e1rmSeries,
+    exerciseE1rm,
+    exTrendSeries,
+    playerDays,
+    selectedTrendEx,
+    setSelectedTrendEx,
+    tempoStr,
+    getTempo,
+    hasDeload,
+    onRemoveDeload,
   } = api;
   // 🏁 Тапер-поля — из контекста (taper-state.tsx).
-  const { attemptStrategy, peakMode, taperWeeksToAdd, mockMeetOn, meetWeekOn, postMeetOn, taperNote, taperAttemptOverride } = usePLTaper();
+  const {
+    attemptStrategy,
+    peakMode,
+    taperWeeksToAdd,
+    mockMeetOn,
+    meetWeekOn,
+    postMeetOn,
+    taperNote,
+    taperAttemptOverride,
+  } = usePLTaper();
 
   // 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт.
   const [expOpen, setExpOpen] = useState(false);
@@ -190,7 +368,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
   const displayPhaseForWeek = (week: LMSBuildOutput['weeks'][number], totalWeeks: number): string => {
     return week.macroPhase
       ? macroPhaseToLmsPhase(week.macroPhase as never)
-      : (week.sourcePhase || mesocyclePhaseForWeek(week.week, totalWeeks));
+      : week.sourcePhase || mesocyclePhaseForWeek(week.week, totalWeeks);
   };
   const weekVolumeOf = (week: LMSBuildOutput['weeks'][number]): number => {
     let v = 0;
@@ -200,264 +378,812 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
 
   return (
     <div className="pl-planview">
-          {builtSrc && (() => {
-             const displaySrc = editMode ? builtSrc : effectiveSrc ?? builtSrc;
-             const W = displaySrc.weeks;
-             const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
-             const totalW = W.length;
-             const phase = displayPhaseForWeek(wk, totalW);
-             const PH_RU: Record<string,string> = { base: 'База (накопление)', build: 'Накопление (рост объёма)', peak: 'Пик (интенсификация)', deload: 'Разгрузка' };
-             const PH_COLOR: Record<string,string> = { base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' };
-             const PH_DESC: Record<string,string> = {
-               base: 'Фаза базы: акклиматизация, наращивание объёма при контроле техники. RIR 2-3, вес = PM_нед × %ПМ.',
-               build: 'Фаза накопления: пик объёма (MAV), прогрессия весов, RIR 1-2. КПШ и тоннаж максимальны.',
-               peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
-               deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
-             };
-             const sourceCycle = getCycleById(selectedCycleId);
-             // Тапер-неделя: добавленная (taperWeek) или legacy-разметка peak/competition
-             // (mock meet исключается — это отдельная неделя имитации соревнований).
-             // ВАЖНО: проверяем ТОЛЬКО оригинальные недели — иначе добавление тапера
-             // «перекрашивает» весь цикл (sourceCalendar обнуляется, все недели теряют свои цвета).
-             const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.taperWeek === true || (!w.mockMeet && !w.meetWeek && !w.postMeet && w.macroPhase === 'competition' && w.sourcePhase === 'peak');
-             const isMockWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.mockMeet === true;
-             const isMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.meetWeek === true;
-             const isPostMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.postMeet === true;
-             /** 🔋 Делод-неделя по действию пользователя (мост kind 'deload'). */
-             const isDeloadWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.deload === true;
-             const sourceCalendar = sourceCycle && !W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some(w => w.macroPhase)
-                 ? summarizeSourceCycleWeeks(sourceCycle.weeks && sourceCycle.weeks.length > 0
-                 ? sourceCycle.weeks
-                 : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1), sourceCycle.meta.period, sourceCycle.meta.sourcePhases, sourceCycle.meta.sourcePhaseSource ?? 'original')
-               : undefined;
-             const TAPER_COLOR = '#f59e0b';
-             const MOCK_COLOR = '#a78bfa';
-             const MEET_COLOR = '#eab308';
-             const POST_COLOR = '#34d399';
-             const DELOAD_COLOR = '#60a5fa';
-             const sourceWeek = sourceCalendar?.[wk.week - 1];
-             const mockPctLabel = wk.meetAttempts ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced) : 'прикиды-синглы';
-             // Спец-недели (соревнование/mock/пост/тапер/делод) перекрывают цвет исходной фазы.
-             const specialColor = isMeetWeek(wk) ? MEET_COLOR : isMockWeek(wk) ? MOCK_COLOR : isPostMeetWeek(wk) ? POST_COLOR : isTaperWeek(wk) ? TAPER_COLOR : isDeloadWeek(wk) ? DELOAD_COLOR : null;
-             const calendarColor = specialColor ?? (sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : PH_COLOR[phase]);
-             const calendarTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 14%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '14';
-             const calendarBorderTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 30%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '30';
-             const calendarBadgeTint = sourceWeek && !specialColor ? `color-mix(in srgb, ${calendarColor} 13%, transparent)` : (specialColor ?? PH_COLOR[phase]) + '22';
-             const calendarLabel = isMeetWeek(wk)
-               ? `🏁 Соревнования · прикиды ${mockPctLabel}`
-               : isMockWeek(wk)
-               ? `🎯 Имитация соревнований (mock meet) · ${mockPctLabel}`
-               : isPostMeetWeek(wk)
-               ? `🔄 Пост-соревновательное восстановление (объём ×0.5, RIR +3)`
+      {builtSrc &&
+        (() => {
+          const displaySrc = editMode ? builtSrc : (effectiveSrc ?? builtSrc);
+          // P2-9 / P2-10: итоги и объём считаются по ТОМУ ЖЕ источнику, что строки и
+          // плеер (`effectiveSrc` из экрана: правки + добавления + мост делода/пика).
+          // Раньше в режиме правки здесь собирался «голый» оверлей только с правками —
+          // множители объёма/RIR моста и дневник терялись, и плитки расходились с плеером.
+          const metricsSrc = effectiveSrc ?? builtSrc;
+          const W = displaySrc.weeks;
+          const wk = W[Math.min(srcWeek, W.length) - 1] || W[0];
+          const totalW = W.length;
+          const phase = displayPhaseForWeek(wk, totalW);
+          const PH_RU: Record<string, string> = {
+            base: 'База (накопление)',
+            build: 'Накопление (рост объёма)',
+            peak: 'Пик (интенсификация)',
+            deload: 'Разгрузка',
+          };
+          const PH_COLOR: Record<string, string> = {
+            base: '#22c55e',
+            build: '#eab308',
+            peak: '#ef4444',
+            deload: '#60a5fa',
+          };
+          const PH_DESC: Record<string, string> = {
+            base: 'Фаза базы: акклиматизация, наращивание объёма при контроле техники. RIR 2-3, вес = PM_нед × %ПМ.',
+            build: 'Фаза накопления: пик объёма (MAV), прогрессия весов, RIR 1-2. КПШ и тоннаж максимальны.',
+            peak: 'Пиковая фаза: интенсификация — %ПМ растёт, объём снижается, RIR 0-1. Готовность к тесту/соревнованию.',
+            deload: 'Разгрузка: 50-60% объёма, RIR 4, восстановление перед следующим мезоциклом.',
+          };
+          const sourceCycle = getCycleById(selectedCycleId);
+          // Тапер-неделя: добавленная (taperWeek) или legacy-разметка peak/competition
+          // (mock meet исключается — это отдельная неделя имитации соревнований).
+          // ВАЖНО: проверяем ТОЛЬКО оригинальные недели — иначе добавление тапера
+          // «перекрашивает» весь цикл (sourceCalendar обнуляется, все недели теряют свои цвета).
+          const isTaperWeek = (w: LMSBuildOutput['weeks'][number]): boolean =>
+            w.taperWeek === true ||
+            (!w.mockMeet && !w.meetWeek && !w.postMeet && w.macroPhase === 'competition' && w.sourcePhase === 'peak');
+          const isMockWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.mockMeet === true;
+          const isMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.meetWeek === true;
+          const isPostMeetWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.postMeet === true;
+          /** 🔋 Делод-неделя по действию пользователя (мост kind 'deload'). */
+          const isDeloadWeek = (w: LMSBuildOutput['weeks'][number]): boolean => w.deload === true;
+          const sourceCalendar =
+            sourceCycle &&
+            !W.filter((w) => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some((w) => w.macroPhase)
+              ? summarizeSourceCycleWeeks(
+                  sourceCycle.weeks && sourceCycle.weeks.length > 0
+                    ? sourceCycle.weeks
+                    : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1),
+                  sourceCycle.meta.period,
+                  sourceCycle.meta.sourcePhases,
+                  sourceCycle.meta.sourcePhaseSource ?? 'original',
+                )
+              : undefined;
+          const TAPER_COLOR = '#f59e0b';
+          const MOCK_COLOR = '#a78bfa';
+          const MEET_COLOR = '#eab308';
+          const POST_COLOR = '#34d399';
+          const DELOAD_COLOR = '#60a5fa';
+          const sourceWeek = sourceCalendar?.[wk.week - 1];
+          const mockPctLabel = wk.meetAttempts
+            ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced)
+            : 'прикиды-синглы';
+          // Спец-недели (соревнование/mock/пост/тапер/делод) перекрывают цвет исходной фазы.
+          const specialColor = isMeetWeek(wk)
+            ? MEET_COLOR
+            : isMockWeek(wk)
+              ? MOCK_COLOR
+              : isPostMeetWeek(wk)
+                ? POST_COLOR
                 : isTaperWeek(wk)
-                ? (peakMode === 'pl' && wk.taperNote
-                  ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
-                  : `📉 Тапер · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма`)
-               : isDeloadWeek(wk)
-               ? `🔋 Делод · объём снижен, интенсивность сохранена`
-               : sourceWeek
-               ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${ruCount(sourceWeek.volumeSets, RU_SETS)}`
-               : PH_RU[phase];
-             const calendarDescription = isMeetWeek(wk)
-               ? `Неделя соревнований (день старта): прикиды как подходы — опенер RIR2 → вторая RIR1 → третья RIR0 (${mockPctLabel} от ПМ недели). План полностью готов: разгрузка (тапер) → попытки.`
-               : isMockWeek(wk)
-               ? `Имитация соревнований за 10-14 дней до старта: основные движения — прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0, ${mockPctLabel} от ПМ), аксессуары — 50% объёма. Проверка стратегии прикидов перед реальным соревнованием.`
-               : isPostMeetWeek(wk)
-               ? `Пост-соревновательное восстановление: объём ×0.5, RIR +3 — полная разгрузка после старта, возврат к базовому объёму со следующей недели.`
-               : isTaperWeek(wk)
-               ? `Тапер-неделя: объём снижен (×0.65/×0.45), RIR +1/+2, интенсивность сохранена (Bosquet 2005). Разгрузка перед соревнованием.`
-               : isDeloadWeek(wk)
-               ? `Делод-неделя (добавлена по вашему действию): объём снижен, веса/проценты сохранены — восстановление без потери интенсивности. Отменить — кнопкой «↩ Убрать делод» в шапке плана.`
-               : sourceWeek
-               ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${ruAdjCount(sourceWeek.volumeSets, RU_ADJ_WORKING, RU_SETS)}, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
-               : PH_DESC[phase];
-             return <BbCard icon="📋" accent="#00e68a" title={`План: ${displaySrc.template.meta.title}`}
-              badge={<span style={{ fontSize:11, fontWeight:700, color: calendarColor }}>{calendarLabel}</span>}
-              style={{ overflow:'hidden', boxSizing:'border-box', maxWidth:'100%' }}>
-                {/* ⚙️ Как собран план — структурированная карточка (PED-стиль) */}
-                {(() => {
-                   const info = parseProgressionRationale(displaySrc.progressionRationale || '');
-                  const tiles = progressionTiles(info);
-                  if (tiles.length === 0) return null;
-                  // Только значимые заметки сборки. Отфильтровываем шум, который
-                  // не относится к действующему циклу и/или дублируется в других карточках:
-                  // слабые группы/диагностика (показаны в «🎯 Слабые точки СРЦ»), S-MRV-бюджет,
-                  // дефолтный объём аксессуаров.
-                  const RELEVANT = (n: string) =>
-                    !/Слабая группа|Диагностика|не добавлен/.test(n) &&
-                    !/S-MRV|объём сессий автоматически/.test(n) &&
-                    !/Объём аксессуаров/.test(n);
-                  const notes = info.notes.filter(RELEVANT);
-                  return (
-                    <BbFoldCard icon="⚙️" accent="#38bdf8" title="Как собран план">
-                      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
-                        {tiles.map((t, i) => (
-                          <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                            <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
-                            <div style={{ fontSize:12, fontWeight:800, color:'#38bdf8', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
-                          </div>
-                        ))}
-                      </div>
-                      {notes.length > 0 && (
-                        <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
-                          {notes.map((n, i) => (
-                            <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.12)', lineHeight:1.4 }}>
-                              {n}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </BbFoldCard>
-                  );
-                })()}
-               {autoRegMode === 'off' && best && modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle) && (
-                 <div role="alert" style={{ marginTop:6, padding:'6px 8px', borderRadius:7, color:'#f59e0b', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:11 }}>
-                   ⚠ {modeMismatchWarning({ goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' }, best.cycle)}
-                 </div>
-               )}
-               <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background: calendarTint, border:'1px solid '+calendarBorderTint }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                   <span style={{ width:8, height:8, borderRadius:'50%', background: calendarColor, flexShrink:0 }} />
-                   <span style={{ fontSize:12, fontWeight:800, color: calendarColor }}>{calendarLabel}</span>
-                  <span style={{ fontSize:10, color:'#fff', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
-                </div>
-                {(() => {
-                  const tiles: Array<{ l: string; v: string }> = isMeetWeek(wk)
-                    ? [{ l: 'Стратегия', v: mockPctLabel }, { l: 'Попытки', v: 'RIR2 → RIR1 → RIR0' }, { l: 'Формат', v: 'Разгрузка → прикиды' }]
-                    : isMockWeek(wk)
-                    ? [{ l: 'Формат', v: 'Прикиды-синглы' }, { l: 'Стратегия', v: mockPctLabel }, { l: 'Аксессуары', v: '50% объёма' }]
-                    : isTaperWeek(wk)
-                    ? [{ l: 'Объём', v: '×0.65 / ×0.45' }, { l: 'RIR', v: '+1 / +2' }, { l: 'Интенсивность', v: 'сохранена' }]
+                  ? TAPER_COLOR
+                  : isDeloadWeek(wk)
+                    ? DELOAD_COLOR
+                    : null;
+          const calendarColor =
+            specialColor ??
+            (sourceWeek && sourceCalendar ? sourceWeekColor(sourceWeek, sourceCalendar) : PH_COLOR[phase]);
+          const calendarTint =
+            sourceWeek && !specialColor
+              ? `color-mix(in srgb, ${calendarColor} 14%, transparent)`
+              : (specialColor ?? PH_COLOR[phase]) + '14';
+          const calendarBorderTint =
+            sourceWeek && !specialColor
+              ? `color-mix(in srgb, ${calendarColor} 30%, transparent)`
+              : (specialColor ?? PH_COLOR[phase]) + '30';
+          const calendarBadgeTint =
+            sourceWeek && !specialColor
+              ? `color-mix(in srgb, ${calendarColor} 13%, transparent)`
+              : (specialColor ?? PH_COLOR[phase]) + '22';
+          const calendarLabel = isMeetWeek(wk)
+            ? `🏁 Соревнования · прикиды ${mockPctLabel}`
+            : isMockWeek(wk)
+              ? `🎯 Имитация соревнований (mock meet) · ${mockPctLabel}`
+              : isPostMeetWeek(wk)
+                ? `🔄 Пост-соревновательное восстановление (объём ×0.5, RIR +3)`
+                : isTaperWeek(wk)
+                  ? peakMode === 'pl' && wk.taperNote
+                    ? `🏁 ${wk.taperNote.split(':')[0].trim()} · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма${wk.meetAttempts ? ' · прикиды' : ''}`
+                    : `📉 Тапер · ${Math.round((weekVolumeOf(wk) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма`
+                  : isDeloadWeek(wk)
+                    ? `🔋 Делод · объём снижен, интенсивность сохранена`
                     : sourceWeek
-                    ? [{ l: 'Фаза', v: SOURCE_PHASE_LABEL[sourceWeek.phase] }, { l: 'Объём', v: `${ruCount(sourceWeek.volumeSets, RU_SETS)}` }, { l: 'Интенсивность', v: `${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ` }, { l: 'RIR', v: sourceWeek.rir.toFixed(1) }]
-                    : [{ l: 'Фаза', v: PH_RU[phase] }, { l: 'Характер', v: phase === 'deload' ? '50-60% объёма' : phase === 'peak' ? 'высокая интенсивность' : 'объёмная работа' }];
-                  return (
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
-                      {tiles.map((t, i) => <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                        <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
-                        <div style={{ fontSize:12, fontWeight:800, color: calendarColor, marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
-                      </div>)}
-                    </div>
-                  );
-                })()}
-                 <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
-                   {splitDescriptionPoints(calendarDescription).map((point, i) => (
-                     <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
-                       <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
-                     </div>
-                   ))}
-                 </div>
-              </div>
-              {/* 📊 Расчёты цикла (метрики микроцикла — Черняк) */}
-               {displaySrc.cycleMetrics && (() => {
-                 const cm = displaySrc.cycleMetrics;
-                const tiles: Array<{ l: string; v: string }> = [
-                  { l: 'Тоннаж', v: Math.round(cm.tonnage).toLocaleString('ru-RU') + ' кг' },
-                  { l: 'КПШ', v: String(cm.kpsh) },
-                  { l: 'Средний вес', v: Math.round(cm.avgWeight) + ' кг' },
-                  { l: 'Отн. интенсивность', v: Math.round(cm.relIntensity * 100) + '%' },
-                  { l: 'УОИ', v: cm.uoi.toFixed(2) },
-                  { l: 'Сессий', v: String(cm.sessions) },
-                ];
+                      ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]} · ${SOURCE_PHASE_LABEL[sourceWeek.phase]} · ${Math.round(sourceWeek.intensityPct * 100)}% · ${ruCount(sourceWeek.volumeSets, RU_SETS)}`
+                      : PH_RU[phase];
+          const calendarDescription = isMeetWeek(wk)
+            ? `Неделя соревнований (день старта): прикиды как подходы — опенер RIR2 → вторая RIR1 → третья RIR0 (${mockPctLabel} от ПМ недели). План полностью готов: разгрузка (тапер) → попытки.`
+            : isMockWeek(wk)
+              ? `Имитация соревнований за 10-14 дней до старта: основные движения — прикиды-синглы (опенер RIR2 → вторая RIR1 → третья RIR0, ${mockPctLabel} от ПМ), аксессуары — 50% объёма. Проверка стратегии прикидов перед реальным соревнованием.`
+              : isPostMeetWeek(wk)
+                ? `Пост-соревновательное восстановление: объём ×0.5, RIR +3 — полная разгрузка после старта, возврат к базовому объёму со следующей недели.`
+                : isTaperWeek(wk)
+                  ? `Тапер-неделя: объём снижен (×0.65/×0.45), RIR +1/+2, интенсивность сохранена (Bosquet 2005). Разгрузка перед соревнованием.`
+                  : isDeloadWeek(wk)
+                    ? `Делод-неделя (добавлена по вашему действию): объём снижен, веса/проценты сохранены — восстановление без потери интенсивности. Отменить — кнопкой «↩ Убрать делод» в шапке плана.`
+                    : sourceWeek
+                      ? `${SOURCE_PHASE_ORIGIN_LABEL[sourceWeek.phaseOrigin]}: ${SOURCE_PHASE_LABEL[sourceWeek.phase]}. ${ruAdjCount(sourceWeek.volumeSets, RU_ADJ_WORKING, RU_SETS)}, средняя интенсивность ${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ, средний RIR ${sourceWeek.rir.toFixed(1)}.`
+                      : PH_DESC[phase];
+          return (
+            <BbCard
+              icon="📋"
+              accent="#00e68a"
+              title={`План: ${displaySrc.template.meta.title}`}
+              badge={<span style={{ fontSize: 11, fontWeight: 700, color: calendarColor }}>{calendarLabel}</span>}
+              style={{ overflow: 'hidden', boxSizing: 'border-box', maxWidth: '100%' }}
+            >
+              {/* ⚙️ Как собран план — структурированная карточка (PED-стиль) */}
+              {(() => {
+                const info = parseProgressionRationale(displaySrc.progressionRationale || '');
+                const tiles = progressionTiles(info);
+                if (tiles.length === 0) return null;
+                // Только значимые заметки сборки. Отфильтровываем шум, который
+                // не относится к действующему циклу и/или дублируется в других карточках:
+                // слабые группы/диагностика (показаны в «🎯 Слабые точки СРЦ»), S-MRV-бюджет,
+                // дефолтный объём аксессуаров.
+                const RELEVANT = (n: string) =>
+                  !/Слабая группа|Диагностика|не добавлен/.test(n) &&
+                  !/S-MRV|объём сессий автоматически/.test(n) &&
+                  !/Объём аксессуаров/.test(n);
+                const notes = info.notes.filter(RELEVANT);
                 return (
-                  <BbFoldCard icon="📊" accent="#00e68a" title="Расчёты цикла">
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
+                  <BbFoldCard icon="⚙️" accent="#38bdf8" title="Как собран план">
+                    <div
+                      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}
+                    >
                       {tiles.map((t, i) => (
-                        <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                          <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
-                          <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
+                        <div
+                          key={i}
+                          style={{
+                            padding: '6px 9px',
+                            borderRadius: 9,
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            minWidth: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 9,
+                              color: '#fff',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {t.l}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: '#38bdf8',
+                              marginTop: 2,
+                              overflowWrap: 'break-word',
+                            }}
+                          >
+                            {t.v}
+                          </div>
                         </div>
                       ))}
                     </div>
+                    {notes.length > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {notes.map((n, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              fontSize: 10,
+                              color: '#fff',
+                              padding: '5px 8px',
+                              borderRadius: 7,
+                              background: 'rgba(56,189,248,0.06)',
+                              border: '1px solid rgba(56,189,248,0.12)',
+                              lineHeight: 1.4,
+                            }}
+                          >
+                            {n}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </BbFoldCard>
                 );
               })()}
+              {autoRegMode === 'off' &&
+                best &&
+                modeMismatchWarning(
+                  { goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' },
+                  best.cycle,
+                ) && (
+                  <div
+                    role="alert"
+                    style={{
+                      marginTop: 6,
+                      padding: '6px 8px',
+                      borderRadius: 7,
+                      color: '#f59e0b',
+                      background: 'rgba(245,158,11,0.08)',
+                      border: '1px solid rgba(245,158,11,0.25)',
+                      fontSize: 11,
+                    }}
+                  >
+                    ⚠{' '}
+                    {modeMismatchWarning(
+                      { goal: goal as any, level: level as any, mode: peds.length > 0 ? 'on_course' : 'natural' },
+                      best.cycle,
+                    )}
+                  </div>
+                )}
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: calendarTint,
+                  border: '1px solid ' + calendarBorderTint,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <span
+                    style={{ width: 8, height: 8, borderRadius: '50%', background: calendarColor, flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: calendarColor }}>{calendarLabel}</span>
+                  <span style={{ fontSize: 10, color: '#fff', marginLeft: 'auto' }}>
+                    Неделя {wk.week} из {totalW}
+                  </span>
+                </div>
+                {(() => {
+                  const tiles: Array<{ l: string; v: string }> = isMeetWeek(wk)
+                    ? [
+                        { l: 'Стратегия', v: mockPctLabel },
+                        { l: 'Попытки', v: 'RIR2 → RIR1 → RIR0' },
+                        { l: 'Формат', v: 'Разгрузка → прикиды' },
+                      ]
+                    : isMockWeek(wk)
+                      ? [
+                          { l: 'Формат', v: 'Прикиды-синглы' },
+                          { l: 'Стратегия', v: mockPctLabel },
+                          { l: 'Аксессуары', v: '50% объёма' },
+                        ]
+                      : isTaperWeek(wk)
+                        ? [
+                            { l: 'Объём', v: '×0.65 / ×0.45' },
+                            { l: 'RIR', v: '+1 / +2' },
+                            { l: 'Интенсивность', v: 'сохранена' },
+                          ]
+                        : sourceWeek
+                          ? [
+                              { l: 'Фаза', v: SOURCE_PHASE_LABEL[sourceWeek.phase] },
+                              { l: 'Объём', v: `${ruCount(sourceWeek.volumeSets, RU_SETS)}` },
+                              { l: 'Интенсивность', v: `${Math.round(sourceWeek.intensityPct * 100)}% 1ПМ` },
+                              { l: 'RIR', v: sourceWeek.rir.toFixed(1) },
+                            ]
+                          : [
+                              { l: 'Фаза', v: PH_RU[phase] },
+                              {
+                                l: 'Характер',
+                                v:
+                                  phase === 'deload'
+                                    ? '50-60% объёма'
+                                    : phase === 'peak'
+                                      ? 'высокая интенсивность'
+                                      : 'объёмная работа',
+                              },
+                            ];
+                  return (
+                    <div
+                      style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}
+                    >
+                      {tiles.map((t, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            padding: '6px 9px',
+                            borderRadius: 9,
+                            background: 'rgba(255,255,255,0.05)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            minWidth: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 9,
+                              color: '#fff',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {t.l}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: calendarColor,
+                              marginTop: 2,
+                              overflowWrap: 'break-word',
+                            }}
+                          >
+                            {t.v}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {splitDescriptionPoints(calendarDescription).map((point, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 10,
+                        color: '#fff',
+                        padding: '5px 8px',
+                        borderRadius: 7,
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        lineHeight: 1.4,
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      <span style={{ color: calendarColor, fontWeight: 800 }}>•</span> {point}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* 📊 Расчёты цикла (метрики микроцикла — Черняк) */}
+              {metricsSrc.cycleMetrics &&
+                (() => {
+                  const cm = metricsSrc.cycleMetrics;
+                  const tiles: Array<{ l: string; v: string }> = [
+                    { l: 'Тоннаж', v: Math.round(cm.tonnage).toLocaleString('ru-RU') + ' кг' },
+                    { l: 'КПШ', v: String(cm.kpsh) },
+                    { l: 'Средний вес', v: Math.round(cm.avgWeight) + ' кг' },
+                    { l: 'Отн. интенсивность', v: Math.round(cm.relIntensity * 100) + '%' },
+                    { l: 'УОИ', v: cm.uoi.toFixed(2) },
+                    { l: 'Сессий', v: String(cm.sessions) },
+                  ];
+                  return (
+                    <BbFoldCard icon="📊" accent="#00e68a" title="Расчёты цикла">
+                      <div
+                        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}
+                      >
+                        {tiles.map((t, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              padding: '6px 9px',
+                              borderRadius: 9,
+                              background: 'rgba(255,255,255,0.05)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              minWidth: 0,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color: '#fff',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {t.l}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: '#00e68a',
+                                marginTop: 2,
+                                overflowWrap: 'break-word',
+                              }}
+                            >
+                              {t.v}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </BbFoldCard>
+                  );
+                })()}
               {plWeakPoints.length > 0 && (
-                <BbCard icon="🎯" accent="#a855f7" title="Слабые точки СРЦ (добавлены ассистенты в план)" style={{ marginTop: 8 }}>
+                <BbCard
+                  icon="🎯"
+                  accent="#a855f7"
+                  title="Слабые точки СРЦ (добавлены ассистенты в план)"
+                  style={{ marginTop: 8 }}
+                >
                   {plWeakPoints.map((wp, i) => {
                     const rec = getPLWeakPointRecommendations(wp.lift, wp.weakPoint);
-                    const liftLabelMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной' };
+                    const liftLabelMap: Record<string, string> = {
+                      bench: 'Жим лёжа',
+                      squat: 'Присед',
+                      deadlift: 'Становая тяга',
+                      ohp: 'Жим стоя',
+                      row: 'Тяга в наклоне',
+                      pulldown: 'Тяга верхнего блока',
+                      incline_press: 'Жим на наклонной',
+                    };
                     const liftLabel = liftLabelMap[wp.lift] || wp.lift;
                     const assists = rec.corrections.length ? rec.corrections : ['—'];
-                    return <div key={i} style={{ marginBottom:2, overflowWrap:'break-word' }}>• <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assists.join(', ')} — {rec.rationale}</div>;
+                    return (
+                      <div key={i} style={{ marginBottom: 2, overflowWrap: 'break-word' }}>
+                        • <b>{PL_WEAKPOINT_LABELS[wp.weakPoint]}</b> ({liftLabel}): + {assists.join(', ')} —{' '}
+                        {rec.rationale}
+                      </div>
+                    );
                   })}
                 </BbCard>
               )}
-              <div style={{ display:'flex', gap:6, marginTop:8, alignItems:'center', flexWrap:'wrap' }}>
-                <button onClick={() => setEditMode(m => !m)} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border: editMode ? '1px solid #f59e0b' : '1px solid rgba(245,158,11,0.55)', background: editMode ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>{editMode ? '✓ Готово' : '✏️ Правка плана'}</button>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setEditMode((m) => !m)}
+                  style={{
+                    padding: '6px 10px',
+                    minHeight: 34,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    borderRadius: 8,
+                    border: editMode ? '1px solid #f59e0b' : '1px solid rgba(245,158,11,0.55)',
+                    background: editMode ? 'rgba(245,158,11,0.28)' : 'rgba(245,158,11,0.12)',
+                    color: '#f59e0b',
+                  }}
+                >
+                  {editMode ? '✓ Готово' : '✏️ Правка плана'}
+                </button>
                 {hasDeload && onRemoveDeload && (
-                  <button data-pl="deload-remove" onClick={onRemoveDeload} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }} title="Снять делод и пересобрать план по раскладке цикла">↩ Убрать делод</button>
+                  <button
+                    data-pl="deload-remove"
+                    onClick={onRemoveDeload}
+                    style={{
+                      padding: '6px 10px',
+                      minHeight: 34,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      borderRadius: 8,
+                      border: '1px solid rgba(96,165,250,0.55)',
+                      background: 'rgba(96,165,250,0.12)',
+                      color: '#60a5fa',
+                    }}
+                    title="Снять делод и пересобрать план по раскладке цикла"
+                  >
+                    ↩ Убрать делод
+                  </button>
                 )}
-                {editMode && <button onClick={() => setSrcEdits({})} disabled={Object.keys(srcEdits).length===0} style={{ ...BTN_GHOST, padding:'6px 10px', minHeight:34, fontSize:11, opacity: Object.keys(srcEdits).length===0?0.4:1 }}>↺ Сбросить</button>}
+                {editMode && (
+                  <button
+                    onClick={() => setSrcEdits({})}
+                    disabled={Object.keys(srcEdits).length === 0}
+                    style={{
+                      ...BTN_GHOST,
+                      padding: '6px 10px',
+                      minHeight: 34,
+                      fontSize: 11,
+                      opacity: Object.keys(srcEdits).length === 0 ? 0.4 : 1,
+                    }}
+                  >
+                    ↺ Сбросить
+                  </button>
+                )}
                 {editMode && <span style={{ ...SMALL }}>правки применяются к «Выполнение» (выбранная неделя)</span>}
-                <button onClick={() => { setExpOpen(true); setExpFormat(null); setExpScope(null); setExpBlock(null); setExpWeek(null); }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(96,165,250,0.55)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📤 Экспорт</button>
-                 <button onClick={async () => {
+                <button
+                  onClick={() => {
+                    setExpOpen(true);
+                    setExpFormat(null);
+                    setExpScope(null);
+                    setExpBlock(null);
+                    setExpWeek(null);
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    minHeight: 34,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    borderRadius: 8,
+                    border: '1px solid rgba(96,165,250,0.55)',
+                    background: 'rgba(96,165,250,0.12)',
+                    color: '#60a5fa',
+                  }}
+                >
+                  📤 Экспорт
+                </button>
+                <button
+                  onClick={async () => {
                     const title = displaySrc.template.meta.title;
-                   const url = plTelegramAppUrl(selectedCycleId);
-                   const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
-                   const result = await openPLShare(url, { title: `ПЛ: ${title}`, text: digest, url });
-                   onNote(result === 'shared' ? '📲 План передан через системное меню «Поделиться».' : '📲 Открыт Telegram с текстом плана.');
-                 }} style={{ padding:'6px 10px', minHeight:34, fontSize:11, fontWeight:700, cursor:'pointer', borderRadius:8, border:'1px solid rgba(56,189,248,0.55)', background:'rgba(56,189,248,0.12)', color:'#38bdf8' }}>📲 Telegram Mini App</button>
+                    const url = plTelegramAppUrl(selectedCycleId);
+                    const digest = plShareDigest({ title, weeks: W, pmSquat, pmBench, pmDead });
+                    const result = await openPLShare(url, { title: `ПЛ: ${title}`, text: digest, url });
+                    onNote(
+                      result === 'shared'
+                        ? '📲 План передан через системное меню «Поделиться».'
+                        : '📲 Открыт Telegram с текстом плана.',
+                    );
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    minHeight: 34,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    borderRadius: 8,
+                    border: '1px solid rgba(56,189,248,0.55)',
+                    background: 'rgba(56,189,248,0.12)',
+                    color: '#38bdf8',
+                  }}
+                >
+                  📲 Telegram Mini App
+                </button>
               </div>
               {/* P12-wire #2: проф-авторегуляция плана — 3 режима (off/auto/diary) */}
               {(() => {
-                const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
+                const stt = shouldTrainToday({
+                  readiness: linked.readiness?.recovery ?? 80,
+                  acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' },
+                  fatigue: linked.readiness?.fatigue ?? 30,
+                  hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0,
+                  combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir,
+                });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 return (
-                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : autoRegResult.deload ? 'rgba(239,68,68,0.08)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : autoRegResult.deload ? 'rgba(239,68,68,0.25)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.2)') }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background:
+                        autoRegMode === 'off'
+                          ? 'rgba(255,255,255,0.02)'
+                          : autoRegResult.deload
+                            ? 'rgba(239,68,68,0.08)'
+                            : autoRegMode === 'diary'
+                              ? 'rgba(34,197,94,0.06)'
+                              : 'rgba(96,165,250,0.06)',
+                      border:
+                        '1px solid ' +
+                        (autoRegMode === 'off'
+                          ? 'rgba(255,255,255,0.06)'
+                          : autoRegResult.deload
+                            ? 'rgba(239,68,68,0.25)'
+                            : autoRegMode === 'diary'
+                              ? 'rgba(34,197,94,0.2)'
+                              : 'rgba(96,165,250,0.2)'),
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                      }}
+                    >
                       <div>
-                        <span style={{ fontSize:11, fontWeight:700, color: stt.train ? (autoRegResult.deload && autoRegMode !== 'off' ? '#ef4444' : modeColor) : '#ef4444' }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: stt.train
+                              ? autoRegResult.deload && autoRegMode !== 'off'
+                                ? '#ef4444'
+                                : modeColor
+                              : '#ef4444',
+                          }}
+                        >
                           {stt.train ? '✅' : '⚠️'} {stt.reason}
                         </span>
-                        {autoRegMode !== 'off' && autoRegResult.intensityNote && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: autoRegResult.intensityNote === 'силовая' ? 'rgba(239,68,68,0.15)' : autoRegResult.intensityNote === 'восстановительная' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: autoRegResult.intensityNote === 'силовая' ? '#ef4444' : autoRegResult.intensityNote === 'восстановительная' ? '#22c55e' : '#f59e0b' }}>{autoRegResult.intensityNote === 'силовая' ? 'СИЛОВАЯ' : autoRegResult.intensityNote === 'восстановительная' ? 'ВОССТАНОВИТ.' : autoRegResult.intensityNote === 'лёгкая' ? 'ЛЁГКАЯ' : ''}</span>}
+                        {autoRegMode !== 'off' && autoRegResult.intensityNote && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background:
+                                autoRegResult.intensityNote === 'силовая'
+                                  ? 'rgba(239,68,68,0.15)'
+                                  : autoRegResult.intensityNote === 'восстановительная'
+                                    ? 'rgba(34,197,94,0.15)'
+                                    : 'rgba(245,158,11,0.15)',
+                              color:
+                                autoRegResult.intensityNote === 'силовая'
+                                  ? '#ef4444'
+                                  : autoRegResult.intensityNote === 'восстановительная'
+                                    ? '#22c55e'
+                                    : '#f59e0b',
+                            }}
+                          >
+                            {autoRegResult.intensityNote === 'силовая'
+                              ? 'СИЛОВАЯ'
+                              : autoRegResult.intensityNote === 'восстановительная'
+                                ? 'ВОССТАНОВИТ.'
+                                : autoRegResult.intensityNote === 'лёгкая'
+                                  ? 'ЛЁГКАЯ'
+                                  : ''}
+                          </span>
+                        )}
                       </div>
                       <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} size="md" showTitleLabel />
                     </div>
-                    {autoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
-                      <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
-                      {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {d}</div>)}
-                    </div>}
-                    {autoRegMode === 'diary' && diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
-                      <div style={{ fontWeight:700, color: '#22c55e' }}>✓ {diaryAutoreg.summary.adjusted} скорректировано · {diaryAutoreg.summary.unchanged} в норме · {diaryAutoreg.summary.noData} без данных</div>
-                      {diaryAutoreg.summary.noData > 0 && <div style={{ marginTop:2, color:'#f59e0b' }}>⚠ {ruCount(diaryAutoreg.summary.noData, RU_EXERCISES)} без данных дневника — плановые веса</div>}
-                      {[...diaryAutoreg.perExercise.entries()].filter(([,v]) => v.source === 'diary').slice(0,4).map(([name, adj], i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {name}: {adj.factWeight}кг→{adj.adjustedWeight}кг (RPE {adj.factRPE}) {adj.note}</div>)}
-                      {diaryAutoreg.plateauWarnings.map((w, i) => <div key={'pw'+i} style={{ marginTop:2, color:'#ef4444' }}>🔴 {w}</div>)}
-                    </div>}
-                    {autoRegMode === 'diary' && !diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план и выберите неделю — дневниковая авторегуляция применится к весам.</div>}
+                    {autoRegMode === 'auto' && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                        <div>
+                          Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +
+                          {autoRegResult.rirShift}
+                          {autoRegResult.deload ? ' · 🔴 DELOAD' : ''}
+                        </div>
+                        {autoRegResult.decisions.slice(0, 3).map((d, i) => (
+                          <div key={i} style={{ marginTop: 2, color: '#fff' }}>
+                            • {d}
+                          </div>
+                        ))}
+                        {/* P0-4: множители применяются к плану ровно один раз — по кнопке. */}
+                        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            data-pl="autoreg-apply"
+                            onClick={() => onApplyAutoReg?.()}
+                            disabled={!onApplyAutoReg}
+                            style={{
+                              ...BTN_GHOST,
+                              minHeight: 34,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              border: '1px solid rgba(96,165,250,0.5)',
+                              color: onApplyAutoReg ? '#60a5fa' : 'rgba(96,165,250,0.5)',
+                              background: 'rgba(96,165,250,0.12)',
+                            }}
+                            title="Зафиксировать множители и применить к плану ОДИН раз (план пересобирается с ними)"
+                          >
+                            ✅ Применить к плану
+                          </button>
+                          {autoRegCfg ? (
+                            <button
+                              data-pl="autoreg-reset"
+                              onClick={() => onResetAutoReg?.()}
+                              disabled={!onResetAutoReg}
+                              style={{
+                                ...BTN_GHOST,
+                                minHeight: 34,
+                                fontSize: 10,
+                                border: '1px solid rgba(255,255,255,0.18)',
+                                color: '#fff',
+                              }}
+                              title="Снять авторегуляцию и пересобрать план без поправок готовности"
+                            >
+                              ↩ Снять
+                            </button>
+                          ) : null}
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 10, color: autoRegCfg ? '#60a5fa' : '#f59e0b' }}>
+                          {autoRegCfg
+                            ? `Применено к плану: вес ×${autoRegCfg.topSetPctMultiplier.toFixed(2)} · объём ×${autoRegCfg.volumeMultiplier.toFixed(2)} · RIR +${autoRegCfg.rirShift}` +
+                              (samePLAutoReg(autoRegCfg, autoRegResult)
+                                ? ' · множители актуальны'
+                                : ' · готовность изменилась — можно применить заново')
+                            : 'Предпросмотр: к плану НЕ применено (кнопка «Применить к плану»)'}
+                        </div>
+                      </div>
+                    )}
+                    {autoRegMode === 'diary' && diaryAutoreg && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                        <div style={{ fontWeight: 700, color: '#22c55e' }}>
+                          ✓ {diaryAutoreg.summary.adjusted} скорректировано · {diaryAutoreg.summary.unchanged} в норме ·{' '}
+                          {diaryAutoreg.summary.noData} без данных
+                        </div>
+                        {diaryAutoreg.summary.noData > 0 && (
+                          <div style={{ marginTop: 2, color: '#f59e0b' }}>
+                            ⚠ {ruCount(diaryAutoreg.summary.noData, RU_EXERCISES)} без данных дневника — плановые веса
+                          </div>
+                        )}
+                        {[...diaryAutoreg.perExercise.entries()]
+                          .filter(([, v]) => v.source === 'diary')
+                          .slice(0, 4)
+                          .map(([name, adj], i) => (
+                            <div key={i} style={{ marginTop: 2, color: '#fff' }}>
+                              • {name}: {adj.factWeight}кг→{adj.adjustedWeight}кг (RPE {adj.factRPE}) {adj.note}
+                            </div>
+                          ))}
+                        {diaryAutoreg.plateauWarnings.map((w, i) => (
+                          <div key={'pw' + i} style={{ marginTop: 2, color: '#ef4444' }}>
+                            🔴 {w}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {autoRegMode === 'diary' && !diaryAutoreg && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#f59e0b' }}>
+                        ⚠ Постройте план и выберите неделю — дневниковая авторегуляция применится к весам.
+                      </div>
+                    )}
                   </div>
                 );
               })()}
               {/* Авторегуляция ПРОГРЕССИИ ПМ (только ПМ, без объёма) — независимый переключатель */}
               {(() => {
-                const pmColor = pmAutoRegMode === 'auto' ? '#a78bfa' : pmAutoRegMode === 'diary' ? '#22c55e' : '#71717a';
+                const pmColor =
+                  pmAutoRegMode === 'auto' ? '#a78bfa' : pmAutoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const pmSegBtn = (m: PMAutoRegMode, label: string) => (
-                  <button onClick={() => setPmAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: pmAutoRegMode === m ? pmColor : 'rgba(255,255,255,0.08)', color: pmAutoRegMode === m ? '#000' : '#fff' }}>{label}</button>
+                  <button
+                    onClick={() => setPmAutoRegMode(m)}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: pmAutoRegMode === m ? pmColor : 'rgba(255,255,255,0.08)',
+                      color: pmAutoRegMode === m ? '#000' : '#fff',
+                    }}
+                  >
+                    {label}
+                  </button>
                 );
                 return (
-                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.06)', border: '1px solid ' + (pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.25)') }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.06)',
+                      border:
+                        '1px solid ' + (pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.25)'),
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                      }}
+                    >
                       <div>
-                        <span style={{ fontSize:11, fontWeight:700, color: pmAutoRegMode === 'off' ? '#fff' : pmColor }}>
-                          {pmAutoRegMode === 'off' ? 'Прогрессия ПМ: по данным цикла' : pmAutoRegMode === 'auto' ? '⚡ ПМ по авторасчётам' : '📒 ПМ по дневнику'}
+                        <span
+                          style={{ fontSize: 11, fontWeight: 700, color: pmAutoRegMode === 'off' ? '#fff' : pmColor }}
+                        >
+                          {pmAutoRegMode === 'off'
+                            ? 'Прогрессия ПМ: по данным цикла'
+                            : pmAutoRegMode === 'auto'
+                              ? '⚡ ПМ по авторасчётам'
+                              : '📒 ПМ по дневнику'}
                         </span>
-                        <span style={{ marginLeft:6, fontSize:10, color:'#fff' }}>только ПМ · без объёма</span>
+                        <span style={{ marginLeft: 6, fontSize: 10, color: '#fff' }}>только ПМ · без объёма</span>
                       </div>
-                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                        <span style={{ fontSize:10, fontWeight:700, color: pmColor, marginRight: 4 }}>Авторег. ПМ:</span>
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: pmColor, marginRight: 4 }}>
+                          Авторег. ПМ:
+                        </span>
                         {pmSegBtn('off', 'ВЫКЛ')}
                         {pmSegBtn('auto', 'АВТО')}
                         {pmSegBtn('diary', 'ДНЕВНИК')}
                       </div>
                     </div>
-                    {pmAutoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
-                      <div>Темп ПМ рассчитывается автоматически (PED/курс/уровень), коррекция цикла игнорируется.</div>
-                    </div>}
-                    {pmAutoRegMode === 'diary' && pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
-                      <div style={{ fontWeight:700, color: '#22c55e' }}>✓ {pmDiary.adjusted} скорректировано · {pmDiary.noData} без данных</div>
-                      {pmDiary.decisions.slice(0,4).map((d, i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {d}</div>)}
-                    </div>}
-                    {pmAutoRegMode === 'diary' && !pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план — дневниковая авторегуляция ПМ применится к кривой ПМ.</div>}
+                    {pmAutoRegMode === 'auto' && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                        <div>
+                          Темп ПМ рассчитывается автоматически (PED/курс/уровень), коррекция цикла игнорируется.
+                        </div>
+                      </div>
+                    )}
+                    {pmAutoRegMode === 'diary' && pmDiary && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                        <div style={{ fontWeight: 700, color: '#22c55e' }}>
+                          ✓ {pmDiary.adjusted} скорректировано · {pmDiary.noData} без данных
+                        </div>
+                        {pmDiary.decisions.slice(0, 4).map((d, i) => (
+                          <div key={i} style={{ marginTop: 2, color: '#fff' }}>
+                            • {d}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {pmAutoRegMode === 'diary' && !pmDiary && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#f59e0b' }}>
+                        ⚠ Постройте план — дневниковая авторегуляция ПМ применится к кривой ПМ.
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -465,268 +1191,906 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               {(() => {
                 const pzColor = periodizationMode === 'dup' ? '#22d3ee' : '#71717a';
                 const pzBtn = (m: 'linear' | 'dup', label: string) => (
-                  <button onClick={() => setPeriodizationMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: periodizationMode === m ? pzColor : 'rgba(255,255,255,0.08)', color: periodizationMode === m ? '#000' : '#fff' }}>{label}</button>
+                  <button
+                    onClick={() => setPeriodizationMode(m)}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: periodizationMode === m ? pzColor : 'rgba(255,255,255,0.08)',
+                      color: periodizationMode === m ? '#000' : '#fff',
+                    }}
+                  >
+                    {label}
+                  </button>
                 );
                 return (
-                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: periodizationMode === 'linear' ? 'rgba(255,255,255,0.02)' : 'rgba(34,211,238,0.06)', border: '1px solid ' + (periodizationMode === 'linear' ? 'rgba(255,255,255,0.06)' : 'rgba(34,211,238,0.25)') }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: periodizationMode === 'linear' ? 'rgba(255,255,255,0.02)' : 'rgba(34,211,238,0.06)',
+                      border:
+                        '1px solid ' +
+                        (periodizationMode === 'linear' ? 'rgba(255,255,255,0.06)' : 'rgba(34,211,238,0.25)'),
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 4,
+                      }}
+                    >
                       <div>
-                        <span style={{ fontSize:11, fontWeight:700, color: periodizationMode === 'linear' ? '#fff' : pzColor }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: periodizationMode === 'linear' ? '#fff' : pzColor,
+                          }}
+                        >
                           {periodizationMode === 'linear' ? 'Периодизация: линейная' : '🔄 Периодизация: DUP'}
                         </span>
-                        <span style={{ marginLeft:6, fontSize:10, color:'#fff' }}>ежедневное варьирование зон</span>
+                        <span style={{ marginLeft: 6, fontSize: 10, color: '#fff' }}>ежедневное варьирование зон</span>
                       </div>
-                      <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                        <span style={{ fontSize:10, fontWeight:700, color: pzColor, marginRight: 4 }}>Периодизация:</span>
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: pzColor, marginRight: 4 }}>
+                          Периодизация:
+                        </span>
                         {pzBtn('linear', 'ЛИНЕЙНАЯ')}
                         {pzBtn('dup', 'DUP')}
                       </div>
                     </div>
-                    {periodizationMode === 'dup' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
-                      <div>DUP (Daily Undulating Periodization): каждый день недели — своя зона (гипертрофия/сила/пик). Вес и RIR варьируются по дням недели.</div>
-                    </div>}
+                    {periodizationMode === 'dup' && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#fff' }}>
+                        <div>
+                          DUP (Daily Undulating Periodization): каждый день недели — своя зона (гипертрофия/сила/пик).
+                          Вес и RIR варьируются по дням недели.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
               {/* Exercise picker popup */}
               {pickerDay && (
-                <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setPickerDay(null)} role="presentation">
-                  <div ref={pickerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Добавить упражнение в день" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column', outline:'none' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
-                      <span style={{ fontSize:14, fontWeight:700, color:'var(--accent)' }}>＋ Упражнение в день</span>
-                      <button onClick={() => setPickerDay(null)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px', minHeight:44 }} aria-label="Закрыть">✕</button>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', background: 'rgba(0,0,0,0.9)' }}
+                  onClick={() => setPickerDay(null)}
+                  role="presentation"
+                >
+                  <div
+                    ref={pickerRef}
+                    tabIndex={-1}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Добавить упражнение в день"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      width: '100%',
+                      maxWidth: 480,
+                      margin: '0 auto',
+                      background: '#18181b',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      outline: 'none',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 12px 0',
+                      }}
+                    >
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+                        ＋ Упражнение в день
+                      </span>
+                      <button
+                        onClick={() => setPickerDay(null)}
+                        style={{
+                          fontSize: 11,
+                          color: '#ef4444',
+                          border: 'none',
+                          background: 'transparent',
+                          cursor: 'pointer',
+                          padding: '4px 8px',
+                          minHeight: 44,
+                        }}
+                        aria-label="Закрыть"
+                      >
+                        ✕
+                      </button>
                     </div>
-                    <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:11, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'#fff' }}>{GRP_RU[g]||g}</button>)}</div>
-                      <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:8 }}>
-                        <option value=''>— выберите упражнение —</option>
-                        {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
-                      </select>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:8 }}>
-                        <span style={{ fontSize:11, color:'#fff' }}>Подходы</span>
-                        <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
-                        <span style={{ fontSize:11 }}>×</span>
-                        <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
-                        <span style={{ fontSize:11 }}>×</span>
-                        <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:11 }} />
-                        <span style={{ fontSize:11, color:'#fff' }}>кг</span>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px 80px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                        {CAT_GROUPS.map((g) => (
+                          <button
+                            key={g}
+                            onClick={() => {
+                              setPickerGroup(g);
+                              setPickerExName('');
+                            }}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 16,
+                              fontSize: 11,
+                              cursor: 'pointer',
+                              border:
+                                pickerGroup === g ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                              background: pickerGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
+                              color: pickerGroup === g ? 'var(--accent)' : '#fff',
+                            }}
+                          >
+                            {GRP_RU[g] || g}
+                          </button>
+                        ))}
                       </div>
-                      <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', minHeight:44, borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
+                      <select
+                        value={pickerExName}
+                        onChange={(e) => setPickerExName(e.target.value)}
+                        style={{ ...SEL, marginBottom: 8 }}
+                      >
+                        <option value="">— выберите упражнение —</option>
+                        {getExercisesByGroup(pickerGroup).map((ex) => (
+                          <option key={ex.id} value={ex.name}>
+                            {ex.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: '#fff' }}>Подходы</span>
+                        <input
+                          type="number"
+                          value={pickerScheme.sets}
+                          onChange={(e) => setPickerScheme((s) => ({ ...s, sets: +e.target.value }))}
+                          style={{ width: 48, ...IN, padding: '4px', fontSize: 11 }}
+                        />
+                        <span style={{ fontSize: 11 }}>×</span>
+                        <input
+                          type="number"
+                          value={pickerScheme.reps}
+                          onChange={(e) => setPickerScheme((s) => ({ ...s, reps: +e.target.value }))}
+                          style={{ width: 48, ...IN, padding: '4px', fontSize: 11 }}
+                        />
+                        <span style={{ fontSize: 11 }}>×</span>
+                        <input
+                          type="number"
+                          value={pickerScheme.weight}
+                          onChange={(e) => setPickerScheme((s) => ({ ...s, weight: +e.target.value }))}
+                          style={{ width: 56, ...IN, padding: '4px', fontSize: 11 }}
+                        />
+                        <span style={{ fontSize: 11, color: '#fff' }}>кг</span>
+                      </div>
+                      <button
+                        onClick={() => addExToDay(pickerDay)}
+                        disabled={!pickerExName}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          minHeight: 44,
+                          borderRadius: 8,
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          background: pickerExName
+                            ? 'linear-gradient(135deg,var(--accent),#00c8a0)'
+                            : 'rgba(255,255,255,0.1)',
+                          color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)',
+                        }}
+                      >
+                        Добавить в день
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
-              <div style={{ marginTop:10 }}>
-                <div style={{ fontSize:12, color:'#fff', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontWeight:700, color:'#fff' }}>Неделя {wk.week} из {totalW}</span>
-                  <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
+              <div style={{ marginTop: 10 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#fff',
+                    marginBottom: 6,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: '#fff' }}>
+                    Неделя {wk.week} из {totalW}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: calendarColor,
+                      background: calendarBadgeTint,
+                      padding: '2px 10px',
+                      borderRadius: 8,
+                    }}
+                  >
+                    {calendarLabel}
+                  </span>
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
-                   {W.map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const tint = original && !deload ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a'; const label = deload ? '🔋 Делод · объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${ruCount(original.volumeSets, RU_SETS)}` : meet ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : mock ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы` : post ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)` : taper ? `📉 Тапер · ${Math.round((weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма` : PH_RU[ph]; const active = w.week===wk.week; return <button key={w.week} onClick={() => setSrcWeek(w.week)} title={'Неделя '+w.week+': '+label} style={{ padding:'6px 0', borderRadius:8, border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? color : tint, color: active ? '#000' : '#fff', fontSize:11, fontWeight:700, cursor:'pointer', minHeight:36, minWidth:0 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}</button>; })}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(36px, 1fr))', gap: 4 }}>
+                  {W.map((w) => {
+                    const ph = displayPhaseForWeek(w, totalW);
+                    const original = sourceCalendar?.[w.week - 1];
+                    const taper = isTaperWeek(w);
+                    const mock = isMockWeek(w);
+                    const meet = isMeetWeek(w);
+                    const post = isPostMeetWeek(w);
+                    const deload = isDeloadWeek(w);
+                    const color = deload
+                      ? DELOAD_COLOR
+                      : original && sourceCalendar
+                        ? sourceWeekColor(original, sourceCalendar)
+                        : meet
+                          ? MEET_COLOR
+                          : mock
+                            ? MOCK_COLOR
+                            : post
+                              ? POST_COLOR
+                              : taper
+                                ? TAPER_COLOR
+                                : PH_COLOR[ph];
+                    const tint = original && !deload ? `color-mix(in srgb, ${color} 13%, transparent)` : color + '1a';
+                    const label = deload
+                      ? '🔋 Делод · объём снижен, интенсивность сохранена'
+                      : original
+                        ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]} ${Math.round(original.intensityPct * 100)}% · ${ruCount(original.volumeSets, RU_SETS)}`
+                        : meet
+                          ? `🏁 Соревнования · прикиды ${MEET_STRATEGY_PCT_LABEL[w.meetAttempts?.strategy ?? attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}`
+                          : mock
+                            ? `🎯 Имитация соревнований (mock meet) · прикиды-синглы`
+                            : post
+                              ? `🔄 Пост-старт восстановление (объём ×0.5, RIR +3)`
+                              : taper
+                                ? `📉 Тапер · ${Math.round((weekVolumeOf(w) / Math.max(1, weekVolumeOf(W[W.length - taperWeeksToAdd - 1] ?? W[0]))) * 100)}% объёма`
+                                : PH_RU[ph];
+                    const active = w.week === wk.week;
+                    return (
+                      <button
+                        key={w.week}
+                        onClick={() => setSrcWeek(w.week)}
+                        title={'Неделя ' + w.week + ': ' + label}
+                        style={{
+                          padding: '6px 0',
+                          borderRadius: 8,
+                          border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                          background: active ? color : tint,
+                          color: active ? '#000' : '#fff',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          minHeight: 36,
+                          minWidth: 0,
+                        }}
+                      >
+                        {deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : w.week}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
-              <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: 8,
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                    📅 Календарь мезоцикла (нед × дни, тоннаж)
+                  </div>
                   {/* Переключатель: оригинальный цикл / с учётом тапера (единый компонент) */}
                   <CalendarViewSwitch
                     value={calendarView}
                     onChange={setCalendarView}
-                    originalLabel={`🔵 Оригинальный (${W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).length} нед)`}
+                    originalLabel={`🔵 Оригинальный (${W.filter((w) => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).length} нед)`}
                     taperedLabel={`📉 С тапером (${W.length} нед)`}
                   />
                 </div>
                 {(W.some(isTaperWeek) || W.some(isMockWeek) || W.some(isMeetWeek)) && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, fontSize: 9, color: '#fff' }}>
-                    {W.some(isTaperWeek) && <span><span style={{ color: TAPER_COLOR }}>📉</span> тапер · разгрузка</span>}
-                    {W.some(isMockWeek) && <span><span style={{ color: MOCK_COLOR }}>🎯</span> mock meet · прикиды-синглы</span>}
-                    {W.some(isMeetWeek) && <span><span style={{ color: MEET_COLOR }}>🏁</span> соревнования · прикиды</span>}
-                    {W.some(isPostMeetWeek) && <span><span style={{ color: POST_COLOR }}>🔄</span> пост-старт · восстановление</span>}
+                  <div
+                    style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, fontSize: 9, color: '#fff' }}
+                  >
+                    {W.some(isTaperWeek) && (
+                      <span>
+                        <span style={{ color: TAPER_COLOR }}>📉</span> тапер · разгрузка
+                      </span>
+                    )}
+                    {W.some(isMockWeek) && (
+                      <span>
+                        <span style={{ color: MOCK_COLOR }}>🎯</span> mock meet · прикиды-синглы
+                      </span>
+                    )}
+                    {W.some(isMeetWeek) && (
+                      <span>
+                        <span style={{ color: MEET_COLOR }}>🏁</span> соревнования · прикиды
+                      </span>
+                    )}
+                    {W.some(isPostMeetWeek) && (
+                      <span>
+                        <span style={{ color: POST_COLOR }}>🔄</span> пост-старт · восстановление
+                      </span>
+                    )}
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    {(calendarView === 'original' ? W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w) && !isPostMeetWeek(w)) : W).map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const deload = isDeloadWeek(w); const color = deload ? DELOAD_COLOR : original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original && !deload ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const calWeeks = calendarView === 'original' ? W.filter(ww => !isTaperWeek(ww) && !isMockWeek(ww) && !isMeetWeek(ww) && !isPostMeetWeek(ww)) : W; const maxT = Math.max(1, ...calWeeks.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
-                    <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (meet ? 'rgba(234,179,8,0.12)' : mock ? 'rgba(167,139,250,0.12)' : post ? 'rgba(52,211,153,0.1)' : taper ? 'rgba(245,158,11,0.1)' : deload ? 'rgba(96,165,250,0.12)' : 'var(--accent-dim)') : 'transparent', border: active ? (meet ? '1px solid rgba(234,179,8,0.45)' : mock ? '1px solid rgba(167,139,250,0.45)' : post ? '1px solid rgba(52,211,153,0.4)' : taper ? '1px solid rgba(245,158,11,0.4)' : deload ? '1px solid rgba(96,165,250,0.45)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (meet ? '#eab308' : mock ? '#a78bfa' : post ? '#34d399' : taper ? '#f59e0b' : deload ? '#60a5fa' : 'var(--accent)') : '#fff', minWidth: 26 }}>{deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}</span>
-                       <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={deload ? '🔋 Делод: объём снижен, интенсивность сохранена' : original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${ruCount(original.volumeSets, RU_SETS)}` : meet ? '🏁 Соревнования: прикиды как подходы' : mock ? '🎯 Имитация соревнований: прикиды-синглы' : post ? '🔄 Пост-старт: объём ×0.5, RIR +3' : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
-                      <div style={{ flex: 1, display: 'flex', gap: 2 }}>
-                          {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
+                  {(calendarView === 'original'
+                    ? W.filter((w) => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w) && !isPostMeetWeek(w))
+                    : W
+                  ).map((w) => {
+                    const ph = displayPhaseForWeek(w, totalW);
+                    const original = sourceCalendar?.[w.week - 1];
+                    const taper = isTaperWeek(w);
+                    const mock = isMockWeek(w);
+                    const meet = isMeetWeek(w);
+                    const post = isPostMeetWeek(w);
+                    const deload = isDeloadWeek(w);
+                    const color = deload
+                      ? DELOAD_COLOR
+                      : original && sourceCalendar
+                        ? sourceWeekColor(original, sourceCalendar)
+                        : meet
+                          ? MEET_COLOR
+                          : mock
+                            ? MOCK_COLOR
+                            : post
+                              ? POST_COLOR
+                              : taper
+                                ? TAPER_COLOR
+                                : PH_COLOR[ph];
+                    const colorFade =
+                      original && !deload ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88';
+                    const active = w.week === wk.week;
+                    const calWeeks =
+                      calendarView === 'original'
+                        ? W.filter(
+                            (ww) => !isTaperWeek(ww) && !isMockWeek(ww) && !isMeetWeek(ww) && !isPostMeetWeek(ww),
+                          )
+                        : W;
+                    const maxT = Math.max(
+                      1,
+                      ...calWeeks.map((ww) => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0)),
+                    );
+                    const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0);
+                    return (
+                      <div
+                        key={w.week}
+                        onClick={() => setSrcWeek(w.week)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '4px 6px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          background: active
+                            ? meet
+                              ? 'rgba(234,179,8,0.12)'
+                              : mock
+                                ? 'rgba(167,139,250,0.12)'
+                                : post
+                                  ? 'rgba(52,211,153,0.1)'
+                                  : taper
+                                    ? 'rgba(245,158,11,0.1)'
+                                    : deload
+                                      ? 'rgba(96,165,250,0.12)'
+                                      : 'var(--accent-dim)'
+                            : 'transparent',
+                          border: active
+                            ? meet
+                              ? '1px solid rgba(234,179,8,0.45)'
+                              : mock
+                                ? '1px solid rgba(167,139,250,0.45)'
+                                : post
+                                  ? '1px solid rgba(52,211,153,0.4)'
+                                  : taper
+                                    ? '1px solid rgba(245,158,11,0.4)'
+                                    : deload
+                                      ? '1px solid rgba(96,165,250,0.45)'
+                                      : '1px solid rgba(0,230,138,0.3)'
+                            : '1px solid transparent',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: active
+                              ? meet
+                                ? '#eab308'
+                                : mock
+                                  ? '#a78bfa'
+                                  : post
+                                    ? '#34d399'
+                                    : taper
+                                      ? '#f59e0b'
+                                      : deload
+                                        ? '#60a5fa'
+                                        : 'var(--accent)'
+                              : '#fff',
+                            minWidth: 26,
+                          }}
+                        >
+                          {deload ? '🔋' : meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}
+                        </span>
+                        <span
+                          style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }}
+                          title={
+                            deload
+                              ? '🔋 Делод: объём снижен, интенсивность сохранена'
+                              : original
+                                ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${ruCount(original.volumeSets, RU_SETS)}`
+                                : meet
+                                  ? '🏁 Соревнования: прикиды как подходы'
+                                  : mock
+                                    ? '🎯 Имитация соревнований: прикиды-синглы'
+                                    : post
+                                      ? '🔄 Пост-старт: объём ×0.5, RIR +3'
+                                      : taper
+                                        ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена'
+                                        : PH_RU[ph]
+                          }
+                        />
+                        <div style={{ flex: 1, display: 'flex', gap: 2 }}>
+                          {w.days.map((d, di) => {
+                            const t = d.metrics.tonnage;
+                            return (
+                              <div
+                                key={di}
+                                title={'Д' + (di + 1) + ': ' + t.toFixed(0) + ' кг·пов'}
+                                style={{
+                                  flex: 1,
+                                  height: 14,
+                                  borderRadius: 3,
+                                  background:
+                                    t > 0
+                                      ? `linear-gradient(180deg, ${color}, ${colorFade})`
+                                      : 'rgba(255,255,255,0.04)',
+                                  opacity: 0.4 + 0.6 * (t / maxT),
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                        <span style={{ fontSize: 10, color: '#fff', minWidth: 38, textAlign: 'right' }}>
+                          {wTotal.toFixed(0)}
+                        </span>
                       </div>
-                      <span style={{ fontSize: 10, color: '#fff', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
-                    </div>
-                  ); })}
+                    );
+                  })}
                 </div>
               </div>
-              <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {splitDescriptionPoints(calendarDescription).map((point, i) => (
-                  <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
-                    <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: 10,
+                      color: '#fff',
+                      padding: '5px 8px',
+                      borderRadius: 7,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      lineHeight: 1.4,
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    <span style={{ color: calendarColor, fontWeight: 800 }}>•</span> {point}
                   </div>
                 ))}
               </div>
-              <MetricCard title={'ПМ на неделю '+wk.week+' (прогрессия)'} icon="📈" accent="#60a5fa">
-                <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>{Object.entries(wk.pmRow).map(([n, pm]) => <span key={n} style={{ ...SMALL, color:'#fff', background:'rgba(96,165,250,0.08)', padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.15)' }}><b>{n}:</b> {pm.toFixed(1)} кг</span>)}</div>
+              <MetricCard title={'ПМ на неделю ' + wk.week + ' (прогрессия)'} icon="📈" accent="#60a5fa">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {Object.entries(wk.pmRow).map(([n, pm]) => (
+                    <span
+                      key={n}
+                      style={{
+                        ...SMALL,
+                        color: '#fff',
+                        background: 'rgba(96,165,250,0.08)',
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        border: '1px solid rgba(96,165,250,0.15)',
+                      }}
+                    >
+                      <b>{n}:</b> {pm.toFixed(1)} кг
+                    </span>
+                  ))}
+                </div>
               </MetricCard>
               {/* График прогрессии ПМ по неделям */}
-               {displaySrc && Array.isArray(displaySrc.weeks) && displaySrc.weeks.length > 0 && (() => {
-                 const exNames = Object.keys(displaySrc.weeks[0]?.pmRow || {}).slice(0, 3);
-                 if (exNames.length === 0) return null;
-                 const allVals = displaySrc.weeks.flatMap(w => exNames.map(n => w.pmRow[n] || 0));
-                 const minV = Math.min(...allVals), maxV = Math.max(...allVals);
-                 const W2 = displaySrc.weeks.length;
-                const colors = ['var(--accent)', '#60a5fa', '#a855f7'];
-                const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
-                const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
-                return <BbFoldCard icon="📈" accent="#60a5fa" title="Прогрессия ПМ по неделям" style={{ marginTop: 8 }}>
-                  <svg width="100%" viewBox="0 0 320 80" style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
-                    {[0,1,2,3].map(g => <line key={g} x1={24} x2={304} y1={14 + g * 18} y2={14 + g * 18} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
-                     {exNames.map((n, ei) => { const pts = displaySrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' '); return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />; })}
-                     {exNames.map((n, ei) => displaySrc.weeks.map((w, i) => <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />))}
-                  </svg>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{exNames.map((n, ei) => <span key={n} style={{ fontSize: 10, color: colors[ei] }}>● {n}</span>)}</div>
-                </BbFoldCard>;
-              })()}
-              {(goal === 'peak' || W.some(isTaperWeek) || W.some(isMeetWeek) || W.some(isMockWeek)) && (() => {
-                const hasDiary = e1rmSeries.length > 0;
-                const diaryLast = (lift: 'squat' | 'bench' | 'deadlift'): number | null => {
-                  const series = e1rmSeries.find(s => s.lift === lift);
-                  return series?.pts.at(-1)?.val ?? null;
-                };
-                const diaryVals = { squat: diaryLast('squat'), bench: diaryLast('bench'), deadlift: diaryLast('deadlift') };
-                const diaryApplied = Object.values(diaryVals).some(v => v != null);
-                const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
-                // Попытки тоже масштабируются множителем режима на лету (паритет с карточкой прикидов).
-                const scale = (w: number) => Math.round(w * arMult * 10) / 10;
-                const round2 = (w: number) => Math.round(w * 10) / 10;
-                // База попыток — ПМ ПО ЦИКЛУ: прогноз pmRow финальной (соревновательной)
-                // недели уже учитывает пройденный цикл (прогрессия PM0→пик), а не
-                // «дневниковые» поля pmSquat/pmBench/pmDead (PM0 из профиля/калибровки).
-                const meetWk = W.find(w => w.meetAttempts && w.meetAttempts.lifts.length > 0) ?? W[W.length - 1];
-                // ПМ ПО ЦИКЛУ: ищем в pmRow финальной недели ключи трёх лифтов.
-                // Матчинг — каноническим detectLift (как e1rmSeries из дневника),
-                // чтобы имена каталога («Жим штанги лёжа») гарантированно находились.
-                const cycleRow = meetWk?.pmRow ?? {};
-                const cycleKeyFor = (lift: 'squat' | 'bench' | 'dead'): string | undefined =>
-                  Object.keys(cycleRow).find(k => detectLift(k, '') === lift);
-                const cycleVal = (lift: 'squat' | 'bench' | 'dead'): number => {
-                  const k = cycleKeyFor(lift);
-                  const v = k ? cycleRow[k] : NaN;
-                  return Number.isFinite(v) && v > 0 ? v : 0;
-                };
-                const basePm = {
-                  squat: cycleVal('squat') || pmSquat,
-                  bench: cycleVal('bench') || pmBench,
-                  deadlift: cycleVal('dead') || pmDead,
-                };
-                const cyclePmApplied = !!cycleKeyFor('squat') || !!cycleKeyFor('bench') || !!cycleKeyFor('dead');
-                return (
-                <MetricCard title={`🏁 Попытки на соревнования${W.some(isTaperWeek) || W.some(isMeetWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon="🏁" accent="#f59e0b">
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                    <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
-                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
-                      {autoRegMode === 'auto'
-                        ? (arMult !== 1 ? `попытки ×${arMult.toFixed(2)}` : 'множитель 1.00')
-                        : autoRegMode === 'diary'
-                          ? 'дневник правит веса тренировок (попытки по плану)'
-                          : 'попытки по плану'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-                    {([['Присед', basePm.squat], ['Жим', basePm.bench], ['Становая', basePm.deadlift]] as const).map(([name, value]) => {
-                      // Канон MEET_STRATEGY_PCT (competition-attempts) — ТОТ ЖЕ источник,
-                      // что в appendPLTaperWeeks/PeakingPanel/печати. Раньше здесь жил
-                      // competitionAttempts (87.5/92.5/100) при подписи стратегии —
-                      // карточка противоречила сама себе и карточке прикидов ниже.
-                      const pct = MEET_STRATEGY_PCT[attemptStrategy] ?? MEET_STRATEGY_PCT.balanced;
-                      const a = meetAttemptsFor(value, attemptStrategy);
-                      const band = (center: number) => `${scale(round2(value * (center - 0.03)))}–${scale(round2(value * (center + 0.03)))}`;
-                      return <div key={name} style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}><b>{name}</b><div>1: {band(pct.opener)} кг</div><div>2: {band(pct.second)} кг</div><div>3: {band(pct.third)} кг</div><div style={{ color: '#f59e0b', marginTop: 3 }}>рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}</div></div>;
-                    })}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-<button
-                      onClick={() => {
-                          if (!hasDiary) { onNote('⚠ В дневнике нет записей 1ПМ (присед/жим лёжа/становая) — кнопка применится, когда появятся записи. Пока попытки от ПМ по циклу.'); return; }
-                          calibratePmFromDiary('squat'); calibratePmFromDiary('bench'); calibratePmFromDiary('deadlift');
-                          onNote('📈 ПМ0 обновлены из дневника — пересоберите план: попытки считаются от ПМ по циклу (прогноз финальной недели).');
-                        }}
-                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: '1px solid rgba(0,230,138,0.35)', color: hasDiary ? '#00e68a' : 'rgba(0,230,138,0.75)', background: hasDiary ? 'rgba(0,230,138,0.08)' : 'rgba(0,230,138,0.04)' }}
-                        title="Заполнить ПМ0 из последних 1ПМ дневника тренировок (как в полях ПМ) — план пересоберите, попытки пересчитаются от прогноза цикла"
-                      >📈 Из дневника{diaryApplied ? ` (присед ${diaryVals.squat ?? '—'} · жим ${diaryVals.bench ?? '—'} · тяга ${diaryVals.deadlift ?? '—'})` : ''}</button>
-                    <button
-                      disabled={!cyclePmApplied}
-                      onClick={() => {
-                          applyPmFromCycle({ squat: basePm.squat, bench: basePm.bench, deadlift: basePm.deadlift });
-                          onNote(`📊 ПМ0 установлены из цикла (прогноз финальной недели): присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift} — пересоберите план.`);
-                        }}
-                        style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: cyclePmApplied ? '1px solid rgba(96,165,250,0.35)' : '1px solid rgba(255,255,255,0.08)', color: cyclePmApplied ? '#60a5fa' : 'rgba(255,255,255,0.3)', background: cyclePmApplied ? 'rgba(96,165,250,0.08)' : 'transparent' }}
-                        title="Установить ПМ0 из прогноза цикла (pmRow финальной недели, уже с учётом пройденного цикла) — пересоберите план"
-                      >📊 Из цикла{cyclePmApplied ? ` (присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift})` : ''}</button>
-                    {!hasDiary && !cyclePmApplied && <span style={{ fontSize: 9, color: '#fff' }}>нет записей в дневнике — попытки от ПМ по циклу</span>}
-                  </div>
-                </MetricCard>
-                );
-              })()}
-              {(wk.meetAttempts && wk.meetAttempts.lifts.length > 0) && (() => {
-                const arMult = autoRegMode === 'auto' && autoRegResult ? autoRegResult.topSetPctMultiplier : 1;
-                // База прикидов — из pmRow недели (без авторегуляции); множитель «🤖 Авто»
-                // применяется при отображении — переключение режима меняет веса на лету
-                // (паритет с движком appendPLTaperWeeks.autoReg).
-                const base = computeMeetAttemptsFromPmRow(wk.pmRow, wk.meetAttempts.strategy) ?? wk.meetAttempts;
-                const scale = (w: number) => Math.round(w * arMult * 10) / 10;
-                return (
-                <MetricCard title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[base.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${autoRegMode === 'auto' ? ` · 🤖 режим авторегуляции${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`} icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'} accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
-                    <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
-                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
-                      {autoRegMode === 'auto'
-                        ? (arMult !== 1 ? `прикиды ×${arMult.toFixed(2)}` : 'множитель 1.00')
-                        : autoRegMode === 'diary'
-                          ? 'дневник правит веса тренировок (прикиды по плану)'
-                          : 'прикиды по плану'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-                    {base.lifts.map(l => (
-                      <div key={l.name} style={{ padding: 6, borderRadius: 6, background: wk.meetWeek ? 'rgba(234,179,8,0.08)' : wk.mockMeet ? 'rgba(167,139,250,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.3)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`, fontSize: 10 }}>
-                        <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.name}</b>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: '#fff' }}>1-я</div><b style={{ fontSize: 12 }}>{scale(l.opener)}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: '#fff' }}>2-я</div><b style={{ fontSize: 12 }}>{scale(l.second)}</b></div>
-                          <div style={{ textAlign: 'center', background: wk.meetWeek ? 'rgba(234,179,8,0.14)' : wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: '#fff' }}>3-я</div><b style={{ fontSize: 12, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{scale(l.third)}</b></div>
-                        </div>
+              {displaySrc &&
+                Array.isArray(displaySrc.weeks) &&
+                displaySrc.weeks.length > 0 &&
+                (() => {
+                  const exNames = Object.keys(displaySrc.weeks[0]?.pmRow || {}).slice(0, 3);
+                  if (exNames.length === 0) return null;
+                  const allVals = displaySrc.weeks.flatMap((w) => exNames.map((n) => w.pmRow[n] || 0));
+                  const minV = Math.min(...allVals),
+                    maxV = Math.max(...allVals);
+                  const W2 = displaySrc.weeks.length;
+                  const colors = ['var(--accent)', '#60a5fa', '#a855f7'];
+                  const px = (i: number) => 24 + (i / Math.max(1, W2 - 1)) * 280;
+                  const py = (v: number) => 70 - ((v - minV) / Math.max(1, maxV - minV)) * 56;
+                  return (
+                    <BbFoldCard icon="📈" accent="#60a5fa" title="Прогрессия ПМ по неделям" style={{ marginTop: 8 }}>
+                      <svg
+                        width="100%"
+                        viewBox="0 0 320 80"
+                        style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}
+                      >
+                        {[0, 1, 2, 3].map((g) => (
+                          <line
+                            key={g}
+                            x1={24}
+                            x2={304}
+                            y1={14 + g * 18}
+                            y2={14 + g * 18}
+                            stroke="rgba(255,255,255,0.06)"
+                            strokeWidth={0.5}
+                          />
+                        ))}
+                        {exNames.map((n, ei) => {
+                          const pts = displaySrc.weeks.map((w, i) => `${px(i)},${py(w.pmRow[n] || 0)}`).join(' ');
+                          return <polyline key={n} points={pts} fill="none" stroke={colors[ei]} strokeWidth={1.6} />;
+                        })}
+                        {exNames.map((n, ei) =>
+                          displaySrc.weeks.map((w, i) => (
+                            <circle key={n + i} cx={px(i)} cy={py(w.pmRow[n] || 0)} r={2} fill={colors[ei]} />
+                          )),
+                        )}
+                      </svg>
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}
+                      >
+                        {exNames.map((n, ei) => (
+                          <span key={n} style={{ fontSize: 10, color: colors[ei] }}>
+                            ● {n}
+                          </span>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  {/* Разминка по опенеру — ИЗ ДВИЖКА (канон warmupToOpener в MeetAttemptsInfo):
+                    </BbFoldCard>
+                  );
+                })()}
+              {(goal === 'peak' || W.some(isTaperWeek) || W.some(isMeetWeek) || W.some(isMockWeek)) &&
+                (() => {
+                  const hasDiary = e1rmSeries.length > 0;
+                  const diaryLast = (lift: 'squat' | 'bench' | 'deadlift'): number | null => {
+                    const series = e1rmSeries.find((s) => s.lift === lift);
+                    return series?.pts.at(-1)?.val ?? null;
+                  };
+                  const diaryVals = {
+                    squat: diaryLast('squat'),
+                    bench: diaryLast('bench'),
+                    deadlift: diaryLast('deadlift'),
+                  };
+                  const diaryApplied = Object.values(diaryVals).some((v) => v != null);
+                  // P0-4: множитель, УЖЕ запечённый в план (подтверждённый конфиг), и «живой»
+                  // предпросмотр режима «Авто» — до тех пор, пока он не применён кнопкой.
+                  const appliedMult = autoRegCfg?.topSetPctMultiplier ?? 1;
+                  const previewMult = autoRegMode === 'auto' && !autoRegCfg ? autoRegResult.topSetPctMultiplier : 1;
+                  const arMult = appliedMult * previewMult;
+                  const arWord = appliedMult !== 1 ? 'применено' : 'предпросмотр';
+                  const round2 = (w: number) => Math.round(w * 10) / 10;
+                  // P2-15: попытки берутся РОВНО из движка (`attemptPmRow` → `meetAttempts`,
+                  // множитель авторегуляции уже вшит в веса и помечен `attemptAutoRegMult`).
+                  // Предпросмотр режима «Авто» докручивает их, только пока конфиг не применён
+                  // кнопкой, — иначе карточка и таблица подходов/экспорт дают разные числа.
+                  const scale = (w: number) => Math.round(w * previewMult * 10) / 10;
+                  const meetWk = W.find((w) => w.meetAttempts && w.meetAttempts.lifts.length > 0) ?? W[W.length - 1];
+                  // База кнопки «📊 Из цикла» — прогноз ПМ самого цикла (pmRow финальной недели,
+                  // без поправок авторегуляции): это установка ПМ0, а не показ попыток.
+                  // Матчинг — каноническим detectLift (как e1rmSeries из дневника),
+                  // чтобы имена каталога («Жим штанги лёжа») гарантированно находились.
+                  const cycleRow = meetWk?.pmRow ?? {};
+                  const cycleKeyFor = (lift: 'squat' | 'bench' | 'dead'): string | undefined =>
+                    Object.keys(cycleRow).find((k) => detectLift(k, '') === lift);
+                  const cycleVal = (lift: 'squat' | 'bench' | 'dead'): number => {
+                    const k = cycleKeyFor(lift);
+                    const v = k ? cycleRow[k] : NaN;
+                    return Number.isFinite(v) && v > 0 ? v : 0;
+                  };
+                  const basePm = {
+                    squat: cycleVal('squat') || pmSquat,
+                    bench: cycleVal('bench') || pmBench,
+                    deadlift: cycleVal('dead') || pmDead,
+                  };
+                  const cyclePmApplied = !!cycleKeyFor('squat') || !!cycleKeyFor('bench') || !!cycleKeyFor('dead');
+                  // Прикиды лифта — из `meetAttempts` недели (единственный источник истины:
+                  // та же база `attemptPmRow` и тот же множитель, что у таблицы подходов).
+                  const liftOf = (lift: 'squat' | 'bench' | 'dead') =>
+                    meetWk?.meetAttempts?.lifts.find((l) => detectLift(l.name, '') === lift);
+                  return (
+                    <MetricCard
+                      title={`🏁 Попытки на соревнования${W.some(isTaperWeek) || W.some(isMeetWeek) ? ` · ${MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}` : ''}${autoRegMode === 'auto' ? ` · 🤖 авторегуляция ${arWord}${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`}
+                      icon="🏁"
+                      accent="#f59e0b"
+                    >
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                        <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
+                        <span
+                          style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}
+                        >
+                          {autoRegMode === 'auto'
+                            ? arMult !== 1
+                              ? `попытки ×${arMult.toFixed(2)} (${arWord})`
+                              : `множитель 1.00 (${arWord})`
+                            : autoRegMode === 'diary'
+                              ? 'дневник правит веса тренировок (попытки по плану)'
+                              : 'попытки по плану'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                        {(
+                          [
+                            ['Присед', 'squat', basePm.squat],
+                            ['Жим', 'bench', basePm.bench],
+                            ['Становая', 'dead', basePm.deadlift],
+                          ] as const
+                        ).map(([name, lift, baseValue]) => {
+                          // P2-15: «рекоменд.» и диапазоны ±3 % — от ПОПЫТОК ДВИЖКА
+                          // (`meetAttempts`), а не от pmRow недели. Раньше карточка жила
+                          // на своей базе и с множителем поверх — числа расходились с
+                          // таблицей подходов и «прыгали» после «🔄 Обновить прикиды».
+                          const att = liftOf(lift);
+                          const a = att ?? meetAttemptsFor(baseValue, attemptStrategy);
+                          const band = (w: number) => `${scale(round2(w * 0.97))}–${scale(round2(w * 1.03))}`;
+                          return (
+                            <div
+                              key={name}
+                              style={{ padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', fontSize: 10 }}
+                            >
+                              <b>{name}</b>
+                              <div>1: {band(a.opener)} кг</div>
+                              <div>2: {band(a.second)} кг</div>
+                              <div>3: {band(a.third)} кг</div>
+                              <div style={{ color: '#f59e0b', marginTop: 3 }}>
+                                рекоменд.: {scale(a.opener)}/{scale(a.second)}/{scale(a.third)}
+                              </div>
+                              {att ? null : <div style={{ color: '#f59e0b' }}>нет прикидов недели — по ПМ0</div>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button
+                          onClick={() => {
+                            if (!hasDiary) {
+                              onNote(
+                                '⚠ В дневнике нет записей 1ПМ (присед/жим лёжа/становая) — кнопка применится, когда появятся записи. Пока попытки от ПМ по циклу.',
+                              );
+                              return;
+                            }
+                            calibratePmFromDiary('squat');
+                            calibratePmFromDiary('bench');
+                            calibratePmFromDiary('deadlift');
+                            onNote(
+                              '📈 ПМ0 обновлены из дневника — пересоберите план: попытки считаются от ПМ по циклу (прогноз финальной недели).',
+                            );
+                          }}
+                          style={{
+                            ...BTN_GHOST,
+                            minHeight: 36,
+                            fontSize: 10,
+                            border: '1px solid rgba(0,230,138,0.35)',
+                            color: hasDiary ? '#00e68a' : 'rgba(0,230,138,0.75)',
+                            background: hasDiary ? 'rgba(0,230,138,0.08)' : 'rgba(0,230,138,0.04)',
+                          }}
+                          title="Заполнить ПМ0 из последних 1ПМ дневника тренировок (как в полях ПМ) — план пересоберите, попытки пересчитаются от прогноза цикла"
+                        >
+                          📈 Из дневника
+                          {diaryApplied
+                            ? ` (присед ${diaryVals.squat ?? '—'} · жим ${diaryVals.bench ?? '—'} · тяга ${diaryVals.deadlift ?? '—'})`
+                            : ''}
+                        </button>
+                        <button
+                          disabled={!cyclePmApplied}
+                          onClick={() => {
+                            applyPmFromCycle({ squat: basePm.squat, bench: basePm.bench, deadlift: basePm.deadlift });
+                            onNote(
+                              `📊 ПМ0 установлены из цикла (прогноз финальной недели): присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift} — пересоберите план.`,
+                            );
+                          }}
+                          style={{
+                            ...BTN_GHOST,
+                            minHeight: 36,
+                            fontSize: 10,
+                            border: cyclePmApplied
+                              ? '1px solid rgba(96,165,250,0.35)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            color: cyclePmApplied ? '#60a5fa' : 'rgba(255,255,255,0.3)',
+                            background: cyclePmApplied ? 'rgba(96,165,250,0.08)' : 'transparent',
+                          }}
+                          title="Установить ПМ0 из прогноза цикла (pmRow финальной недели, уже с учётом пройденного цикла) — пересоберите план"
+                        >
+                          📊 Из цикла
+                          {cyclePmApplied
+                            ? ` (присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift})`
+                            : ''}
+                        </button>
+                        {!hasDiary && !cyclePmApplied && (
+                          <span style={{ fontSize: 9, color: '#fff' }}>
+                            нет записей в дневнике — попытки от ПМ по циклу
+                          </span>
+                        )}
+                      </div>
+                    </MetricCard>
+                  );
+                })()}
+              {wk.meetAttempts &&
+                wk.meetAttempts.lifts.length > 0 &&
+                (() => {
+                  // P0-4/P2-15: прикиды недели — РОВНО то, что посчитал движок
+                  // (attemptPmRow → meetAttempts, с уже применённым `attemptAutoRegMult`).
+                  // Предпросмотр режима «Авто» масштабирует их только пока конфиг НЕ
+                  // применён к плану — двойного ×m больше нет.
+                  const appliedMult = wk.attemptAutoRegMult ?? 1;
+                  const previewMult = autoRegMode === 'auto' && !autoRegCfg ? autoRegResult.topSetPctMultiplier : 1;
+                  const arMult = appliedMult * previewMult;
+                  const arWord = appliedMult !== 1 ? 'применено' : 'предпросмотр';
+                  const base = wk.meetAttempts;
+                  const scale = (w: number) => Math.round(w * previewMult * 10) / 10;
+                  return (
+                    <MetricCard
+                      title={`${wk.meetWeek ? '🏁 Неделя соревнований' : wk.mockMeet ? '🎯 Имитация соревнований (mock meet)' : '🏁 Соревновательный день'} · прикиды ${MEET_STRATEGY_PCT_LABEL[base.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (неделя ${wk.week})${autoRegMode === 'auto' ? ` · 🤖 авторегуляция ${arWord}${arMult !== 1 ? `: веса ×${arMult.toFixed(2)}` : ' (множитель 1.00)'}` : ''}`}
+                      icon={wk.meetWeek ? '🏁' : wk.mockMeet ? '🎯' : '🏁'}
+                      accent={wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b'}
+                    >
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                        <AutoRegModeSwitch value={autoRegMode} onChange={setAutoRegMode} />
+                        <span
+                          style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}
+                        >
+                          {autoRegMode === 'auto'
+                            ? arMult !== 1
+                              ? `прикиды ×${arMult.toFixed(2)} (${arWord})`
+                              : `множитель 1.00 (${arWord})`
+                            : autoRegMode === 'diary'
+                              ? 'дневник правит веса тренировок (прикиды по плану)'
+                              : 'прикиды по плану'}
+                        </span>
+                      </div>
+                      <div
+                        style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}
+                      >
+                        {base.lifts.map((l) => (
+                          <div
+                            key={l.name}
+                            style={{
+                              padding: 6,
+                              borderRadius: 6,
+                              background: wk.meetWeek
+                                ? 'rgba(234,179,8,0.08)'
+                                : wk.mockMeet
+                                  ? 'rgba(167,139,250,0.08)'
+                                  : 'rgba(245,158,11,0.08)',
+                              border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.3)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`,
+                              fontSize: 10,
+                            }}
+                          >
+                            <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>
+                              {l.name}
+                            </b>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
+                              <div
+                                style={{
+                                  textAlign: 'center',
+                                  background: 'rgba(255,255,255,0.04)',
+                                  borderRadius: 6,
+                                  padding: '4px 2px',
+                                }}
+                              >
+                                <div style={{ color: '#fff' }}>1-я</div>
+                                <b style={{ fontSize: 12 }}>{scale(l.opener)}</b>
+                              </div>
+                              <div
+                                style={{
+                                  textAlign: 'center',
+                                  background: 'rgba(255,255,255,0.04)',
+                                  borderRadius: 6,
+                                  padding: '4px 2px',
+                                }}
+                              >
+                                <div style={{ color: '#fff' }}>2-я</div>
+                                <b style={{ fontSize: 12 }}>{scale(l.second)}</b>
+                              </div>
+                              <div
+                                style={{
+                                  textAlign: 'center',
+                                  background: wk.meetWeek
+                                    ? 'rgba(234,179,8,0.14)'
+                                    : wk.mockMeet
+                                      ? 'rgba(167,139,250,0.14)'
+                                      : 'rgba(245,158,11,0.12)',
+                                  borderRadius: 6,
+                                  padding: '4px 2px',
+                                  border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}`,
+                                }}
+                              >
+                                <div style={{ color: '#fff' }}>3-я</div>
+                                <b
+                                  style={{
+                                    fontSize: 12,
+                                    color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b',
+                                  }}
+                                >
+                                  {scale(l.third)}
+                                </b>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Разминка по опенеру — ИЗ ДВИЖКА (канон warmupToOpener в MeetAttemptsInfo):
                       веса/повторы те же, что уйдут в план и экспорт, шаг блинов 2.5 кг.
                       Локальный пересчёт с округлением 0.5 кг расходился с движком. */}
-                  {(() => {
-                    const first = base.lifts[0];
-                    if (!first) return null;
-                    const openerScaled = scale(first.opener);
-                    const steps = (first.warmup ?? []).map(s => ({ pct: s.pct, weight: scale(s.weight), reps: s.reps }));
-                    if (steps.length === 0) return null;
-                    return (
-                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                        🔥 Разминка под опенер {openerScaled} кг ({first.name}): {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)
+                      {(() => {
+                        const first = base.lifts[0];
+                        if (!first) return null;
+                        const openerScaled = scale(first.opener);
+                        const steps = (first.warmup ?? []).map((s) => ({
+                          pct: s.pct,
+                          weight: scale(s.weight),
+                          reps: s.reps,
+                        }));
+                        if (steps.length === 0) return null;
+                        return (
+                          <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                            🔥 Разминка под опенер {openerScaled} кг ({first.name}):{' '}
+                            {steps.map((s) => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} (
+                            {steps.map((s) => s.weight).join('/')} кг)
+                          </div>
+                        );
+                      })()}
+                      {/* Последние тяжёлые движения (тайминг разгрузки) */}
+                      <div style={{ marginTop: 4, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                        ⏱ Последние тяжёлые:{' '}
+                        {(
+                          [
+                            ['Присед', LAST_HEAVY_DAYS.squat],
+                            ['Жим', LAST_HEAVY_DAYS.bench],
+                            ['Тяга', LAST_HEAVY_DAYS.deadlift],
+                          ] as const
+                        )
+                          .map(([n, d]) => `${n} — за ${d} дн.`)
+                          .join(' · ')}{' '}
+                        до старта.
                       </div>
-                    );
-                  })()}
-                  {/* Последние тяжёлые движения (тайминг разгрузки) */}
-                  <div style={{ marginTop: 4, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                    ⏱ Последние тяжёлые: {([['Присед', LAST_HEAVY_DAYS.squat], ['Жим', LAST_HEAVY_DAYS.bench], ['Тяга', LAST_HEAVY_DAYS.deadlift]] as const).map(([n, d]) => `${n} — за ${d} дн.`).join(' · ')} до старта.
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
-                    {wk.meetWeek
-                      ? '🏁 День старта: прикиды — реальные попытки на соревнованиях (опенер RIR2 → вторая RIR1 → третья RIR0). Разгрузка выполнена тапер-неделями — план полностью готов.'
-                      : wk.mockMeet
-                      ? '🎯 Это ТРЕНИРОВОЧНАЯ неделя за 10-14 дней до старта: прикиды-синглы на 100% усилия (опенер RIR2 → вторая RIR1 → третья RIR0) — проверка стратегии. После неё — тапер-разгрузка, а затем реальные прикиды на соревнованиях.'
-                      : '📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.'}
-                  </div>
-                </MetricCard>
-                );
+                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
+                        {wk.meetWeek
+                          ? '🏁 День старта: прикиды — реальные попытки на соревнованиях (опенер RIR2 → вторая RIR1 → третья RIR0). Разгрузка выполнена тапер-неделями — план полностью готов.'
+                          : wk.mockMeet
+                            ? '🎯 Это ТРЕНИРОВОЧНАЯ неделя за 10-14 дней до старта: прикиды-синглы на 100% усилия (опенер RIR2 → вторая RIR1 → третья RIR0) — проверка стратегии. После неё — тапер-разгрузка, а затем реальные прикиды на соревнованиях.'
+                            : '📉 Разгрузка уже выполнена тапер-неделями (объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена — Bosquet 2005). Прикиды — план дня соревнований, не тренировочная нагрузка: разминка по опенеру, подходы строго по стратегии, между попытками 10-20 мин.'}
+                      </div>
+                    </MetricCard>
+                  );
                 })()}
               {/* 📈 План vs факт (недели): выполнение по дневнику, дрейф % плана,
                   интенсивностная подсказка — остаток аудита Oct 2026 §5. */}
@@ -735,13 +2099,22 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 const drift = planFactDriftWarnings(historyWorkouts ?? []);
                 const intensity = plIntensityAdvisory(displaySrc, { sessions: historyWorkouts ?? [] });
                 // Разбивка по дням считается ТОЛЬКО при раскрытии (тяжелее недельной).
-                const days = factDaysOpen && compliance.hasDiary
-                  ? plWeeklyComplianceByDays(displaySrc, historyWorkouts ?? [], { currentWeek })
-                  : null;
+                const days =
+                  factDaysOpen && compliance.hasDiary
+                    ? plWeeklyComplianceByDays(displaySrc, historyWorkouts ?? [], { currentWeek })
+                    : null;
                 const hasAny = compliance.hasDiary || drift.length > 0 || !!intensity.advisory;
                 if (!hasAny) return null;
-                const statusColor = (s: string) => s === 'done' ? '#22c55e' : s === 'partial' ? '#f59e0b' : s === 'missed' ? '#ef4444' : 'rgba(255,255,255,0.35)';
-                const statusLabel = (s: string) => s === 'done' ? '✓' : s === 'partial' ? '≈' : s === 'missed' ? '✗' : '·';
+                const statusColor = (s: string) =>
+                  s === 'done'
+                    ? '#22c55e'
+                    : s === 'partial'
+                      ? '#f59e0b'
+                      : s === 'missed'
+                        ? '#ef4444'
+                        : 'rgba(255,255,255,0.35)';
+                const statusLabel = (s: string) =>
+                  s === 'done' ? '✓' : s === 'partial' ? '≈' : s === 'missed' ? '✗' : '·';
                 // Выдача через общий APK-мост (§5-quat): в Capacitor WebView
                 // <a download> уводит файл в никуда — native идёт в Documents+Share.
                 const download = async (text: string, filename: string, mime: string, note: string) => {
@@ -749,71 +2122,155 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     const out = mime.startsWith('text/csv')
                       ? await saveCsvApk(filename, text)
                       : await saveTextFileApk(filename, text, mime);
-                    onNote(out === 'failed' ? `⚠ Не удалось выгрузить ${filename}.` : `${note} ${shareOutcomeLabel(out)}`);
-                  } catch (e) { onNote('⚠ Ошибка выгрузки: ' + (e as Error).message); }
+                    onNote(
+                      out === 'failed' ? `⚠ Не удалось выгрузить ${filename}.` : `${note} ${shareOutcomeLabel(out)}`,
+                    );
+                  } catch (e) {
+                    onNote('⚠ Ошибка выгрузки: ' + (e as Error).message);
+                  }
                 };
                 return (
                   <MetricCard title="📈 План vs факт (недели)" icon="📈" accent="#22c55e">
                     {compliance.hasDiary ? (
                       <>
                         <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>
-                          Выполнение: <b>{Math.round(compliance.overallPct * 100)}%</b> сетов плана по {compliance.past.length} прошедн. нед.
+                          Выполнение: <b>{Math.round(compliance.overallPct * 100)}%</b> сетов плана по{' '}
+                          {compliance.past.length} прошедн. нед.
                           {compliance.past.length === 0 && ' — в дневнике нет недель этого плана.'}
                         </div>
-                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}>
-                          {compliance.weeks.map(w => (
-                            <span key={w.week} title={`Нед ${w.week}: план ${ruCount(w.plannedSets, RU_SETS)}, факт ${w.factSets} (${Math.round(w.setsPct * 100)}%)${w.note ? ' · ' + w.note : ''}`}
-                              style={{ minWidth: 30, padding: '3px 5px', borderRadius: 6, fontSize: 10, fontWeight: 700, textAlign: 'center', color: statusColor(w.status), border: `1px solid ${statusColor(w.status)}55`, background: statusColor(w.status) + '14' }}>
-                              {w.week}{statusLabel(w.status)}
+                        <div
+                          style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 4, alignItems: 'center' }}
+                        >
+                          {compliance.weeks.map((w) => (
+                            <span
+                              key={w.week}
+                              title={`Нед ${w.week}: план ${ruCount(w.plannedSets, RU_SETS)}, факт ${w.factSets} (${Math.round(w.setsPct * 100)}%)${w.note ? ' · ' + w.note : ''}`}
+                              style={{
+                                minWidth: 30,
+                                padding: '3px 5px',
+                                borderRadius: 6,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                color: statusColor(w.status),
+                                border: `1px solid ${statusColor(w.status)}55`,
+                                background: statusColor(w.status) + '14',
+                              }}
+                            >
+                              {w.week}
+                              {statusLabel(w.status)}
                             </span>
                           ))}
                           {/* Разбивка по дням/упражнениям (§5-bis п.3) */}
-                          <button data-pl="fact-days-toggle" onClick={() => setFactDaysOpen(v => !v)} aria-pressed={factDaysOpen}
-                            style={{ marginLeft: 4, padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: factDaysOpen ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)', color: factDaysOpen ? '#22c55e' : '#fff' }}>
+                          <button
+                            data-pl="fact-days-toggle"
+                            onClick={() => setFactDaysOpen((v) => !v)}
+                            aria-pressed={factDaysOpen}
+                            style={{
+                              marginLeft: 4,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(255,255,255,0.14)',
+                              background: factDaysOpen ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+                              color: factDaysOpen ? '#22c55e' : '#fff',
+                            }}
+                          >
                             {factDaysOpen ? '▲ Скрыть дни' : '▼ По дням'}
                           </button>
                         </div>
                         {days && (
-                          <div data-pl="fact-days" style={{ margin: '2px 0 6px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 4 }}>
-                            {days.weeks.filter(w => w.days.some(d => d.status !== 'upcoming')).map(w => (
-                              <div key={w.week} style={{ marginBottom: 4 }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Нед {w.week} — {w.factSets}/{w.plannedSets} сетов</div>
-                                {w.days.map(d => (
-                                  <div key={d.day} style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, paddingLeft: 8 }}>
-                                    День {d.day}: {d.factSets}/{d.plannedSets} ({Math.round(d.setsPct * 100)}%){' '}
-                                    <span style={{ color: statusColor(d.status) }}>{statusLabel(d.status)}</span>
-                                    {d.exercises.filter(e => e.status !== 'done').length > 0 && (
-                                      <span style={{ color: '#f59e0b' }}> — не добито: {d.exercises.filter(e => e.status !== 'done').map(e => `${e.name} ${e.factSets}/${e.plannedSets}`).join(', ')}</span>
-                                    )}
+                          <div
+                            data-pl="fact-days"
+                            style={{
+                              margin: '2px 0 6px',
+                              borderTop: '1px solid rgba(255,255,255,0.06)',
+                              paddingTop: 4,
+                            }}
+                          >
+                            {days.weeks
+                              .filter((w) => w.days.some((d) => d.status !== 'upcoming'))
+                              .map((w) => (
+                                <div key={w.week} style={{ marginBottom: 4 }}>
+                                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
+                                    Нед {w.week} — {w.factSets}/{w.plannedSets} сетов
                                   </div>
-                                ))}
-                              </div>
-                            ))}
+                                  {w.days.map((d) => (
+                                    <div
+                                      key={d.day}
+                                      style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, paddingLeft: 8 }}
+                                    >
+                                      День {d.day}: {d.factSets}/{d.plannedSets} ({Math.round(d.setsPct * 100)}%){' '}
+                                      <span style={{ color: statusColor(d.status) }}>{statusLabel(d.status)}</span>
+                                      {d.exercises.filter((e) => e.status !== 'done').length > 0 && (
+                                        <span style={{ color: '#f59e0b' }}>
+                                          {' '}
+                                          — не добито:{' '}
+                                          {d.exercises
+                                            .filter((e) => e.status !== 'done')
+                                            .map((e) => `${e.name} ${e.factSets}/${e.plannedSets}`)
+                                            .join(', ')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
                           </div>
                         )}
-                        {compliance.notes.map((n, i) => <div key={i} style={{ fontSize: 9, color: '#f59e0b' }}>⚠ {n}</div>)}
+                        {compliance.notes.map((n, i) => (
+                          <div key={i} style={{ fontSize: 9, color: '#f59e0b' }}>
+                            ⚠ {n}
+                          </div>
+                        ))}
                       </>
                     ) : (
-                      <div style={{ fontSize: 10, color: '#fff' }}>Дневник тренировок пуст — недельная сверка появится после первых записей.</div>
+                      <div style={{ fontSize: 10, color: '#fff' }}>
+                        Дневник тренировок пуст — недельная сверка появится после первых записей.
+                      </div>
                     )}
                     {drift.length > 0 && (
-                      <div data-pl="fact-drift" style={{ marginTop: 6, fontSize: 10, color: '#fbbf24', lineHeight: 1.45 }}>
+                      <div
+                        data-pl="fact-drift"
+                        style={{ marginTop: 6, fontSize: 10, color: '#fbbf24', lineHeight: 1.45 }}
+                      >
                         {driftWarningLine(drift)}
                         {/* §5-bis п.1: при зафиксированном дрейфе предлагаем самому
                             переключить авторегуляцию (сейчас — только текст). */}
                         {autoRegMode === 'off' && (
-                          <button data-pl="drift-autoreg" onClick={() => setAutoRegMode('auto')}
-                            style={{ display: 'block', marginTop: 4, padding: '5px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(96,165,250,0.4)', background: 'rgba(96,165,250,0.1)', color: '#60a5fa' }}>
+                          <button
+                            data-pl="drift-autoreg"
+                            onClick={() => setAutoRegMode('auto')}
+                            style={{
+                              display: 'block',
+                              marginTop: 4,
+                              padding: '5px 10px',
+                              borderRadius: 8,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(96,165,250,0.4)',
+                              background: 'rgba(96,165,250,0.1)',
+                              color: '#60a5fa',
+                            }}
+                          >
                             🤖 Включить авторегуляцию
                           </button>
                         )}
                       </div>
                     )}
                     {intensity.advisory && (
-                      <div data-pl="vl-advisory" style={{ marginTop: 6, fontSize: 10, color: '#60a5fa', lineHeight: 1.45 }}>
+                      <div
+                        data-pl="vl-advisory"
+                        style={{ marginTop: 6, fontSize: 10, color: '#60a5fa', lineHeight: 1.45 }}
+                      >
                         ⚡ {intensity.advisory}
                         {intensity.source === 'diary-velocity' && (
-                          <span data-pl="vl-source" style={{ marginLeft: 4, fontSize: 9, color: '#22c55e' }}>· по факту дневника</span>
+                          <span data-pl="vl-source" style={{ marginLeft: 4, fontSize: 9, color: '#22c55e' }}>
+                            · по факту дневника
+                          </span>
                         )}
                       </div>
                     )}
@@ -826,20 +2283,57 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           const exportInput = {
                             result: compliance,
                             days: days ?? plWeeklyComplianceByDays(displaySrc, historyWorkouts ?? [], { currentWeek }),
-                            drift, advisory: intensity,
+                            drift,
+                            advisory: intensity,
                           };
                           return (
                             <>
-                              <button data-pl="fact-export-csv" onClick={() => download(
-                                buildPLComplianceCsv(exportInput),
-                                'pl-plan-fact.csv', 'text/csv;charset=utf-8',
-                                '📄 Отчёт «план vs факт» (pl-plan-fact.csv):',
-                              )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>📄 CSV</button>
-                              <button data-pl="fact-export-html" onClick={() => download(
-                                buildPLComplianceHtml(exportInput),
-                                'pl-plan-fact.html', 'text/html;charset=utf-8',
-                                '🖨 Отчёт «план vs факт» (pl-plan-fact.html):',
-                              )} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>🖨 HTML</button>
+                              <button
+                                data-pl="fact-export-csv"
+                                onClick={() =>
+                                  download(
+                                    buildPLComplianceCsv(exportInput),
+                                    'pl-plan-fact.csv',
+                                    'text/csv;charset=utf-8',
+                                    '📄 Отчёт «план vs факт» (pl-plan-fact.csv):',
+                                  )
+                                }
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: 8,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  border: '1px solid rgba(255,255,255,0.14)',
+                                  background: 'rgba(255,255,255,0.03)',
+                                  color: '#fff',
+                                }}
+                              >
+                                📄 CSV
+                              </button>
+                              <button
+                                data-pl="fact-export-html"
+                                onClick={() =>
+                                  download(
+                                    buildPLComplianceHtml(exportInput),
+                                    'pl-plan-fact.html',
+                                    'text/html;charset=utf-8',
+                                    '🖨 Отчёт «план vs факт» (pl-plan-fact.html):',
+                                  )
+                                }
+                                style={{
+                                  padding: '4px 10px',
+                                  borderRadius: 8,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  border: '1px solid rgba(255,255,255,0.14)',
+                                  background: 'rgba(255,255,255,0.03)',
+                                  color: '#fff',
+                                }}
+                              >
+                                🖨 HTML
+                              </button>
                             </>
                           );
                         })()}
@@ -848,400 +2342,1224 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   </MetricCard>
                 );
               })()}
-              {e1rmSeries.length > 0 && (() => {
-                const W = 300, H = 120, PADX = 26, PADY = 16;
-                const allVals = e1rmSeries.flatMap(s => s.pts.map(p => p.val));
-                const minV = Math.min(...allVals, pmSquat, pmBench, pmDead);
-                const maxV = Math.max(...allVals, pmSquat, pmBench, pmDead);
-                const maxPts = Math.max(...e1rmSeries.map(s => s.pts.length), 1);
-                const px = (i: number) => PADX + (maxPts <= 1 ? 0 : (i / (maxPts - 1)) * (W - PADX - 8));
-                const py = (v: number) => H - PADY - ((v - minV) / ((maxV - minV) || 1)) * (H - PADY - 14);
-                return (
-                  <MetricCard title={'Прогресс 1ПМ (дневник тренировок)'} icon="📈">
-                    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
-                      {[0, 1, 2, 3].map(g => <line key={g} x1={PADX} x2={W - 8} y1={14 + g * ((H - PADY - 14) / 3)} y2={14 + g * ((H - PADY - 14) / 3)} stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />)}
-                      {e1rmSeries.map(s => <polyline key={s.lift} points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={1.6} />)}
-                      {e1rmSeries.map(s => s.pts.map((p, i) => <circle key={s.lift + i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />))}
-                    </svg>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{e1rmSeries.map(s => <span key={s.lift} style={{ fontSize: 11, color: s.color }}>● {s.label} {s.pts[s.pts.length - 1].val} кг</span>)}</div>
-                    <div style={{ fontSize: 11, color: '#fff', marginTop: 4, textAlign: 'center' }}>PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг</div>
-                    {exerciseE1rm.length > 0 && (
-                      <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Личные 1ПМ по упражнениям (из дневника):</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: '3px 8px', fontSize: 11, alignItems: 'center' }}>
-                          <div style={{ color: '#fff', fontWeight: 600 }}>Упражнение</div>
-                          <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
-                          <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>подход</div>
-                          {exerciseE1rm.slice(0, 15).map((e) => (
-                            <React.Fragment key={e.name}>
-                              <div style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{e.name}</div>
-                              <div style={{ color: 'var(--accent)', fontWeight: 700, textAlign: 'right' }}>{e.e1}</div>
-                              <div style={{ color: '#fff', textAlign: 'right' }}>{e.w}×{e.r}</div>
-                            </React.Fragment>
-                          ))}
-                        </div>
-                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 10, color: '#fff', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
-                      </div>
-                    )}
-                    {exerciseE1rm.length > 0 && (
-                      <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Тренд 1ПМ по упражнению (график во времени):</div>
-                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
-                          {exerciseE1rm.slice(0, 10).map((e) => (
-                            <button key={e.name} onClick={() => setSelectedTrendEx(s => s === e.name ? null : e.name)}
-                              style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                                border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-                                background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
-                                color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff' }}>
-                              {e.name} ({e.e1}кг)
-                            </button>
-                          ))}
-                        </div>
-                        {selectedTrendEx && exTrendSeries.length >= 2 && (() => {
-                          const W = 300, H = 100, PADX = 28, PADY = 16;
-                          const vals = exTrendSeries.map(p => p.e1);
-                          const minV = Math.min(...vals) - 5;
-                          const maxV = Math.max(...vals) + 5;
-                          const n = exTrendSeries.length;
-                          const px = (i: number) => PADX + (i / Math.max(n - 1, 1)) * (W - PADX - 8);
-                          const py = (v: number) => H - PADY - ((v - minV) / ((maxV - minV) || 1)) * (H - PADY - 12);
-                          return (
-                            <div>
-                              <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx}</div>
-                              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
-                                {[0, 1, 2].map(g => <line key={g} x1={PADX} x2={W - 8} y1={12 + g * ((H - PADY - 12) / 2)} y2={12 + g * ((H - PADY - 12) / 2)} stroke="rgba(255,255,255,0.05)" strokeWidth={0.5} />)}
-                                <polyline points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
-                                {exTrendSeries.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />)}
-                              </svg>
-                              <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 10, color: 'var(--accent)' }}>посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг</span>
-                                <span style={{ fontSize: 10, color: '#fff' }}>макс: {maxV.toFixed(0)}кг</span>
-                                <span style={{ fontSize: 10, color: '#fff' }}>тренировок: {n}</span>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                        {selectedTrendEx && exTrendSeries.length < 2 && (
-                          <div style={{ fontSize: 10, color: '#fff' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
+              {e1rmSeries.length > 0 &&
+                (() => {
+                  const W = 300,
+                    H = 120,
+                    PADX = 26,
+                    PADY = 16;
+                  const allVals = e1rmSeries.flatMap((s) => s.pts.map((p) => p.val));
+                  const minV = Math.min(...allVals, pmSquat, pmBench, pmDead);
+                  const maxV = Math.max(...allVals, pmSquat, pmBench, pmDead);
+                  const maxPts = Math.max(...e1rmSeries.map((s) => s.pts.length), 1);
+                  const px = (i: number) => PADX + (maxPts <= 1 ? 0 : (i / (maxPts - 1)) * (W - PADX - 8));
+                  const py = (v: number) => H - PADY - ((v - minV) / (maxV - minV || 1)) * (H - PADY - 14);
+                  return (
+                    <MetricCard title={'Прогресс 1ПМ (дневник тренировок)'} icon="📈">
+                      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                        {[0, 1, 2, 3].map((g) => (
+                          <line
+                            key={g}
+                            x1={PADX}
+                            x2={W - 8}
+                            y1={14 + g * ((H - PADY - 14) / 3)}
+                            y2={14 + g * ((H - PADY - 14) / 3)}
+                            stroke="rgba(255,255,255,0.06)"
+                            strokeWidth={0.5}
+                          />
+                        ))}
+                        {e1rmSeries.map((s) => (
+                          <polyline
+                            key={s.lift}
+                            points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')}
+                            fill="none"
+                            stroke={s.color}
+                            strokeWidth={1.6}
+                          />
+                        ))}
+                        {e1rmSeries.map((s) =>
+                          s.pts.map((p, i) => (
+                            <circle key={s.lift + i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />
+                          )),
                         )}
+                      </svg>
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}
+                      >
+                        {e1rmSeries.map((s) => (
+                          <span key={s.lift} style={{ fontSize: 11, color: s.color }}>
+                            ● {s.label} {s.pts[s.pts.length - 1].val} кг
+                          </span>
+                        ))}
                       </div>
-                    )}
-                  </MetricCard>
-                );
-              })()}
-              <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
-                <SaveButton label="💾 Сохранить программу" savedLabel="✓ Программа сохранена" onSave={() => {
-                  try {
-                     const cycle = LMS_CYCLES.find(c => c.meta.id === selectedCycleId);
-                     const saveSrc = effectiveSrc ?? builtSrc;
-                     // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
-                     // `exercises` остаётся плоским списком ПЕРВОЙ недели (обратная совместимость с
-                     // MyTrainingTab/ProgramsTab/BbAutoConstructor), а полный цикл пишем в `weeksPlan`,
-                     // чтобы «сохранённая программа» не теряла недели 2..N.
-                     const weekToExercises = (w: typeof saveSrc.weeks[number] | undefined) => w ? w.days.flatMap(d => d.exercises.map(e => ({
-                       name: e.name,
-                       sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
-                       reps: e.workSets[0]?.reps ?? 5,
-                       rir: e.workSets[0]?.rir ?? e.rir ?? 2,
-                     }))) : [];
-                    const exercises = weekToExercises(saveSrc.weeks[0]);
-                    const weeksPlan = saveSrc.weeks.map(w => ({ week: w.week, exercises: weekToExercises(w) }));
-                    const plan = { id: 'plplan_' + Date.now(), name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`, date: new Date().toISOString(), exercises, weeksPlan, weekCount: weeksPlan.length, cycleWeeks };
-                    const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
-                    // Отбрасываем битые записи старых версий (без exercises) — они ломали рендер «Планы».
-                    const updated = [...(Array.isArray(existing) ? existing : []).filter((p: any) => p && typeof p === 'object' && Array.isArray(p.exercises)), plan].slice(-30);
-                    localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
-                    onNote(`✓ Программа сохранена в «Мои тренировки»: ${plan.name} — ${exercises.length} упр. · ${weeksPlan.length} нед`);
-                  } catch (e) { onNote(`⚠ Ошибка сохранения: ${(e as Error).message}`); }
-                }} />
+                      <div style={{ fontSize: 11, color: '#fff', marginTop: 4, textAlign: 'center' }}>
+                        PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг
+                      </div>
+                      {exerciseE1rm.length > 0 && (
+                        <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                            Личные 1ПМ по упражнениям (из дневника):
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'minmax(0,1fr) auto auto',
+                              gap: '3px 8px',
+                              fontSize: 11,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <div style={{ color: '#fff', fontWeight: 600 }}>Упражнение</div>
+                            <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
+                            <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>подход</div>
+                            {exerciseE1rm.slice(0, 15).map((e) => (
+                              <React.Fragment key={e.name}>
+                                <div
+                                  style={{
+                                    color: '#fff',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  {e.name}
+                                </div>
+                                <div style={{ color: 'var(--accent)', fontWeight: 700, textAlign: 'right' }}>
+                                  {e.e1}
+                                </div>
+                                <div style={{ color: '#fff', textAlign: 'right' }}>
+                                  {e.w}×{e.r}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                          {exerciseE1rm.length > 15 && (
+                            <div style={{ fontSize: 10, color: '#fff', marginTop: 4, textAlign: 'center' }}>
+                              показано 15 из {exerciseE1rm.length}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {exerciseE1rm.length > 0 && (
+                        <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                            Тренд 1ПМ по упражнению (график во времени):
+                          </div>
+                          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
+                            {exerciseE1rm.slice(0, 10).map((e) => (
+                              <button
+                                key={e.name}
+                                onClick={() => setSelectedTrendEx((s) => (s === e.name ? null : e.name))}
+                                style={{
+                                  padding: '2px 7px',
+                                  borderRadius: 10,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  border:
+                                    selectedTrendEx === e.name
+                                      ? '1px solid var(--accent)'
+                                      : '1px solid rgba(255,255,255,0.08)',
+                                  background:
+                                    selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
+                                  color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff',
+                                }}
+                              >
+                                {e.name} ({e.e1}кг)
+                              </button>
+                            ))}
+                          </div>
+                          {selectedTrendEx &&
+                            exTrendSeries.length >= 2 &&
+                            (() => {
+                              const W = 300,
+                                H = 100,
+                                PADX = 28,
+                                PADY = 16;
+                              const vals = exTrendSeries.map((p) => p.e1);
+                              const minV = Math.min(...vals) - 5;
+                              const maxV = Math.max(...vals) + 5;
+                              const n = exTrendSeries.length;
+                              const px = (i: number) => PADX + (i / Math.max(n - 1, 1)) * (W - PADX - 8);
+                              const py = (v: number) => H - PADY - ((v - minV) / (maxV - minV || 1)) * (H - PADY - 12);
+                              return (
+                                <div>
+                                  <div
+                                    style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}
+                                  >
+                                    {selectedTrendEx}
+                                  </div>
+                                  <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                                    {[0, 1, 2].map((g) => (
+                                      <line
+                                        key={g}
+                                        x1={PADX}
+                                        x2={W - 8}
+                                        y1={12 + g * ((H - PADY - 12) / 2)}
+                                        y2={12 + g * ((H - PADY - 12) / 2)}
+                                        stroke="rgba(255,255,255,0.05)"
+                                        strokeWidth={0.5}
+                                      />
+                                    ))}
+                                    <polyline
+                                      points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')}
+                                      fill="none"
+                                      stroke="var(--accent)"
+                                      strokeWidth={1.8}
+                                    />
+                                    {exTrendSeries.map((p, i) => (
+                                      <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />
+                                    ))}
+                                  </svg>
+                                  <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 10, color: 'var(--accent)' }}>
+                                      посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг
+                                    </span>
+                                    <span style={{ fontSize: 10, color: '#fff' }}>макс: {maxV.toFixed(0)}кг</span>
+                                    <span style={{ fontSize: 10, color: '#fff' }}>тренировок: {n}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          {selectedTrendEx && exTrendSeries.length < 2 && (
+                            <div style={{ fontSize: 10, color: '#fff' }}>
+                              нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </MetricCard>
+                  );
+                })()}
+              <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <SaveButton
+                  label="💾 Сохранить программу"
+                  savedLabel="✓ Программа сохранена"
+                  onSave={() => {
+                    try {
+                      const cycle = LMS_CYCLES.find((c) => c.meta.id === selectedCycleId);
+                      const saveSrc = effectiveSrc ?? builtSrc;
+                      // Полный формат «Моих тренировок»: id + exercises (иначе вкладка «Планы» крашится на plan.exercises.length).
+                      // `exercises` остаётся плоским списком ПЕРВОЙ недели (обратная совместимость с
+                      // MyTrainingTab/ProgramsTab/BbAutoConstructor), а полный цикл пишем в `weeksPlan`,
+                      // чтобы «сохранённая программа» не теряла недели 2..N.
+                      const weekToExercises = (w: (typeof saveSrc.weeks)[number] | undefined) =>
+                        w
+                          ? w.days.flatMap((d) =>
+                              d.exercises.map((e) => ({
+                                name: e.name,
+                                sets: e.workSets.reduce((s, ws) => s + ws.sets, 0),
+                                reps: e.workSets[0]?.reps ?? 5,
+                                rir: e.workSets[0]?.rir ?? e.rir ?? 2,
+                              })),
+                            )
+                          : [];
+                      const exercises = weekToExercises(saveSrc.weeks[0]);
+                      const weeksPlan = saveSrc.weeks.map((w) => ({ week: w.week, exercises: weekToExercises(w) }));
+                      const plan = {
+                        id: 'plplan_' + Date.now(),
+                        name: `PL ${cycle?.meta.title || selectedCycleId || 'цикл'}`,
+                        date: new Date().toISOString(),
+                        exercises,
+                        weeksPlan,
+                        weekCount: weeksPlan.length,
+                        cycleWeeks,
+                      };
+                      const existing = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
+                      // Отбрасываем битые записи старых версий (без exercises) — они ломали рендер «Планы».
+                      const updated = [
+                        ...(Array.isArray(existing) ? existing : []).filter(
+                          (p: any) => p && typeof p === 'object' && Array.isArray(p.exercises),
+                        ),
+                        plan,
+                      ].slice(-30);
+                      localStorage.setItem('myTrainingPlans', JSON.stringify(updated));
+                      onNote(
+                        `✓ Программа сохранена в «Мои тренировки»: ${plan.name} — ${exercises.length} упр. · ${weeksPlan.length} нед`,
+                      );
+                    } catch (e) {
+                      onNote(`⚠ Ошибка сохранения: ${(e as Error).message}`);
+                    }
+                  }}
+                />
                 <button
                   onClick={() => {
-                    if (!builtSrc || playerDays.length === 0) { onNote('⚠ Сначала сгенерируйте план'); return; }
+                    if (!builtSrc || playerDays.length === 0) {
+                      onNote('⚠ Сначала сгенерируйте план');
+                      return;
+                    }
                     try {
                       // План уже пишется в he_pl_runtime эффектом выше; фиксируем выбранную неделю явно.
-                      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: 'pl' }));
+                      localStorage.setItem(
+                        'he_pl_runtime',
+                        JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: 'pl' }),
+                      );
                       localStorage.setItem('he_training_tab', 'runtime');
                       if (typeof (window as any).__navigateToTrainingTab === 'function') {
                         (window as any).__navigateToTrainingTab('runtime');
                       } else {
                         onNote('▶ План готов к выполнению: откройте «Тренировки → Проведение тренировки».');
                       }
-                    } catch (e) { onNote(`⚠ Не удалось запустить: ${(e as Error).message}`); }
+                    } catch (e) {
+                      onNote(`⚠ Не удалось запустить: ${(e as Error).message}`);
+                    }
                   }}
-                  style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', minHeight: 44,
-                    background: 'linear-gradient(135deg,#3b82f6,#2563eb)', color: '#fff', fontWeight: 800, fontSize: 12 }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: 10,
+                    border: 'none',
+                    cursor: 'pointer',
+                    minHeight: 44,
+                    background: 'linear-gradient(135deg,#3b82f6,#2563eb)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: 12,
+                  }}
                   title="Записать план в «Проведение тренировки» и открыть выполнение (SessionPlayer)"
-                >▶ Начать работу по циклу</button>
+                >
+                  ▶ Начать работу по циклу
+                </button>
               </div>
               {/* Явная подпись недели в понедельном плане: соревнования / имитация / тапер не выглядят как обычные */}
               {isMeetWeek(wk) && (
-                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.35)', fontSize: 11, color: '#eab308', lineHeight: 1.45 }}>
-                  🏁 <b>Неделя соревнований</b> — прикиды как подходы дня старта (опенер RIR2 → вторая RIR1 → третья RIR0, {wk.meetAttempts ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced) : MEET_STRATEGY_PCT_LABEL.balanced} от ПМ недели). Разгрузка выполнена тапер-неделями — план готов полностью.
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(234,179,8,0.08)',
+                    border: '1px solid rgba(234,179,8,0.35)',
+                    fontSize: 11,
+                    color: '#eab308',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  🏁 <b>Неделя соревнований</b> — прикиды как подходы дня старта (опенер RIR2 → вторая RIR1 → третья
+                  RIR0,{' '}
+                  {wk.meetAttempts
+                    ? (MEET_STRATEGY_PCT_LABEL[wk.meetAttempts.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced)
+                    : MEET_STRATEGY_PCT_LABEL.balanced}{' '}
+                  от ПМ недели). Разгрузка выполнена тапер-неделями — план готов полностью.
                 </div>
               )}
               {isMockWeek(wk) && (
-                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.35)', fontSize: 11, color: '#a78bfa', lineHeight: 1.45 }}>
-                  🎯 <b>Имитация соревнований (mock meet)</b> — прикиды-синглы за 10-14 дней до старта (опенер RIR2 → вторая RIR1 → третья RIR0), аксессуары 50% объёма. Проверка стратегии перед реальными соревнованиями.
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(167,139,250,0.08)',
+                    border: '1px solid rgba(167,139,250,0.35)',
+                    fontSize: 11,
+                    color: '#a78bfa',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  🎯 <b>Имитация соревнований (mock meet)</b> — прикиды-синглы за 10-14 дней до старта (опенер RIR2 →
+                  вторая RIR1 → третья RIR0), аксессуары 50% объёма. Проверка стратегии перед реальными соревнованиями.
                 </div>
               )}
               {isTaperWeek(wk) && !isMockWeek(wk) && !isMeetWeek(wk) && (
-                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', fontSize: 11, color: '#f59e0b', lineHeight: 1.45 }}>
-                  📉 <b>Тапер-неделя</b> — разгрузка: объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet 2005). Восстановление перед соревнованиями.
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(245,158,11,0.08)',
+                    border: '1px solid rgba(245,158,11,0.35)',
+                    fontSize: 11,
+                    color: '#f59e0b',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  📉 <b>Тапер-неделя</b> — разгрузка: объём ×0.65/×0.45, RIR +1/+2, интенсивность сохранена (Bosquet
+                  2005). Восстановление перед соревнованиями.
                 </div>
               )}
               {isDeloadWeek(wk) && !isMockWeek(wk) && !isMeetWeek(wk) && !isTaperWeek(wk) && (
-                <div data-pl="deload-banner" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.35)', fontSize: 11, color: '#60a5fa', lineHeight: 1.45 }}>
-                  🔋 <b>Делод-неделя</b> — объём снижен, веса/проценты сохранены (разгрузка без потери интенсивности).{onRemoveDeload ? ' Убрать — кнопкой «↩ Убрать делод» выше.' : ''}
+                <div
+                  data-pl="deload-banner"
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(96,165,250,0.08)',
+                    border: '1px solid rgba(96,165,250,0.35)',
+                    fontSize: 11,
+                    color: '#60a5fa',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  🔋 <b>Делод-неделя</b> — объём снижен, веса/проценты сохранены (разгрузка без потери интенсивности).
+                  {onRemoveDeload ? ' Убрать — кнопкой «↩ Убрать делод» выше.' : ''}
                 </div>
               )}
               {wk.days.map((d, di) => {
                 const sourcePhase = sourceWeek?.phase || phase;
-                const dayPhase: PhaseKey = ({ base: 'accumulation', build: 'intensification', peak: 'peaking', deload: 'deload' } as Record<string, PhaseKey>)[sourcePhase] || 'accumulation';
+                const dayPhase: PhaseKey =
+                  (
+                    { base: 'accumulation', build: 'intensification', peak: 'peaking', deload: 'deload' } as Record<
+                      string,
+                      PhaseKey
+                    >
+                  )[sourcePhase] || 'accumulation';
                 const loadStr = d.exercises[0]?.load ? ' · ' + d.exercises[0].load : '';
                 const volumeTag = `${d.metrics.tonnage.toFixed(0)}т · ${d.metrics.kpsh}КПШ · УОИ ${d.metrics.uoi.toFixed(2)}`;
-                const roleOf = (load?: string) => (load === 'main' ? 'main' : load === 'additional' ? 'additional' : 'accessory');
+                const roleOf = (load?: string) =>
+                  load === 'main' ? 'main' : load === 'additional' ? 'additional' : 'accessory';
                 const dk = dayKey(wk.week, di);
                 if (editMode) {
                   return (
-                    <DayCard key={di} day={{
+                    <DayCard
+                      key={di}
+                      day={{
+                        key: 'day-' + di,
+                        title: `🏋️ День ${di + 1}${loadStr}`,
+                        phase: dayPhase,
+                        volumeTag,
+                        renderBody: (
+                          <>
+                            {d.exercises.map((e, ei) => (
+                              <div
+                                key={ei}
+                                style={{
+                                  background: 'rgba(255,255,255,0.02)',
+                                  borderRadius: 8,
+                                  padding: '6px 8px',
+                                  marginBottom: 4,
+                                  border: '1px solid rgba(255,255,255,0.04)',
+                                  overflow: 'hidden',
+                                  boxSizing: 'border-box',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      color: '#fff',
+                                      flex: 1,
+                                      minWidth: 0,
+                                      overflowWrap: 'break-word',
+                                    }}
+                                  >
+                                    {e.name}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 11,
+                                      color:
+                                        e.load === 'main'
+                                          ? 'var(--accent)'
+                                          : e.load === 'additional'
+                                            ? '#f59e0b'
+                                            : '#fff',
+                                      fontWeight: 600,
+                                      padding: '1px 6px',
+                                      borderRadius: 4,
+                                      flexShrink: 0,
+                                      background:
+                                        e.load === 'main'
+                                          ? 'var(--accent-dim)'
+                                          : e.load === 'additional'
+                                            ? 'rgba(245,158,11,0.1)'
+                                            : 'transparent',
+                                    }}
+                                  >
+                                    {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+                                  {(() => {
+                                    // Ключ правки = ИНДЕКС ПЕРВОГО СЕТА БЛОКА (flat). Контракт
+                                    // lms-effective-plan.applyDay: правка читается один раз на
+                                    // work-set блок (по его стартовому индексу). Раньше каждая
+                                    // строка блока писала свой ключ (_1, _2 …) — правки сетов
+                                    // 2..N молча терялись при «✓ Готово».
+                                    let flatIdx = 0;
+                                    const allSets: {
+                                      ws: (typeof e.workSets)[number];
+                                      blockIdx: number;
+                                      setIdx: number;
+                                      rowNum: number;
+                                    }[] = [];
+                                    e.workSets.forEach((ws, bi) => {
+                                      const blockStart = flatIdx;
+                                      for (let r = 0; r < ws.sets; r++)
+                                        allSets.push({
+                                          ws,
+                                          blockIdx: bi,
+                                          setIdx: blockStart,
+                                          rowNum: allSets.length + 1,
+                                        });
+                                      flatIdx += ws.sets;
+                                    });
+                                    const INM: React.CSSProperties = {
+                                      background: '#18181b',
+                                      color: '#fff',
+                                      border: '1px solid rgba(255,255,255,0.1)',
+                                      borderRadius: 4,
+                                      padding: '5px 4px',
+                                      fontSize: 12,
+                                      textAlign: 'center',
+                                      minWidth: 0,
+                                    };
+                                    const IN_LBL: React.CSSProperties = {
+                                      fontSize: 9,
+                                      color: '#fff',
+                                      textTransform: 'uppercase' as const,
+                                      letterSpacing: 0.5,
+                                      textAlign: 'center' as const,
+                                    };
+                                    return allSets.map(({ ws, setIdx, rowNum }) => {
+                                      const k = setKey(wk.week, di, ei, setIdx);
+                                      const es = effSet(wk.week, di, ei, setIdx, ws, e.name);
+                                      return (
+                                        <div
+                                          key={rowNum}
+                                          style={{
+                                            background: 'rgba(255,255,255,0.025)',
+                                            borderRadius: 6,
+                                            padding: '4px 6px',
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              fontSize: 10,
+                                              color: '#fff',
+                                              marginBottom: 2,
+                                              fontWeight: 600,
+                                              display: 'flex',
+                                              justifyContent: 'space-between',
+                                            }}
+                                          >
+                                            <span>Сет {rowNum}</span>
+                                            <span style={{ color: '#60a5fa', fontWeight: 700 }}>
+                                              {Math.round(es.pct * 100)}%
+                                              {es.pct > 1.1 && (
+                                                <span
+                                                  data-pl="test-attempt"
+                                                  title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)"
+                                                  style={{
+                                                    marginLeft: 4,
+                                                    fontSize: 9,
+                                                    fontWeight: 800,
+                                                    color: '#f59e0b',
+                                                  }}
+                                                >
+                                                  ⚡ проходка
+                                                </span>
+                                              )}
+                                            </span>
+                                          </div>
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                                            <div>
+                                              <div style={IN_LBL}>Вес, кг</div>
+                                              <input
+                                                type="number"
+                                                value={es.weight}
+                                                onChange={(ev) =>
+                                                  setSrcEdits((prev) => {
+                                                    const next = {
+                                                      ...prev,
+                                                      [k]: { ...(prev[k] ?? {}), weight: +ev.target.value },
+                                                    };
+                                                    delete next[k].pct;
+                                                    return next;
+                                                  })
+                                                }
+                                                style={{ ...INM, width: '100%' }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <div style={IN_LBL}>Повторы</div>
+                                              <input
+                                                type="number"
+                                                value={es.reps}
+                                                onChange={(ev) =>
+                                                  setSrcEdits((prev) => ({
+                                                    ...prev,
+                                                    [k]: { ...prev[k], reps: +ev.target.value },
+                                                  }))
+                                                }
+                                                style={{ ...INM, width: '100%' }}
+                                              />
+                                            </div>
+                                            <div>
+                                              <div style={IN_LBL}>% ПМ</div>
+                                              <input
+                                                type="number"
+                                                value={Math.round(es.pct * 100)}
+                                                min={0}
+                                                max={130}
+                                                onChange={(ev) =>
+                                                  setSrcEdits((prev) => {
+                                                    const next = {
+                                                      ...prev,
+                                                      [k]: { ...(prev[k] ?? {}), pct: +ev.target.value / 100 },
+                                                    };
+                                                    delete next[k].weight;
+                                                    return next;
+                                                  })
+                                                }
+                                                style={{ ...INM, width: '100%' }}
+                                                title="% от ПМ недели — вес пересчитается автоматически (до 130% — проходки источника)"
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+                              </div>
+                            ))}
+                            {editMode &&
+                              (srcAdditions[dk] || []).map((a) => (
+                                <div
+                                  key={a.uid}
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 4,
+                                    padding: '5px 0',
+                                    borderBottom: '1px solid var(--accent-dim)',
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                                    <div
+                                      style={{
+                                        fontSize: 11,
+                                        color: 'var(--accent)',
+                                        fontWeight: 600,
+                                        flex: 1,
+                                        minWidth: 0,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {a.name}
+                                    </div>
+                                    <span style={{ fontSize: 10, color: '#fff', flexShrink: 0 }}>＋ добавлено</span>
+                                    <button
+                                      onClick={() =>
+                                        setSrcAdditions((prev) => {
+                                          return { ...prev, [dk]: (prev[dk] || []).filter((x) => x.uid !== a.uid) };
+                                        })
+                                      }
+                                      style={{
+                                        fontSize: 11,
+                                        color: '#ef4444',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3 }}>
+                                    <input
+                                      type="number"
+                                      value={a.sets}
+                                      onChange={(ev) =>
+                                        setSrcAdditions((prev) => {
+                                          return {
+                                            ...prev,
+                                            [dk]: (prev[dk] || []).map((x) =>
+                                              x.uid === a.uid ? { ...x, sets: +ev.target.value } : x,
+                                            ),
+                                          };
+                                        })
+                                      }
+                                      style={{
+                                        background: '#18181b',
+                                        color: '#fff',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: 5,
+                                        padding: '6px 2px',
+                                        fontSize: 11,
+                                        textAlign: 'center',
+                                        minWidth: 0,
+                                        width: '100%',
+                                      }}
+                                      aria-label="подходы"
+                                      title="подходы"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={a.reps}
+                                      onChange={(ev) =>
+                                        setSrcAdditions((prev) => {
+                                          return {
+                                            ...prev,
+                                            [dk]: (prev[dk] || []).map((x) =>
+                                              x.uid === a.uid ? { ...x, reps: +ev.target.value } : x,
+                                            ),
+                                          };
+                                        })
+                                      }
+                                      style={{
+                                        background: '#18181b',
+                                        color: '#fff',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: 5,
+                                        padding: '6px 2px',
+                                        fontSize: 11,
+                                        textAlign: 'center',
+                                        minWidth: 0,
+                                        width: '100%',
+                                      }}
+                                      aria-label="повт"
+                                      title="повторы"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={a.weight}
+                                      onChange={(ev) =>
+                                        setSrcAdditions((prev) => {
+                                          return {
+                                            ...prev,
+                                            [dk]: (prev[dk] || []).map((x) =>
+                                              x.uid === a.uid ? { ...x, weight: +ev.target.value } : x,
+                                            ),
+                                          };
+                                        })
+                                      }
+                                      style={{
+                                        background: '#18181b',
+                                        color: '#fff',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: 5,
+                                        padding: '6px 2px',
+                                        fontSize: 11,
+                                        textAlign: 'center',
+                                        minWidth: 0,
+                                        width: '100%',
+                                      }}
+                                      aria-label="вес"
+                                      title="вес, кг"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            <button
+                              onClick={() => {
+                                setPickerDay(dk);
+                                setPickerExName('');
+                              }}
+                              style={{
+                                marginTop: 6,
+                                padding: '5px 10px',
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 600,
+                                border: '1px dashed rgba(0,230,138,0.4)',
+                                background: 'var(--accent-dim)',
+                                color: 'var(--accent)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ＋ Добавить упражнение из каталога
+                            </button>
+                          </>
+                        ),
+                      }}
+                    />
+                  );
+                }
+                return (
+                  <DayCard
+                    key={di}
+                    day={{
                       key: 'day-' + di,
                       title: `🏋️ День ${di + 1}${loadStr}`,
                       phase: dayPhase,
                       volumeTag,
                       renderBody: (
                         <>
-                           {d.exercises.map((e, ei) => (
-                              <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)', overflow:'hidden', boxSizing:'border-box' }}>
-                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:2 }}>
-                                 <span style={{ fontSize:11, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
-                                  <span style={{ fontSize:11, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : '#fff', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
-                                   {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
-                                 </span>
-                               </div>
-                              <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:6 }}>
-                                 {(() => {
-                                   // Ключ правки = ИНДЕКС ПЕРВОГО СЕТА БЛОКА (flat). Контракт
-                                   // lms-effective-plan.applyDay: правка читается один раз на
-                                   // work-set блок (по его стартовому индексу). Раньше каждая
-                                   // строка блока писала свой ключ (_1, _2 …) — правки сетов
-                                   // 2..N молча терялись при «✓ Готово».
-                                   let flatIdx = 0;
-                                   const allSets: { ws: typeof e.workSets[number]; blockIdx: number; setIdx: number; rowNum: number }[] = [];
-                                   e.workSets.forEach((ws, bi) => {
-                                     const blockStart = flatIdx;
-                                     for (let r=0; r<ws.sets; r++) allSets.push({ ws, blockIdx: bi, setIdx: blockStart, rowNum: allSets.length + 1 });
-                                     flatIdx += ws.sets;
-                                   });
-                                   const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 };
-                                   const IN_LBL: React.CSSProperties = { fontSize:9, color:'#fff', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
-                                   return allSets.map(({ ws, setIdx, rowNum }) => {
-                                     const k = setKey(wk.week, di, ei, setIdx);
-                                      const es = effSet(wk.week, di, ei, setIdx, ws, e.name);
-                                     return (
-                                       <div key={rowNum} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                         <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {rowNum}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span></div>
-                                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-                                          <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
-                                          <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
-                                          <div><div style={IN_LBL}>% ПМ</div><input type='number' value={Math.round(es.pct*100)} min={0} max={130} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), pct: (+ev.target.value) / 100 } }; delete next[k].weight; return next; })} style={{ ...INM, width:'100%' }} title='% от ПМ недели — вес пересчитается автоматически (до 130% — проходки источника)' /></div>
+                          {d.exercises.map((e, ei) => {
+                            const tmpo = getTempo(e.name, goal, e.load === 'main');
+                            const isCompound =
+                              !e.name.toLowerCase().includes('сгибан') &&
+                              !e.name.toLowerCase().includes('разгибан') &&
+                              !e.name.toLowerCase().includes('подъём') &&
+                              !e.name.toLowerCase().includes('махи');
+                            const roleColor =
+                              e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : '#fff';
+                            const charColor =
+                              e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : '#fff';
+                            const charLabel =
+                              e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
+                            const roleLabel =
+                              e.load === 'main'
+                                ? '🎯 Основное'
+                                : e.load === 'additional'
+                                  ? '📌 Добивка'
+                                  : '⚙️ Аксессуар';
+                            // P2-12: этот путь рендерится только вне режима правки
+                            // (editMode уходит в отдельную ветку выше) — правок здесь нет.
+                            const firstWs = e.workSets[0] ?? null;
+                            const adjustDisplaySet = (ws: (typeof e.workSets)[number], _si: number) => ws;
+                            const firstRir = firstWs?.rir;
+                            const tempo = tempoStr || tmpo.tempo.toString;
+                            return (
+                              <div
+                                key={ei}
+                                style={{
+                                  padding: '8px 10px',
+                                  marginBottom: 6,
+                                  background: 'rgba(255,255,255,0.025)',
+                                  borderRadius: 10,
+                                  border: '0.5px solid rgba(255,255,255,0.04)',
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'baseline',
+                                    gap: 8,
+                                    marginBottom: 5,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      minWidth: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      background: 'rgba(0,230,138,0.15)',
+                                      color: '#00e68a',
+                                      fontSize: 11,
+                                      fontWeight: 800,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {ei + 1}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      lineHeight: 1.2,
+                                      flex: 1,
+                                      minWidth: 0,
+                                      overflowWrap: 'break-word',
+                                    }}
+                                  >
+                                    {e.name}
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: '2px 6px',
+                                      borderRadius: 5,
+                                      background: (isCompound ? '#00e68a' : '#f59e0b') + '20',
+                                      color: isCompound ? '#00e68a' : '#f59e0b',
+                                      border: '0.5px solid ' + (isCompound ? '#00e68a' : '#f59e0b') + '30',
+                                    }}
+                                  >
+                                    {isCompound ? 'База' : 'Изо'}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: '2px 6px',
+                                      borderRadius: 5,
+                                      background: roleColor + '20',
+                                      color: roleColor,
+                                      border: '0.5px solid ' + roleColor + '30',
+                                    }}
+                                  >
+                                    {roleLabel}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: '2px 6px',
+                                      borderRadius: 5,
+                                      background: charColor + '20',
+                                      color: charColor,
+                                      border: '0.5px solid ' + charColor + '30',
+                                    }}
+                                  >
+                                    {charLabel}
+                                  </span>
+                                </div>
+                                <div
+                                  style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+                                    gap: 5,
+                                  }}
+                                >
+                                  {firstWs && (
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        color: '#fff',
+                                        padding: '3px 6px',
+                                        borderRadius: 6,
+                                        background: 'rgba(34,197,94,0.1)',
+                                        border: '0.5px solid rgba(34,197,94,0.2)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                      }}
+                                    >
+                                      <span style={{ color: 'rgba(34,197,94,0.8)' }}>Сеты</span>
+                                      <b style={{ color: '#fff' }}>
+                                        {e.workSets.reduce((n, ws) => n + ws.sets, 0)}×{firstWs.reps}
+                                      </b>
+                                    </span>
+                                  )}
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      color: '#fff',
+                                      padding: '3px 6px',
+                                      borderRadius: 6,
+                                      background: 'rgba(245,158,11,0.1)',
+                                      border: '0.5px solid rgba(245,158,11,0.2)',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                    }}
+                                  >
+                                    <span style={{ color: 'rgba(245,158,11,0.8)' }}>RIR</span>
+                                    <b style={{ color: '#fff' }}>{firstRir ?? e.rir}</b>
+                                  </span>
+                                  {firstWs && (
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        color: '#fff',
+                                        padding: '3px 6px',
+                                        borderRadius: 6,
+                                        background: 'rgba(96,165,250,0.1)',
+                                        border: '0.5px solid rgba(96,165,250,0.2)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                      }}
+                                    >
+                                      <span style={{ color: 'rgba(96,165,250,0.8)' }}>Вес</span>
+                                      <b style={{ color: '#fff' }}>{firstWs.weight}кг </b>
+                                    </span>
+                                  )}
+                                  {tempo && (
+                                    <span
+                                      style={{
+                                        fontSize: 10,
+                                        color: '#fff',
+                                        padding: '3px 6px',
+                                        borderRadius: 6,
+                                        background: 'rgba(168,85,247,0.1)',
+                                        border: '0.5px solid rgba(168,85,247,0.2)',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                      }}
+                                    >
+                                      <span style={{ color: 'rgba(168,85,247,0.8)' }}>Темп</span>
+                                      <b style={{ color: '#fff' }}>{tempo}</b>
+                                    </span>
+                                  )}
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      color: '#fff',
+                                      padding: '3px 6px',
+                                      borderRadius: 6,
+                                      background: 'rgba(255,255,255,0.05)',
+                                      border: '0.5px solid rgba(255,255,255,0.1)',
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                    }}
+                                  >
+                                    <span style={{ color: '#fff' }}>Группа</span>
+                                    <b style={{ color: '#fff' }}>{e.group}</b>
+                                  </span>
+                                </div>
+                                <div
+                                  data-pl="set-list-body"
+                                  style={{ marginTop: 5, display: 'flex', flexDirection: 'column', gap: 3 }}
+                                >
+                                  {(() => {
+                                    // Ключ правки — НАЧАЛЬНЫЙ индекс work-set блока (контракт
+                                    // applyPLEffectiveOverlay: одна правка на блок). Для строк
+                                    // 2..N внутри блока берём тот же ключ.
+                                    const allSets: {
+                                      ws: (typeof e.workSets)[number];
+                                      si: number;
+                                      blockStart: number;
+                                      repIdx: number;
+                                    }[] = [];
+                                    let flat = 0;
+                                    e.workSets.forEach((ws) => {
+                                      const blockStart = flat;
+                                      for (let r = 0; r < ws.sets; r++) {
+                                        allSets.push({ ws, si: allSets.length, blockStart, repIdx: r });
+                                      }
+                                      flat += ws.sets;
+                                    });
+                                    return allSets.map(({ ws, si, blockStart }) => {
+                                      const es = adjustDisplaySet(ws, blockStart);
+                                      return (
+                                        <div
+                                          key={si}
+                                          style={{
+                                            fontSize: 11,
+                                            color: '#fff',
+                                            padding: '4px 8px',
+                                            borderRadius: 6,
+                                            background: 'rgba(255,255,255,0.03)',
+                                            border: '0.5px solid rgba(255,255,255,0.06)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 8,
+                                            flexWrap: 'wrap',
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: 9,
+                                              fontWeight: 700,
+                                              color: 'rgba(0,230,138,0.7)',
+                                              minWidth: 40,
+                                            }}
+                                          >
+                                            Сет {si + 1}
+                                          </span>
+                                          <span style={{ fontWeight: 700, color: '#fff' }}>{es.reps} повт</span>
+                                          <span style={{ color: '#60a5fa', fontWeight: 700 }}>
+                                            {Math.round(es.pct * 100)}%
+                                            {es.pct > 1.1 && (
+                                              <span
+                                                data-pl="test-attempt"
+                                                title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)"
+                                                style={{
+                                                  marginLeft: 4,
+                                                  fontSize: 9,
+                                                  fontWeight: 800,
+                                                  color: '#f59e0b',
+                                                }}
+                                              >
+                                                ⚡ проходка
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span style={{ color: '#fff' }}>{es.weight}кг</span>
+                                          {typeof es.rir === 'number' && (
+                                            <span style={{ color: '#f59e0b' }}>RIR {es.rir}</span>
+                                          )}
                                         </div>
-                                      </div>
-                                    );
-                                  });
-                                })()}
+                                      );
+                                    });
+                                  })()}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                           {editMode && (srcAdditions[dk] || []).map(a => (
-                             <div key={a.uid} style={{ display:'flex', flexDirection:'column', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
-                               <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
-                                 <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
-                                 <span style={{ fontSize:10, color:'#fff', flexShrink:0 }}>＋ добавлено</span>
-                                 <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', flexShrink:0 }}>✕</button>
-                               </div>
-                               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
-                                 <input type='number' value={a.sets} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, sets: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='подходы' title='подходы'/>
-                                 <input type='number' value={a.reps} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, reps: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='повт' title='повторы'/>
-                                 <input type='number' value={a.weight} onChange={ev => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).map(x => x.uid===a.uid ? { ...x, weight: +ev.target.value } : x) }; })} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:5, padding:'6px 2px', fontSize:11, textAlign:'center', minWidth:0, width:'100%' }} aria-label='вес' title='вес, кг'/>
-                               </div>
-                             </div>
-                           ))}
-                          <button onClick={() => { setPickerDay(dk); setPickerExName(''); }} style={{ marginTop:6, padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:600, border:'1px dashed rgba(0,230,138,0.4)', background:'var(--accent-dim)', color:'var(--accent)', cursor:'pointer' }}>＋ Добавить упражнение из каталога</button>
-                        </>
-                      ),
-                    }} />
-                  );
-                }
-                return (
-                  <DayCard key={di} day={{
-                    key: 'day-' + di,
-                    title: `🏋️ День ${di + 1}${loadStr}`,
-                    phase: dayPhase,
-                    volumeTag,
-                    renderBody: (
-                      <>
-                        {d.exercises.map((e, ei) => {
-                          const tmpo = getTempo(e.name, goal, e.load === 'main');
-                          const isCompound = !e.name.toLowerCase().includes('сгибан') && !e.name.toLowerCase().includes('разгибан') && !e.name.toLowerCase().includes('подъём') && !e.name.toLowerCase().includes('махи');
-                          const roleColor = e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : '#fff';
-                          const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : '#fff';
-                          const charLabel = e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
-                          const roleLabel = e.load === 'main' ? '🎯 Основное' : e.load === 'additional' ? '📌 Добивка' : '⚙️ Аксессуар';
-                             const rawFirstWs = e.workSets[0] ? (editMode ? effSet(wk.week, di, ei, 0, e.workSets[0], e.name) : e.workSets[0]) : null;
-                             const diaryAdj = editMode && autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(e.name) : undefined;
-                             const firstWs = rawFirstWs;
-                             const adjustedMark = diaryAdj ? ' 📓' : '';
-                             const adjustDisplaySet = (ws: typeof e.workSets[number], si: number) => {
-                                return editMode ? effSet(wk.week, di, ei, si, ws, e.name) : ws;
-                             };
-                           const firstRir = firstWs?.rir;
-                          const setSummary = firstWs ? (firstWs.sets + '×' + firstWs.reps + ' @ ' + Math.round(firstWs.pct*100) + '%') : '';
-                          const tempo = tempoStr || tmpo.tempo.toString;
-                          return (
-                            <div key={ei} style={{ padding:'8px 10px', marginBottom:6, background:'rgba(255,255,255,0.025)', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.04)', overflow:'hidden' }}>
-                              <div style={{ display:'flex', alignItems:'baseline', gap:8, marginBottom:5, minWidth:0 }}>
-                                <span style={{ minWidth:20, height:20, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:11, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{ei+1}</span>
-                                <span style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1.2, flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
-                              </div>
-                              <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:6 }}>
-                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:(isCompound?'#00e68a':'#f59e0b')+'20', color:isCompound?'#00e68a':'#f59e0b', border:'0.5px solid '+(isCompound?'#00e68a':'#f59e0b')+'30' }}>{isCompound?'База':'Изо'}</span>
-                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:roleColor+'20', color:roleColor, border:'0.5px solid '+roleColor+'30' }}>{roleLabel}</span>
-                                <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:charColor+'20', color:charColor, border:'0.5px solid '+charColor+'30' }}>{charLabel}</span>
-                              </div>
-                              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:5 }}>
-                                 {firstWs && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{e.workSets.reduce((n,ws)=>n+ws.sets,0)}×{firstWs.reps}{adjustedMark}</b></span>}
-                                <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
-                                 {firstWs && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг{adjustedMark}</b></span>}
-                                 {tempo && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
-                                <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'#fff' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
-                              </div>
-                              <div data-pl="set-list-body" style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
-                                {(() => {
-                                  // Ключ правки — НАЧАЛЬНЫЙ индекс work-set блока (контракт
-                                  // applyPLEffectiveOverlay: одна правка на блок). Для строк
-                                  // 2..N внутри блока берём тот же ключ.
-                                  const allSets: { ws: typeof e.workSets[number]; si: number; blockStart: number; repIdx: number }[] = [];
-                                  let flat = 0;
-                                  e.workSets.forEach((ws) => {
-                                    const blockStart = flat;
-                                    for (let r = 0; r < ws.sets; r++) {
-                                      allSets.push({ ws, si: allSets.length, blockStart, repIdx: r });
-                                    }
-                                    flat += ws.sets;
-                                  });
-                                  return allSets.map(({ ws, si, blockStart }) => {
-                                    const es = adjustDisplaySet(ws, blockStart);
-                                    return (
-                                      <div key={si} style={{ fontSize:11, color:'#fff', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                                        <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:40 }}>Сет {si+1}</span>
-                                        <span style={{ fontWeight:700, color:'#fff' }}>{es.reps} повт</span>
-                                        <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%{es.pct > 1.1 && <span data-pl="test-attempt" title="Проходка источника: тестовый максимум выше 110% ПМ (не клампится)" style={{ marginLeft:4, fontSize:9, fontWeight:800, color:'#f59e0b' }}>⚡ проходка</span>}</span>
-                                        <span style={{ color:'#fff' }}>{es.weight}кг</span>
-                                        {typeof es.rir === 'number' && <span style={{ color:'#f59e0b' }}>RIR {es.rir}</span>}
-                                        {adjustedMark && <span style={{ fontSize:9 }}>{adjustedMark}</span>}
-                                      </div>
-                                    );
-                                  });
-                                })()}
-                              </div>
-                            </div>
-                          );
-                        })}
-                         {/* Добавленные из каталога упражнения уже ВНУТРИ effectiveSrc
+                            );
+                          })}
+                          {/* Добавленные из каталога упражнения уже ВНУТРИ effectiveSrc
                              (applyPLEffectiveOverlay кладёт их в day.exercises с
                              load:'additional') — вне режима правки второй раз не рисуем,
                              иначе один и тот же «＋» показывался дважды. */}
-                         {editMode && (srcAdditions[dk] || []).map(a => (
-                          <div key={a.uid} style={{ padding:'6px 10px', marginBottom:6, background:'rgba(0,230,138,0.05)', borderRadius:10, border:'0.5px solid rgba(0,230,138,0.2)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
-                            <div style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              <span style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>＋ {a.name}</span>
-                              <span style={{ fontSize:11, color:'#fff', marginLeft:6 }}>{a.sets}×{a.reps}×{a.weight}кг</span>
-                            </div>
-                            <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer', flexShrink:0 }}>✕</button>
-                          </div>
-                        ))}
-                      </>
-                    ),
-                  }} />
+                        </>
+                      ),
+                    }}
+                  />
                 );
               })}
-              <MetricCard title={'Итоги мезоцикла ('+totalW+' нед)'} icon="📊">
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Тоннаж: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов</div>
-                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>КПШ: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.kpsh}</b></div>
-                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>Инт. отн: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.relIntensity.toFixed(3)}</b></div>
-                   <div style={{ ...SMALL, background:'var(--accent-dim)', padding:'6px 8px', borderRadius:8 }}>УОИ: <b style={{color:'#fff'}}>{displaySrc.cycleMetrics.uoi.toFixed(3)}</b></div>
+              <MetricCard title={'Итоги мезоцикла (' + totalW + ' нед)'} icon="📊">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <div style={{ ...SMALL, background: 'var(--accent-dim)', padding: '6px 8px', borderRadius: 8 }}>
+                    Тоннаж: <b style={{ color: '#fff' }}>{metricsSrc.cycleMetrics.tonnage.toFixed(0)}</b> кг·пов
+                  </div>
+                  <div style={{ ...SMALL, background: 'var(--accent-dim)', padding: '6px 8px', borderRadius: 8 }}>
+                    КПШ: <b style={{ color: '#fff' }}>{metricsSrc.cycleMetrics.kpsh}</b>
+                  </div>
+                  <div style={{ ...SMALL, background: 'var(--accent-dim)', padding: '6px 8px', borderRadius: 8 }}>
+                    Инт. отн: <b style={{ color: '#fff' }}>{metricsSrc.cycleMetrics.relIntensity.toFixed(3)}</b>
+                  </div>
+                  <div style={{ ...SMALL, background: 'var(--accent-dim)', padding: '6px 8px', borderRadius: 8 }}>
+                    УОИ: <b style={{ color: '#fff' }}>{metricsSrc.cycleMetrics.uoi.toFixed(3)}</b>
+                  </div>
                 </div>
               </MetricCard>
-               {displaySrc && displaySrc.plVolumeLandmarks && displaySrc.plVolumeLandmarks.length > 0 && (() => {
-                // P2-2: вклад упражнений в группу — видно, ИЗ-ЗА ЧЕГО перебор,
-                // без введения мелких мышечных групп и новых порогов.
-                const breakdown = getPLVolumeBreakdown(displaySrc.weeks);
-                // PED-множитель MRV — один расчёт на оба режима (заголовок и строки).
-                const pedFactor = (() => {
-                  if (!(pedAuto && peds.length > 0)) return 1;
-                  try {
-                    const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv]));
-                    return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier;
-                  } catch { return 1; }
-                })();
-                // «По мышцам» — те же пороги, но объём композитов разложен пропорционально.
-                const volRows = volByMuscle
-                  ? getPLVolumeLandmarksByMuscle(displaySrc.weeks, level, pedFactor)
-                  : displaySrc.plVolumeLandmarks;
-                return (
-                <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-                    <button
-                      data-pl="vol-mode-group"
-                      onClick={() => setVolByMuscle(false)}
-                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: '#fff', background: volByMuscle ? 'rgba(255,255,255,0.12)' : '#00e68a' }}
-                    >Группы</button>
-                    <button
-                      data-pl="vol-mode-muscle"
-                      onClick={() => setVolByMuscle(true)}
-                      style={{ padding: '4px 8px', borderRadius: 6, border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer', color: '#fff', background: volByMuscle ? '#00e68a' : 'rgba(255,255,255,0.12)' }}
-                    >По мышцам</button>
-                  </div>
-                  {volByMuscle && (
-                    <div style={{ color:'#fff', fontSize:9, opacity:0.7, marginBottom:6 }}>
-                      Композиты разложены пропорционально: присед/выпады 60 % квадрицепс · 40 % бицепс бедра; жим 65/25/10 грудь/трицепс/передняя дельта; становая 45/30/25 бицепс бедра/ягодицы/спина. Суммарный объём плана не меняется.
-                    </div>
-                  )}
-                  <div style={{ color:'#fff', fontSize:11, marginBottom:8 }}>
-                     Пиковая неделя: {volRows[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, pedFactor).toFixed(2)} (PED)` : ''}
-                  </div>
-                   {volRows.map((lm) => {
-                    const c = lm.status === 'over' ? '#ff5252' : lm.status === 'high' ? '#ffb74d' : lm.status === 'optimal' ? '#4caf50' : '#90caf9';
-                    const lbl = lm.status === 'over' ? 'ПЕРЕБОР' : lm.status === 'high' ? 'высоко' : lm.status === 'optimal' ? 'оптимум' : 'низко';
-                    return (
-                      <div key={lm.group} data-pl="volume-row" style={{ marginBottom: 6, minWidth: 0 }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ color:'#fff', fontSize:12, minWidth: 0, overflowWrap: 'break-word' }}>{lm.muscle}</span>
-                          <span style={{ color: c, fontSize:11, fontWeight:700, whiteSpace: 'nowrap' }}>{lm.sets} сет · MRV {lm.mrv} · {lbl}</span>
-                        </div>
-                        <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>MAV {lm.mav} · MEV {lm.mev}</div>
-                        <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, marginTop:3, overflow:'hidden' }}>
-                          <div style={{ width: `${Math.min(100, (lm.sets / lm.mrv) * 100)}%`, height:'100%', background:c, borderRadius:3 }} />
-                        </div>
-                        {!volByMuscle && breakdown.rows.filter(r => r.group === lm.group).slice(0, 3).map(r => (
-                          <div key={r.exercise} data-pl="volume-share" style={{ fontSize: 9, color: '#fff', opacity: 0.85, marginTop: 2 }}>
-                            · {r.exercise} — {r.sets} сет{r.sharePct >= 1 ? ` (${r.sharePct}%)` : ''}
-                          </div>
-                        ))}
+              {metricsSrc &&
+                metricsSrc.plVolumeLandmarks &&
+                metricsSrc.plVolumeLandmarks.length > 0 &&
+                (() => {
+                  // P2-2: вклад упражнений в группу — видно, ИЗ-ЗА ЧЕГО перебор,
+                  // без введения мелких мышечных групп и новых порогов.
+                  const breakdown = getPLVolumeBreakdown(metricsSrc.weeks);
+                  // PED-множитель MRV — один расчёт на оба режима (заголовок и строки).
+                  const pedFactor = (() => {
+                    if (!(pedAuto && peds.length > 0)) return 1;
+                    try {
+                      const lm = Object.fromEntries(
+                        Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv]),
+                      );
+                      return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier;
+                    } catch {
+                      return 1;
+                    }
+                  })();
+                  // «По мышцам» — те же пороги, но объём композитов разложен пропорционально.
+                  const volRows = volByMuscle
+                    ? getPLVolumeLandmarksByMuscle(metricsSrc.weeks, level, pedFactor)
+                    : metricsSrc.plVolumeLandmarks;
+                  return (
+                    <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
+                      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                        <button
+                          data-pl="vol-mode-group"
+                          onClick={() => setVolByMuscle(false)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            border: 'none',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            color: '#fff',
+                            background: volByMuscle ? 'rgba(255,255,255,0.12)' : '#00e68a',
+                          }}
+                        >
+                          Группы
+                        </button>
+                        <button
+                          data-pl="vol-mode-muscle"
+                          onClick={() => setVolByMuscle(true)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            border: 'none',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            color: '#fff',
+                            background: volByMuscle ? '#00e68a' : 'rgba(255,255,255,0.12)',
+                          }}
+                        >
+                          По мышцам
+                        </button>
                       </div>
-                    );
-                  })}
-                   {volRows.some(l => l.status === 'over') && (
-                    <div style={{ color:'#ff5252', fontSize:11, marginTop:4 }}>⚠ Объём выше верхней границы MRV. Важно: MRV — это верх РАБОЧЕГО ДИАПАЗОНА ориентировочной модели, а не потолок организма. В РКИ (Camargo 2026, +120 % объёма за 8 недель) ухудшения адаптации не нашли, поэтому решение ваше: снизить объём, если восстановление вас не устраивает, или оставить как есть.</div>
-                  )}
-                </MetricCard>
-                );
-              })()}
+                      {volByMuscle && (
+                        <div style={{ color: '#fff', fontSize: 9, opacity: 0.7, marginBottom: 6 }}>
+                          Композиты разложены пропорционально: присед/выпады 60 % квадрицепс · 40 % бицепс бедра; жим
+                          65/25/10 грудь/трицепс/передняя дельта; становая 45/30/25 бицепс бедра/ягодицы/спина.
+                          Суммарный объём плана не меняется.
+                        </div>
+                      )}
+                      <div style={{ color: '#fff', fontSize: 11, marginBottom: 8 }}>
+                        Пиковая неделя: {volRows[0].peakWeek}
+                        {W.some((w) => w.macroPhase === 'competition')
+                          ? ` · 📉 +${W.filter((w) => w.macroPhase === 'competition').length} тапер-нед`
+                          : ''}
+                        {pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, pedFactor).toFixed(2)} (PED)` : ''}
+                      </div>
+                      {volRows.map((lm) => {
+                        const c =
+                          lm.status === 'over'
+                            ? '#ff5252'
+                            : lm.status === 'high'
+                              ? '#ffb74d'
+                              : lm.status === 'optimal'
+                                ? '#4caf50'
+                                : '#90caf9';
+                        const lbl =
+                          lm.status === 'over'
+                            ? 'ПЕРЕБОР'
+                            : lm.status === 'high'
+                              ? 'высоко'
+                              : lm.status === 'optimal'
+                                ? 'оптимум'
+                                : 'низко';
+                        return (
+                          <div key={lm.group} data-pl="volume-row" style={{ marginBottom: 6, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ color: '#fff', fontSize: 12, minWidth: 0, overflowWrap: 'break-word' }}>
+                                {lm.muscle}
+                              </span>
+                              <span style={{ color: c, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                {lm.sets} сет · MRV {lm.mrv} · {lbl}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
+                              MAV {lm.mav} · MEV {lm.mev}
+                            </div>
+                            <div
+                              style={{
+                                height: 6,
+                                background: 'rgba(255,255,255,0.1)',
+                                borderRadius: 3,
+                                marginTop: 3,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: `${Math.min(100, (lm.sets / lm.mrv) * 100)}%`,
+                                  height: '100%',
+                                  background: c,
+                                  borderRadius: 3,
+                                }}
+                              />
+                            </div>
+                            {!volByMuscle &&
+                              breakdown.rows
+                                .filter((r) => r.group === lm.group)
+                                .slice(0, 3)
+                                .map((r) => (
+                                  <div
+                                    key={r.exercise}
+                                    data-pl="volume-share"
+                                    style={{ fontSize: 9, color: '#fff', opacity: 0.85, marginTop: 2 }}
+                                  >
+                                    · {r.exercise} — {r.sets} сет{r.sharePct >= 1 ? ` (${r.sharePct}%)` : ''}
+                                  </div>
+                                ))}
+                          </div>
+                        );
+                      })}
+                      {volRows.some((l) => l.status === 'over') && (
+                        <div style={{ color: '#ff5252', fontSize: 11, marginTop: 4 }}>
+                          ⚠ Объём выше верхней границы MRV. Важно: MRV — это верх РАБОЧЕГО ДИАПАЗОНА ориентировочной
+                          модели, а не потолок организма. В РКИ (Camargo 2026, +120 % объёма за 8 недель) ухудшения
+                          адаптации не нашли, поэтому решение ваше: снизить объём, если восстановление вас не
+                          устраивает, или оставить как есть.
+                        </div>
+                      )}
+                    </MetricCard>
+                  );
+                })()}
               {/* 🌅 Фаза 6, п.6: утренний чек-ин → сегодняшняя тренировка (плеер применит) */}
               <PLReadinessCard
                 onNote={onNote}
-                previewDay={playerDays?.[0]?.exercises?.map(ex => ({ name: ex.name, targetSets: ex.targetSets })) ?? null}
+                previewDay={
+                  playerDays?.[0]?.exercises?.map((ex) => ({ name: ex.name, targetSets: ex.targetSets })) ?? null
+                }
+                previewDayLabel={playerDays?.[0]?.label ?? null}
               />
               {/* Календарь цикла: оригинальный / с учётом тапера */}
               <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end' }}>
@@ -1250,7 +3568,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   onChange={setCalendarView}
                   // P0-1 guard: id цикла может быть удалён из каталога (сессия старше каталога) —
                   // без проверки originalCycleWeeks(undefined) ронял рендер.
-                  originalLabel={`🔵 Оригинальный (${(() => { const c = getCycleById(selectedCycleId); return c ? originalCycleWeeks(c) : totalW; })()} нед)`}
+                  originalLabel={`🔵 Оригинальный (${(() => {
+                    const c = getCycleById(selectedCycleId);
+                    return c ? originalCycleWeeks(c) : totalW;
+                  })()} нед)`}
                   taperedLabel={`📉 С тапером (${totalW} нед)`}
                 />
               </div>
@@ -1259,13 +3580,17 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 sourceWeeks={(() => {
                   if (calendarView === 'tapered') {
                     // С учётом тапера: все недели плана (оригинал + mock + тапер + соревнования)
-                    return W.map(wk => {
-                      let volumeSets = 0, intNum = 0, rirNum = 0;
-                      for (const d of wk.days) for (const e of d.exercises) for (const ws of e.workSets) {
-                        volumeSets += ws.sets;
-                        intNum += ws.pct * ws.sets;
-                        rirNum += (ws.rir ?? 0) * ws.sets;
-                      }
+                    return W.map((wk) => {
+                      let volumeSets = 0,
+                        intNum = 0,
+                        rirNum = 0;
+                      for (const d of wk.days)
+                        for (const e of d.exercises)
+                          for (const ws of e.workSets) {
+                            volumeSets += ws.sets;
+                            intNum += ws.pct * ws.sets;
+                            rirNum += (ws.rir ?? 0) * ws.sets;
+                          }
                       return {
                         week: wk.week,
                         volumeSets,
@@ -1280,11 +3605,21 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   // Только оригинальные недели решают про исходный календарь: добавленные
                   // тапер/mock meet/неделя соревнований (macroPhase/taperWeek) не должны
                   // «перекрашивать» цикл.
-                  if (!sourceCycle || W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some(week => week.macroPhase)) return undefined;
-                  const layouts = sourceCycle.weeks && sourceCycle.weeks.length > 0
-                    ? sourceCycle.weeks
-                    : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);
-                   return summarizeSourceCycleWeeks(layouts, sourceCycle.meta.period, sourceCycle.meta.sourcePhases, sourceCycle.meta.sourcePhaseSource ?? 'original');
+                  if (
+                    !sourceCycle ||
+                    W.filter((w) => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).some((week) => week.macroPhase)
+                  )
+                    return undefined;
+                  const layouts =
+                    sourceCycle.weeks && sourceCycle.weeks.length > 0
+                      ? sourceCycle.weeks
+                      : Array.from({ length: originalCycleWeeks(sourceCycle) }, () => sourceCycle.week1);
+                  return summarizeSourceCycleWeeks(
+                    layouts,
+                    sourceCycle.meta.period,
+                    sourceCycle.meta.sourcePhases,
+                    sourceCycle.meta.sourcePhaseSource ?? 'original',
+                  );
                 })()}
                 weekOverrides={(() => {
                   if (calendarView !== 'tapered') return undefined;
@@ -1292,137 +3627,393 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   for (const w of W) {
                     if (isMeetWeek(w)) ov[w.week] = { label: '🏁 Соревнования (прикиды)', color: MEET_COLOR };
                     else if (isMockWeek(w)) ov[w.week] = { label: '🎯 Mock meet (прикиды-синглы)', color: MOCK_COLOR };
-                    else if (isPostMeetWeek(w)) ov[w.week] = { label: '🔄 Пост-старт (восстановление)', color: POST_COLOR };
+                    else if (isPostMeetWeek(w))
+                      ov[w.week] = { label: '🔄 Пост-старт (восстановление)', color: POST_COLOR };
                     else if (isTaperWeek(w)) ov[w.week] = { label: '📉 Тапер (разгрузка)', color: TAPER_COLOR };
                   }
                   return Object.keys(ov).length > 0 ? ov : undefined;
                 })()}
-                startVolumeSets={Math.round(W.reduce((s, w) => s + w.days.reduce((ss, d) => ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0), 0), 0) / totalW / (days || 3))}
+                startVolumeSets={Math.round(
+                  W.reduce(
+                    (s, w) =>
+                      s +
+                      w.days.reduce(
+                        (ss, d) =>
+                          ss + d.exercises.reduce((sss, e) => sss + e.workSets.reduce((a, ws) => a + ws.sets, 0), 0),
+                        0,
+                      ),
+                    0,
+                  ) /
+                    totalW /
+                    (days || 3),
+                )}
                 startIntensityPct={0.72}
                 startRIR={3}
                 goal="strength"
-                title={calendarView === 'tapered' ? 'Календарь цикла с тапером (ПЛ)' : 'Календарь оригинального цикла (ПЛ)'}
+                title={
+                  calendarView === 'tapered' ? 'Календарь цикла с тапером (ПЛ)' : 'Календарь оригинального цикла (ПЛ)'
+                }
               />
-              <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-                <div style={{ ...LABEL, color:'#60a5fa', margin:'0 0 4px' }}>➡️ Что дальше</div>
-                <div style={SMALL}>{phase === 'peak'
-                  ? 'Цикл завершается пиковой фазой. После теста ПМ — неделя разгрузки (deload: 60% объёма, RIR 4), затем новый мезоцикл с пересчитанным PM0 (новый PM = результат теста). Система пересчитает прогрессию автоматически при вводе нового PM.'
-                  : phase === 'deload'
-                  ? 'Разгрузка — восстановление перед следующим мезо. После неё начните новый цикл: PM0 = текущий расчётный PM (он вырос за мезо по формуле PM0×(1+k)^нед).'
-                  : 'Система считает дальнейшие недели сама: вес = PM_нед × %ПМ, где PM_нед = PM0×(1+k)^нед (k=0.5% натурал / 1.5-2.5% на курсе). Переходите по неделям ◀▶ — фазы Base→Build→Peak чередуются автоматически.'}</div>
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: 10,
+                  borderRadius: 10,
+                  background: 'rgba(96,165,250,0.06)',
+                  border: '1px solid rgba(96,165,250,0.15)',
+                }}
+              >
+                <div style={{ ...LABEL, color: '#60a5fa', margin: '0 0 4px' }}>➡️ Что дальше</div>
+                <div style={SMALL}>
+                  {phase === 'peak'
+                    ? 'Цикл завершается пиковой фазой. После теста ПМ — неделя разгрузки (deload: 60% объёма, RIR 4), затем новый мезоцикл с пересчитанным PM0 (новый PM = результат теста). Система пересчитает прогрессию автоматически при вводе нового PM.'
+                    : phase === 'deload'
+                      ? 'Разгрузка — восстановление перед следующим мезо. После неё начните новый цикл: PM0 = текущий расчётный PM (он вырос за мезо по формуле PM0×(1+k)^нед).'
+                      : 'Система считает дальнейшие недели сама: вес = PM_нед × %ПМ, где PM_нед = PM0×(1+k)^нед (k=0.5% натурал / 1.5-2.5% на курсе). Переходите по неделям ◀▶ — фазы Base→Build→Peak чередуются автоматически.'}
+                </div>
               </div>
               {/* 📤 Экспорт: цепочка Формат → Объём → (Блок/Неделя) → Экспорт */}
-              {expOpen && (() => {
-                const exportSrc = effectiveSrc ?? builtSrc;
-                const exportWeeks = exportSrc.weeks;
-                const blocks = plBlockGroups(exportWeeks);
-                const scopeLabel = expScope === 'all' ? `Весь план (${exportWeeks.length} нед)`
-                  : expScope === 'full' ? `Всё вместе (${exportWeeks.length} нед + сводка)`
-                  : expScope === 'block' ? `Блок «${expBlock ? PL_BLOCK_LABEL[expBlock] : ''}»`
-                  : expScope === 'week' ? `Неделя ${expWeek}`
-                  : '';
-                const ready = !!expFormat && !!expScope && (expScope !== 'block' || !!expBlock) && (expScope !== 'week' || !!expWeek);
-                const summary = expScope === 'full' && exportSrc.cycleMetrics ? [
-                  { label: 'Тоннаж', value: Math.round(exportSrc.cycleMetrics.tonnage).toLocaleString('ru-RU') + ' кг·пов' },
-                  { label: 'КПШ', value: String(exportSrc.cycleMetrics.kpsh) },
-                  { label: 'Средний вес', value: Math.round(exportSrc.cycleMetrics.avgWeight) + ' кг' },
-                  { label: 'Отн. интенсивность', value: Math.round(exportSrc.cycleMetrics.relIntensity * 100) + '%' },
-                  { label: 'УОИ', value: exportSrc.cycleMetrics.uoi.toFixed(2) },
-                  { label: 'Сессий', value: String(exportSrc.cycleMetrics.sessions) },
-                ] : undefined;
-                const doExport = async () => {
-                  if (!ready) return;
-                  const sel: LMSBuildOutput['weeks'] = expScope === 'all' || expScope === 'full'
-                    ? exportWeeks
-                    : expScope === 'block'
-                      ? (blocks.find(b => b.id === expBlock)?.weeks ?? exportWeeks)
-                      : exportWeeks.filter(w => w.week === expWeek);
-                   const title = exportSrc.template.meta.title;
-                  setExpOpen(false);
-                  if (expFormat === 'xlsx') {
-                    const res = await downloadPLExcel(buildPLExcelWorkbook(title, plExportRows(sel), summary), `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`);
-                    onNote(res === 'saved'
-                      ? `✅ Excel сохранён в выбранную папку (${scopeLabel}, ${sel.length} нед.).`
-                      : res === 'shared'
-                      ? `📤 Открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
-                      : res === 'opened'
-                      ? `🌐 Файл открыт в браузере телефона — там появится загрузка (${scopeLabel}, ${sel.length} нед.).`
-                      : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`);
-                  } else {
-                    const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
-                      title,
-                      text: plShareDigest({ title, weeks: sel, pmSquat, pmBench, pmDead }),
-                    });
-                    onNote(opened
-                      ? `🖨 PDF: окно печати — ${scopeLabel}.`
-                      : `🖨 PDF: просмотр открыт — «Печать» → сохранить как PDF (${scopeLabel}).`);
-                  }
-                };
-                const stepBtn = (on: boolean, label: string, sub: string, onClick: () => void, color: string, ariaLabel?: string) => (
-                  <button onClick={onClick} aria-label={ariaLabel} style={{ padding:'10px 12px', borderRadius:10, textAlign:'left', cursor:'pointer', border: on ? '1px solid ' + color : '1px solid rgba(255,255,255,0.12)', background: on ? color + '22' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
-                    <div style={{ fontSize:13, fontWeight:800, color: on ? color : '#fff' }}>{label}</div>
-                    <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{sub}</div>
-                  </button>
-                );
-                return (
-                  <div style={{ position:'fixed', inset:0, zIndex:210, display:'flex', background:'rgba(0,0,0,0.9)' }} onClick={() => setExpOpen(false)} role="presentation">
-                    <div ref={expRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Экспорт плана" onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column', outline:'none' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
-                        <span style={{ fontSize:14, fontWeight:700, color:'#60a5fa' }}>📤 Экспорт плана</span>
-                        <button onClick={() => setExpOpen(false)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px', minHeight:44 }} aria-label="Закрыть">✕</button>
-                      </div>
-                      <div style={{ flex:1, overflowY:'auto', padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
-                        {!expFormat && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>1 · Формат</div>
-                          {stepBtn(expFormat === 'xlsx', '📊 Excel (.xlsx)', 'Таблица для Excel / Google Sheets', () => setExpFormat('xlsx'), '#60a5fa')}
-                          {stepBtn(expFormat === 'pdf', '🖨 PDF', 'Окно печати → «Сохранить как PDF»', () => setExpFormat('pdf'), '#f59e0b')}
-                        </>}
-                        {expFormat && !expScope && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>2 · Что выгружаем</div>
-                          {stepBtn(expScope === 'all', '📋 Весь план', 'Тренировочный план — все недели', () => setExpScope('all'), '#00e68a')}
-                          {stepBtn(expScope === 'block', '🧩 Отдельный блок на выбор', 'Основной цикл / тапер / mock / соревнования / пост-старт', () => setExpScope('block'), '#a78bfa')}
-                          {stepBtn(expScope === 'week', '📅 Одна неделя на выбор', 'Выберите номер недели', () => setExpScope('week'), '#eab308')}
-                          {stepBtn(expScope === 'full', '📦 Всё вместе', 'Все недели + сводка цикла + прикиды', () => setExpScope('full'), '#f59e0b')}
-                        </>}
-                        {expFormat && expScope === 'block' && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>3 · Выберите блок</div>
-                          {blocks.map(b => <div key={b.id} style={{ width:'100%' }}>{stepBtn(expBlock === b.id, `${b.icon} ${b.label}`, `нед ${b.range} · ${b.weeks.length} нед`, () => setExpBlock(b.id), '#a78bfa', `Экспорт блок ${b.id}`)}</div>)}                          {blocks.length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Отдельных блоков нет — план однородный.</div>}
-                        </>}
-                         {expFormat && expScope === 'week' && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>3 · Выберите неделю</div>
-                          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(72px, 1fr))', gap:4 }}>
-                            {W.map(w => {
-                              const ph2 = displayPhaseForWeek(w, totalW);
-                              const active2 = expWeek === w.week;
-                              return <button key={w.week} onClick={() => setExpWeek(w.week)} aria-label={'Экспорт неделя ' + w.week} style={{ padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border: active2 ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)', background: active2 ? 'rgba(234,179,8,0.18)' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
-                                <div>{w.week}</div>
-                                <div style={{ fontSize:8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? '#fff' }}>{PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}</div>
-                              </button>;
-                            })}
-                           </div>
-                         </>}
-                         {ready && (
-                           <button
-                             type="button"
-                             onClick={doExport}
-                             style={{ width:'100%', marginTop:6, padding:'14px 12px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(0,230,138,0.65)', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontSize:13, fontWeight:900, minHeight:50 }}
-                           >
-                             {expFormat === 'xlsx' ? '💾 Сохранить Excel на телефон' : '🖨 Сохранить PDF на телефон'} · {scopeLabel}
-                           </button>
-                         )}
-                       </div>
-                       <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-                         <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'#fff', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
-                         <span style={{ flex:1, padding:'10px 12px', fontSize:11, color:'#fff', textAlign:'center' }}>
-                           {ready ? 'Кнопка сохранения находится выше' : 'Выберите формат и объём'}
-                         </span>
+              {expOpen &&
+                (() => {
+                  const exportSrc = effectiveSrc ?? builtSrc;
+                  const exportWeeks = exportSrc.weeks;
+                  const blocks = plBlockGroups(exportWeeks);
+                  const scopeLabel =
+                    expScope === 'all'
+                      ? `Весь план (${exportWeeks.length} нед)`
+                      : expScope === 'full'
+                        ? `Всё вместе (${exportWeeks.length} нед + сводка)`
+                        : expScope === 'block'
+                          ? `Блок «${expBlock ? PL_BLOCK_LABEL[expBlock] : ''}»`
+                          : expScope === 'week'
+                            ? `Неделя ${expWeek}`
+                            : '';
+                  const ready =
+                    !!expFormat &&
+                    !!expScope &&
+                    (expScope !== 'block' || !!expBlock) &&
+                    (expScope !== 'week' || !!expWeek);
+                  const summary =
+                    expScope === 'full' && exportSrc.cycleMetrics
+                      ? [
+                          {
+                            label: 'Тоннаж',
+                            value: Math.round(exportSrc.cycleMetrics.tonnage).toLocaleString('ru-RU') + ' кг·пов',
+                          },
+                          { label: 'КПШ', value: String(exportSrc.cycleMetrics.kpsh) },
+                          { label: 'Средний вес', value: Math.round(exportSrc.cycleMetrics.avgWeight) + ' кг' },
+                          {
+                            label: 'Отн. интенсивность',
+                            value: Math.round(exportSrc.cycleMetrics.relIntensity * 100) + '%',
+                          },
+                          { label: 'УОИ', value: exportSrc.cycleMetrics.uoi.toFixed(2) },
+                          { label: 'Сессий', value: String(exportSrc.cycleMetrics.sessions) },
+                        ]
+                      : undefined;
+                  const doExport = async () => {
+                    if (!ready) return;
+                    const sel: LMSBuildOutput['weeks'] =
+                      expScope === 'all' || expScope === 'full'
+                        ? exportWeeks
+                        : expScope === 'block'
+                          ? (blocks.find((b) => b.id === expBlock)?.weeks ?? exportWeeks)
+                          : exportWeeks.filter((w) => w.week === expWeek);
+                    const title = exportSrc.template.meta.title;
+                    setExpOpen(false);
+                    if (expFormat === 'xlsx') {
+                      const res = await downloadPLExcel(
+                        buildPLExcelWorkbook(title, plExportRows(sel), summary),
+                        `pl-plan-${selectedCycleId}-${expScope ?? 'all'}.xlsx`,
+                      );
+                      onNote(
+                        res === 'saved'
+                          ? `✅ Excel сохранён в выбранную папку (${scopeLabel}, ${sel.length} нед.).`
+                          : res === 'shared'
+                            ? `📤 Открыта системная панель — сохраните файл (${scopeLabel}, ${sel.length} нед.).`
+                            : res === 'opened'
+                              ? `🌐 Файл открыт в браузере телефона — там появится загрузка (${scopeLabel}, ${sel.length} нед.).`
+                              : `📥 Excel сохранён: ${scopeLabel} (${sel.length} нед.).`,
+                      );
+                    } else {
+                      const opened = printPLHtml(buildPLPrintHtml(title, scopeLabel, sel, { summary }), {
+                        title,
+                        text: plShareDigest({ title, weeks: sel, pmSquat, pmBench, pmDead }),
+                      });
+                      onNote(
+                        opened
+                          ? `🖨 PDF: окно печати — ${scopeLabel}.`
+                          : `🖨 PDF: просмотр открыт — «Печать» → сохранить как PDF (${scopeLabel}).`,
+                      );
+                    }
+                  };
+                  const stepBtn = (
+                    on: boolean,
+                    label: string,
+                    sub: string,
+                    onClick: () => void,
+                    color: string,
+                    ariaLabel?: string,
+                  ) => (
+                    <button
+                      onClick={onClick}
+                      aria-label={ariaLabel}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        border: on ? '1px solid ' + color : '1px solid rgba(255,255,255,0.12)',
+                        background: on ? color + '22' : 'rgba(255,255,255,0.03)',
+                        color: '#fff',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 800, color: on ? color : '#fff' }}>{label}</div>
+                      <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{sub}</div>
+                    </button>
+                  );
+                  return (
+                    <div
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 210,
+                        display: 'flex',
+                        background: 'rgba(0,0,0,0.9)',
+                      }}
+                      onClick={() => setExpOpen(false)}
+                      role="presentation"
+                    >
+                      <div
+                        ref={expRef}
+                        tabIndex={-1}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Экспорт плана"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%',
+                          maxWidth: 480,
+                          margin: '0 auto',
+                          background: '#18181b',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          outline: 'none',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px 12px 0',
+                          }}
+                        >
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#60a5fa' }}>📤 Экспорт плана</span>
+                          <button
+                            onClick={() => setExpOpen(false)}
+                            style={{
+                              fontSize: 11,
+                              color: '#ef4444',
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              padding: '4px 8px',
+                              minHeight: 44,
+                            }}
+                            aria-label="Закрыть"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div
+                          style={{
+                            flex: 1,
+                            overflowY: 'auto',
+                            padding: '10px 12px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                          }}
+                        >
+                          {!expFormat && (
+                            <>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>1 · Формат</div>
+                              {stepBtn(
+                                expFormat === 'xlsx',
+                                '📊 Excel (.xlsx)',
+                                'Таблица для Excel / Google Sheets',
+                                () => setExpFormat('xlsx'),
+                                '#60a5fa',
+                              )}
+                              {stepBtn(
+                                expFormat === 'pdf',
+                                '🖨 PDF',
+                                'Окно печати → «Сохранить как PDF»',
+                                () => setExpFormat('pdf'),
+                                '#f59e0b',
+                              )}
+                            </>
+                          )}
+                          {expFormat && !expScope && (
+                            <>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>2 · Что выгружаем</div>
+                              {stepBtn(
+                                expScope === 'all',
+                                '📋 Весь план',
+                                'Тренировочный план — все недели',
+                                () => setExpScope('all'),
+                                '#00e68a',
+                              )}
+                              {stepBtn(
+                                expScope === 'block',
+                                '🧩 Отдельный блок на выбор',
+                                'Основной цикл / тапер / mock / соревнования / пост-старт',
+                                () => setExpScope('block'),
+                                '#a78bfa',
+                              )}
+                              {stepBtn(
+                                expScope === 'week',
+                                '📅 Одна неделя на выбор',
+                                'Выберите номер недели',
+                                () => setExpScope('week'),
+                                '#eab308',
+                              )}
+                              {stepBtn(
+                                expScope === 'full',
+                                '📦 Всё вместе',
+                                'Все недели + сводка цикла + прикиды',
+                                () => setExpScope('full'),
+                                '#f59e0b',
+                              )}
+                            </>
+                          )}
+                          {expFormat && expScope === 'block' && (
+                            <>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>3 · Выберите блок</div>
+                              {blocks.map((b) => (
+                                <div key={b.id} style={{ width: '100%' }}>
+                                  {stepBtn(
+                                    expBlock === b.id,
+                                    `${b.icon} ${b.label}`,
+                                    `нед ${b.range} · ${b.weeks.length} нед`,
+                                    () => setExpBlock(b.id),
+                                    '#a78bfa',
+                                    `Экспорт блок ${b.id}`,
+                                  )}
+                                </div>
+                              ))}{' '}
+                              {blocks.length === 0 && (
+                                <div style={{ fontSize: 11, color: '#fff' }}>
+                                  Отдельных блоков нет — план однородный.
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {expFormat && expScope === 'week' && (
+                            <>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>3 · Выберите неделю</div>
+                              <div
+                                style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))',
+                                  gap: 4,
+                                }}
+                              >
+                                {W.map((w) => {
+                                  const ph2 = displayPhaseForWeek(w, totalW);
+                                  const active2 = expWeek === w.week;
+                                  return (
+                                    <button
+                                      key={w.week}
+                                      onClick={() => setExpWeek(w.week)}
+                                      aria-label={'Экспорт неделя ' + w.week}
+                                      style={{
+                                        padding: '8px 4px',
+                                        borderRadius: 8,
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        border: active2 ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)',
+                                        background: active2 ? 'rgba(234,179,8,0.18)' : 'rgba(255,255,255,0.03)',
+                                        color: '#fff',
+                                      }}
+                                    >
+                                      <div>{w.week}</div>
+                                      <div
+                                        style={{ fontSize: 8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? '#fff' }}
+                                      >
+                                        {PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                          {ready && (
+                            <button
+                              type="button"
+                              onClick={doExport}
+                              style={{
+                                width: '100%',
+                                marginTop: 6,
+                                padding: '14px 12px',
+                                borderRadius: 10,
+                                cursor: 'pointer',
+                                border: '1px solid rgba(0,230,138,0.65)',
+                                background: 'linear-gradient(135deg,#00e68a,#00c853)',
+                                color: '#000',
+                                fontSize: 13,
+                                fontWeight: 900,
+                                minHeight: 50,
+                              }}
+                            >
+                              {expFormat === 'xlsx' ? '💾 Сохранить Excel на телефон' : '🖨 Сохранить PDF на телефон'} ·{' '}
+                              {scopeLabel}
+                            </button>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 6,
+                            padding: '10px 12px',
+                            borderTop: '1px solid rgba(255,255,255,0.08)',
+                          }}
+                        >
+                          <button
+                            onClick={() => {
+                              if (expScope) setExpScope(null);
+                              else if (expFormat) setExpFormat(null);
+                            }}
+                            disabled={!expFormat}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: 8,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              background: 'transparent',
+                              color: '#fff',
+                              opacity: expFormat ? 1 : 0.4,
+                            }}
+                          >
+                            ⬅ Назад
+                          </button>
+                          <span
+                            style={{ flex: 1, padding: '10px 12px', fontSize: 11, color: '#fff', textAlign: 'center' }}
+                          >
+                            {ready ? 'Кнопка сохранения находится выше' : 'Выберите формат и объём'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </BbCard>;
-          })()}
+                  );
+                })()}
+            </BbCard>
+          );
+        })()}
     </div>
   );
 };

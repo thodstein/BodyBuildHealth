@@ -1,12 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LMS_CYCLES, getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { rankCycles, explainSelection } from '../../engines/lms/lms-selector.engine';
-import { buildLMSPlan, extractExercises, originalCycleWeeks, appendPLTaperWeeks, type LMSBuildOutput, type LMSBuildInput } from '../../engines/lms/lms-builder.engine';
-import { applyPLEffectiveOverlay } from '../../engines/lms/lms-effective-plan';
+import {
+  buildLMSPlan,
+  extractExercises,
+  originalCycleWeeks,
+  appendPLTaperWeeks,
+  type LMSBuildOutput,
+  type LMSBuildInput,
+} from '../../engines/lms/lms-builder.engine';
+import { applyPLEffectiveOverlay, scaleSetCount } from '../../engines/lms/lms-effective-plan';
 import { applyMacroTaperToPLWeeks } from '../../engines/lms/lms-macro-taper.engine';
-import { mergeMeetRegistry, syncCompetitionsFromMeets, dateFromWeeksToStart } from '../../engines/lms/pl-meet-registry.engine';
+import {
+  mergeMeetRegistry,
+  syncCompetitionsFromMeets,
+  meetDayFromWeeksToStart,
+  weeksToStartFromDate,
+} from '../../engines/lms/pl-meet-registry.engine';
 import { recommendTaperConfig, type TaperCoachCtx } from '../../engines/lms/lms-taper-coach.engine';
-import { TAPER_MODE_LABELS, TAPER_WEIGHT_GOAL_LABELS, type TaperMode, type TaperWeightGoal } from '../../engines/lms/lms-taper.engine';
+import {
+  TAPER_MODE_LABELS,
+  TAPER_WEIGHT_GOAL_LABELS,
+  type TaperMode,
+  type TaperWeightGoal,
+} from '../../engines/lms/lms-taper.engine';
 import { type Lift, type WeakPoint } from '../../engines/lms/weakpoint-pl';
 import { detectLift } from '../../engines/lms/lms-to-pl';
 import { mesocyclePhaseForWeek } from '../../engines/rir-matrix.engine';
@@ -17,26 +34,51 @@ import { rankBBSplits } from '../../engines/bb/bb-selector.engine';
 import { applyMacrocycleToBBPlan, type BBPlan } from '../../engines/bb/bb-builder.engine';
 import { buildBBPlanAsync } from '../../engines/bb/bb-build-async';
 import { arrangeSupersetBlocks } from '../../engines/bb/bb-session-order.engine';
-import { applyTrainingTaperToBBPlan, deserializeBBPrepConfig, legacyConfigFromProfile, isoAddDays, isoToday, type BBContestPrepConfig } from '../../engines/bb/bb-contest-prep.engine';
+import {
+  applyTrainingTaperToBBPlan,
+  deserializeBBPrepConfig,
+  legacyConfigFromProfile,
+  isoAddDays,
+  isoToday,
+  type BBContestPrepConfig,
+} from '../../engines/bb/bb-contest-prep.engine';
 import { adaptForPEDs, type PED } from '../../engines/bb/bb-ped-adaptation.engine';
 import { volumeRegimeOf } from '../../engines/bb/bb-ped-profile';
 import { getAllVolumeLandmarks } from '../../engines/volume-landmarks.engine';
 import { SessionPlayer, type PlayerDay } from './SRCBBScreen_parts/SessionPlayer';
 import {
-  CARD as TRAIN_CARD, SMALL as TRAIN_SMALL, BTN as TRAIN_BTN, BTN_GHOST as TRAIN_BTN_GHOST, IN as TRAIN_IN,
+  CARD as TRAIN_CARD,
+  SMALL as TRAIN_SMALL,
+  BTN as TRAIN_BTN,
+  BTN_GHOST as TRAIN_BTN_GHOST,
+  IN as TRAIN_IN,
   BbCard,
 } from './TrainingScreen_parts/training-ui';
 import { PedInputPanel, PedAdaptationCard } from './TrainingScreen_parts/PedCoursePanel';
 
-
 import { PLCompetitionTab } from './SRCBBScreen_parts/PLCompetitionTab';
 import { PLPlanView } from './SRCBBScreen_parts/PLPlanView';
-import { PLTaperProvider, usePLTaper, TAPER_PLAN_PERSIST_MAX_CHARS, validateSavedMacroTaperMode, validateSavedMacroWeightGoal, validateSavedMacroBool } from './SRCBBScreen_parts/taper-state';
+import { parsePLAutoRegCfg, plAutoRegPayload, type PLAutoRegCfg } from './SRCBBScreen_parts/pl-autoreg-cfg';
+import {
+  PLTaperProvider,
+  usePLTaper,
+  TAPER_PLAN_PERSIST_MAX_CHARS,
+  validateSavedMacroTaperMode,
+  validateSavedMacroWeightGoal,
+  validateSavedMacroBool,
+} from './SRCBBScreen_parts/taper-state';
 import { TrainingMetricsChart, type LMSWeekMetric } from './SRCBBScreen_parts/TrainingMetricsChart';
+import { TrainingModal } from './TrainingScreen_parts/TrainingModal';
 
 import { useDataLink } from '../../core/data-link';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
-import { subscribePlannerApply, getPlannerApply, clearPlannerApply, setPlannerSource, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
+import {
+  subscribePlannerApply,
+  getPlannerApply,
+  clearPlannerApply,
+  setPlannerSource,
+  type PlannerApply,
+} from './TrainingScreen_parts/planner-bridge';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 
@@ -44,7 +86,16 @@ import { PopupNumber, PopupSelect, PopupMultiSelect, ExpandableCard } from './SR
 import { generateRepTempo, type RepTempoOutput } from '../../engines/rep-tempo-engine';
 import { MacrocyclePanel } from './SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './TrainingScreen_parts/CardioLinkCard';
-import { deserializeMacro, deserializeBbMacro, serializeMacro, serializeBbMacro, rebalanceMacrocycle, rebalanceBbMacrocycle, type Macrocycle, type BBMacrocycle } from '../../engines/lms/macrocycle.engine';
+import {
+  deserializeMacro,
+  deserializeBbMacro,
+  serializeMacro,
+  serializeBbMacro,
+  rebalanceMacrocycle,
+  rebalanceBbMacrocycle,
+  type Macrocycle,
+  type BBMacrocycle,
+} from '../../engines/lms/macrocycle.engine';
 import { calcCycleMetrics, type SRExercise } from '../../engines/lms/lms-metrics.engine';
 import { applyPLDeload, planHasDeload, type PLDeloadRequest } from '../../engines/lms/lms-deload.engine';
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
@@ -56,7 +107,13 @@ import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
 import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { BlockView } from './SRCBBScreen_parts/BlockView';
 import { PLToolsCard } from './SRCBBScreen_parts/PLToolsCard';
-import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
+import {
+  buildPLPrintHtml,
+  printPLHtml,
+  buildPLExcelWorkbook,
+  downloadPLExcel,
+  plExportRows,
+} from './SRCBBScreen_parts/pl-export';
 import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 import { loadSessions } from '../../engines/workout-logger.engine';
 import { ruCount, RU_BLOCKS, RU_EXERCISES, RU_SETS, RU_WEEKS } from '../../engines/ru-plural';
@@ -76,8 +133,17 @@ const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepT
  * Билдер применяет topSetPctMultiplier/volumeMultiplier/rirShift/deload —
  * остальные диагностические поля (decisions/factors/…) ему не нужны.
  */
-const autoregPayload = (ar: AutoRegOutput | null): { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean } | undefined =>
-  ar ? { topSetPctMultiplier: ar.topSetPctMultiplier, volumeMultiplier: ar.volumeMultiplier, rirShift: ar.rirShift, deload: ar.deload } : undefined;
+const autoregPayload = (
+  ar: AutoRegOutput | null,
+): { topSetPctMultiplier: number; volumeMultiplier: number; rirShift: number; deload: boolean } | undefined =>
+  ar
+    ? {
+        topSetPctMultiplier: ar.topSetPctMultiplier,
+        volumeMultiplier: ar.volumeMultiplier,
+        rirShift: ar.rirShift,
+        deload: ar.deload,
+      }
+    : undefined;
 
 type Mode = 'pl' | 'bb' | 'manual';
 
@@ -87,8 +153,25 @@ const SMALL = TRAIN_SMALL;
 const ACCENT = 'var(--accent)';
 const BTN = TRAIN_BTN;
 const BTN_GHOST = TRAIN_BTN_GHOST;
-const PILL = (active: boolean) => ({ padding:'8px 14px', borderRadius:20, fontSize:11, fontWeight: active ? 800 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent) 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: active ? '#000' : '#fff', flexShrink:0, boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none' } as React.CSSProperties);
+const PILL = (active: boolean) =>
+  ({
+    padding: '8px 14px',
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: active ? 800 : 500,
+    cursor: 'pointer',
+    border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+    background: active ? 'linear-gradient(135deg,var(--accent) 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)',
+    color: active ? '#000' : '#fff',
+    flexShrink: 0,
+    boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+    backdropFilter: 'blur(8px)',
+    transition: 'all 0.2s ease',
+    transform: active ? 'translateY(-1px)' : 'none',
+  }) as React.CSSProperties;
 const IN = TRAIN_IN;
+/** P0-1: одноразовый вопрос о дате старта (после массового «съезда» дат). */
+const PL_MEET_DATE_PROMPT_KEY = 'he_pl_meet_date_prompt_v1';
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
 /** 6 групп Frequency Planner ← канонические мышцы volume-landmarks (без выдуманных цифр). */
@@ -105,10 +188,17 @@ function plToolGroupOf(group: string): 'chest' | 'back' | 'legs' | 'shoulders' |
 
 /** Русские подписи групп Frequency Planner (карточка была англоязычной в русском UI). */
 const PL_TOOL_GROUP_RU: Record<string, string> = {
-  chest: 'грудь', back: 'спина', legs: 'ноги', shoulders: 'плечи', arms: 'руки', core: 'кор',
+  chest: 'грудь',
+  back: 'спина',
+  legs: 'ноги',
+  shoulders: 'плечи',
+  arms: 'руки',
+  core: 'кор',
 };
 
-function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
+function getRecoveryMetrics(
+  linked: any,
+): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
   const settings = linked.profile?.settings as Record<string, any> | undefined;
   const weight = settings?.personal?.weight;
   const bodyFat = settings?.personal?.bodyFat;
@@ -124,8 +214,20 @@ function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanM
 export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) => {
   // Обёртка: предоставляет тапер-state (сезон/параметры/прикиды) через контекст —
   // SRCBBScreen и вкладка «🏁 Соревнования» читают его без пропс-дриллинга.
-  const _saved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
-  const _prof = (() => { try { return loadTrainingProfile(); } catch { return {} as ReturnType<typeof loadTrainingProfile>; } })();
+  const _saved: any = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('he_pl_session') || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const _prof = (() => {
+    try {
+      return loadTrainingProfile();
+    } catch {
+      return {} as ReturnType<typeof loadTrainingProfile>;
+    }
+  })();
   return (
     <PLTaperProvider saved={_saved} profBodyWeight={_prof.bodyWeight}>
       <SRCBBScreenInner {...props} />
@@ -133,11 +235,17 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
   );
 };
 
-const finiteAuto = (value: number | undefined, fallback: number): number => typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+const finiteAuto = (value: number | undefined, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-const normalizeSavedEdits = (raw: unknown): Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }> => {
+const normalizeSavedEdits = (
+  raw: unknown,
+): Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }> => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out: Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }> = {};
+  const out: Record<
+    string,
+    { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }
+  > = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!/^\d+_\d+_\d+_\d+$/.test(key) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
     const item = value as Record<string, unknown>;
@@ -151,22 +259,30 @@ const normalizeSavedEdits = (raw: unknown): Record<string, { weight?: number; re
   return out;
 };
 
-const normalizeSavedAdditions = (raw: unknown): Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]> => {
+const normalizeSavedAdditions = (
+  raw: unknown,
+): Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]> => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out: Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]> = {};
+  const out: Record<
+    string,
+    { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]
+  > = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!/^\d+_\d+$/.test(key) || !Array.isArray(value)) continue;
-    out[key] = value.filter(item => item && typeof item === 'object' && !Array.isArray(item)).map(item => {
-      const row = item as Record<string, unknown>;
-      return {
-        uid: typeof row.uid === 'string' ? row.uid.slice(0, 64) : '',
-        name: typeof row.name === 'string' ? row.name.slice(0, 120) : '',
-        group: typeof row.group === 'string' ? row.group.slice(0, 40) : '',
-        sets: Math.max(1, Math.min(20, Number(row.sets) || 1)),
-        reps: Math.max(0, Math.min(100, Number(row.reps) || 0)),
-        weight: Math.max(0, Math.min(2000, Number(row.weight) || 0)),
-      };
-    }).filter(item => item.uid && item.name);
+    out[key] = value
+      .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => {
+        const row = item as Record<string, unknown>;
+        return {
+          uid: typeof row.uid === 'string' ? row.uid.slice(0, 64) : '',
+          name: typeof row.name === 'string' ? row.name.slice(0, 120) : '',
+          group: typeof row.group === 'string' ? row.group.slice(0, 40) : '',
+          sets: Math.max(1, Math.min(20, Number(row.sets) || 1)),
+          reps: Math.max(0, Math.min(100, Number(row.reps) || 0)),
+          weight: Math.max(0, Math.min(2000, Number(row.weight) || 0)),
+        };
+      })
+      .filter((item) => item.uid && item.name);
   }
   return out;
 };
@@ -174,7 +290,16 @@ const normalizeSavedAdditions = (raw: unknown): Record<string, { uid: string; na
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['settings', '1 ⚙️ Настройки'], ['diagnostics', '2 🔧 Корректор движений'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [
+      ['settings', '1 ⚙️ Настройки'],
+      ['diagnostics', '2 🔧 Корректор движений'],
+      ['plan', '3 📋 План'],
+      ['charts', '4 📊 Графики'],
+      ['reference', '5 📚 Справка и отчёты'],
+      ['competition', '🏁 Соревнования'],
+      ['macro', '🗓 Годовой план'],
+      ['tools', '🔧 Инструменты'],
+    ].map(([k, l]) => ({ key: k, label: l })),
     // Фаза 2: BB/manual/bridge/peak_bb/methods/analytics/prometrics-ветки удалены —
     // SRCBBScreen монтируется только как track='pl' (PlannerPlAuto); ББ живёт в BbAutoConstructor.
     bb: [],
@@ -188,7 +313,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   }, [mainTab, subView]);
 
   // ── СРЦ ── (инициализация из сессии PL и единого профиля тренированности)
-  const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+  const _plSaved: any = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('he_pl_session') || 'null');
+    } catch {
+      return null;
+    }
+  })();
   const _profPL = loadTrainingProfile();
   const [level, setLevel] = useState<string>(_plSaved?.plLevel || 'II-KMS');
   const [goal, setGoal] = useState<string>(_plSaved?.plGoal || 'strength');
@@ -196,16 +327,24 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // State для MacrocyclePanel (редактируемые level/goal в годовом плане)
   const [macroLevel, setMacroLevel] = useState<string>(level);
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
-    track === 'bb' || dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'
+    track === 'bb' || dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting',
   );
   // 🏁 Тапер/пик в макроцикле ПЛ (применяется к peak/competition блокам).
   // P1-§4: настройки персистятся (раньше сбрасывались на дефолт после F5).
   // Контекст отдельный от циклового тапера (taper-state, дефолт 'pl') — у
   // макроцикла дефолт 'classic' (Bosquet); слияние меняло бы числа по умолчанию.
-  const [macroTaperMode, setMacroTaperMode] = useState<TaperMode>(() => validateSavedMacroTaperMode(_plSaved?.plMacroTaperMode));
-  const [macroWeightGoal, setMacroWeightGoal] = useState<TaperWeightGoal>(() => validateSavedMacroWeightGoal(_plSaved?.plMacroWeightGoal));
-  const [macroMockMeet, setMacroMockMeet] = useState<boolean>(() => validateSavedMacroBool(_plSaved?.plMacroMockMeet, true));
-  const [macroPostMeet, setMacroPostMeet] = useState<boolean>(() => validateSavedMacroBool(_plSaved?.plMacroPostMeet, true));
+  const [macroTaperMode, setMacroTaperMode] = useState<TaperMode>(() =>
+    validateSavedMacroTaperMode(_plSaved?.plMacroTaperMode),
+  );
+  const [macroWeightGoal, setMacroWeightGoal] = useState<TaperWeightGoal>(() =>
+    validateSavedMacroWeightGoal(_plSaved?.plMacroWeightGoal),
+  );
+  const [macroMockMeet, setMacroMockMeet] = useState<boolean>(() =>
+    validateSavedMacroBool(_plSaved?.plMacroMockMeet, true),
+  );
+  const [macroPostMeet, setMacroPostMeet] = useState<boolean>(() =>
+    validateSavedMacroBool(_plSaved?.plMacroPostMeet, true),
+  );
   // Keep the annual planner aligned with the active PL level when it changes
   // outside the annual-planning view (profile/session restore).
   useEffect(() => {
@@ -214,7 +353,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   useEffect(() => {
     // Годовой план в ББ-вкладке всегда строит ББ-макроцикл (4 фазы), иначе
     // панель строила ПЛ-макроцикл, а «Применить» не находило цикл в блоке.
-    setMacroGoal(mainTab === 'bb' ? 'bodybuilding' : (dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting'));
+    setMacroGoal(mainTab === 'bb' ? 'bodybuilding' : dir === 'bodybuilding' ? 'bodybuilding' : 'powerlifting');
   }, [dir, mainTab]);
   const [days, setDays] = useState<number>(_plSaved?.plDays ?? 3);
   const [pmSquat, setPmSquat] = useState<number>(_plSaved?.pmSquat ?? _profPL.pmSquat ?? 120);
@@ -222,20 +361,50 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [pmDead, setPmDead] = useState<number>(_plSaved?.pmDead ?? _profPL.pmDead ?? 140);
   // 🏁 Тапер-state (сезон/параметры/прикиды/mock/meet/пост/тапер-план) — из хука+контекста.
   const {
-    bw, setBw, targetBw, weeksToMeet,
-    taperWeeksToAdd, setTaperWeeksToAdd, attemptStrategy, setAttemptStrategy,
-    peakMode, setPeakMode, peakLayout, taperWeightGoal, setTaperWeightGoal,
-    taperFed, taperGear, taperActualPm, taperPlannedPm,
+    bw,
+    setBw,
+    targetBw,
+    weeksToMeet,
+    taperWeeksToAdd,
+    setTaperWeeksToAdd,
+    attemptStrategy,
+    setAttemptStrategy,
+    peakMode,
+    setPeakMode,
+    peakLayout,
+    taperWeightGoal,
+    setTaperWeightGoal,
+    taperFed,
+    taperGear,
+    taperActualPm,
+    taperPlannedPm,
     taperAttemptOverride,
-    mockMeetOn, setMockMeetOn, meetWeekOn, postMeetOn, setPostMeetOn,
-    taperNote, taperPlan, setTaperPlan,
-    meetList, setMeetList, mainMeetId, setMainMeetId,
-    peakCycleId, setPeakCycleId,
+    mockMeetOn,
+    setMockMeetOn,
+    meetWeekOn,
+    postMeetOn,
+    setPostMeetOn,
+    taperNote,
+    taperPlan,
+    setTaperPlan,
+    meetList,
+    setMeetList,
+    mainMeetId,
+    setMainMeetId,
+    peakCycleId,
+    setPeakCycleId,
   } = usePLTaper();
+  // P2-18: если сохранённый черновик тапера не прошёл валидацию при гидрации,
+  // первый прогон persist затирал его `null` — восстановить было нельзя.
+  // Отличаем «не читается» (не трогаем сохранённое) от «пользователь очистил».
+  const taperDraftUnreadableRef = useRef(_plSaved?.plTaperPlan != null && taperPlan === null);
   const [exercisePMs, setExercisePMs] = useState<Record<string, number>>(_plSaved?.exercisePMs ?? {});
   const initExercisePMs = (cycleId: string) => {
     const tpl = getCycleById(cycleId);
-    if (!tpl) { setExercisePMs({}); return; }
+    if (!tpl) {
+      setExercisePMs({});
+      return;
+    }
     const exs = extractExercises(tpl);
     const pm: Record<string, number> = {};
     // Реалистичная оценка ПМ для любого упражнения по коэффициентам от основных движений
@@ -243,59 +412,65 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const EST: [RegExp, number][] = [
       // ── Приседания ──
       [/присед/i, pmSquat],
-      [/гакк/i, pmSquat], [/жим ногами/i, Math.round(pmSquat * 1.3)], // Жим ногами: ~1.3× ПМ приседа (машина, иной диапазон) — не 1.5× (завышение)
+      [/гакк/i, pmSquat],
+      [/жим ногами/i, Math.round(pmSquat * 1.3)], // Жим ногами: ~1.3× ПМ приседа (машина, иной диапазон) — не 1.5× (завышение)
       // ── Жимовые ── (специфичные ДО общего жима)
       [/французский жим/i, Math.round(pmBench * 0.45)],
-      [/дожим/i, Math.round(pmBench * 1.15)],       // дожим с плинтов — «ПМ» больше жима (частичная амплитуда)
-      [/жим.*гантел/i, Math.round(pmBench * 0.70)],
+      [/дожим/i, Math.round(pmBench * 1.15)], // дожим с плинтов — «ПМ» больше жима (частичная амплитуда)
+      [/жим.*гантел/i, Math.round(pmBench * 0.7)],
       [/жим.*(наклон|гор)/i, Math.round(pmBench * 0.82)],
       [/жим.*средн/i, Math.round(pmBench * 0.92)],
       [/жим.*стоя/i, Math.round(pmBench * 0.65)],
-      [/жим.*блок/i, Math.round(pmBench * 0.30)],
+      [/жим.*блок/i, Math.round(pmBench * 0.3)],
       [/жим лежа/i, pmBench],
       [/жим/i, pmBench],
       // ── Тяговые ──
       [/становая/i, pmDead],
       [/тяга/i, pmDead],
-      [/наклон/i, Math.round(pmDead * 0.50)],
+      [/наклон/i, Math.round(pmDead * 0.5)],
       [/гиперэкстенз/i, Math.round(pmDead * 0.35)],
       // ── Спина ──
       [/подтягив/i, Math.round(pmBench * 0.65)],
-      [/пуловер/i, Math.round(pmBench * 0.40)],
+      [/пуловер/i, Math.round(pmBench * 0.4)],
       // ── Руки (трицепс/бицепс/предплечья) ──
       [/трицепс/i, Math.round(pmBench * 0.35)],
-      [/французский/i, Math.round(pmBench * 0.45)],   // самостоятельное имя без «жим»
+      [/французский/i, Math.round(pmBench * 0.45)], // самостоятельное имя без «жим»
       [/разгиб/i, Math.round(pmBench * 0.35)],
-      [/бицепс/i, Math.round(pmBench * 0.30)],
-      [/сгибан/i, Math.round(pmBench * 0.30)],
+      [/бицепс/i, Math.round(pmBench * 0.3)],
+      [/сгибан/i, Math.round(pmBench * 0.3)],
       [/молотк/i, Math.round(pmBench * 0.35)],
-      [/кисть/i, Math.round(pmBench * 0.20)],
+      [/кисть/i, Math.round(pmBench * 0.2)],
       [/концентрир/i, Math.round(pmBench * 0.25)],
       // ── Плечи ──
-      [/face.?pull|тяга.*лиц/i, Math.round(pmBench * 0.30)],
-      [/отведени/i, Math.round(pmBench * 0.20)],
+      [/face.?pull|тяга.*лиц/i, Math.round(pmBench * 0.3)],
+      [/отведени/i, Math.round(pmBench * 0.2)],
       [/кроссовер/i, Math.round(pmBench * 0.25)],
       // ── Пресс / кор ──
-      [/пресс/i, 0], [/скручив/i, 0],
+      [/пресс/i, 0],
+      [/скручив/i, 0],
       // ── Специфические для армрестлинга ──
       [/натяжк/i, Math.round(pmBench * 0.25)],
-      [/приведени/i, Math.round(pmBench * 0.20)],
+      [/приведени/i, Math.round(pmBench * 0.2)],
       [/имитаци/i, Math.round(pmBench * 0.25)],
-      [/боковой нажим/i, Math.round(pmBench * 0.30)],
-      [/отведение сб/i, Math.round(pmBench * 0.20)],
+      [/боковой нажим/i, Math.round(pmBench * 0.3)],
+      [/отведение сб/i, Math.round(pmBench * 0.2)],
     ];
     for (const name of exs) {
       const n = name.toLowerCase();
       let found = false;
       for (const [re, val] of EST) {
-        if (re.test(n)) { pm[name] = val; found = true; break; }
+        if (re.test(n)) {
+          pm[name] = val;
+          found = true;
+          break;
+        }
       }
       if (!found) pm[name] = 80; // fallback для неизвестных упражнений
     }
-    setExercisePMs(prev => ({ ...pm, ...prev }));
+    setExercisePMs((prev) => ({ ...pm, ...prev }));
   };
   const setExPM = (name: string, val: number) => {
-    setExercisePMs(prev => ({ ...prev, [name]: val }));
+    setExercisePMs((prev) => ({ ...prev, [name]: val }));
   };
   const [selectedCycleId, setSelectedCycleId] = useState<string>(() => {
     const saved = _plSaved?.selectedCycleId;
@@ -313,16 +488,41 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [calendarView, setCalendarView] = useState<'original' | 'tapered'>('tapered');
   const validateSavedSrc = (plan: any): LMSBuildOutput | null => {
     if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
-    if (!plan.template || typeof plan.template !== 'object' || !plan.template.meta || typeof plan.template.meta.id !== 'string') return null;
+    if (
+      !plan.template ||
+      typeof plan.template !== 'object' ||
+      !plan.template.meta ||
+      typeof plan.template.meta.id !== 'string'
+    )
+      return null;
     if (!plan.weeks.every((week: any) => week && Number.isFinite(week.week) && Array.isArray(week.days))) return null;
-    if (!plan.weeks.every((week: any) => week.days.every((day: any) => day && Array.isArray(day.exercises)
-      && day.exercises.every((exercise: any) => exercise && typeof exercise.name === 'string' && Array.isArray(exercise.workSets)
-        && exercise.workSets.every((set: any) => set && Number.isFinite(set.weight) && Number.isFinite(set.reps) && Number.isFinite(set.sets)))))) return null;
+    if (
+      !plan.weeks.every((week: any) =>
+        week.days.every(
+          (day: any) =>
+            day &&
+            Array.isArray(day.exercises) &&
+            day.exercises.every(
+              (exercise: any) =>
+                exercise &&
+                typeof exercise.name === 'string' &&
+                Array.isArray(exercise.workSets) &&
+                exercise.workSets.every(
+                  (set: any) =>
+                    set && Number.isFinite(set.weight) && Number.isFinite(set.reps) && Number.isFinite(set.sets),
+                ),
+            ),
+        ),
+      )
+    )
+      return null;
     return plan as LMSBuildOutput;
   };
   const [builtSrc, setBuiltSrc] = useState<LMSBuildOutput | null>(() => validateSavedSrc(_plSaved?.builtSrc));
   const [srcWeek, setSrcWeek] = useState<number>(_plSaved?.srcWeek ?? 1);
-  const [srcAdditions, setSrcAdditions] = useState<Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>>(normalizeSavedAdditions(_plSaved?.srcAdditions));
+  const [srcAdditions, setSrcAdditions] = useState<
+    Record<string, { uid: string; name: string; group: string; sets: number; reps: number; weight: number }[]>
+  >(normalizeSavedAdditions(_plSaved?.srcAdditions));
   // 🔋 Делод по кнопке пользователя (мост kind 'deload'): конфиг персистится и
   // переприменяется при каждой сборке плана — показано = вставлено = уехало в печать.
   type PLDeloadCfg = Required<Pick<PLDeloadRequest, 'volumeMult' | 'rirShift' | 'weeks'>>;
@@ -331,7 +531,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!raw || typeof raw !== 'object') return null;
     const vol = Number(raw.volumeMult);
     const rir = Number(raw.rirShift);
-    const weeks = Array.isArray(raw.weeks) ? raw.weeks.map(Number).filter(n => Number.isFinite(n) && n > 0) : [];
+    const weeks = Array.isArray(raw.weeks) ? raw.weeks.map(Number).filter((n) => Number.isFinite(n) && n > 0) : [];
     if (!Number.isFinite(vol) || !Number.isFinite(rir)) return null;
     return { volumeMult: Math.min(1, Math.max(0.2, vol)), rirShift: Math.min(6, Math.max(0, Math.round(rir))), weeks };
   });
@@ -341,11 +541,21 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const v = (_plSaved as Record<string, unknown> | null)?.plDiagnosticWeakSide;
     return v === 'left' || v === 'right' ? v : null;
   });
-  const [srcEdits, setSrcEdits] = useState<Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>>(normalizeSavedEdits(_plSaved?.srcEdits));
+  const [srcEdits, setSrcEdits] = useState<
+    Record<string, { weight?: number; reps?: number; sets?: number; tempo?: string; pct?: number; rir?: number }>
+  >(normalizeSavedEdits(_plSaved?.srcEdits));
   const [autoRegMode, setAutoRegMode] = useState<AutoRegMode>(() => {
     const saved = _plSaved?.autoRegMode;
     return saved === 'auto' || saved === 'diary' ? saved : 'off';
   });
+  /**
+   * P0-4 (аудит 2026-11): авторегуляция НЕ применяется молча при каждой сборке.
+   * Режим «Авто» — предпросмотр; множители применяются к плану ровно один раз,
+   * когда пользователь нажимает «Применить» (конфиг живёт в he_pl_session).
+   */
+  const [autoRegCfg, setAutoRegCfg] = useState<PLAutoRegCfg | null>(() =>
+    parsePLAutoRegCfg((_plSaved as Record<string, unknown> | null)?.plAutoRegCfg),
+  );
   // Авторегуляция ПРОГРЕССИИ ПМ (только ПМ) — независимая ось от авторегуляции весов/объёма/RIR.
   // Персистится вместе с остальной ПЛ-сессией (аудит 2026-11, P1-3): раньше режим
   // сбрасывался в 'off' после перезагрузки, и план собирался по-другому.
@@ -359,45 +569,160 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   });
   useEffect(() => {
     if (!builtSrc) return;
-    setSrcWeek(current => Math.max(1, Math.min(builtSrc.weeks.length, current)));
+    setSrcWeek((current) => Math.max(1, Math.min(builtSrc.weeks.length, current)));
   }, [builtSrc]);
   // P0-2: merge-запись сессии — не теряем независимые ключи (season из PLSeasonBuilder,
   // peds/pedDoses/courseIntensity, taper-черновики, deload-конфиг).
-  useEffect(() => { try {
-    const raw = localStorage.getItem('he_pl_session');
-    const prev = raw ? JSON.parse(raw) : null;
-    const base = prev && typeof prev === 'object' && !Array.isArray(prev) ? prev as Record<string, unknown> : {};
-    // P2-1: черновики тапера — plan (карточка/печать/встройка после F5) и
-    // attemptOverride. Размер плана капнут: слишком большой не перезаписываем
-    // (в base остаётся прежний) — с честной заметкой, null — очистка (сброс сборки).
-    const taperDraft: Record<string, unknown> = { plTaperAttemptOverride: taperAttemptOverride };
-    const taperPlanJson = taperPlan ? JSON.stringify(taperPlan) : '';
-    if (taperPlan === null) taperDraft.plTaperPlan = null;
-    else if (taperPlanJson.length <= TAPER_PLAN_PERSIST_MAX_CHARS) taperDraft.plTaperPlan = taperPlan;
-    else setMethodNote(`⚠ Тапер-план слишком большой (${Math.round(taperPlanJson.length / 1024)} КБ > ${Math.round(TAPER_PLAN_PERSIST_MAX_CHARS / 1024)} КБ) — не сохранён; при перезагрузке останется прошлый.`);
-    localStorage.setItem('he_pl_session', JSON.stringify({
-      ...base,
-      ...taperDraft,
-             selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, plLevel: level, plGoal: goal, plDir: dir, plBw: bw, plDays: days, pmSquat, pmBench, pmDead, exercisePMs, plTargetBw: targetBw, plWeeksToMeet: weeksToMeet, plTaperWeeksToAdd: taperWeeksToAdd, plTaperNote: taperNote, plAttemptStrategy: attemptStrategy, plMockMeet: mockMeetOn, plMeetWeek: meetWeekOn, plPostMeetOn: postMeetOn, plTaperFed: taperFed, plTaperGear: taperGear, plTaperActualPm: taperActualPm, plTaperPlannedPm: taperPlannedPm, plPeakMode: peakMode, plTaperWeightGoal: taperWeightGoal, plPeakLayout: peakLayout, plMeetList: meetList, plMainMeetId: mainMeetId, plPeakCycleId: peakCycleId,
-      plDeloadCfg, plDiagnosticWeakSide: diagnosticWeakSide,
-      plMacroTaperMode: macroTaperMode, plMacroWeightGoal: macroWeightGoal, plMacroMockMeet: macroMockMeet, plMacroPostMeet: macroPostMeet,
-      plPmAutoRegMode: pmAutoRegMode, plPeriodizationMode: periodizationMode,
-    }));
-  } catch { /* ignore */ } }, [selectedCycleId, cycleWeeks, srcWeek, builtSrc, srcEdits, srcAdditions, autoRegMode, level, goal, dir, bw, days, pmSquat, pmBench, pmDead, exercisePMs, targetBw, weeksToMeet, taperWeeksToAdd, taperNote, attemptStrategy, mockMeetOn, meetWeekOn, postMeetOn, taperFed, taperGear, taperActualPm, taperPlannedPm, peakMode, taperWeightGoal, peakLayout, meetList, mainMeetId, peakCycleId, plDeloadCfg, diagnosticWeakSide, taperPlan, taperAttemptOverride, macroTaperMode, macroWeightGoal, macroMockMeet, macroPostMeet, pmAutoRegMode, periodizationMode]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_pl_session');
+      const prev = raw ? JSON.parse(raw) : null;
+      const base = prev && typeof prev === 'object' && !Array.isArray(prev) ? (prev as Record<string, unknown>) : {};
+      // P2-1: черновики тапера — plan (карточка/печать/встройка после F5) и
+      // attemptOverride. Размер плана капнут: слишком большой не перезаписываем
+      // (в base остаётся прежний) — с честной заметкой, null — очистка (сброс сборки).
+      const taperDraft: Record<string, unknown> = { plTaperAttemptOverride: taperAttemptOverride };
+      const taperPlanJson = taperPlan ? JSON.stringify(taperPlan) : '';
+      if (taperPlan === null) {
+        // P2-18: битый черновик не затираем — только явную очистку пользователя.
+        if (!taperDraftUnreadableRef.current) taperDraft.plTaperPlan = null;
+      } else if (taperPlanJson.length <= TAPER_PLAN_PERSIST_MAX_CHARS) taperDraft.plTaperPlan = taperPlan;
+      else
+        setMethodNote(
+          `⚠ Тапер-план слишком большой (${Math.round(taperPlanJson.length / 1024)} КБ > ${Math.round(TAPER_PLAN_PERSIST_MAX_CHARS / 1024)} КБ) — не сохранён; при перезагрузке останется прошлый.`,
+        );
+      localStorage.setItem(
+        'he_pl_session',
+        JSON.stringify({
+          ...base,
+          ...taperDraft,
+          selectedCycleId,
+          cycleWeeks,
+          srcWeek,
+          builtSrc,
+          srcEdits,
+          srcAdditions,
+          autoRegMode,
+          plAutoRegCfg: autoRegCfg,
+          plLevel: level,
+          plGoal: goal,
+          plDir: dir,
+          plBw: bw,
+          plDays: days,
+          pmSquat,
+          pmBench,
+          pmDead,
+          exercisePMs,
+          plTargetBw: targetBw,
+          plWeeksToMeet: weeksToMeet,
+          plTaperWeeksToAdd: taperWeeksToAdd,
+          plTaperNote: taperNote,
+          plAttemptStrategy: attemptStrategy,
+          plMockMeet: mockMeetOn,
+          plMeetWeek: meetWeekOn,
+          plPostMeetOn: postMeetOn,
+          plTaperFed: taperFed,
+          plTaperGear: taperGear,
+          plTaperActualPm: taperActualPm,
+          plTaperPlannedPm: taperPlannedPm,
+          plPeakMode: peakMode,
+          plTaperWeightGoal: taperWeightGoal,
+          plPeakLayout: peakLayout,
+          plMeetList: meetList,
+          plMainMeetId: mainMeetId,
+          plPeakCycleId: peakCycleId,
+          plDeloadCfg,
+          plDiagnosticWeakSide: diagnosticWeakSide,
+          plMacroTaperMode: macroTaperMode,
+          plMacroWeightGoal: macroWeightGoal,
+          plMacroMockMeet: macroMockMeet,
+          plMacroPostMeet: macroPostMeet,
+          plPmAutoRegMode: pmAutoRegMode,
+          plPeriodizationMode: periodizationMode,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [
+    selectedCycleId,
+    cycleWeeks,
+    srcWeek,
+    builtSrc,
+    srcEdits,
+    srcAdditions,
+    autoRegMode,
+    autoRegCfg,
+    level,
+    goal,
+    dir,
+    bw,
+    days,
+    pmSquat,
+    pmBench,
+    pmDead,
+    exercisePMs,
+    targetBw,
+    weeksToMeet,
+    taperWeeksToAdd,
+    taperNote,
+    attemptStrategy,
+    mockMeetOn,
+    meetWeekOn,
+    postMeetOn,
+    taperFed,
+    taperGear,
+    taperActualPm,
+    taperPlannedPm,
+    peakMode,
+    taperWeightGoal,
+    peakLayout,
+    meetList,
+    mainMeetId,
+    peakCycleId,
+    plDeloadCfg,
+    diagnosticWeakSide,
+    taperPlan,
+    taperAttemptOverride,
+    macroTaperMode,
+    macroWeightGoal,
+    macroMockMeet,
+    macroPostMeet,
+    pmAutoRegMode,
+    periodizationMode,
+  ]);
   // 🏁 Единый реестр стартов (слияние Фазы 2): канон — he_pl_macro.competitions,
   // plMeetList — надстройка ПЛ (федерация/ПМ/стратегия). Гидрация при монтировании
   // и по событию годового плана; обратная запись — при правках стартов в ПЛ.
   const meetsHydratedRef = useRef(false);
   const macroMeetsJsonRef = useRef('');
   const registryEmptyRef = useRef(false);
+  // P0-1 (данные): дата старта в he_pl_macro уже «съехала» у всех, кто пользовался
+  // вкладкой (она пересчитывалась из countdown). Один раз спрашиваем, верна ли
+  // найденная дата; флаг ставится в любом случае, повторно не спрашиваем.
+  const meetDateAskOnceRef = useRef(false);
+  const [meetDateAsk, setMeetDateAsk] = useState<{ id: string; name: string; date: string } | null>(null);
+  const [meetDateFix, setMeetDateFix] = useState('');
   useEffect(() => {
     const applyMacroMeets = () => {
       try {
         const raw = localStorage.getItem('he_pl_macro');
-        if (!raw) { meetsHydratedRef.current = true; return; }
+        if (!raw) {
+          meetsHydratedRef.current = true;
+          return;
+        }
         const macro = deserializeMacro(raw);
-        if (!macro) { meetsHydratedRef.current = true; return; }
-        const sess = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
+        if (!macro) {
+          meetsHydratedRef.current = true;
+          return;
+        }
+        const sess = (() => {
+          try {
+            return JSON.parse(localStorage.getItem('he_pl_session') || 'null');
+          } catch {
+            return null;
+          }
+        })();
         const persistedMeets = Array.isArray(sess?.plMeetList) && sess.plMeetList.length > 0 ? sess.plMeetList : [];
         const legacyMain = typeof sess?.plMainMeetId === 'string' ? sess.plMainMeetId : '';
         if ((macro.competitions ?? []).length === 0 && persistedMeets.length === 0) {
@@ -424,7 +749,25 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           if (res.notes.length) setMethodNote('🏁 ' + res.notes.join(' · '));
           window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: next }));
         }
-      } catch { meetsHydratedRef.current = true; }
+        if (!meetDateAskOnceRef.current) {
+          meetDateAskOnceRef.current = true;
+          try {
+            if (!localStorage.getItem(PL_MEET_DATE_PROMPT_KEY)) {
+              const withDate = res.competitions.filter((c) => c.date && /^\d{4}-\d{2}-\d{2}/.test(c.date));
+              const mainEv = withDate.find((c) => c.id === res.mainMeetId) ?? withDate[0];
+              if (mainEv?.date) {
+                const iso = mainEv.date.slice(0, 10);
+                setMeetDateAsk({ id: mainEv.id, name: mainEv.name, date: iso });
+                setMeetDateFix(iso);
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        meetsHydratedRef.current = true;
+      }
     };
     applyMacroMeets();
     const handler = () => applyMacroMeets();
@@ -444,20 +787,67 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       if (!raw) return;
       const macro = deserializeMacro(raw);
       if (!macro) return;
-      const synced = syncCompetitionsFromMeets(macro.competitions ?? [], meetList, { mainMeetId, todayIso: isoToday() });
+      const synced = syncCompetitionsFromMeets(macro.competitions ?? [], meetList, {
+        mainMeetId,
+        todayIso: isoToday(),
+      });
       const sig = JSON.stringify(synced);
       if (sig === JSON.stringify(macro.competitions ?? []) || sig === macroMeetsJsonRef.current) return;
       macroMeetsJsonRef.current = sig;
       const next = serializeMacro({ ...macro, competitions: synced });
       localStorage.setItem('he_pl_macro', next);
       window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: next }));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [meetList, mainMeetId]);
+  // P0-1: фиксация ответа пользователя. Флаг выставляется в ЛЮБОМ случае
+  // (подтвердил / исправил / закрыл) — второй раз не спрашиваем.
+  const resolveMeetDateAsk = (id: string, iso: string | null) => {
+    try {
+      localStorage.setItem(PL_MEET_DATE_PROMPT_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+    setMeetDateAsk(null);
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+    try {
+      const today = isoToday();
+      const raw = localStorage.getItem('he_pl_macro');
+      const macro = raw ? deserializeMacro(raw) : null;
+      if (macro) {
+        const competitions = (macro.competitions ?? []).map((c) =>
+          c.id === id ? { ...c, date: iso, week: weeksToStartFromDate(iso, today) } : c,
+        );
+        const next = serializeMacro({ ...macro, competitions });
+        localStorage.setItem('he_pl_macro', next);
+        window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated', { detail: next }));
+      }
+      setMeetList((cur) =>
+        cur.map((m) => (m.id === id ? { ...m, weeksToStart: weeksToStartFromDate(iso, today) } : m)),
+      );
+      setMethodNote(`🏁 Дата старта исправлена: ${iso}.`);
+    } catch {
+      /* ignore */
+    }
+  };
+  // P1-9: сохранённая длина цикла (пользователь/макроплан) не должна перетираться
+  // длиной каталога на первом маунте. Каталог задаёт длину только при смене цикла
+  // и когда сохранённого значения нет.
+  const cycleWeeksHydratedRef = useRef(false);
   useEffect(() => {
     const cycle = getCycleById(selectedCycleId);
-    if (cycle) setCycleWeeks(originalCycleWeeks(cycle));
+    if (!cycle) return;
+    if (!cycleWeeksHydratedRef.current) {
+      cycleWeeksHydratedRef.current = true;
+      if (_plSaved?.cycleWeeks == null) setCycleWeeks(originalCycleWeeks(cycle));
+      return;
+    }
+    setCycleWeeks(originalCycleWeeks(cycle));
   }, [selectedCycleId]);
-  useEffect(() => { initExercisePMs(selectedCycleId); }, [selectedCycleId]);
+  useEffect(() => {
+    initExercisePMs(selectedCycleId);
+  }, [selectedCycleId]);
   // Deep-link из шаринга «Поделиться в ТГ»: маркер ставит App.tsx (hash #pl-plan-<cycleId>).
   // Выбираем цикл на вкладке ПЛ; если план в сессии от другого цикла — сбрасываем его.
   useEffect(() => {
@@ -470,52 +860,97 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       setMainTab('pl');
       setSubView('plan');
       if (_plSaved?.selectedCycleId !== cid) setBuiltSrc(null);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw }); } catch { /* ignore */ } }, [pmSquat, pmBench, pmDead, bw]);
+  useEffect(() => {
+    try {
+      saveTrainingProfile({ ...loadTrainingProfile(), pmSquat, pmBench, pmDead, bodyWeight: bw });
+    } catch {
+      /* ignore */
+    }
+  }, [pmSquat, pmBench, pmDead, bw]);
   // U4: ручная правка поверх сгенерированного плана (оверлей правок по позиции сета)
   const [editMode, setEditMode] = useState<boolean>(false);
   const setKey = (w: number, di: number, ei: number, si: number) => `${w}_${di}_${ei}_${si}`;
-  const effSet = (w: number, di: number, ei: number, si: number, ws: { sets: number; reps: number; weight: number; pct: number; rir?: number }, exerciseName?: string) => {
+  const effSet = (
+    w: number,
+    di: number,
+    ei: number,
+    si: number,
+    ws: { sets: number; reps: number; weight: number; pct: number; rir?: number },
+    exerciseName?: string,
+  ) => {
     const ed = srcEdits[setKey(w, di, ei, si)];
     const pct = ed?.pct != null && ed.pct > 0 ? ed.pct : ws.pct;
     // База пересчёта %→кг: сам подход, иначе ПМ упражнения. Деление на ws.pct=0
     // давало Infinity/NaN и «вес 0» в карточке (аудит 2026-11).
-    const pmBase = ws.pct > 0 ? ws.weight / ws.pct : (exerciseName ? (exercisePMs[exerciseName] ?? 0) : 0);
-    const editedWeight = ed?.pct != null && ed.pct > 0
-      ? (pmBase > 0 ? Math.round(pmBase * ed.pct * 10) / 10 : ws.weight)
-      : ed?.weight ?? ws.weight;
+    const pmBase = ws.pct > 0 ? ws.weight / ws.pct : exerciseName ? (exercisePMs[exerciseName] ?? 0) : 0;
+    const editedWeight =
+      ed?.pct != null && ed.pct > 0
+        ? pmBase > 0
+          ? Math.round(pmBase * ed.pct * 10) / 10
+          : ws.weight
+        : (ed?.weight ?? ws.weight);
     const diaryAdj = exerciseName && autoRegMode === 'diary' ? diaryAutoreg?.perExercise.get(exerciseName) : undefined;
-    const autoVol = autoRegMode === 'auto' ? finiteAuto(autoRegResult.volumeMultiplier, 1) : 1;
-    const autoWeight = autoRegMode === 'auto' ? finiteAuto(autoRegResult.topSetPctMultiplier, 1) : 1;
+    // P0-4: авторегуляция уже запечена в веса/подходы собранного плана (единственная
+    // точка — билдер по кнопке «Применить»). В режиме правки таблица считается от
+    // `builtSrc`, поэтому здесь множители НЕ применяются (иначе ×m²).
     const baseRir = ed?.rir ?? ws.rir ?? 2;
     const diaryRir = ed?.rir == null && diaryAdj ? diaryAdj.adjustedRir - baseRir : 0;
-    const autoRir = autoRegMode === 'auto' ? finiteAuto(autoRegResult.rirShift, 0) : 0;
-    const sets = Math.max(1, Math.round((ed?.sets ?? diaryAdj?.adjustedSets ?? ws.sets) * bridgeMult * autoVol));
-    const rir = Math.max(0, Math.min(6, peakAdjust ? peakAdjust.rirTarget : baseRir + bridgeRir + autoRir + diaryRir));
+    // P2-10: одна формула подходов на таблицу и эффективный план/плеер
+    // (`scaleSetCount` в lms-effective-plan). Делод уже запечён в builtSrc
+    // (applyPLDeload), мост добивает множителем объёма — ровно как в оверлее.
+    const sets = scaleSetCount(ed?.sets ?? diaryAdj?.adjustedSets ?? ws.sets, { volumeMultiplier: bridgeMult });
+    const rir = Math.max(0, Math.min(6, peakAdjust ? peakAdjust.rirTarget : baseRir + bridgeRir + diaryRir));
     const hasManualWeight = ed?.pct != null || ed?.weight != null;
-    const outputWeight = hasManualWeight ? editedWeight : diaryAdj?.adjustedWeight ?? editedWeight;
-    // Ручной вес — последнее слово: авторегуляция его не перемасштабирует.
-    return { sets, reps: ed?.reps ?? ws.reps, weight: hasManualWeight ? outputWeight : outputWeight * autoWeight, pct, rir };
+    const outputWeight = hasManualWeight ? editedWeight : (diaryAdj?.adjustedWeight ?? editedWeight);
+    return {
+      sets,
+      reps: ed?.reps ?? ws.reps,
+      weight: outputWeight,
+      pct,
+      rir,
+    };
   };
 
   // U5: добавление упражнений из каталога (536) в день плана
   const [pickerDay, setPickerDay] = useState<string | null>(null);
   const [pickerGroup, setPickerGroup] = useState<string>('chest');
   const [pickerExName, setPickerExName] = useState<string>('');
-  const [pickerScheme, setPickerScheme] = useState<{ sets: number; reps: number; weight: number }>({ sets: 3, reps: 8, weight: 40 });
+  const [pickerScheme, setPickerScheme] = useState<{ sets: number; reps: number; weight: number }>({
+    sets: 3,
+    reps: 8,
+    weight: 40,
+  });
   const dayKey = (w: number, di: number) => `${w}_${di}`;
   const addExToDay = (dk: string) => {
     if (!pickerExName) return;
-    setSrcAdditions(prev => ({ ...prev, [dk]: [...(prev[dk]||[]), { uid: 'add_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name: pickerExName, group: pickerGroup, sets: pickerScheme.sets, reps: pickerScheme.reps, weight: pickerScheme.weight }] }));
-    setPickerExName(''); setPickerDay(null);
+    setSrcAdditions((prev) => ({
+      ...prev,
+      [dk]: [
+        ...(prev[dk] || []),
+        {
+          uid: 'add_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          name: pickerExName,
+          group: pickerGroup,
+          sets: pickerScheme.sets,
+          reps: pickerScheme.reps,
+          weight: pickerScheme.weight,
+        },
+      ],
+    }));
+    setPickerExName('');
+    setPickerDay(null);
   };
 
-
-
   // ПЛ-авто работает ТОЛЬКО с силовыми циклами (бодибилдинг-циклы имеют свой экран track='bb')
-  const plCycles = useMemo(() => LMS_CYCLES.filter(c => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'), []);
+  const plCycles = useMemo(
+    () => LMS_CYCLES.filter((c) => normalizeCycleDirection(c.meta.direction) !== 'bodybuilding'),
+    [],
+  );
   // ── Фильтры каталога: автор / тип(период) / уровень. [] = все (по умолчанию) ──
   const [filterAuthors, setFilterAuthors] = useState<string[]>([]);
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
@@ -524,28 +959,46 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const map = new Map<string, number>();
     for (const c of plCycles) {
       const tags = c.meta.tags ?? ['lms'];
-      const key = tags.find(t => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
+      const key = tags.find((t) => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
       map.set(key, (map.get(key) ?? 0) + 1);
     }
-    const AUTHOR_LABELS: Record<string, string> = { lms: 'LMS', surovetsky: 'Суровецкий', sheiko: 'Шейко', solovyov: 'Соловьёв', muravyov: 'Муравьёв', coan: 'Коан', butenko: 'Бутенко', hatfield: 'Хэтфилд', mccullough: 'МакКаллоу', petrushin: 'Петрушин', verkhoshansky: 'Верхошанский', washington: 'Washington', muravjev: 'Муравьёв' };
-    return [...map.entries()].sort((a, b) => (AUTHOR_LABELS[a[0]] ?? a[0]).localeCompare(AUTHOR_LABELS[b[0]] ?? b[0], 'ru')).map(([id, count]) => ({ id, label: AUTHOR_LABELS[id] ?? id, count }));
+    const AUTHOR_LABELS: Record<string, string> = {
+      lms: 'LMS',
+      surovetsky: 'Суровецкий',
+      sheiko: 'Шейко',
+      solovyov: 'Соловьёв',
+      muravyov: 'Муравьёв',
+      coan: 'Коан',
+      butenko: 'Бутенко',
+      hatfield: 'Хэтфилд',
+      mccullough: 'МакКаллоу',
+      petrushin: 'Петрушин',
+      verkhoshansky: 'Верхошанский',
+      washington: 'Washington',
+      muravjev: 'Муравьёв',
+    };
+    return [...map.entries()]
+      .sort((a, b) => (AUTHOR_LABELS[a[0]] ?? a[0]).localeCompare(AUTHOR_LABELS[b[0]] ?? b[0], 'ru'))
+      .map(([id, count]) => ({ id, label: AUTHOR_LABELS[id] ?? id, count }));
   }, [plCycles]);
   const typeOptions = useMemo(() => {
     const order: string[] = ['strength', 'endurance', 'peak', 'mass', 'mixed'];
     const counts = new Map<string, number>();
     for (const c of plCycles) counts.set(c.meta.period, (counts.get(c.meta.period) ?? 0) + 1);
-    return [...counts.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(id => ({ id, label: periodLabelRu(id), count: counts.get(id) }));
+    return [...counts.keys()]
+      .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+      .map((id) => ({ id, label: periodLabelRu(id), count: counts.get(id) }));
   }, [plCycles]);
   const levelOptions = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of plCycles) counts.set(c.meta.level, (counts.get(c.meta.level) ?? 0) + 1);
-    return [...counts.keys()].sort().map(id => ({ id, label: id, count: counts.get(id) }));
+    return [...counts.keys()].sort().map((id) => ({ id, label: id, count: counts.get(id) }));
   }, [plCycles]);
   const filteredPlCycles = useMemo(() => {
-    return plCycles.filter(c => {
+    return plCycles.filter((c) => {
       if (filterAuthors.length > 0) {
         const tags = c.meta.tags ?? ['lms'];
-        const author = tags.find(t => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
+        const author = tags.find((t) => t !== 'bodybuilding' && t !== 'hypertrophy') ?? 'lms';
         if (!filterAuthors.includes(author)) return false;
       }
       if (filterTypes.length > 0 && !filterTypes.includes(c.meta.period)) return false;
@@ -554,12 +1007,20 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     });
   }, [plCycles, filterAuthors, filterTypes, filterLevels]);
   const hasActiveFilters = filterAuthors.length > 0 || filterTypes.length > 0 || filterLevels.length > 0;
-  const resetAllFilters = () => { setFilterAuthors([]); setFilterTypes([]); setFilterLevels([]); };
+  const resetAllFilters = () => {
+    setFilterAuthors([]);
+    setFilterTypes([]);
+    setFilterLevels([]);
+  };
   // Календарь задаёт ОРИГИНАЛ цикла (originalCycleWeeks), а не UI-длительность:
   // аргумент weeks отсюда убран (был тихим no-op, вводил в заблуждение).
   // Авто-тапер в faithful-сборке не применяется — он навешивается отдельно
   // кнопками вкладки «🏁 Соревнования» (appendPLTaperWeeks).
-  const buildSrc = (cycleId = selectedCycleId, deloadOverride?: PLDeloadCfg | null) => {
+  const buildSrc = (
+    cycleId = selectedCycleId,
+    deloadOverride?: PLDeloadCfg | null,
+    autoRegOverride?: PLAutoRegCfg | null,
+  ) => {
     const tpl = getCycleById(cycleId);
     if (!tpl) {
       // Раньше — тихий return: кнопка «Применить как активный цикл» молча
@@ -574,8 +1035,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!pmMap['Жим лежа']) pmMap['Жим лежа'] = pmBench;
     if (!pmMap['Становая тяга']) pmMap['Становая тяга'] = pmDead;
     const rec = getRecoveryMetrics(linked);
+    // P0-4: в план попадает только ПОДТВЕРЖДЁННАЯ авторегуляция (кнопка «Применить»
+    // на карточке авторегуляции), а не предпросмотр режима «Авто».
+    const effAutoReg = autoRegOverride === undefined ? autoRegCfg : autoRegOverride;
     const plan = buildLMSPlan({
-       template: tpl, pmMap, fallbackPm: 80, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural', courseIntensity, weeksOverride: safeWeeks, sourceChangeConsent: true, requireSourceChangeConsent: true,
+      template: tpl,
+      pmMap,
+      fallbackPm: 80,
+      mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+      courseIntensity,
+      weeksOverride: safeWeeks,
+      sourceChangeConsent: true,
+      requireSourceChangeConsent: true,
       volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
       focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
       currentReadiness: linked.readiness?.recovery,
@@ -584,61 +1055,72 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       plWeakPoints: plWeakPoints,
       weakGroupDayMap,
       plWeakPointDayMap,
-       weakGroupExerciseMap,
-            plWeakPointExerciseMap,
-            orthopedicBlockedPatterns,
-       diagnosticExerciseMap,
-       diagnosticDayMap,
-       diagnosticWeakSide,
-       limiterExerciseMap,
-       limiterProtocolMap,
-       limiterDayMap,
+      weakGroupExerciseMap,
+      plWeakPointExerciseMap,
+      orthopedicBlockedPatterns,
+      diagnosticExerciseMap,
+      diagnosticDayMap,
+      diagnosticWeakSide,
+      limiterExerciseMap,
+      limiterProtocolMap,
+      limiterDayMap,
       peds: peds.length ? peds : undefined,
       pedDoses,
       nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-       acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-       pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+      acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+      pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
       // Original SRC cycles are self-calculating: preserve their source layout
       // and apply the cycle's own PM correction between weeks.
       progressionEnabled: true,
       faithful: true,
       periodization: periodizationMode,
-      // Авторегуляция: 'auto' применяет рассчитанные множители к самому плану,
+      // Авторегуляция: только подтверждённый пользователем конфиг (P0-4).
       // 'diary' — только к runtime-показу SessionPlayer (в buildSrc не трогаем).
-      autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
+      autoReg: plAutoRegPayload(effAutoReg),
       ...rec,
     });
     // 🔋 Делод по кнопке пользователя: применяется к САМОМУ плану (таблица/печать/
     // графики видят одно), не только к runtime-показу SessionPlayer.
     const effDeload = deloadOverride === undefined ? plDeloadCfg : deloadOverride;
     const planOut = effDeload ? applyPLDeload(plan, { ...effDeload, currentWeek: srcWeek, level }).plan : plan;
-    setBuiltSrc(planOut); setSrcWeek(1); setSrcEdits({}); setEditMode(false); setPickerDay(null);
+    setBuiltSrc(planOut);
+    setSrcWeek(1);
+    setSrcEdits({});
+    setEditMode(false);
+    setPickerDay(null);
   };
 
   const buildSrcMacrocycle = (macro: Macrocycle, sourceChangeConsent = false) => {
-    const unsupported = macro.blocks.find(block => block.kind !== 'SRC');
+    const unsupported = macro.blocks.find((block) => block.kind !== 'SRC');
     if (unsupported) {
       throw new Error(`Фаза «${unsupported.phase}» не содержит доступного СРЦ-цикла для PL-плана`);
     }
     const rec = getRecoveryMetrics(linked);
     const outputs = macro.blocks
-      .map(block => {
-         const cycle = getCycleById(block.cycleId!);
-         if (!cycle) return null;
-         const sourceWeeks = originalCycleWeeks(cycle);
-         if (sourceWeeks !== block.weeks && !sourceChangeConsent) {
-           throw new Error(`Нужно согласие на изменение длины исходного цикла «${cycle.meta.title}» (${sourceWeeks}→${block.weeks} нед). Оригинал не изменён.`);
-         }
-         const output = buildLMSPlan({
+      .map((block) => {
+        const cycle = getCycleById(block.cycleId!);
+        if (!cycle) return null;
+        const sourceWeeks = originalCycleWeeks(cycle);
+        if (sourceWeeks !== block.weeks && !sourceChangeConsent) {
+          throw new Error(
+            `Нужно согласие на изменение длины исходного цикла «${cycle.meta.title}» (${sourceWeeks}→${block.weeks} нед). Оригинал не изменён.`,
+          );
+        }
+        const output = buildLMSPlan({
           template: cycle,
-          pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
+          pmMap: {
+            ...exercisePMs,
+            Присед: exercisePMs['Присед'] || pmSquat,
+            'Жим лежа': exercisePMs['Жим лежа'] || pmBench,
+            'Становая тяга': exercisePMs['Становая тяга'] || pmDead,
+          },
           fallbackPm: 80,
-           mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
-           courseIntensity,
-           weeksOverride: block.weeks,
-           progressionEnabled: true,
-           periodization: periodizationMode,
-           autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
+          mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+          courseIntensity,
+          weeksOverride: block.weeks,
+          progressionEnabled: true,
+          periodization: periodizationMode,
+          autoReg: plAutoRegPayload(autoRegCfg),
           volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
           focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
           currentReadiness: linked.readiness?.recovery,
@@ -647,24 +1129,25 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           plWeakPoints,
           weakGroupDayMap,
           plWeakPointDayMap,
-           weakGroupExerciseMap,
-            plWeakPointExerciseMap,
-            orthopedicBlockedPatterns,
-            diagnosticExerciseMap,
-            diagnosticDayMap,
-            diagnosticWeakSide,
-            limiterExerciseMap,
-            limiterProtocolMap,
-            limiterDayMap,
-           peds: peds.length ? peds : undefined,
-           pedDoses,
-           nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-            acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-             pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
-            faithful: true,
-             sourceChangeConsent: true,
-             requireSourceChangeConsent: true,
-             ...rec,
+          weakGroupExerciseMap,
+          plWeakPointExerciseMap,
+          orthopedicBlockedPatterns,
+          diagnosticExerciseMap,
+          diagnosticDayMap,
+          diagnosticWeakSide,
+          limiterExerciseMap,
+          limiterProtocolMap,
+          limiterDayMap,
+          peds: peds.length ? peds : undefined,
+          pedDoses,
+          nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+          acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+          pmAutoReg:
+            pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+          faithful: true,
+          sourceChangeConsent: true,
+          requireSourceChangeConsent: true,
+          ...rec,
         });
         const blockWeeks = Array.from({ length: block.weeks }, (_, index) => {
           const source = output.weeks[index % output.weeks.length];
@@ -674,22 +1157,31 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       })
       .filter((item): item is { block: Macrocycle['blocks'][number]; output: LMSBuildOutput } => item !== null);
     if (outputs.length === 0) throw new Error('В макроцикле нет доступных СРЦ-циклов');
-    const outputByBlock = new Map(outputs.map(item => [item.block, item.output]));
+    const outputByBlock = new Map(outputs.map((item) => [item.block, item.output]));
     // Честность: недели блоков без собственного цикла (соревновательные)
     // заполняются ближайшей тренировочной раскладкой — сообщаем в rationale.
     let reusedWeeks = 0;
     const weeks = Array.from({ length: macro.totalWeeks }, (_, index) => {
       const weekNumber = index + 1;
-      const block = macro.blocks.find(candidate => weekNumber >= candidate.weekOffset && weekNumber < candidate.weekOffset + candidate.weeks);
+      const block = macro.blocks.find(
+        (candidate) => weekNumber >= candidate.weekOffset && weekNumber < candidate.weekOffset + candidate.weeks,
+      );
       if (!block) throw new Error(`Неделя ${weekNumber} не покрыта макроциклом`);
       const output = outputByBlock.get(block);
       if (!output) reusedWeeks += 1;
       // Competition blocks intentionally have no cycleId. Reuse the nearest
       // training week so the annual result still contains a runnable week.
-      const sourceOutput = output ?? outputs.reduce((best, item) =>
-        Math.abs(item.block.weekOffset - weekNumber) < Math.abs(best.block.weekOffset - weekNumber) ? item : best,
-      outputs[0]).output;
-      const source = sourceOutput.weeks[(weekNumber - (output ? block.weekOffset : sourceOutput.weeks[0]?.week ?? 1)) % sourceOutput.weeks.length] ?? sourceOutput.weeks[0];
+      const sourceOutput =
+        output ??
+        outputs.reduce(
+          (best, item) =>
+            Math.abs(item.block.weekOffset - weekNumber) < Math.abs(best.block.weekOffset - weekNumber) ? item : best,
+          outputs[0],
+        ).output;
+      const source =
+        sourceOutput.weeks[
+          (weekNumber - (output ? block.weekOffset : (sourceOutput.weeks[0]?.week ?? 1))) % sourceOutput.weeks.length
+        ] ?? sourceOutput.weeks[0];
       return { ...source, week: weekNumber, macroPhase: block.phase };
     });
     if (weeks.length !== macro.totalWeeks || weeks.some((week, index) => week.week !== index + 1)) {
@@ -707,17 +1199,39 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       peakCycleId: peakCycleId ?? undefined,
     });
     const finalWeeks = taperRes.weeks;
-    const sessions = finalWeeks.flatMap(week => week.days.map(day => day.exercises.map(exercise => ({
-      name: exercise.name, group: exercise.group, coef: exercise.coef, mnosz: exercise.mnosz, pm: exercise.pm,
-      sets: exercise.workSets.map(set => ({ weight: set.weight, reps: set.reps, sets: set.sets })),
-    } as SRExercise))));
+    const sessions = finalWeeks.flatMap((week) =>
+      week.days.map((day) =>
+        day.exercises.map(
+          (exercise) =>
+            ({
+              name: exercise.name,
+              group: exercise.group,
+              coef: exercise.coef,
+              mnosz: exercise.mnosz,
+              pm: exercise.pm,
+              sets: exercise.workSets.map((set) => ({ weight: set.weight, reps: set.reps, sets: set.sets })),
+            }) as SRExercise,
+        ),
+      ),
+    );
     const first = outputs[0].output;
     const combined: LMSBuildOutput = {
       ...first,
       template: first.template,
       weeks: finalWeeks,
       cycleMetrics: calcCycleMetrics(sessions),
-      progressionRationale: `Макроцикл: ${ruCount(outputs.length, RU_BLOCKS)} СРЦ, ${ruCount(weeks.length, RU_WEEKS)}. ` + outputs.map(({ block, output }) => `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`).join('; ') + (reusedWeeks > 0 ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.` : '') + (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
+      progressionRationale:
+        `Макроцикл: ${ruCount(outputs.length, RU_BLOCKS)} СРЦ, ${ruCount(weeks.length, RU_WEEKS)}. ` +
+        outputs
+          .map(
+            ({ block, output }) =>
+              `${block.phase} ${block.weekOffset}-${block.weekOffset + block.weeks - 1}: ${output.template.meta.title}`,
+          )
+          .join('; ') +
+        (reusedWeeks > 0
+          ? ` ⚠ ${reusedWeeks} нед без собственного цикла (соревновательные блоки) — использована ближайшая тренировочная раскладка.`
+          : '') +
+        (taperRes.notes.length > 0 ? ' 🏁 ' + taperRes.notes.join(' ') : ''),
     };
     // 🔋 Делод по кнопке — и на макроцикловом пути (недели могут не совпасть:
     // pickDeloadWeeks сам честно пропустит отсутствующие/защищённые).
@@ -734,18 +1248,35 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
   // ── 🧠 Тренерский слой (lms-taper-coach.engine): контекст спортсмена + подбор ──
   /** MC-5: контекст правки микроцикла блока годового плана (записан MacrocyclePanel). */
-  const getMacroEditCtx = (): { isBB: boolean; cycleId: string; weeks: number; phase: string; blockIdx: number } | null => {
+  const getMacroEditCtx = (): {
+    isBB: boolean;
+    cycleId: string;
+    weeks: number;
+    phase: string;
+    blockIdx: number;
+  } | null => {
     try {
       const raw = JSON.parse(localStorage.getItem('he_macro_edit_ctx') || 'null');
       if (!raw || typeof raw !== 'object') return null;
-      return { isBB: !!raw.isBB, cycleId: String(raw.cycleId ?? ''), weeks: Number(raw.weeks ?? 0), phase: String(raw.phase ?? ''), blockIdx: Number(raw.blockIdx ?? -1) };
-    } catch { return null; }
+      return {
+        isBB: !!raw.isBB,
+        cycleId: String(raw.cycleId ?? ''),
+        weeks: Number(raw.weeks ?? 0),
+        phase: String(raw.phase ?? ''),
+        blockIdx: Number(raw.blockIdx ?? -1),
+      };
+    } catch {
+      return null;
+    }
   };
 
   const saveMacroEdit = () => {
     try {
       const ctx = getMacroEditCtx();
-      if (!ctx) { setMethodNote('⚠ Контекст правки не найден — нажмите «✏️ Редактировать микроцикл» в блоке'); return; }
+      if (!ctx) {
+        setMethodNote('⚠ Контекст правки не найден — нажмите «✏️ Редактировать микроцикл» в блоке');
+        return;
+      }
       // Сохраняем фактическую длительность, выбранную в текущем конструкторе,
       // а не исходное значение блока из he_macro_edit_ctx.
       // P2-8 (Aug 18 2026): единый кламп 1-52 для ПЛ и ББ (раньше ББ 4-24, ПЛ 1-∞ —
@@ -754,28 +1285,64 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const blockIdx = ctx.blockIdx;
       if (ctx.isBB) {
         const raw = localStorage.getItem('he_bb_macro');
-        if (!raw) { setMethodNote('⚠ BB-макроцикл не найден'); return; }
+        if (!raw) {
+          setMethodNote('⚠ BB-макроцикл не найден');
+          return;
+        }
         const macro = deserializeBbMacro(raw);
-        if (!macro) { setMethodNote('⚠ BB-макроцикл повреждён'); return; }
-        const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
-        if (!target) { setMethodNote('⚠ Блок BB-макроцикла не найден'); return; }
-        if (weeks === target.weeks) { setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе'); return; }
-        const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
+        if (!macro) {
+          setMethodNote('⚠ BB-макроцикл повреждён');
+          return;
+        }
+        const target =
+          blockIdx >= 0 && blockIdx < macro.blocks.length
+            ? macro.blocks[blockIdx]
+            : macro.blocks.find((b) => b.phase === ctx.phase);
+        if (!target) {
+          setMethodNote('⚠ Блок BB-макроцикла не найден');
+          return;
+        }
+        if (weeks === target.weeks) {
+          setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе');
+          return;
+        }
+        const phaseTotal = macro.blocks.filter((b) => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
         const next = rebalanceBbMacrocycle(macro, { [target.phase]: Math.max(1, phaseTotal + (weeks - target.weeks)) });
         localStorage.setItem('he_bb_macro', serializeBbMacro(next));
       } else {
         const raw = localStorage.getItem('he_pl_macro');
-        if (!raw) { setMethodNote('⚠ ПЛ-макроцикл не найден'); return; }
+        if (!raw) {
+          setMethodNote('⚠ ПЛ-макроцикл не найден');
+          return;
+        }
         const macro = deserializeMacro(raw);
-        if (!macro) { setMethodNote('⚠ ПЛ-макроцикл повреждён'); return; }
-        const target = (blockIdx >= 0 && blockIdx < macro.blocks.length) ? macro.blocks[blockIdx] : macro.blocks.find(b => b.phase === ctx.phase);
-        if (!target) { setMethodNote('⚠ Блок ПЛ-макроцикла не найден'); return; }
-        if (weeks === target.weeks) { setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе'); return; }
-        const phaseTotal = macro.blocks.filter(b => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
-        const next = rebalanceMacrocycle(macro, [{ phase: target.phase, weeks: Math.max(1, phaseTotal + (weeks - target.weeks)) }]);
+        if (!macro) {
+          setMethodNote('⚠ ПЛ-макроцикл повреждён');
+          return;
+        }
+        const target =
+          blockIdx >= 0 && blockIdx < macro.blocks.length
+            ? macro.blocks[blockIdx]
+            : macro.blocks.find((b) => b.phase === ctx.phase);
+        if (!target) {
+          setMethodNote('⚠ Блок ПЛ-макроцикла не найден');
+          return;
+        }
+        if (weeks === target.weeks) {
+          setMethodNote('⚠ Недель не изменилось — задайте другую длительность в конструкторе');
+          return;
+        }
+        const phaseTotal = macro.blocks.filter((b) => b.phase === target.phase).reduce((s, b) => s + b.weeks, 0);
+        const next = rebalanceMacrocycle(macro, [
+          { phase: target.phase, weeks: Math.max(1, phaseTotal + (weeks - target.weeks)) },
+        ]);
         localStorage.setItem('he_pl_macro', serializeMacro(next));
       }
-      try { localStorage.removeItem('he_macro_edit_ctx'); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem('he_macro_edit_ctx');
+      } catch {
+        /* ignore */
+      }
       window.dispatchEvent(new CustomEvent('he-pl-macrocycle-updated'));
       window.dispatchEvent(new CustomEvent('he-bb-macrocycle-updated'));
       window.dispatchEvent(new CustomEvent('he-annual-training-plan-updated'));
@@ -790,9 +1357,23 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const ctx = getMacroEditCtx();
     if (!ctx || (mainTab === 'bb') !== ctx.isBB) return null;
     return (
-      <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          marginBottom: 10,
+          padding: '10px 12px',
+          borderRadius: 12,
+          background: 'rgba(0,230,138,0.06)',
+          border: '1px solid rgba(0,230,138,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, minWidth: 0 }}>
-          ✏️ Правка блока годового плана: {ctx.weeks} нед · фаза «{ctx.phase}»{!ctx.isBB && ctx.cycleId ? ` · цикл «${getCycleById(ctx.cycleId)?.meta.title ?? ctx.cycleId}»` : ''}
+          ✏️ Правка блока годового плана: {ctx.weeks} нед · фаза «{ctx.phase}»
+          {!ctx.isBB && ctx.cycleId ? ` · цикл «${getCycleById(ctx.cycleId)?.meta.title ?? ctx.cycleId}»` : ''}
           <div style={{ fontSize: 10, color: '#fff' }}>
             {ctx.isBB
               ? 'Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».'
@@ -800,8 +1381,29 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          {ctx.isBB && <button type="button" onClick={saveMacroEdit} style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>💾 Сохранить в годовой план</button>}
-          <button type="button" onClick={() => { try { localStorage.removeItem('he_macro_edit_ctx'); } catch { /* ignore */ } setSubView('macro'); }} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>✕ Отменить</button>
+          {ctx.isBB && (
+            <button
+              type="button"
+              onClick={saveMacroEdit}
+              style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}
+            >
+              💾 Сохранить в годовой план
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                localStorage.removeItem('he_macro_edit_ctx');
+              } catch {
+                /* ignore */
+              }
+              setSubView('macro');
+            }}
+            style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, padding: '6px 12px' }}
+          >
+            ✕ Отменить
+          </button>
         </div>
       </div>
     );
@@ -813,8 +1415,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       fatigue: linked.readiness?.fatigue ?? 30,
       acwr: acwrData,
       recentSessions: loadSRPESessions(),
-      // Канон недель: старт в неделе N = начало недели N (today + (N−1)×7).
-      meetDate: dateFromWeeksToStart(Math.max(1, Math.round(weeksToMeet || 1)), isoToday()),
+      // P2-3: канон даты старта — день соревнования (конец недели N), а не её начало.
+      meetDate: meetDayFromWeeksToStart(Math.max(1, Math.round(weeksToMeet || 1)), isoToday()),
       currentWeight: bw,
       targetWeight: targetBw,
       actualPm: Object.fromEntries(Object.entries(taperActualPm).filter(([, v]) => v > 0)),
@@ -822,7 +1424,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // База прогноза — ПМ НАЧАЛА блока (текущий), а не последней недели:
       // последняя неделя уже спрогнозирована, и движок продлевает базу темпом
       // до старта → двойной счёт «план достижим» при отставании (аудит 2026-11).
-      forecastPm: (builtSrc?.weeks[0]?.pmRow ?? lastWk?.pmRow) ?? undefined,
+      forecastPm: builtSrc?.weeks[0]?.pmRow ?? lastWk?.pmRow ?? undefined,
       weeksToMeet,
       weeklyK: builtSrc?.template?.meta?.correctionPct ?? 0.005,
     };
@@ -838,29 +1440,75 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   };
 
   // ── BB ──
-  const _bbSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_bb_session') || 'null'); } catch { return null; } })();
+  const _bbSaved: any = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('he_bb_session') || 'null');
+    } catch {
+      return null;
+    }
+  })();
   const [bbLevel, setBbLevel] = useState<string>(_bbSaved?.bbLevel || 'intermediate');
   const [bbGoal, setBbGoal] = useState<string>(_bbSaved?.bbGoal || 'mass');
   const [bbDays, setBbDays] = useState<number>(_bbSaved?.bbDays ?? 4);
   const [bbWeeks, setBbWeeks] = useState<number>(_bbSaved?.bbWeeks ?? 4);
   const [bbVolGoal, setBbVolGoal] = useState<string>(_bbSaved?.bbVolGoal || 'mav');
   const [bbFocus, setBbFocus] = useState<string>(_bbSaved?.bbFocus || '');
-  const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(_bbSaved?.bbTrainingFocus || 'hypertrophy');
+  const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
+    _bbSaved?.bbTrainingFocus || 'hypertrophy',
+  );
   const [peds, setPeds] = useState<PED[]>(_bbSaved?.peds ?? (_profPL.onCourse ? (['AAS'] as PED[]) : []));
-  const [pedAuto, setPedAuto] = useState(_profPL.onCourse);
-  const [pedDoses, setPedDoses] = useState<Record<string, number>>(_plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
-  const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(_plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate');
+  // P2-16: режим авто-прогрессии ПМ персистится — раньше после перезагрузки
+  // возвращался профильный и план собирался по-другому без предупреждения.
+  // Миграция: нет ключа → значение из профиля.
+  const [pedAuto, setPedAuto] = useState<boolean>(() =>
+    typeof _plSaved?.plPedAuto === 'boolean' ? _plSaved.plPedAuto : _profPL.onCourse,
+  );
+  const [pedDoses, setPedDoses] = useState<Record<string, number>>(
+    _plSaved?.pedDoses ?? _bbSaved?.pedDoses ?? { AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 },
+  );
+  const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(
+    _plSaved?.courseIntensity ?? _profPL.courseIntensity ?? 'moderate',
+  );
   // 🥗 Питание (как в ББ-авто): профицит калорий и белок г/кг → MRV soft-cap (Helms 2022).
-  const [plCalorieSurplus, setPlCalorieSurplus] = useState<number>(() => Number((getProfile()?.settings?.nutrition as any)?.calorieSurplus ?? 0));
-  const [plProteinPerKg, setPlProteinPerKg] = useState<number>(() => Number((getProfile()?.settings?.nutrition as any)?.proteinPerKg ?? 1.8));
-  const ranked = useMemo(() => rankCycles({
-    goal: goal as any,
-    level: level as any,
-    bodyWeight: bw,
-    daysPerWeek: days,
-    direction: dir as any,
-    mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
-  }).filter(r => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'), [goal, level, bw, days, dir, pedAuto, peds.length]);
+  // P2-17: сохраняются в he_pl_session (приоритет над профилем) — иначе после
+  // перезагрузки MRV считался по профильным/дефолтным значениям.
+  const [plCalorieSurplus, setPlCalorieSurplus] = useState<number>(() =>
+    Number(_plSaved?.plCalorieSurplus ?? (getProfile()?.settings?.nutrition as any)?.calorieSurplus ?? 0),
+  );
+  const [plProteinPerKg, setPlProteinPerKg] = useState<number>(() =>
+    Number(_plSaved?.plProteinPerKg ?? (getProfile()?.settings?.nutrition as any)?.proteinPerKg ?? 1.8),
+  );
+  // Merge-запись: не затираем остальную ПЛ-сессию (она пишется большим эффектом ниже/выше).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_pl_session');
+      const cur = raw ? JSON.parse(raw) : null;
+      const base = cur && typeof cur === 'object' && !Array.isArray(cur) ? cur : {};
+      localStorage.setItem(
+        'he_pl_session',
+        JSON.stringify({
+          ...base,
+          plPedAuto: pedAuto,
+          plCalorieSurplus,
+          plProteinPerKg,
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [pedAuto, plCalorieSurplus, plProteinPerKg]);
+  const ranked = useMemo(
+    () =>
+      rankCycles({
+        goal: goal as any,
+        level: level as any,
+        bodyWeight: bw,
+        daysPerWeek: days,
+        direction: dir as any,
+        mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+      }).filter((r) => normalizeCycleDirection(r.cycle.meta.direction) !== 'bodybuilding'),
+    [goal, level, bw, days, dir, pedAuto, peds.length],
+  );
   const best = ranked[0];
   const [seasonNotes, setSeasonNotes] = useState<string[]>([]);
   const [seasonSegments, setSeasonSegments] = useState<SeasonBuildInfo[]>([]);
@@ -868,9 +1516,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     try {
       const s = JSON.parse(localStorage.getItem('he_pl_session') || '{}').season;
       return s && s.mode === 'season' ? 'season' : 'single';
-    } catch { return 'single'; }
+    } catch {
+      return 'single';
+    }
   });
-  useEffect(() => { try { const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}'); localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity })); } catch { /* ignore */ } }, [peds, pedDoses, courseIntensity]);
+  useEffect(() => {
+    try {
+      const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
+      localStorage.setItem('he_pl_session', JSON.stringify({ ...cur, peds, pedDoses, courseIntensity }));
+    } catch {
+      /* ignore */
+    }
+  }, [peds, pedDoses, courseIntensity]);
   const _validateBBPlan = (plan: any): BBPlan | null => {
     if (!plan || !Array.isArray(plan.weeks) || !plan.weeks.length) return null;
     return plan;
@@ -878,40 +1535,153 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [builtBb, setBuiltBb] = useState<BBPlan | null>(_validateBBPlan(_bbSaved?.builtBb));
   const [bbWeekSel, setBbWeekSel] = useState<number>(_bbSaved?.bbWeekSel ?? 1);
   const [weakPoints, setWeakPoints] = useState<string[]>(_profPL.weakPoints || []);
-  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), weakPoints }); } catch {} }, [weakPoints]);
+  useEffect(() => {
+    try {
+      saveTrainingProfile({ ...loadTrainingProfile(), weakPoints });
+    } catch {}
+  }, [weakPoints]);
   // 🎯 Слабые точки СРЦ-движений (профи-диагностика weakpoint-pl) — заполняются из единого калькулятора движения (PlDeadpointsBarPathCard, weakpoints-событие)
   const [plWeakPoints, setPlWeakPoints] = useState<{ lift: Lift; weakPoint: WeakPoint }[]>([]);
   // 📅 Ручной выбор дней недели для слабых групп и слабых точек (1-based)
-  const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>({});
-  const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>({});
-  const [weakGroupExerciseMap, setWeakGroupExerciseMap] = useState<Record<string, string[]>>({});
-   const [plWeakPointExerciseMap, setPlWeakPointExerciseMap] = useState<Record<string, string[]>>({});
-   const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>([]);
-  const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>({});
-  const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>({});
-   // 🧩 Калькулятор «Лимитирующие факторы движения» (limiter-событие): выбранные упражнения + категорийные протоколы.
-   const [limiterExerciseMap, setLimiterExerciseMap] = useState<Record<string, string[]>>({});
-   const [limiterProtocolMap, setLimiterProtocolMap] = useState<Record<string, { protocol: { sets: number; reps: number; pct: number; rir: number; tempo?: string; rest?: string; holdSec?: number; note?: string }; category: string }>>({});
-   const [limiterDayMap, setLimiterDayMap] = useState<Record<string, number[]>>({});
-  // Clear stale day selections when cycle changes (old cycle may have had different day count)
+  // P1-10: карты персистятся в he_pl_session (`plDayMaps`, с привязкой к циклу) —
+  // раньше после перезагрузки «группа слабая» оставалась, а выбранные дни/упражнения
+  // исчезали, и инъекции аксессуаров уходили не туда.
+  const _savedDayMaps: Record<string, any> = (() => {
+    try {
+      const m = (_plSaved as Record<string, any> | null)?.plDayMaps;
+      return m && typeof m === 'object' && m.cycleId === selectedCycleId ? m : {};
+    } catch {
+      return {};
+    }
+  })();
+  const [weakGroupDayMap, setWeakGroupDayMap] = useState<Record<string, number[]>>(
+    () => (_savedDayMaps.weakGroupDayMap as Record<string, number[]>) ?? {},
+  );
+  const [plWeakPointDayMap, setPlWeakPointDayMap] = useState<Record<string, number[]>>(
+    () => (_savedDayMaps.plWeakPointDayMap as Record<string, number[]>) ?? {},
+  );
+  const [weakGroupExerciseMap, setWeakGroupExerciseMap] = useState<Record<string, string[]>>(
+    () => (_savedDayMaps.weakGroupExerciseMap as Record<string, string[]>) ?? {},
+  );
+  const [plWeakPointExerciseMap, setPlWeakPointExerciseMap] = useState<Record<string, string[]>>(
+    () => (_savedDayMaps.plWeakPointExerciseMap as Record<string, string[]>) ?? {},
+  );
+  const [orthopedicBlockedPatterns, setOrthopedicBlockedPatterns] = useState<string[]>(
+    () => (_savedDayMaps.orthopedicBlockedPatterns as string[]) ?? [],
+  );
+  const [diagnosticExerciseMap, setDiagnosticExerciseMap] = useState<Record<string, string[]>>(
+    () => (_savedDayMaps.diagnosticExerciseMap as Record<string, string[]>) ?? {},
+  );
+  const [diagnosticDayMap, setDiagnosticDayMap] = useState<Record<string, number[]>>(
+    () => (_savedDayMaps.diagnosticDayMap as Record<string, number[]>) ?? {},
+  );
+  // 🧩 Калькулятор «Лимитирующие факторы движения» (limiter-событие): выбранные упражнения + категорийные протоколы.
+  const [limiterExerciseMap, setLimiterExerciseMap] = useState<Record<string, string[]>>(
+    () => (_savedDayMaps.limiterExerciseMap as Record<string, string[]>) ?? {},
+  );
+  const [limiterProtocolMap, setLimiterProtocolMap] = useState<
+    Record<
+      string,
+      {
+        protocol: {
+          sets: number;
+          reps: number;
+          pct: number;
+          rir: number;
+          tempo?: string;
+          rest?: string;
+          holdSec?: number;
+          note?: string;
+        };
+        category: string;
+      }
+    >
+  >(() => (_savedDayMaps.limiterProtocolMap as Record<string, any>) ?? {});
+  const [limiterDayMap, setLimiterDayMap] = useState<Record<string, number[]>>(
+    () => (_savedDayMaps.limiterDayMap as Record<string, number[]>) ?? {},
+  );
+  // Clear stale day selections when cycle changes (old cycle may have had different day count).
+  // P1-10: на первом маунте НЕ чистим — иначе гидрация из he_pl_session сразу стирается.
+  const dayMapsCycleRef = useRef<string | null>(null);
   useEffect(() => {
+    if (dayMapsCycleRef.current === null) {
+      dayMapsCycleRef.current = selectedCycleId;
+      return;
+    }
+    if (dayMapsCycleRef.current === selectedCycleId) return;
+    dayMapsCycleRef.current = selectedCycleId;
     setWeakGroupDayMap({});
     setPlWeakPointDayMap({});
     setWeakGroupExerciseMap({});
     setPlWeakPointExerciseMap({});
+    setDiagnosticExerciseMap({});
+    setDiagnosticDayMap({});
+    setLimiterExerciseMap({});
+    setLimiterProtocolMap({});
+    setLimiterDayMap({});
+    setOrthopedicBlockedPatterns([]);
   }, [selectedCycleId]);
+  // P1-10: персист карт (отдельная merge-запись, чтобы не раздувать основной эффект).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_pl_session');
+      const cur = raw ? JSON.parse(raw) : null;
+      const base = cur && typeof cur === 'object' && !Array.isArray(cur) ? cur : {};
+      localStorage.setItem(
+        'he_pl_session',
+        JSON.stringify({
+          ...base,
+          plDayMaps: {
+            cycleId: selectedCycleId,
+            weakGroupDayMap,
+            plWeakPointDayMap,
+            weakGroupExerciseMap,
+            plWeakPointExerciseMap,
+            orthopedicBlockedPatterns,
+            diagnosticExerciseMap,
+            diagnosticDayMap,
+            limiterExerciseMap,
+            limiterProtocolMap,
+            limiterDayMap,
+          },
+        }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [
+    selectedCycleId,
+    weakGroupDayMap,
+    plWeakPointDayMap,
+    weakGroupExerciseMap,
+    plWeakPointExerciseMap,
+    orthopedicBlockedPatterns,
+    diagnosticExerciseMap,
+    diagnosticDayMap,
+    limiterExerciseMap,
+    limiterProtocolMap,
+    limiterDayMap,
+  ]);
   // V7 расширение: тренд 1ПМ по выбранному упражнению
   const [selectedTrendEx, setSelectedTrendEx] = useState<string | null>(null);
   // 🔗 planner-bridge: приём корректировок от калькуляторов (ПМ/слабые точки/PRI/сплит)
   const [applyPayload, setApplyPayload] = useState<PlannerApply | null>(() => getPlannerApply());
   const [priAdjust, setPriAdjust] = useState<{ volumeMult: number; rirShift: number } | null>(null);
-  const [tempoAdjust, setTempoAdjust] = useState<{ eccentric: number; bottomPause: number; concentric: number; topPause: number; label?: string } | null>(null);
+  const [tempoAdjust, setTempoAdjust] = useState<{
+    eccentric: number;
+    bottomPause: number;
+    concentric: number;
+    topPause: number;
+    label?: string;
+  } | null>(null);
   const [rirShiftAdjust, setRirShiftAdjust] = useState<number>(0);
   const [mrvOverride, setMrvOverride] = useState<number | null>(null);
-  const [deloadAdjust, setDeloadAdjust] = useState<{ volumeMult: number; rirShift: number; weeks: number[] } | null>(null);
+  const [deloadAdjust, setDeloadAdjust] = useState<{ volumeMult: number; rirShift: number; weeks: number[] } | null>(
+    null,
+  );
   const [peakAdjust, setPeakAdjust] = useState<{ volumeMult: number; rirTarget: number } | null>(null);
   const pendingApplyRef = useRef<PlannerApply | null>(null);
-  useEffect(() => subscribePlannerApply(p => setApplyPayload(p)), []);
+  useEffect(() => subscribePlannerApply((p) => setApplyPayload(p)), []);
   // Авто-применение bridge: только НОВЫЕ события (не stale данные при монтировании)
   const mountedRef = useRef(false);
   useEffect(() => {
@@ -924,18 +1694,57 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         applyExternal(pending);
         return;
       }
-      clearPlannerApply(); setApplyPayload(null); return;
+      clearPlannerApply();
+      setApplyPayload(null);
+      return;
     }
     if (applyPayload) applyExternal();
   }, [applyPayload]);
   // производные от bridge-корректировок (видны в таблице плана ПЛ/ББ и в runtime)
-  const tempoStr = tempoAdjust ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}` : '';
-  const bridgeMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
+  const tempoStr = tempoAdjust
+    ? `${tempoAdjust.eccentric}-${tempoAdjust.bottomPause}-${tempoAdjust.concentric}-${tempoAdjust.topPause}`
+    : '';
+  const bridgeMult =
+    (priAdjust ? priAdjust.volumeMult : 1) *
+    (deloadAdjust ? deloadAdjust.volumeMult : 1) *
+    (peakAdjust ? peakAdjust.volumeMult : 1);
   const bridgeRir = (priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0);
-  const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({ chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60, ...(_profPL?.workMax || {}), ...(_bbSaved?.bbWorkMax || {}) });
-  useEffect(() => { try { localStorage.setItem('he_bb_session', JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus })); } catch { /* ignore */ } }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus]);
-  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax }); } catch { /* ignore */ } }, [bbWorkMax]);
-  useEffect(() => { try { saveTrainingProfile({ ...loadTrainingProfile(), onCourse: volumeRegimeOf({ peds }) === 'course' }); } catch {} }, [peds]);
+  const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>({
+    chest: 100,
+    back: 110,
+    quads: 140,
+    hamstrings: 90,
+    shoulders: 60,
+    biceps: 50,
+    triceps: 60,
+    glutes: 160,
+    calves: 120,
+    abs: 60,
+    ...(_profPL?.workMax || {}),
+    ...(_bbSaved?.bbWorkMax || {}),
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'he_bb_session',
+        JSON.stringify({ bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbWorkMax, bbTrainingFocus }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [bbLevel, bbGoal, bbDays, bbWeeks, peds, builtBb, bbWeekSel, bbTrainingFocus, bbWorkMax]);
+  useEffect(() => {
+    try {
+      saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax });
+    } catch {
+      /* ignore */
+    }
+  }, [bbWorkMax]);
+  useEffect(() => {
+    try {
+      saveTrainingProfile({ ...loadTrainingProfile(), onCourse: volumeRegimeOf({ peds }) === 'course' });
+    } catch {}
+  }, [peds]);
   const [methodNote, setMethodNote] = useState<string | null>(null);
   const linked = useDataLink();
   const diarySessions = useMemo(() => loadSessions(), []);
@@ -952,29 +1761,51 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const fat = linked.readiness?.fatigue ?? 30;
     const sleep = linked.readiness?.sleep ?? 70;
     const hrv = linked.profile?.settings?.baselineHrvRatio ?? 1.0;
-    return autoRegulate({ readiness: rec, acwr: { ratio: acwrData.ratio, zone: acwrData.zone }, fatigue: fat, hrvRatio: hrv, sleepScore: sleep, plannedTopSetPct: 0.85, plannedRIR: 2 });
+    return autoRegulate({
+      readiness: rec,
+      acwr: { ratio: acwrData.ratio, zone: acwrData.zone },
+      fatigue: fat,
+      hrvRatio: hrv,
+      sleepScore: sleep,
+      plannedTopSetPct: 0.85,
+      plannedRIR: 2,
+    });
   }, [linked.readiness, linked.profile?.settings, acwrData]);
   const diary = useMemo(() => new StrengthDiary(), []);
   const [historyWorkouts, setHistoryWorkouts] = useState<WorkoutLog[]>([]);
-  useEffect(() => { (async () => { try { const w = await diary.getWorkoutLogs(); setHistoryWorkouts(w.reverse()); } catch { /* ignore */ } })(); }, [diary]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const w = await diary.getWorkoutLogs();
+        setHistoryWorkouts(w.reverse());
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [diary]);
 
   // Diary-авторегуляция: per-exercise корректировка весов из последней сессии дневника
   const diaryAutoreg: DiaryAutoregResult | null = useMemo(() => {
     if (autoRegMode !== 'diary' || !builtSrc) return null;
     const wk = builtSrc.weeks[srcWeek - 1];
     if (!wk) return null;
-    const planned = wk.days.flatMap(d => d.exercises.map(e => {
-      // P1-fix: pick the highest-weight (working) work set, not workSets[0] which may be warmup.
-      const mainSet = e.workSets.reduce((best, ws) => (ws.weight ?? 0) > (best.weight ?? 0) ? ws : best, e.workSets[0] ?? ({} as typeof e.workSets[number]));
-      return {
-        name: e.name,
-        plannedWeight: mainSet?.weight ?? 0,
-        plannedReps: mainSet?.reps ?? 8,
-        plannedSets: mainSet?.sets ?? 3,
-        plannedRir: mainSet?.rir ?? 2,
-        isMain: e.load === 'Тяжелая',
-      };
-    }));
+    const planned = wk.days.flatMap((d) =>
+      d.exercises.map((e) => {
+        // P1-fix: pick the highest-weight (working) work set, not workSets[0] which may be warmup.
+        const mainSet = e.workSets.reduce(
+          (best, ws) => ((ws.weight ?? 0) > (best.weight ?? 0) ? ws : best),
+          e.workSets[0] ?? ({} as (typeof e.workSets)[number]),
+        );
+        return {
+          name: e.name,
+          plannedWeight: mainSet?.weight ?? 0,
+          plannedReps: mainSet?.reps ?? 8,
+          plannedSets: mainSet?.sets ?? 3,
+          plannedRir: mainSet?.rir ?? 2,
+          isMain: e.load === 'Тяжелая',
+        };
+      }),
+    );
     return buildDiaryAutoreg({ historyWorkouts, plannedExercises: planned });
   }, [autoRegMode, builtSrc, srcWeek, historyWorkouts]);
 
@@ -983,13 +1814,86 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     return applyPLEffectiveOverlay(builtSrc, {
       edits: srcEdits,
       additions: srcAdditions,
-      autoReg: autoRegMode === 'auto' ? autoRegResult : null,
-      diary: autoRegMode === 'diary' ? diaryAutoreg?.perExercise ?? null : null,
+      // P0-4: авторегуляция в плане УЖЕ применена билдером — одна точка применения
+      // (кнопка «Применить» + метка `autoRegApplied`). Повторное применение здесь
+      // давало −19 % вместо −10 % и ×m² по подходам/RIR.
+      autoReg: null,
+      diary: autoRegMode === 'diary' ? (diaryAutoreg?.perExercise ?? null) : null,
       volumeMultiplier: (priAdjust?.volumeMult ?? 1) * (deloadAdjust?.volumeMult ?? 1) * (peakAdjust?.volumeMult ?? 1),
       rirShift: bridgeRir,
       rirTarget: peakAdjust?.rirTarget,
     });
-  }, [builtSrc, srcEdits, srcAdditions, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, deloadAdjust, peakAdjust, bridgeRir]);
+  }, [
+    builtSrc,
+    srcEdits,
+    srcAdditions,
+    autoRegMode,
+    autoRegResult,
+    diaryAutoreg,
+    priAdjust,
+    deloadAdjust,
+    peakAdjust,
+    bridgeRir,
+  ]);
+
+  // ── P0-4: авторегуляция «по кнопке» ────────────────────────────────────────
+  // Режим «Авто» = предпросмотр множителей (готовность/ACWR). К плану они
+  // применяются ровно один раз — когда пользователь нажимает «Применить»:
+  // конфиг сохраняется в he_pl_session и уходит в билдер (там же метка autoRegApplied).
+  const applyAutoRegConfig = () => {
+    const payload = autoregPayload(autoRegResult);
+    if (!payload) {
+      setMethodNote(
+        '⚠ Нет данных готовности/ACWR — авторегуляцию применять не к чему: план остаётся по раскладке цикла.',
+      );
+      return;
+    }
+    // Разбор/клип — тот же, что при гидрации сохранённого конфига (не даём
+    // в план абсурдные множители, если движок вернул мусор).
+    const cfg = parsePLAutoRegCfg({
+      topSetPctMultiplier: finiteAuto(payload.topSetPctMultiplier, 1),
+      volumeMultiplier: finiteAuto(payload.volumeMultiplier, 1),
+      rirShift: finiteAuto(payload.rirShift, 0),
+      deload: payload.deload === true,
+      appliedAt: new Date().toISOString(),
+    });
+    if (!cfg) {
+      setMethodNote('⚠ Множители авторегуляции некорректны — план не изменён.');
+      return;
+    }
+    setAutoRegCfg(cfg);
+    if (builtSrc) {
+      try {
+        buildSrc(selectedCycleId, undefined, cfg);
+      } catch (error) {
+        setMethodNote(`⚠ План не пересобран: ${(error as Error).message}`);
+        return;
+      }
+    }
+    setMethodNote(
+      `🧠 Авторегуляция применена один раз: вес ×${cfg.topSetPctMultiplier.toFixed(2)}, объём ×${cfg.volumeMultiplier.toFixed(2)}, RIR +${cfg.rirShift}${cfg.deload ? ' · 🔴 делод' : ''}.`,
+    );
+  };
+  const resetAutoRegConfig = (silent = false) => {
+    setAutoRegCfg(null);
+    if (builtSrc) {
+      try {
+        buildSrc(selectedCycleId, undefined, null);
+      } catch {
+        /* остаётся прежний план — конфиг всё равно снят */
+      }
+    }
+    if (!silent) setMethodNote('🧠 Авторегуляция снята — план собран по раскладке цикла, без поправок готовности.');
+  };
+  // Смена режима: 'off' снимает зафиксированный конфиг (иначе он жил бы «в тени»
+  // и веса остались бы поправленными при выключенной авторегуляции).
+  const changeAutoRegMode = (mode: AutoRegMode) => {
+    setAutoRegMode(mode);
+    if (mode === 'off' && autoRegCfg) {
+      resetAutoRegConfig(true);
+      setMethodNote('🧠 Авторегуляция выключена — план пересобран без поправок готовности.');
+    }
+  };
 
   // Авторегуляция ПМ по дневнику: множитель кривой ПМ по e1RM vs плановый ПМ0.
   const pmDiary = useMemo(() => {
@@ -1001,38 +1905,57 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     return pmDiaryMultiplier({ historyWorkouts, pm0Map });
   }, [pmAutoRegMode, exercisePMs, pmSquat, pmBench, pmDead, historyWorkouts]);
 
-  const bbRanked = useMemo(() => rankBBSplits({
-    level: bbLevel,
-    goal: bbGoal as any,
-    daysPerWeek: bbDays,
-    // M2 (аудит женского слоя): без пола экран рекомендовал «Женский Glute
-    // Focus» всем подряд — теперь пол профиля доезжает до селектора.
-    sex: linked.profile?.settings?.personal?.sex,
-  }), [bbLevel, bbGoal, bbDays, linked.profile?.settings?.personal?.sex]);
+  const bbRanked = useMemo(
+    () =>
+      rankBBSplits({
+        level: bbLevel,
+        goal: bbGoal as any,
+        daysPerWeek: bbDays,
+        // M2 (аудит женского слоя): без пола экран рекомендовал «Женский Glute
+        // Focus» всем подряд — теперь пол профиля доезжает до селектора.
+        sex: linked.profile?.settings?.personal?.sex,
+      }),
+    [bbLevel, bbGoal, bbDays, linked.profile?.settings?.personal?.sex],
+  );
   const bbBest = bbRanked[0];
 
   const buildBb = async () => {
     if (!bbBest) return;
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
-    const nutrData = linked.profile?.settings?.nutrition as (Record<string, any> | undefined);
+    const nutrData = linked.profile?.settings?.nutrition as Record<string, any> | undefined;
     const bodyFat = profData?.bodyFat;
-    const leanMass = (profData?.weight && bodyFat != null) ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
+    const leanMass =
+      profData?.weight && bodyFat != null ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
     // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
     // Сборка идёт в воркере (bb-build-async), чтобы не морозить UI на ~0.2–1 с.
-    let plan: BBPlan = await buildBBPlanAsync({
-      patternId: bbBest.pattern.id, level: bbLevel, goal: bbGoal as any, weeks: bbWeeks,
-      workMax: bbWorkMax, weakPoints, focusGroup: bbFocus, volumeGoal: bbVolGoal as any,
-      trainingFocus: bbTrainingFocus,
-      bodyFat, leanMass, hrvMs: lifeData?.morningHRV, sleepHours: lifeData?.sleepHours, stressLevel: lifeData?.stressLevel,
-      // BB-4 FIX: pass PED parameters
-      pedDoses, courseIntensity,
-      // Profile parameters
-      sex: profData?.sex,
-      age: Number(profData?.age) || undefined,
-      proteinPerKg: nutrData?.proteinPerKg,
-      calorieSurplus: nutrData?.calorieSurplus ?? 0,
-    }, pedAdapt);
+    let plan: BBPlan = await buildBBPlanAsync(
+      {
+        patternId: bbBest.pattern.id,
+        level: bbLevel,
+        goal: bbGoal as any,
+        weeks: bbWeeks,
+        workMax: bbWorkMax,
+        weakPoints,
+        focusGroup: bbFocus,
+        volumeGoal: bbVolGoal as any,
+        trainingFocus: bbTrainingFocus,
+        bodyFat,
+        leanMass,
+        hrvMs: lifeData?.morningHRV,
+        sleepHours: lifeData?.sleepHours,
+        stressLevel: lifeData?.stressLevel,
+        // BB-4 FIX: pass PED parameters
+        pedDoses,
+        courseIntensity,
+        // Profile parameters
+        sex: profData?.sex,
+        age: Number(profData?.age) || undefined,
+        proteinPerKg: nutrData?.proteinPerKg,
+        calorieSurplus: nutrData?.calorieSurplus ?? 0,
+      },
+      pedAdapt,
+    );
     // 🏁 Единая система тапера ББ: оверлей на собранный план из профиля
     // (goals.bbPeakConfig с legacy-fallback) — накладывается СВЕРХУ цикла.
     try {
@@ -1040,44 +1963,50 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const rawCfg = goals?.bbPeakConfig;
       const prepCfg = rawCfg ? deserializeBBPrepConfig(rawCfg) : legacyConfigFromProfile(goals, profData);
       if (prepCfg) plan = applyTrainingTaperToBBPlan(plan, prepCfg);
-    } catch { /* оверлей не блокирует сборку */ }
-    setBuiltBb(plan); setBbWeekSel(1);
+    } catch {
+      /* оверлей не блокирует сборку */
+    }
+    setBuiltBb(plan);
+    setBbWeekSel(1);
   };
 
   const applyBBMacrocycle = async (macro: Macrocycle | BBMacrocycle) => {
     if (!bbBest) throw new Error('Не найден подходящий ББ-сплит');
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
-    const nutrData = linked.profile?.settings?.nutrition as (Record<string, any> | undefined);
+    const nutrData = linked.profile?.settings?.nutrition as Record<string, any> | undefined;
     const bodyFat = profData?.bodyFat;
-    const leanMass = (profData?.weight && bodyFat != null)
-      ? Math.round(profData.weight * (1 - bodyFat / 100))
-      : undefined;
+    const leanMass =
+      profData?.weight && bodyFat != null ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
     // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
     // Сборка — в воркере (bb-build-async): кнопка «применить макроцикл» не морозится.
-    const plan = await buildBBPlanAsync({
-      patternId: bbBest.pattern.id,
-      level: bbLevel,
-      goal: bbGoal as any,
-      weeks: macro.totalWeeks,
-      workMax: bbWorkMax,
-      weakPoints,
-      focusGroup: bbFocus,
-      volumeGoal: bbVolGoal as any,
-      trainingFocus: 'trainingFocus' in macro ? macro.trainingFocus : bbTrainingFocus,
-      bodyFat,
-      leanMass,
-      hrvMs: lifeData?.morningHRV,
-      sleepHours: lifeData?.sleepHours,
-      stressLevel: lifeData?.stressLevel,
-      // BB-4 FIX: pass PED parameters
-      pedDoses, courseIntensity,
-      // Profile parameters
-      sex: profData?.sex,
-      age: Number(profData?.age) || undefined,
-      proteinPerKg: nutrData?.proteinPerKg,
-      calorieSurplus: nutrData?.calorieSurplus ?? 0,
-    }, pedAdapt);
+    const plan = await buildBBPlanAsync(
+      {
+        patternId: bbBest.pattern.id,
+        level: bbLevel,
+        goal: bbGoal as any,
+        weeks: macro.totalWeeks,
+        workMax: bbWorkMax,
+        weakPoints,
+        focusGroup: bbFocus,
+        volumeGoal: bbVolGoal as any,
+        trainingFocus: 'trainingFocus' in macro ? macro.trainingFocus : bbTrainingFocus,
+        bodyFat,
+        leanMass,
+        hrvMs: lifeData?.morningHRV,
+        sleepHours: lifeData?.sleepHours,
+        stressLevel: lifeData?.stressLevel,
+        // BB-4 FIX: pass PED parameters
+        pedDoses,
+        courseIntensity,
+        // Profile parameters
+        sex: profData?.sex,
+        age: Number(profData?.age) || undefined,
+        proteinPerKg: nutrData?.proteinPerKg,
+        calorieSurplus: nutrData?.calorieSurplus ?? 0,
+      },
+      pedAdapt,
+    );
     const phased = applyMacrocycleToBBPlan(plan, macro);
     // 🏁 Тапер ББ: оверлей на макроцикл-план из профиля (goals.bbPeakConfig).
     // Мульти-соревнования: тапер + пик-неделя накладываются на КАЖДЫЙ блок
@@ -1108,7 +2037,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           finalPlan = applyTrainingTaperToBBPlan(phased, prepCfg);
         }
       }
-    } catch { /* оверлей не блокирует сборку */ }
+    } catch {
+      /* оверлей не блокирует сборку */
+    }
     setBbWeeks(macro.totalWeeks);
     setBuiltBb(finalPlan);
     setBbWeekSel(1);
@@ -1133,8 +2064,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const src = (p as any).source as string | undefined;
     const targetId = (p as any).targetCycleId as string | undefined;
     // pl-auto → только PL, bb-auto → только BB, intellectual → к выбранному циклу
-    if (src === 'pl-auto' && mainTab !== 'pl') { clearPlannerApply(); setApplyPayload(null); return; }
-    if (src === 'bb-auto' && mainTab !== 'bb') { clearPlannerApply(); setApplyPayload(null); return; }
+    if (src === 'pl-auto' && mainTab !== 'pl') {
+      clearPlannerApply();
+      setApplyPayload(null);
+      return;
+    }
+    if (src === 'bb-auto' && mainTab !== 'bb') {
+      clearPlannerApply();
+      setApplyPayload(null);
+      return;
+    }
     let effectiveTab: Mode = mainTab;
     if (src === 'intellectual' && targetId) {
       const c = getCycleById(targetId);
@@ -1161,52 +2100,82 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           else if (pm.lift === 'dead') setPmDead(pm.value);
           pendingApplyRef.current = p;
         } else if (tabForApply === 'bb') {
-          setBbWorkMax(w => ({ ...w, quads: pm.lift === 'squat' ? pm.value : w.quads, chest: pm.lift === 'bench' ? pm.value : w.chest, hamstrings: pm.lift === 'dead' ? pm.value : w.hamstrings }));
+          setBbWorkMax((w) => ({
+            ...w,
+            quads: pm.lift === 'squat' ? pm.value : w.quads,
+            chest: pm.lift === 'bench' ? pm.value : w.chest,
+            hamstrings: pm.lift === 'dead' ? pm.value : w.hamstrings,
+          }));
           pendingApplyRef.current = p;
         }
       } else {
-        if (tabForApply === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
-        else if (tabForApply === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
-      }
-      } else if (p.kind === 'weakpoints') {
-       setWeakPoints(p.data?.groups || []);
-        if (Array.isArray(p.data?.orthopedic?.blockedPatterns)) setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
-        if (p.data?.diagnosticExerciseMap) setDiagnosticExerciseMap(p.data.diagnosticExerciseMap);
-        if (p.data?.diagnosticDayMap) setDiagnosticDayMap(p.data.diagnosticDayMap);
-        // P1-4: слабая сторона из мастера движений — в план (унилатеральная добивка).
-        setDiagnosticWeakSide(p.data?.diagnosticWeakSide === 'left' ? 'left' : p.data?.diagnosticWeakSide === 'right' ? 'right' : null);
-        if (p.data?.redBlocked) setMethodNote('⛔ Красный флаг движений: коррекции не добавляем автоматически — сначала разгрузка/обследование; план собран по раскладке цикла.');
-        if (Array.isArray(p.data?.plWeakPoints)) {
-          setPlWeakPoints(p.data.plWeakPoints.map((x: any) => ({ lift: x.lift, weakPoint: x.weakPoint })));
-          const dm: Record<string, number[]> = {};
-          for (const x of p.data.plWeakPoints) {
-            if (Array.isArray(x.days) && x.days.length > 0) dm[`${x.lift}|${x.weakPoint}`] = x.days;
-          }
-          setPlWeakPointDayMap(dm);
+        if (tabForApply === 'pl') {
+          setPmSquat(pm.squat || pmSquat);
+          setPmBench(pm.bench || pmBench);
+          setPmDead(pm.dead || pmDead);
+          pendingApplyRef.current = p;
+        } else if (tabForApply === 'bb') {
+          setBbWorkMax((w) => ({
+            ...w,
+            quads: pm.squat || w.quads,
+            chest: pm.bench || w.chest,
+            hamstrings: pm.dead || w.hamstrings,
+          }));
+          pendingApplyRef.current = p;
         }
-        if (p.data?.weakGroupExerciseMap) setWeakGroupExerciseMap(p.data.weakGroupExerciseMap);
-        if (p.data?.weakGroupDayMap) setWeakGroupDayMap(p.data.weakGroupDayMap);
-       pendingApplyRef.current = p;
+      }
+    } else if (p.kind === 'weakpoints') {
+      setWeakPoints(p.data?.groups || []);
+      if (Array.isArray(p.data?.orthopedic?.blockedPatterns))
+        setOrthopedicBlockedPatterns(p.data.orthopedic.blockedPatterns);
+      if (p.data?.diagnosticExerciseMap) setDiagnosticExerciseMap(p.data.diagnosticExerciseMap);
+      if (p.data?.diagnosticDayMap) setDiagnosticDayMap(p.data.diagnosticDayMap);
+      // P1-4: слабая сторона из мастера движений — в план (унилатеральная добивка).
+      setDiagnosticWeakSide(
+        p.data?.diagnosticWeakSide === 'left' ? 'left' : p.data?.diagnosticWeakSide === 'right' ? 'right' : null,
+      );
+      if (p.data?.redBlocked)
+        setMethodNote(
+          '⛔ Красный флаг движений: коррекции не добавляем автоматически — сначала разгрузка/обследование; план собран по раскладке цикла.',
+        );
+      if (Array.isArray(p.data?.plWeakPoints)) {
+        setPlWeakPoints(p.data.plWeakPoints.map((x: any) => ({ lift: x.lift, weakPoint: x.weakPoint })));
+        const dm: Record<string, number[]> = {};
+        for (const x of p.data.plWeakPoints) {
+          if (Array.isArray(x.days) && x.days.length > 0) dm[`${x.lift}|${x.weakPoint}`] = x.days;
+        }
+        setPlWeakPointDayMap(dm);
+      }
+      if (p.data?.weakGroupExerciseMap) setWeakGroupExerciseMap(p.data.weakGroupExerciseMap);
+      if (p.data?.weakGroupDayMap) setWeakGroupDayMap(p.data.weakGroupDayMap);
+      pendingApplyRef.current = p;
     } else if (p.kind === 'limiter') {
-       // 🧩 Калькулятор «Лимитирующие факторы движения» — категорийные протоколы.
-       setLimiterExerciseMap(p.data?.limiterExerciseMap ?? {});
-       setLimiterProtocolMap(p.data?.limiterProtocolMap ?? {});
-       setLimiterDayMap(p.data?.limiterDayMap ?? {});
-       pendingApplyRef.current = p;
+      // 🧩 Калькулятор «Лимитирующие факторы движения» — категорийные протоколы.
+      setLimiterExerciseMap(p.data?.limiterExerciseMap ?? {});
+      setLimiterProtocolMap(p.data?.limiterProtocolMap ?? {});
+      setLimiterDayMap(p.data?.limiterDayMap ?? {});
+      pendingApplyRef.current = p;
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
       // Абсолютная цель «сет/мышцу/нед» (карточки MRV/мезо/прогрессии): в ББ это ориентир
       // авто-конструктора (раньше приходило легаси-каналом kind:'mrv').
       const targetSets = Number(p.data?.volumeSets);
       if (Number.isFinite(targetSets) && targetSets > 0) {
-        if (tabForApply === 'bb') { setMrvOverride(Math.round(targetSets)); pendingApplyRef.current = p; }
-        else {
+        if (tabForApply === 'bb') {
+          setMrvOverride(Math.round(targetSets));
+          pendingApplyRef.current = p;
+        } else {
           // Честность (аудит P1-1): в ПЛ объём задаёт раскладка цикла — «применить» тут нечего, не молчим.
-          setMethodNote(`🛠 Цель ${ruCount(Math.round(targetSets), RU_SETS)}/мышца/нед — ориентир ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`);
+          setMethodNote(
+            `🛠 Цель ${ruCount(Math.round(targetSets), RU_SETS)}/мышца/нед — ориентир ББ-авто. В ПЛ объём задаёт цикл: смените цикл/ассистентов, а для разгрузки используйте «Применить делод».`,
+          );
         }
       }
     } else if (p.kind === 'split') {
-      if (tabForApply === 'bb') { setBbDays(p.data?.cycle?.length || bbDays); pendingApplyRef.current = p; }
+      if (tabForApply === 'bb') {
+        setBbDays(p.data?.cycle?.length || bbDays);
+        pendingApplyRef.current = p;
+      }
     } else if (p.kind === 'tempo') {
       setTempoAdjust(p.data ? { ...p.data } : null);
     } else if (p.kind === 'rir') {
@@ -1216,7 +2185,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const vol = Math.min(1, Math.max(0.2, (p.data?.volumeMult ?? 0.5) as number));
       const rir = Math.min(6, Math.max(0, Math.round((p.data?.rirShift ?? 3) as number)));
       const weeksRaw = Array.isArray(p.data?.weeks)
-        ? (p.data!.weeks as unknown[]).map(n => Number(n)).filter(n => Number.isFinite(n) && n > 0) as number[]
+        ? ((p.data!.weeks as unknown[]).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0) as number[])
         : [];
       if (tabForApply === 'bb') {
         setDeloadAdjust({ volumeMult: vol, rirShift: rir, weeks: weeksRaw });
@@ -1233,17 +2202,24 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           setMethodNote(res.notes[0]);
         } else {
           setPlDeloadCfg(cfg);
-          setMethodNote(`🔋 Делод запомнен: объём ×${vol}, RIR +${rir} — добавится в план при сборке (недели: ${weeksRaw.length ? weeksRaw.join(', ') : 'ближайшая подходящая'}).`);
+          setMethodNote(
+            `🔋 Делод запомнен: объём ×${vol}, RIR +${rir} — добавится в план при сборке (недели: ${weeksRaw.length ? weeksRaw.join(', ') : 'ближайшая подходящая'}).`,
+          );
         }
       }
     } else if (p.kind === 'peak') {
-      setPeakAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirTarget: (p.data?.rirTarget ?? 0) as number });
+      setPeakAdjust({
+        volumeMult: (p.data?.volumeMult ?? 0.5) as number,
+        rirTarget: (p.data?.rirTarget ?? 0) as number,
+      });
       if (p.data?.peakCycleId) setPeakCycleId(p.data.peakCycleId as string);
     } else if (p.kind === 'volume') {
       // Честность (Фаза 1): собранный PL-план не пересобирается под посетовый
       // объём из моста (faithful сохраняет раскладку источника) — сообщаем прямо,
       // а не храним мёртвый state.
-      setMethodNote('📊 Объём-мост: посетовый объём не применяется к дословному PL-плану — раскладку меняйте в конструкторе/цикле.');
+      setMethodNote(
+        '📊 Объём-мост: посетовый объём не применяется к дословному PL-плану — раскладку меняйте в конструкторе/цикле.',
+      );
     } else if (p.kind === 'cycle') {
       // Мост «Периодизация → ПЛ-авто»: применить выбранный СРЦ-цикл (оригинал)
       // и пересобрать план. Раньше kind не был зарегистрирован — кнопка молча
@@ -1255,7 +2231,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         setSelectedCycleId(cid);
         setCycleWeeks(origWeeks);
         buildSrc(cid);
-        setMethodNote(`✅ Цикл «${tpl.meta.title}» применён из «Периодизации» — план пересобран по оригиналу (${origWeeks} нед).`);
+        setMethodNote(
+          `✅ Цикл «${tpl.meta.title}» применён из «Периодизации» — план пересобран по оригиналу (${origWeeks} нед).`,
+        );
       } else {
         setMethodNote('⚠ Цикл из моста не найден в каталоге — выберите вручную.');
       }
@@ -1265,7 +2243,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       // раньше молча съедались — теперь честная заметка вместо тишины.
       setMethodNote(`⚠ Мост «${p.label || p.kind}» адресован другому конструктору — в ПЛ-авто не применяется.`);
     }
-    clearPlannerApply(); setApplyPayload(null);
+    clearPlannerApply();
+    setApplyPayload(null);
     setSubView('plan'); // показать обновлённый план
   };
   /** ↩ Убрать делод: снять конфиг и пересобрать план по раскладке цикла (честный откат). */
@@ -1293,28 +2272,50 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const c = getCycleById(targetId);
       if (c) eff = normalizeCycleDirection(c.meta.direction) === 'bodybuilding' ? 'bb' : 'pl';
     }
-    if (eff === 'pl') { try { buildSrc(); } catch (e) { setMethodNote(`⚠ Не удалось пересобрать ПЛ-план после моста: ${(e as Error).message}`); } }
-    else if (eff === 'bb') { try { buildBb(); } catch (e) { setMethodNote(`⚠ Не удалось пересобрать ББ-план после моста: ${(e as Error).message}`); } }
+    if (eff === 'pl') {
+      try {
+        buildSrc();
+      } catch (e) {
+        setMethodNote(`⚠ Не удалось пересобрать ПЛ-план после моста: ${(e as Error).message}`);
+      }
+    } else if (eff === 'bb') {
+      try {
+        buildBb();
+      } catch (e) {
+        setMethodNote(`⚠ Не удалось пересобрать ББ-план после моста: ${(e as Error).message}`);
+      }
+    }
     setSubView('plan'); // показать пересобранный план
   }, [pmSquat, pmBench, pmDead, weakPoints, bbDays, bbWorkMax, mrvOverride, mainTab]);
-  const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv])), [bbLevel, mrvOverride]);
-  const pedAdapt = useMemo(() => adaptForPEDs(peds, baseMrv, pedDoses, courseIntensity), [peds, baseMrv, pedDoses, courseIntensity]);
+  const baseMrv = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv]),
+      ),
+    [bbLevel, mrvOverride],
+  );
+  const pedAdapt = useMemo(
+    () => adaptForPEDs(peds, baseMrv, pedDoses, courseIntensity),
+    [peds, baseMrv, pedDoses, courseIntensity],
+  );
 
-  const togglePed = (p: PED) => setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  const togglePed = (p: PED) => setPeds((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   const srcDays: PlayerDay[] = useMemo(() => {
     if (!effectiveSrc || !Array.isArray(effectiveSrc.weeks) || !effectiveSrc.weeks.length) return [];
     const wk0 = effectiveSrc.weeks[Math.min(Math.max(srcWeek - 1, 0), effectiveSrc.weeks.length - 1)];
     return wk0.days.map((d, i) => ({
       label: `Д${i + 1}`,
-      exercises: d.exercises.map(e => ({
+      exercises: d.exercises.map((e) => ({
         name: e.name,
         muscleGroup: e.group,
-        targetSets: e.workSets.flatMap(ws => Array.from({ length: Math.max(1, ws.sets) }, () => ({
-          weight: ws.weight,
-          reps: ws.reps,
-          rir: ws.rir,
-          tempo: tempoAdjust ?? undefined,
-        }))),
+        targetSets: e.workSets.flatMap((ws) =>
+          Array.from({ length: Math.max(1, ws.sets) }, () => ({
+            weight: ws.weight,
+            reps: ws.reps,
+            rir: ws.rir,
+            tempo: tempoAdjust ?? undefined,
+          })),
+        ),
         pm: e.pm,
         coef: e.coef,
         mnosz: e.mnosz,
@@ -1325,67 +2326,95 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
 
   const bbDaysArr: PlayerDay[] = useMemo(() => {
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
-     const wk = builtBb.weeks[Math.min(Math.max(bbWeekSel - 1, 0), builtBb.weeks.length - 1)];
+    const wk = builtBb.weeks[Math.min(Math.max(bbWeekSel - 1, 0), builtBb.weeks.length - 1)];
     return wk.sessions.map((sess, i) => ({
       label: `Д${i + 1} ${sess.character}${(sess as any).peakWeekTraining ? ' 🎭' : ''}${sess.exercises.length === 0 ? ' 😴 отдых' : ''}`,
-      exercises: arrangeSupersetBlocks(sess.exercises.map(e => {
-        const sourceSets = e.workSets.length > 0
-          ? e.workSets
-          : [{ weight: 0, reps: 0, rir: e.rir }];
-        const exName = e.name || e.exerciseName || e.muscle;
-        const diaryAdj = autoRegMode === 'diary' && diaryAutoreg
-          ? diaryAutoreg.perExercise.get(exName)
-          : undefined;
-        let volumeMult = 1;
-        let weightMult = 1;
-        if (autoRegMode === 'auto' && autoRegResult) {
-          volumeMult = autoRegResult.volumeMultiplier;
-          weightMult = autoRegResult.topSetPctMultiplier;
-        }
-        const sets = Math.max(1, Math.round((diaryAdj?.adjustedSets ?? e.sets) * volumeMult));
-        const priMult = (priAdjust ? priAdjust.volumeMult : 1) * (deloadAdjust ? deloadAdjust.volumeMult : 1) * (peakAdjust ? peakAdjust.volumeMult : 1);
-        const priRir = peakAdjust ? peakAdjust.rirTarget : ((priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0));
-        const outputSets = Math.max(1, Math.round(sets * priMult));
-        let diaryRir = 0;
-        if (diaryAdj) diaryRir = diaryAdj.adjustedRir - e.rir;
-        const rirOut = Math.max(0, peakAdjust ? peakAdjust.rirTarget : (e.rir + priRir + diaryRir));
-        const targetSets = Array.from({ length: outputSets }, (_, index) => {
-          const source = sourceSets[index % sourceSets.length];
+      exercises: arrangeSupersetBlocks(
+        sess.exercises.map((e) => {
+          const sourceSets = e.workSets.length > 0 ? e.workSets : [{ weight: 0, reps: 0, rir: e.rir }];
+          const exName = e.name || e.exerciseName || e.muscle;
+          const diaryAdj = autoRegMode === 'diary' && diaryAutoreg ? diaryAutoreg.perExercise.get(exName) : undefined;
+          let volumeMult = 1;
+          let weightMult = 1;
+          if (autoRegMode === 'auto' && autoRegResult) {
+            volumeMult = autoRegResult.volumeMultiplier;
+            weightMult = autoRegResult.topSetPctMultiplier;
+          }
+          const sets = Math.max(1, Math.round((diaryAdj?.adjustedSets ?? e.sets) * volumeMult));
+          const priMult =
+            (priAdjust ? priAdjust.volumeMult : 1) *
+            (deloadAdjust ? deloadAdjust.volumeMult : 1) *
+            (peakAdjust ? peakAdjust.volumeMult : 1);
+          const priRir = peakAdjust
+            ? peakAdjust.rirTarget
+            : (priAdjust ? priAdjust.rirShift : 0) + rirShiftAdjust + (deloadAdjust ? deloadAdjust.rirShift : 0);
+          const outputSets = Math.max(1, Math.round(sets * priMult));
+          let diaryRir = 0;
+          if (diaryAdj) diaryRir = diaryAdj.adjustedRir - e.rir;
+          const rirOut = Math.max(0, peakAdjust ? peakAdjust.rirTarget : e.rir + priRir + diaryRir);
+          const targetSets = Array.from({ length: outputSets }, (_, index) => {
+            const source = sourceSets[index % sourceSets.length];
+            return {
+              weight: diaryAdj ? diaryAdj.adjustedWeight : Math.round(source.weight * weightMult * 10) / 10,
+              reps: source.reps,
+              rir: rirOut,
+              tempo: tempoAdjust ? tempoAdjust : source.tempo,
+            };
+          });
           return {
-            weight: diaryAdj ? diaryAdj.adjustedWeight : Math.round(source.weight * weightMult * 10) / 10,
-            reps: source.reps,
-            rir: rirOut,
-            tempo: tempoAdjust ? tempoAdjust : source.tempo,
+            name: exName,
+            muscleGroup: e.muscle,
+            targetSets,
+            // §8: суперсет — это блок A1→B1, а не бейдж на разнесённых упражнениях.
+            // Раньше поля терялись при выдаче в плеер; теперь доезжают (и порядок
+            // собирается arrangeSupersetBlocks, чтобы пара была рядом).
+            ...(e.supersetGroup != null
+              ? {
+                  supersetGroup: Number(e.supersetGroup),
+                  supersetSlot: (Number(e.supersetSlot) === 1 ? 1 : 0) as 0 | 1,
+                }
+              : {}),
           };
-        });
-        return {
-          name: exName, muscleGroup: e.muscle,
-          targetSets,
-          // §8: суперсет — это блок A1→B1, а не бейдж на разнесённых упражнениях.
-          // Раньше поля терялись при выдаче в плеер; теперь доезжают (и порядок
-          // собирается arrangeSupersetBlocks, чтобы пара была рядом).
-          ...(e.supersetGroup != null ? {
-            supersetGroup: Number(e.supersetGroup),
-            supersetSlot: (Number(e.supersetSlot) === 1 ? 1 : 0) as 0 | 1,
-          } : {}),
-        };
-      })),
+        }),
+      ),
     }));
-  }, [builtBb, bbWeekSel, autoRegOn, autoRegMode, autoRegResult, diaryAutoreg, priAdjust, tempoAdjust, rirShiftAdjust, deloadAdjust, peakAdjust]);
+  }, [
+    builtBb,
+    bbWeekSel,
+    autoRegOn,
+    autoRegMode,
+    autoRegResult,
+    diaryAutoreg,
+    priAdjust,
+    tempoAdjust,
+    rirShiftAdjust,
+    deloadAdjust,
+    peakAdjust,
+  ]);
 
   const playerDays: PlayerDay[] = mainTab === 'pl' ? srcDays : bbDaysArr;
-  const runFocus = mainTab === 'pl'
-    ? (plSeasonMode === 'season' ? '🧩 Сезон по микроциклам' : (getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл'))
-    : 'BB';
+  const runFocus =
+    mainTab === 'pl'
+      ? plSeasonMode === 'season'
+        ? '🧩 Сезон по микроциклам'
+        : getCycleById(selectedCycleId)?.meta.title || 'Силовой цикл'
+      : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
     if (!effectiveSrc || !Array.isArray(effectiveSrc.weeks) || !effectiveSrc.weeks.length) return [];
-    return effectiveSrc.weeks.map(wk => {
+    return effectiveSrc.weeks.map((wk) => {
       const t = wk.days.reduce((s, d) => s + d.metrics.tonnage, 0);
       const k = wk.days.reduce((s, d) => s + d.metrics.kpsh, 0);
       const uoi = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.uoi * d.metrics.kpsh, 0) / k : 0;
       const relInt = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.relIntensity * d.metrics.kpsh, 0) / k : 0;
       const intFB = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.intFB * d.metrics.kpsh, 0) / k : 0;
-      return { week: wk.week, tonnage: Math.round(t), kpsh: k, relInt: Math.round(relInt * 1000) / 1000, uoi: Math.round(uoi * 100) / 100, intFB: Math.round(intFB) };
+      return {
+        week: wk.week,
+        tonnage: Math.round(t),
+        kpsh: k,
+        relInt: Math.round(relInt * 1000) / 1000,
+        uoi: Math.round(uoi * 100) / 100,
+        intFB: Math.round(intFB),
+      };
     });
   }, [effectiveSrc]);
 
@@ -1393,7 +2422,19 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   // вкладка «Тренировки» (runtime) могла запустить его выполнение.
   useEffect(() => {
     if (playerDays.length > 0) {
-       try { localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: runFocus, week: mainTab === 'bb' ? bbWeekSel : srcWeek, track: mainTab })); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(
+          'he_pl_runtime',
+          JSON.stringify({
+            days: playerDays,
+            focus: runFocus,
+            week: mainTab === 'bb' ? bbWeekSel : srcWeek,
+            track: mainTab,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
     }
   }, [playerDays, runFocus, srcWeek, mainTab]);
 
@@ -1401,31 +2442,50 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   const [strengthLogs, setStrengthLogs] = useState<any[]>([]);
   useEffect(() => {
     let m = true;
-    try { new StrengthDiary().getWorkoutLogs().then((l: any) => { if (m) setStrengthLogs(l || []); }); } catch { /* ignore */ }
-    return () => { m = false; };
+    try {
+      new StrengthDiary().getWorkoutLogs().then((l: any) => {
+        if (m) setStrengthLogs(l || []);
+      });
+    } catch {
+      /* ignore */
+    }
+    return () => {
+      m = false;
+    };
   }, []);
   const e1rmSeries = useMemo(() => {
     if (!strengthLogs.length) return [];
     const byLift: Record<string, Map<string, number>> = { squat: new Map(), bench: new Map(), deadlift: new Map() };
     for (const log of strengthLogs) {
-      for (const ex of (log.exercises || [])) {
+      for (const ex of log.exercises || []) {
         const lift = detectLift(ex.exerciseName || '', ex.group || '');
         if (!lift) continue;
         const key = lift === 'dead' ? 'deadlift' : lift;
         let best = 0;
-        for (const st of (ex.sets || [])) {
-          const w = +st.weight || 0, r = +st.reps || 0;
-          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > best) best = e1; }
+        for (const st of ex.sets || []) {
+          const w = +st.weight || 0,
+            r = +st.reps || 0;
+          if (w > 0) {
+            const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10;
+            if (e1 > best) best = e1;
+          }
         }
-        if (best > 0) { const cur = byLift[key].get(log.date) || 0; if (best > cur) byLift[key].set(log.date, best); }
+        if (best > 0) {
+          const cur = byLift[key].get(log.date) || 0;
+          if (best > cur) byLift[key].set(log.date, best);
+        }
       }
     }
     const COL: Record<string, string> = { squat: 'var(--accent)', bench: '#60a5fa', deadlift: '#f59e0b' };
     const LBL: Record<string, string> = { squat: 'Присед', bench: 'Жим', deadlift: 'Становая' };
-    return Object.keys(byLift).map(lift => {
-      const pts = [...byLift[lift].entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, val]) => ({ date, val }));
-      return { lift, color: COL[lift], label: LBL[lift], pts };
-    }).filter(s => s.pts.length > 0);
+    return Object.keys(byLift)
+      .map((lift) => {
+        const pts = [...byLift[lift].entries()]
+          .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+          .map(([date, val]) => ({ date, val }));
+        return { lift, color: COL[lift], label: LBL[lift], pts };
+      })
+      .filter((s) => s.pts.length > 0);
   }, [strengthLogs]);
 
   // V7 (расширение): личные 1ПМ по КАЖДОМУ упражнению из дневника (Epley из реальных подходов)
@@ -1433,23 +2493,36 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!strengthLogs.length) return [];
     const best = new Map<string, { e1: number; w: number; r: number }>();
     for (const log of strengthLogs) {
-      for (const ex of (log.exercises || [])) {
+      for (const ex of log.exercises || []) {
         const nm = ex.exerciseName || '';
         if (!nm) continue;
-        let be1 = 0, bw = 0, br = 0;
-        for (const st of (ex.sets || [])) {
-          const w = +st.weight || 0, r = +st.reps || 0;
-          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > be1) { be1 = e1; bw = w; br = r; } }
+        let be1 = 0,
+          bw = 0,
+          br = 0;
+        for (const st of ex.sets || []) {
+          const w = +st.weight || 0,
+            r = +st.reps || 0;
+          if (w > 0) {
+            const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10;
+            if (e1 > be1) {
+              be1 = e1;
+              bw = w;
+              br = r;
+            }
+          }
         }
         const cur = best.get(nm);
         if (!cur || be1 > cur.e1) best.set(nm, { e1: be1, w: bw, r: br });
       }
     }
-    return [...best.entries()].filter(([, v]) => v.e1 > 0).sort((a, b) => b[1].e1 - a[1].e1).map(([name, v]) => ({ name, ...v }));
+    return [...best.entries()]
+      .filter(([, v]) => v.e1 > 0)
+      .sort((a, b) => b[1].e1 - a[1].e1)
+      .map(([name, v]) => ({ name, ...v }));
   }, [strengthLogs]);
 
   const calibratePmFromDiary = (lift: 'squat' | 'bench' | 'deadlift') => {
-    const series = e1rmSeries.find(s => s.lift === lift);
+    const series = e1rmSeries.find((s) => s.lift === lift);
     const last = series?.pts.at(-1)?.val;
     if (last == null) return;
     if (lift === 'squat') setPmSquat(last);
@@ -1470,12 +2543,22 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     for (const log of strengthLogs) {
       const date = log.date?.slice(0, 10) || '';
       if (!date) continue;
-      let be1 = 0, bw = 0, br = 0;
-      for (const ex of (log.exercises || [])) {
+      let be1 = 0,
+        bw = 0,
+        br = 0;
+      for (const ex of log.exercises || []) {
         if ((ex.exerciseName || '') !== selectedTrendEx) continue;
-        for (const st of (ex.sets || [])) {
-          const w = +st.weight || 0, r = +st.reps || 0;
-          if (w > 0) { const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10; if (e1 > be1) { be1 = e1; bw = w; br = r; } }
+        for (const st of ex.sets || []) {
+          const w = +st.weight || 0,
+            r = +st.reps || 0;
+          if (w > 0) {
+            const e1 = r <= 1 ? w : Math.round(w * (1 + r / 30) * 10) / 10;
+            if (e1 > be1) {
+              be1 = e1;
+              bw = w;
+              br = r;
+            }
+          }
         }
       }
       if (be1 > 0) {
@@ -1497,6 +2580,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setSrcEdits({});
     setEditMode(false);
     setPickerDay(null);
+    taperDraftUnreadableRef.current = false;
     setTaperPlan(null);
     // ББ-план (вкладка ББ этого экрана).
     setBuiltBb(null);
@@ -1505,37 +2589,75 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     setMethodNote('🔄 Сборка сброшена — начинаем заново');
   };
 
-  const seasonBuildOpts = useMemo(() => ({
-    pmMap: { ...exercisePMs, 'Присед': exercisePMs['Присед'] || pmSquat, 'Жим лежа': exercisePMs['Жим лежа'] || pmBench, 'Становая тяга': exercisePMs['Становая тяга'] || pmDead },
-    fallbackPm: 80,
-    progressionMode: (pedAuto && peds.length > 0 ? 'on_course' : 'natural') as LMSBuildInput['mode'],
-    courseIntensity,
-    peds: peds.length ? peds : undefined,
-    pedDoses,
-    nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
-     acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
-     pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
-    volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
-    focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
-    currentReadiness: linked.readiness?.recovery,
-    equipment: (linked.profile?.settings as Record<string, any> | undefined)?.equipment,
-    weakPoints,
-    plWeakPoints,
-    weakGroupDayMap,
-    plWeakPointDayMap,
-    weakGroupExerciseMap,
-    plWeakPointExerciseMap,
-    orthopedicBlockedPatterns,
-    diagnosticExerciseMap,
-    diagnosticDayMap,
-    diagnosticWeakSide,
-    limiterExerciseMap,
-    limiterProtocolMap,
-    limiterDayMap,
-    autoReg: autoRegMode === 'auto' ? autoregPayload(autoRegResult) : undefined,
-    periodization: periodizationMode,
-    recovery: getRecoveryMetrics(linked),
-  }), [exercisePMs, pmSquat, pmBench, pmDead, pedAuto, peds, courseIntensity, pedDoses, plCalorieSurplus, plProteinPerKg, acwrData, autoRegMode, autoRegResult, periodizationMode, pmAutoRegMode, pmDiary, linked, weakPoints, plWeakPoints, weakGroupDayMap, plWeakPointDayMap, weakGroupExerciseMap, plWeakPointExerciseMap, orthopedicBlockedPatterns, diagnosticExerciseMap, diagnosticDayMap, diagnosticWeakSide, limiterExerciseMap, limiterProtocolMap, limiterDayMap]);
+  const seasonBuildOpts = useMemo(
+    () => ({
+      pmMap: {
+        ...exercisePMs,
+        Присед: exercisePMs['Присед'] || pmSquat,
+        'Жим лежа': exercisePMs['Жим лежа'] || pmBench,
+        'Становая тяга': exercisePMs['Становая тяга'] || pmDead,
+      },
+      fallbackPm: 80,
+      progressionMode: (pedAuto && peds.length > 0 ? 'on_course' : 'natural') as LMSBuildInput['mode'],
+      courseIntensity,
+      peds: peds.length ? peds : undefined,
+      pedDoses,
+      nutrition: { calorieSurplus: plCalorieSurplus, proteinPerKg: plProteinPerKg },
+      acwr: acwrData.zone !== 'optimal' ? acwrData : undefined,
+      pmAutoReg: pmAutoRegMode === 'off' ? undefined : { mode: pmAutoRegMode, diaryMultiplier: pmDiary?.multiplier },
+      volumeGoal: (linked.profile?.settings as Record<string, any> | undefined)?.volumeGoal || 'mav',
+      focusLift: (linked.profile?.settings as Record<string, any> | undefined)?.focusLift,
+      currentReadiness: linked.readiness?.recovery,
+      equipment: (linked.profile?.settings as Record<string, any> | undefined)?.equipment,
+      weakPoints,
+      plWeakPoints,
+      weakGroupDayMap,
+      plWeakPointDayMap,
+      weakGroupExerciseMap,
+      plWeakPointExerciseMap,
+      orthopedicBlockedPatterns,
+      diagnosticExerciseMap,
+      diagnosticDayMap,
+      diagnosticWeakSide,
+      limiterExerciseMap,
+      limiterProtocolMap,
+      limiterDayMap,
+      autoReg: plAutoRegPayload(autoRegCfg),
+      periodization: periodizationMode,
+      recovery: getRecoveryMetrics(linked),
+    }),
+    [
+      exercisePMs,
+      pmSquat,
+      pmBench,
+      pmDead,
+      pedAuto,
+      peds,
+      courseIntensity,
+      pedDoses,
+      plCalorieSurplus,
+      plProteinPerKg,
+      acwrData,
+      autoRegCfg,
+      periodizationMode,
+      pmAutoRegMode,
+      pmDiary,
+      linked,
+      weakPoints,
+      plWeakPoints,
+      weakGroupDayMap,
+      plWeakPointDayMap,
+      weakGroupExerciseMap,
+      plWeakPointExerciseMap,
+      orthopedicBlockedPatterns,
+      diagnosticExerciseMap,
+      diagnosticDayMap,
+      diagnosticWeakSide,
+      limiterExerciseMap,
+      limiterProtocolMap,
+      limiterDayMap,
+    ],
+  );
 
   // 📊 Frequency Planner: недельные объёмы по группам — из volume-landmarks
   // собранного плана (раньше передавался вымышленный хардкод 12/10/14/8/6/4).
@@ -1559,13 +2681,22 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       { label: 'Тяга ПМ', value: `${pmDead} кг` },
     ];
     if (plSeasonMode === 'season' && seasonSegments.length > 0) {
-      seasonSegments.forEach(s => {
+      seasonSegments.forEach((s) => {
         const isShrink = s.fitMode === 'shrink' || s.fitMode === 'proposed_shrink';
         const isExtend = s.fitMode === 'extend' || s.fitMode === 'proposed_extend';
         const isBlocked = s.fitMode === 'strict_skip';
-        if (isBlocked) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⛔ без согласия — пропущен` });
-        else if (isShrink) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬇ сжат по согласию ${s.cycleWeeks}→${s.weeks} нед` });
-        else if (isExtend) rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⬆ растянут по согласию → ${s.weeks} нед` });
+        if (isBlocked)
+          rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `⛔ без согласия — пропущен` });
+        else if (isShrink)
+          rows.push({
+            label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`,
+            value: `⬇ сжат по согласию ${s.cycleWeeks}→${s.weeks} нед`,
+          });
+        else if (isExtend)
+          rows.push({
+            label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`,
+            value: `⬆ растянут по согласию → ${s.weeks} нед`,
+          });
         else rows.push({ label: `${s.periodLabel ?? 'Сезон'} · ${s.cycleTitle}`, value: `${s.weeks} нед` });
       });
     }
@@ -1573,76 +2704,335 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
   };
 
   return (
-    <div key={mainTab} className="pl-auto-screen" style={{ padding: '12px 0', color: '#fff', width: '100%', maxWidth: '100%', margin: 0, minWidth: 0, boxSizing: 'border-box', overflowX: 'hidden' }}>
+    <div
+      key={mainTab}
+      className="pl-auto-screen"
+      style={{
+        padding: '12px 0',
+        color: '#fff',
+        width: '100%',
+        maxWidth: '100%',
+        margin: 0,
+        minWidth: 0,
+        boxSizing: 'border-box',
+        overflowX: 'hidden',
+      }}
+    >
       {/* Заголовок текущего режима планирования (выбор режима — в навигации блока) */}
-      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 12, background: 'var(--accent-dim)', border: '1px solid var(--accent-glow)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>{mainTab === 'pl' ? '🏆 Силовой цикл (ПЛ)' : mainTab === 'bb' ? '💪 Бодибилдинг (ББ)' : '🛠 Ручной конструктор'}</span>
-        <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
+      <div
+        style={{
+          marginBottom: 10,
+          padding: '8px 12px',
+          borderRadius: 12,
+          background: 'var(--accent-dim)',
+          border: '1px solid var(--accent-glow)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent)' }}>
+          {mainTab === 'pl'
+            ? '🏆 Силовой цикл (ПЛ)'
+            : mainTab === 'bb'
+              ? '💪 Бодибилдинг (ББ)'
+              : '🛠 Ручной конструктор'}
+        </span>
+        <button
+          onClick={() => setResetAsk(true)}
+          title="Сбросить сборку и начать заново"
+          aria-label="Начать заново"
+          style={{
+            padding: '5px 10px',
+            borderRadius: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            border: '1px solid rgba(244,63,94,0.35)',
+            background: 'rgba(244,63,94,0.08)',
+            color: '#fb7185',
+            minHeight: 30,
+            flexShrink: 0,
+          }}
+        >
+          🔄 Начать заново
+        </button>
       </div>
       {applyPayload && (
-        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, fontSize: 11, color: 'var(--accent)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ Применено: {applyPayload.label}</span>
-          <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+        <div
+          style={{
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: 'var(--accent-dim)',
+            border: '1px solid rgba(0,230,138,0.25)',
+            marginBottom: 10,
+            fontSize: 11,
+            color: 'var(--accent)',
+            fontWeight: 700,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            ✓ Применено: {applyPayload.label}
+          </span>
+          <button
+            onClick={() => {
+              clearPlannerApply();
+              setApplyPayload(null);
+            }}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'transparent',
+              color: '#fff',
+              fontSize: 10,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
       {methodNote && (
-        <div role="alert" aria-live="polite" style={{ ...CARD, borderColor: 'rgba(0,230,138,0.3)', background: 'var(--accent-dim)', color: 'var(--accent)', fontSize: 11 }}>
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            ...CARD,
+            borderColor: 'rgba(0,230,138,0.3)',
+            background: 'var(--accent-dim)',
+            color: 'var(--accent)',
+            fontSize: 11,
+          }}
+        >
           {methodNote}
         </div>
       )}
       {/* sub-view pill nav for PL/BB — компактно, современно */}
-      {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (() => {
-        const list = subViewList[mainTab];
-        const groups: Record<string, string[]> = { 'СБОРКА': ['settings','diagnostics','plan'], 'АНАЛИЗ': ['charts','reference'], 'СИСТЕМА': ['competition','macro','tools'] };
-        const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
-        return (
-          <div style={{ background: 'linear-gradient(135deg, rgba(24,24,27,0.65), rgba(18,18,22,0.85))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '8px', marginBottom: 12, display: 'flex', gap: 6, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-            {list.map(({ key, label }) => (
-              <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
-                <button style={{ ...PILL(subView === key), flexShrink: 0 as const }} onClick={() => setSubView(key)}>{label}</button>
-                {groupEndKeys.has(key) && key !== list[list.length - 1].key && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
-              </span>
-            ))}
-          </div>
-        );
-      })()}
+      {mainTab !== 'manual' &&
+        subViewList[mainTab].length > 0 &&
+        (() => {
+          const list = subViewList[mainTab];
+          const groups: Record<string, string[]> = {
+            СБОРКА: ['settings', 'diagnostics', 'plan'],
+            АНАЛИЗ: ['charts', 'reference'],
+            СИСТЕМА: ['competition', 'macro', 'tools'],
+          };
+          const groupEndKeys = new Set(
+            Object.values(groups)
+              .map((arr) => (arr as string[])[(arr as string[]).length - 1])
+              .filter(Boolean) as string[],
+          );
+          return (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(24,24,27,0.65), rgba(18,18,22,0.85))',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 14,
+                padding: '8px',
+                marginBottom: 12,
+                display: 'flex',
+                gap: 6,
+                overflowX: 'auto' as const,
+                scrollbarWidth: 'none' as const,
+                WebkitOverflowScrolling: 'touch' as const,
+                alignItems: 'center',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+            >
+              {list.map(({ key, label }) => (
+                <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
+                  <button style={{ ...PILL(subView === key), flexShrink: 0 as const }} onClick={() => setSubView(key)}>
+                    {label}
+                  </button>
+                  {groupEndKeys.has(key) && key !== list[list.length - 1].key && (
+                    <span
+                      style={{
+                        width: 1,
+                        height: 18,
+                        background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)',
+                        flexShrink: 0 as const,
+                        margin: '0 2px',
+                        alignSelf: 'center',
+                      }}
+                    />
+                  )}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
       {mainTab === 'pl' && subView === 'settings' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           {renderMacroEditBanner()}
           <div style={H}>1 ⚙️ Настройки (+💉 ПЕД + 🥗 питание)</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, minWidth: 0 }}>
-            <PopupSelect label="Уровень спортсмена" value={level} onChange={setLevel} options={[['novice','Новичок'],['II-KMS','II разряд — КМС'],['KMS-MS','КМС — МС'],['MS-MSMK','МС — МСМК'],['II-MS','II разряд — МС'],['intermediate','Средний']].map(([id,label]) => ({ id, label }))} />
-            <PopupSelect label="Цель тренировок" value={goal} onChange={setGoal} options={[['strength','Сила'],['mass','Мышечная масса'],['endurance','Выносливость'],['peak','Выход на пик'],['mixed','Смешанная']].map(([id,label]) => ({ id, label }))} />
-            <PopupSelect label="Направление" value={dir} onChange={setDir} options={[['powerlifting','Троеборье'],['bench','Жим лёжа'],['deadlift_bench','Тяга + Жим'],['armwrestling','Армрестлинг']].map(([id,label]) => ({ id, label }))} />
-            <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={v => setDays(v)} />
-            <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={v => setBw(v)} />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: 8,
+              minWidth: 0,
+            }}
+          >
+            <PopupSelect
+              label="Уровень спортсмена"
+              value={level}
+              onChange={setLevel}
+              options={[
+                ['novice', 'Новичок'],
+                ['II-KMS', 'II разряд — КМС'],
+                ['KMS-MS', 'КМС — МС'],
+                ['MS-MSMK', 'МС — МСМК'],
+                ['II-MS', 'II разряд — МС'],
+                ['intermediate', 'Средний'],
+              ].map(([id, label]) => ({ id, label }))}
+            />
+            <PopupSelect
+              label="Цель тренировок"
+              value={goal}
+              onChange={setGoal}
+              options={[
+                ['strength', 'Сила'],
+                ['mass', 'Мышечная масса'],
+                ['endurance', 'Выносливость'],
+                ['peak', 'Выход на пик'],
+                ['mixed', 'Смешанная'],
+              ].map(([id, label]) => ({ id, label }))}
+            />
+            <PopupSelect
+              label="Направление"
+              value={dir}
+              onChange={setDir}
+              options={[
+                ['powerlifting', 'Троеборье'],
+                ['bench', 'Жим лёжа'],
+                ['deadlift_bench', 'Тяга + Жим'],
+                ['armwrestling', 'Армрестлинг'],
+              ].map(([id, label]) => ({ id, label }))}
+            />
+            <PopupNumber label="Дней в неделю" value={days} min={2} max={7} suffix="" onChange={(v) => setDays(v)} />
+            <PopupNumber label="Вес тела" value={bw} min={40} max={200} suffix=" кг" onChange={(v) => setBw(v)} />
           </div>
           <div style={H}>💪 Предельные максимумы (ПМ) по упражнениям цикла</div>
           {(() => {
             const tpl = getCycleById(selectedCycleId);
             if (!tpl) return null;
             const exs = extractExercises(tpl);
-            const isArmCycle = exs.some(e => e.includes('Кисть') || e.includes('Натяжка') || e.includes('Боковой') || e.includes('Приведение'));
-            const mainCount = exs.filter(e => e.includes('Присед') || e.includes('Жим') || e.includes('Становая') || e.includes('Тяга')).length;
+            const isArmCycle = exs.some(
+              (e) => e.includes('Кисть') || e.includes('Натяжка') || e.includes('Боковой') || e.includes('Приведение'),
+            );
+            const mainCount = exs.filter(
+              (e) => e.includes('Присед') || e.includes('Жим') || e.includes('Становая') || e.includes('Тяга'),
+            ).length;
             if (mainCount <= 3 && !isArmCycle) {
               return (
                 <>
-                  <div role="group" aria-label="Предельные максимумы основных упражнений" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}>
-                    <div><PopupNumber label="Присед" value={pmSquat} min={20} max={500} suffix=" кг" onChange={v => setPmSquat(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'squat') && <button onClick={() => calibratePmFromDiary('squat')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
-                    <div><PopupNumber label="Жим лёжа" value={pmBench} min={20} max={400} suffix=" кг" onChange={v => setPmBench(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'bench') && <button onClick={() => calibratePmFromDiary('bench')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
-                    <div><PopupNumber label="Становая тяга" value={pmDead} min={20} max={500} suffix=" кг" onChange={v => setPmDead(v)} />{exerciseE1rm.some(e => detectLift(e.name, '') === 'dead') && <button onClick={() => calibratePmFromDiary('deadlift')} style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}>📈 Из дневника</button>}</div>
+                  <div
+                    role="group"
+                    aria-label="Предельные максимумы основных упражнений"
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8 }}
+                  >
+                    <div>
+                      <PopupNumber
+                        label="Присед"
+                        value={pmSquat}
+                        min={20}
+                        max={500}
+                        suffix=" кг"
+                        onChange={(v) => setPmSquat(v)}
+                      />
+                      {exerciseE1rm.some((e) => detectLift(e.name, '') === 'squat') && (
+                        <button
+                          onClick={() => calibratePmFromDiary('squat')}
+                          style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}
+                        >
+                          📈 Из дневника
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <PopupNumber
+                        label="Жим лёжа"
+                        value={pmBench}
+                        min={20}
+                        max={400}
+                        suffix=" кг"
+                        onChange={(v) => setPmBench(v)}
+                      />
+                      {exerciseE1rm.some((e) => detectLift(e.name, '') === 'bench') && (
+                        <button
+                          onClick={() => calibratePmFromDiary('bench')}
+                          style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}
+                        >
+                          📈 Из дневника
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <PopupNumber
+                        label="Становая тяга"
+                        value={pmDead}
+                        min={20}
+                        max={500}
+                        suffix=" кг"
+                        onChange={(v) => setPmDead(v)}
+                      />
+                      {exerciseE1rm.some((e) => detectLift(e.name, '') === 'dead') && (
+                        <button
+                          onClick={() => calibratePmFromDiary('deadlift')}
+                          style={{ ...BTN_GHOST, width: '100%', padding: '4px 6px', minHeight: 30, fontSize: 10 }}
+                        >
+                          📈 Из дневника
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {exs.length > 3 && (
-                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid var(--accent-dim)' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔧 Дополнительные ПМ по упражнениям цикла</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
-                        {exs.filter(e => {
-                          const n = e.toLowerCase();
-                          return !n.includes('присед') && !n.includes('жим') && !n.includes('становая');
-                        }).map(e => (
-                          <PopupNumber key={e} label={e} value={exercisePMs[e] ?? 80} min={0} max={500} suffix=" кг" onChange={v => setExPM(e, v)} />
-                        ))}
+                    <div
+                      style={{
+                        marginTop: 10,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(0,230,138,0.04)',
+                        border: '1px solid var(--accent-dim)',
+                      }}
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
+                        🔧 Дополнительные ПМ по упражнениям цикла
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                          gap: 6,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {exs
+                          .filter((e) => {
+                            const n = e.toLowerCase();
+                            return !n.includes('присед') && !n.includes('жим') && !n.includes('становая');
+                          })
+                          .map((e) => (
+                            <PopupNumber
+                              key={e}
+                              label={e}
+                              value={exercisePMs[e] ?? 80}
+                              min={0}
+                              max={500}
+                              suffix=" кг"
+                              onChange={(v) => setExPM(e, v)}
+                            />
+                          ))}
                       </div>
                     </div>
                   )}
@@ -1654,13 +3044,28 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
                   Цикл использует {ruCount(exs.length, RU_EXERCISES)}. Укажите ПМ для каждого:
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
-                  {exs.map(e => {
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                    gap: 6,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {exs.map((e) => {
                     const n = e.toLowerCase();
-                    const isMain = n.includes('присед') || n.includes('жим') || n.includes('становая') || n.includes('тяга');
+                    const isMain =
+                      n.includes('присед') || n.includes('жим') || n.includes('становая') || n.includes('тяга');
                     return (
                       <div key={e} style={isMain ? { gridColumn: 'span 1' } : {}}>
-                        <PopupNumber label={e} value={exercisePMs[e] ?? (isMain ? 80 : 0)} min={0} max={500} suffix=" кг" onChange={v => setExPM(e, v)} />
+                        <PopupNumber
+                          label={e}
+                          value={exercisePMs[e] ?? (isMain ? 80 : 0)}
+                          min={0}
+                          max={500}
+                          suffix=" кг"
+                          onChange={(v) => setExPM(e, v)}
+                        />
                       </div>
                     );
                   })}
@@ -1671,9 +3076,22 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {(() => {
             const sourceCycle = getCycleById(selectedCycleId);
             const sourceWeeks = sourceCycle ? originalCycleWeeks(sourceCycle) : cycleWeeks;
-            return <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', fontSize: 11, color: '#fff' }}>
-              📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
-            </div>;
+            return (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(96,165,250,0.06)',
+                  border: '1px solid rgba(96,165,250,0.18)',
+                  fontSize: 11,
+                  color: '#fff',
+                }}
+              >
+                📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся
+                из исходной раскладки СРЦ.
+              </div>
+            );
           })()}
           {/* 💉 PED-адаптация объёмов (как в ББ-авто) */}
           <div style={{ marginTop: 10 }}>
@@ -1681,76 +3099,170 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               peds={peds}
               onToggle={togglePed}
               pedDoses={pedDoses}
-              onDose={(p, v) => setPedDoses(d => ({ ...d, [p]: v }))}
+              onDose={(p, v) => setPedDoses((d) => ({ ...d, [p]: v }))}
               courseIntensity={courseIntensity}
               onIntensity={setCourseIntensity}
               headerExtra={
-                <button onClick={() => setPedAuto(a => !a)} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : '#fff', flexShrink: 0, minHeight: 32 }}>
+                <button
+                  onClick={() => setPedAuto((a) => !a)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)',
+                    color: pedAuto ? '#000' : '#fff',
+                    flexShrink: 0,
+                    minHeight: 32,
+                  }}
+                >
                   АВТО {pedAuto ? 'ON' : 'OFF'}
                 </button>
               }
             />
-            {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
-            {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
+            {pedAuto && peds.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
+                ⚡ Авто-прогрессия ПМ включена:{' '}
+                {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'}{' '}
+                интенсивность →{' '}
+                {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед
+              </div>
+            )}
+            {!pedAuto && peds.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
+                ⏸ Авто-прогрессия выключена → базовая progression цикла
+              </div>
+            )}
             <PedAdaptationCard adaptation={pedAdapt} />
             {/* 🥗 Питание (как в ББ-авто): профицит калорий + белок → MRV soft-cap (Helms 2022) */}
             <BbCard icon="🥗" accent="#22c55e" title="Питание" style={{ marginTop: 8 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <PopupNumber label="Профицит калорий (ккал/день)" value={plCalorieSurplus} onChange={v => setPlCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10%. Дефицит <-200 → -20% MRV (Helms 2022)" />
-                <PopupNumber label="Белок (г/кг)" value={plProteinPerKg} onChange={v => setPlProteinPerKg(v)} step={0.1} min={0.5} max={3} hint="≥2.0 → +10% MRV, ≥1.6 → +5%, <1.0 → -15% MRV" />
+                <PopupNumber
+                  label="Профицит калорий (ккал/день)"
+                  value={plCalorieSurplus}
+                  onChange={(v) => setPlCalorieSurplus(Math.round(v))}
+                  step={50}
+                  min={-500}
+                  max={1000}
+                  hint="Профицит >100 → +5% MRV, >300 → +10%. Дефицит <-200 → -20% MRV (Helms 2022)"
+                />
+                <PopupNumber
+                  label="Белок (г/кг)"
+                  value={plProteinPerKg}
+                  onChange={(v) => setPlProteinPerKg(v)}
+                  step={0.1}
+                  min={0.5}
+                  max={3}
+                  hint="≥2.0 → +10% MRV, ≥1.6 → +5%, <1.0 → -15% MRV"
+                />
               </div>
               {(() => {
                 const nut: Record<string, { cal: string; pro: string; tip: string }> = {
-                  strength: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы 5-7 г/кг для силовой производительности. 4-6 приёмов пищи.' },
-                  mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
-                  cut: { cal: 'Дефицит 300-500 ккал/день', pro: '2.2-2.8 г/кг (≥180 г/день)', tip: 'Белок повышен для сохранения мышц. Клетчатка 30+ г/день.' },
-                  recomp: { cal: 'Поддержание ±100 ккал', pro: '2.0-2.4 г/кг', tip: 'Циклирование углеводов: высокие в дни тренировок, низкие в дни отдыха.' },
-                  maintenance: { cal: 'Поддержание (TDEE)', pro: '1.6-2.0 г/кг', tip: 'Стабильное питание, контроль веса 1 раз/нед.' },
+                  strength: {
+                    cal: 'Профицит 300-500 ккал/день',
+                    pro: '1.8-2.2 г/кг (≥160 г/день)',
+                    tip: 'Углеводы 5-7 г/кг для силовой производительности. 4-6 приёмов пищи.',
+                  },
+                  mass: {
+                    cal: 'Профицит 300-500 ккал/день',
+                    pro: '1.8-2.2 г/кг (≥160 г/день)',
+                    tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.',
+                  },
+                  cut: {
+                    cal: 'Дефицит 300-500 ккал/день',
+                    pro: '2.2-2.8 г/кг (≥180 г/день)',
+                    tip: 'Белок повышен для сохранения мышц. Клетчатка 30+ г/день.',
+                  },
+                  recomp: {
+                    cal: 'Поддержание ±100 ккал',
+                    pro: '2.0-2.4 г/кг',
+                    tip: 'Циклирование углеводов: высокие в дни тренировок, низкие в дни отдыха.',
+                  },
+                  maintenance: {
+                    cal: 'Поддержание (TDEE)',
+                    pro: '1.6-2.0 г/кг',
+                    tip: 'Стабильное питание, контроль веса 1 раз/нед.',
+                  },
                 };
                 const n = nut[goal] || nut.strength;
                 const calMult = (pedAdapt.combinedMrvMultiplier - 1) * 3 + 1;
-                const adjCal = n.cal.replace(/\d+/, m => String(Math.round(Number(m) * calMult)));
+                const adjCal = n.cal.replace(/\d+/, (m) => String(Math.round(Number(m) * calMult)));
                 return (
                   <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
-                    <div><span style={{ color: '#fff' }}>Рекомендация: </span><span style={{ fontWeight: 700, color: '#f59e0b' }}>{adjCal}</span></div>
-                    <div><span style={{ color: '#fff' }}>Белок: </span><span style={{ fontWeight: 700, color: '#22c55e' }}>{n.pro}</span></div>
-                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#fff' }}>💡 </span><span style={{ color: '#fff' }}>{n.tip}</span></div>
+                    <div>
+                      <span style={{ color: '#fff' }}>Рекомендация: </span>
+                      <span style={{ fontWeight: 700, color: '#f59e0b' }}>{adjCal}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#fff' }}>Белок: </span>
+                      <span style={{ fontWeight: 700, color: '#22c55e' }}>{n.pro}</span>
+                    </div>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <span style={{ color: '#fff' }}>💡 </span>
+                      <span style={{ color: '#fff' }}>{n.tip}</span>
+                    </div>
                     {pedAdapt.combinedMrvMultiplier > 1 && (
                       <div style={{ gridColumn: '1/-1', marginTop: 4, fontSize: 10, color: '#f59e0b' }}>
-                        💉 PED увеличивают потребность в калориях — рекомендация по калориям скорректирована; белок при необходимости задайте полем «Белок (г/кг)» выше.
+                        💉 PED увеличивают потребность в калориях — рекомендация по калориям скорректирована; белок при
+                        необходимости задайте полем «Белок (г/кг)» выше.
                       </div>
                     )}
                   </div>
                 );
               })()}
               {/* 🏁 Тапер/соревнование: питание по фазе (сброс веса или набор к старту) */}
-              {(taperNote || mockMeetOn || meetWeekOn) && (() => {
-                const losing = bw > targetBw + 0.5;
-                return (
-                  <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
-                      🏁 Тапер{taperNote ? ' применён' : ' включён'}{mockMeetOn ? ' · 🎯 mock meet' : ''}{meetWeekOn ? ' · 🏁 соревнования' : ''} — питание по фазе
+              {(taperNote || mockMeetOn || meetWeekOn) &&
+                (() => {
+                  const losing = bw > targetBw + 0.5;
+                  return (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 8,
+                        borderRadius: 10,
+                        background: 'rgba(245,158,11,0.06)',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                      }}
+                    >
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+                        🏁 Тапер{taperNote ? ' применён' : ' включён'}
+                        {mockMeetOn ? ' · 🎯 mock meet' : ''}
+                        {meetWeekOn ? ' · 🏁 соревнования' : ''} — питание по фазе
+                      </div>
+                      {losing ? (
+                        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                          <b style={{ color: '#f59e0b' }}>Сброс веса к старту</b> ({bw} → {targetBw} кг): дефицит
+                          300-500 ккал, белок 2.2-2.8 г/кг (сохранить мышцы), клетчатка 30+ г. За 48-24ч — сгонка воды:
+                          вода+натрий → вода-натрий, взвешивание утром. MRV ниже при дефиците — объём ассистентов уже
+                          скорректирован.
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                          <b style={{ color: '#f59e0b' }}>Набор к старту</b> (вес в категории): профицит 200-400 ккал,
+                          белок 1.8-2.2 г/кг. За 48-72ч до прикидок — углеводная нагрузка 4-7 г/кг (гликоген к
+                          попыткам), соль по плану. Тапер = разгрузка, питание = заправка.
+                        </div>
+                      )}
                     </div>
-                    {losing ? (
-                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                        <b style={{ color: '#f59e0b' }}>Сброс веса к старту</b> ({bw} → {targetBw} кг): дефицит 300-500 ккал, белок 2.2-2.8 г/кг (сохранить мышцы), клетчатка 30+ г. За 48-24ч — сгонка воды: вода+натрий → вода-натрий, взвешивание утром. MRV ниже при дефиците — объём ассистентов уже скорректирован.
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                        <b style={{ color: '#f59e0b' }}>Набор к старту</b> (вес в категории): профицит 200-400 ккал, белок 1.8-2.2 г/кг. За 48-72ч до прикидок — углеводная нагрузка 4-7 г/кг (гликоген к попыткам), соль по плану. Тапер = разгрузка, питание = заправка.
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                  );
+                })()}
             </BbCard>
           </div>
           {/* 🧩 Сезон — встроен в Настройки (выбор одиночный / сезон) */}
           <PLSeasonBuilder
             mode={plSeasonMode}
             onModeChange={setPlSeasonMode}
-            selector={{ goal: goal as never, level: level as never, bodyWeight: bw, daysPerWeek: days, direction: dir as never, mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural' }}
-            meets={meetList.map(m => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart }))}
+            selector={{
+              goal: goal as never,
+              level: level as never,
+              bodyWeight: bw,
+              daysPerWeek: days,
+              direction: dir as never,
+              mode: pedAuto && peds.length > 0 ? 'on_course' : 'natural',
+            }}
+            meets={meetList.map((m) => ({ id: m.id, name: m.name, weeksToStart: m.weeksToStart }))}
             taper={{
               mode: peakMode,
               weightGoal: taperWeightGoal,
@@ -1760,17 +3272,41 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               windowWeeks: weeksToMeet,
             }}
             buildOpts={seasonBuildOpts}
-            onBuilt={(out, notes, segments) => { setBuiltSrc(out); setSrcWeek(1); setSeasonNotes(notes); setSeasonSegments(segments || []); if (notes && notes.length > 0) setMethodNote(notes[notes.length - 1]); }}
+            onBuilt={(out, notes, segments) => {
+              setBuiltSrc(out);
+              setSrcWeek(1);
+              setSeasonNotes(notes);
+              setSeasonSegments(segments || []);
+              if (notes && notes.length > 0) setMethodNote(notes[notes.length - 1]);
+            }}
             onNavigatePlan={() => setSubView('plan')}
           />
           {seasonNotes.length > 0 && (
-            <div role="alert" style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd', fontSize: 11, lineHeight: 1.5 }}>
-              {seasonNotes.map((n, i) => <div key={i}>{n}</div>)}
+            <div
+              role="alert"
+              style={{
+                marginTop: 8,
+                padding: 8,
+                borderRadius: 8,
+                background: 'rgba(139,92,246,0.08)',
+                border: '1px solid rgba(139,92,246,0.2)',
+                color: '#c4b5fd',
+                fontSize: 11,
+                lineHeight: 1.5,
+              }}
+            >
+              {seasonNotes.map((n, i) => (
+                <div key={i}>{n}</div>
+              ))}
             </div>
           )}
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>2 Корректор →</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>
+              2 Корректор →
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>
+              3 План →
+            </button>
           </div>
         </div>
       )}
@@ -1778,71 +3314,318 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'plan' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           {renderMacroEditBanner()}
-          {plSeasonMode !== 'season' && best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "#fff" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {plSeasonMode !== 'season' && best && (
+            <ExpandableCard
+              title={`🏆 Рекомендован: ${best.cycle.meta.title}`}
+              icon="🏆"
+              short={best.cycle.meta.description}
+              full={
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <b>Почему этот цикл:</b> {explainSelection(best)}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#fff' }}>{best.cycle.meta.howItWorks}</div>
+                  <button
+                    onClick={() => {
+                      try {
+                        setSelectedCycleId(best.cycle.meta.id);
+                        buildSrc(best.cycle.meta.id);
+                      } catch (error) {
+                        setMethodNote(`⚠ План не собран: ${(error as Error).message}`);
+                      }
+                    }}
+                    style={{
+                      marginTop: 10,
+                      width: '100%',
+                      padding: 10,
+                      borderRadius: 8,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: 'linear-gradient(135deg,var(--accent),#00c853)',
+                      color: '#000',
+                      fontWeight: 700,
+                      fontSize: 12,
+                    }}
+                  >
+                    ✅ Применить цикл и собрать план
+                  </button>
+                </>
+              }
+            />
+          )}
           {plSeasonMode !== 'season' && (
             <>
               <div style={H}>📂 Каталог силовых циклов ({filteredPlCycles.length})</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, marginBottom: 6 }}>
-                <PopupMultiSelect label="👤 Автор" options={authorOptions} selected={filterAuthors} onChange={setFilterAuthors} hint="Фильтр по автору цикла (LMS, Суровецкий, Шейко и др.)" />
-                <PopupMultiSelect label="🎯 Тип" options={typeOptions} selected={filterTypes} onChange={setFilterTypes} hint="Тип/период цикла: сила, выносливость, выход на пик, масса, смешанный" />
-                <PopupMultiSelect label="📶 Уровень" options={levelOptions} selected={filterLevels} onChange={setFilterLevels} hint="Уровень спортсмена (новичок, II-КМС, КМС-МС и т.д.)" />
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                  gap: 6,
+                  marginBottom: 6,
+                }}
+              >
+                <PopupMultiSelect
+                  label="👤 Автор"
+                  options={authorOptions}
+                  selected={filterAuthors}
+                  onChange={setFilterAuthors}
+                  hint="Фильтр по автору цикла (LMS, Суровецкий, Шейко и др.)"
+                />
+                <PopupMultiSelect
+                  label="🎯 Тип"
+                  options={typeOptions}
+                  selected={filterTypes}
+                  onChange={setFilterTypes}
+                  hint="Тип/период цикла: сила, выносливость, выход на пик, масса, смешанный"
+                />
+                <PopupMultiSelect
+                  label="📶 Уровень"
+                  options={levelOptions}
+                  selected={filterLevels}
+                  onChange={setFilterLevels}
+                  hint="Уровень спортсмена (новичок, II-КМС, КМС-МС и т.д.)"
+                />
               </div>
               {hasActiveFilters && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6, fontSize: 10, color: '#fff' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 6,
+                    marginBottom: 6,
+                    fontSize: 10,
+                    color: '#fff',
+                  }}
+                >
                   <span>Фильтр активен · найдено {filteredPlCycles.length}</span>
-                  <button onClick={resetAllFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer' }}>↺ Сбросить фильтры</button>
+                  <button
+                    onClick={resetAllFilters}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 8,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      background: 'rgba(255,255,255,0.04)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ↺ Сбросить фильтры
+                  </button>
                 </div>
               )}
-              <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={filteredPlCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
-              {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
-              <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед) — {getCycleById(selectedCycleId)?.meta.title || 'выберите цикл'}</button>
+              <PopupSelect
+                label="Выбор цикла из каталога"
+                value={selectedCycleId}
+                onChange={setSelectedCycleId}
+                hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть."
+                options={filteredPlCycles.map((c) => ({
+                  id: c.meta.id,
+                  label: c.meta.title,
+                  desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед`,
+                }))}
+              />
+              {(() => {
+                const c = getCycleById(selectedCycleId);
+                if (!c) return null;
+                return (
+                  <ExpandableCard
+                    title={c.meta.title}
+                    icon="📖"
+                    short={
+                      <>
+                        <b>Кратко:</b> {c.meta.description}
+                      </>
+                    }
+                    full={
+                      <>
+                        <div style={{ marginBottom: 8 }}>
+                          <b>Как работает цикл:</b> {c.meta.howItWorks}
+                        </div>
+                        {c.meta.conditions.length > 0 && (
+                          <div>
+                            <b>Условия применения:</b>
+                            <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                              {c.meta.conditions.map((cond, i) => (
+                                <li key={i} style={{ marginBottom: 3 }}>
+                                  {cond}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
+                    }
+                  />
+                );
+              })()}
+              <button
+                style={{ ...BTN, width: '100%', marginTop: 10, minHeight: 44, fontSize: 13 }}
+                onClick={() => {
+                  try {
+                    buildSrc();
+                  } catch (error) {
+                    setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`);
+                  }
+                }}
+              >
+                Сгенерировать план ({cycleWeeks} нед) — {getCycleById(selectedCycleId)?.meta.title || 'выберите цикл'}
+              </button>
             </>
           )}
           {/* 🏁 Компактный статус соревнований + переход в мастерскую тапера (отдельная вкладка) */}
-          <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              marginTop: 10,
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: 'rgba(245,158,11,0.05)',
+              border: '1px solid rgba(245,158,11,0.18)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 8,
+              flexWrap: 'wrap',
+            }}
+          >
             <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>
-              🏁 Соревнования сезона ({meetList.length}){taperNote ? ` · 📉 тапер в плане (+${taperWeeksToAdd} нед)` : ''}{mockMeetOn ? ' · 🎯 mock' : ''}{meetWeekOn ? ' · 🏁 старт' : ''}{postMeetOn ? ' · 🔄 пост' : ''}
+              🏁 Соревнования сезона ({meetList.length})
+              {taperNote ? ` · 📉 тапер в плане (+${taperWeeksToAdd} нед)` : ''}
+              {mockMeetOn ? ' · 🎯 mock' : ''}
+              {meetWeekOn ? ' · 🏁 старт' : ''}
+              {postMeetOn ? ' · 🔄 пост' : ''}
             </div>
             <button
               onClick={() => setSubView('competition')}
-              style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', background: 'rgba(245,158,11,0.1)' }}
+              style={{
+                ...BTN_GHOST,
+                minHeight: 36,
+                fontSize: 10,
+                border: '1px solid rgba(245,158,11,0.4)',
+                color: '#f59e0b',
+                background: 'rgba(245,158,11,0.1)',
+              }}
               title="Открыть мастерскую тапера: сезон, параметры, тренер, генерация тапер-плана"
-            >⚙️ Открыть мастерскую тапера →</button>
+            >
+              ⚙️ Открыть мастерскую тапера →
+            </button>
           </div>
-          <PLPlanView api={{
-             builtSrc: builtSrc!,
-             effectiveSrc,
-             setBuiltSrc: p => setBuiltSrc(p),
-            srcWeek, setSrcWeek, srcEdits, setSrcEdits, srcAdditions, setSrcAdditions,
-            editMode, setEditMode, setKey, effSet, dayKey, addExToDay,
-            pickerDay, setPickerDay, pickerGroup, setPickerGroup, pickerExName, setPickerExName,
-            pickerScheme, setPickerScheme, days, calendarView, setCalendarView,
-            onNote: setMethodNote,
-            buildSrc: () => buildSrc(),
-            selectedCycleId, cycleWeeks, goal, level, peds, pedDoses, pedAuto, courseIntensity,
-            autoRegMode, setAutoRegMode, autoRegResult, bridgeRir, pmSquat, pmBench, pmDead,
-             pmAutoRegMode, setPmAutoRegMode, periodizationMode, setPeriodizationMode, pmDiary,
-            best: ranked[0] as never,
-            plWeakPoints,
-            linked, runFocus, diaryAutoreg, calibratePmFromDiary, applyPmFromCycle,
-            historyWorkouts, currentWeek: srcWeek,
-            e1rmSeries, exerciseE1rm, exTrendSeries, playerDays, selectedTrendEx, setSelectedTrendEx,
-            tempoStr, getTempo,
-             hasDeload: planHasDeload(effectiveSrc ?? builtSrc),
-            onRemoveDeload: handleRemoveDeload,
-          }} />
-           <BlockView plan={effectiveSrc ?? builtSrc} />
-           <PLToolsCard level={level} days={days} totalSets={plToolTotalSets} bodyWeight={linked.profile?.settings?.personal?.weight ?? bw} sex={linked.profile?.settings?.personal?.sex} e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }} hrvRatio={linked.profile?.settings?.baselineHrvRatio} acwr={acwrData.ratio} rpeDelta={autoRegResult.rirShift} plan={effectiveSrc ?? builtSrc} onApplyFrequency={(plans)=>{ const m: Record<string, number[]> = {}; plans.forEach(p=>{ m[p.muscle]=Array.from({length:p.frequency},(_,i)=>i+1); }); setWeakGroupDayMap(m);
-             // Аудит P1: раньше кнопка писала ТОЛЬКО weakGroupDayMap, а инъекция
-             // аксессуаров в lms-builder идёт по weakPoints — если группа ещё не
-             // выбрана слабой, «Применить в план» было тихим no-op при тосте «применена».
-             // Теперь частотный совет реально помечает группы слабыми.
-             const ru = PL_TOOL_GROUP_RU; const added = plans.map(p=>`${ru[p.muscle] ?? p.muscle} ${p.frequency}×`).join(', ');
-             setWeakPoints(prev => Array.from(new Set([...prev, ...plans.map(p=>p.muscle)])));
-             setMethodNote(`📊 Частота применена: ${added} — группы помечены слабыми, пересоберите план.`);
-           }} />
+          <PLPlanView
+            api={{
+              builtSrc: builtSrc!,
+              effectiveSrc,
+              srcWeek,
+              setSrcWeek,
+              srcEdits,
+              setSrcEdits,
+              srcAdditions,
+              setSrcAdditions,
+              editMode,
+              setEditMode,
+              setKey,
+              effSet,
+              dayKey,
+              addExToDay,
+              pickerDay,
+              setPickerDay,
+              pickerGroup,
+              setPickerGroup,
+              pickerExName,
+              setPickerExName,
+              pickerScheme,
+              setPickerScheme,
+              days,
+              calendarView,
+              setCalendarView,
+              onNote: setMethodNote,
+              selectedCycleId,
+              cycleWeeks,
+              goal,
+              level,
+              peds,
+              pedDoses,
+              pedAuto,
+              courseIntensity,
+              autoRegMode,
+              setAutoRegMode: changeAutoRegMode,
+              autoRegResult,
+              autoRegCfg,
+              onApplyAutoReg: applyAutoRegConfig,
+              onResetAutoReg: resetAutoRegConfig,
+              bridgeRir,
+              pmSquat,
+              pmBench,
+              pmDead,
+              pmAutoRegMode,
+              setPmAutoRegMode,
+              periodizationMode,
+              setPeriodizationMode,
+              pmDiary,
+              best: ranked[0] as never,
+              plWeakPoints,
+              linked,
+              runFocus,
+              diaryAutoreg,
+              calibratePmFromDiary,
+              applyPmFromCycle,
+              historyWorkouts,
+              currentWeek: srcWeek,
+              e1rmSeries,
+              exerciseE1rm,
+              exTrendSeries,
+              playerDays,
+              selectedTrendEx,
+              setSelectedTrendEx,
+              tempoStr,
+              getTempo,
+              hasDeload: planHasDeload(effectiveSrc ?? builtSrc),
+              onRemoveDeload: handleRemoveDeload,
+            }}
+          />
+          <BlockView plan={effectiveSrc ?? builtSrc} />
+          <PLToolsCard
+            level={level}
+            days={days}
+            totalSets={plToolTotalSets}
+            bodyWeight={linked.profile?.settings?.personal?.weight ?? bw}
+            sex={linked.profile?.settings?.personal?.sex}
+            e1RM={{ squat: pmSquat, bench: pmBench, deadlift: pmDead }}
+            hrvRatio={linked.profile?.settings?.baselineHrvRatio}
+            acwr={acwrData.ratio}
+            rpeDelta={autoRegResult.rirShift}
+            plan={effectiveSrc ?? builtSrc}
+            onApplyFrequency={(plans) => {
+              const m: Record<string, number[]> = {};
+              plans.forEach((p) => {
+                m[p.muscle] = Array.from({ length: p.frequency }, (_, i) => i + 1);
+              });
+              setWeakGroupDayMap(m);
+              // Аудит P1: раньше кнопка писала ТОЛЬКО weakGroupDayMap, а инъекция
+              // аксессуаров в lms-builder идёт по weakPoints — если группа ещё не
+              // выбрана слабой, «Применить в план» было тихим no-op при тосте «применена».
+              // Теперь частотный совет реально помечает группы слабыми.
+              const ru = PL_TOOL_GROUP_RU;
+              const added = plans.map((p) => `${ru[p.muscle] ?? p.muscle} ${p.frequency}×`).join(', ');
+              setWeakPoints((prev) => Array.from(new Set([...prev, ...plans.map((p) => p.muscle)])));
+              setMethodNote(`📊 Частота применена: ${added} — группы помечены слабыми, пересоберите план.`);
+            }}
+          />
           {plSeasonMode === 'season' && (
-            <div role="status" style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 11, color: '#c4b5fd', lineHeight: 1.5 }}>
+            <div
+              role="status"
+              style={{
+                marginTop: 10,
+                padding: '8px 12px',
+                borderRadius: 10,
+                background: 'rgba(139,92,246,0.06)',
+                border: '1px solid rgba(139,92,246,0.2)',
+                fontSize: 11,
+                color: '#c4b5fd',
+                lineHeight: 1.5,
+              }}
+            >
               {seasonNotes.length > 0 ? (
                 <>
                   <div style={{ fontWeight: 800, marginBottom: 4 }}>🧩 Сезон по микроциклам</div>
@@ -1853,29 +3636,69 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                         const isExtend = s.fitMode === 'extend' || s.fitMode === 'proposed_extend';
                         const isBlocked = s.fitMode === 'strict_skip';
                         return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ color: 'rgba(196,181,253,0.85)' }}>{s.periodLabel ? `${s.periodLabel}: ` : ''}{s.cycleTitle} · {s.weeks} нед</span>
-                          {isShrink && <span style={{ color: '#fb923c', fontWeight: 700, fontSize: 10 }}>⬇ сжат по согласию {s.cycleWeeks}→{s.weeks}</span>}
-                          {isExtend && <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: 10 }}>⬆ растянут по согласию</span>}
-                          {s.fitMode === 'skip' && <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10 }}>только старт</span>}
-                          {isBlocked && <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 10 }}>⛔ без согласия — пропущен</span>}
-                        </div>
-                      );})}
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ color: 'rgba(196,181,253,0.85)' }}>
+                              {s.periodLabel ? `${s.periodLabel}: ` : ''}
+                              {s.cycleTitle} · {s.weeks} нед
+                            </span>
+                            {isShrink && (
+                              <span style={{ color: '#fb923c', fontWeight: 700, fontSize: 10 }}>
+                                ⬇ сжат по согласию {s.cycleWeeks}→{s.weeks}
+                              </span>
+                            )}
+                            {isExtend && (
+                              <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: 10 }}>
+                                ⬆ растянут по согласию
+                              </span>
+                            )}
+                            {s.fitMode === 'skip' && (
+                              <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10 }}>только старт</span>
+                            )}
+                            {isBlocked && (
+                              <span style={{ color: '#ef4444', fontWeight: 700, fontSize: 10 }}>
+                                ⛔ без согласия — пропущен
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  {seasonNotes.slice(0, 8).map((n, i) => <div key={i} style={{ color: 'rgba(196,181,253,0.6)', fontSize: 10 }}>{n}</div>)}
+                  {seasonNotes.slice(0, 8).map((n, i) => (
+                    <div key={i} style={{ color: 'rgba(196,181,253,0.6)', fontSize: 10 }}>
+                      {n}
+                    </div>
+                  ))}
                 </>
               ) : (
                 <>
-                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» в «1 Настройки» (карточка Сезон). Здесь будет итоговый план (включая пик/тапер под соревнования).
-                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('settings')}>→ 1 Настройки</button>
+                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать
+                  сезон» в «1 Настройки» (карточка Сезон). Здесь будет итоговый план (включая пик/тапер под
+                  соревнования).
+                  <button
+                    style={{
+                      ...BTN_GHOST,
+                      minHeight: 32,
+                      fontSize: 10,
+                      marginLeft: 6,
+                      border: '1px solid rgba(168,85,247,0.4)',
+                      color: '#c4b5fd',
+                    }}
+                    onClick={() => setSubView('settings')}
+                  >
+                    → 1 Настройки
+                  </button>
                 </>
               )}
             </div>
           )}
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>← 2 Слабые точки + 10 калькуляторов</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>4 Графики →</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>
+              ← 2 Слабые точки + 10 калькуляторов
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>
+              4 Графики →
+            </button>
           </div>
         </div>
       )}
@@ -1883,53 +3706,105 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'charts' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>4 📊 Графики</div>
-           {effectiveSrc && effectiveSrc.weeks.length > 0 && (() => {
-             const W = effectiveSrc.weeks;
-            const weekData = W.map(wk => ({
-              week: wk.week,
-              sets: wk.days.reduce((s, d) => s + d.exercises.reduce((ss, e) => ss + (e.workSets || []).reduce((s2, ws) => s2 + (ws.sets || 0), 0), 0), 0),
-              tonnage: wk.days.reduce((s, d) => s + (d.metrics?.tonnage || 0), 0),
-            }));
-            const maxT = Math.max(1, ...weekData.map(w => w.tonnage));
-            return (
-              <BbCard icon="🔥" accent="#fb7185" title="Объём по неделям (heatmap)" style={{ marginTop: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(34px, 1fr))', gap: 4 }}>
-                  {weekData.map(w => {
-                    const intensity = w.tonnage / maxT;
-                    const bg = intensity > 0.85 ? '#ef4444' : intensity > 0.6 ? '#f59e0b' : intensity > 0.35 ? '#eab308' : intensity > 0.15 ? '#22c55e' : '#14532d';
-                    return (
-                      <div key={w.week} title={`Неделя ${w.week}: ${ruCount(w.sets, RU_SETS)} · ${Math.round(w.tonnage).toLocaleString('ru-RU')} кг`} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg, color: intensity > 0.6 ? '#000' : '#fff', fontSize: 10, fontWeight: 800, cursor: 'default' }}>{w.week}</div>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
-              </BbCard>
-            );
-          })()}
+          {effectiveSrc &&
+            effectiveSrc.weeks.length > 0 &&
+            (() => {
+              const W = effectiveSrc.weeks;
+              const weekData = W.map((wk) => ({
+                week: wk.week,
+                sets: wk.days.reduce(
+                  (s, d) =>
+                    s +
+                    d.exercises.reduce(
+                      (ss, e) => ss + (e.workSets || []).reduce((s2, ws) => s2 + (ws.sets || 0), 0),
+                      0,
+                    ),
+                  0,
+                ),
+                tonnage: wk.days.reduce((s, d) => s + (d.metrics?.tonnage || 0), 0),
+              }));
+              const maxT = Math.max(1, ...weekData.map((w) => w.tonnage));
+              return (
+                <BbCard icon="🔥" accent="#fb7185" title="Объём по неделям (heatmap)" style={{ marginTop: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(34px, 1fr))', gap: 4 }}>
+                    {weekData.map((w) => {
+                      const intensity = w.tonnage / maxT;
+                      const bg =
+                        intensity > 0.85
+                          ? '#ef4444'
+                          : intensity > 0.6
+                            ? '#f59e0b'
+                            : intensity > 0.35
+                              ? '#eab308'
+                              : intensity > 0.15
+                                ? '#22c55e'
+                                : '#14532d';
+                      return (
+                        <div
+                          key={w.week}
+                          title={`Неделя ${w.week}: ${ruCount(w.sets, RU_SETS)} · ${Math.round(w.tonnage).toLocaleString('ru-RU')} кг`}
+                          style={{
+                            textAlign: 'center',
+                            padding: '6px 2px',
+                            borderRadius: 6,
+                            background: bg,
+                            color: intensity > 0.6 ? '#000' : '#fff',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            cursor: 'default',
+                          }}
+                        >
+                          {w.week}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>
+                    Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг.
+                    Светло-зелёные — разгрузки/тапер.
+                  </div>
+                </BbCard>
+              );
+            })()}
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
           {/* 📈 Тренды e1RM из дневника (план: шаг 4 — графики) */}
           <BbCard icon="📈" accent="#60a5fa" title="Тренды e1RM (из дневника тренировок)" style={{ marginTop: 8 }}>
             {e1rmSeries.length === 0 ? (
-              <div style={{ fontSize: 11, color: '#fff' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
+              <div style={{ fontSize: 11, color: '#fff' }}>
+                Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.
+              </div>
             ) : (
               <div style={{ marginBottom: 8 }}>
-                {e1rmSeries.map(s => {
-                  const W = 100, H = 34;
-                  const pts = s.pts.map(p => p.val);
-                  const min = Math.min(...pts), max = Math.max(...pts);
+                {e1rmSeries.map((s) => {
+                  const W = 100,
+                    H = 34;
+                  const pts = s.pts.map((p) => p.val);
+                  const min = Math.min(...pts),
+                    max = Math.max(...pts);
                   const range = Math.max(1, max - min);
                   const px = (i: number) => (i / Math.max(1, pts.length - 1)) * W;
                   const py = (v: number) => H - 3 - ((v - min) / range) * (H - 6);
-                  const trend = pts.length >= 2 ? ((pts[pts.length - 1] - pts[0]) / Math.max(1, pts[0]) * 100) : 0;
+                  const trend = pts.length >= 2 ? ((pts[pts.length - 1] - pts[0]) / Math.max(1, pts[0])) * 100 : 0;
                   const dirColor = trend <= -5 ? '#ef4444' : trend <= 1 ? '#eab308' : '#22c55e';
                   return (
                     <div key={s.lift} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: s.color, width: 84, flexShrink: 0 }}>{s.label} {pts[pts.length - 1]} кг</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: s.color, width: 84, flexShrink: 0 }}>
+                        {s.label} {pts[pts.length - 1]} кг
+                      </div>
                       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ flex: 1, maxWidth: 180 }}>
-                        <polyline points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={1.6} />
-                        {s.pts.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />)}
+                        <polyline
+                          points={s.pts.map((p, i) => `${px(i)},${py(p.val)}`).join(' ')}
+                          fill="none"
+                          stroke={s.color}
+                          strokeWidth={1.6}
+                        />
+                        {s.pts.map((p, i) => (
+                          <circle key={i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />
+                        ))}
                       </svg>
-                      <span style={{ fontSize: 10, fontWeight: 700, color: dirColor, flexShrink: 0 }}>{trend > 0 ? '▲' : trend < 0 ? '▼' : '→'} {Math.abs(trend).toFixed(1)}%</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: dirColor, flexShrink: 0 }}>
+                        {trend > 0 ? '▲' : trend < 0 ? '▼' : '→'} {Math.abs(trend).toFixed(1)}%
+                      </span>
                     </div>
                   );
                 })}
@@ -1937,43 +3812,76 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             )}
             {exerciseE1rm.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Тренд по упражнению:</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                  Тренд по упражнению:
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-                  {exerciseE1rm.slice(0, 15).map(e => (
-                    <button key={e.name} onClick={() => setSelectedTrendEx(selectedTrendEx === e.name ? null : e.name)} style={{
-                      padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
-                      border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
-                      background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
-                      color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff',
-                    }}>{e.name} · {e.e1} кг</button>
+                  {exerciseE1rm.slice(0, 15).map((e) => (
+                    <button
+                      key={e.name}
+                      onClick={() => setSelectedTrendEx(selectedTrendEx === e.name ? null : e.name)}
+                      style={{
+                        padding: '4px 9px',
+                        borderRadius: 14,
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: 10,
+                        border:
+                          selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
+                        background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
+                        color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff',
+                      }}
+                    >
+                      {e.name} · {e.e1} кг
+                    </button>
                   ))}
                 </div>
-                {selectedTrendEx && (() => {
-                  if (exTrendSeries.length < 2) {
-                    return <div style={{ fontSize: 10, color: '#fff' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
-                  }
-                  const vals = exTrendSeries.map(p => p.e1);
-                  const W = 100, H = 40;
-                  const min = Math.min(...vals), max = Math.max(...vals);
-                  const range = Math.max(1, max - min);
-                  const px = (i: number) => (i / Math.max(1, vals.length - 1)) * W;
-                  const py = (v: number) => H - 3 - ((v - min) / range) * (H - 6);
-                  return (
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>{selectedTrendEx} · посл: {vals[vals.length - 1]} кг</div>
-                      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 200 }}>
-                        <polyline points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
-                        {exTrendSeries.map((p, i) => <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />)}
-                      </svg>
-                    </div>
-                  );
-                })()}
+                {selectedTrendEx &&
+                  (() => {
+                    if (exTrendSeries.length < 2) {
+                      return (
+                        <div style={{ fontSize: 10, color: '#fff' }}>
+                          нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})
+                        </div>
+                      );
+                    }
+                    const vals = exTrendSeries.map((p) => p.e1);
+                    const W = 100,
+                      H = 40;
+                    const min = Math.min(...vals),
+                      max = Math.max(...vals);
+                    const range = Math.max(1, max - min);
+                    const px = (i: number) => (i / Math.max(1, vals.length - 1)) * W;
+                    const py = (v: number) => H - 3 - ((v - min) / range) * (H - 6);
+                    return (
+                      <div>
+                        <div style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>
+                          {selectedTrendEx} · посл: {vals[vals.length - 1]} кг
+                        </div>
+                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 200 }}>
+                          <polyline
+                            points={exTrendSeries.map((p, i) => `${px(i)},${py(p.e1)}`).join(' ')}
+                            fill="none"
+                            stroke="var(--accent)"
+                            strokeWidth={1.8}
+                          />
+                          {exTrendSeries.map((p, i) => (
+                            <circle key={i} cx={px(i)} cy={py(p.e1)} r={2.5} fill="var(--accent)" />
+                          ))}
+                        </svg>
+                      </div>
+                    );
+                  })()}
               </>
             )}
           </BbCard>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>← 3 План</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('reference')}>5 Справка и отчёты →</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>
+              ← 3 План
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('reference')}>
+              5 Справка и отчёты →
+            </button>
           </div>
         </div>
       )}
@@ -1981,39 +3889,110 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'reference' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>5 📚 Справка и отчёты</div>
-           {effectiveSrc && (
+          {effectiveSrc && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
               <button
                 onClick={() => {
                   try {
                     const cycle = getCycleById(selectedCycleId);
-                    const scope = plSeasonMode === 'season'
-                      ? `Сезон по микроциклам · ${seasonSegments.map(s => s.cycleTitle).join(' → ')}`
-                      : (cycle ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед` : 'Силовой цикл ПЛ');
-                     const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, effectiveSrc!.weeks, {
+                    const scope =
+                      plSeasonMode === 'season'
+                        ? `Сезон по микроциклам · ${seasonSegments.map((s) => s.cycleTitle).join(' → ')}`
+                        : cycle
+                          ? `${cycle.meta.title} · ${cycle.meta.level} · ${cycle.meta.weeks} нед`
+                          : 'Силовой цикл ПЛ';
+                    const html = buildPLPrintHtml('Силовой цикл ПЛ', scope, effectiveSrc!.weeks, {
                       summary: plPrintSummary(),
                     });
                     printPLHtml(html, { title: 'ПЛ-план', text: 'Печать / PDF плана силового цикла' });
-                  } catch (e) { setMethodNote('⚠ Ошибка печати: ' + (e as Error).message); }
+                  } catch (e) {
+                    setMethodNote('⚠ Ошибка печати: ' + (e as Error).message);
+                  }
                 }}
-                style={{ ...BTN_GHOST, minHeight: 36, fontSize: 11, border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }}
-              >🖨 Печать / PDF</button>
+                style={{
+                  ...BTN_GHOST,
+                  minHeight: 36,
+                  fontSize: 11,
+                  border: '1px solid rgba(0,230,138,0.3)',
+                  color: '#00e68a',
+                }}
+              >
+                🖨 Печать / PDF
+              </button>
               <button
                 onClick={() => {
                   try {
-                     const wb = buildPLExcelWorkbook('Силовой цикл ПЛ', plExportRows(effectiveSrc!.weeks), plPrintSummary());
+                    const wb = buildPLExcelWorkbook(
+                      'Силовой цикл ПЛ',
+                      plExportRows(effectiveSrc!.weeks),
+                      plPrintSummary(),
+                    );
                     downloadPLExcel(wb, 'pl-plan.xlsx');
-                  } catch (e) { setMethodNote('⚠ Ошибка экспорта: ' + (e as Error).message); }
+                  } catch (e) {
+                    setMethodNote('⚠ Ошибка экспорта: ' + (e as Error).message);
+                  }
                 }}
-                style={{ ...BTN_GHOST, minHeight: 36, fontSize: 11, border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
-              >📥 Excel (.xlsx)</button>
+                style={{
+                  ...BTN_GHOST,
+                  minHeight: 36,
+                  fontSize: 11,
+                  border: '1px solid rgba(96,165,250,0.3)',
+                  color: '#60a5fa',
+                }}
+              >
+                📥 Excel (.xlsx)
+              </button>
             </div>
           )}
-           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
-             {effectiveSrc && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>📦 Block View — весь блок</div><BlockView plan={effectiveSrc} /></div>}
-            <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>← 4 Графики</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
+          {(() => {
+            const c = getCycleById(selectedCycleId);
+            if (!c) return null;
+            return (
+              <ExpandableCard
+                title={c.meta.title}
+                icon="📖"
+                short={
+                  <>
+                    <b>Кратко:</b> {c.meta.description}
+                  </>
+                }
+                full={
+                  <>
+                    <div style={{ marginBottom: 8 }}>
+                      <b>Как работает цикл:</b> {c.meta.howItWorks}
+                    </div>
+                    {c.meta.conditions.length > 0 && (
+                      <div>
+                        <b>Условия применения:</b>
+                        <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                          {c.meta.conditions.map((cond, i) => (
+                            <li key={i} style={{ marginBottom: 3 }}>
+                              {cond}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                }
+              />
+            );
+          })()}
+          {effectiveSrc && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', marginBottom: 6 }}>
+                📦 Block View — весь блок
+              </div>
+              <BlockView plan={effectiveSrc} />
+            </div>
+          )}
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>
+              ← 4 Графики
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>
+              🏁 Соревнования →
+            </button>
           </div>
         </div>
       )}
@@ -2021,133 +4000,386 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {/* 🔧 Корректор движений — единый готовый инструмент 9 лифтов + видео (вместо легаси 4 слоя) */}
       {mainTab === 'pl' && subView === 'diagnostics' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <LiftMasterCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+          <LiftMasterCard
+            dayCount={getCycleById(selectedCycleId)?.week1?.length || 3}
+            template={getCycleById(selectedCycleId) ?? null}
+            sessions={diarySessions}
+          />
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>
+              ← 1 Настройки
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>
+              3 План →
+            </button>
           </div>
         </div>
       )}
 
       {subView === 'macro' && mainTab === 'pl' && (
-        <BbCard icon="🏁" accent="#f59e0b" title="Тапер/пик в макроцикле (ПЛ)" style={{ margin: '0 0 10px', background: 'rgba(245,158,11,0.05)' }}>
+        <BbCard
+          icon="🏁"
+          accent="#f59e0b"
+          title="Тапер/пик в макроцикле (ПЛ)"
+          style={{ margin: '0 0 10px', background: 'rgba(245,158,11,0.05)' }}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <PopupSelect label="Раскладка тапера макроцикла" value={macroTaperMode} onChange={v => setMacroTaperMode(v as TaperMode)} hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация). Отдельно от циклового тапера («🏁 Соревнования»)" options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m], desc: '' }))} />
-            <PopupSelect label="Весовая цель (макроцикл)" value={macroWeightGoal} onChange={v => setMacroWeightGoal(v as TaperWeightGoal)} hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём" options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map(g => ({ id: g, label: TAPER_WEIGHT_GOAL_LABELS[g], desc: '' }))} />
+            <PopupSelect
+              label="Раскладка тапера макроцикла"
+              value={macroTaperMode}
+              onChange={(v) => setMacroTaperMode(v as TaperMode)}
+              hint="Как снижается объём к старту: классика (Bosquet, разгрузка), ПЛ-пик-протокол (интенсификация к 100%), про-кривая по усталости или Classic WF (перегрузка → суперкомпенсация). Отдельно от циклового тапера («🏁 Соревнования»)"
+              options={(['classic', 'pl', 'pro', 'wf'] as TaperMode[]).map((m) => ({
+                id: m,
+                label: TAPER_MODE_LABELS[m],
+                desc: '',
+              }))}
+            />
+            <PopupSelect
+              label="Весовая цель (макроцикл)"
+              value={macroWeightGoal}
+              onChange={(v) => setMacroWeightGoal(v as TaperWeightGoal)}
+              hint="Сгонка к категории режет объём тапера ×0.9 (дефицит → MRV ниже); набор/стабильный — полный объём"
+              options={(['auto', 'lose', 'gain', 'maintain'] as TaperWeightGoal[]).map((g) => ({
+                id: g,
+                label: TAPER_WEIGHT_GOAL_LABELS[g],
+                desc: '',
+              }))}
+            />
             <button
-              onClick={() => { try { const r = recommendTaperConfig(buildCoachCtx()); setMacroTaperMode(r.mode); setMacroWeightGoal(r.weightGoal); setMacroMockMeet(r.mockMeet); setMacroPostMeet(r.postMeet); setMethodNote(`🤖 Тренер подобрал тапер макроцикла: ${r.rationale.join(' ')}`); } catch (error) { setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`); } }}
-              style={{ minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+              onClick={() => {
+                try {
+                  const r = recommendTaperConfig(buildCoachCtx());
+                  setMacroTaperMode(r.mode);
+                  setMacroWeightGoal(r.weightGoal);
+                  setMacroMockMeet(r.mockMeet);
+                  setMacroPostMeet(r.postMeet);
+                  setMethodNote(`🤖 Тренер подобрал тапер макроцикла: ${r.rationale.join(' ')}`);
+                } catch (error) {
+                  setMethodNote(`⚠ Ошибка подбора: ${(error as Error).message}`);
+                }
+              }}
+              style={{
+                minHeight: 40,
+                borderRadius: 8,
+                fontSize: 10,
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '8px 12px',
+                border: '1px solid rgba(167,139,250,0.4)',
+                color: '#a78bfa',
+                background: 'rgba(139,92,246,0.1)',
+              }}
               title="Подобрать схему/весовую цель тапера макроцикла под усталость, ACWR, вес и план ПМ"
-            >🤖 Подобрать</button>
-            <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 40, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : '#fff' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
+            >
+              🤖 Подобрать
+            </button>
+            <button
+              onClick={() => setMacroMockMeet((v) => !v)}
+              style={{
+                ...BTN_GHOST,
+                minHeight: 40,
+                fontSize: 10,
+                border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)',
+                background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)',
+                color: macroMockMeet ? '#a78bfa' : '#fff',
+              }}
+            >
+              🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : '#fff' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
-            <span style={{ alignSelf: 'center', fontSize: 10, color: '#fff', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
+            <button
+              onClick={() => setMacroPostMeet((v) => !v)}
+              style={{
+                ...BTN_GHOST,
+                minHeight: 36,
+                fontSize: 10,
+                flex: 1,
+                minWidth: 180,
+                border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)',
+                background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)',
+                color: macroPostMeet ? '#34d399' : '#fff',
+              }}
+            >
+              🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}
+            </button>
+            <span style={{ alignSelf: 'center', fontSize: 10, color: '#fff', flex: 2, minWidth: 200 }}>
+              Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и
+              пост-разгрузка — для КАЖДОГО старта.
+            </span>
           </div>
         </BbCard>
       )}
-      {subView === 'macro' && <MacrocyclePanel taperMode={macroTaperMode} level={macroLevel} goal={macroGoal} onLevelChange={setMacroLevel} onGoalChange={setMacroGoal} onApplyMacrocycle={(macro, sourceChangeConsent = false) => {
-        try {
-          if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle, sourceChangeConsent);
-          else applyBBMacrocycleSafe(macro as Macrocycle | BBMacrocycle);
-        } catch (error) {
-          setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
-          setSubView('plan');
-        }
-      }} onApplyCycle={(cycleId, weeks) => {
-        if (mainTab === 'bb') {
-          // ББ-авто: legacy-кнопка блока, применяем сохранённый BB-макроцикл целиком.
-          try {
-            const raw = localStorage.getItem('he_bb_macro');
-            if (raw) {
-              const bbMacro = deserializeBbMacro(raw);
-              if (bbMacro) { applyBBMacrocycleSafe(bbMacro); return; }
-            }
-            // Fallback на PL-макроцикл
-            const rawPl = localStorage.getItem('he_pl_macro');
-            if (!rawPl) { setSubView('plan'); return; }
-            const macro = deserializeMacro(rawPl);
-            if (!macro) { setSubView('plan'); return; }
-            applyBBMacrocycleSafe(macro);
-           } catch (error) {
-              setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
+      {subView === 'macro' && (
+        <MacrocyclePanel
+          taperMode={macroTaperMode}
+          level={macroLevel}
+          goal={macroGoal}
+          onLevelChange={setMacroLevel}
+          onGoalChange={setMacroGoal}
+          onApplyMacrocycle={(macro, sourceChangeConsent = false) => {
+            try {
+              if (mainTab === 'pl') buildSrcMacrocycle(macro as Macrocycle, sourceChangeConsent);
+              else applyBBMacrocycleSafe(macro as Macrocycle | BBMacrocycle);
+            } catch (error) {
+              setMethodNote(`⚠ Макроцикл не применён: ${(error as Error).message}`);
               setSubView('plan');
             }
-        } else {
-          // ПЛ-авто: загрузить выбранный СРЦ-цикл.
-          // Длина плана = оригинал цикла; если блок года длиннее/короче —
-          // честно сообщаем, что адаптация выполняется лишь через «Применить весь макроцикл».
-          try {
-            const tplApply = getCycleById(cycleId);
-            const originalWeeks = tplApply ? originalCycleWeeks(tplApply) : weeks;
-            setSelectedCycleId(cycleId);
-            setCycleWeeks(originalWeeks);
-            buildSrc(cycleId);
-            if (tplApply && originalWeeks !== weeks) {
-              setMethodNote(`ℹ️ Цикл «${tplApply.meta.title}» (${originalWeeks} нед) применён как есть — блок ${weeks} нед. Для адаптации раскладки используйте «🗓 Применить весь макроцикл» (по согласию).`);
+          }}
+          onApplyCycle={(cycleId, weeks) => {
+            if (mainTab === 'bb') {
+              // ББ-авто: legacy-кнопка блока, применяем сохранённый BB-макроцикл целиком.
+              try {
+                const raw = localStorage.getItem('he_bb_macro');
+                if (raw) {
+                  const bbMacro = deserializeBbMacro(raw);
+                  if (bbMacro) {
+                    applyBBMacrocycleSafe(bbMacro);
+                    return;
+                  }
+                }
+                // Fallback на PL-макроцикл
+                const rawPl = localStorage.getItem('he_pl_macro');
+                if (!rawPl) {
+                  setSubView('plan');
+                  return;
+                }
+                const macro = deserializeMacro(rawPl);
+                if (!macro) {
+                  setSubView('plan');
+                  return;
+                }
+                applyBBMacrocycleSafe(macro);
+              } catch (error) {
+                setMethodNote(`⚠ Макроцикл ББ не применён: ${(error as Error).message}`);
+                setSubView('plan');
+              }
+            } else {
+              // ПЛ-авто: загрузить выбранный СРЦ-цикл.
+              // Длина плана = оригинал цикла; если блок года длиннее/короче —
+              // честно сообщаем, что адаптация выполняется лишь через «Применить весь макроцикл».
+              try {
+                const tplApply = getCycleById(cycleId);
+                const originalWeeks = tplApply ? originalCycleWeeks(tplApply) : weeks;
+                setSelectedCycleId(cycleId);
+                setCycleWeeks(originalWeeks);
+                buildSrc(cycleId);
+                if (tplApply && originalWeeks !== weeks) {
+                  setMethodNote(
+                    `ℹ️ Цикл «${tplApply.meta.title}» (${originalWeeks} нед) применён как есть — блок ${weeks} нед. Для адаптации раскладки используйте «🗓 Применить весь макроцикл» (по согласию).`,
+                  );
+                }
+              } catch (error) {
+                setMethodNote(`⚠ Цикл не применён: ${(error as Error).message}`);
+              }
+              setSubView('plan');
             }
-          } catch (error) {
-            setMethodNote(`⚠ Цикл не применён: ${(error as Error).message}`);
-          }
-          setSubView('plan');
-        }
-      }} onEditMicrocycle={(cycleId, weeks, phase, isBB, blockIdx) => {
-        // MC-5: сохраняем контекст правки блока и открываем конструктор с его данными.
-        try {
-          localStorage.setItem('he_macro_edit_ctx', JSON.stringify({ isBB, cycleId, weeks, phase, blockIdx }));
-        } catch { /* ignore */ }
-        if (isBB) {
-          // ББ-авто: недели блока уже в параметрах плана.
-          setBbWeeks(Math.min(24, Math.max(4, weeks)));
-        } else if (cycleId) {
-          // ПЛ-авто: предзагружаем цикл блока. Длина цикла неизменна (оригинал) —
-          // показываем реальную длину, а не длину блока.
-          const tplEdit = getCycleById(cycleId);
-          setSelectedCycleId(cycleId);
-          setCycleWeeks(tplEdit ? originalCycleWeeks(tplEdit) : weeks);
-        }
-        setSubView('plan');
-      }} />}
-      {subView === 'macro' && <div style={{ marginTop: 8 }}><CardioLinkCard /></div>}
+          }}
+          onEditMicrocycle={(cycleId, weeks, phase, isBB, blockIdx) => {
+            // MC-5: сохраняем контекст правки блока и открываем конструктор с его данными.
+            try {
+              localStorage.setItem('he_macro_edit_ctx', JSON.stringify({ isBB, cycleId, weeks, phase, blockIdx }));
+            } catch {
+              /* ignore */
+            }
+            if (isBB) {
+              // ББ-авто: недели блока уже в параметрах плана.
+              setBbWeeks(Math.min(24, Math.max(4, weeks)));
+            } else if (cycleId) {
+              // ПЛ-авто: предзагружаем цикл блока. Длина цикла неизменна (оригинал) —
+              // показываем реальную длину, а не длину блока.
+              const tplEdit = getCycleById(cycleId);
+              setSelectedCycleId(cycleId);
+              setCycleWeeks(tplEdit ? originalCycleWeeks(tplEdit) : weeks);
+            }
+            setSubView('plan');
+          }}
+        />
+      )}
+      {subView === 'macro' && (
+        <div style={{ marginTop: 8 }}>
+          <CardioLinkCard />
+        </div>
+      )}
       {mainTab === 'pl' && subView === 'tools' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>🔧 Инструменты планирования</div>
           <PlannerToolsPanel mode="pl" />
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('macro')}>← 🗓 Годовой план</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('macro')}>
+              ← 🗓 Годовой план
+            </button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>
+              🏁 Соревнования →
+            </button>
           </div>
         </div>
       )}
-      {subView === 'competition' && <PLCompetitionTab api={{
-        builtSrc,
-        setBuiltSrc: p => setBuiltSrc(p),
-        onNote: setMethodNote,
-        cycle: {
-          peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult,
-          plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead,
-        },
-        coach: {
-          buildCtx: buildCoachCtx,
-          applyRecommendation: applyTaperRecommendation,
-          diarySessions,
-        },
-        autoRegMode,
-        setAutoRegMode: (mode: AutoRegMode) => setAutoRegMode(mode),
-      }} />}
+      {subView === 'competition' && (
+        <PLCompetitionTab
+          api={{
+            builtSrc,
+            setBuiltSrc: (p) => setBuiltSrc(p),
+            onNote: setMethodNote,
+            cycle: {
+              peds,
+              pedDoses,
+              courseIntensity,
+              pedAuto,
+              autoRegMode,
+              autoRegResult,
+              autoRegCfg,
+              plCalorieSurplus,
+              plProteinPerKg,
+              selectedCycleId,
+              pmSquat,
+              pmBench,
+              pmDead,
+            },
+            coach: {
+              buildCtx: buildCoachCtx,
+              applyRecommendation: applyTaperRecommendation,
+              diarySessions,
+            },
+            autoRegMode,
+            setAutoRegMode: changeAutoRegMode,
+            onApplyAutoReg: applyAutoRegConfig,
+            onResetAutoReg: resetAutoRegConfig,
+          }}
+        />
+      )}
+      {/* P0-1: одноразовая проверка даты старта (после массового «съезда» дат) */}
+      {meetDateAsk && (
+        <TrainingModal title="🏁 Проверьте дату старта" onClose={() => resolveMeetDateAsk(meetDateAsk.id, null)}>
+          <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 10 }}>
+            В сохранённом плане старт «{meetDateAsk.name}» стоит на <b>{meetDateAsk.date}</b>. Раньше дата
+            пересчитывалась из «недель до старта» и могла «съехать» ближе к сегодняшнему дню. Эта дата верна?
+          </div>
+          <input
+            type="date"
+            value={meetDateFix}
+            onChange={(e) => setMeetDateFix(e.target.value)}
+            aria-label="Дата старта"
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              color: '#fff',
+              fontSize: 13,
+              minHeight: 44,
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() => resolveMeetDateAsk(meetDateAsk.id, null)}
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: 10,
+                border: '1px solid rgba(34,197,94,0.35)',
+                background: 'rgba(34,197,94,0.12)',
+                color: '#4ade80',
+                fontWeight: 800,
+                fontSize: 12,
+                cursor: 'pointer',
+                minHeight: 44,
+              }}
+            >
+              ✅ Дата верна
+            </button>
+            <button
+              type="button"
+              onClick={() => resolveMeetDateAsk(meetDateAsk.id, meetDateFix)}
+              style={{
+                flex: 1,
+                padding: '10px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 12,
+                cursor: 'pointer',
+                minHeight: 44,
+              }}
+            >
+              📅 Исправить дату
+            </button>
+          </div>
+        </TrainingModal>
+      )}
       {/* Модалка подтверждения «Начать заново» */}
       {resetAsk && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 16 }}
-          onClick={() => setResetAsk(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', padding: 16, boxSizing: 'border-box', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 260,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.85)',
+            padding: 16,
+          }}
+          onClick={() => setResetAsk(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              borderRadius: 16,
+              background: '#18181b',
+              border: '1px solid rgba(255,255,255,0.12)',
+              padding: 16,
+              boxSizing: 'border-box',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            }}
+          >
             <div style={{ fontSize: 14, fontWeight: 800, color: '#fb7185', marginBottom: 8 }}>🔄 Начать заново?</div>
             <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 12 }}>
               Собранный план и все правки будут сброшены. Параметры останутся на месте — можно собрать план заново.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setResetAsk(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>Отмена</button>
-              <button onClick={resetBuild} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f43f5e,#e11d48)', color: '#fff', fontWeight: 800, fontSize: 12, minHeight: 44 }}>🔄 Сбросить</button>
+              <button
+                onClick={() => setResetAsk(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'transparent',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={resetBuild}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: 'linear-gradient(135deg,#f43f5e,#e11d48)',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  minHeight: 44,
+                }}
+              >
+                🔄 Сбросить
+              </button>
             </div>
           </div>
         </div>

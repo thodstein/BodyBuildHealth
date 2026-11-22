@@ -31,23 +31,6 @@ import { resolveCompetitionLifts } from './competition-attempts';
 import { ipfGLPointsFor } from '../pro/relative-strength.engine';
 
 /**
- * Федерация сезона → таблица нормативов справочника (классика).
- * 'other' намеренно отсутствует: своих нормативов для произвольной федерации
- * у нас нет, и придумывать их нельзя. Для экипировки — `resolveNormsFederation`.
- */
-export const PL_FED_TO_NORMS: Record<string, Federation> = {
-  ipf: 'fpr_classic',
-  fpr: 'fpr_classic',
-  wpc: 'wrpf_untested',
-};
-
-export const PL_FED_NORMS_LABEL: Record<string, string> = {
-  ipf: 'ФПР / IPF — классика',
-  fpr: 'ФПР / IPF — классика',
-  wpc: 'WRPF / СПР (без ДК)',
-};
-
-/**
  * Федерации с РАЗНЫМИ таблицами для классики и экипировки (ФПР ведёт обе).
  * Для остальных выбор экипировки меняет только очки IPF GL — таблица та же.
  */
@@ -99,6 +82,8 @@ export interface PLNormsBridgeResult {
   total: number;
   /** Сколько соревновательных движений найдено (0..3) — тотал может быть неполным. */
   liftsFound: number;
+  /** P1-3: тотал неполный (< 3 движений) — разряд по такой сумме не считаем. */
+  incomplete: boolean;
   classification: ClassificationResult | null;
   /** Прогресс до следующего разряда, %. */
   progressPct: number;
@@ -117,17 +102,30 @@ export function plNormsSnapshot(input: PLNormsBridgeInput): PLNormsBridgeResult 
   const gear: PLGear = input.gear ?? 'classic';
   const federation = resolveNormsFederation(input.fed, gear);
   const fedLabel = normsFedLabel(input.fed, gear);
-  const glPoints = total > 0 && bodyWeight > 0
-    ? ipfGLPointsFor(total, bodyWeight, input.sex, gearToGL(gear), discipline === 'bench' ? 'bench' : 'total')
-    : 0;
+  const glPoints =
+    total > 0 && bodyWeight > 0
+      ? ipfGLPointsFor(total, bodyWeight, input.sex, gearToGL(gear), discipline === 'bench' ? 'bench' : 'total')
+      : 0;
+  const gearNote =
+    gear === 'classic' ? '' : ` Экипировка: ${PL_GEAR_LABEL[gear]} — другие нормативы и коэффициенты очков.`;
 
   const base = {
-    federation, fedLabel, bodyWeight, total, liftsFound: lifts.length, glPoints,
-    classification: null as ClassificationResult | null, progressPct: 0,
+    federation,
+    fedLabel,
+    bodyWeight,
+    total,
+    liftsFound: lifts.length,
+    incomplete: lifts.length < 3,
+    glPoints,
+    classification: null as ClassificationResult | null,
+    progressPct: 0,
   };
 
   if (lifts.length === 0 || total <= 0) {
-    return { ...base, note: 'Заполните целевые ПМ (присед/жим/тяга) — тогда посчитаем тотал, разряд и «сколько кг до следующего».' };
+    return {
+      ...base,
+      note: 'Заполните целевые ПМ (присед/жим/тяга) — тогда посчитаем тотал, разряд и «сколько кг до следующего».',
+    };
   }
 
   if (!federation) {
@@ -145,19 +143,27 @@ export function plNormsSnapshot(input: PLNormsBridgeInput): PLNormsBridgeResult 
     };
   }
 
+  // P1-3: разряд — это тотал из ТРЁХ движений. Сумма двух не даёт права
+  // показывать «выполнен разряд» / «до следующего N кг» — сначала честная подсказка.
+  if (base.incomplete) {
+    return {
+      ...base,
+      note:
+        `Тотал неполный: найдено ${lifts.length} из 3 движений — разряд по неполной сумме не считаем. ` +
+        'Заполните недостающие ПМ (присед/жим/тяга).' +
+        gearNote,
+    };
+  }
+
   const classification = classifyTotal(table, bodyWeight, total);
   const progressPct = Math.round(progressToNextRank(classification, total) * 10) / 10;
-  const incomplete = lifts.length < 3
-    ? ` Тотал неполный: найдено ${lifts.length} из 3 движений.`
-    : '';
-  const gearNote = gear === 'classic' ? '' : ` Экипировка: ${PL_GEAR_LABEL[gear]} — другие нормативы и коэффициенты очков.`;
   return {
     ...base,
     classification,
     progressPct,
-    note: `Таблица «${fedLabel}», категория ${classification.category.label}.`
-      + gearNote
-      + incomplete
-      + ' Сверяйте с официальной таблицей федерации на сезон — пороги обновляются.',
+    note:
+      `Таблица «${fedLabel}», категория ${classification.category.label}.` +
+      gearNote +
+      ' Сверяйте с официальной таблицей федерации на сезон — пороги обновляются.',
   };
 }

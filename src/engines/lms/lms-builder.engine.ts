@@ -7,9 +7,23 @@
  */
 
 import type { SRCycleTemplate, SRDaySpec, SRExerciseSpec, SRSetSpec } from '../../data/lms-cycles/lms-types';
-import { pmProgression, pmForWeek, workWeight, progressionRationale, levelPmFloor, type ProgressionMode, type PMProgressionInput } from './lms-progression.engine';
+import {
+  pmProgression,
+  pmForWeek,
+  workWeight,
+  progressionRationale,
+  levelPmFloor,
+  type ProgressionMode,
+  type PMProgressionInput,
+} from './lms-progression.engine';
 import { autoWeeklyPercent, type PMAutoRegMode } from './pm-autoreg.engine';
-import { calcSessionMetrics, calcCycleMetrics, type SRExercise, type SRSessionMetrics, type SRCycleMetrics } from './lms-metrics.engine';
+import {
+  calcSessionMetrics,
+  calcCycleMetrics,
+  type SRExercise,
+  type SRSessionMetrics,
+  type SRCycleMetrics,
+} from './lms-metrics.engine';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { type Exercise } from '../../core/types';
 import { selectExercisesSmart } from '../exercise-selector.engine';
@@ -19,7 +33,14 @@ import { diagnoseLift } from '../pro/lift-diagnostics.engine';
 import type { LimiterProtocol } from '../pro/limiter-calculator.engine';
 import { LMS_EXERCISES } from '../../data/lms-cycles/lms-exercises';
 
-import { computeVolumeLandmarks, getVolumeLandmarks, getAllVolumeLandmarks, normMuscle, checkVolumeStatus, MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+import {
+  computeVolumeLandmarks,
+  getVolumeLandmarks,
+  getAllVolumeLandmarks,
+  normMuscle,
+  checkVolumeStatus,
+  MUSCLE_LABEL_RU,
+} from '../volume-landmarks.engine';
 import { adaptForPEDs, type PED } from '../bb/bb-ped-adaptation.engine';
 import { derivePattern, trueMuscleOf } from '../movement-pattern';
 import { norm } from '../norm';
@@ -27,8 +48,23 @@ import { hrvRecoveryMult, hrvSignalFromStore, type HrvRecoverySignal } from '../
 import { resolveCatalogId, stripCycleNotation } from '../../data/lms-cycles/exercise-alias-map';
 import { summarizeSourceCycleWeeks } from './source-phase.engine';
 import { cloneCycleTemplate } from '../../data/lms-cycles/lms-cycle-clone';
-import { meetAttemptsFor, MEET_STRATEGY_PCT_LABEL, MEET_WARMUP_STEPS, warmupToOpener, resolveCompetitionLifts, type MeetAttemptsInfo, type MeetStrategy } from './competition-attempts';
-import { buildPLTaperCurve, summarizeTaperCurve, type PeakWeekLayout, type TaperCurvePoint, type TaperMode, type TaperWeightGoal } from './lms-taper.engine';
+import {
+  meetAttemptsFor,
+  MEET_STRATEGY_PCT_LABEL,
+  MEET_WARMUP_STEPS,
+  warmupToOpener,
+  resolveCompetitionLifts,
+  type MeetAttemptsInfo,
+  type MeetStrategy,
+} from './competition-attempts';
+import {
+  buildPLTaperCurve,
+  summarizeTaperCurve,
+  type PeakWeekLayout,
+  type TaperCurvePoint,
+  type TaperMode,
+  type TaperWeightGoal,
+} from './lms-taper.engine';
 import { buildPLPeakBlockLayout, dateWeeksBackward, type PLPeakBlockLayout } from './lms-peak-block.engine';
 import { ruCount, RU_WEEKS } from '../ru-plural';
 
@@ -89,15 +125,15 @@ export interface LMSBuildInput {
   peds?: PED[];
   pedDoses?: Record<string, number>;
   /** Recovery-метрики для recovery multiplier (Helms 2022, Plews 2022). */
-  bodyFat?: number;       // % жира
-  leanMass?: number;      // кг сухой массы
-  hrvMs?: number;         // RMSSD в мс
+  bodyFat?: number; // % жира
+  leanMass?: number; // кг сухой массы
+  hrvMs?: number; // RMSSD в мс
   /** Личная HRV-база (среднее RMSSD, мс). Нет — база читается из `he_hrv_log` (P0-Б). */
   hrvBaseline?: number;
   /** Отклонение lnRMSSD от базы в единицах SWC — предпочтительный способ (P0-Б). */
   hrvBaselineZ?: number;
-  sleepHours?: number;    // часов сна/ночь
-  stressLevel?: number;   // 1-10
+  sleepHours?: number; // часов сна/ночь
+  stressLevel?: number; // 1-10
   /** Питание (Helms 2022): профицит калорий и белок г/кг → MRV soft-cap
    *  (как в ББ-авто computeBBNutritionMultiplier). */
   nutrition?: { calorieSurplus?: number; proteinPerKg?: number };
@@ -114,13 +150,12 @@ export interface LMSBuildInput {
   peakCycleId?: string;
 }
 
-
 export interface LMSWorkSet {
   pct: number;
   reps: number;
   sets: number;
   weight: number; // расчётный вес (кг)
-  rir: number;    // repetitions in reserve для подхода (фаза мезоцикла)
+  rir: number; // repetitions in reserve для подхода (фаза мезоцикла)
 }
 
 export interface LMSPlanExercise {
@@ -130,7 +165,7 @@ export interface LMSPlanExercise {
   mnosz: number;
   load?: string;
   pm: number;
-  rir: number;    // базовый RIR упражнения (по фазе)
+  rir: number; // базовый RIR упражнения (по фазе)
   workSets: LMSWorkSet[];
 }
 
@@ -164,6 +199,11 @@ export interface LMSPlanWeek {
    *  иначе pmRow недели). Держим на неделе, чтобы «🔄 Обновить прикиды» пересчитывало
    *  от того же основания (иначе плановый ПМ федерации молча терялся). */
   attemptPmRow?: Record<string, number>;
+  /** Множитель авторегуляции, уже применённый к `meetAttempts` (вес).
+   *  Нужен, чтобы «🔄 Обновить прикиды» не терял коррекцию режима «Авто»:
+   *  попытки пересчитываются от `attemptPmRow` (немасштабированной базы) и
+   *  домножаются на это значение. 1/undefined — авторегуляция не применялась. */
+  attemptAutoRegMult?: number;
   /** Пометка недели тапера/прикидов (напр. «план федерации выше факта — прикиды от потолка»). */
   taperNote?: string;
   /** Дата начала недели (ISO) — календарная разметка (реверс от даты старта). */
@@ -206,6 +246,17 @@ export interface LMSBuildOutput {
    * согласием/пустым сезоном — weeks пуст, template НЕ подставной чужой цикл.
    */
   blocked?: boolean;
+  /**
+   * Авторегуляция, уже применённая к весам/объёму/RIR этого плана (аудит 2026-11, P0-4).
+   * Единая точка применения — билдер/тапер; слой правок (`applyPLEffectiveOverlay`)
+   * обязан НЕ применять её повторно, иначе −10 % превратятся в −19 %.
+   */
+  autoRegApplied?: {
+    topSetPctMultiplier: number;
+    volumeMultiplier: number;
+    rirShift: number;
+    deload: boolean;
+  };
 }
 
 /**
@@ -222,26 +273,52 @@ export function originalCycleWeeks(template: SRCycleTemplate): number {
 }
 
 export interface PLVolumeLandmark {
-  group: string;       // английская группа (chest/back/legs/...)
-  muscle: string;      // русское имя мышцы (из VOLUME_REFERENCES)
-  peakWeek: number;    // неделя с пиковым объёмом
-  sets: number;        // сетов/нед в пиковую неделю
-  mev: number; mav: number; mrv: number;
+  group: string; // английская группа (chest/back/legs/...)
+  muscle: string; // русское имя мышцы (из VOLUME_REFERENCES)
+  peakWeek: number; // неделя с пиковым объёмом
+  sets: number; // сетов/нед в пиковую неделю
+  mev: number;
+  mav: number;
+  mrv: number;
   status: 'under' | 'optimal' | 'high' | 'over';
 }
 
 /** Уровень → ключ VolumeReference (enhanced → advanced). */
 function vrLevelKey(level: string): 'beginner' | 'intermediate' | 'advanced' {
   switch (level) {
-    case 'novice': return 'beginner';
-    case 'intermediate': case 'II-KMS': return 'intermediate';
-    case 'KMS-MS': case 'II-MS': case 'KMS-MSMK': case 'MS-MSMK': case 'enhanced': return 'advanced';
-    default: return 'intermediate';
+    case 'novice':
+      return 'beginner';
+    case 'intermediate':
+    case 'II-KMS':
+      return 'intermediate';
+    case 'KMS-MS':
+    case 'II-MS':
+    case 'KMS-MSMK':
+    case 'MS-MSMK':
+    case 'enhanced':
+      return 'advanced';
+    default:
+      return 'intermediate';
   }
 }
 
-const RU_TO_EN: Record<string, string> = { 'Грудь': 'chest', 'Спина': 'back', 'Ноги': 'legs', 'Плечи': 'shoulders', 'Руки': 'arms', 'Кор': 'core' };
-const SENT_TO_RU: Record<string, string> = { 'ПР': 'Ноги', 'ЖМ': 'Грудь', 'ТГ': 'Спина', 'ЖИМ': 'Грудь', 'ТЯГА': 'Спина', 'ОФП': 'Кор', 'СФП': 'Кор' };
+const RU_TO_EN: Record<string, string> = {
+  Грудь: 'chest',
+  Спина: 'back',
+  Ноги: 'legs',
+  Плечи: 'shoulders',
+  Руки: 'arms',
+  Кор: 'core',
+};
+const SENT_TO_RU: Record<string, string> = {
+  ПР: 'Ноги',
+  ЖМ: 'Грудь',
+  ТГ: 'Спина',
+  ЖИМ: 'Грудь',
+  ТЯГА: 'Спина',
+  ОФП: 'Кор',
+  СФП: 'Кор',
+};
 const EN_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 /**
  * Проверяет, является ли упражнение вариантом приоритетного лифта.
@@ -276,7 +353,17 @@ function exEnGroup(g: string | undefined): string | undefined {
  *  deadlift → 'hamstrings' (задняя цепь), не 'back' (становая не растит широчайшие).
  *  Иначе MRV-кап accessory считался по back, а не по hamstrings. */
 function liftToEnGroup(lift: Lift): string {
-  const m: Record<string, string> = { bench: 'chest', squat: 'legs', deadlift: 'hamstrings', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest', sumo: 'hamstrings', biceps: 'arms' };
+  const m: Record<string, string> = {
+    bench: 'chest',
+    squat: 'legs',
+    deadlift: 'hamstrings',
+    ohp: 'shoulders',
+    row: 'back',
+    pulldown: 'back',
+    incline_press: 'chest',
+    sumo: 'hamstrings',
+    biceps: 'arms',
+  };
   return m[lift] || 'back';
 }
 
@@ -293,7 +380,7 @@ function pmFor(exName: string, pmMap: Record<string, number>, fallback: number):
   // эвристика: жимовые/присед/тяга — попытка сопоставления по ключам (с нормализацией ё→е)
   const n = norm(exName);
   const keys = Object.keys(pmMap)
-    .filter(k => Number.isFinite(pmMap[k]) && pmMap[k] > 0)
+    .filter((k) => Number.isFinite(pmMap[k]) && pmMap[k] > 0)
     .sort((a, b) => norm(b).length - norm(a).length);
   for (const k of keys) {
     const nk = norm(k);
@@ -306,23 +393,26 @@ function pmFor(exName: string, pmMap: Record<string, number>, fallback: number):
 
 /** Разрешить PM для инъецированного упражнения с тем же fuzzy-поведением, что и для шаблона. */
 function pmForInjected(exName: string, mainName: string, pmRow: Record<string, number>, fallback: number): number {
-  return pmRow[exName]
-    ?? pmRow[mainName]
-    ?? Object.entries(pmRow).find(([key]) => {
+  return (
+    pmRow[exName] ??
+    pmRow[mainName] ??
+    Object.entries(pmRow).find(([key]) => {
       const n = norm(key);
       const target = norm(exName);
       const main = norm(mainName);
-      return n === target || n.includes(target) || target.includes(n)
-        || n === main || n.includes(main) || main.includes(n);
-    })?.[1]
-    ?? fallback;
+      return (
+        n === target || n.includes(target) || target.includes(n) || n === main || n.includes(main) || main.includes(n)
+      );
+    })?.[1] ??
+    fallback
+  );
 }
 
 // Нормализация load (Тяжелая/Средняя/Легкая): в шаблонах поле load иногда содержало
 // мусор (имя упражнения из-за бага парсера). Берём валидный тег дня, иначе 'Средняя'.
 const VALID_LOAD = /^(Тяжелая|Средняя|Легкая)$/;
 function dayLoadTag(exercises: { load?: string }[]): string {
-  const valid = exercises.find(e => e.load && VALID_LOAD.test(e.load));
+  const valid = exercises.find((e) => e.load && VALID_LOAD.test(e.load));
   return valid?.load || 'Средняя';
 }
 function cleanLoad(load: string | undefined, dayTag: string): string {
@@ -332,22 +422,36 @@ function cleanLoad(load: string | undefined, dayTag: string): string {
 /** Маппинг period цикла → ключ RIR_MATRIX. */
 function rirGoalKey(period: string): keyof typeof RIR_MATRIX {
   switch (period) {
-    case 'strength': case 'peak': return 'strength';
-    case 'mass': return 'hypertrophy';
-    case 'endurance': return 'maintenance';
-    case 'mixed': return 'hypertrophy';
-    default: return 'strength';
+    case 'strength':
+    case 'peak':
+      return 'strength';
+    case 'mass':
+      return 'hypertrophy';
+    case 'endurance':
+      return 'maintenance';
+    case 'mixed':
+      return 'hypertrophy';
+    default:
+      return 'strength';
   }
 }
 
 /** Маппинг level цикла → ключ RIR_MATRIX. */
-function rirLevelKey(level: string): keyof typeof RIR_MATRIX['strength'] {
+function rirLevelKey(level: string): keyof (typeof RIR_MATRIX)['strength'] {
   switch (level) {
-    case 'novice': return 'beginner';
-    case 'intermediate': case 'II-KMS': return 'intermediate';
-    case 'KMS-MS': case 'II-MS': return 'advanced';
-    case 'KMS-MSMK': case 'MS-MSMK': return 'enhanced';
-    default: return 'intermediate';
+    case 'novice':
+      return 'beginner';
+    case 'intermediate':
+    case 'II-KMS':
+      return 'intermediate';
+    case 'KMS-MS':
+    case 'II-MS':
+      return 'advanced';
+    case 'KMS-MSMK':
+    case 'MS-MSMK':
+      return 'enhanced';
+    default:
+      return 'intermediate';
   }
 }
 
@@ -377,15 +481,15 @@ function _findCatalogExerciseByLabelUncached(label: string): Exercise | null {
   // P0-1: точный маппинг из alias map (шаблонные имена → catalog ID)
   const aliasId = resolveCatalogId(label);
   if (aliasId) {
-    const byId = EXERCISE_CATALOG.find(e => e.id === aliasId);
+    const byId = EXERCISE_CATALOG.find((e) => e.id === aliasId);
     if (byId) return byId;
   }
   const n = norm(label);
-  let ex = EXERCISE_CATALOG.find(e => norm(e.name) === n);
+  let ex = EXERCISE_CATALOG.find((e) => norm(e.name) === n);
   if (ex) return ex;
   // P2-fix: bidirectional includes was too greedy — a 3-char label "жим" matched "жим ногами".
   // Now require the SHORTER string to be at least 4 chars for substring matching.
-  ex = EXERCISE_CATALOG.find(e => {
+  ex = EXERCISE_CATALOG.find((e) => {
     const en = norm(e.name);
     if (en.length <= 2 || n.length <= 2) return false;
     const shorter = en.length <= n.length ? en : n;
@@ -398,11 +502,11 @@ function _findCatalogExerciseByLabelUncached(label: string): Exercise | null {
   if (core && core.length > 2 && core !== label) {
     const coreAliasId = resolveCatalogId(core);
     if (coreAliasId) {
-      const byId = EXERCISE_CATALOG.find(e => e.id === coreAliasId);
+      const byId = EXERCISE_CATALOG.find((e) => e.id === coreAliasId);
       if (byId) return byId;
     }
     const cn = norm(core);
-    ex = EXERCISE_CATALOG.find(e => {
+    ex = EXERCISE_CATALOG.find((e) => {
       const en = norm(e.name);
       if (en.length <= 2 || cn.length <= 2) return false;
       const shorter = en.length <= cn.length ? en : cn;
@@ -420,14 +524,14 @@ function groupOfExercise(name: string, fallback: string): string {
   // P0-1: сначала проверяем alias map для catalog lookup
   const aliasId = resolveCatalogId(name);
   if (aliasId) {
-    const byId = EXERCISE_CATALOG.find(e => e.id === aliasId);
+    const byId = EXERCISE_CATALOG.find((e) => e.id === aliasId);
     if (byId) return trueMuscleOf(byId) ?? (byId.group as string) ?? fallback;
   }
-  const ex = EXERCISE_CATALOG.find(e => norm(e.name) === norm(name));
+  const ex = EXERCISE_CATALOG.find((e) => norm(e.name) === norm(name));
   if (ex) return trueMuscleOf(ex) ?? (ex.group as string) ?? fallback;
   // fuzzy match
   const n = norm(name);
-  const fx = EXERCISE_CATALOG.find(e => {
+  const fx = EXERCISE_CATALOG.find((e) => {
     const en = norm(e.name);
     return en.length > 2 && (en.includes(n) || n.includes(en));
   });
@@ -484,24 +588,38 @@ export const ACWR_ADVISORY_NOTE =
 
 /** Есть ли независимый маркер восстановления, подтверждающий зону ACWR (мультимаркерное правило, см. ACWR_ADVISORY_NOTE). */
 export function acwrCorroboratedByRecovery(input: {
-  autoReg?: unknown; hrvMs?: number; sleepHours?: number; stressLevel?: number; currentReadiness?: number;
+  autoReg?: unknown;
+  hrvMs?: number;
+  sleepHours?: number;
+  stressLevel?: number;
+  currentReadiness?: number;
 }): boolean {
-  return !!(input.autoReg
-    || input.hrvMs != null
-    || input.sleepHours != null
-    || input.stressLevel != null
-    || input.currentReadiness != null);
+  return !!(
+    input.autoReg ||
+    input.hrvMs != null ||
+    input.sleepHours != null ||
+    input.stressLevel != null ||
+    input.currentReadiness != null
+  );
 }
 
 /** MRV-бюджет группы: сумма MRV входящих мышц × (PED/recovery × ACWR × авторег). */
-function groupMrvBudgetFor(vrLevel: 'beginner' | 'intermediate' | 'advanced', combinedMrvMult: number, acwrVolMod: number, arVolMult: number, group: string): number | null {
+function groupMrvBudgetFor(
+  vrLevel: 'beginner' | 'intermediate' | 'advanced',
+  combinedMrvMult: number,
+  acwrVolMod: number,
+  arVolMult: number,
+  group: string,
+): number | null {
   try {
     const muscles = MRV_BUDGET_MUSCLES[group] ?? [group];
     const sum = muscles.reduce((acc, m) => acc + (getVolumeLandmarks(vrLevel, m)?.mrv ?? 0), 0);
     if (sum <= 0) return null;
     const mult = Math.max(1, combinedMrvMult) * acwrVolMod * arVolMult;
     return Math.round(sum * mult);
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -552,7 +670,7 @@ function catalogPattern(exercise: Exercise): string {
 
 function plCatalogUses(name: string): number {
   const normalized = norm(name);
-  const row = LMS_EXERCISES.find(item => {
+  const row = LMS_EXERCISES.find((item) => {
     const itemName = norm(item.name);
     return itemName === normalized || itemName.includes(normalized) || normalized.includes(itemName);
   });
@@ -574,69 +692,92 @@ export function getPLWeakGroupExerciseCandidates(template: SRCycleTemplate, grou
   if (allowed.size === 0) return [];
 
   const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
-  const cycleNames = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(spec => norm(spec.name)))));
-  const cyclePatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises.map(sourcePattern))));
-  const cycleSubstitutionGroups = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .map(spec => findCatalogExerciseByLabel(spec.name)?.substitutionGroup)
-    .filter((group): group is string => Boolean(group)))));
-  const cyclePrimaryPatterns = new Set(layouts.flatMap(days => days.flatMap(day => day.exercises
-    .filter(spec => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1)
-    .map(sourcePattern))));
+  const cycleNames = new Set(
+    layouts.flatMap((days) => days.flatMap((day) => day.exercises.map((spec) => norm(spec.name)))),
+  );
+  const cyclePatterns = new Set(layouts.flatMap((days) => days.flatMap((day) => day.exercises.map(sourcePattern))));
+  const cycleSubstitutionGroups = new Set(
+    layouts.flatMap((days) =>
+      days.flatMap((day) =>
+        day.exercises
+          .map((spec) => findCatalogExerciseByLabel(spec.name)?.substitutionGroup)
+          .filter((group): group is string => Boolean(group)),
+      ),
+    ),
+  );
+  const cyclePrimaryPatterns = new Set(
+    layouts.flatMap((days) =>
+      days.flatMap((day) =>
+        day.exercises.filter((spec) => spec.load === 'Тяжелая' || (spec.coef ?? 0) >= 1).map(sourcePattern),
+      ),
+    ),
+  );
 
   const base = getExercisesByGroup(group)
-    .filter(exercise => allowed.has(catalogPattern(exercise)))
-    .filter(exercise => isPLWeakGroupTarget(exercise, group));
+    .filter((exercise) => allowed.has(catalogPattern(exercise)))
+    .filter((exercise) => isPLWeakGroupTarget(exercise, group));
   // Фильтр дублей (primary-паттерны цикла + substitution-группы) — ТОЛЬКО если
   // после него у паттерна остаются варианты; вырезанные целиком паттерны
   // возвращаются в конец (лучше предложить ассистентов, чем пустую подгруппу).
-  const filtered = base.filter(exercise =>
-    !cyclePrimaryPatterns.has(catalogPattern(exercise)) &&
-    (!exercise.substitutionGroup || !cycleSubstitutionGroups.has(exercise.substitutionGroup)));
-  const filteredPatterns = new Set(filtered.map(exercise => catalogPattern(exercise)));
-  const fallbackExtra = base.filter(exercise => !filteredPatterns.has(catalogPattern(exercise)));
+  const filtered = base.filter(
+    (exercise) =>
+      !cyclePrimaryPatterns.has(catalogPattern(exercise)) &&
+      (!exercise.substitutionGroup || !cycleSubstitutionGroups.has(exercise.substitutionGroup)),
+  );
+  const filteredPatterns = new Set(filtered.map((exercise) => catalogPattern(exercise)));
+  const fallbackExtra = base.filter((exercise) => !filteredPatterns.has(catalogPattern(exercise)));
   const candidates = [...filtered, ...fallbackExtra];
 
   return candidates.sort((a, b) => {
-      const aName = norm(a.name), bName = norm(b.name);
-      const aInCycle = cycleNames.has(aName), bInCycle = cycleNames.has(bName);
-      if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
+    const aName = norm(a.name),
+      bName = norm(b.name);
+    const aInCycle = cycleNames.has(aName),
+      bInCycle = cycleNames.has(bName);
+    if (aInCycle !== bInCycle) return aInCycle ? -1 : 1;
 
-      const aPatternInCycle = cyclePatterns.has(catalogPattern(a));
-      const bPatternInCycle = cyclePatterns.has(catalogPattern(b));
-      if (aPatternInCycle !== bPatternInCycle) return aPatternInCycle ? -1 : 1;
+    const aPatternInCycle = cyclePatterns.has(catalogPattern(a));
+    const bPatternInCycle = cyclePatterns.has(catalogPattern(b));
+    if (aPatternInCycle !== bPatternInCycle) return aPatternInCycle ? -1 : 1;
 
-      const aUses = plCatalogUses(a.name), bUses = plCatalogUses(b.name);
-      if (aUses !== bUses) return bUses - aUses;
+    const aUses = plCatalogUses(a.name),
+      bUses = plCatalogUses(b.name);
+    if (aUses !== bUses) return bUses - aUses;
 
-      const priority = PL_WEAK_GROUP_PATTERN_PRIORITY[group] ?? [];
-      const aPriority = priority.indexOf(catalogPattern(a));
-      const bPriority = priority.indexOf(catalogPattern(b));
-      if (aPriority !== bPriority) return (aPriority < 0 ? 99 : aPriority) - (bPriority < 0 ? 99 : bPriority);
-      // Для груди/спины/ног сначала реальное силовое вспомогательное движение,
-      // затем резина/предреабилитация. Для плеч/рук/кора разрешённый isolation
-      // остаётся приоритетным по самой карте паттернов.
-      const preferCompound = group === 'chest' || group === 'back' || group === 'legs';
-      if (preferCompound) {
-        const aCompound = a.type === 'compound' || a.movementType === 'compound';
-        const bCompound = b.type === 'compound' || b.movementType === 'compound';
-        if (aCompound !== bCompound) return aCompound ? -1 : 1;
-      }
-      const equipmentRank = (exercise: Exercise): number => {
-        const equipment = String(exercise.equipment || '').toLowerCase();
-        if (/band|резин|other/.test(equipment)) return 2;
-        if (/bodyweight|suspension/.test(equipment)) return 1;
-        return 0;
-      };
-      const aEquipment = equipmentRank(a), bEquipment = equipmentRank(b);
-      if (aEquipment !== bEquipment) return aEquipment - bEquipment;
-      return (a.fatigueCost || 0) - (b.fatigueCost || 0);
-    });
+    const priority = PL_WEAK_GROUP_PATTERN_PRIORITY[group] ?? [];
+    const aPriority = priority.indexOf(catalogPattern(a));
+    const bPriority = priority.indexOf(catalogPattern(b));
+    if (aPriority !== bPriority) return (aPriority < 0 ? 99 : aPriority) - (bPriority < 0 ? 99 : bPriority);
+    // Для груди/спины/ног сначала реальное силовое вспомогательное движение,
+    // затем резина/предреабилитация. Для плеч/рук/кора разрешённый isolation
+    // остаётся приоритетным по самой карте паттернов.
+    const preferCompound = group === 'chest' || group === 'back' || group === 'legs';
+    if (preferCompound) {
+      const aCompound = a.type === 'compound' || a.movementType === 'compound';
+      const bCompound = b.type === 'compound' || b.movementType === 'compound';
+      if (aCompound !== bCompound) return aCompound ? -1 : 1;
+    }
+    const equipmentRank = (exercise: Exercise): number => {
+      const equipment = String(exercise.equipment || '').toLowerCase();
+      if (/band|резин|other/.test(equipment)) return 2;
+      if (/bodyweight|suspension/.test(equipment)) return 1;
+      return 0;
+    };
+    const aEquipment = equipmentRank(a),
+      bEquipment = equipmentRank(b);
+    if (aEquipment !== bEquipment) return aEquipment - bEquipment;
+    return (a.fatigueCost || 0) - (b.fatigueCost || 0);
+  });
 }
 
 function weeklyMuscleSets(days: LMSPlanDay[], group: string): number {
-  return days.reduce((total, day) => total + day.exercises
-    .filter(ex => groupOfExercise(ex.name, ex.group) === group)
-    .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0), 0);
+  return days.reduce(
+    (total, day) =>
+      total +
+      day.exercises
+        .filter((ex) => groupOfExercise(ex.name, ex.group) === group)
+        .reduce((dayTotal, ex) => dayTotal + ex.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
+    0,
+  );
 }
 
 /** Fatigue budget per session, scaled by readiness (0-100%).
@@ -700,7 +841,17 @@ function injectPLWeakPoints(
   orthopedicBlockedPatterns: string[] = [],
   fallbackPm: number = 80,
 ): void {
-  const mainNameMap: Record<string, string> = { bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя', row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс' };
+  const mainNameMap: Record<string, string> = {
+    bench: 'Жим лёжа',
+    squat: 'Присед',
+    deadlift: 'Становая тяга',
+    ohp: 'Жим стоя',
+    row: 'Тяга',
+    pulldown: 'Тяга',
+    incline_press: 'Жим гантелей',
+    sumo: 'Становая тяга (сумо)',
+    biceps: 'Подъём на бицепс',
+  };
   const MAX_CORRECTIONS = 2;
   for (const wp of weakPoints) {
     const mainName = mainNameMap[wp.lift] || 'Жим';
@@ -708,15 +859,17 @@ function injectPLWeakPoints(
     const dayRankByMain: { idx: number; mainSets: number }[] = [];
     for (let i = 0; i < days.length; i++) {
       const mainSets = days[i].exercises
-        .filter(e => {
-          const en = norm(e.name), mn = norm(mainName);
+        .filter((e) => {
+          const en = norm(e.name),
+            mn = norm(mainName);
           return en === mn || en.includes(mn) || mn.includes(en);
         })
         .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
       if (mainSets > 0) dayRankByMain.push({ idx: i, mainSets });
     }
     // Авто-распределение: heavy = max объём лифта, light = min объём среди остальных
-    let heavyDayIdx = -1, lightDayIdx = -1;
+    let heavyDayIdx = -1,
+      lightDayIdx = -1;
     if (dayRankByMain.length > 0) {
       const sortedDesc = [...dayRankByMain].sort((a, b) => b.mainSets - a.mainSets);
       heavyDayIdx = sortedDesc[0].idx;
@@ -731,10 +884,10 @@ function injectPLWeakPoints(
     const mapKey = `${wp.lift}|${wp.weakPoint}`;
     const userDays = plWeakPointDayMap?.[mapKey];
     if (userDays && userDays.length > 0) {
-      heavyDayIdx = (userDays[0] - 1);
+      heavyDayIdx = userDays[0] - 1;
       if (heavyDayIdx < 0 || heavyDayIdx >= days.length) heavyDayIdx = 0;
       if (userDays.length > 1) {
-        lightDayIdx = (userDays[1] - 1);
+        lightDayIdx = userDays[1] - 1;
         if (lightDayIdx < 0 || lightDayIdx >= days.length) lightDayIdx = -1;
       } else {
         // Пользователь выбрал только 1 день — 2-я коррекция идёт в тот же день
@@ -746,38 +899,43 @@ function injectPLWeakPoints(
     const liftGroup = liftToEnGroup(wp.lift);
     const diagnosisCorrections = collectPLCorrections(wp.lift, wp.weakPoint);
     const selectedNames = plWeakPointExerciseMap?.[mapKey];
-    const corrections = (selectedNames && selectedNames.length > 0
-      ? diagnosisCorrections.filter(c => selectedNames.includes(c.name))
-      : diagnosisCorrections
-    );
-    const selectedCorrections = (selectedNames && selectedNames.length > 0
-      ? corrections
-      : corrections.slice(0, MAX_CORRECTIONS)).filter(c => {
-        const exercise = findCatalogExerciseByLabel(c.name);
-        return !exercise?.movementPattern || !orthopedicBlockedPatterns.includes(exercise.movementPattern);
-      });
+    const corrections =
+      selectedNames && selectedNames.length > 0
+        ? diagnosisCorrections.filter((c) => selectedNames.includes(c.name))
+        : diagnosisCorrections;
+    const selectedCorrections = (
+      selectedNames && selectedNames.length > 0 ? corrections : corrections.slice(0, MAX_CORRECTIONS)
+    ).filter((c) => {
+      const exercise = findCatalogExerciseByLabel(c.name);
+      return !exercise?.movementPattern || !orthopedicBlockedPatterns.includes(exercise.movementPattern);
+    });
     if (selectedCorrections.length === 0) continue;
 
     // 1-й кандидат — в heavy-day (3×8 @ RIR 2, "Тяжёлая" добивка)
     // 2-й кандидат — в light-day (3×12 @ RIR 3, памп-вариант)
     const heavyDay = days[heavyDayIdx];
     if (heavyDay) {
-       const c = selectedCorrections[0];
-       const ex = findCatalogExerciseByLabel(c.name);
-       // Диагностика является источником названия. Не заменяем "Дожим с 3 см"
-       // на похожий базовый "Жим штанги лёжа" из-за fuzzy-match каталога.
-       const resolvedName = c.name;
-      const existing = new Set(heavyDay.exercises.map(e => norm(e.name)));
-       if (!existing.has(norm(resolvedName))) {
-         const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
+      const c = selectedCorrections[0];
+      const ex = findCatalogExerciseByLabel(c.name);
+      // Диагностика является источником названия. Не заменяем "Дожим с 3 см"
+      // на похожий базовый "Жим штанги лёжа" из-за fuzzy-match каталога.
+      const resolvedName = c.name;
+      const existing = new Set(heavyDay.exercises.map((e) => norm(e.name)));
+      if (!existing.has(norm(resolvedName))) {
+        const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
         const sets = Math.max(2, Math.round(3 * phaseVolMod));
         const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
         // User explicitly selected these weak points — always add, no MRV cap.
         // P2: coef not in Exercise catalog — use heuristic by movementType (compound vs isolation).
         const injCoef = ex?.type === 'compound' ? 1.0 : ex?.type === 'isolation' ? 0.3 : 0.7;
         heavyDay.exercises.push({
-          name: resolvedName, group: exGroup, coef: injCoef, mnosz: 1,
-          load: 'Тяжелая', pm, rir: rirBase,
+          name: resolvedName,
+          group: exGroup,
+          coef: injCoef,
+          mnosz: 1,
+          load: 'Тяжелая',
+          pm,
+          rir: rirBase,
           workSets: [{ pct: c.pct, reps: 8, sets: Math.max(1, sets), weight: workWeight(pm, c.pct), rir: rirBase }],
         });
         existing.add(norm(resolvedName));
@@ -789,22 +947,35 @@ function injectPLWeakPoints(
       const lightDay = days[lightDayIdx];
       if (lightDay) {
         const c = selectedCorrections[1];
-         const ex = findCatalogExerciseByLabel(c.name);
-         const resolvedName = c.name;
-        const existing = new Set(lightDay.exercises.map(e => norm(e.name)));
+        const ex = findCatalogExerciseByLabel(c.name);
+        const resolvedName = c.name;
+        const existing = new Set(lightDay.exercises.map((e) => norm(e.name)));
         if (!existing.has(norm(resolvedName))) {
           const exGroup = ex ? (trueMuscleOf(ex) ?? (ex.group as string)) : liftGroup;
           const sets = Math.max(2, Math.round(3 * phaseVolMod));
           const pm = pmForInjected(resolvedName, mainName, pmRow, fallbackPm);
           // User explicitly selected these weak points — always add, no MRV cap.
           // Памп-протокол: 3×12 @ 60% 1PM, RIR 3
-          const pumpPct = 0.60;
+          const pumpPct = 0.6;
           // P2: coef by catalog type — compound ~1.0, isolation ~0.3, fallback 0.65
           const pumpCoef = ex?.type === 'compound' ? 0.8 : ex?.type === 'isolation' ? 0.3 : 0.65;
           lightDay.exercises.push({
-            name: resolvedName, group: exGroup, coef: pumpCoef, mnosz: 1,
-            load: 'Средняя', pm, rir: Math.max(3, rirBase + 1),
-            workSets: [{ pct: pumpPct, reps: 12, sets: Math.max(1, sets), weight: workWeight(pm, pumpPct), rir: Math.max(3, rirBase + 1) }],
+            name: resolvedName,
+            group: exGroup,
+            coef: pumpCoef,
+            mnosz: 1,
+            load: 'Средняя',
+            pm,
+            rir: Math.max(3, rirBase + 1),
+            workSets: [
+              {
+                pct: pumpPct,
+                reps: 12,
+                sets: Math.max(1, sets),
+                weight: workWeight(pm, pumpPct),
+                rir: Math.max(3, rirBase + 1),
+              },
+            ],
           });
           existing.add(norm(resolvedName));
         }
@@ -814,14 +985,15 @@ function injectPLWeakPoints(
     // При явном выборе пользователь может назначить все упражнения диагностики,
     // а не только стандартную пару heavy/pump. Дни используются циклически.
     if (selectedNames && selectedNames.length > 0 && selectedCorrections.length > 2) {
-      const targetDays = userDays && userDays.length > 0
-        ? userDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
-        : [heavyDayIdx];
+      const targetDays =
+        userDays && userDays.length > 0
+          ? userDays.map((day) => day - 1).filter((day) => day >= 0 && day < days.length)
+          : [heavyDayIdx];
       for (let correctionIndex = 2; correctionIndex < selectedCorrections.length; correctionIndex++) {
         const targetDay = days[targetDays[(correctionIndex - 2) % targetDays.length]];
         if (!targetDay) continue;
         const correction = selectedCorrections[correctionIndex];
-        const existing = new Set(targetDay.exercises.map(e => norm(e.name)));
+        const existing = new Set(targetDay.exercises.map((e) => norm(e.name)));
         if (existing.has(norm(correction.name))) continue;
         const catalogExercise = findCatalogExerciseByLabel(correction.name);
         const group = catalogExercise ? (trueMuscleOf(catalogExercise) ?? catalogExercise.group) : liftGroup;
@@ -834,7 +1006,15 @@ function injectPLWeakPoints(
           load: 'Средняя',
           pm,
           rir: Math.max(3, rirBase + 1),
-          workSets: [{ pct: correction.pct, reps: 10, sets: Math.max(2, Math.round(3 * phaseVolMod)), weight: workWeight(pm, correction.pct), rir: Math.max(3, rirBase + 1) }],
+          workSets: [
+            {
+              pct: correction.pct,
+              reps: 10,
+              sets: Math.max(2, Math.round(3 * phaseVolMod)),
+              weight: workWeight(pm, correction.pct),
+              rir: Math.max(3, rirBase + 1),
+            },
+          ],
         });
       }
     }
@@ -849,9 +1029,9 @@ function injectPLWeakPoints(
 function diagnosticGroupForExercise(name: string): string | null {
   const n = norm(name);
   for (const group of Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS)) {
-    if (getExercisesByGroup(group).some(e => norm(e.name) === n)) return group;
+    if (getExercisesByGroup(group).some((e) => norm(e.name) === n)) return group;
   }
-  const lms = LMS_EXERCISES.find(l => norm(l.name) === n);
+  const lms = LMS_EXERCISES.find((l) => norm(l.name) === n);
   if (lms) {
     const g = (lms.groups ?? []).join(' ').toLowerCase();
     if (/тяга|становая|гипер|наклон|шраги/.test(g)) return 'back';
@@ -872,23 +1052,27 @@ function diagnosticGroupForExercise(name: string): string | null {
  * группу. Показанный в UI протокол и вписанный в план совпадают по построению.
  * Экспортирован для parity-теста (diagnostic-protocol-parity.test.ts).
  */
-export function diagnosticProtocolFromCycle(template: SRCycleTemplate | undefined, exerciseName: string): { pct: number; reps: number; sets: number; rir: number } {
+export function diagnosticProtocolFromCycle(
+  template: SRCycleTemplate | undefined,
+  exerciseName: string,
+): { pct: number; reps: number; sets: number; rir: number } {
   const fallback = { pct: 0.6, reps: 10, sets: 3, rir: 2 };
   if (!template) return fallback;
   const layouts = template.weeks && template.weeks.length > 0 ? template.weeks : [template.week1];
-  const accSpecs: SRExerciseSpec[] = layouts.flatMap(days => days.flatMap(day =>
-    day.exercises.filter(spec => spec.load !== 'Тяжелая' && spec.sets && spec.sets.length > 0)));
+  const accSpecs: SRExerciseSpec[] = layouts.flatMap((days) =>
+    days.flatMap((day) => day.exercises.filter((spec) => spec.load !== 'Тяжелая' && spec.sets && spec.sets.length > 0)),
+  );
   if (accSpecs.length === 0) return fallback;
   const group = diagnosticGroupForExercise(exerciseName);
   const allowed = group ? (PL_WEAK_GROUP_ALLOWED_PATTERNS[group] ?? []) : [];
   // Паттерн spec резолвится ТЕМ ЖЕ способом, что в карточке (protocolFromCycle):
   // точное имя в ПЛ-группах каталога → movementPattern/derivePattern; иначе ''.
-  const pool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap(g => getExercisesByGroup(g));
+  const pool = (Object.keys(PL_WEAK_GROUP_ALLOWED_PATTERNS) as string[]).flatMap((g) => getExercisesByGroup(g));
   const pattern = (spec: SRExerciseSpec): string => {
-    const ex = pool.find(e => norm(e.name) === norm(spec.name));
+    const ex = pool.find((e) => norm(e.name) === norm(spec.name));
     return ex ? catalogPattern(ex) : '';
   };
-  const match = accSpecs.find(spec => allowed.includes(pattern(spec)));
+  const match = accSpecs.find((spec) => allowed.includes(pattern(spec)));
   const spec = match ?? accSpecs[0];
   const first = spec?.sets?.[0];
   if (!first) return fallback;
@@ -944,54 +1128,70 @@ function injectDiagnosticExercises(
     const mainName = mainNameMap[lift];
     if (!mainName) return [0];
 
-    const ranked = days.map((day, index) => ({
-      index,
-      mainSets: day.exercises
-        .filter(exercise => {
-          const exerciseName = norm(exercise.name);
-          const targetName = norm(mainName);
-          return exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName);
-        })
-        .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
-    })).filter(day => day.mainSets > 0);
+    const ranked = days
+      .map((day, index) => ({
+        index,
+        mainSets: day.exercises
+          .filter((exercise) => {
+            const exerciseName = norm(exercise.name);
+            const targetName = norm(mainName);
+            return (
+              exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName)
+            );
+          })
+          .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
+      }))
+      .filter((day) => day.mainSets > 0);
 
     if (ranked.length === 0) return [0];
     const heavy = [...ranked].sort((a, b) => b.mainSets - a.mainSets)[0].index;
-    const light = [...ranked]
-      .filter(day => day.index !== heavy)
-      .sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
+    const light = [...ranked].filter((day) => day.index !== heavy).sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
     return light == null ? [heavy] : [heavy, light];
   };
 
   // MRV-бюджет группы (та же схема, что у слабых групп: сумма MRV мышц составной группы).
   const groupMrvBudget = (group: string): number | null => {
     if (!mrvParams) return null;
-    return groupMrvBudgetFor(mrvParams.vrLevel, mrvParams.combinedMrvMult, mrvParams.acwrVolMod, mrvParams.arVolMult, group);
+    return groupMrvBudgetFor(
+      mrvParams.vrLevel,
+      mrvParams.combinedMrvMult,
+      mrvParams.acwrVolMod,
+      mrvParams.arVolMult,
+      group,
+    );
   };
-  const weeklyGroupSets = (group: string): number => days.reduce((sum, d) => sum + d.exercises
-    .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
-    .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+  const weeklyGroupSets = (group: string): number =>
+    days.reduce(
+      (sum, d) =>
+        sum +
+        d.exercises
+          .filter((e) => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
+          .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0),
+      0,
+    );
 
   for (const [key, names] of Object.entries(exerciseMap)) {
     if (!names?.length) continue;
     const configuredDays = dayMap?.[key];
-    const selectedDays = Array.isArray(configuredDays) && configuredDays.length > 0
-      ? configuredDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
-      : autoDaysFor(key);
+    const selectedDays =
+      Array.isArray(configuredDays) && configuredDays.length > 0
+        ? configuredDays.map((day) => day - 1).filter((day) => day >= 0 && day < days.length)
+        : autoDaysFor(key);
     const targetDays = selectedDays.length > 0 ? selectedDays : autoDaysFor(key);
 
     // Один выбранный ассистент повторяется в выбранных днях; несколько
     // распределяются по дням, чтобы не перегружать одну сессию.
-    const placements = targetDays.length > names.length
-      ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
-      : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
+    const placements =
+      targetDays.length > names.length
+        ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
+        : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
 
     for (const { dayIndex, name } of placements) {
       const day = days[dayIndex];
       if (!day) continue;
       // Per-day dedup: упражнение уже есть в этом дне (слабые точки/группы/другой ключ).
       // Повтор одного ассистента в РАЗНЫХ днях (тяжёлый + памп) — намеренная фича.
-      if (day.exercises.some(ex => norm(ex.name) === norm(name))) continue;
+      if (day.exercises.some((ex) => norm(ex.name) === norm(name))) continue;
       // Day cap (паритет со слабыми группами): упражнений ≤ 10 на сессию.
       if (day.exercises.length >= 10) continue;
       // ПМ диагностического упражнения: точное имя → fuzzy (в т.ч. основной лифт)
@@ -1002,20 +1202,21 @@ function injectDiagnosticExercises(
       const mainName = mainNameMap[liftKey] ?? '';
       const pmFuzzy = pmForInjected(name, mainName, pmRow, 0);
       const mainPm = mainName ? (pmRow[mainName] ?? 0) : 0;
-      const pm = pmFuzzy > 0
-        ? pmFuzzy
-        : (matchesFocusLift(name, liftKey) && mainPm > 0 ? mainPm : fallbackPm);
+      const pm = pmFuzzy > 0 ? pmFuzzy : matchesFocusLift(name, liftKey) && mainPm > 0 ? mainPm : fallbackPm;
       const protocol = diagnosticProtocolFromCycle(template, name);
       const group = diagnosticGroupForExercise(name);
       // P2: слабая сторона получает +1 сет на унилатеральных (в пределах MRV).
-      const uniBonus = weakSide && /гантел|одной рук|выпад|болгарск|одной ног|одна ног|single|unilateral|сплит/i.test(name) ? 1 : 0;
+      const uniBonus =
+        weakSide && /гантел|одной рук|выпад|болгарск|одной ног|одна ног|single|unilateral|сплит/i.test(name) ? 1 : 0;
       const effSets = protocol.sets + uniBonus;
       // MRV-бюджет группы: не добавляем, если недельный объём группы выйдет за MRV.
       if (group) {
         const budget = groupMrvBudget(group);
         const addedSets = Math.max(1, effSets);
         if (budget != null && weeklyGroupSets(group) + addedSets > budget) {
-          notes?.push(`⚠ Диагностика: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + addedSets} сетов > MRV ${budget} (уровень ×${Math.max(1, mrvParams!.combinedMrvMult).toFixed(2)} PED/восст ×${mrvParams!.acwrVolMod} ACWR ×${mrvParams!.arVolMult} авторег).`);
+          notes?.push(
+            `⚠ Диагностика: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + addedSets} сетов > MRV ${budget} (уровень ×${Math.max(1, mrvParams!.combinedMrvMult).toFixed(2)} PED/восст ×${mrvParams!.acwrVolMod} ACWR ×${mrvParams!.arVolMult} авторег).`,
+          );
           continue;
         }
       }
@@ -1027,9 +1228,19 @@ function injectDiagnosticExercises(
         load: 'Средняя',
         pm,
         rir: protocol.rir,
-        workSets: [{ pct: protocol.pct, reps: protocol.reps, sets: effSets, weight: workWeight(pm, protocol.pct), rir: protocol.rir }],
+        workSets: [
+          {
+            pct: protocol.pct,
+            reps: protocol.reps,
+            sets: effSets,
+            weight: workWeight(pm, protocol.pct),
+            rir: protocol.rir,
+          },
+        ],
       });
-      notes?.push(`🔥 Диагностика: ${name} → день ${dayIndex + 1} (${effSets}×${protocol.reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${uniBonus ? `, +1 слабой стороне` : ''}) · группа ${group ?? '—'}${group ? ` ≤ MRV ${groupMrvBudget(group) ?? '—'}` : ''}.`);
+      notes?.push(
+        `🔥 Диагностика: ${name} → день ${dayIndex + 1} (${effSets}×${protocol.reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${uniBonus ? `, +1 слабой стороне` : ''}) · группа ${group ?? '—'}${group ? ` ≤ MRV ${groupMrvBudget(group) ?? '—'}` : ''}.`,
+      );
     }
   }
 }
@@ -1065,39 +1276,60 @@ function injectLimiterExercises(
   if (!limiterMap) return;
 
   const mainNameMap: Record<string, string> = {
-    bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга', ohp: 'Жим стоя',
-    row: 'Тяга', pulldown: 'Тяга', incline_press: 'Жим гантелей', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
+    bench: 'Жим лёжа',
+    squat: 'Присед',
+    deadlift: 'Становая тяга',
+    ohp: 'Жим стоя',
+    row: 'Тяга',
+    pulldown: 'Тяга',
+    incline_press: 'Жим гантелей',
+    sumo: 'Становая тяга (сумо)',
+    biceps: 'Подъём на бицепс',
   };
 
   const autoDaysFor = (key: string): number[] => {
     const lift = key.split('|')[0];
     const mainName = mainNameMap[lift];
     if (!mainName) return [0];
-    const ranked = days.map((day, index) => ({
-      index,
-      mainSets: day.exercises
-        .filter(exercise => {
-          const exerciseName = norm(exercise.name);
-          const targetName = norm(mainName);
-          return exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName);
-        })
-        .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
-    })).filter(day => day.mainSets > 0);
+    const ranked = days
+      .map((day, index) => ({
+        index,
+        mainSets: day.exercises
+          .filter((exercise) => {
+            const exerciseName = norm(exercise.name);
+            const targetName = norm(mainName);
+            return (
+              exerciseName === targetName || exerciseName.includes(targetName) || targetName.includes(exerciseName)
+            );
+          })
+          .reduce((total, exercise) => total + exercise.workSets.reduce((sets, workSet) => sets + workSet.sets, 0), 0),
+      }))
+      .filter((day) => day.mainSets > 0);
     if (ranked.length === 0) return [0];
     const heavy = [...ranked].sort((a, b) => b.mainSets - a.mainSets)[0].index;
-    const light = [...ranked]
-      .filter(day => day.index !== heavy)
-      .sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
+    const light = [...ranked].filter((day) => day.index !== heavy).sort((a, b) => a.mainSets - b.mainSets)[0]?.index;
     return light == null ? [heavy] : [heavy, light];
   };
 
   const groupMrvBudget = (group: string): number | null => {
     if (!mrvParams) return null;
-    return groupMrvBudgetFor(mrvParams.vrLevel, mrvParams.combinedMrvMult, mrvParams.acwrVolMod, mrvParams.arVolMult, group);
+    return groupMrvBudgetFor(
+      mrvParams.vrLevel,
+      mrvParams.combinedMrvMult,
+      mrvParams.acwrVolMod,
+      mrvParams.arVolMult,
+      group,
+    );
   };
-  const weeklyGroupSets = (group: string): number => days.reduce((sum, d) => sum + d.exercises
-    .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
-    .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
+  const weeklyGroupSets = (group: string): number =>
+    days.reduce(
+      (sum, d) =>
+        sum +
+        d.exercises
+          .filter((e) => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === group)
+          .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0),
+      0,
+    );
 
   // Группа лимитирующего упражнения — по ИМЕНИ (поле groups СРЦ-пула — коды движений,
   // а не мышцы: «Бицепс стоя» с кодами ЖМ/ЖИМ давал chest, «Присед» с ТГ — back).
@@ -1105,7 +1337,8 @@ function injectLimiterExercises(
     const n = norm(name);
     if (/пресс|скруч|планк|анти.?рот|ротац|(?:^|[^а-яё])кор(?:$|[^а-яё])|core/.test(n)) return 'core';
     if (/жим стоя|армейск|махи|дельт|плеч/.test(n)) return 'shoulders';
-    if (/присед|выпад|жим ногами|разгибани.*ног|сгибани.*ног|икр|гудморнинг|good.?morning|бицепс бедра|бедра/.test(n)) return 'legs';
+    if (/присед|выпад|жим ногами|разгибани.*ног|сгибани.*ног|икр|гудморнинг|good.?morning|бицепс бедра|бедра/.test(n))
+      return 'legs';
     if (/жим узким|француз|трицепс|разгибан.*рук|разгибани.*блок|кист|запяст|wrist/.test(n)) return 'arms';
     if (/бицепс(?! бедра)|сгибан.*рук|молот|скотт|брахи|curl/.test(n)) return 'arms';
     if (/жим/.test(n)) return 'chest';
@@ -1122,22 +1355,26 @@ function injectLimiterExercises(
     const lift = key.split('|')[0];
     const mainName = mainNameMap[lift] || 'Жим';
     const configuredDays = dayMap?.[key];
-    const selectedDays = Array.isArray(configuredDays) && configuredDays.length > 0
-      ? configuredDays.map(day => day - 1).filter(day => day >= 0 && day < days.length)
-      : autoDaysFor(key);
+    const selectedDays =
+      Array.isArray(configuredDays) && configuredDays.length > 0
+        ? configuredDays.map((day) => day - 1).filter((day) => day >= 0 && day < days.length)
+        : autoDaysFor(key);
     const targetDays = selectedDays.length > 0 ? selectedDays : autoDaysFor(key);
 
-    const placements = targetDays.length > names.length
-      ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
-      : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
+    const placements =
+      targetDays.length > names.length
+        ? targetDays.map((dayIndex, index) => ({ dayIndex, name: names[index % names.length] }))
+        : names.map((name, index) => ({ dayIndex: targetDays[index % targetDays.length], name }));
 
     for (const { dayIndex, name } of placements) {
       const day = days[dayIndex];
       if (!day) continue;
       // Метод-оверлей: упражнение уже в этом дне (напр. «Присед» для эксцентрики/ёмкости) —
       // отдельное не добавляется, но ПРОЗРАЧНО помечаем (метод применяется к движению).
-      if (day.exercises.some(ex => norm(ex.name) === norm(name))) {
-        notes?.push(`💡 Лимит.фактор: «${name}» уже в плане (день ${dayIndex + 1}) — метод применяется к этому движению, отдельное упражнение не добавлено.`);
+      if (day.exercises.some((ex) => norm(ex.name) === norm(name))) {
+        notes?.push(
+          `💡 Лимит.фактор: «${name}» уже в плане (день ${dayIndex + 1}) — метод применяется к этому движению, отдельное упражнение не добавлено.`,
+        );
         continue;
       }
       if (day.exercises.length >= 10) continue;
@@ -1147,7 +1384,9 @@ function injectLimiterExercises(
       if (countsTowardMrv && group) {
         const budget = groupMrvBudget(group);
         if (budget != null && weeklyGroupSets(group) + sets > budget) {
-          notes?.push(`⚠ Лимит.фактор: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + sets} сетов > MRV ${budget} (гипертрофия лимитирующей группы).`);
+          notes?.push(
+            `⚠ Лимит.фактор: ${name} не добавлен — объём группы ${group} ${weeklyGroupSets(group) + sets} сетов > MRV ${budget} (гипертрофия лимитирующей группы).`,
+          );
           continue;
         }
       }
@@ -1168,8 +1407,12 @@ function injectLimiterExercises(
         protocol.rest ? `отдых ${protocol.rest}` : '',
         protocol.holdSec ? `удержание ${protocol.holdSec}с` : '',
         protocol.note ? `(${protocol.note})` : '',
-      ].filter(Boolean).join(' · ');
-      notes?.push(`🔥 Лимит.фактор: ${name} → день ${dayIndex + 1} (${sets}×${reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${extras ? ' · ' + extras : ''}) · группа ${group ?? '—'}.`);
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      notes?.push(
+        `🔥 Лимит.фактор: ${name} → день ${dayIndex + 1} (${sets}×${reps} @${Math.round(protocol.pct * 100)}% RIR ${protocol.rir}${extras ? ' · ' + extras : ''}) · группа ${group ?? '—'}.`,
+      );
     }
   }
 }
@@ -1187,35 +1430,57 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   if (fallbackPm <= 0) throw new Error('buildLMSPlan: fallbackPm must be > 0');
 
   // Валидация шаблона
-  if (!template.meta.weeks || template.meta.weeks <= 0) throw new Error('buildLMSPlan: template.meta.weeks must be > 0');
-  if (!template.week1 || !Array.isArray(template.week1) || template.week1.length === 0) throw new Error('buildLMSPlan: template.week1 must be a non-empty array of days');
-  if (typeof template.meta.correctionPct !== 'number' || isNaN(template.meta.correctionPct)) throw new Error('buildLMSPlan: template.meta.correctionPct must be a number');
+  if (!template.meta.weeks || template.meta.weeks <= 0)
+    throw new Error('buildLMSPlan: template.meta.weeks must be > 0');
+  if (!template.week1 || !Array.isArray(template.week1) || template.week1.length === 0)
+    throw new Error('buildLMSPlan: template.week1 must be a non-empty array of days');
+  if (typeof template.meta.correctionPct !== 'number' || isNaN(template.meta.correctionPct))
+    throw new Error('buildLMSPlan: template.meta.correctionPct must be a number');
   for (const day of template.week1) {
     if (!day || !Array.isArray(day.exercises)) throw new Error('buildLMSPlan: week1 contains an invalid day');
     for (const ex of day.exercises) {
-      if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error('buildLMSPlan: exercise name must be non-empty');
-      if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
+      if (!ex || typeof ex.name !== 'string' || !ex.name.trim())
+        throw new Error('buildLMSPlan: exercise name must be non-empty');
+      if (!ex.sets || !Array.isArray(ex.sets))
+        throw new Error(`buildLMSPlan: exercise "${ex.name}" has missing or invalid sets`);
       for (const s of ex.sets) {
-        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..${MAX_SOURCE_SET_PCT}`);
-        if (typeof s.sets !== 'number' || s.sets <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid sets count (${s.sets})`);
-        if (typeof s.reps !== 'number' || s.reps <= 0) throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid reps (${s.reps})`);
+        if (typeof s.pct !== 'number' || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT)
+          throw new Error(
+            `buildLMSPlan: exercise "${ex.name}" has invalid pct (${s.pct}), expected 0..${MAX_SOURCE_SET_PCT}`,
+          );
+        if (typeof s.sets !== 'number' || s.sets <= 0)
+          throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid sets count (${s.sets})`);
+        if (typeof s.reps !== 'number' || s.reps <= 0)
+          throw new Error(`buildLMSPlan: exercise "${ex.name}" has invalid reps (${s.reps})`);
       }
     }
   }
-  if (template.weeks && !Array.isArray(template.weeks)) throw new Error('buildLMSPlan: template.weeks must be an array if provided');
+  if (template.weeks && !Array.isArray(template.weeks))
+    throw new Error('buildLMSPlan: template.weeks must be an array if provided');
   if (template.weeks) {
     for (let wi = 0; wi < template.weeks.length; wi++) {
       const w = template.weeks[wi];
-      if (!Array.isArray(w) || w.length === 0) throw new Error(`buildLMSPlan: template.weeks[${wi}] must be a non-empty array of days`);
+      if (!Array.isArray(w) || w.length === 0)
+        throw new Error(`buildLMSPlan: template.weeks[${wi}] must be a non-empty array of days`);
       for (const day of w) {
-        if (!day || !Array.isArray(day.exercises)) throw new Error(`buildLMSPlan: template.weeks[${wi}] contains an invalid day`);
+        if (!day || !Array.isArray(day.exercises))
+          throw new Error(`buildLMSPlan: template.weeks[${wi}] contains an invalid day`);
         for (const ex of day.exercises) {
-          if (!ex || typeof ex.name !== 'string' || !ex.name.trim()) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise name must be non-empty`);
-          if (!ex.sets || !Array.isArray(ex.sets)) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
+          if (!ex || typeof ex.name !== 'string' || !ex.name.trim())
+            throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise name must be non-empty`);
+          if (!ex.sets || !Array.isArray(ex.sets))
+            throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets`);
           for (const s of ex.sets) {
-            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
-            if (typeof s.sets !== 'number' || !Number.isFinite(s.sets) || s.sets <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets count (${s.sets})`);
-            if (typeof s.reps !== 'number' || !Number.isFinite(s.reps) || s.reps <= 0) throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid reps (${s.reps})`);
+            if (typeof s.pct !== 'number' || !Number.isFinite(s.pct) || s.pct <= 0 || s.pct > MAX_SOURCE_SET_PCT)
+              throw new Error(`buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid pct (${s.pct})`);
+            if (typeof s.sets !== 'number' || !Number.isFinite(s.sets) || s.sets <= 0)
+              throw new Error(
+                `buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid sets count (${s.sets})`,
+              );
+            if (typeof s.reps !== 'number' || !Number.isFinite(s.reps) || s.reps <= 0)
+              throw new Error(
+                `buildLMSPlan: explicit week ${wi + 1} exercise "${ex.name}" has invalid reps (${s.reps})`,
+              );
           }
         }
       }
@@ -1238,13 +1503,21 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
 
   // Faithful multi-week: если задана явная раскладка ВСЕХ недель — используем её
   // дословно, БЕЗ авто-прогрессии (pct каждой недели уже отражает реальную нагрузку).
-  const hasExplicitWeeks = !!(template.weeks && template.weeks.length)
-    && (faithful || template.meta.sourceWeeks !== true);
+  const hasExplicitWeeks =
+    !!(template.weeks && template.weeks.length) && (faithful || template.meta.sourceWeeks !== true);
   const totalWeeks = hasExplicitWeeks
     ? template.weeks!.length
     : Math.max(1, Math.round(input.weeksOverride ?? template.meta.weeks));
-  if (input.requireSourceChangeConsent && !hasExplicitWeeks && input.weeksOverride != null && input.weeksOverride !== originalCycleWeeks(template) && input.sourceChangeConsent !== true) {
-    throw new Error(`Нужно согласие на изменение длины исходного цикла «${template.meta.title}» (${originalCycleWeeks(template)}→${Math.round(input.weeksOverride)} нед). Оригинал не изменён.`);
+  if (
+    input.requireSourceChangeConsent &&
+    !hasExplicitWeeks &&
+    input.weeksOverride != null &&
+    input.weeksOverride !== originalCycleWeeks(template) &&
+    input.sourceChangeConsent !== true
+  ) {
+    throw new Error(
+      `Нужно согласие на изменение длины исходного цикла «${template.meta.title}» (${originalCycleWeeks(template)}→${Math.round(input.weeksOverride)} нед). Оригинал не изменён.`,
+    );
   }
 
   const pm0Map: Record<string, number> = {};
@@ -1255,23 +1528,29 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   }
 
   // прогрессия PM для каждого упражнения
-  const rationalePm0 = Object.values(pm0Map).reduce((sum, pm) => sum + pm, 0) / Math.max(1, Object.values(pm0Map).length);
+  const rationalePm0 =
+    Object.values(pm0Map).reduce((sum, pm) => sum + pm, 0) / Math.max(1, Object.values(pm0Map).length);
   const progInput: PMProgressionInput = {
-    pm0: rationalePm0, weeks: totalWeeks, mode,
-    weeklyPercent: input.weeklyPercent, courseIntensity: input.courseIntensity,
+    pm0: rationalePm0,
+    weeks: totalWeeks,
+    mode,
+    weeklyPercent: input.weeklyPercent,
+    courseIntensity: input.courseIntensity,
   };
-  const rationale = (hasExplicitWeeks && input.progressionEnabled === false)
-    ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
-    : progressionRationale(progInput);
+  const rationale =
+    hasExplicitWeeks && input.progressionEnabled === false
+      ? 'Программа задана дословно по источнику (явная раскладка всех недель, без авто-прогрессии PM).'
+      : progressionRationale(progInput);
   const weakNotes: string[] = [];
 
   const goalKey = rirGoalKey(template.meta.period);
   const levelKey = rirLevelKey(template.meta.level);
   const vrLevel = vrLevelKey(template.meta.level);
   // Уровень спортсмена в темпе прогрессии ПМ (натурал/custom): k ≥ levelK (Rhea 2003).
-  const levelPmNote = (!hasExplicitWeeks && (mode === 'natural' || mode === 'custom') && levelPmFloor(vrLevel) != null)
-    ? ` 🎓 Уровень ${vrLevel}: темп ПМ ≥ +${(levelPmFloor(vrLevel)! * 100).toFixed(1)}%/нед.`
-    : '';
+  const levelPmNote =
+    !hasExplicitWeeks && (mode === 'natural' || mode === 'custom') && levelPmFloor(vrLevel) != null
+      ? ` 🎓 Уровень ${vrLevel}: темп ПМ ≥ +${(levelPmFloor(vrLevel)! * 100).toFixed(1)}%/нед.`
+      : '';
   // PED-адаптация: dose-aware через adaptForPEDs (если переданы PEDs), иначе fallback на хардкод.
   let pedMrvMult = 1;
   let pedRecMult = 1;
@@ -1290,31 +1569,46 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // HRV — ТОЛЬКО от личной базы (P0-Б, hrv-baseline.engine): абсолютный порог >70/<50 мс
   // запрещён шапкой того модуля (Plews 2013 PMID 23535808; Buchheit 2014 PMID 24282094).
   // Явные hrvBaseline/hrvBaselineZ приоритетнее; иначе база берётся из `he_hrv_log`.
-  const hrvSig: HrvRecoverySignal = (input.hrvBaseline != null || input.hrvBaselineZ != null)
-    ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
-    : hrvSignalFromStore(input.hrvMs);
+  const hrvSig: HrvRecoverySignal =
+    input.hrvBaseline != null || input.hrvBaselineZ != null
+      ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+      : hrvSignalFromStore(input.hrvMs);
   const hrvVerdict = hrvRecoveryMult(hrvSig);
-  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
-    let r = 1.0;
-    if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
-    if (input.leanMass != null) r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
-    r *= hrvVerdict.mult;
-    if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
-    if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
-    return r;
-  })()));
+  const recoveryMult = Math.max(
+    0.6,
+    Math.min(
+      1.5,
+      (() => {
+        let r = 1.0;
+        if (input.bodyFat != null) r *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1.0;
+        if (input.leanMass != null)
+          r *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1.0 : 0.9;
+        r *= hrvVerdict.mult;
+        if (input.sleepHours != null) r *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1.0 : 0.85;
+        if (input.stressLevel != null) r *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1.0 : 0.85;
+        return r;
+      })(),
+    ),
+  );
   // Питание (Helms 2022): профицит калорий и белок → MRV soft-cap (паритет с ББ-авто).
-  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
-    let n = 1;
-    const cal = input.nutrition?.calorieSurplus;
-    const pro = input.nutrition?.proteinPerKg;
-    if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
-    if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
-    return n;
-  })()));
-  const nutritionNote = nutritionMult !== 1
-    ? ` 🥗 Питание: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${input.nutrition?.calorieSurplus ?? 0} ккал, белок ${input.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
-    : '';
+  const nutritionMult = Math.max(
+    0.6,
+    Math.min(
+      1.5,
+      (() => {
+        let n = 1;
+        const cal = input.nutrition?.calorieSurplus;
+        const pro = input.nutrition?.proteinPerKg;
+        if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
+        if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
+        return n;
+      })(),
+    ),
+  );
+  const nutritionNote =
+    nutritionMult !== 1
+      ? ` 🥗 Питание: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${input.nutrition?.calorieSurplus ?? 0} ккал, белок ${input.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
+      : '';
   // Итоговый MRV-множитель: PED × recovery × питание (комбинированный soft-cap)
   const combinedMrvMult = pedMrvMult * recoveryMult * nutritionMult;
 
@@ -1323,11 +1617,20 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // без подтверждения зона остаётся видимой в rationale, но план не трогает.
   const acwrZone = input.acwr?.zone;
   const acwrCorroborated = acwrCorroboratedByRecovery(input);
-  let acwrVolMod = 1, acwrRirShift = 0, acwrDeload = false;
+  let acwrVolMod = 1,
+    acwrRirShift = 0,
+    acwrDeload = false;
   if (acwrZone && acwrCorroborated) {
-    if (acwrZone === 'dangerous') { acwrVolMod = 0.65; acwrRirShift = 2; acwrDeload = true; }
-    else if (acwrZone === 'caution') { acwrVolMod = 0.85; acwrRirShift = 1; }
-    else if (acwrZone === 'undertrained') { acwrVolMod = 1.1; } // Растренированность: стимул +10% объёма без RIR-shift (восстановление через объём, не интенсивность).
+    if (acwrZone === 'dangerous') {
+      acwrVolMod = 0.65;
+      acwrRirShift = 2;
+      acwrDeload = true;
+    } else if (acwrZone === 'caution') {
+      acwrVolMod = 0.85;
+      acwrRirShift = 1;
+    } else if (acwrZone === 'undertrained') {
+      acwrVolMod = 1.1;
+    } // Растренированность: стимул +10% объёма без RIR-shift (восстановление через объём, не интенсивность).
   }
 
   // Авторегуляция: если передана — применяется к весам (topSetPctMultiplier) и объёму/RIR.
@@ -1343,27 +1646,48 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   let pmK: number;
   if (pmAuto?.mode === 'auto') {
     // АВТО: % по авторасчётам (PED/курс/уров), а не из фикс. correctionPct цикла.
-    pmK = autoWeeklyPercent({ mode, courseIntensity: input.courseIntensity, level: vrLevel, weeklyPercent: input.weeklyPercent });
+    pmK = autoWeeklyPercent({
+      mode,
+      courseIntensity: input.courseIntensity,
+      level: vrLevel,
+      weeklyPercent: input.weeklyPercent,
+    });
   } else {
     // off / diary: фикс. % из цикла (с levelK-флором для натурала).
-    const rawK = (input.weeklyPercent != null ? input.weeklyPercent
-      : mode === 'on_course' ? (input.courseIntensity === 'mild' ? 0.015 : input.courseIntensity === 'heavy' ? 0.025 : 0.02)
-      : mode === 'pct' ? -0.005 : template.meta.correctionPct);
-    const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(vrLevel) : null;
-    pmK = (levelK != null && rawK < levelK) ? levelK : rawK;
+    const rawK =
+      input.weeklyPercent != null
+        ? input.weeklyPercent
+        : mode === 'on_course'
+          ? input.courseIntensity === 'mild'
+            ? 0.015
+            : input.courseIntensity === 'heavy'
+              ? 0.025
+              : 0.02
+          : mode === 'pct'
+            ? -0.005
+            : template.meta.correctionPct;
+    const levelK = mode === 'natural' || mode === 'custom' ? levelPmFloor(vrLevel) : null;
+    pmK = levelK != null && rawK < levelK ? levelK : rawK;
   }
-  const pmAutoNote = pmAuto?.mode === 'auto'
-    ? ` ⚡ Авторегуляция ПМ: темп ${(pmK * 100).toFixed(1)}%/нед рассчитан автоматически (PED/курс/уровень).`
-    : pmAuto?.mode === 'diary'
-      ? ` 📒 Авторегуляция ПМ: по дневнику (e1RM vs плановый ПМ, множитель ×1.05/×1/×0.95).`
-      : '';
+  const pmAutoNote =
+    pmAuto?.mode === 'auto'
+      ? ` ⚡ Авторегуляция ПМ: темп ${(pmK * 100).toFixed(1)}%/нед рассчитан автоматически (PED/курс/уровень).`
+      : pmAuto?.mode === 'diary'
+        ? ` 📒 Авторегуляция ПМ: по дневнику (e1RM vs плановый ПМ, множитель ×1.05/×1/×0.95).`
+        : '';
 
   const weeks: LMSPlanWeek[] = [];
   const deloadNotes: string[] = [];
-  const sourceLayouts = template.weeks && template.weeks.length > 0
-    ? template.weeks
-    : Array.from({ length: totalWeeks }, () => template.week1);
-  const sourceSnapshots = summarizeSourceCycleWeeks(sourceLayouts, template.meta.period, template.meta.sourcePhases, template.meta.sourcePhaseSource ?? 'original');
+  const sourceLayouts =
+    template.weeks && template.weeks.length > 0
+      ? template.weeks
+      : Array.from({ length: totalWeeks }, () => template.week1);
+  const sourceSnapshots = summarizeSourceCycleWeeks(
+    sourceLayouts,
+    template.meta.period,
+    template.meta.sourcePhases,
+    template.meta.sourcePhaseSource ?? 'original',
+  );
   for (let w = 0; w < totalWeeks; w++) {
     const weekNumber = w + 1;
     const phase: MesocyclePhase = mesocyclePhaseForWeek(weekNumber, totalWeeks);
@@ -1375,7 +1699,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     // игнорировал (делод доходил только через ACWR/autoReg). 17 циклов
     // объявляют делоды, но планы собирались без единой разгрузки.
     const metaDeload = !!((template.meta as any).deloadWeeks as number[] | undefined)?.includes(weekNumber);
-    if (metaDeload) deloadNotes.push(`🔋 Делод нед ${weekNumber} (meta): объём ×0.5, RIR+2${faithful ? ' — faithful: только метка' : ''}.`);
+    if (metaDeload)
+      deloadNotes.push(
+        `🔋 Делод нед ${weekNumber} (meta): объём ×0.5, RIR+2${faithful ? ' — faithful: только метка' : ''}.`,
+      );
 
     const pmRow: Record<string, number> = {};
     for (const name of exercises) {
@@ -1386,7 +1713,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         // k = max(коррекция цикла, levelK) — новичок растёт быстрее (Rhea 2003).
         // На курсе — курсовая кривая, на ПКТ — нисходящая (levelK не применяется).
         // k уже рассчитан выше (pmK): off/diary — фикс. % цикла, auto — по авторасчётам.
-        const progInput: PMProgressionInput = { pm0: pm0Map[name], weeks: totalWeeks, mode, weeklyPercent: pmK, courseIntensity: input.courseIntensity };
+        const progInput: PMProgressionInput = {
+          pm0: pm0Map[name],
+          weeks: totalWeeks,
+          mode,
+          weeklyPercent: pmK,
+          courseIntensity: input.courseIntensity,
+        };
         let progressedPm = pmForWeek(progInput, weekNumber);
         // ДНЕВНИК: множитель ПМ по e1RM из дневника (обгон → ×1.05, отставание → ×0.95).
         if (pmAuto?.mode === 'diary') {
@@ -1400,7 +1733,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     const days: LMSPlanDay[] = weekLayout.map((day: SRDaySpec, dayIdx: number) => {
       const dayTag = dayLoadTag(day.exercises as { load?: string }[]);
       // DUP: варьирование зон по дням недели (мягкий DUP поверх шаблона цикла)
-      const dupWtMult = input.periodization === 'dup' && !faithful ? [1.0, 0.97, 0.94][dayIdx % 3] ?? 1 : 1;
+      const dupWtMult = input.periodization === 'dup' && !faithful ? ([1.0, 0.97, 0.94][dayIdx % 3] ?? 1) : 1;
       const dupRirShift = input.periodization === 'dup' && !faithful ? dayIdx % 3 : 0;
 
       // S-MRV: Бюджет утомления на сессию
@@ -1409,7 +1742,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       const planEx: LMSPlanExercise[] = day.exercises.map((spec: SRExerciseSpec) => {
         const pm = pmRow[spec.name];
         const isMain = spec.load === 'Тяжелая';
-        const workSets: LMSWorkSet[] = spec.sets.map(s => {
+        const workSets: LMSWorkSet[] = spec.sets.map((s) => {
           let sets = s.sets;
 
           // Коррекция объёма по VolumeGoal + фазе мезоцикла (только для аксессуаров)
@@ -1417,7 +1750,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             const vMult = input.volumeGoal === 'mev' ? 0.8 : input.volumeGoal === 'mrv' ? 1.2 : 1.0;
             const focusMult = matchesFocusLift(spec.name, input.focusLift) ? 1.2 : 1.0;
             const weakEn = exEnGroup(spec.group);
-            const weakMult = (input.weakPoints && weakEn && input.weakPoints.includes(weakEn)) ? 1.2 : 1.0;
+            const weakMult = input.weakPoints && weakEn && input.weakPoints.includes(weakEn) ? 1.2 : 1.0;
             const pedMult = Math.min(1.5, pedMrvMult);
             const totalMult = Math.min(1.5, vMult * phaseVolMod * focusMult * weakMult * pedMult);
             sets = Math.round(sets * totalMult);
@@ -1439,16 +1772,23 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // авторская разгрузка выходила тяжелее инференции тапера.
           if (metaDeload && !faithful) sets = Math.max(1, Math.round(sets * 0.5));
 
-           // Расчётный вес с авторегуляцией (topSetPctMultiplier)
-           const baseWeight = workWeight(pm, s.pct);
-           const adjWeight = Math.round(baseWeight * arTopMult * dupWtMult * 10) / 10;
+          // Расчётный вес с авторегуляцией (topSetPctMultiplier).
+          // P3: в режиме !faithful `pmRow[name]` уже умножен на arTopMult выше —
+          // второй раз не умножаем, иначе m=0.9 даёт −19 % вместо −10 %.
+          const baseWeight = workWeight(pm, s.pct);
+          const adjWeight = Math.round(baseWeight * (faithful ? arTopMult : 1) * dupWtMult * 10) / 10;
 
-            // RIR с ACWR + авторегуляцией + DUP
-            const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
-            const adjRir = Math.max(0, Math.min(6, baseRir + acwrRirShift + arRirShift + dupRirShift + (metaDeload && !faithful ? 2 : 0)));
+          // RIR с ACWR + авторегуляцией + DUP
+          const baseRir = faithful ? (s.rir ?? rirBase) : rirBase;
+          const adjRir = Math.max(
+            0,
+            Math.min(6, baseRir + acwrRirShift + arRirShift + dupRirShift + (metaDeload && !faithful ? 2 : 0)),
+          );
 
           return {
-            pct: s.pct, reps: s.reps, sets: Math.max(1, sets),
+            pct: s.pct,
+            reps: s.reps,
+            sets: Math.max(1, sets),
             weight: adjWeight,
             rir: adjRir,
           };
@@ -1457,33 +1797,82 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         // Проверка S-MRV: срезаем аксессуары, чтобы влезть в бюджет утомления
         let totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
         const aliasId = resolveCatalogId(spec.name);
-        const fatigueCost = (aliasId
-          ? EXERCISE_CATALOG.find(e => e.id === aliasId)
-          : EXERCISE_CATALOG.find(e => e.name === spec.name))?.fatigueCost ?? 5;
+        const fatigueCost =
+          (aliasId
+            ? EXERCISE_CATALOG.find((e) => e.id === aliasId)
+            : EXERCISE_CATALOG.find((e) => e.name === spec.name)
+          )?.fatigueCost ?? 5;
         const exCost = fatigueCost * totalWorkSets;
         if (!faithful && dayFatigueBudget < exCost && !isMain) {
           const fit = Math.max(2, Math.floor(Math.max(0, dayFatigueBudget) / fatigueCost));
-          workSets.forEach(ws => { ws.sets = Math.min(ws.sets, fit); });
+          workSets.forEach((ws) => {
+            ws.sets = Math.min(ws.sets, fit);
+          });
           totalWorkSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
         }
         dayFatigueBudget -= fatigueCost * totalWorkSets;
 
-      return { name: spec.name, group: spec.group, coef: spec.coef, mnosz: spec.mnosz, load: cleanLoad(spec.load, dayTag), pm, rir: workSets[0]?.rir ?? rirBase, workSets };
-       });
- 
-       const metricsEx: SRExercise[] = planEx.map(pe => ({
-         name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-         sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
-       }));
-       return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
-     });
+        return {
+          name: spec.name,
+          group: spec.group,
+          coef: spec.coef,
+          mnosz: spec.mnosz,
+          load: cleanLoad(spec.load, dayTag),
+          pm,
+          rir: workSets[0]?.rir ?? rirBase,
+          workSets,
+        };
+      });
+
+      const metricsEx: SRExercise[] = planEx.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      }));
+      return { exercises: planEx, metrics: calcSessionMetrics(metricsEx) };
+    });
     // Слабые точки и слабые группы добавляются отдельным слоем. Faithful защищает source-сеты,
     // но не должен отключать выбранные пользователем ассистенты.
     if (input.plWeakPoints && input.plWeakPoints.length) {
-      injectPLWeakPoints(days, input.plWeakPoints, pmRow, rirBase, phaseVolMod, vrLevel, combinedMrvMult, input.plWeakPointDayMap, input.plWeakPointExerciseMap, input.orthopedicBlockedPatterns ?? [], input.fallbackPm ?? 80);
+      injectPLWeakPoints(
+        days,
+        input.plWeakPoints,
+        pmRow,
+        rirBase,
+        phaseVolMod,
+        vrLevel,
+        combinedMrvMult,
+        input.plWeakPointDayMap,
+        input.plWeakPointExerciseMap,
+        input.orthopedicBlockedPatterns ?? [],
+        input.fallbackPm ?? 80,
+      );
     }
-    injectDiagnosticExercises(days, input.diagnosticExerciseMap, input.diagnosticDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes, input.diagnosticWeakSide ?? null);
-    injectLimiterExercises(days, input.limiterExerciseMap, input.limiterProtocolMap, input.limiterDayMap, pmRow, input.fallbackPm ?? 80, template, { vrLevel, combinedMrvMult, acwrVolMod, arVolMult }, weakNotes);
+    injectDiagnosticExercises(
+      days,
+      input.diagnosticExerciseMap,
+      input.diagnosticDayMap,
+      pmRow,
+      input.fallbackPm ?? 80,
+      template,
+      { vrLevel, combinedMrvMult, acwrVolMod, arVolMult },
+      weakNotes,
+      input.diagnosticWeakSide ?? null,
+    );
+    injectLimiterExercises(
+      days,
+      input.limiterExerciseMap,
+      input.limiterProtocolMap,
+      input.limiterDayMap,
+      pmRow,
+      input.fallbackPm ?? 80,
+      template,
+      { vrLevel, combinedMrvMult, acwrVolMod, arVolMult },
+      weakNotes,
+    );
 
     // Инъекция accessory-упражнений для слабых групп мышц — авто-распределение по 1-2 дням.
     // PL-логика:
@@ -1492,41 +1881,59 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     //    выбранного дня/недели цикла, а не универсальную BB-схему;
     //  - основные паттерны цикла (жим/присед/становая и primary-варианты) исключены;
     //  - пользовательский override: weakGroupDayMap[muscle] = [dayIdx,...] — 1-based.
-      if (input.weakPoints && input.weakPoints.length) {
-       const SMALL_GROUPS_2X = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'delt_rear', 'delt_mid', 'arms']);
+    if (input.weakPoints && input.weakPoints.length) {
+      const SMALL_GROUPS_2X = new Set([
+        'biceps',
+        'triceps',
+        'forearms',
+        'calves',
+        'abs',
+        'delt_rear',
+        'delt_mid',
+        'arms',
+      ]);
       const userDayMap = input.weakGroupDayMap;
-      const allWeekNames = new Set(days.flatMap(d => d.exercises.map(e => norm(e.name))));
-      const allWeekSubstitutionGroups = new Set(days.flatMap(d => d.exercises
-        .map(e => findCatalogExerciseByLabel(e.name)?.substitutionGroup)
-        .filter((group): group is string => Boolean(group))));
+      const allWeekNames = new Set(days.flatMap((d) => d.exercises.map((e) => norm(e.name))));
+      const allWeekSubstitutionGroups = new Set(
+        days.flatMap((d) =>
+          d.exercises
+            .map((e) => findCatalogExerciseByLabel(e.name)?.substitutionGroup)
+            .filter((group): group is string => Boolean(group)),
+        ),
+      );
       const fallbackPm = input.fallbackPm ?? 80;
 
-        for (const wg of input.weakPoints) {
-          const selectedExercises = input.weakGroupExerciseMap?.[wg];
-          // Оборудование профиля: если задано — разрешаем только доступные снаряды.
-          const equipmentSet = (input.equipment && input.equipment.length > 0)
-            ? new Set(input.equipment.map(eq => eq.toLowerCase()))
-            : null;
-          const candidates = getPLWeakGroupExerciseCandidates(template, wg)
-            .filter(ex => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
-            .filter(ex => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || derivePattern(ex)))
-            .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)))
-            .filter((ex: Exercise) => !ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup))
-            .filter((ex: Exercise) => {
-              if (!equipmentSet) return true;
-              const eq = String(ex.equipment || '').toLowerCase();
-              return eq === 'bodyweight' || equipmentSet.has(eq);
-            });
-          if (candidates.length === 0) continue;
+      for (const wg of input.weakPoints) {
+        const selectedExercises = input.weakGroupExerciseMap?.[wg];
+        // Оборудование профиля: если задано — разрешаем только доступные снаряды.
+        const equipmentSet =
+          input.equipment && input.equipment.length > 0 ? new Set(input.equipment.map((eq) => eq.toLowerCase())) : null;
+        const candidates = getPLWeakGroupExerciseCandidates(template, wg)
+          .filter((ex) => !selectedExercises || selectedExercises.length === 0 || selectedExercises.includes(ex.name))
+          .filter((ex) => !input.orthopedicBlockedPatterns?.includes(ex.movementPattern || derivePattern(ex)))
+          .filter((ex: Exercise) => !allWeekNames.has(norm(ex.name)))
+          .filter((ex: Exercise) => !ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup))
+          .filter((ex: Exercise) => {
+            if (!equipmentSet) return true;
+            const eq = String(ex.equipment || '').toLowerCase();
+            return eq === 'bodyweight' || equipmentSet.has(eq);
+          });
+        if (candidates.length === 0) continue;
 
-          // Тренерский MRV-бюджет слабой группы: суммарные сеты группы за неделю
-          // не должны превышать MRV мышцы, скорректированный PED/recovery и
-          // ACWR/авторегуляцией. Пользовательский ручной выбор не ограничивается.
-          const weakMrv = groupMrvBudgetFor(vrLevel, combinedMrvMult, acwrVolMod, arVolMult, wg);
-          const weakSetsThisWeek = (): number => days.reduce((sum, d) => sum + d.exercises
-            .filter(e => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === wg)
-            .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0), 0);
-          const noMrvCap = Boolean(selectedExercises && selectedExercises.length > 0);
+        // Тренерский MRV-бюджет слабой группы: суммарные сеты группы за неделю
+        // не должны превышать MRV мышцы, скорректированный PED/recovery и
+        // ACWR/авторегуляцией. Пользовательский ручной выбор не ограничивается.
+        const weakMrv = groupMrvBudgetFor(vrLevel, combinedMrvMult, acwrVolMod, arVolMult, wg);
+        const weakSetsThisWeek = (): number =>
+          days.reduce(
+            (sum, d) =>
+              sum +
+              d.exercises
+                .filter((e) => plGroupOfMuscle(groupOfExercise(e.name, exEnGroup(e.group) || '')) === wg)
+                .reduce((s, e) => s + e.workSets.reduce((n, ws) => n + ws.sets, 0), 0),
+            0,
+          );
+        const noMrvCap = Boolean(selectedExercises && selectedExercises.length > 0);
 
         // Определить число дней для добивки
         const isSmall = SMALL_GROUPS_2X.has(wg);
@@ -1534,7 +1941,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         // Пользовательский override выбора дней
         let targetDays: number[] = [];
         if (userDayMap && userDayMap[wg]) {
-          targetDays = userDayMap[wg].slice(0, days.length).filter(d => d >= 1 && d <= days.length);
+          targetDays = userDayMap[wg].slice(0, days.length).filter((d) => d >= 1 && d <= days.length);
           targetDayCount = targetDays.length;
         }
         if (targetDays.length === 0) {
@@ -1542,11 +1949,13 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const dayStats: { idx: number; cnt: number; isLegsDay: boolean; isUpperDay: boolean }[] = [];
           for (let di = 0; di < days.length; di++) {
             const cnt = days[di].exercises
-              .filter(e => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
+              .filter((e) => groupOfExercise(e.name, exEnGroup(e.group) || '') === wg)
               .reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.sets, 0), 0);
-            const dayMuscleGroups = new Set(days[di].exercises.map(e => exEnGroup(e.group) || ''));
-            const isLegsDay = dayMuscleGroups.has('quads') || dayMuscleGroups.has('hamstrings') || dayMuscleGroups.has('glutes');
-            const isUpperDay = dayMuscleGroups.has('chest') || dayMuscleGroups.has('back') || dayMuscleGroups.has('shoulders');
+            const dayMuscleGroups = new Set(days[di].exercises.map((e) => exEnGroup(e.group) || ''));
+            const isLegsDay =
+              dayMuscleGroups.has('quads') || dayMuscleGroups.has('hamstrings') || dayMuscleGroups.has('glutes');
+            const isUpperDay =
+              dayMuscleGroups.has('chest') || dayMuscleGroups.has('back') || dayMuscleGroups.has('shoulders');
             dayStats.push({ idx: di, cnt, isLegsDay, isUpperDay });
           }
           // Сортировать по возрастанию объёма мышцы (min volume = best для spread)
@@ -1568,7 +1977,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             return 0;
           });
           // Взять top targetDayCount дней — обновляем после каждой группы чтобы spread
-          targetDays = dayStats.slice(0, targetDayCount).map(s => s.idx + 1);
+          targetDays = dayStats.slice(0, targetDayCount).map((s) => s.idx + 1);
         }
 
         // ПРОТОКОЛ СЛАБОЙ ГРУППЫ — ИЗ РАСКЛАДКИ ЦИКЛА (не выдуманный):
@@ -1582,16 +1991,18 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
         };
         const dayProtocol = (dayIdx: number, wg: string): { sets: SRSetSpec[]; load: string } => {
           const daySpecs = accSpecsOfDay(dayIdx);
-          const weekSpecs = weekLayout.flatMap((d: SRDaySpec) => d.exercises)
+          const weekSpecs = weekLayout
+            .flatMap((d: SRDaySpec) => d.exercises)
             .filter((s: SRExerciseSpec) => s.load !== 'Тяжелая' && s.sets && s.sets.length > 0);
           // Сначала берём аксессуар на ту же мышечную группу, затем самый лёгкий
           // неосновной протокол недели. Если в выбранном дне нет такой группы,
           // ищем её аксессуар в другой тренировке этого же микроцикла, а не
           // подменяем его случайным жимом/основным движением.
           const sourceGroup = (s: SRExerciseSpec): string => groupOfExercise(s.name, exEnGroup(s.group) || '');
-          const sameDay = daySpecs.filter(s => sourceGroup(s) === wg);
-          const sameWeek = weekSpecs.filter(s => sourceGroup(s) === wg);
-          const pool = sameDay.length > 0 ? sameDay : sameWeek.length > 0 ? sameWeek : daySpecs.length > 0 ? daySpecs : weekSpecs;
+          const sameDay = daySpecs.filter((s) => sourceGroup(s) === wg);
+          const sameWeek = weekSpecs.filter((s) => sourceGroup(s) === wg);
+          const pool =
+            sameDay.length > 0 ? sameDay : sameWeek.length > 0 ? sameWeek : daySpecs.length > 0 ? daySpecs : weekSpecs;
           const rankedPool = [...pool].sort((a, b) => {
             const aGroup = sourceGroup(a) === wg ? 0 : 1;
             const bGroup = sourceGroup(b) === wg ? 0 : 1;
@@ -1602,7 +2013,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
             return (a.coef || 0) - (b.coef || 0);
           });
           const spec = rankedPool[0] as SRExerciseSpec | undefined;
-          const sets = spec?.sets?.length ? spec.sets.map(s => ({ ...s })) : [{ pct: 0.6, reps: 8, sets: 3 }];
+          const sets = spec?.sets?.length ? spec.sets.map((s) => ({ ...s })) : [{ pct: 0.6, reps: 8, sets: 3 }];
           return {
             sets,
             load: spec?.load === 'Легкая' ? 'Легкая' : 'Средняя',
@@ -1616,10 +2027,11 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           const targetDay = days[dayIdx];
           const proto = dayProtocol(dayIdx, wg);
           // Кандидаты уже отфильтрованы и отсортированы общим PL-пулом.
-          const poolFiltered = candidates.filter(ex =>
-            !allWeekNames.has(norm(ex.name)) &&
-            (!ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup)) &&
-            !targetDay.exercises.some(e => norm(e.name) === norm(ex.name))
+          const poolFiltered = candidates.filter(
+            (ex) =>
+              !allWeekNames.has(norm(ex.name)) &&
+              (!ex.substitutionGroup || !allWeekSubstitutionGroups.has(ex.substitutionGroup)) &&
+              !targetDay.exercises.some((e) => norm(e.name) === norm(ex.name)),
           );
           if (poolFiltered.length === 0) continue;
           const pick = poolFiltered[0] as Exercise;
@@ -1627,7 +2039,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // RIR: источник цикла имеет приоритет; если RIR не задан — база фазы
           // с запасом для аксессуара (легкий протокол +2, средний +1).
           const wPm = pmFor(pick.name, pmRow, fallbackPm);
-          const workSets = proto.sets.map(set => {
+          const workSets = proto.sets.map((set) => {
             const setRir = Number.isFinite(set.rir)
               ? Math.max(0, set.rir as number)
               : Math.max(0, rirBase + (proto.load === 'Легкая' ? 2 : 1));
@@ -1649,7 +2061,9 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           // скорректированный MRV мышцы. Ручной выбор пользователя — вне бюджета.
           const addedSets = workSets.reduce((sum, ws) => sum + ws.sets, 0);
           if (!noMrvCap && weakMrv != null && weakSetsThisWeek() + addedSets > weakMrv) {
-            weakNotes.push(`⚠ Слабая группа ${wg} (${vrLevel}): ${pick.name} не добавлен — объём ${weakSetsThisWeek() + addedSets} сетов > MRV ${weakMrv} (уровень ×${Math.max(1, combinedMrvMult).toFixed(2)} PED/восст ×${acwrVolMod} ACWR ×${arVolMult} авторег).`);
+            weakNotes.push(
+              `⚠ Слабая группа ${wg} (${vrLevel}): ${pick.name} не добавлен — объём ${weakSetsThisWeek() + addedSets} сетов > MRV ${weakMrv} (уровень ×${Math.max(1, combinedMrvMult).toFixed(2)} PED/восст ×${acwrVolMod} ACWR ×${arVolMult} авторег).`,
+            );
             continue;
           }
 
@@ -1667,15 +2081,21 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
           });
           allWeekNames.add(norm(pick.name));
           if (pick.substitutionGroup) allWeekSubstitutionGroups.add(pick.substitutionGroup);
-          weakNotes.push(`🔥 Слабая группа ${wg} (${vrLevel}) — PL-ассистент в день ${dayIdx + 1} (${proto.load}): ${pick.name} ${workSets.map(set => `${set.sets}×${set.reps} @${Math.round(set.pct * 100)}%`).join(' + ')} (${Math.round(workSets[0]?.weight || 0)}кг) RIR ${rir} · объём группы ${weakSetsThisWeek()} сетов ≤ MRV ${weakMrv ?? '—'}.`);
+          weakNotes.push(
+            `🔥 Слабая группа ${wg} (${vrLevel}) — PL-ассистент в день ${dayIdx + 1} (${proto.load}): ${pick.name} ${workSets.map((set) => `${set.sets}×${set.reps} @${Math.round(set.pct * 100)}%`).join(' + ')} (${Math.round(workSets[0]?.weight || 0)}кг) RIR ${rir} · объём группы ${weakSetsThisWeek()} сетов ≤ MRV ${weakMrv ?? '—'}.`,
+          );
         }
       }
     }
     // Пересчёт метрик сессий (после возможной инъекции слабых точек)
     for (const d of days) {
-      const metricsEx: SRExercise[] = d.exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      const metricsEx: SRExercise[] = d.exercises.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
       }));
       d.metrics = calcSessionMetrics(metricsEx);
     }
@@ -1690,10 +2110,21 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     });
   }
 
-  const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
-    name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-    sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
-  } as SRExercise))));
+  const allSessions = weeks.flatMap((wk) =>
+    wk.days.map((d) =>
+      d.exercises.map(
+        (pe) =>
+          ({
+            name: pe.name,
+            group: pe.group,
+            coef: pe.coef,
+            mnosz: pe.mnosz,
+            pm: pe.pm,
+            sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+          }) as SRExercise,
+      ),
+    ),
+  );
   const cycleMetrics = calcCycleMetrics(allSessions);
 
   const proRationale = [
@@ -1712,20 +2143,30 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
       ? `Слабые группы: ${input.weakPoints.join(', ')}${faithful ? ' — ассистенты добавлены сверху, объём источника не изменён.' : ' (+20% объёма для упражнений на эти группы).'}`
       : '',
     `S-MRV: объём сессий автоматически ограничен бюджетом утомления (Ready: ${input.currentReadiness ?? 80}%).`,
-    input.peds?.length ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.` : '',
-    (input.bodyFat != null || input.hrvMs != null || input.sleepHours != null) ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.` : '',
+    input.peds?.length
+      ? `💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}.`
+      : '',
+    input.bodyFat != null || input.hrvMs != null || input.sleepHours != null
+      ? `🔄 Recovery multiplier: ×${recoveryMult.toFixed(2)} (bodyFat/HRV/sleep/stress). Итог MRV ×${combinedMrvMult.toFixed(2)}.`
+      : '',
     input.hrvMs != null ? `💓 HRV: ${hrvVerdict.note}` : '',
     input.acwr
-      ? (acwrCorroborated
+      ? acwrCorroborated
         ? `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): объём×${acwrVolMod}, RIR+${acwrRirShift}${acwrDeload ? ', deload' : ''}.`
-        : `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): индикатор, план не изменён — нет подтверждающего маркера восстановления. ${ACWR_ADVISORY_NOTE}`)
+        : `📊 ACWR ${input.acwr.ratio.toFixed(1)} (${acwrZone}): индикатор, план не изменён — нет подтверждающего маркера восстановления. ${ACWR_ADVISORY_NOTE}`
       : '',
     ...deloadNotes,
-    input.autoReg ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.` : '',
-    input.periodization === 'dup' ? '🔄 DUP: ежедневное варьирование зон (гипертрофия/сила/пик) вместо линейной прогрессии.' : '',
+    input.autoReg
+      ? `🧠 Авторегуляция: топ-сет×${arTopMult}, объём×${arVolMult}, RIR+${arRirShift}${input.autoReg.deload ? ', deload' : ''}.`
+      : '',
+    input.periodization === 'dup'
+      ? '🔄 DUP: ежедневное варьирование зон (гипертрофия/сила/пик) вместо линейной прогрессии.'
+      : '',
     pmAutoNote,
     ...weakNotes,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   // P1: Авто-taper к финальным 2 неделям (peaking phase) — снижение объёма, интенсивность сохранена.
   // Применяется только для auto-прогрессирующих циклов (не faithful).
@@ -1734,11 +2175,17 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // (×0.65 ACWR × тапер-кривая) корректен для опасной зоны: финал должен
   // приближаться к старту, а не держать полный рабочий объём.
   // B1: уважает выбранную модель (peakMode) и число недель (taperWeeks) вместо хардкода classic/2.
-  const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4)
-    ? applyPLTaper(weeks, totalWeeks, { taperWeeks: input.taperWeeks, mode: input.peakMode, peakCycleId: input.peakCycleId })
-    : weeks;
+  const taperedWeeks =
+    !faithful && !hasExplicitWeeks && totalWeeks >= 4
+      ? applyPLTaper(weeks, totalWeeks, {
+          taperWeeks: input.taperWeeks,
+          mode: input.peakMode,
+          peakCycleId: input.peakCycleId,
+        })
+      : weeks;
 
-  const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
+  const taperNote =
+    taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
 
   return {
     // Выход не должен давать потребителю ссылку на замороженный реестр:
@@ -1749,6 +2196,8 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
     weeks: taperedWeeks,
     cycleMetrics,
     plVolumeLandmarks: getPLVolumeLandmarks(taperedWeeks, template.meta.level, combinedMrvMult),
+    // Метка единого применения авторегуляции (P0-4): оверлей правок её не повторяет.
+    autoRegApplied: input.autoReg ? { ...input.autoReg } : undefined,
   };
 }
 
@@ -1757,7 +2206,10 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
  * Основные движения ищутся по имени (присед / жим лёжа / становая) — как в UI.
  * Если соревновательных движений нет (армрестлинг и т.п.) — возвращает null.
  */
-export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, strategy: MeetStrategy = 'balanced'): MeetAttemptsInfo | null {
+export function computeMeetAttemptsFromPmRow(
+  pmRow: Record<string, number>,
+  strategy: MeetStrategy = 'balanced',
+): MeetAttemptsInfo | null {
   const liftKeys = resolveCompetitionLifts(pmRow);
   if (liftKeys.length === 0) return null;
   return {
@@ -1808,34 +2260,38 @@ function applyPLTaper(
     return 0;
   })();
 
-   return weeks.map((wk, idx) => {
-     if (idx < startIdx) return wk;
-     // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
-     // PL-3 FIX: also skip deload weeks
-     const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
-     if (phase === 'deload') return wk;
-     if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
-     const pt = curve[idx - startIdx];
-     const volumeMult = pt.volumePct;
-     const rirAdd = pt.rirShift;
-     const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
-     const currentSets = Math.max(1, weekVolume(wk));
-     const setScale = targetSets / currentSets;
-     const newDays = wk.days.map(d => ({
+  return weeks.map((wk, idx) => {
+    if (idx < startIdx) return wk;
+    // Guard: если неделя уже low-volume (< 60% от предыдущей) — не применять taper.
+    // PL-3 FIX: also skip deload weeks
+    const phase = mesocyclePhaseForWeek(wk.week, totalWeeks);
+    if (phase === 'deload') return wk;
+    if (refVolume > 0 && weekVolume(wk) < refVolume * 0.6) return wk;
+    const pt = curve[idx - startIdx];
+    const volumeMult = pt.volumePct;
+    const rirAdd = pt.rirShift;
+    const targetSets = Math.max(1, Math.round(refVolume * volumeMult));
+    const currentSets = Math.max(1, weekVolume(wk));
+    const setScale = targetSets / currentSets;
+    const newDays = wk.days.map((d) => ({
       ...d,
-      exercises: d.exercises.map(e => ({
+      exercises: d.exercises.map((e) => ({
         ...e,
-        workSets: e.workSets.map(ws => ({
+        workSets: e.workSets.map((ws) => ({
           ...ws,
-           sets: Math.max(1, Math.round(ws.sets * setScale)),
+          sets: Math.max(1, Math.round(ws.sets * setScale)),
           rir: ws.rir + rirAdd,
         })),
       })),
     }));
     for (const d of newDays) {
-      const metricsEx: SRExercise[] = d.exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      const metricsEx: SRExercise[] = d.exercises.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
       }));
       d.metrics = calcSessionMetrics(metricsEx);
     }
@@ -1848,7 +2304,6 @@ function applyPLTaper(
     return week;
   });
 }
-
 
 /**
  * Реальное применение тапера к ДЕЙСТВУЮЩЕМУ циклу: добавляет N тапер-недель
@@ -1944,7 +2399,8 @@ export function appendPLTaperWeeks(
     let end = arr.length;
     for (let i = arr.length - 1; i >= 0; i--) {
       const w = arr[i];
-      if (w.taperWeek || w.meetWeek || w.mockMeet || w.postMeet) end = i; else break;
+      if (w.taperWeek || w.meetWeek || w.mockMeet || w.postMeet) end = i;
+      else break;
     }
     // Aудит P1: авто-тапер сборки (applyPLTaper) режет последние недели цикла, а
     // meta-deload может висеть на той же финальной неделе. Без этого шага пик-блок
@@ -1976,42 +2432,56 @@ export function appendPLTaperWeeks(
   // ── A1: Окно до старта → раскладка пик-блока (lms-peak-block.engine). ──
   // Если задан windowWeeks — блок = ramp (вход в пик) + mock + taper + meet (+ post).
   // taperWeeks (параметр) тогда = недели ГЛУБОКОГО тапера внутри окна.
-  const layout: PLPeakBlockLayout | null = opts?.windowWeeks != null
-    ? buildPLPeakBlockLayout({
-        windowWeeks: opts.windowWeeks,
-        taperWeeks,
-        mode: opts?.peakMode,
-        weightGoal: opts?.weightGoal,
-        mockMeet: !!opts?.mockMeet,
-        meetWeek: !!opts?.meetWeek,
-        postMeet: !!opts?.postMeet,
-        wholeWindowAsTaper: opts?.wholeWindowAsTaper,
-        peakCycleId: opts?.peakCycleId,
-      })
-    : null;
+  const layout: PLPeakBlockLayout | null =
+    opts?.windowWeeks != null
+      ? buildPLPeakBlockLayout({
+          windowWeeks: opts.windowWeeks,
+          taperWeeks,
+          mode: opts?.peakMode,
+          weightGoal: opts?.weightGoal,
+          mockMeet: !!opts?.mockMeet,
+          meetWeek: !!opts?.meetWeek,
+          postMeet: !!opts?.postMeet,
+          wholeWindowAsTaper: opts?.wholeWindowAsTaper,
+          peakCycleId: opts?.peakCycleId,
+        })
+      : null;
   const taperCurvePoints = layout
     ? layout.curve
-    : buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal, peakCycleId: opts?.peakCycleId });
+    : buildPLTaperCurve({
+        taperWeeks,
+        mode: opts?.peakMode ?? 'classic',
+        weightGoal: opts?.weightGoal,
+        peakCycleId: opts?.peakCycleId,
+      });
   const taperWeeksEff = layout ? layout.taperWeeks : taperWeeks;
   const rampWeeksEff = layout ? layout.rampWeeks : 0;
   const blockWarnings = layout ? layout.warnings : [];
   const replacedTailNote = replacedTail ? ` (заменён предыдущий тапер-блок: ${trimmed.removed} нед)` : '';
 
   // ── PED-адаптация по аналогии с buildLMSPlan (строки 697-762) ──
-  const activePeds = (opts?.peds ?? []).filter(ped => {
+  const activePeds = (opts?.peds ?? []).filter((ped) => {
     const dose = opts?.pedDoses?.[ped];
     return dose != null && Number.isFinite(Number(dose)) && Number(dose) > 0;
   });
   // Режим прогрессии: явный mode, иначе on_course при активном курсе (как UI buildSrc).
   const mode: ProgressionMode = opts?.mode ?? (activePeds.length > 0 ? 'on_course' : 'natural');
-  const rawK = (opts?.weeklyPercent != null ? opts.weeklyPercent
-    : mode === 'on_course' ? (opts?.courseIntensity === 'mild' ? 0.015 : opts?.courseIntensity === 'heavy' ? 0.025 : 0.02)
-    : mode === 'pct' ? -0.005
-    : (plan.template?.meta?.correctionPct ?? 0.005));
+  const rawK =
+    opts?.weeklyPercent != null
+      ? opts.weeklyPercent
+      : mode === 'on_course'
+        ? opts?.courseIntensity === 'mild'
+          ? 0.015
+          : opts?.courseIntensity === 'heavy'
+            ? 0.025
+            : 0.02
+        : mode === 'pct'
+          ? -0.005
+          : (plan.template?.meta?.correctionPct ?? 0.005);
   // Уровень спортсмена (как в buildLMSPlan): натурал/custom — k ≥ levelK.
-  const taperLevel = vrLevelKey(plan.template?.meta?.level as string | undefined ?? 'intermediate');
-  const levelK = (mode === 'natural' || mode === 'custom') ? levelPmFloor(taperLevel) : null;
-  const k = (levelK != null && rawK < levelK) ? levelK : rawK;
+  const taperLevel = vrLevelKey((plan.template?.meta?.level as string | undefined) ?? 'intermediate');
+  const levelK = mode === 'natural' || mode === 'custom' ? levelPmFloor(taperLevel) : null;
+  const k = levelK != null && rawK < levelK ? levelK : rawK;
   let pedMrvMult = 1;
   let pedRecMult = 1;
   if (activePeds.length > 0) {
@@ -2023,22 +2493,31 @@ export function appendPLTaperWeeks(
       const adapt = adaptForPEDs(activePeds, baseMrv, opts?.pedDoses, opts?.courseIntensity ?? 'moderate');
       pedMrvMult = adapt.combinedMrvMultiplier || 1;
       pedRecMult = adapt.combinedRecoveryMultiplier || 1;
-    } catch { /* leave 1.0 */ }
+    } catch {
+      /* leave 1.0 */
+    }
   }
   // На курсе объём аксессуаров в taper-неделях не режем ниже PED-адаптированного
   // уровня (как buildLMSPlan:784 применяет Math.min(1.5, pedMrvMult) к аксессуарам).
   // Питание (как в buildLMSPlan nutritionMult) участвует в том же soft-cap.
-  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
-    let n = 1;
-    const cal = opts?.nutrition?.calorieSurplus;
-    const pro = opts?.nutrition?.proteinPerKg;
-    if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
-    if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
-    return n;
-  })()));
-  const nutritionTaperNote = nutritionMult !== 1
-    ? ` 🥗 Питание в taper-неделях: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${opts?.nutrition?.calorieSurplus ?? 0} ккал, белок ${opts?.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
-    : '';
+  const nutritionMult = Math.max(
+    0.6,
+    Math.min(
+      1.5,
+      (() => {
+        let n = 1;
+        const cal = opts?.nutrition?.calorieSurplus;
+        const pro = opts?.nutrition?.proteinPerKg;
+        if (cal != null) n *= cal > 300 ? 1.1 : cal > 100 ? 1.05 : cal < -200 ? 0.8 : 1.0;
+        if (pro != null) n *= pro >= 2.0 ? 1.1 : pro >= 1.6 ? 1.05 : pro < 1.0 ? 0.85 : 1.0;
+        return n;
+      })(),
+    ),
+  );
+  const nutritionTaperNote =
+    nutritionMult !== 1
+      ? ` 🥗 Питание в taper-неделях: MRV ${nutritionMult > 1 ? '+' : ''}${Math.round((nutritionMult - 1) * 100)}% (калории ${opts?.nutrition?.calorieSurplus ?? 0} ккал, белок ${opts?.nutrition?.proteinPerKg ?? 0} г/кг; Helms 2022).`
+      : '';
   const pedVolFloor = Math.min(1.5, pedMrvMult * nutritionMult);
 
   const refVolume = (() => {
@@ -2063,8 +2542,8 @@ export function appendPLTaperWeeks(
     const capped: string[] = [];
     const actual = opts?.meetData?.actualPm ?? {};
     const planned = opts?.meetData?.plannedPm ?? {};
-    const hasActual = Object.values(actual).some(v => v > 0);
-    const hasPlanned = Object.values(planned).some(v => v > 0);
+    const hasActual = Object.values(actual).some((v) => v > 0);
+    const hasPlanned = Object.values(planned).some((v) => v > 0);
     let row = { ...pmRow };
     if (hasPlanned) {
       for (const [name, plan] of Object.entries(planned)) {
@@ -2095,16 +2574,14 @@ export function appendPLTaperWeeks(
     const pmRow: Record<string, number> = {};
     for (const [name, pm] of Object.entries(baseWeek.pmRow)) {
       const actual = opts?.meetData?.actualPm?.[name];
-      pmRow[name] = actual != null && actual > 0
-        ? Math.round(actual * 10) / 10
-        : Math.round(pm * pmGrowth * 10) / 10;
+      pmRow[name] = actual != null && actual > 0 ? Math.round(actual * 10) / 10 : Math.round(pm * pmGrowth * 10) / 10;
     }
     const isFinal = isFinalTaper;
     // Соревновательная неделя ПЛ-протокола (100% ПМ): основные движения — только разминка
     // 50/70/90% × 3/2/1 + прикиды (meetAttempts) отдельно: «разминка → открытие → 2-3 прохода».
     const protocolFinal = isFinal && pt.warmupOnly === true;
-    const days = baseWeek.days.map(d => {
-      const exercises = d.exercises.map(e => {
+    const days = baseWeek.days.map((d) => {
+      const exercises = d.exercises.map((e) => {
         // Подготовительные прикиды на тапер-неделях (кроме финальной):
         // пробный сингл ~80% от ПМ недели для основных движений — «прощупать»
         // траекторию перед соревнованием, не нагружая (разгрузка сохраняется).
@@ -2112,14 +2589,41 @@ export function appendPLTaperWeeks(
         // Подготовительные прикиды — только в разгрузочных режимах (классика/pro):
         // пробный сингл ~80% от ПМ недели «прощупать траекторию» перед соревнованием.
         // В ПЛ-протоколе (set_pct) интенсивность диктует сам протокол — prepSets не нужны.
-        const prepSets = (!isFinal && isMain && pt.intensityMode === 'preserve')
-          ? [{ sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.8) * 10) / 10, rir: 2, pct: 0.8 }]
-          : [];
+        const prepSets =
+          !isFinal && isMain && pt.intensityMode === 'preserve'
+            ? [
+                {
+                  sets: 1,
+                  reps: 1,
+                  weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.8) * 10) / 10,
+                  rir: 2,
+                  pct: 0.8,
+                },
+              ]
+            : [];
         if (protocolFinal && isMain) {
           const warmup = [
-            { sets: 1, reps: 3, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.5) * 10) / 10, rir: 3, pct: 0.5 },
-            { sets: 1, reps: 2, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 2, pct: 0.7 },
-            { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.9) * 10) / 10, rir: 1, pct: 0.9 },
+            {
+              sets: 1,
+              reps: 3,
+              weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.5) * 10) / 10,
+              rir: 3,
+              pct: 0.5,
+            },
+            {
+              sets: 1,
+              reps: 2,
+              weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10,
+              rir: 2,
+              pct: 0.7,
+            },
+            {
+              sets: 1,
+              reps: 1,
+              weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.9) * 10) / 10,
+              rir: 1,
+              pct: 0.9,
+            },
           ];
           return { ...e, rir: pt.rirTarget ?? 0, workSets: warmup };
         }
@@ -2128,7 +2632,7 @@ export function appendPLTaperWeeks(
           rir: pt.rirTarget != null ? pt.rirTarget : e.rir + pt.rirShift,
           workSets: [
             ...prepSets,
-            ...e.workSets.map(ws => {
+            ...e.workSets.map((ws) => {
               const pm = pmRow[e.name] ?? e.pm;
               // Интенсивность: классика — сохранена (вес от прежнего pct);
               // pl/pro — по канону (абсолютный % ПМ, синглы на интенсивной неделе).
@@ -2147,9 +2651,13 @@ export function appendPLTaperWeeks(
           ],
         };
       });
-      const metricsEx: SRExercise[] = exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      const metricsEx: SRExercise[] = exercises.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
       }));
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
@@ -2175,7 +2683,8 @@ export function appendPLTaperWeeks(
         // Основание прикидов сохраняем: «🔄 Обновить прикиды» пересчитывает от
         // него же (иначе плановый ПМ федерации терялся при смене стратегии).
         week.attemptPmRow = row;
-        if (capped.length > 0) week.taperNote = `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
+        if (capped.length > 0)
+          week.taperNote = `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`;
       }
     }
     return week;
@@ -2190,16 +2699,14 @@ export function appendPLTaperWeeks(
     const pmRow: Record<string, number> = {};
     for (const [name, pm] of Object.entries(baseWeek.pmRow)) {
       const actual = opts?.meetData?.actualPm?.[name];
-      pmRow[name] = actual != null && actual > 0
-        ? Math.round(actual * 10) / 10
-        : Math.round(pm * pmGrowth * 10) / 10;
+      pmRow[name] = actual != null && actual > 0 ? Math.round(actual * 10) / 10 : Math.round(pm * pmGrowth * 10) / 10;
     }
     // Прикиды считаются от ПЛАНИРУЕМОГО ПМ в федерации (если задан) — целевые
     // веса соревнования; иначе от фактического ПМ; иначе от ПМ своей недели.
     const { row: attemptRow, capped } = resolveAttemptRow(pmRow);
     const attempts = computeMeetAttemptsFromPmRow(attemptRow, strategy);
     if (!attempts) return null;
-    const liftByName = new Map(attempts.lifts.map(l => [norm(l.name), l]));
+    const liftByName = new Map(attempts.lifts.map((l) => [norm(l.name), l]));
     // Соответствие упражнения → прикиды: точное совпадение имени, иначе fuzzy
     // по regex соревновательных движений (как computeMeetAttemptsFromPmRow) —
     // чтобы прикиды попадали в правильные упражнения ЛЮБОГО цикла
@@ -2208,13 +2715,13 @@ export function appendPLTaperWeeks(
       const exact = liftByName.get(norm(name));
       if (exact) return exact;
       const n = norm(name);
-      if (/присед|сквот/.test(n)) return attempts.lifts.find(l => /присед|сквот/.test(norm(l.name)));
-      if (/жим.*леж|леж.*жим/.test(n)) return attempts.lifts.find(l => /жим.*леж|леж.*жим/.test(norm(l.name)));
-      if (/станов/.test(n)) return attempts.lifts.find(l => /станов/.test(norm(l.name)));
+      if (/присед|сквот/.test(n)) return attempts.lifts.find((l) => /присед|сквот/.test(norm(l.name)));
+      if (/жим.*леж|леж.*жим/.test(n)) return attempts.lifts.find((l) => /жим.*леж|леж.*жим/.test(norm(l.name)));
+      if (/станов/.test(n)) return attempts.lifts.find((l) => /станов/.test(norm(l.name)));
       return undefined;
     };
-    const days = baseWeek.days.map(d => {
-      const exercises = d.exercises.map(e => {
+    const days = baseWeek.days.map((d) => {
+      const exercises = d.exercises.map((e) => {
         const lift = matchLift(e.name);
         if (lift) {
           // Прикиды-синглы: опенер RIR2 → вторая RIR1 → третья RIR0 (как день соревнований).
@@ -2228,23 +2735,40 @@ export function appendPLTaperWeeks(
           });
           // 🔥 Прайминг за 1-2 дня до старта (только в неделе соревнований):
           // синглы 60/70% — активация ЦНС без утомления.
-          const priming = (kind === 'meet' && opts?.priming !== false)
-            ? [
-                { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.6) * 10) / 10, rir: 3, pct: 0.6 },
-                { sets: 1, reps: 1, weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10, rir: 3, pct: 0.7 },
-              ]
-            : [];
+          const priming =
+            kind === 'meet' && opts?.priming !== false
+              ? [
+                  {
+                    sets: 1,
+                    reps: 1,
+                    weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.6) * 10) / 10,
+                    rir: 3,
+                    pct: 0.6,
+                  },
+                  {
+                    sets: 1,
+                    reps: 1,
+                    weight: Math.round(workWeight(pmRow[e.name] ?? e.pm, 0.7) * 10) / 10,
+                    rir: 3,
+                    pct: 0.7,
+                  },
+                ]
+              : [];
           return { ...e, rir: 1, workSets: [...priming, mk(lift.opener, 2), mk(lift.second, 1), mk(lift.third, 0)] };
         }
         return {
           ...e,
           rir: e.rir + 1,
-          workSets: e.workSets.map(ws => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * 0.5)) })),
+          workSets: e.workSets.map((ws) => ({ ...ws, sets: Math.max(1, Math.round(ws.sets * 0.5)) })),
         };
       });
-      const metricsEx: SRExercise[] = exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      const metricsEx: SRExercise[] = exercises.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
       }));
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
@@ -2258,9 +2782,15 @@ export function appendPLTaperWeeks(
       [kind === 'mock' ? 'mockMeet' : 'meetWeek']: true,
       meetAttempts: attempts,
       attemptPmRow: attemptRow,
-      taperNote: kind === 'meet' && opts?.priming !== false
-        ? '🔥 прайминг за 1-2 дня до старта: синглы 60/70% на основных лифтах (активация ЦНС), затем прикиды.' + (capped.length > 0 ? ` План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : '')
-        : (capped.length > 0 ? `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).` : undefined),
+      taperNote:
+        kind === 'meet' && opts?.priming !== false
+          ? '🔥 прайминг за 1-2 дня до старта: синглы 60/70% на основных лифтах (активация ЦНС), затем прикиды.' +
+            (capped.length > 0
+              ? ` План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`
+              : '')
+          : capped.length > 0
+            ? `План федерации выше факта для: ${capped.join(', ')} — прикиды от реалистичного потолка (факт ×1.02).`
+            : undefined,
     };
   };
 
@@ -2276,13 +2806,18 @@ export function appendPLTaperWeeks(
   const rampLen = layout ? rampWeeksEff : 0;
   const pushMock = () => {
     const wk = buildAttemptsWeek(cur, 'mock');
-    if (wk) { extra.push(wk); cur++; }
+    if (wk) {
+      extra.push(wk);
+      cur++;
+    }
   };
   // Раскладка решает, ВЛЕЗАЕТ ли mock в окно: при `mockWeeks = 0` (окно
   // 1–2 нед под mock+старт) она его исключила и предупредила. Раньше билдер всё
   // равно вставлял mock → недель в блоке больше, чем в окне, и даты уезжали.
   const mockAllowed = layout ? (layout.mockWeeks ?? 0) > 0 : true;
-  const pushMockIfAllowed = () => { if (mockMeetOn && mockAllowed) pushMock(); };
+  const pushMockIfAllowed = () => {
+    if (mockMeetOn && mockAllowed) pushMock();
+  };
   if (!layout) pushMockIfAllowed();
   // Раскладка пика — канон (lms-taper.engine): 'classic' — разгрузка Bosquet;
   // 'pl' — 3-нед протокол Библиотеки (при taperWeeks < 3 — последние N недель
@@ -2304,7 +2839,10 @@ export function appendPLTaperWeeks(
   }
   if (meetWeekOn) {
     const wk = buildAttemptsWeek(cur, 'meet');
-    if (wk) { extra.push(wk); cur++; }
+    if (wk) {
+      extra.push(wk);
+      cur++;
+    }
   }
   // Пост-соревновательная неделя (post-meet): лёгкий объём, высокий RIR —
   // возврат к тренировкам после прикидок без перегруза.
@@ -2315,33 +2853,51 @@ export function appendPLTaperWeeks(
     const postPmRow: Record<string, number> = { ...baseWeek.pmRow };
     const volMult = Math.max(0.3, Math.min(1, opts.postMeet.volumeMult ?? 0.5));
     const postPct = 0.65;
-    const days = baseWeek.days.map(d => {
-      const exercises = d.exercises.map(e => {
+    // P2-13: один источник — «+3 к базовому RIR» (как в lms-macro-taper.toPostMeetWeek),
+    // а не жёсткая 4 при базовом RIR 2 (текст обещал 5, в таблице стояло 4).
+    const POST_MEET_RIR_SHIFT = 3;
+    const postRir = (base: number) =>
+      Math.max(0, Math.min(10, Math.round((Number.isFinite(base) ? base : 2) + POST_MEET_RIR_SHIFT)));
+    const rirSeen = new Set<number>();
+    const days = baseWeek.days.map((d) => {
+      const exercises = d.exercises.map((e) => {
         const pm = Math.max(1, postPmRow[e.name] ?? e.pm ?? 1);
-        // 60–70 % ПМ (берём середину), объём × volMult, RIR 4: старт восстановления
+        // 60–70 % ПМ (берём середину), объём × volMult, RIR +3: старт восстановления
         // без соревновательных весов и без синглов. Подходы урезаем «вниз» —
         // упражнение, у которого не остаётся подходов, уходит из недели целиком
         // (иначе минимум 1 подход на каждое упражнение съедал всю разгрузку).
         const scaled = e.workSets
-          .map(ws => ({ ...ws, sets: Math.floor((ws.sets ?? 0) * volMult) }))
-          .filter(ws => ws.sets >= 1);
-        const chosen = scaled.length > 0
-          ? scaled
-          : (e.workSets[0] ? [{ ...e.workSets[0], sets: 1 }] : []);
-        const workSets = chosen.map(ws => ({
+          .map((ws) => ({ ...ws, sets: Math.floor((ws.sets ?? 0) * volMult) }))
+          .filter((ws) => ws.sets >= 1);
+        const chosen = scaled.length > 0 ? scaled : e.workSets[0] ? [{ ...e.workSets[0], sets: 1 }] : [];
+        const exRir = postRir(e.rir ?? 2);
+        rirSeen.add(exRir);
+        const workSets = chosen.map((ws) => ({
           ...ws,
           weight: Math.round(workWeight(pm, postPct) * 10) / 10,
           pct: postPct,
-          rir: 4,
+          rir: exRir,
         }));
-        return { ...e, rir: 4, workSets };
+        return { ...e, rir: exRir, workSets };
       });
-      const metricsEx: SRExercise[] = exercises.map(pe => ({
-        name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-        sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+      const metricsEx: SRExercise[] = exercises.map((pe) => ({
+        name: pe.name,
+        group: pe.group,
+        coef: pe.coef,
+        mnosz: pe.mnosz,
+        pm: pe.pm,
+        sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
       }));
       return { ...d, exercises, metrics: calcSessionMetrics(metricsEx) };
     });
+    const rirValues = [...rirSeen].sort((a, b) => a - b);
+    // Заметка — из фактических значений недели (одно число или диапазон).
+    const rirLabel =
+      rirValues.length === 0
+        ? '4'
+        : rirValues.length === 1
+          ? String(rirValues[0])
+          : `${rirValues[0]}–${rirValues[rirValues.length - 1]}`;
     extra.push({
       week: nextWeekNum + cur,
       pmRow: postPmRow,
@@ -2350,7 +2906,7 @@ export function appendPLTaperWeeks(
       sourcePhaseOrigin: 'inferred' as const,
       macroPhase: 'transition' as const,
       postMeet: true,
-      taperNote: `Восстановление после соревнований: объём ×${volMult}, вес ${Math.round(postPct * 100)} % ПМ, RIR 4 — плавный старт без соревновательных весов.`,
+      taperNote: `Восстановление после соревнований: объём ×${volMult}, вес ${Math.round(postPct * 100)} % ПМ, RIR ${rirLabel} — плавный старт без соревновательных весов.`,
     });
     cur++;
   }
@@ -2359,7 +2915,8 @@ export function appendPLTaperWeeks(
   if (opts?.reference && extra.length > 0) {
     const dated = dateWeeksBackward(extra, opts.reference, !!opts?.postMeet);
     for (let i = 0; i < extra.length; i++) {
-      if (dated[i] && (dated[i].weekStart || dated[i].weekEnd)) extra[i] = { ...extra[i], weekStart: dated[i].weekStart, weekEnd: dated[i].weekEnd };
+      if (dated[i] && (dated[i].weekStart || dated[i].weekEnd))
+        extra[i] = { ...extra[i], weekStart: dated[i].weekStart, weekEnd: dated[i].weekEnd };
     }
   }
 
@@ -2373,7 +2930,7 @@ export function appendPLTaperWeeks(
     for (const wk of extra) {
       for (const d of wk.days) {
         for (const e of d.exercises) {
-          e.workSets = e.workSets.map(ws => ({
+          e.workSets = e.workSets.map((ws) => ({
             ...ws,
             weight: Math.round(ws.weight * ar.topSetPctMultiplier * 10) / 10,
             sets: Math.max(1, Math.round(ws.sets * ar.volumeMultiplier)),
@@ -2386,7 +2943,7 @@ export function appendPLTaperWeeks(
         // веса прикидов соответствуют скорректированным тренировочным весам недели.
         wk.meetAttempts = {
           ...wk.meetAttempts,
-          lifts: wk.meetAttempts.lifts.map(l => ({
+          lifts: wk.meetAttempts.lifts.map((l) => ({
             ...l,
             opener: Math.round(l.opener * ar.topSetPctMultiplier * 10) / 10,
             second: Math.round(l.second * ar.topSetPctMultiplier * 10) / 10,
@@ -2394,42 +2951,65 @@ export function appendPLTaperWeeks(
             target: Math.round(l.target * ar.topSetPctMultiplier * 10) / 10,
           })),
         };
+        // Фиксируем множитель: «🔄 Обновить прикиды» пересчитывает попытки от
+        // attemptPmRow (немасштабированная база) и обязан вернуть те же веса.
+        wk.attemptAutoRegMult = Math.round((wk.attemptAutoRegMult ?? 1) * ar.topSetPctMultiplier * 1000) / 1000;
       }
     }
   }
 
   const weeks = [...basePlanWeeks, ...extra];
-  const allSessions = weeks.flatMap(wk => wk.days.map(d => d.exercises.map(pe => ({
-    name: pe.name, group: pe.group, coef: pe.coef, mnosz: pe.mnosz, pm: pe.pm,
-    sets: pe.workSets.map(ws => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
-  } as SRExercise))));
+  const allSessions = weeks.flatMap((wk) =>
+    wk.days.map((d) =>
+      d.exercises.map(
+        (pe) =>
+          ({
+            name: pe.name,
+            group: pe.group,
+            coef: pe.coef,
+            mnosz: pe.mnosz,
+            pm: pe.pm,
+            sets: pe.workSets.map((ws) => ({ weight: ws.weight, reps: ws.reps, sets: ws.sets })),
+          }) as SRExercise,
+      ),
+    ),
+  );
   const cycleMetrics = calcCycleMetrics(allSessions);
 
-  const pedNote = activePeds.length > 0
-    ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
-    : '';
+  const pedNote =
+    activePeds.length > 0
+      ? ` 💉 PED-адаптация (dose-aware): MRV ×${pedMrvMult.toFixed(2)}, восст ×${pedRecMult.toFixed(2)}; прогрессия ПМ ${k >= 0 ? '+' : ''}${(k * 100).toFixed(1)}%/нед продолжена в taper-неделях.`
+      : '';
 
   // Выход на пик: описание стратегии прикидов финальной недели (как в тапер-калькуляторе).
   const peakPct = MEET_STRATEGY_PCT_LABEL[peakStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced;
-  const peakLabel = peakStrategy === 'aggressive' ? 'агрессивная' : peakStrategy === 'conservative' ? 'консервативная' : 'сбалансированная';
-  const weightGoalNote = opts?.weightGoal === 'lose'
-    ? ' ⬇ Сгонка к категории: объём тапера ×0.9 (дефицит → MRV ниже, Helms 2022).'
-    : opts?.weightGoal === 'gain'
-      ? ' ⬆ Набор к категории: объём тапера полный (профицит — полное восстановление).'
+  const peakLabel =
+    peakStrategy === 'aggressive'
+      ? 'агрессивная'
+      : peakStrategy === 'conservative'
+        ? 'консервативная'
+        : 'сбалансированная';
+  const weightGoalNote =
+    opts?.weightGoal === 'lose'
+      ? ' ⬇ Сгонка к категории: объём тапера ×0.9 (дефицит → MRV ниже, Helms 2022).'
+      : opts?.weightGoal === 'gain'
+        ? ' ⬆ Набор к категории: объём тапера полный (профицит — полное восстановление).'
+        : '';
+  const peakNote =
+    opts?.peakMode === 'pl'
+      ? ` 🏁 ПЛ-пик-протокол (3 нед): объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
+      : opts?.peakMode === 'pro'
+        ? ` 🎯 Про-тапер (усталость-зависимый): объём ~0.65/0.45/0.40, интенсивность ~92% ПМ, прайминг; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
+        : opts?.peakMode === 'wf'
+          ? ` 🎢 Classic WF (Библиотека): 2 нед перегрузка (объём ×1.15/×1.20, инт. 70/75%) → суперкомпенсация (×0.60/×0.40, инт. 90/100%); прикиды соревновательного дня ${peakPct} (${peakLabel}).`
+          : ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakLabel} стратегия).`;
+  const peakLayoutNote =
+    opts?.peakLayout === 'light'
+      ? ' 🎭 Раскладка финальной недели: light — только разминка 50/70/90% без прикидов (контрольный старт).'
       : '';
-  const peakNote = opts?.peakMode === 'pl'
-    ? ` 🏁 ПЛ-пик-протокол (3 нед): объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR 1-2/0-1/0; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
-    : opts?.peakMode === 'pro'
-      ? ` 🎯 Про-тапер (усталость-зависимый): объём ~0.65/0.45/0.40, интенсивность ~92% ПМ, прайминг; прикиды соревновательного дня ${peakPct} (${peakLabel}).`
-      : opts?.peakMode === 'wf'
-        ? ` 🎢 Classic WF (Библиотека): 2 нед перегрузка (объём ×1.15/×1.20, инт. 70/75%) → суперкомпенсация (×0.60/×0.40, инт. 90/100%); прикиды соревновательного дня ${peakPct} (${peakLabel}).`
-        : ` 🏁 Выход на пик: прикиды соревновательного дня ${peakPct} от ПМ финальной недели (${peakLabel} стратегия).`;
-  const peakLayoutNote = opts?.peakLayout === 'light'
-    ? ' 🎭 Раскладка финальной недели: light — только разминка 50/70/90% без прикидов (контрольный старт).'
-    : '';
-  const mockWk = weeks.find(w => w.mockMeet);
-  const meetWk = weeks.find(w => w.meetWeek);
-  const postMeetWk = weeks.find(w => w.postMeet);
+  const mockWk = weeks.find((w) => w.mockMeet);
+  const meetWk = weeks.find((w) => w.meetWeek);
+  const postMeetWk = weeks.find((w) => w.postMeet);
   const mockNote = mockWk
     ? ` 🎯 Имитация соревнований (mock meet): неделя ${mockWk.week} — прикиды-синглы ${MEET_STRATEGY_PCT_LABEL[mockStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} от ПМ, аксессуары ×0.5.`
     : '';
@@ -2444,7 +3024,9 @@ export function appendPLTaperWeeks(
   const windowNote = layout
     ? ` 🗓 Пик-блок по окну до старта (${layout.windowWeeks} нед): ${layout.summary}.${rampWeeksEff > 0 ? ` Вход в пик ${rampWeeksEff} нед — объём плавно ↓, интенсивность сохранена.` : ''}`
     : '';
-  const cycleNote = opts?.peakCycleId ? ` 🏆 Пиковый цикл «${opts.peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : '';
+  const cycleNote = opts?.peakCycleId
+    ? ` 🏆 Пиковый цикл «${opts.peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).`
+    : '';
 
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
   // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
@@ -2458,7 +3040,18 @@ export function appendPLTaperWeeks(
     weeks,
     cycleMetrics,
     plVolumeLandmarks,
-    progressionRationale: plan.progressionRationale +
+    // Метка единого применения: тапер-недели промасштабированы тем же конфигом, что и
+    // база (или она уже помечена) — оверлей правок/сезон не применяют её повторно.
+    autoRegApplied: opts?.autoReg
+      ? {
+          topSetPctMultiplier: opts.autoReg.topSetPctMultiplier,
+          volumeMultiplier: opts.autoReg.volumeMultiplier,
+          rirShift: opts.autoReg.rirShift,
+          deload: plan.autoRegApplied?.deload ?? false,
+        }
+      : plan.autoRegApplied,
+    progressionRationale:
+      plan.progressionRationale +
       ` 📉 Тапер к действующему циклу: +${ruCount(blockTotal, RU_WEEKS)} — ${taperCurveSummary} (${taperMode === 'pl' ? 'ПЛ-пик-протокол' : taperMode === 'pro' ? 'про-тапер по усталости' : 'Bosquet 2005'}).` +
       windowNote +
       (blockWarnings.length > 0 ? ' ⚠ ' + blockWarnings.join(' ⚠ ') : '') +
@@ -2473,7 +3066,9 @@ export function appendPLTaperWeeks(
       pedNote +
       nutritionTaperNote +
       autoRegNote +
-      (lastPhase === 'deload' ? ' ⚠ Последняя неделя была разгрузкой — тапер построен от последней НЕ-deload недели (разгрузка поверх разгрузки не нужна).' : ''),
+      (lastPhase === 'deload'
+        ? ' ⚠ Последняя неделя была разгрузкой — тапер построен от последней НЕ-deload недели (разгрузка поверх разгрузки не нужна).'
+        : ''),
   };
 }
 
@@ -2487,19 +3082,40 @@ export function appendPLTaperWeeks(
 export function refreshMeetAttempts(plan: LMSBuildOutput, strategy: MeetStrategy = 'balanced'): LMSBuildOutput {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
   let changed = false;
-  const weeks = plan.weeks.map(wk => {
+  const weeks = plan.weeks.map((wk) => {
     if (!wk.meetAttempts || wk.meetAttempts.strategy === strategy) return wk;
-    const attempts = computeMeetAttemptsFromPmRow(wk.attemptPmRow ?? wk.pmRow, strategy);
-    if (!attempts) return wk;
+    const base = computeMeetAttemptsFromPmRow(wk.attemptPmRow ?? wk.pmRow, strategy);
+    if (!base) return wk;
+    // Авторегуляция применяется к прикидам вместе с тренировочными весами недели.
+    // Пересчёт стратегии идёт от немасштабированной базы (attemptPmRow), поэтому
+    // множитель, зафиксированный билдером, надо вернуть — иначе «Обновить прикиды»
+    // молча откатывало коррекцию режима «Авто» (вес прикидов «прыгал» вверх).
+    const mult = wk.attemptAutoRegMult ?? 1;
+    const scale1 = (v: number) => Math.round(v * mult * 10) / 10;
+    const attempts =
+      mult === 1
+        ? base
+        : {
+            ...base,
+            lifts: base.lifts.map((l) => ({
+              ...l,
+              opener: scale1(l.opener),
+              second: scale1(l.second),
+              third: scale1(l.third),
+              target: scale1(l.target),
+            })),
+          };
     changed = true;
     return { ...wk, meetAttempts: attempts };
   });
   if (!changed) return plan;
-  const label = strategy === 'aggressive' ? 'агрессивная' : strategy === 'conservative' ? 'консервативная' : 'сбалансированная';
+  const label =
+    strategy === 'aggressive' ? 'агрессивная' : strategy === 'conservative' ? 'консервативная' : 'сбалансированная';
   return {
     ...plan,
     weeks,
-    progressionRationale: plan.progressionRationale +
+    progressionRationale:
+      plan.progressionRationale +
       ` 🔄 Прикиды пересчитаны: ${MEET_STRATEGY_PCT_LABEL[strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced} (${label}).`,
   };
 }
@@ -2516,24 +3132,31 @@ function volumeWeekSnapshot(weeks: LMSPlanWeek[]): {
 } {
   let peakTotal = -1;
   let best: { idx: number; groups: Record<string, number>; byExercise: Record<string, Record<string, number>> } = {
-    idx: 0, groups: {}, byExercise: {},
+    idx: 0,
+    groups: {},
+    byExercise: {},
   };
   weeks.forEach((wk, i) => {
     const g: Record<string, number> = {};
     const per: Record<string, Record<string, number>> = {};
-    for (const day of wk.days) for (const ex of day.exercises) {
-      const rawGroup = exEnGroup(ex.group); if (!rawGroup) continue;
-      // Канонический ключ — тот же, что вернёт computeVolumeLandmarks ('core' → 'abs',
-      // 'ПР' → 'legs'): иначе группа пика и разбивка по упражнениям разъезжаются.
-      const eg = normMuscle(rawGroup);
-      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
-      if (sets <= 0) continue;
-      g[eg] = (g[eg] || 0) + sets;
-      per[eg] = per[eg] || {};
-      per[eg][ex.name] = (per[eg][ex.name] || 0) + sets;
-    }
+    for (const day of wk.days)
+      for (const ex of day.exercises) {
+        const rawGroup = exEnGroup(ex.group);
+        if (!rawGroup) continue;
+        // Канонический ключ — тот же, что вернёт computeVolumeLandmarks ('core' → 'abs',
+        // 'ПР' → 'legs'): иначе группа пика и разбивка по упражнениям разъезжаются.
+        const eg = normMuscle(rawGroup);
+        const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
+        if (sets <= 0) continue;
+        g[eg] = (g[eg] || 0) + sets;
+        per[eg] = per[eg] || {};
+        per[eg][ex.name] = (per[eg][ex.name] || 0) + sets;
+      }
     const total = Object.values(g).reduce((a, b) => a + b, 0);
-    if (total > peakTotal) { peakTotal = total; best = { idx: i, groups: g, byExercise: per }; }
+    if (total > peakTotal) {
+      peakTotal = total;
+      best = { idx: i, groups: g, byExercise: per };
+    }
   });
   return best;
 }
@@ -2548,20 +3171,33 @@ export function getPLVolumeLandmarks(weeks: LMSPlanWeek[], level: string, pedMrv
   const peak = snap.groups;
   // Делегируем в канонический движок (единый источник MEV/MAV/MRV по EN-мышцам).
   const rows = computeVolumeLandmarks(peak, level, { labMult: pedMrvMult, peakWeek: peakIdx + 1 });
-  return rows.map(r => {
+  return rows.map((r) => {
     const status: PLVolumeLandmark['status'] =
-      r.status === 'below_mev' ? 'under' :
-      r.status === 'optimal' ? 'optimal' :
-      r.status === 'approaching_mrv' ? 'high' : 'over';
-    return { group: r.group, muscle: r.label, peakWeek: r.peakWeek ?? (peakIdx + 1), sets: r.sets, mev: r.mev, mav: r.mav, mrv: r.mrv, status };
+      r.status === 'below_mev'
+        ? 'under'
+        : r.status === 'optimal'
+          ? 'optimal'
+          : r.status === 'approaching_mrv'
+            ? 'high'
+            : 'over';
+    return {
+      group: r.group,
+      muscle: r.label,
+      peakWeek: r.peakWeek ?? peakIdx + 1,
+      sets: r.sets,
+      mev: r.mev,
+      mav: r.mav,
+      mrv: r.mrv,
+      status,
+    };
   });
 }
 
 export interface PLVolumeExerciseRow {
-  group: string;      // EN-группа (совпадает с `PLVolumeLandmark.group`)
+  group: string; // EN-группа (совпадает с `PLVolumeLandmark.group`)
   exercise: string;
-  sets: number;       // подходов на пиковой неделе
-  sharePct: number;   // доля внутри группы, %
+  sets: number; // подходов на пиковой неделе
+  sharePct: number; // доля внутри группы, %
 }
 
 /**
@@ -2638,7 +3274,13 @@ const MUSCLE_SPLIT_BY_GROUP: Record<string, Record<string, number>> = {
  * Доли стимула упражнения по МЫШЦАМ (сумма = 1).
  * Порядок: паттерн (пропорции композитов) → точная мышца (`trueMuscleOf`) → коарс-группа.
  */
-function muscleSharesFor(ex: { name: string; group?: string; movementPattern?: string; targetMuscle?: string; type?: string }): Record<string, number> {
+function muscleSharesFor(ex: {
+  name: string;
+  group?: string;
+  movementPattern?: string;
+  targetMuscle?: string;
+  type?: string;
+}): Record<string, number> {
   const pattern = ex.movementPattern || derivePattern(ex);
   const byPattern = MUSCLE_SPLIT_BY_PATTERN[pattern];
   if (byPattern) return byPattern;
@@ -2653,7 +3295,10 @@ function muscleSharesFor(ex: { name: string; group?: string; movementPattern?: s
 }
 
 const VOL_STATUS_ORDER: Record<PLVolumeLandmark['status'], number> = {
-  over: 0, high: 1, optimal: 2, under: 3,
+  over: 0,
+  high: 1,
+  optimal: 2,
+  under: 3,
 };
 
 /**
@@ -2669,34 +3314,36 @@ export function getPLVolumeLandmarksByMuscle(weeks: LMSPlanWeek[], level: string
   const peak = weeks[snap.idx];
   const byMuscle: Record<string, number> = {};
   if (peak) {
-    for (const day of peak.days) for (const ex of day.exercises) {
-      const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
-      if (sets <= 0) continue;
-      for (const [muscle, share] of Object.entries(muscleSharesFor(ex))) {
-        byMuscle[muscle] = (byMuscle[muscle] || 0) + sets * share;
+    for (const day of peak.days)
+      for (const ex of day.exercises) {
+        const sets = ex.workSets.reduce((s, ws) => s + ws.sets, 0);
+        if (sets <= 0) continue;
+        for (const [muscle, share] of Object.entries(muscleSharesFor(ex))) {
+          byMuscle[muscle] = (byMuscle[muscle] || 0) + sets * share;
+        }
       }
-    }
   }
   const rows: PLVolumeLandmark[] = [];
   for (const [muscle, raw] of Object.entries(byMuscle)) {
     const sets = Math.round(raw * 10) / 10;
     if (sets <= 0) continue;
     const lm = getVolumeLandmarks(level, muscle);
-    if (!lm) continue;   // мышца без порогов в базе — не выдумываем
+    if (!lm) continue; // мышца без порогов в базе — не выдумываем
     const mrv = pedMrvMult ? Math.round(lm.mrv * pedMrvMult) : lm.mrv;
     const st = checkVolumeStatus(sets, { ...lm, mrv });
     const status: PLVolumeLandmark['status'] =
-      st === 'below_mev' ? 'under' :
-      st === 'optimal' ? 'optimal' :
-      st === 'approaching_mrv' ? 'high' : 'over';
+      st === 'below_mev' ? 'under' : st === 'optimal' ? 'optimal' : st === 'approaching_mrv' ? 'high' : 'over';
     rows.push({
       group: muscle,
       muscle: MUSCLE_LABEL_RU[muscle] || muscle,
       peakWeek: snap.idx + 1,
-      sets, mev: lm.mev, mav: lm.mav, mrv, status,
+      sets,
+      mev: lm.mev,
+      mav: lm.mav,
+      mrv,
+      status,
     });
   }
-  rows.sort((a, b) => (VOL_STATUS_ORDER[a.status] - VOL_STATUS_ORDER[b.status]) || (b.sets - a.sets));
+  rows.sort((a, b) => VOL_STATUS_ORDER[a.status] - VOL_STATUS_ORDER[b.status] || b.sets - a.sets);
   return rows;
 }
-

@@ -9,7 +9,12 @@ import { PLPlanView, type PLPlanViewApi } from '../PLPlanView';
 import type { LMSBuildOutput } from '../../../../engines/lms/lms-builder.engine';
 
 const mkEx = (name: string, pct: number, sets: number, load?: string) => ({
-  name, group: 'Грудь', coef: 1, mnosz: 1, pm: 200, rir: 2,
+  name,
+  group: 'Грудь',
+  coef: 1,
+  mnosz: 1,
+  pm: 200,
+  rir: 2,
   ...(load ? { load } : {}),
   workSets: [{ pct, reps: 3, sets, weight: 160, rir: 2 }],
 });
@@ -26,40 +31,121 @@ const mkDay = (taper = false) => ({
 const plan = (): LMSBuildOutput => ({
   template: { meta: { title: 'Тестовый цикл', correctionPct: 0.005 } } as never,
   progressionRationale: '',
-  cycleMetrics: { tonnage: 0, kpsh: 0, avgWeight: 0, relIntensity: 0, intFB: 0, uoi: 0, sessions: 0, perSession: [] } as never,
+  cycleMetrics: {
+    tonnage: 0,
+    kpsh: 0,
+    avgWeight: 0,
+    relIntensity: 0,
+    intFB: 0,
+    uoi: 0,
+    sessions: 0,
+    perSession: [],
+  } as never,
   weeks: [
-    { week: 1, pmRow: { 'Присед': 200, 'Жим лежа': 140 }, days: [mkDay(false)], sourcePhase: 'base' },
-    { week: 2, pmRow: { 'Присед': 200, 'Жим лежа': 140 }, days: [mkDay(false)], sourcePhase: 'base' },
-    { week: 7, pmRow: { 'Присед': 200, 'Жим лежа': 140 }, days: [mkDay(true)], taperWeek: true, sourcePhase: 'peak' },
-    { week: 8, pmRow: { 'Присед': 200, 'Жим лежа': 140 }, days: [mkDay(true)], taperWeek: true, sourcePhase: 'peak', meetAttempts: { strategy: 'balanced', lifts: [{ name: 'Присед', opener: 185, second: 192.5, third: 202.5, target: 202.5, warmup: [{ pct: 0.4, weight: 75, reps: 5 }] }] } },
+    { week: 1, pmRow: { Присед: 200, 'Жим лежа': 140 }, days: [mkDay(false)], sourcePhase: 'base' },
+    { week: 2, pmRow: { Присед: 200, 'Жим лежа': 140 }, days: [mkDay(false)], sourcePhase: 'base' },
+    { week: 7, pmRow: { Присед: 200, 'Жим лежа': 140 }, days: [mkDay(true)], taperWeek: true, sourcePhase: 'peak' },
+    {
+      week: 8,
+      pmRow: { Присед: 200, 'Жим лежа': 140 },
+      days: [mkDay(true)],
+      taperWeek: true,
+      sourcePhase: 'peak',
+      meetAttempts: {
+        strategy: 'balanced',
+        lifts: [
+          {
+            name: 'Присед',
+            opener: 185,
+            second: 192.5,
+            third: 202.5,
+            target: 202.5,
+            warmup: [{ pct: 0.4, weight: 75, reps: 5 }],
+          },
+        ],
+      },
+    },
   ] as never,
 });
 
 const api = (): PLPlanViewApi => ({
   builtSrc: plan() as never,
-  setBuiltSrc: () => {},
-  srcWeek: 1, setSrcWeek: () => {},
-  srcEdits: {}, setSrcEdits: () => {},
-  srcAdditions: {}, setSrcAdditions: () => {},
-  editMode: false, setEditMode: () => {},
-  setKey: () => '', effSet: (_w, _d, _e, _s, ws) => ws,
-  dayKey: () => '', addExToDay: () => {},
-  pickerDay: null, setPickerDay: () => {}, pickerGroup: 'chest', setPickerGroup: () => {},
-  pickerExName: '', setPickerExName: () => {}, pickerScheme: { sets: 3, reps: 8, weight: 40 }, setPickerScheme: () => {},
-  days: 3, calendarView: 'tapered', setCalendarView: () => {},
-  onNote: () => {}, buildSrc: () => {},
-  selectedCycleId: 'cycle-01', cycleWeeks: 8, goal: 'strength', level: 'II-KMS',
-  peds: [], pedDoses: {}, pedAuto: false, courseIntensity: 'moderate',
-  autoRegMode: 'off', setAutoRegMode: () => {}, autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,
-  pmAutoRegMode: 'off', setPmAutoRegMode: () => {}, periodizationMode: 'linear', setPeriodizationMode: () => {}, pmDiary: null,
-  bridgeRir: 0, pmSquat: 180, pmBench: 120, pmDead: 220,
-  best: { cycle: { meta: { id: 'cycle-01', title: 'Тестовый цикл', direction: 'powerlifting', period: 'силовой', level: 'II-KMS', weeks: 8, sessionsPerWeek: 3, correctionPct: 0.005 } }, score: 0, rationale: [], warnings: [] } as never,
+  srcWeek: 1,
+  setSrcWeek: () => {},
+  srcEdits: {},
+  setSrcEdits: () => {},
+  srcAdditions: {},
+  setSrcAdditions: () => {},
+  editMode: false,
+  setEditMode: () => {},
+  setKey: () => '',
+  effSet: (_w, _d, _e, _s, ws) => ws,
+  dayKey: () => '',
+  addExToDay: () => {},
+  pickerDay: null,
+  setPickerDay: () => {},
+  pickerGroup: 'chest',
+  setPickerGroup: () => {},
+  pickerExName: '',
+  setPickerExName: () => {},
+  pickerScheme: { sets: 3, reps: 8, weight: 40 },
+  setPickerScheme: () => {},
+  days: 3,
+  calendarView: 'tapered',
+  setCalendarView: () => {},
+  onNote: () => {},
+  selectedCycleId: 'cycle-01',
+  cycleWeeks: 8,
+  goal: 'strength',
+  level: 'II-KMS',
+  peds: [],
+  pedDoses: {},
+  pedAuto: false,
+  courseIntensity: 'moderate',
+  autoRegMode: 'off',
+  setAutoRegMode: () => {},
+  autoRegResult: { topSetPctMultiplier: 1, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never,
+  pmAutoRegMode: 'off',
+  setPmAutoRegMode: () => {},
+  periodizationMode: 'linear',
+  setPeriodizationMode: () => {},
+  pmDiary: null,
+  bridgeRir: 0,
+  pmSquat: 180,
+  pmBench: 120,
+  pmDead: 220,
+  best: {
+    cycle: {
+      meta: {
+        id: 'cycle-01',
+        title: 'Тестовый цикл',
+        direction: 'powerlifting',
+        period: 'силовой',
+        level: 'II-KMS',
+        weeks: 8,
+        sessionsPerWeek: 3,
+        correctionPct: 0.005,
+      },
+    },
+    score: 0,
+    rationale: [],
+    warnings: [],
+  } as never,
   plWeakPoints: [],
   linked: { readiness: { recovery: 80, fatigue: 30, sleep: 70 } } as never,
-  runFocus: null, diaryAutoreg: null, calibratePmFromDiary: () => {}, applyPmFromCycle: () => {},
-  e1rmSeries: [], exerciseE1rm: [], exTrendSeries: [], playerDays: [],
-  selectedTrendEx: null, setSelectedTrendEx: () => {},
-  tempoStr: '', getTempo: () => ({ tempo: '', restSec: 90 } as never), methodHints: { volumeMult: 1, technique: null, label: '' },
+  runFocus: null,
+  diaryAutoreg: null,
+  calibratePmFromDiary: () => {},
+  applyPmFromCycle: () => {},
+  e1rmSeries: [],
+  exerciseE1rm: [],
+  exTrendSeries: [],
+  playerDays: [],
+  selectedTrendEx: null,
+  setSelectedTrendEx: () => {},
+  tempoStr: '',
+  getTempo: () => ({ tempo: '', restSec: 90 }) as never,
+  methodHints: { volumeMult: 1, technique: null, label: '' },
 });
 
 describe('PLPlanView', () => {
@@ -85,7 +171,9 @@ describe('PLPlanView', () => {
 
   it('проходки источника (>110%) помечаются «⚡ проходка» (display-only, числа не меняются)', () => {
     const a = api();
-    const custom = plan() as unknown as { weeks: Array<{ days: Array<{ exercises: Array<{ workSets: Array<{ pct: number }> }> }> }> };
+    const custom = plan() as unknown as {
+      weeks: Array<{ days: Array<{ exercises: Array<{ workSets: Array<{ pct: number }> }> }> }>;
+    };
     custom.weeks[0].days[0].exercises[0].workSets[0].pct = 1.12;
     a.builtSrc = custom as never;
     render(<PLPlanView api={a} />);
@@ -93,7 +181,11 @@ describe('PLPlanView', () => {
   });
 
   it('«💾 Сохранить программу» пишет ВСЕ недели в weeksPlan (P0-4), а exercises остаётся неделей 1', () => {
-    try { localStorage.removeItem('myTrainingPlans'); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem('myTrainingPlans');
+    } catch {
+      /* ignore */
+    }
     render(<PLPlanView api={api()} />);
     fireEvent.click(screen.getByText('💾 Сохранить программу'));
     const saved = JSON.parse(localStorage.getItem('myTrainingPlans') || '[]');
@@ -107,34 +199,42 @@ describe('PLPlanView', () => {
     // Обратная совместимость: плоский exercises = неделя 1.
     expect(p.exercises.length).toBeGreaterThan(0);
     expect(p.weeksPlan[0].exercises.length).toBe(p.exercises.length);
-    try { localStorage.removeItem('myTrainingPlans'); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem('myTrainingPlans');
+    } catch {
+      /* ignore */
+    }
   });
 
-  it('карточка прикидов: переключение «🤖 Авто» меняет веса на лету (база из pmRow, множитель в отображении)', () => {
+  it('карточка прикидов: переключение «🤖 Авто» меняет веса на лету (предпросмотр множителя)', () => {
     const a = api();
     a.srcWeek = 8;
-    a.autoRegResult = { topSetPctMultiplier: 0.9, volumeMultiplier: 1, rirShift: 0, deload: false, decisions: [] } as never;
+    a.autoRegResult = {
+      topSetPctMultiplier: 0.9,
+      volumeMultiplier: 1,
+      rirShift: 0,
+      deload: false,
+      decisions: [],
+    } as never;
     const Harness = () => {
       const [mode, setMode] = useState<'off' | 'auto' | 'diary'>('off');
-      return <PLPlanView api={{ ...a, autoRegMode: mode, setAutoRegMode: m => setMode(m) }} />;
+      return <PLPlanView api={{ ...a, autoRegMode: mode, setAutoRegMode: (m) => setMode(m) }} />;
     };
     render(<Harness />);
-    // off: база из pmRow 200 (balanced) → присед 185/192.5/205
+    // off: прикиды недели — из движка (meetAttempts: 185/192.5/202.5).
     expect(screen.getAllByText('185').length).toBeGreaterThan(0);
     expect(screen.queryByText('166.5')).toBeNull();
-    // «Попытки на соревнования» считаются от ПМ ПО ЦИКЛУ (pmRow финальной недели 200).
-    // Канон MEET_STRATEGY_PCT (balanced 92/96/102) — был legacy competitionAttempts
-    // (87.5/92.5/100 → 175/185/200), расходился с карточкой прикидов ниже.
-    expect(screen.getByText(/рекоменд.: 185\/192\.5\/205/)).toBeTruthy();
-    // Канон balanced 92/96/102 от 140 (было legacy 87.5/92.5/100 → 122.5/130/140)
+    // «Попытки на соревнования» читают ту же строку движка (P2-15), а не pmRow×множитель.
+    expect(screen.getByText(/рекоменд.: 185\/192\.5\/202\.5/)).toBeTruthy();
+    // Жим: в неделе нет прикидов этого лифта → fallback на канон balanced 92/96/102 от 140.
     expect(screen.getByText(/рекоменд.: 130\/135\/142\.5/)).toBeTruthy();
     expect(screen.queryByText(/рекоменд.: 157\.5\/166\.5\/180/)).toBeNull();
     fireEvent.click(screen.getAllByText('🤖 Авто')[0]);
-    // auto ×0.9: 185×0.9 = 166.5 (round 0.1)
+    // auto-предпросмотр ×0.9: 185×0.9 = 166.5 (пока конфиг не применён кнопкой)
     expect(screen.getAllByText('166.5').length).toBeGreaterThan(0);
     expect(screen.queryByText('185')).toBeNull();
-    // карточка «Попытки на соревнования» тоже масштабируется и показывает hint множителя
-    expect(screen.getByText(/попытки ×0\.90/)).toBeTruthy();
+    // подпись честно говорит, что это предпросмотр, а не применённый план
+    expect(screen.getByText(/попытки ×0\.90 \(предпросмотр\)/)).toBeTruthy();
   });
 
   it('кнопка «📊 Из цикла» ставит ПМ0 из прогноза цикла (pmRow финальной недели), а не из дневника', () => {
@@ -142,8 +242,12 @@ describe('PLPlanView', () => {
     a.srcWeek = 8;
     let applied: { squat: number; bench: number; deadlift: number } | null = null;
     let noted = '';
-    a.applyPmFromCycle = pm => { applied = pm; };
-    a.onNote = n => { noted = n; };
+    a.applyPmFromCycle = (pm) => {
+      applied = pm;
+    };
+    a.onNote = (n) => {
+      noted = n;
+    };
     render(<PLPlanView api={a} />);
     // кнопка активна: pmRow финальной недели даёт ПМ 200/140, отличные от PM0-полей 180/120
     const btn = screen.getByText(/📊 Из цикла/);
@@ -157,7 +261,9 @@ describe('PLPlanView', () => {
   it('кнопка «📊 Из цикла» активна, когда pmRow финальной недели содержит лифты (даже если PM0 совпадают)', () => {
     const a = api();
     a.srcWeek = 8;
-    a.pmSquat = 200; a.pmBench = 140; a.pmDead = 220;
+    a.pmSquat = 200;
+    a.pmBench = 140;
+    a.pmDead = 220;
     render(<PLPlanView api={a} />);
     // pmRow = { 'Присед': 200, 'Жим лежа': 140 } → цикл содержит лифты → кнопка активна
     expect((screen.getByText(/📊 Из цикла/) as HTMLButtonElement).disabled).toBe(false);
@@ -169,12 +275,30 @@ describe('PLPlanView', () => {
     // Серия строится в SRCBBScreen через detectLift: «Жим штанги лёжа» → bench (раньше
     // матчинг подстрокой «жим лёжа» не ловил каноническое имя каталога — серия не строилась).
     a.e1rmSeries = [
-      { lift: 'squat', label: 'Присед', color: '#00e68a', pts: [{ date: '2026-08-01', val: 190 }, { date: '2026-08-10', val: 195 }] },
-      { lift: 'bench', label: 'Жим', color: '#60a5fa', pts: [{ date: '2026-08-01', val: 135 }, { date: '2026-08-10', val: 140 }] },
+      {
+        lift: 'squat',
+        label: 'Присед',
+        color: '#00e68a',
+        pts: [
+          { date: '2026-08-01', val: 190 },
+          { date: '2026-08-10', val: 195 },
+        ],
+      },
+      {
+        lift: 'bench',
+        label: 'Жим',
+        color: '#60a5fa',
+        pts: [
+          { date: '2026-08-01', val: 135 },
+          { date: '2026-08-10', val: 140 },
+        ],
+      },
       { lift: 'deadlift', label: 'Становая', color: '#f59e0b', pts: [{ date: '2026-08-01', val: 230 }] },
     ];
     let noted = '';
-    a.onNote = n => { noted = n; };
+    a.onNote = (n) => {
+      noted = n;
+    };
     render(<PLPlanView api={a} />);
     // бейдж показывает последние значения серий
     expect(screen.getByText(/📈 Из дневника \(присед 195 · жим 140 · тяга 230\)/)).toBeTruthy();
@@ -190,7 +314,9 @@ describe('PLPlanView', () => {
     a.srcWeek = 8;
     a.e1rmSeries = [];
     let noted = '';
-    a.onNote = n => { noted = n; };
+    a.onNote = (n) => {
+      noted = n;
+    };
     render(<PLPlanView api={a} />);
     const btn = screen.getByText('📈 Из дневника') as HTMLButtonElement;
     expect(btn.disabled).toBe(false);
@@ -202,21 +328,47 @@ describe('PLPlanView', () => {
     const a = api();
     a.srcWeek = 1;
     // Дневник: неделя 1 выполнена, неделя 2 пропущена; RPE 9.8 три сессии — дрейф.
-    const iso = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); const p = (v: number) => String(v).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
-    const mkLog = (week: number, rpe: number): never => ({
-      id: `l${week}`, date: iso(28 - week * 7), duration: 60, overallRPE: rpe, recoveryBefore: 80, split: 'test',
-      exercises: [{
-        id: `e${week}`, date: iso(28 - week * 7), exerciseId: 'squat', exerciseName: 'Присед',
-        sets: Array.from({ length: 10 }, () => ({ weight: 150, reps: 3, rir: 0, rpe })),
-        totalVolume: 10 * 450, estimated1RM: 160, isCompound: true, weekNumber: week,
-      }],
-    } as never);
+    const iso = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      const p = (v: number) => String(v).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    };
+    const mkLog = (week: number, rpe: number): never =>
+      ({
+        id: `l${week}`,
+        date: iso(28 - week * 7),
+        duration: 60,
+        overallRPE: rpe,
+        recoveryBefore: 80,
+        split: 'test',
+        exercises: [
+          {
+            id: `e${week}`,
+            date: iso(28 - week * 7),
+            exerciseId: 'squat',
+            exerciseName: 'Присед',
+            sets: Array.from({ length: 10 }, () => ({ weight: 150, reps: 3, rir: 0, rpe })),
+            totalVolume: 10 * 450,
+            estimated1RM: 160,
+            isCompound: true,
+            weekNumber: week,
+          },
+        ],
+      }) as never;
     a.historyWorkouts = [mkLog(1, 9.8), mkLog(2, 10), mkLog(3, 9.6)];
     a.currentWeek = 3;
     // Основные подходы в RIR0 → интенсивностная подсказка про velocity loss
-    (a.builtSrc as LMSBuildOutput).weeks.forEach(w => {
+    (a.builtSrc as LMSBuildOutput).weeks.forEach((w) => {
       if (w.taperWeek || w.deload) return;
-      w.days.forEach(d => d.exercises.forEach(e => { if (e.load === 'main') e.workSets.forEach(ws => { ws.rir = 0; }); }));
+      w.days.forEach((d) =>
+        d.exercises.forEach((e) => {
+          if (e.load === 'main')
+            e.workSets.forEach((ws) => {
+              ws.rir = 0;
+            });
+        }),
+      );
     });
     render(<PLPlanView api={a} />);
     expect(screen.getByText('📈 План vs факт (недели)')).toBeTruthy();
@@ -237,15 +389,36 @@ describe('PLPlanView', () => {
       ...plan(),
       weeks: [
         ...plan().weeks.slice(0, 3),
-        { week: 8, pmRow: { 'Присед со штангой': 200, 'Жим штанги лёжа': 140, 'Становая тяга': 240 }, days: [mkDay(true)], taperWeek: true, sourcePhase: 'peak', meetAttempts: { strategy: 'balanced', lifts: [{ name: 'Присед', opener: 185, second: 192.5, third: 202.5, target: 202.5, warmup: [{ pct: 0.4, weight: 75, reps: 5 }] }] } },
+        {
+          week: 8,
+          pmRow: { 'Присед со штангой': 200, 'Жим штанги лёжа': 140, 'Становая тяга': 240 },
+          days: [mkDay(true)],
+          taperWeek: true,
+          sourcePhase: 'peak',
+          meetAttempts: {
+            strategy: 'balanced',
+            lifts: [
+              {
+                name: 'Присед',
+                opener: 185,
+                second: 192.5,
+                third: 202.5,
+                target: 202.5,
+                warmup: [{ pct: 0.4, weight: 75, reps: 5 }],
+              },
+            ],
+          },
+        },
       ],
     } as never;
     let applied: { squat: number; bench: number; deadlift: number } | null = null;
-    a.applyPmFromCycle = pm => { applied = pm; };
+    a.applyPmFromCycle = (pm) => {
+      applied = pm;
+    };
     render(<PLPlanView api={a} />);
     // база попыток — из pmRow цикла (200/140/240), а не из дневниковых PM0-полей (180/120/220)
-    // Канон MEET_STRATEGY_PCT balanced: 92/96/102 от 200 (было legacy 87.5/92.5/100)
-    expect(screen.getByText(/рекоменд.: 185\/192\.5\/205/)).toBeTruthy();
+    // P2-15: прикиды — из движка (meetAttempts недели), а не пересчёт со своей базой.
+    expect(screen.getByText(/рекоменд.: 185\/192\.5\/202\.5/)).toBeTruthy();
     const btn = screen.getByText(/📊 Из цикла/);
     expect((btn as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(btn);
@@ -256,18 +429,42 @@ describe('PLPlanView', () => {
 
   /** Дневник с RPE ≥9.5 три сессии (дрейф) + опц. фактические скорости. */
   const driftDiary = (vels?: number[]): never[] => {
-    const iso = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); const p = (v: number) => String(v).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
-    return [1, 2, 3].map(week => ({
-      id: `l${week}`, date: iso(28 - week * 7), duration: 60, overallRPE: 9.8, recoveryBefore: 80, split: 'test',
-      exercises: [{
-        id: `e${week}`, date: iso(28 - week * 7), exerciseId: 'squat', exerciseName: 'Присед',
-        sets: Array.from({ length: 3 }, (_, i) => ({
-          weight: 150, reps: 3, rir: 0, rpe: 9.8,
-          ...(vels && i < vels.length ? { velocity: vels[i] } : {}),
-        })),
-        totalVolume: 3 * 450, estimated1RM: 160, isCompound: true, weekNumber: week,
-      }],
-    } as never));
+    const iso = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - n);
+      const p = (v: number) => String(v).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    };
+    return [1, 2, 3].map(
+      (week) =>
+        ({
+          id: `l${week}`,
+          date: iso(28 - week * 7),
+          duration: 60,
+          overallRPE: 9.8,
+          recoveryBefore: 80,
+          split: 'test',
+          exercises: [
+            {
+              id: `e${week}`,
+              date: iso(28 - week * 7),
+              exerciseId: 'squat',
+              exerciseName: 'Присед',
+              sets: Array.from({ length: 3 }, (_, i) => ({
+                weight: 150,
+                reps: 3,
+                rir: 0,
+                rpe: 9.8,
+                ...(vels && i < vels.length ? { velocity: vels[i] } : {}),
+              })),
+              totalVolume: 3 * 450,
+              estimated1RM: 160,
+              isCompound: true,
+              weekNumber: week,
+            },
+          ],
+        }) as never,
+    );
   };
 
   it('дрейф плана: кнопка «🤖 Включить авторегуляцию» переключает режим (§5-bis п.1)', () => {
@@ -278,7 +475,18 @@ describe('PLPlanView', () => {
     const calls: string[] = [];
     const Harness = () => {
       const [mode, setMode] = useState<'off' | 'auto' | 'diary'>('off');
-      return <PLPlanView api={{ ...a, autoRegMode: mode, setAutoRegMode: m => { calls.push(m); setMode(m); } }} />;
+      return (
+        <PLPlanView
+          api={{
+            ...a,
+            autoRegMode: mode,
+            setAutoRegMode: (m) => {
+              calls.push(m);
+              setMode(m);
+            },
+          }}
+        />
+      );
     };
     render(<Harness />);
     expect(screen.getByText(/План тяжелее факта/)).toBeTruthy();
@@ -338,7 +546,7 @@ describe('PLPlanView', () => {
     expect(rows.length).toBeGreaterThan(0);
     // Порядок — по убыванию подходов на пиковой неделе (Тяга к поясу 4 → Присед/Жим по 3).
     expect(rows[0].textContent).toContain('Тяга к поясу');
-    expect(rows.map(r => r.textContent).join(' ')).toContain('Присед');
+    expect(rows.map((r) => r.textContent).join(' ')).toContain('Присед');
     // Сумма подходов строк = подходы группы (сетка сходится с «10 сет · MRV 24»).
     const sum = rows.reduce((n, r) => n + Number((r.textContent || '').match(/— (\d+) сет/)?.[1] || 0), 0);
     expect(sum).toBe(10);
@@ -355,7 +563,7 @@ describe('PLPlanView', () => {
     fireEvent.click(document.querySelector('[data-pl="vol-mode-muscle"]') as HTMLElement);
     const rows = [...document.querySelectorAll('[data-pl="volume-row"]')];
     expect(rows.length).toBeGreaterThan(0);
-    const text = rows.map(r => r.textContent).join(' ');
+    const text = rows.map((r) => r.textContent).join(' ');
     // Присед → квадрицепс/бицепс бедра (60/40), жим → грудь/трицепс, тяга → грудь (фикстура).
     expect(text).toMatch(/Квадрицепс/);
     expect(text).toMatch(/Бицепс бедра/);
@@ -373,7 +581,9 @@ describe('PLPlanView', () => {
     a.historyWorkouts = driftDiary();
     a.currentWeek = 3;
     const notes: string[] = [];
-    a.onNote = n => { notes.push(n); };
+    a.onNote = (n) => {
+      notes.push(n);
+    };
     render(<PLPlanView api={a} />);
     fireEvent.click(screen.getByText('📄 CSV'));
     // Мост асинхронный (web — Blob, native — Documents+Share) — ждём тост.

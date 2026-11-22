@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { plNormsSnapshot } from '../pl-norms-bridge.engine';
 import { getNormTable, classifyTotal } from '../../pl-norms.engine';
 
-const pm = { 'Присед': 200, 'Жим лежа': 140, 'Становая тяга': 240, 'Тяга блока': 90 };
+const pm = { Присед: 200, 'Жим лежа': 140, 'Становая тяга': 240, 'Тяга блока': 90 };
 
 describe('plNormsSnapshot — мост PL-авто → нормативы', () => {
   it('тотал = только присед+жим+тяга (аксессуары не в счёт)', () => {
@@ -49,14 +49,39 @@ describe('plNormsSnapshot — мост PL-авто → нормативы', () =
   });
 
   it('неполный тотал (только присед+жим) честно помечен', () => {
-    const r = plNormsSnapshot({ fed: 'fpr', sex: 'male', bodyWeight: 83, plannedPm: { 'Присед': 200, 'Жим лежа': 140 } });
+    const r = plNormsSnapshot({ fed: 'fpr', sex: 'male', bodyWeight: 83, plannedPm: { Присед: 200, 'Жим лежа': 140 } });
     expect(r.total).toBe(340);
     expect(r.liftsFound).toBe(2);
     expect(r.note).toMatch(/Тотал неполный/);
   });
 
+  it('P1-3: по неполному тоталу разряд НЕ считается (иначе «выполнен» по двум движениям)', () => {
+    const partial = plNormsSnapshot({
+      fed: 'fpr',
+      sex: 'male',
+      bodyWeight: 83,
+      plannedPm: { Присед: 200, 'Жим лежа': 140 },
+    });
+    expect(partial.incomplete).toBe(true);
+    expect(partial.classification).toBeNull();
+    expect(partial.progressPct).toBe(0);
+    const full = plNormsSnapshot({
+      fed: 'fpr',
+      sex: 'male',
+      bodyWeight: 83,
+      plannedPm: { Присед: 200, 'Жим лежа': 140, 'Становая тяга': 220 },
+    });
+    expect(full.incomplete).toBe(false);
+    expect(full.classification).not.toBeNull();
+  });
+
   it('женская таблица WRPF отсутствует → разряд не считаем (без выдуманных порогов)', () => {
-    const r = plNormsSnapshot({ fed: 'wpc', sex: 'female', bodyWeight: 63, plannedPm: { 'Присед': 120, 'Жим лежа': 70, 'Становая тяга': 150 } });
+    const r = plNormsSnapshot({
+      fed: 'wpc',
+      sex: 'female',
+      bodyWeight: 63,
+      plannedPm: { Присед: 120, 'Жим лежа': 70, 'Становая тяга': 150 },
+    });
     expect(r.federation).toBe('wrpf_untested');
     expect(r.classification).toBeNull();
     expect(r.glPoints).toBeGreaterThan(0);

@@ -24,7 +24,7 @@
  */
 import type { LMSBuildOutput, LMSPlanWeek } from './lms-builder.engine';
 import { ruCount, RU_SESSIONS } from '../ru-plural';
-import { dateFromWeeksToStart } from './pl-meet-registry.engine';
+import { meetDayFromWeeksToStart } from './pl-meet-registry.engine';
 import type { WorkoutLog } from '../../core/types';
 import { localIsoDate } from '../../core/local-date';
 import { norm } from '../norm';
@@ -158,39 +158,43 @@ export function buildPLSeasonIcs(
     }
   }
 
-  // 2) Соревнования: явная дата реестра, иначе «today + (N−1)×7» (контракт недель).
+  // 2) Соревнования: явная дата реестра, иначе ДЕНЬ СОРЕВНОВАНИЯ недели N
+  //    (канон P2-3: последний день недели старта, не её понедельник).
   for (const m of meets ?? []) {
-    const date = (m.date && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m.date : null)
-      ?? dateFromWeeksToStart(m.weeksToStart, opts.todayIso);
+    const date =
+      (m.date && /^\d{4}-\d{2}-\d{2}$/.test(m.date) ? m.date : null) ??
+      meetDayFromWeeksToStart(m.weeksToStart, opts.todayIso);
     if (!date) continue;
     const priority = m.priority ? ` [${m.priority}]` : '';
-    push(`🏁 ${m.name}${priority}`, date, isoPlusDays(date, 1) ?? date, `ПЛ-сезон: старт недели ${Math.max(1, Math.round(m.weeksToStart))}`);
+    push(
+      `🏁 ${m.name}${priority}`,
+      date,
+      isoPlusDays(date, 1) ?? date,
+      `ПЛ-сезон: старт недели ${Math.max(1, Math.round(m.weeksToStart))}`,
+    );
   }
 
   // 3) Тренировочные сессии сезона (опция): VEVENT на каждый день каждой недели,
   //    у которой известна дата начала (weekStart или seasonStart + (N−1)×7).
   if (opts.withTrainingSessions) {
     for (const w of weeks ?? []) {
-      const start = w.weekStart
-        ?? (opts.seasonStart ? isoPlusDays(opts.seasonStart, (Math.max(1, w.week) - 1) * 7) : null);
+      const start =
+        w.weekStart ?? (opts.seasonStart ? isoPlusDays(opts.seasonStart, (Math.max(1, w.week) - 1) * 7) : null);
       if (!start) continue; // честно: без даты события нет
       w.days.forEach((day, di) => {
         const dayIso = isoPlusDays(start, di);
         if (!dayIso) return;
         const linesEx = (day.exercises ?? [])
-          .filter(e => !/^(отдых|тест\s*:)/i.test((e.name || '').trim()))
-          .map(e => {
-            const sets = (e.workSets ?? []).map(ws => `${ws.sets}×${ws.reps} @${Math.round(ws.weight)}кг`).join(' + ');
+          .filter((e) => !/^(отдых|тест\s*:)/i.test((e.name || '').trim()))
+          .map((e) => {
+            const sets = (e.workSets ?? [])
+              .map((ws) => `${ws.sets}×${ws.reps} @${Math.round(ws.weight)}кг`)
+              .join(' + ');
             return `${e.name}: ${sets}`;
           });
         if (linesEx.length === 0) return;
         const tag = weekLabel(w).replace(/ \(нед \d+\)$/, '');
-        push(
-          `🏋 Н${w.week} Д${di + 1} — ${tag}`,
-          dayIso,
-          isoPlusDays(dayIso, 1) ?? dayIso,
-          linesEx.join('\n'),
-        );
+        push(`🏋 Н${w.week} Д${di + 1} — ${tag}`, dayIso, isoPlusDays(dayIso, 1) ?? dayIso, linesEx.join('\n'));
       });
     }
   }
@@ -232,7 +236,8 @@ export interface PLComplianceResult {
   hasDiary: boolean;
 }
 
-const ton = (weight: number, reps: number, sets: number) => (Number(weight) || 0) * (Number(reps) || 0) * (Number(sets) || 0);
+const ton = (weight: number, reps: number, sets: number) =>
+  (Number(weight) || 0) * (Number(reps) || 0) * (Number(sets) || 0);
 
 /**
  * Сверка недель плана с фактом дневника. Группировка сессий — по `weekNumber`
@@ -265,38 +270,54 @@ export function plWeeklyCompliance(
   }
 
   const todayIso = opts?.todayIso ?? localIsoDate();
-  const weeks: PLWeekCompliance[] = (plan?.weeks ?? []).map(w => {
-    let plannedSets = 0, plannedReps = 0, plannedTonnage = 0;
-    for (const d of w.days) for (const e of d.exercises) {
-      if (/^(отдых|тест\s*:)/i.test((e.name || '').trim())) continue; // служебные строки
-      for (const ws of e.workSets) {
-        plannedSets += ws.sets;
-        plannedReps += ws.reps * ws.sets;
-        plannedTonnage += ton(ws.weight, ws.reps, ws.sets);
+  const weeks: PLWeekCompliance[] = (plan?.weeks ?? []).map((w) => {
+    let plannedSets = 0,
+      plannedReps = 0,
+      plannedTonnage = 0;
+    for (const d of w.days)
+      for (const e of d.exercises) {
+        if (/^(отдых|тест\s*:)/i.test((e.name || '').trim())) continue; // служебные строки
+        for (const ws of e.workSets) {
+          plannedSets += ws.sets;
+          plannedReps += ws.reps * ws.sets;
+          plannedTonnage += ton(ws.weight, ws.reps, ws.sets);
+        }
       }
-    }
     const fact = factByWeek.get(w.week) ?? { sets: 0, tonnage: 0 };
     const setsPct = plannedSets > 0 ? fact.sets / plannedSets : 0;
     let status: PLWeekCompliance['status'];
     if (fact.sets === 0) {
       // Неделя «в прошлом»? Даты разметки приоритетнее номера: неделя началась
       // раньше сегодня — иначе неделя плана впереди.
-      const started = w.weekStart ? w.weekStart <= todayIso : (opts?.currentWeek != null ? w.week <= opts.currentWeek : true);
+      const started = w.weekStart
+        ? w.weekStart <= todayIso
+        : opts?.currentWeek != null
+          ? w.week <= opts.currentWeek
+          : true;
       status = started ? 'missed' : 'upcoming';
     } else if (setsPct >= 0.999) status = 'done';
     else status = 'partial';
     const note = fact.sets === 0 && status === 'missed' ? 'нет сессий дневника с этой неделей плана' : undefined;
-    return { week: w.week, plannedSets, plannedReps, plannedTonnage: Math.round(plannedTonnage), factSets: fact.sets, factTonnage: Math.round(fact.tonnage), setsPct, status, note };
+    return {
+      week: w.week,
+      plannedSets,
+      plannedReps,
+      plannedTonnage: Math.round(plannedTonnage),
+      factSets: fact.sets,
+      factTonnage: Math.round(fact.tonnage),
+      setsPct,
+      status,
+      note,
+    };
   });
 
-  const past = weeks.filter(w => w.status !== 'upcoming');
-  const overallPct = past.length > 0
-    ? past.reduce((s, w) => s + w.setsPct, 0) / past.length
-    : 0;
+  const past = weeks.filter((w) => w.status !== 'upcoming');
+  const overallPct = past.length > 0 ? past.reduce((s, w) => s + w.setsPct, 0) / past.length : 0;
   if (!hasDiary) notes.push('Дневник тренировок пуст — сверка «план vs факт» невозможна.');
-  else if (past.length === 0) notes.push('В дневнике нет недель этого плана — отметь weekNumber в записях или дождитесь первой недели.');
+  else if (past.length === 0)
+    notes.push('В дневнике нет недель этого плана — отметь weekNumber в записях или дождитесь первой недели.');
   else {
-    const missed = past.filter(w => w.status === 'missed').length;
+    const missed = past.filter((w) => w.status === 'missed').length;
     if (missed > 0) notes.push(`Пропущено недель: ${missed} из ${past.length} прошедших.`);
   }
   return { weeks, past, overallPct, notes, hasDiary };
@@ -369,9 +390,9 @@ export function plWeeklyComplianceByDays(
   }
 
   const weekStarted = (w: LMSPlanWeek): boolean =>
-    w.weekStart ? w.weekStart <= todayIso : (opts?.currentWeek != null ? w.week <= opts.currentWeek : true);
+    w.weekStart ? w.weekStart <= todayIso : opts?.currentWeek != null ? w.week <= opts.currentWeek : true;
 
-  const weeks: PLWeekDaysCompliance[] = (plan?.weeks ?? []).map(w => {
+  const weeks: PLWeekDaysCompliance[] = (plan?.weeks ?? []).map((w) => {
     const fact = factByWeek.get(w.week) ?? new Map<string, number>();
     const started = weekStarted(w);
     // Закрепляем факт имени за ПЕРВЫМ днём недели, где оно запланировано:
@@ -385,36 +406,36 @@ export function plWeeklyComplianceByDays(
         if (key && !assignedDay.has(key)) assignedDay.set(key, di);
       }
     });
-      const days: PLDayCompliance[] = w.days.map((d, di) => {
-        const planned = (d.exercises ?? []).filter(e => !isServiceExercise(e.name || ''));
-        // Факт, закреплённый за ЭТИМ днём (первый день, где запланировано имя).
-        const dayFact = new Map<string, number>();
-        for (const [key, sets] of fact) if (assignedDay.get(key) === di) dayFact.set(key, sets);
-        let plannedSets = 0;
-        for (const e of planned) {
-          for (const ws of e.workSets ?? []) plannedSets += ws.sets;
-        }
-        const factSets = [...dayFact.values()].reduce((a, b) => a + b, 0);
-        const perName = new Map<string, { plannedSets: number; factSets: number }>();
-        for (const e of planned) {
-          const key = plNameKey(e.name || '');
-          const p = perName.get(key) ?? { plannedSets: 0, factSets: 0 };
-          for (const ws of e.workSets ?? []) p.plannedSets += ws.sets;
-          if (!perName.has(key)) p.factSets = dayFact.get(key) ?? 0;
-          perName.set(key, p);
-        }
+    const days: PLDayCompliance[] = w.days.map((d, di) => {
+      const planned = (d.exercises ?? []).filter((e) => !isServiceExercise(e.name || ''));
+      // Факт, закреплённый за ЭТИМ днём (первый день, где запланировано имя).
+      const dayFact = new Map<string, number>();
+      for (const [key, sets] of fact) if (assignedDay.get(key) === di) dayFact.set(key, sets);
+      let plannedSets = 0;
+      for (const e of planned) {
+        for (const ws of e.workSets ?? []) plannedSets += ws.sets;
+      }
+      const factSets = [...dayFact.values()].reduce((a, b) => a + b, 0);
+      const perName = new Map<string, { plannedSets: number; factSets: number }>();
+      for (const e of planned) {
+        const key = plNameKey(e.name || '');
+        const p = perName.get(key) ?? { plannedSets: 0, factSets: 0 };
+        for (const ws of e.workSets ?? []) p.plannedSets += ws.sets;
+        if (!perName.has(key)) p.factSets = dayFact.get(key) ?? 0;
+        perName.set(key, p);
+      }
       const exercises: PLExerciseCompliance[] = [];
       for (const e of planned) {
         const key = plNameKey(e.name || '');
         const agg = perName.get(key);
-        if (!agg || exercises.some(x => plNameKey(x.name) === key)) continue; // одно имя — одна строка
-        const status: PLExerciseCompliance['status'] = agg.factSets === 0 ? 'missed' : agg.factSets >= agg.plannedSets ? 'done' : 'partial';
+        if (!agg || exercises.some((x) => plNameKey(x.name) === key)) continue; // одно имя — одна строка
+        const status: PLExerciseCompliance['status'] =
+          agg.factSets === 0 ? 'missed' : agg.factSets >= agg.plannedSets ? 'done' : 'partial';
         exercises.push({ name: e.name, plannedSets: agg.plannedSets, factSets: agg.factSets, status });
       }
       const setsPct = plannedSets > 0 ? factSets / plannedSets : 0;
-      const status: PLDayCompliance['status'] = factSets === 0
-        ? (started ? 'missed' : 'upcoming')
-        : setsPct >= 0.999 ? 'done' : 'partial';
+      const status: PLDayCompliance['status'] =
+        factSets === 0 ? (started ? 'missed' : 'upcoming') : setsPct >= 0.999 ? 'done' : 'partial';
       return { day: di + 1, plannedSets, factSets, setsPct, exercises, status };
     });
 
@@ -427,7 +448,8 @@ export function plWeeklyComplianceByDays(
   });
 
   if (!hasDiary) notes.push('Дневник тренировок пуст — разбивка по дням невозможна.');
-  else if (weeks.every(w => w.factSets === 0)) notes.push('В дневнике нет недель этого плана — отметьте weekNumber в записях.');
+  else if (weeks.every((w) => w.factSets === 0))
+    notes.push('В дневнике нет недель этого плана — отметьте weekNumber в записях.');
   return { weeks, notes, hasDiary };
 }
 
@@ -472,7 +494,7 @@ export function planFactDriftWarnings(
   for (const [name, agg] of byName) {
     const rpes = agg.rpes.slice(-minSessions); // последние сессии
     if (rpes.length < minSessions) continue;
-    if (!rpes.every(r => r >= rpeThreshold)) continue;
+    if (!rpes.every((r) => r >= rpeThreshold)) continue;
     const avg = rpes.reduce((a, b) => a + b, 0) / rpes.length;
     out.push({
       name,
@@ -487,7 +509,10 @@ export function planFactDriftWarnings(
 /** Подсказка из дрейфа — одна строка для rationale/UI. */
 export function driftWarningLine(warnings: PLDriftWarning[]): string {
   if (warnings.length === 0) return '';
-  return `⚠ План тяжелее факта: ${warnings.slice(0, 3).map(w => `${w.name} (RPE ${w.avgFactRpe}×${w.sessions})`).join(', ')} — фиксированный % ПМ дрейфует (Cowley 2025), используйте авторегуляцию.`;
+  return `⚠ План тяжелее факта: ${warnings
+    .slice(0, 3)
+    .map((w) => `${w.name} (RPE ${w.avgFactRpe}×${w.sessions})`)
+    .join(', ')} — фиксированный % ПМ дрейфует (Cowley 2025), используйте авторегуляцию.`;
 }
 
 // ---------- Интенсивностная подсказка (velocity load) ----------
@@ -516,38 +541,52 @@ export function plIntensityAdvisory(plan: LMSBuildOutput, opts?: { sessions?: Wo
   const fact = plVelocityLossFact(opts?.sessions ?? []);
   if (fact.avgLossPct != null && fact.sessions > 0) {
     // Фактический VL: порог силы 20% (Zhang/Jukic), выше 30% — стоп-зона.
-    const advisory = fact.avgLossPct > 30
-      ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — стоп-зона: штанга замедляется сильнее 30%, оставьте 1–2 повтора в запасе (velocity loss ≤20%).`
-      : fact.avgLossPct > 20
-        ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — выше коридора 10–20% для силы (Zhang 2023), снижайте вес или срезайте повторы.`
-        : '';
+    const advisory =
+      fact.avgLossPct > 30
+        ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — стоп-зона: штанга замедляется сильнее 30%, оставьте 1–2 повтора в запасе (velocity loss ≤20%).`
+        : fact.avgLossPct > 20
+          ? `Потеря скорости по факту дневника: ${fact.avgLossPct}% в среднем (${ruCount(fact.sessions, RU_SESSIONS)}) — выше коридора 10–20% для силы (Zhang 2023), снижайте вес или срезайте повторы.`
+          : '';
     return {
-      nearFailureShare: 0, mainSets: 0, nearFailureSets: 0,
-      advisory, source: 'diary-velocity', fact,
+      nearFailureShare: 0,
+      mainSets: 0,
+      nearFailureSets: 0,
+      advisory,
+      source: 'diary-velocity',
+      fact,
     };
   }
-  let mainSets = 0, near = 0;
+  let mainSets = 0,
+    near = 0;
   for (const w of plan?.weeks ?? []) {
     if (w.deload || w.taperWeek || w.meetWeek || w.mockMeet || w.postMeet) continue; // разгрузочные недели не считаем
-    for (const d of w.days) for (const e of d.exercises) {
-      if (/^(отдых|тест\s*:)/i.test((e.name || '').trim())) continue;
-      const isMain = e.load === 'Тяжелая' || e.load === 'main';
-      if (!isMain) continue;
-      for (const ws of e.workSets) {
-        mainSets += ws.sets;
-        if (ws.rir <= 1) near += ws.sets;
+    for (const d of w.days)
+      for (const e of d.exercises) {
+        if (/^(отдых|тест\s*:)/i.test((e.name || '').trim())) continue;
+        const isMain = e.load === 'Тяжелая' || e.load === 'main';
+        if (!isMain) continue;
+        for (const ws of e.workSets) {
+          mainSets += ws.sets;
+          if (ws.rir <= 1) near += ws.sets;
+        }
       }
-    }
   }
   const share = mainSets > 0 ? near / mainSets : 0;
-  const advisory = mainSets === 0
-    ? ''
-    : share > 0.5
-      ? 'Основные подходы чаще всего в RIR ≤1 — для силы держите velocity loss 10–20% (Zhang 2023): высокая близость к отказу замедляет штангу и снимает прирост 1ПМ.'
-      : share > 0.3
-        ? 'Часть основных подходов в RIR ≤1 — следите за скоростью штанги (velocity loss ≤20% на силовых блоках).'
-        : '';
-  return { nearFailureShare: Math.round(share * 1000) / 1000, mainSets, nearFailureSets: near, advisory, source: 'plan-rir' };
+  const advisory =
+    mainSets === 0
+      ? ''
+      : share > 0.5
+        ? 'Основные подходы чаще всего в RIR ≤1 — для силы держите velocity loss 10–20% (Zhang 2023): высокая близость к отказу замедляет штангу и снимает прирост 1ПМ.'
+        : share > 0.3
+          ? 'Часть основных подходов в RIR ≤1 — следите за скоростью штанги (velocity loss ≤20% на силовых блоках).'
+          : '';
+  return {
+    nearFailureShare: Math.round(share * 1000) / 1000,
+    mainSets,
+    nearFailureSets: near,
+    advisory,
+    source: 'plan-rir',
+  };
 }
 
 /** Нормализованное имя — общий помощник (экспорт для UI-сверки). */
@@ -565,8 +604,11 @@ function csvCell(v: unknown): string {
 
 function htmlEsc(v: unknown): string {
   return String(v ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export interface PLComplianceExportInput {
@@ -594,8 +636,15 @@ export function buildPLComplianceCsv(input: PLComplianceExportInput): string {
     for (const d of wk.days) {
       push('День', `Нед ${wk.week} Д${d.day}`, d.plannedSets, d.factSets, Math.round(d.setsPct * 100), d.status, '');
       for (const e of d.exercises) {
-        push('Упражнение', `Нед ${wk.week} Д${d.day} · ${e.name}`, e.plannedSets, e.factSets,
-          e.plannedSets > 0 ? Math.round((e.factSets / e.plannedSets) * 100) : 0, e.status, '');
+        push(
+          'Упражнение',
+          `Нед ${wk.week} Д${d.day} · ${e.name}`,
+          e.plannedSets,
+          e.factSets,
+          e.plannedSets > 0 ? Math.round((e.factSets / e.plannedSets) * 100) : 0,
+          e.status,
+          '',
+        );
       }
     }
   }
@@ -603,9 +652,15 @@ export function buildPLComplianceCsv(input: PLComplianceExportInput): string {
     push('Дрейф', d.name, 0, 0, 0, 'дрейф', `${d.note} (RPE ${d.avgFactRpe} × ${d.sessions})`);
   }
   if (input.advisory?.advisory) {
-    push('Интенсивность', input.advisory.source === 'diary-velocity' ? 'velocity loss (факт)' : 'RIR ≤1 (план)',
-      input.advisory.mainSets, input.advisory.nearFailureSets,
-      Math.round(input.advisory.nearFailureShare * 100), 'совет', input.advisory.advisory);
+    push(
+      'Интенсивность',
+      input.advisory.source === 'diary-velocity' ? 'velocity loss (факт)' : 'RIR ≤1 (план)',
+      input.advisory.mainSets,
+      input.advisory.nearFailureSets,
+      Math.round(input.advisory.nearFailureShare * 100),
+      'совет',
+      input.advisory.advisory,
+    );
   }
   return rows.join('\r\n');
 }
@@ -616,25 +671,45 @@ export function buildPLComplianceCsv(input: PLComplianceExportInput): string {
  */
 export function buildPLComplianceHtml(input: PLComplianceExportInput): string {
   const title = input.title ?? 'ПЛ-авто: план vs факт';
-  const statusColor = (s: string) => s === 'done' ? '#16a34a' : s === 'partial' ? '#d97706' : s === 'missed' ? '#dc2626' : '#71717a';
-  const statusRu = (s: string) => s === 'done' ? 'выполнено' : s === 'partial' ? 'частично' : s === 'missed' ? 'пропущено' : 'впереди';
+  const statusColor = (s: string) =>
+    s === 'done' ? '#16a34a' : s === 'partial' ? '#d97706' : s === 'missed' ? '#dc2626' : '#71717a';
+  const statusRu = (s: string) =>
+    s === 'done' ? 'выполнено' : s === 'partial' ? 'частично' : s === 'missed' ? 'пропущено' : 'впереди';
   const pct = (v: number) => `${Math.round(v * 100)}%`;
-  const weekRows = input.result.weeks.map(w =>
-    `<tr><td>Нед ${w.week}</td><td>${w.plannedSets}</td><td>${w.factSets}</td><td>${pct(w.setsPct)}</td>` +
-    `<td style="color:${statusColor(w.status)};font-weight:700">${statusRu(w.status)}</td><td>${htmlEsc(w.note ?? '')}</td></tr>`).join('');
+  const weekRows = input.result.weeks
+    .map(
+      (w) =>
+        `<tr><td>Нед ${w.week}</td><td>${w.plannedSets}</td><td>${w.factSets}</td><td>${pct(w.setsPct)}</td>` +
+        `<td style="color:${statusColor(w.status)};font-weight:700">${statusRu(w.status)}</td><td>${htmlEsc(w.note ?? '')}</td></tr>`,
+    )
+    .join('');
   let daysHtml = '';
   if (input.days) {
-    const dayBlocks = input.days.weeks.map(wk => wk.days.map(d => {
-      const exRows = d.exercises.map(e =>
-        `<li style="color:${statusColor(e.status)}">${htmlEsc(e.name)}: ${e.factSets}/${e.plannedSets} сетов — ${statusRu(e.status)}</li>`).join('');
-      return `<div style="margin:4px 0 8px"><b>Нед ${wk.week} · день ${d.day}</b> — ${d.factSets}/${d.plannedSets} сетов (${pct(d.setsPct)}, ${statusRu(d.status)})` +
-        (exRows ? `<ul style="margin:4px 0 0 16px;padding:0">${exRows}</ul>` : '') + '</div>';
-    }).join('')).join('');
+    const dayBlocks = input.days.weeks
+      .map((wk) =>
+        wk.days
+          .map((d) => {
+            const exRows = d.exercises
+              .map(
+                (e) =>
+                  `<li style="color:${statusColor(e.status)}">${htmlEsc(e.name)}: ${e.factSets}/${e.plannedSets} сетов — ${statusRu(e.status)}</li>`,
+              )
+              .join('');
+            return (
+              `<div style="margin:4px 0 8px"><b>Нед ${wk.week} · день ${d.day}</b> — ${d.factSets}/${d.plannedSets} сетов (${pct(d.setsPct)}, ${statusRu(d.status)})` +
+              (exRows ? `<ul style="margin:4px 0 0 16px;padding:0">${exRows}</ul>` : '') +
+              '</div>'
+            );
+          })
+          .join(''),
+      )
+      .join('');
     daysHtml = `<h3>Разбивка по дням</h3>${dayBlocks || '<p>Нет данных.</p>'}`;
   }
-  const driftHtml = (input.drift ?? []).length > 0
-    ? `<h3>Дрейф плана</h3><ul>${(input.drift ?? []).map(d => `<li>${htmlEsc(d.name)}: ${htmlEsc(d.note)}</li>`).join('')}</ul>`
-    : '';
+  const driftHtml =
+    (input.drift ?? []).length > 0
+      ? `<h3>Дрейф плана</h3><ul>${(input.drift ?? []).map((d) => `<li>${htmlEsc(d.name)}: ${htmlEsc(d.note)}</li>`).join('')}</ul>`
+      : '';
   const advHtml = input.advisory?.advisory
     ? `<h3>Интенсивность (${input.advisory.source === 'diary-velocity' ? 'факт скорости дневника' : 'плановый RIR'})</h3><p>${htmlEsc(input.advisory.advisory)}</p>`
     : '';
@@ -646,7 +721,7 @@ export function buildPLComplianceHtml(input: PLComplianceExportInput): string {
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px">
 <tr style="background:#f4f4f5"><th>Неделя</th><th>План, сетов</th><th>Факт, сетов</th><th>%</th><th>Статус</th><th>Примечание</th></tr>
 ${weekRows}</table>
-${input.result.notes.length > 0 ? `<p style="color:#b45309">${input.result.notes.map(n => htmlEsc(n)).join('<br>')}</p>` : ''}
+${input.result.notes.length > 0 ? `<p style="color:#b45309">${input.result.notes.map((n) => htmlEsc(n)).join('<br>')}</p>` : ''}
 ${daysHtml}${driftHtml}${advHtml}
 </body></html>`;
 }
@@ -683,7 +758,7 @@ export function plVelocityLossFact(sessions: WorkoutLog[], opts?: { minSets?: nu
   for (const wl of sessions ?? []) {
     for (const ex of wl.exercises ?? []) {
       const name = (ex.exerciseName || '').trim();
-      const vels = (ex.sets ?? []).map(s => Number(s.velocity ?? 0)).filter(v => v > 0);
+      const vels = (ex.sets ?? []).map((s) => Number(s.velocity ?? 0)).filter((v) => v > 0);
       if (!name || vels.length < minSets) continue;
       const best = Math.max(...vels);
       const last = vels[vels.length - 1];
@@ -697,7 +772,8 @@ export function plVelocityLossFact(sessions: WorkoutLog[], opts?: { minSets?: nu
     }
   }
   const exercises: PLVelocityFactExercise[] = [];
-  let allLosses = 0, allCount = 0;
+  let allLosses = 0,
+    allCount = 0;
   for (const [name, agg] of byName) {
     const recent = agg.losses.slice(-5); // последние сессии упражнения
     const avg = Math.round((recent.reduce((a, b) => a + b, 0) / recent.length) * 10) / 10;

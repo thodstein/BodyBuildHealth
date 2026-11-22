@@ -15,25 +15,32 @@
  */
 import { buildLMSPlan, originalCycleWeeks, type LMSBuildInput, type LMSPlanWeek } from './lms-builder.engine';
 import { buildPLSeasonPeaks, type MacroTaperOpts, type PLSeasonMeet } from './lms-macro-taper.engine';
-import { candidateCyclesForSlot, fitCycleToWeeks, applyFitConsent, PL_MIN_CYCLE_WEEKS, type PLSeasonPeriod, type PLSeasonSlot } from './lms-season.engine';
+import {
+  candidateCyclesForSlot,
+  fitCycleToWeeks,
+  applyFitConsent,
+  PL_MIN_CYCLE_WEEKS,
+  type PLSeasonPeriod,
+  type PLSeasonSlot,
+} from './lms-season.engine';
 import type { LMSRankedCycle, LMSSelectorInput } from './lms-selector.engine';
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import type { PED } from '../bb/bb-ped-adaptation.engine';
 import { ruCount, RU_GAPS } from '../ru-plural';
 
 export interface GapSegment {
-  meetId: string;          // старт, К КОТОРОМУ ведёт сегмент
+  meetId: string; // старт, К КОТОРОМУ ведёт сегмент
   meetName: string;
   meetWeek: number;
-  startWeek: number;       // 1-индекс первой недели сегмента
-  endWeek: number;         // 1-индекс последней недели сегмента (вкл. meet+post)
-  availableWeeks: number;  // чистое тренировочное окно (без тапера/старта/поста)
+  startWeek: number; // 1-индекс первой недели сегмента
+  endWeek: number; // 1-индекс последней недели сегмента (вкл. meet+post)
+  availableWeeks: number; // чистое тренировочное окно (без тапера/старта/поста)
   cycleId: string;
   cycleTitle: string;
-  cycleWeeks: number;      // исходная длина выбранного цикла
+  cycleWeeks: number; // исходная длина выбранного цикла
   fitWeeks: number | null; // ужатая/растянутая длина (null = окно слишком мало или без согласия)
   fitMode: 'exact' | 'proposed_extend' | 'proposed_shrink' | 'strict_skip' | 'skip';
-  needsConsent: boolean;   // true → требует согласия
+  needsConsent: boolean; // true → требует согласия
   fittedCycle: SRCycleTemplate | null; // производный шаблон (сжатый/растянутый)
   taperWeeks: number;
   candidates: LMSRankedCycle[];
@@ -41,8 +48,8 @@ export interface GapSegment {
 }
 
 export interface GapSlotInput {
-  period?: PLSeasonPeriod;          // фаза между стартами (по умолчанию strength)
-  weeks?: number;                   // пользовательское число недель слота (по умолчанию = окно)
+  period?: PLSeasonPeriod; // фаза между стартами (по умолчанию strength)
+  weeks?: number; // пользовательское число недель слота (по умолчанию = окно)
   weeksMin?: number;
   weeksMax?: number;
 }
@@ -50,10 +57,10 @@ export interface GapSlotInput {
 export interface CompGapOptions {
   selector: LMSSelectorInput;
   mode?: 'auto' | 'manual';
-  selections?: Record<number, string>;   // manual: id цикла на индекс пролёта
-  consents?: Record<number, boolean>;    // согласие на изменение каждого пролёта
+  selections?: Record<string | number, string>; // manual: id цикла на ключ пролёта (meetId; числовой индекс — legacy)
+  consents?: Record<string | number, boolean>; // согласие на изменение пролёта (meetId; числовой индекс — legacy)
   cycleForGap?: (gapIndex: number) => SRCycleTemplate | undefined; // прямой выбор (без кандидатов)
-  slotForGap?: (gapIndex: number) => GapSlotInput;                 // переопределение фазы окна
+  slotForGap?: (gapIndex: number) => GapSlotInput; // переопределение фазы окна
   taper?: MacroTaperOpts;
   minCycleFloor?: number;
 }
@@ -61,7 +68,7 @@ export interface CompGapOptions {
 export interface CompGapBuildResult {
   segments: GapSegment[];
   totalPlanWeeks: number;
-  weeks: LMSPlanWeek[];   // финальные недели сезона (с пик-блоками buildPLSeasonPeaks)
+  weeks: LMSPlanWeek[]; // финальные недели сезона (с пик-блоками buildPLSeasonPeaks)
   notes: string[];
   /** Недели без тренировочного блока (позиции в календаре сохранены) — P2-6. */
   emptyWeeks?: number[];
@@ -115,10 +122,7 @@ function slotFromGap(
   return { period, weeks, weeksMin: min, weeksMax: max };
 }
 
-export function planBetweenCompetitions(
-  meets: PLSeasonMeet[],
-  opts: CompGapBuildOptions,
-): CompGapBuildResult {
+export function planBetweenCompetitions(meets: PLSeasonMeet[], opts: CompGapBuildOptions): CompGapBuildResult {
   const sorted = (meets ?? [])
     .filter((m) => m && Number.isFinite(m.weeksToStart) && m.weeksToStart >= 1)
     .slice()
@@ -129,6 +133,15 @@ export function planBetweenCompetitions(
   const floor = Math.max(1, Math.round(opts.minCycleFloor ?? 4));
   const notes: string[] = [];
   const segments: GapSegment[] = [];
+
+  // P1-4: ключ пролёта — meetId, а не позиция в отсортированном списке.
+  // Удалили/добавили старт или сдвинули окно → сохранённый выбор цикла и
+  // согласие на сжатие остаются у СВОЕГО соревнования. Числовой индекс
+  // поддерживаем как legacy-ключ (старые сохранения; UI мигрирует их при чтении).
+  const gapSelection = (meet: PLSeasonMeet, j: number): string | undefined =>
+    opts.selections?.[meet.id] ?? opts.selections?.[j];
+  const gapConsent = (meet: PLSeasonMeet, j: number): boolean =>
+    (opts.consents?.[meet.id] ?? opts.consents?.[j]) === true;
 
   if (sorted.length === 0) {
     return { segments: [], totalPlanWeeks: 0, weeks: [], notes: ['⚠ Нет соревнований — сезон не построен.'] };
@@ -156,7 +169,7 @@ export function planBetweenCompetitions(
       }
     }
     if (!chosen && opts.mode === 'manual') {
-      const sel = opts.selections?.[j];
+      const sel = gapSelection(meet, j);
       if (sel) {
         const found = candidates.find((r) => r.cycle.meta.id === sel);
         if (found) chosen = found;
@@ -168,17 +181,33 @@ export function planBetweenCompetitions(
     if (!chosen) chosen = candidates[0];
 
     if (!chosen) {
-      notes.push(`⚠ Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): нет подходящих циклов в базе — недели до старта останутся БЕЗ тренировочного блока (выберите цикл вручную или сдвиньте старт)`);
+      notes.push(
+        `⚠ Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): нет подходящих циклов в базе — недели до старта останутся БЕЗ тренировочного блока (выберите цикл вручную или сдвиньте старт)`,
+      );
       segments.push({
-        meetId: meet.id, meetName: meet.name, meetWeek: meet.weeksToStart,
-        startWeek, endWeek, availableWeeks: available,
-        cycleId: '', cycleTitle: 'Нет подходящего цикла', cycleWeeks: 0,
-        fitWeeks: null, fitMode: 'skip', needsConsent: false, fittedCycle: null, taperWeeks: taperW, candidates, notes,
+        meetId: meet.id,
+        meetName: meet.name,
+        meetWeek: meet.weeksToStart,
+        startWeek,
+        endWeek,
+        availableWeeks: available,
+        cycleId: '',
+        cycleTitle: 'Нет подходящего цикла',
+        cycleWeeks: 0,
+        fitWeeks: null,
+        fitMode: 'skip',
+        needsConsent: false,
+        fittedCycle: null,
+        taperWeeks: taperW,
+        candidates,
+        notes,
       });
       return;
     }
 
-    const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), { minCycleFloor: Math.min(PL_MIN_CYCLE_WEEKS, Math.max(1, available)) });
+    const rawFit = fitCycleToWeeks(chosen.cycle, Math.max(1, available), {
+      minCycleFloor: Math.min(PL_MIN_CYCLE_WEEKS, Math.max(1, available)),
+    });
     // Окна нет вовсе (до старта 0 недель). Раньше цикл здесь молча сжимался до
     // 1 недели — обход контракта «любое изменение раскладки только по согласию».
     // Теперь noWindow идёт ТЕМ ЖЕ согласованием, что и обычное сжатие.
@@ -189,9 +218,7 @@ export function planBetweenCompetitions(
     let fittedCycle: SRCycleTemplate | null = rawFit.cycle;
     let fitNotes: string[] = [...rawFit.notes];
     if (noWindow) {
-      const applied = rawFit.needsConsent
-        ? applyFitConsent(rawFit, opts.consents?.[j] === true)
-        : rawFit;
+      const applied = rawFit.needsConsent ? applyFitConsent(rawFit, gapConsent(meet, j)) : rawFit;
       if (applied.mode === 'strict_skip') {
         fitWeeks = null;
         fitMode = 'strict_skip';
@@ -205,11 +232,15 @@ export function planBetweenCompetitions(
         fitWeeks = 1;
         fitMode = 'skip';
         fittedCycle = applied.cycle;
-        fitNotes = ['окно между стартами слишком мало — стартовая неделя собрана из 1 недели цикла «' + chosen.cycle.meta.title + '» (прикиды сверху), время не простаивает'];
+        fitNotes = [
+          'окно между стартами слишком мало — стартовая неделя собрана из 1 недели цикла «' +
+            chosen.cycle.meta.title +
+            '» (прикиды сверху), время не простаивает',
+        ];
       }
     } else if (rawFit.needsConsent) {
       needsConsent = true;
-      const consent = opts.consents?.[j] === true;
+      const consent = gapConsent(meet, j);
       const applied = applyFitConsent(rawFit, consent);
       if (applied.mode === 'strict_skip') {
         fitWeeks = null;
@@ -239,13 +270,25 @@ export function planBetweenCompetitions(
       `Пролёт к «${meet.name}» (нед ${meet.weeksToStart}): окно ${available} нед, тапер ${taperW} нед${postW ? ' + пост' : ''}, цикл «${chosen.cycle.meta.title}» (${originalCycleWeeks(chosen.cycle)} нед)`,
       ...fitNotes,
     ];
-    if (!noWindow && available < floor && fitWeeks != null) segNotes.push(`окно меньше комфортного минимума (${floor} нед) — цикл ужат до ${fitWeeks} нед`);
+    if (!noWindow && available < floor && fitWeeks != null)
+      segNotes.push(`окно меньше комфортного минимума (${floor} нед) — цикл ужат до ${fitWeeks} нед`);
     segments.push({
-      meetId: meet.id, meetName: meet.name, meetWeek: meet.weeksToStart,
-      startWeek, endWeek, availableWeeks: available,
-      cycleId: chosen.cycle.meta.id, cycleTitle: chosen.cycle.meta.title,
-      cycleWeeks: originalCycleWeeks(chosen.cycle), fitWeeks, fitMode,
-      needsConsent, fittedCycle, taperWeeks: taperW, candidates, notes: segNotes,
+      meetId: meet.id,
+      meetName: meet.name,
+      meetWeek: meet.weeksToStart,
+      startWeek,
+      endWeek,
+      availableWeeks: available,
+      cycleId: chosen.cycle.meta.id,
+      cycleTitle: chosen.cycle.meta.title,
+      cycleWeeks: originalCycleWeeks(chosen.cycle),
+      fitWeeks,
+      fitMode,
+      needsConsent,
+      fittedCycle,
+      taperWeeks: taperW,
+      candidates,
+      notes: segNotes,
     });
   });
 
@@ -261,7 +304,12 @@ export function planBetweenCompetitions(
     return `к «${seg.meetName}» не подобран цикл (окно ${seg.availableWeeks} нед)`;
   };
   const placeholder = (week: number, reason: string): LMSPlanWeek => ({
-    week, pmRow: {}, days: [], macroPhase: 'endurance', emptyBlock: true, blockNote: reason,
+    week,
+    pmRow: {},
+    days: [],
+    macroPhase: 'endurance',
+    emptyBlock: true,
+    blockNote: reason,
   });
 
   // Предварительная сборка плана каждого пролёта ОДИН раз (детерминизм, без повторов).
@@ -274,10 +322,10 @@ export function planBetweenCompetitions(
       fallbackPm: opts.fallbackPm,
       mode: opts.progressionMode,
       courseIntensity: opts.courseIntensity,
-       weeksOverride: seg.fitWeeks,
-       requireSourceChangeConsent: true,
-       sourceChangeConsent: true,
-       progressionEnabled: true,
+      weeksOverride: seg.fitWeeks,
+      requireSourceChangeConsent: true,
+      sourceChangeConsent: true,
+      progressionEnabled: true,
       faithful: true,
       volumeGoal: opts.volumeGoal,
       focusLift: opts.focusLift,
@@ -316,7 +364,9 @@ export function planBetweenCompetitions(
       baseWeeks.push(placeholder(w, segReasonOf(seg)));
       continue;
     }
-    const fitCycleWeeks = segOutputs.get(segIdx >= 0 ? segIdx : segments.length - 1) ?? [placeholder(1, segReasonOf(seg))];
+    const fitCycleWeeks = segOutputs.get(segIdx >= 0 ? segIdx : segments.length - 1) ?? [
+      placeholder(1, segReasonOf(seg)),
+    ];
     const rel = (w - seg.startWeek) % fitCycleWeeks.length;
     const src = fitCycleWeeks[rel] ?? fitCycleWeeks[fitCycleWeeks.length - 1];
     baseWeeks.push({ ...src, week: w, macroPhase: 'endurance' });
@@ -331,15 +381,19 @@ export function planBetweenCompetitions(
   }
 
   // Итоговое предупреждение о требующих согласия сегментах
-  const blocked = segments.filter(s => s.fitMode === 'strict_skip' && s.needsConsent);
+  const blocked = segments.filter((s) => s.fitMode === 'strict_skip' && s.needsConsent);
   if (blocked.length > 0) {
-    notes.push(`⛔ ${ruCount(blocked.length, RU_GAPS)} требуют согласия на изменение раскладки — сборка заблокирована до решения`);
+    notes.push(
+      `⛔ ${ruCount(blocked.length, RU_GAPS)} требуют согласия на изменение раскладки — сборка заблокирована до решения`,
+    );
   }
 
   // P2-6: честный учёт недель без тренировочного блока (иначе «итого N нед» врёт).
-  const emptyWeeks = weeks.filter(w => w.emptyBlock || w.days.length === 0).map(w => w.week);
+  const emptyWeeks = weeks.filter((w) => w.emptyBlock || w.days.length === 0).map((w) => w.week);
   if (emptyWeeks.length > 0) {
-    notes.push(`⚠ Без тренировочного блока: нед ${formatWeekRanges(emptyWeeks)} — выберите цикл для пролёта или сдвиньте старт.`);
+    notes.push(
+      `⚠ Без тренировочного блока: нед ${formatWeekRanges(emptyWeeks)} — выберите цикл для пролёта или сдвиньте старт.`,
+    );
   }
 
   return {
@@ -359,9 +413,13 @@ function formatWeekRanges(weeks: number[]): string {
   let start = sorted[0];
   let prev = sorted[0];
   for (const w of sorted.slice(1)) {
-    if (w === prev + 1) { prev = w; continue; }
+    if (w === prev + 1) {
+      prev = w;
+      continue;
+    }
     parts.push(start === prev ? `${start}` : `${start}–${prev}`);
-    start = w; prev = w;
+    start = w;
+    prev = w;
   }
   if (start != null) parts.push(start === prev ? `${start}` : `${start}–${prev}`);
   return parts.join(', ');

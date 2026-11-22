@@ -9,15 +9,26 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PLSeasonBuilder } from '../PLSeasonBuilder';
 import type { LMSBuildOutput } from '../../../engines/lms/lms-builder.engine';
 
-const selector = { goal: 'strength', level: 'II-KMS', bodyWeight: 90, daysPerWeek: 4, direction: 'powerlifting', mode: 'natural' } as never;
+const selector = {
+  goal: 'strength',
+  level: 'II-KMS',
+  bodyWeight: 90,
+  daysPerWeek: 4,
+  direction: 'powerlifting',
+  mode: 'natural',
+} as never;
 
 const buildOpts = {
-  pmMap: { 'Присед': 180, 'Жим лежа': 120, 'Становая тяга': 220 },
+  pmMap: { Присед: 180, 'Жим лежа': 120, 'Становая тяга': 220 },
   fallbackPm: 80,
 } as never;
 
 beforeEach(() => {
-  try { localStorage.removeItem('he_pl_session'); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem('he_pl_session');
+  } catch {
+    /* ignore */
+  }
 });
 
 function props(overrides: Partial<Parameters<typeof PLSeasonBuilder>[0]> = {}) {
@@ -33,7 +44,11 @@ function props(overrides: Partial<Parameters<typeof PLSeasonBuilder>[0]> = {}) {
 }
 
 function seedSeasonMode(mode: 'single' | 'season') {
-  try { localStorage.setItem('he_pl_session', JSON.stringify({ season: { mode } })); } catch { /* ignore */ }
+  try {
+    localStorage.setItem('he_pl_session', JSON.stringify({ season: { mode } }));
+  } catch {
+    /* ignore */
+  }
 }
 
 describe('PLSeasonBuilder', () => {
@@ -72,10 +87,21 @@ describe('PLSeasonBuilder', () => {
     let built: LMSBuildOutput | null = null;
     let navigated = false;
     seedSeasonMode('season');
-    render(<PLSeasonBuilder {...props({ onBuilt: (o) => { built = o; }, onNavigatePlan: () => { navigated = true; } })} />);
+    render(
+      <PLSeasonBuilder
+        {...props({
+          onBuilt: (o) => {
+            built = o;
+          },
+          onNavigatePlan: () => {
+            navigated = true;
+          },
+        })}
+      />,
+    );
     // Даём согласие на все предложения изменения раскладки
     const consentBtns = screen.queryAllByText(/Согласен, применить/);
-    consentBtns.forEach(btn => fireEvent.click(btn));
+    consentBtns.forEach((btn) => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
     expect(Array.isArray(built!.weeks) && built!.weeks.length > 0).toBe(true);
@@ -86,7 +112,7 @@ describe('PLSeasonBuilder', () => {
     seedSeasonMode('single');
     render(<PLSeasonBuilder {...props()} />);
     fireEvent.click(screen.getByText('🧩 Сезон'));
-    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
+    screen.queryAllByText(/Согласен, применить/).forEach((btn) => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     const saved = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
     expect(saved.season && saved.season.mode).toBe('season');
@@ -96,19 +122,26 @@ describe('PLSeasonBuilder', () => {
     let built: LMSBuildOutput | null = null;
     let segments: import('../PLSeasonBuilder').SeasonBuildInfo[] = [];
     seedSeasonMode('season');
-    render(<PLSeasonBuilder {...props({
-      meets: [
-        { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
-        { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
-      ],
-      taper: { mode: 'classic' as const, mockMeet: true, postMeet: true, windowWeeks: 2 },
-      onBuilt: (o, _n, segs) => { built = o; segments = segs || []; },
-    })} />);
+    render(
+      <PLSeasonBuilder
+        {...props({
+          meets: [
+            { id: 'm1', name: 'Старт 1', weeksToStart: 8 },
+            { id: 'm2', name: 'Старт 2', weeksToStart: 20 },
+          ],
+          taper: { mode: 'classic' as const, mockMeet: true, postMeet: true, windowWeeks: 2 },
+          onBuilt: (o, _n, segs) => {
+            built = o;
+            segments = segs || [];
+          },
+        })}
+      />,
+    );
     expect(screen.queryByText(/Циклы между соревнованиями/)).not.toBeNull();
     expect(screen.queryByText(/Старт 1 \(нед 8\)/)).not.toBeNull();
     expect(screen.queryByText(/Старт 2 \(нед 20\)/)).not.toBeNull();
     // Даём согласие на все слоты и пролёты
-    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
+    screen.queryAllByText(/Согласен, применить/).forEach((btn) => fireEvent.click(btn));
     // Ручной выбор цикла на пролёт (второй «👆 Выбрать вручную» — карточка пролётов),
     // выбираем 12-нед цикл в 8-нед окно → бейдж «⬇ предлагается сжать» → после согласия «⬇ сжат по согласию».
     const manualBtns = screen.getAllByText('👆 Выбрать вручную');
@@ -116,7 +149,7 @@ describe('PLSeasonBuilder', () => {
     const gapSelect = screen.getByLabelText(/пролёта к «Старт 2»/);
     fireEvent.change(gapSelect, { target: { value: 'cycle-01' } });
     // После смены цикла появляется новое предложение — даём согласие снова
-    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
+    screen.queryAllByText(/Согласен, применить/).forEach((btn) => fireEvent.click(btn));
     expect(screen.getAllByText(/сжат по согласию|предлагается сжать/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
@@ -126,7 +159,9 @@ describe('PLSeasonBuilder', () => {
     expect(built!.cycleMetrics.tonnage).toBeGreaterThan(0);
     // Сводка сегментов сезона передана в родителя (для вкладки «План» и печати).
     expect(segments.length).toBeGreaterThanOrEqual(2);
-    expect(segments.some(s => (s.fitMode === 'proposed_shrink' || s.fitMode === 'shrink') && s.cycleWeeks > s.weeks)).toBe(true);
+    expect(
+      segments.some((s) => (s.fitMode === 'proposed_shrink' || s.fitMode === 'shrink') && s.cycleWeeks > s.weeks),
+    ).toBe(true);
   });
 
   it('SSR-рендер карточки не падает', () => {
@@ -146,25 +181,54 @@ describe('PLSeasonBuilder', () => {
   it('один старт в сезоне — пик/тапер применяется поверх (buildPLSeasonPeaks через assembleSeasonPlan) с согласием', () => {
     let built: LMSBuildOutput | null = null;
     seedSeasonMode('season');
-    render(<PLSeasonBuilder {...props({
-      meets: [{ id: 'm1', name: 'Старт', weeksToStart: 20 }],
-      taper: { mode: 'classic' as const, mockMeet: true, meetWeek: true, postMeet: true, windowWeeks: 2 },
-      onBuilt: (o) => { built = o; },
-    })} />);
-    screen.queryAllByText(/Согласен, применить/).forEach(btn => fireEvent.click(btn));
+    render(
+      <PLSeasonBuilder
+        {...props({
+          meets: [{ id: 'm1', name: 'Старт', weeksToStart: 20 }],
+          taper: { mode: 'classic' as const, mockMeet: true, meetWeek: true, postMeet: true, windowWeeks: 2 },
+          onBuilt: (o) => {
+            built = o;
+          },
+        })}
+      />,
+    );
+    screen.queryAllByText(/Согласен, применить/).forEach((btn) => fireEvent.click(btn));
     fireEvent.click(screen.getByText(/Собрать сезон/));
     expect(built).not.toBeNull();
-    expect(built!.weeks.some(w => w.meetWeek)).toBe(true);
+    expect(built!.weeks.some((w) => w.meetWeek)).toBe(true);
     expect(built!.weeks.length).toBeGreaterThan(20);
   });
 
   it('ручные выборы (pickMode/selections) восстанавливаются из сессии', () => {
-    localStorage.setItem('he_pl_session', JSON.stringify({
-      season: { mode: 'season', slots: undefined, pickMode: 'manual', selections: { 0: 'cycle-01' }, compPickMode: 'manual', compSelections: { 0: 'cycle-03' } },
-    }));
+    localStorage.setItem(
+      'he_pl_session',
+      JSON.stringify({
+        season: {
+          mode: 'season',
+          slots: undefined,
+          pickMode: 'manual',
+          selections: { 0: 'cycle-01' },
+          compPickMode: 'manual',
+          compSelections: { 0: 'cycle-03' },
+        },
+      }),
+    );
     render(<PLSeasonBuilder {...props()} />);
     expect(screen.getAllByText('👆 Выбрать вручную').length).toBeGreaterThan(0);
     const slotSelect = screen.getByLabelText(/Выбор цикла для периода «Выносливость»/);
     expect((slotSelect as HTMLSelectElement).value).toBe('cycle-01');
+  });
+
+  it('P2-4: правка «Недель в периоде» сразу пишется в he_pl_session (не теряется при F5)', () => {
+    seedSeasonMode('season');
+    render(<PLSeasonBuilder {...props()} />);
+    const inputs = screen.getAllByRole('spinbutton') as HTMLInputElement[];
+    expect(inputs.length).toBeGreaterThan(0);
+    // Первый слот — «Выносливость»: 12 нед, окно 6–20.
+    fireEvent.change(inputs[0], { target: { value: '7' } });
+    const shown = Number(inputs[0].value);
+    expect(shown).toBe(7);
+    const saved = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
+    expect(saved.season.slots[0].weeks).toBe(shown);
   });
 });

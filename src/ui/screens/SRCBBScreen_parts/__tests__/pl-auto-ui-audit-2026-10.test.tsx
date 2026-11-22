@@ -23,12 +23,16 @@ const screen = read('src/ui/screens/SRCBBScreen.tsx');
 describe('P1-A/P1-B: подписи и канон прикидов', () => {
   it('процент объёма тапера умножается ПОСЛЕ округления (не Math.round(ratio)*100)', () => {
     expect(view).not.toMatch(/Math\.round\([^)]*weekVolumeOf[^)]*\)\s*\*\s*100/);
-    expect(view).toMatch(/Math\.round\(\(weekVolumeOf\(w\) \/ Math\.max\(1, weekVolumeOf\(W\[W\.length - taperWeeksToAdd - 1\] \?\? W\[0\]\)\)\) \* 100\)/);
+    expect(view).toMatch(
+      /Math\.round\(\(weekVolumeOf\(w\) \/ Math\.max\(1, weekVolumeOf\(W\[W\.length - taperWeeksToAdd - 1\] \?\? W\[0\]\)\)\) \* 100\)/,
+    );
   });
 
-  it('карточка «Попытки на соревнования» считает через meetAttemptsFor (канон стратегии)', () => {
-    expect(view).toContain('meetAttemptsFor(value, attemptStrategy)');
-    expect(view).toContain('MEET_STRATEGY_PCT[attemptStrategy]');
+  it('карточка «Попытки на соревнования» читает прикиды ДВИЖКА (канон стратегии)', () => {
+    // P2-15: единственный источник — meetAttempts недели (attemptPmRow → движок),
+    // а не своя база pmRow × множитель. Fallback без прикидов недели — канон процентов.
+    expect(view).toContain('meetWk?.meetAttempts?.lifts.find');
+    expect(view).toContain('meetAttemptsFor(baseValue, attemptStrategy)');
     expect(view).not.toContain('competitionAttempts(value)');
   });
 });
@@ -39,19 +43,23 @@ describe('P1-C: ключи правки сетов = block-start (контрак
     expect(view).toContain('const blockStart = flatIdx;');
     expect(view).toContain('const k = setKey(wk.week, di, ei, setIdx);');
     // все строки блока делят один ключ: правка сета 2..N доезжает до плана
-    expect(view).toMatch(/allSets\.push\(\{ ws, blockIdx: bi, setIdx: blockStart, rowNum: allSets\.length \+ 1 \}\)/);
+    expect(view).toMatch(
+      /allSets\.push\(\{\s*ws,\s*blockIdx: bi,\s*setIdx: blockStart,\s*rowNum: allSets\.length \+ 1,?\s*\}\)/,
+    );
   });
 });
 
 describe('P1-D: добавленные упражнения не дублируются вне режима правки', () => {
   it('зелёные строки «＋ добавлено» рисуются только в editMode', () => {
-    expect(view).toContain('{editMode && (srcAdditions[dk] || []).map(a => (');
+    expect(view).toMatch(/\{editMode &&\s*\(srcAdditions\[dk\] \|\| \[\]\)\.map\(/);
   });
 });
 
 describe('P1-E: Frequency Planner «Применить в план» реально помечает группы слабыми', () => {
   it('SRCBBScreen мержит мышцы частоты в weakPoints (инъекция идёт по weakPoints)', () => {
-    expect(screen).toContain("setWeakPoints(prev => Array.from(new Set([...prev, ...plans.map(p=>p.muscle)])));");
+    expect(screen).toMatch(
+      /setWeakPoints\(\(prev\)\s*=>\s*Array\.from\(new Set\(\[\.\.\.prev, \.\.\.plans\.map\(\(p\)\s*=>\s*p\.muscle\)\]\)\),?\s*\)/,
+    );
     expect(screen).toContain('PL_TOOL_GROUP_RU');
     expect(screen).toContain('группы помечены слабыми, пересоберите план');
   });
@@ -102,7 +110,7 @@ describe('P2-D: карточка «План vs факт» питается дн�
     expect(view).toContain('plIntensityAdvisory(displaySrc, { sessions: historyWorkouts ?? [] })');
     expect(view).toContain('data-pl="fact-drift"');
     expect(view).toContain('data-pl="vl-advisory"');
-    expect(screen).toContain('historyWorkouts, currentWeek: srcWeek,');
+    expect(screen).toMatch(/historyWorkouts,\s*currentWeek: srcWeek,/);
   });
 });
 
