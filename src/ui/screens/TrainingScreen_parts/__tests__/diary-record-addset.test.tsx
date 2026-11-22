@@ -62,6 +62,23 @@ describe('DiaryRecordingForm — «+» на конкретном упражне�
     );
   });
 
+  it('RPE/восстановление/сплит/самочувствие спрятаны в «Детали», заметки на виду', () => {
+    const { container } = renderForm();
+    const details = container.querySelector('[data-pl="record-details"]') as HTMLElement | null;
+    expect(details).not.toBeNull();
+    expect(details!.style.display).toBe('none');
+    // Дата и длительность остаются на виду
+    expect(details!.textContent).not.toContain('Длительность');
+    // Заметки — вне свёрнутого блока: их не надо искать за аккордеоном
+    const notes = Array.from(container.querySelectorAll('label')).find(
+      (l) => (l.textContent || '').trim() === 'Заметки',
+    );
+    expect(notes).toBeTruthy();
+    expect(details!.contains(notes!)).toBe(false);
+    fireEvent.click(container.querySelector('[data-act="record-details"]') as HTMLElement);
+    expect(details!.style.display).toBe('block');
+  });
+
   it('чек-ины практик свёрнуты и раскрываются одной кнопкой', () => {
     const { container } = renderForm();
     const body = () => container.querySelector('[data-pl="record-checkins"]') as HTMLElement | null;

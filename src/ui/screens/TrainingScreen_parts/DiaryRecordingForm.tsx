@@ -79,6 +79,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
   const [restTarget, setRestTarget] = useState(90);
   const [mmcOpen, setMmcOpen] = useState<Record<string, boolean>>({});
   const [checkinsOpen, setCheckinsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Undo history
@@ -410,20 +411,22 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         </div>
       </div>
 
-      {/* Session fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+      {/* Session fields: на виду только дата и длительность — остальное в «Детали» */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
         <div><label style={{ fontSize: 10, color: '#fff' }}>Дата</label><input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={style.input} /></div>
         <div><label style={{ fontSize: 10, color: '#fff' }}>Длительность (мин)</label><input type="number" min={1} value={logDuration} onChange={e => setLogDuration(parseInt(e.target.value) || 0)} style={style.input} /></div>
-        {!isMobile && <div><label style={{ fontSize: 10, color: '#fff' }}>RPE (1-10)</label><input type="number" min={1} max={10} value={logRPE} onChange={e => setLogRPE(parseInt(e.target.value) || 5)} style={style.input} /></div>}
       </div>
-      {isMobile && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div><label style={{ fontSize: 10, color: '#fff' }}>RPE (1-10)</label><input type="number" min={1} max={10} value={logRPE} onChange={e => setLogRPE(parseInt(e.target.value) || 5)} style={style.input} /></div>
-          <div><label style={{ fontSize: 10, color: '#fff' }}>Восстановление</label><input type="number" min={1} max={10} value={logRecovery} onChange={e => setLogRecovery(parseInt(e.target.value) || 5)} style={style.input} /></div>
-        </div>
-      )}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-        {!isMobile && <div><label style={{ fontSize: 10, color: '#fff' }}>Восстановление (1-10)</label><input type="number" min={1} max={10} value={logRecovery} onChange={e => setLogRecovery(parseInt(e.target.value) || 5)} style={style.input} /></div>}
+      <button type="button" data-act="record-details" onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', minHeight: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginBottom: 6 }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⚙️ Детали: RPE {logRPE} · восст. {logRecovery} · {SP_LABELS[logSplit] || logSplit}</span>
+        <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{detailsOpen ? '▲' : '▼'}</span>
+      </button>
+      <div data-pl="record-details" style={{ display: detailsOpen ? 'block' : 'none' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+        <div><label style={{ fontSize: 10, color: '#fff' }}>RPE (1-10)</label><input type="number" min={1} max={10} value={logRPE} onChange={e => setLogRPE(parseInt(e.target.value) || 5)} style={style.input} /></div>
+        <div><label style={{ fontSize: 10, color: '#fff' }}>Восстановление (1-10)</label><input type="number" min={1} max={10} value={logRecovery} onChange={e => setLogRecovery(parseInt(e.target.value) || 5)} style={style.input} /></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
         <div><label style={{ fontSize: 10, color: '#fff' }}>Сплит</label>
           <select value={logSplit} onChange={e => setLogSplit(e.target.value)} style={style.input}>
             {Object.entries(SP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -435,6 +438,8 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           </select>
         </div>
       </div>
+      </div>
+
       <div style={{ marginBottom: 8 }}>
         <label style={{ fontSize: 10, color: '#fff' }}>Заметки</label>
         <input type="text" value={logNotes} onChange={e => setLogNotes(e.target.value)} placeholder="Самочувствие, особенности, инвентарь..." style={style.input} />
