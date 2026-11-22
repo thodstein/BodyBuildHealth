@@ -460,11 +460,23 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
      поэтому экран тренировок тоже слушает: кнопка старта работает из любого места. */
   useEffect(() => {
     const onOpen = () => {
-      setZone('training'); setPage('tabs'); setTab('runtime'); setRuntimeStarted(true);
+      setZone('training'); setPage('tabs'); setTab('runtime');
+      // ExecutionZone в этот момент ещё не смонтирован (мы только переключаем
+      // зону), поэтому его собственный слушатель событие уже не увидит.
+      // Открываем проведение здесь: если есть план ПЛ/ББ — его карточку,
+      // иначе выбор дня. Раньше виджет приводил на свёрнутую карточку.
+      let hasPl = false;
+      try {
+        const raw = localStorage.getItem('he_pl_runtime');
+        const parsed = raw ? JSON.parse(raw) : null;
+        hasPl = !!parsed && Array.isArray(parsed.days) && parsed.days.length > 0;
+      } catch { hasPl = false; }
+      if (hasPl) setPlRunOpen(true);
+      else setRuntimeStarted(true);
     };
     window.addEventListener('he-workout-open', onOpen);
     // Плеер завершил сессию («Готово» в «Итоге») — возвращаемся к списку зоны.
-    const onClose = () => setRuntimeStarted(false);
+    const onClose = () => { setRuntimeStarted(false); setPlRunOpen(false); };
     window.addEventListener('he-workout-close', onClose);
     return () => {
       window.removeEventListener('he-workout-open', onOpen);
