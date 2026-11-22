@@ -24,7 +24,7 @@ import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { readLabValue } from '../../core/constants';
-import { ckdEpi2021 } from '../lab-norms.engine';
+import { egfrFromCreatinine } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
@@ -1159,6 +1159,9 @@ function extractLabValues(
   if (num(b.Bilirubin) !== undefined) v['BIL'] = num(b.Bilirubin)!;
   if (num(b.Glucose) !== undefined) v['GLU'] = num(b.Glucose)!;
   if (num(b.Creatinine) !== undefined) v['CREATININE'] = num(b.Creatinine)!;
+  // Проход 203: СКФ вводится полем бланка (`eGFR` → код склада `EGFR`). Раньше
+  // поля не было вовсе, и триггер «Фильтрация» читал пустой ключ.
+  if (num(b.eGFR) !== undefined) v['EGFR'] = num(b.eGFR)!;
   if (num(b.CRP) !== undefined) v['CRP'] = num(b.CRP)!;
   if (num(b.Homocysteine) !== undefined) v['HOMOCYSTEINE'] = num(b.Homocysteine)!;
   // Insulin (may be in panelBiochem or panelSex depending on lab)
@@ -1313,11 +1316,13 @@ function extractLabValues(
   // (~на 10-15%), и ренальный риск занижался.
   // Проход 133: сама формула одна на приложение (`lab-norms.engine`, `ckdEpi2021`):
   // вторая копия в `clinical-indices` считала по смешанным коэффициентам 2009/2021.
-  if (v['CREATININE'] !== undefined) {
-    // Возраст: при отсутствии — 40 лет (нейтральная точка CKD-EPI).
-    const years = Number.isFinite(age) && (age as number) > 0 ? (age as number) : 40;
-    const egfr = Math.round(ckdEpi2021(v['CREATININE'], years, sex));
-    v['EGFR'] = Math.min(150, Math.max(5, egfr));
+  // Проход 203: расчёт не перекрывает явную СКФ из бланка — лаборатория могла
+  // посчитать её другим методом (цистатин C, Кокрофт), и её число главнее.
+  // Само правило «креатинин → СКФ» тоже одно на приложение
+  // (`lab-norms.engine`, `egfrFromCreatinine`): тот же вывод нужен плану поддержки.
+  if (v['EGFR'] === undefined) {
+    const egfr = egfrFromCreatinine(v['CREATININE'], age, sex);
+    if (egfr !== undefined) v['EGFR'] = egfr;
   }
 
   return v;

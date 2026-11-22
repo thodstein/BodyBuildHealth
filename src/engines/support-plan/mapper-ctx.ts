@@ -11,6 +11,7 @@ import { readLabValue } from '../../core/constants';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber } from './lab-field-number';
 import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
+import { egfrFromCreatinine } from '../lab-norms.engine';
 import type { SupportLevel } from '../tz-bridge-mechanism';
 import type { MapperCtx } from '../tz-mapper-engine';
 import type { PhaseContext, PhaseKey } from '../tz-bridge-phase';
@@ -79,6 +80,15 @@ export function buildMapperCtx(
   // Проход 136: бланк выбирается тем же правилом, что в риск-модели и баннерах
   // формы (`currentLabSlice`): полный → середина курса → до курса.
   const labs = labSliceToValues(currentLabSlice(state.labs), sex);
+  // Проход 203: СКФ плану поддержки. Креатинин есть, СКФ в бланке нет — считаем
+  // тем же правилом, что риск-модель (`egfrFromCreatinine`): иначе у человека с
+  // креатинином в бланке ренальный риск считается, а триггеры и ступени почки
+  // видят пустую карту. Явная СКФ из бланка главнее расчёта. Нет креатинина —
+  // ключа нет («нет записи» не значит «СКФ в норме»); в интерфейсе поле не подменяется.
+  if (labs['EGFR'] === undefined) {
+    const derivedEgfr = egfrFromCreatinine(labs['CREATININE'], state.profile?.age, sex);
+    if (derivedEgfr !== undefined) labs['EGFR'] = derivedEgfr;
+  }
   const pedDoses = (Array.isArray(state.pharma?.aas) ? state.pharma.aas : [])
     .filter((a: any) => a && a.id)
     .map((a: any) => ({

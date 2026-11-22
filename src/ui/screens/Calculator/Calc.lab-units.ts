@@ -20,6 +20,10 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'Neutrophils': 'NEUT', 'Lymphocytes': 'LYMPH',
   // ── биохимия ──
   'Creatinine': 'CREATININE', 'Urea': 'UREA', 'Uric acid': 'UA',
+  // Проход 203: цистатин C — мг/л. Без моста запись бланка в нмоль/л легла бы в
+  // поле как «75 мг/л» (в 75 раз выше нормы); с мостом общий конвертер такую
+  // величину не пересчитает и назовёт отказ.
+  'Cystatin C': 'CYSTATIN_C',
   'Bilirubin': 'BIL', 'Glucose': 'GLU',
   'CRP': 'CRP', 'IL-6': 'IL6',
   // ── липиды ──

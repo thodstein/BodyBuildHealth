@@ -50,6 +50,23 @@ describe('системные триггеры: пороги по полу', () =
     expect(trigger('renal', 'filtration', { CREATININE: 115 }, 'male')).toBe(true);
   });
 
+  it('фильтрация: СКФ читается каноном `EGFR` и порогом лестницы (90)', () => {
+    // Проход 203: триггер читал `l.eGFR` — ключ, которого не бывает (мост имён
+    // даёт `EGFR`), и сравнивал с литералом 90. Ветка была мертва.
+    expect(trigger('renal', 'filtration', { EGFR: 75 }, 'male')).toBe(true);
+    expect(trigger('renal', 'filtration', { EGFR: 89 }, 'female')).toBe(true);
+    expect(trigger('renal', 'filtration', { EGFR: 95 }, 'male')).toBe(false);
+    // Старое написание ничего не включает: это не наш канон.
+    expect(trigger('renal', 'filtration', { eGFR: 50 }, 'male')).toBe(false);
+    // Отсутствие СКФ не «норма», но и не повод включать фильтрацию.
+    expect(trigger('renal', 'filtration', {}, 'male')).toBe(false);
+  });
+
+  it('фильтрация: цистатин C — порог из лестницы ступеней (1.0 мг/л)', () => {
+    expect(trigger('renal', 'filtration', { CYSTATIN_C: 1.4 }, 'male')).toBe(true);
+    expect(trigger('renal', 'filtration', { CYSTATIN_C: 0.8 }, 'male')).toBe(false);
+  });
+
   it('E2>40 — мужской AI-триггер, у женщины не срабатывает', () => {
     expect(trigger('endocrine', 'e2', { E2: 60 }, 'male')).toBe(true);
     expect(trigger('endocrine', 'e2', { E2: 60 }, 'female')).toBe(false);

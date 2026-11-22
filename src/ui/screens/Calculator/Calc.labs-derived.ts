@@ -144,6 +144,10 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   // ── биохимия ──
   'GLU': 'Glucose', 'GLUCOSE': 'Glucose',
   'CREAT': 'Creatinine', 'CREA': 'Creatinine', 'CREATININE': 'Creatinine',
+  // Проход 203: маркеры фильтрации. `EGFR` находит поле по имени, а у цистатина C
+  // имя бланка с пробелом («Cystatin C»), и код `CYSTATIN_C` без этой строки
+  // пропускался бы мимо готового поля.
+  'CYSTATIN_C': 'Cystatin C',
   // Проход 134: инсулин — поле «Биохимии»; без него HOMA-IR не считался.
   'INS': 'Insulin', 'INSULIN': 'Insulin',
   'BUN': 'Urea', 'UREA': 'Urea',

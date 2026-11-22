@@ -323,3 +323,34 @@ describe('проход 197: абсолютные ретикулоциты — т
     ]);
   });
 });
+
+/**
+ * Проход 203: СКФ и цистатин C — записи каталога находят свои поля бланка.
+ *
+ * Поля появились именно затем, чтобы маркеры фильтрации можно было ввести: без
+ * них импорт молча пропускал `EGFR`/`CYSTATIN_C`, а триггер «Фильтрация» читал
+ * пустые ключи.
+ */
+describe('проход 203: маркеры фильтрации из каталога', () => {
+  it('`EGFR` и `CYSTATIN_C` находят поля «eGFR» и «Cystatin C»', () => {
+    expect(sliceMarkerFor('EGFR')).toBe('eGFR');
+    expect(sliceMarkerFor('eGFR')).toBe('eGFR');
+    expect(sliceMarkerFor('CYSTATIN_C')).toBe('Cystatin C');
+  });
+
+  it('значение ложится в поле; единица другой величины не выдаётся за мг/л', () => {
+    const s = point('EGFR', 58)!;
+    expect(s.panelBiochem!.eGFR).toBe('58');
+    const c = labPointsToSlice([{ code: 'CYSTATIN_C', value: 1.4, unit: 'мг/л', date: '2026-11-01' }])!;
+    expect(c.panelBiochem!['Cystatin C']).toBe('1.4');
+    // Цистатин C в нмоль/л: молярной массы в каталоге нет, значит пересчёта нет,
+    // а число в чужой величине не подписывается мг/л — запись названа отказом.
+    const notes: LabImportNote[] = [];
+    labPointsToSlice([
+      { code: 'CYSTATIN_C', value: 75, unit: 'нмоль/л', date: '2026-11-01' },
+      { code: 'EGFR', value: 58, date: '2026-11-01' },
+    ], notes);
+    expect(notes.map((n) => n.reason)).toEqual(['unit']);
+    expect(notes[0].label).toBe('Цистатин C');
+  });
+});

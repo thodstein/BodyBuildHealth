@@ -755,3 +755,33 @@ export function ckdEpi2021(
   const base = 142 * Math.pow(Math.min(ratio, 1), alpha) * Math.pow(Math.max(ratio, 1), -1.2);
   return base * Math.pow(0.9938, ageYears) * (female ? 1.012 : 1);
 }
+
+/**
+ * СКФ из креатинина — единственное место правила «креатинин → eGFR».
+ *
+ * Проход 203: правило жило в риск-модели (`extractLabValues`), а план поддержки
+ * (`buildMapperCtx`) СКФ не выводил вовсе: человек с креатинином в бланке видел
+ * ренальный риск, но триггер «Фильтрация» и ступени почки — пустыми. Теперь
+ * оба контура зовут эту функцию.
+ *
+ * Что здесь зафиксировано и не должно разъезжаться:
+ *  - возраст по умолчанию 40 лет — нейтральная точка CKD-EPI (так было в
+ *    риск-модели); при наличии возраста профиля он главнее;
+ *  - пол без значения идёт мужским путём, как во всей модели;
+ *  - результат округляется и держится в 5..150 мл/мин — за этими границами
+ *    формула даёт числа, которых не бывает в бланке.
+ *
+ * `undefined` — креатинина нет или он непригоден. Это НЕ «СКФ в норме»: ключа
+ * в карте не появляется, и «нет записи» остаётся отсутствием анализа.
+ */
+export function egfrFromCreatinine(
+  creatinineUmolL: number | undefined | null,
+  ageYears?: number | null,
+  sex?: 'male' | 'female' | null,
+): number | undefined {
+  if (creatinineUmolL == null || !Number.isFinite(creatinineUmolL) || creatinineUmolL <= 0) return undefined;
+  const years = Number.isFinite(ageYears) && (ageYears as number) > 0 ? (ageYears as number) : 40;
+  const egfr = ckdEpi2021(creatinineUmolL, years, sex);
+  if (!Number.isFinite(egfr)) return undefined;
+  return Math.min(150, Math.max(5, Math.round(egfr)));
+}

@@ -8,6 +8,7 @@ import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../e
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
+import { getLabEntry } from '../../../data/lab-tier-ranges';
 import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
 import { detectActivePedClasses } from '../../../data/ped-class-matrix';
 import type { LabSlice } from '../../../engines/support-plan';
@@ -143,6 +144,14 @@ const normUln = (code: string, state?: { profile?: { sex?: 'male' | 'female' } }
 /** Ранний порог гемореологии = «коррекция» доменной карты (♂ 48, ♀ 44). */
 const hctCorrection = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
   hctSymptomCuts(state?.profile?.sex).correction;
+/**
+ * Границы нормы маркера — из лестницы ступеней (`LAB_TIERS`), а не литералами.
+ * Проход 203: триггер «Фильтрация» сравнивал СКФ с 90, которого не было ни у
+ * одного маркера в резолвере, а цистатин C — с 1; теперь оба числа читаются из
+ * той же таблицы, что и ступени/советы.
+ */
+const labNormalLow = (code: string, fallback = 0): number => getLabEntry(code)?.normal?.[0] ?? fallback;
+const labNormalHigh = (code: string, fallback = 0): number => getLabEntry(code)?.normal?.[1] ?? fallback;
 export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   cardio: [
     { id:'bp', label:'АД/объём', icon:'🩺', markers:['BP_SYSTOLIC','BP_DIASTOLIC'], ids:['hydration','cardio_aerobic','electrolyte_balance','telmisartan'], trigger:(l)=> (l.BP_SYSTOLIC ?? 0)>130 || (l.BP_DIASTOLIC ?? 0)>85 },
@@ -156,7 +165,12 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
     { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
   ],
   renal: [
-    { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','eGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.eGFR??200)<90||(l.CYSTATIN_C??0)>1 },
+    // Проход 203: СКФ и цистатин C приходят кодами склада (`EGFR`, `CYSTATIN_C`):
+    // прежний `l.eGFR` не мог существовать (мост имён даёт `EGFR`), а поля
+    // цистатина C в бланке не было — обе ветки были мертвы. Пороги — из лестницы
+    // ступеней. Отсутствие записи фильтрацию не включает: без числа «норма» не
+    // угадывается (`?? 0` дал бы ложное срабатывание).
+    { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','EGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.EGFR!==undefined&&l.EGFR<labNormalLow('EGFR',90))||(l.CYSTATIN_C??0)>labNormalHigh('CYSTATIN_C',1) },
     { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>.15 },
     { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<3.5||(l.K??4)>5||(l.MG??1)<.75 },
   ],
@@ -197,7 +211,7 @@ const makePresets = (core: string[], lv2: string[], lv3: string[]) => [
 const rawGenericConfigs: Record<string, Omit<GenericEnhancementConfig, 'presets'>> = {
   cardio: { label:'ССС', icon:'❤️', color:'#ef4444', markers:['BP_SYSTOLIC','BP_DIASTOLIC','HR','LDL','HDL','TRIGLYCERIDES','APO_B','APOB','NT_PROBNP'], domains:['АД/объём','Липиды','Эндотелий/тромбоз','Ремоделирование','Ритм'], core:['hydration','cardio_aerobic','electrolyte_balance','omega3','coq10','magnesium','taurine'], lv2:['telmisartan','tadalafil','nebivolol','citrulline','pycnogenol','bergamot'], lv3:['atorvastatin','rosuvastatin'], notes:'Кардио-кандидаты выбираются по АД, ЧСС, липидам и фармакологии курса.' },
   hepatic: { label:'Печень', icon:'🫁', color:'#f59e0b', markers:['ALT','AST','GGT','ALP','BILIRUBIN'], domains:['Цитолиз','Холестаз','Желчеотток','Оксидативный стресс','Фиброзный риск'], core:['nac','milk_thistle','glycine','selenium'], lv2:['tudca','alpha_lipoic','phosphatidylcholine'], lv3:['udca','heptral'], notes:'Для оральных 17α-алкилов приоритет печени повышается независимо от наличия текущих анализов.' },
-  renal: { label:'Почки', icon:'🫘', color:'#60a5fa', markers:['CREATININE','eGFR','CYSTATIN_C','UACR','UREA','K','NA','MG'], domains:['Гемодинамика','Гиперфильтрация','Протеинурия','Тубулярный стресс','Электролиты'], core:['hydration','electrolyte_balance','nac','astragalus','cordyceps','taurine'], lv2:['omega3','coq10','magnesium','telmisartan'], lv3:['potassium','celery_extract'], notes:'Калий и усиление ARB требуют K⁺/eGFR; при отсутствии анализа показывается warning, но базовая поддержка не исчезает.' },
+  renal: { label:'Почки', icon:'🫘', color:'#60a5fa', markers:['CREATININE','EGFR','CYSTATIN_C','UACR','UREA','K','NA','MG'], domains:['Гемодинамика','Гиперфильтрация','Протеинурия','Тубулярный стресс','Электролиты'], core:['hydration','electrolyte_balance','nac','astragalus','cordyceps','taurine'], lv2:['omega3','coq10','magnesium','telmisartan'], lv3:['potassium','celery_extract'], notes:'Калий и усиление ARB требуют K⁺/eGFR; при отсутствии анализа показывается warning, но базовая поддержка не исчезает.' },
   endocrine: { label:'Эндокринная', icon:'🧪', color:'#ec4899', markers:['E2','PRL','TT','FT','LH','FSH','SHBG','CORTISOL','TSH'], domains:['Ароматизация/E2','PRL','HPTA','Кортизол','Щитовидная ось'], core:['hcg','magnesium','vitamin_d3','zinc','agmatine'], lv2:['anastrozole','ashwagandha','phosphatidylserine','magnesium_l_threonate'], lv3:['cabergoline','tamoxifen','enclomiphene'], notes:'Анастрозол — контроль E2; каберголин — только подтверждённый PRL и назначение врача.' },
   reproductive: { label:'Репродуктивная', icon:'🧬', color:'#f472b6', markers:['TT','FT','LH','FSH','E2','PRL','SHBG'], domains:['LH/FSH','Интратестикулярный T','Сперматогенез','E2','ПКТ'], core:['hcg','zinc','magnesium','vitamin_d3','omega3'], lv2:['coq10','nac','ashwagandha','boron'], lv3:['tamoxifen','clomiphene','enclomiphene'], notes:'Состав зависит от course/bridge/pct/fertility; SERM и hCG не смешиваются без фазовой логики.' },
   musculoskeletal: { label:'ОДА', icon:'🦴', color:'#4ade80', markers:['CRP','CK','CALCIUM','VITD','MG'], domains:['Хрящ','Сухожилия/связки','Кость','Воспаление','Травма'], core:['collagen','vitamin_c','magnesium','omega3'], lv2:['glucosamine','chondroitin','msm','curcumin','boswellia','vitamin_d3'], lv3:['bpc157','tb500','ghk_cu'], notes:'LV3 и пептиды — только отдельный врачебный/исследовательский статус; не обычная база.' },
