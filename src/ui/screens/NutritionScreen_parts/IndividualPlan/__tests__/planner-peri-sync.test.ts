@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
 import {
   itemSodiumMg,
@@ -313,5 +315,22 @@ describe('соль по приёмам в готовом рационе', () => 
     const total = p.meals.reduce((s: number, m: any) => s + (m.totals?.na || 0), 0);
     expect(total).toBeGreaterThan(0);
     expect(sodiumToSaltG(total)).toBeGreaterThan(0);
+  });
+
+  it('каждый приём даёт конечное число натрия (0 — «нет данных», а не пропуск)', () => {
+    const p = buildDayPlan(base({ randomSalt: 16 }));
+    expect(p.meals.length).toBeGreaterThan(0);
+    for (const m of p.meals) {
+      const na = mealSodiumMg(m as any);
+      expect(Number.isFinite(na)).toBe(true);
+      expect(na).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('плашка соли в разметке рисуется всегда (нулевой приём — «нет данных о соли»)', () => {
+    const src = readFileSync(join(__dirname, '..', 'MealListRender.tsx'), 'utf8');
+    expect(src).toContain('нет данных о соли');
+    // ранний `return null` при нулевом натрии запрещён — иначе обещание «в каждом приёме» ложно
+    expect(src).not.toMatch(/if \(!_na > 0\) return null/);
   });
 });

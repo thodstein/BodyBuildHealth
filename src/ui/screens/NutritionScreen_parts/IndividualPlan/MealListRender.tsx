@@ -1920,17 +1920,25 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   })}
                 </div>
                 {/* 🧂 Соль приёма: единый читатель микро (item.na → FOOD_DB-фолбэк).
-                    Показываем ОБА числа — граммы соли крупно и мг натрия, как просил владелец. */}
+                    Показываем ОБА числа — граммы соли крупно и мг натрия, как просил владелец.
+                    Приём без данных о натрии не прячем: честная плашка «нет данных» лучше
+                    пустого места (обещали «в каждом приёме»). */}
                 {(() => {
                   const _na = mealSodiumMg(m as any);
-                  if (!(_na > 0)) return null;
                   const _salt = sodiumToSaltG(_na);
                   const _pct = (_na / SODIUM_RDA_MG) * 100;
-                  const _tone = sodiumTone(_pct);
+                  const _has = _na > 0;
+                  const _tone = _has
+                    ? sodiumTone(_pct)
+                    : { color: 'rgba(255,255,255,0.45)', bg: 'rgba(255,255,255,0.04)' };
                   return (
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                       <span
-                        title={`${sodiumLabel(_na)} · ${Math.round(_pct)}% от 2300 мг Na/сут`}
+                        title={
+                          _has
+                            ? `${sodiumLabel(_na)} · ${Math.round(_pct)}% от 2300 мг Na/сут`
+                            : 'В продуктах приёма нет данных о натрии — соль не оценена'
+                        }
                         style={{
                           fontSize: 10,
                           fontWeight: 800,
@@ -1942,8 +1950,15 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        🧂 {_salt.toFixed(2)} г соли{' '}
-                        <span style={{ opacity: 0.72, fontWeight: 600 }}>· Na {Math.round(_na)} мг</span>
+                        🧂{' '}
+                        {_has ? (
+                          <>
+                            {_salt.toFixed(2)} г соли{' '}
+                            <span style={{ opacity: 0.72, fontWeight: 600 }}>· Na {Math.round(_na)} мг</span>
+                          </>
+                        ) : (
+                          <span style={{ fontWeight: 600 }}>нет данных о соли</span>
+                        )}
                       </span>
                     </div>
                   );
