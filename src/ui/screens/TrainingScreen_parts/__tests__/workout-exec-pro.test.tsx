@@ -722,6 +722,8 @@ describe('SessionPlayer: кнопки доводят от разминки до 
       const strip = container.querySelector('[data-session="rest-strip"]') as HTMLElement;
       expect(strip).toBeTruthy();
       expect(strip.textContent).toContain('Отдых');
+      // Счётчик закреплён сверху: пока листаешь следующие упражнения, он на экране.
+      expect(strip.style.position).toBe('sticky');
       fireEvent.click(container.querySelector('[data-act="rest-strip-skip"]') as HTMLElement);
       expect(container.querySelector('[data-session="rest-strip"]')).toBeNull();
       unmount();

@@ -1798,7 +1798,7 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
             {/* Таймер отдыха уехал вместе с прошлым упражнением (мы прокрутили экран
                 к следующему) — держим счётчик видимым строкой сверху. */}
             {timerRunning && timerExIdx >= 0 && timerExIdx !== currentExIdx && (
-              <div data-session="rest-strip" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: `1px solid ${timerSec <= 10 ? 'rgba(245,158,11,0.35)' : 'rgba(0,230,138,0.18)'}` }}>
+              <div data-session="rest-strip" style={{ position: 'sticky', top: 0, zIndex: 22, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(14,18,20,0.98), rgba(14,18,20,0.94))', backdropFilter: 'blur(8px)', border: `1px solid ${timerSec <= 10 ? 'rgba(245,158,11,0.45)' : 'rgba(0,230,138,0.28)'}`, boxShadow: '0 6px 14px rgba(0,0,0,0.35)' }}>
                 <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>⏱ Отдых</span>
                 <b style={{ fontSize: 15, fontWeight: 800, color: timerSec <= 10 ? '#f59e0b' : ACCENT, fontVariantNumeric: 'tabular-nums', flex: 1 }}>{String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}</b>
                 <button type="button" data-act="rest-strip-skip" onClick={skipRestTimer}
