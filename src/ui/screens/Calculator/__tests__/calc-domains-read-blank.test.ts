@@ -21,7 +21,7 @@ import { resolve } from 'node:path';
 import { DEFAULT_STATE } from '../Calc.types';
 import { FULL_PANELS } from '../Calc.lab';
 import { SPECIALIZED_DOMAINS } from '../Calc.mapper';
-import { labSliceToValues } from '../../../../engines/support-plan/mapper-ctx';
+import { labSliceToValues, labValuesForEngine } from '../../../../engines/support-plan/mapper-ctx';
 import { tierLabView } from '../../../../data/lab-tier-ranges';
 import type { CalculatorState } from '../../../../engines/support-plan/types';
 
@@ -106,11 +106,40 @@ describe('проход 205: ЩФ — поле бланка, а не мёртва
   });
 });
 
+describe('проход 206: производные доходят до доменов', () => {
+  const engineLabs = (panel: string, markers: Record<string, string>, sex: 'male' | 'female' = 'male') =>
+    labValuesForEngine(slice(panel, markers), sex, 30);
+
+  it('глюкоза + инсулин включают «Глюкозу/IR» через HOMA-IR', () => {
+    // 5.4 × 20 / 22.5 = 4.8 — выше верхней нормы HOMA-IR 2.5.
+    expect(on('metabolic', 'glucose', engineLabs('panelBiochem', { Glucose: '5.4', Insulin: '20' }))).toBe(true);
+    // Без инсулина HOMA-IR нет: сама глюкоза 5.4 в норме, находки быть не должно.
+    expect(on('metabolic', 'glucose', engineLabs('panelBiochem', { Glucose: '5.4' }))).toBe(false);
+  });
+
+  it('ферритин судится по порогу своего пола', () => {
+    // `SCREEN_TARGETS.FERRITIN`: ♀ 150, ♂ 300. Литерал 300 был мужским порогом,
+    // поэтому женский ферритин 200 не включал «Оксидативный стресс».
+    const labs = engineLabs('panelIron', { Ferritin: '200' });
+    expect(on('hepatic', 'oxidative', labs, 'female')).toBe(true);
+    expect(on('hepatic', 'oxidative', labs, 'male')).toBe(false);
+  });
+});
+
 describe('проход 205: попап переводит карту до решения', () => {
   const src = readFileSync(resolve(process.cwd(), 'src/ui/screens/Calculator/Calc.mapper.tsx'), 'utf8');
 
+  // Проход 206: попап больше не собирает свою цепочку — он берёт карту движка
+  // риска (`labValuesForEngine`), которая внутри и есть `tierLabView(
+  // labSliceToValues(...))` плюс производные. Гард держит оба звена: попап
+  // зовёт общий читатель, а общий читатель переводит написания.
   it('домены получают карту написаний, а не сырую карту формы', () => {
-    expect(src).toContain('tierLabView(labSliceToValues(');
+    expect(src).toContain('labValuesForEngine(currentLabSlice(state.labs)');
+    const engineSrc = readFileSync(
+      resolve(process.cwd(), 'src/engines/support-plan/mapper-ctx.ts'),
+      'utf8',
+    );
+    expect(engineSrc).toContain('tierLabView(labSliceToValues(');
     expect(src).not.toMatch(
       /const labs = labSliceToValues\(currentLabSlice\(state\.labs\), state\.profile\.sex\);\s*\n\s*const domains = SPECIALIZED_DOMAINS/,
     );

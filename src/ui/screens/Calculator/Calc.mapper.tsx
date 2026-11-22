@@ -8,7 +8,7 @@ import { courseSignature, writeCalcSnapshot, SUPPORT_RISK_KEY } from '../../../e
 import { getAdministrationRules } from '../../../data/administration-rules-db';
 import { PREANALYTIC_EFFECTS_DB, ASSAY_INTERFERENCE_DB } from '../../../data/assay-interference-db';
 import { findSeparationRules } from '../../../data/separation-timing-db';
-import { getLabEntry, tierLabView, labValueFrom } from '../../../data/lab-tier-ranges';
+import { getLabEntry, labValueFrom } from '../../../data/lab-tier-ranges';
 import { MINERAL_SEPARATION_HOURS } from '../../../engines/support-plan/types';
 import { detectActivePedClasses } from '../../../data/ped-class-matrix';
 import type { LabSlice } from '../../../engines/support-plan';
@@ -21,7 +21,7 @@ import type { BoosterTriggerCtx } from '../../../engines/tz-bridge-boosters';
 import { PHASE_PROTOCOL } from '../../../engines/tz-bridge-phase';
 import { STACK_BOOSTER_TRIGGERS, buildGapFillSuggestions, megaEnhance, type MegaEnhanceSuggestion, getNeuroBoosterSubstanceIds, getJointsBoosterSubstanceIds, getHematoBoosterSubstanceIds } from '../../../engines/tz-bridge-boosters';
 import { computeResidualRisk, type PedRiskAssessment } from '../../../engines/ped-risk-matrix';
-import { buildMapperCtx, labSliceToValues } from '../../../engines/support-plan/mapper-ctx';
+import { buildMapperCtx, labSliceToValues, labValuesForEngine } from '../../../engines/support-plan/mapper-ctx';
 import { currentLabSlice } from '../../../engines/support-plan';
 import { TT_NMOL_TO_NG_DL } from '../../../core/constants';
 import { applyGeneticsToRecSubs, applyDietAwareToRecSubs } from '../../../engines/support-genetics-diet.engine';
@@ -45,7 +45,7 @@ import { StackExpandableRow, SelectedStackChips } from './CalcStackComponents';
 import { ALL_STACKS } from '../../../data/support-stacks';
 import { CalcSubstanceManager } from './CalcSubstanceManager';
 import { hctCuts, hctGradationLabel, hctSymptomCuts, hgbSymptomCut } from './Calc.labs-derived';
-import { getLabNorm, LFT_ULN, HCT_THRESHOLDS, HDL_LOW } from '../../../engines/lab-norms.engine';
+import { getLabNorm, LFT_ULN, HCT_THRESHOLDS, HDL_LOW, SCREEN_TARGETS } from '../../../engines/lab-norms.engine';
 import { bpStageCanon, bpStageIsHigh, bpSystolicOfStage, BP_STAGE_LABEL, heartRateOf } from '../../../engines/support-plan/cardio-vitals';
 import { flatLabUnit } from '../../../engines/lab-flat';
 import { checkStackToxicity, type ToxWarning } from '../../../engines/biostack-safety.engine';
@@ -163,6 +163,22 @@ const hctCorrection = (state?: { profile?: { sex?: 'male' | 'female' } }): numbe
 const hdlLowCut = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
   HDL_LOW[state?.profile?.sex === 'female' ? 'female' : 'male'];
 /**
+ * Верх нормы каталога (`UCUM_MAP` через `getLabNorm`) — для порогов, которых нет
+ * в лестнице ступеней. Проход 206: литералы СРБ 5 и UACR 30 уже были этими
+ * числами; теперь они читаются из источника, а не повторяются в триггере.
+ * Где каталог и лестница расходятся (СРБ 5 против нормы 3), расхождение остаётся
+ * названным в §4 — домен читает верх нормы каталога, а не «границу совета».
+ */
+const catalogUln = (code: string, fallback: number): number => getLabNorm(code)?.uln ?? fallback;
+/**
+ * Порог скрининга ферритина по полу (`SCREEN_TARGETS.FERRITIN`: ♂ 300, ♀ 150) —
+ * тот же, что на экране анализов. Проход 206: прежний литерал 300 был мужским
+ * порогом, и женщина с ферритином 200 не попадала в «Оксидативный стресс», хотя
+ * её собственный экран анализов уже помечал ферритин высоким.
+ */
+const ferritinScreenCut = (state?: { profile?: { sex?: 'male' | 'female' } }): number =>
+  SCREEN_TARGETS.FERRITIN[state?.profile?.sex === 'female' ? 'female' : 'male'];
+/**
  * Границы нормы маркера — из лестницы ступеней (`LAB_TIERS`), а не литералами.
  * Проход 203: триггер «Фильтрация» сравнивал СКФ с 90, которого не было ни у
  * одного маркера в резолвере, а цистатин C — с 1; теперь оба числа читаются из
@@ -196,11 +212,12 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
   hepatic: [
     { id:'cytolysis', label:'Цитолиз', icon:'🧫', markers:['ALT','AST'], ids:['nac','milk_thistle','alpha_lipoic'], trigger:(l, state)=>(l.ALT??0)>normUln('ALT',state,40)||(l.AST??0)>normUln('AST',state,40) },
     { id:'cholestasis', label:'Холестаз', icon:'🟡', markers:['GGT','ALP','BILIRUBIN'], ids:['tudca','udca','milk_thistle'], trigger:(l, state)=>(l.GGT??0)>normUln('GGT',state,55)||(l.ALP??0)>normUln('ALP',state,130)||(l.BILIRUBIN??0)>normUln('BIL',state,17.1) },
-    // CRP 5 и ферритин 300 — числа, которых нет в лестнице ступеней (там верх
-    // нормы 3 и 400). Клинического источника на «порог оксидативного стресса» в
-    // проекте нет, поэтому они остаются литералами и названы блокером
-    // (`docs/LAB-NORMS-SINGLE-SOURCE.md`, §4), а не подменяются чужим числом.
-    { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l)=>(l.CRP??0)>5||(l.FERRITIN??0)>300 },
+    // Проход 206: СРБ читается верхом нормы каталога (`getLabNorm`), ферритин —
+    // порогом скрининга по полу (`SCREEN_TARGETS`). Оба числа были литералами
+    // 5 и 300: у СРБ это верх нормы каталога (лестница считает нормой 3 — это
+    // расхождение названо в §4), у ферритина — мужской порог, из-за которого
+    // женский ферритин 200 не включал домен.
+    { id:'oxidative', label:'Оксидативный стресс', icon:'🛡️', markers:['CRP','FERRITIN'], ids:['nac','glycine','selenium','alpha_lipoic'], trigger:(l, state)=>(l.CRP??0)>catalogUln('CRP',5)||(l.FERRITIN??0)>ferritinScreenCut(state) },
   ],
   renal: [
     // Проход 203: СКФ и цистатин C приходят кодами склада (`EGFR`, `CYSTATIN_C`):
@@ -209,10 +226,12 @@ export const SPECIALIZED_DOMAINS: Record<string, SpecializedDomain[]> = {
     // ступеней. Отсутствие записи фильтрацию не включает: без числа «норма» не
     // угадывается (`?? 0` дал бы ложное срабатывание).
     { id:'filtration', label:'Фильтрация', icon:'💧', markers:['CREATININE','EGFR','CYSTATIN_C'], ids:['hydration','nac','astragalus','cordyceps'], trigger:(l, state)=>(l.CREATININE??0)>normUln('CREATININE',state,110)||(l.EGFR!==undefined&&l.EGFR<labNormalLow('EGFR',90))||(l.CYSTATIN_C??0)>labNormalHigh('CYSTATIN_C',1) },
-    // 30 мг/г — порог альбуминурии, строки в `LAB_TIERS` у него нет (там `MICROALB`
-    // в мг/л — другая величина), поэтому число остаётся литералом. Белок мочи —
-    // из лестницы.
-    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>30||(l.PROTEIN_URINE??0)>labNormalHigh('PROTEIN_URINE',0.15) },
+    // Проход 206: 30 мг/г — верх нормы каталога (`UCUM_MAP.UACR`), а не литерал;
+    // строки в `LAB_TIERS` у альбумин/креатинина нет (там `MICROALB` в мг/л —
+    // другая величина), поэтому лестница здесь не читается. Белок мочи — из
+    // лестницы. Поля UACR в бланке по-прежнему нет: ветка ждёт второго читателя,
+    // который мог бы отдать это число (см. §4).
+    { id:'proteinuria', label:'Протеинурия', icon:'🧪', markers:['UACR','PROTEIN_URINE'], ids:['astragalus','cordyceps','taurine','telmisartan'], trigger:(l)=>(l.UACR??0)>catalogUln('UACR',30)||(l.PROTEIN_URINE??0)>labNormalHigh('PROTEIN_URINE',0.15) },
     // Магний 0.75 — не граница лестницы (там норма 0.85–1.1), источника нет:
     // остаётся литералом до клинического решения.
     { id:'electrolytes', label:'Электролиты', icon:'⚡', markers:['K','NA','MG'], ids:['electrolyte_balance','magnesium','taurine'], trigger:(l)=>(l.K??4)<labNormalLow('K',3.5)||(l.K??4)>labNormalHigh('K',5)||(l.MG??1)<.75 },
@@ -1989,10 +2008,13 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
       {genericEnhancementPopup && GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup] && ReactDOM.createPortal((() => {
         const cfg = GENERIC_ENHANCEMENT_CONFIG[genericEnhancementPopup];
         // Проход 205: домены называют анализ кодом склада (`l.K`, `l.HCT`, `l.E2`), а
-        // карта бланка — каноном формы (`POTASSIUM`, `HEMATOCRIT`, `ESTRADIOL`).
-        // `tierLabView` даёт то же число под вторым именем; без моста триггер
-        // сравнивал `undefined` с порогом и домен не включался ни при каком вводе.
-        const labs = tierLabView(labSliceToValues(currentLabSlice(state.labs), state.profile.sex));
+        // карта бланка — каноном формы (`POTASSIUM`, `HEMATOCRIT`, `ESTRADIOL`); мост
+        // даёт то же число под вторым именем.
+        // Проход 206: попап берёт ту же карту, что и движок риска
+        // (`labValuesForEngine`), а не собирает свою цепочку: иначе HOMA-IR, СКФ по
+        // креатинину и худший из СРБ/вчСРБ доходили до риска, но не до доменов —
+        // ветка `l.HOMAIR` ждала числа, которого эта сборка не делала.
+        const labs = labValuesForEngine(currentLabSlice(state.labs), state.profile.sex, state.profile.age);
         const domains = SPECIALIZED_DOMAINS[genericEnhancementPopup] || [];
         const activeDomains = domains.filter(d => d.trigger?.(labs, state));
         // Проход 204: «Контрольные маркеры» — это маркеры доменов (то, что решает)

@@ -200,7 +200,7 @@ const LAB_CODE_TO_MARKER: Record<string, string> = {
   'INR': 'INR', 'PT': 'PT', 'APTT': 'APTT', 'CK': 'CK',
   'LDL': 'LDL', 'HDL': 'HDL', 'VLDL': 'VLDL', 'LH': 'LH', 'FSH': 'FSH',
   'SHBG': 'SHBG', 'DHT': 'DHT', 'TSH': 'TSH',
-  'ALT': 'ALT', 'AST': 'AST', 'GGT': 'GGT', 'ALP': 'ALP', 'RBC': 'RBC', 'WBC': 'WBC',
+  'ALT': 'ALT', 'AST': 'AST', 'GGT': 'GGT', 'ALP': 'ALP', 'HBA1C': 'HbA1c', 'RBC': 'RBC', 'WBC': 'WBC',
 };
 
 // Проход 114: таблица «маркер бланка → код UCUM» переехала в `Calc.lab-units`,

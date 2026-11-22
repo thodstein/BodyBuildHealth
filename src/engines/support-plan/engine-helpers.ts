@@ -15,7 +15,7 @@ import {
 } from './shared-constants';
 export { SUB_ALIAS, canonId, TZ_AUTO_BLACKLIST, SAME_CLASS_GROUPS, ID_TO_CLASS, sameClassIds, PHASE_BLOCKLIST };
 import { evaluateRecommendations } from '../recommendation-engine';
-import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
+import { calculateTzSpecRisk, calculateTzSpecRiskTimeline, riskLabCoverage, type TzSpecInput, type DrugInput, type TzSpecResult, type TzSpecMechanismResult, type TzDrugClass } from '../risk-engine-tz-spec';
 import { DRUG_DB } from '../../data/support-db';
 import { formatDose, formatDefaultDose, doseUnitLabel, vitaminDMcgFromIu } from '../../data/dose-units';
 import { resolveNutrient, type LimitKind } from '../support-limits';
@@ -24,13 +24,13 @@ import { SUPPLEMENTS_DB } from '../../data/support-db/supplements';
 import { PHARMACY_DB } from '../../data/support-db/pharmacy-db';
 import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { readLabValue } from '../../core/constants';
-import { egfrFromCreatinine } from '../lab-norms.engine';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
 import { resolvePlanDose } from './substances';
 import { currentLabSlice } from './lab-slice';
-import { labFieldNumber as num, labFieldEntry } from './lab-field-number';
+import { labFieldEntry } from './lab-field-number';
 import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
+import { labValuesForEngine } from './mapper-ctx';
 import { getLabEntry } from '../../data/lab-tier-ranges';
 // Проход 156: динамика сравнивает только то, что записи доказывают. Знак границы
 // едет в строку вместе с числом (`labFieldEntry`), направление доказывает
@@ -1137,197 +1137,12 @@ export function getContraindicationAlerts(state: CalculatorState): string[] {
 }
 
 // ── TZ Risk Engine helpers ──
-function extractLabValues(
-  labs: CalculatorState['labs'],
-  sex?: 'male' | 'female',
-  age?: number,
-): Record<string, number> {
-  const v: Record<string, number> = {};
-  // Проход 136: бланк выбирается одним правилом на всё приложение.
-  // Проход 169: ключи — коды склада (`UCUM_MAP`), а не прежние имена модели:
-  // `CREATININE`, `CHOL`, `UA`, `EGFR`, `DHEA_S`, `P`, `FOL`, `TPO_AB`, `TNF_ALPHA`,
-  // свободные `FT3`/`FT4` (общие Т3/Т4 — другой анализ в другой единице).
-  // Один анализ не занимает чужое имя и не пропадает при передаче в движок.
-  const fp = currentLabSlice(labs);
-  if (!fp) return v;
-
-  // panelBiochem: ALT, AST, GGT, Bilirubin, Glucose, Creatinine, Urea, Uric acid, CRP, Homocysteine
-  const b = (fp.panelBiochem || {}) as Record<string, any>;
-  if (num(b.ALT) !== undefined) v['ALT'] = num(b.ALT)!;
-  if (num(b.AST) !== undefined) v['AST'] = num(b.AST)!;
-  if (num(b.GGT) !== undefined) v['GGT'] = num(b.GGT)!;
-  if (num(b.Bilirubin) !== undefined) v['BIL'] = num(b.Bilirubin)!;
-  if (num(b.Glucose) !== undefined) v['GLU'] = num(b.Glucose)!;
-  if (num(b.Creatinine) !== undefined) v['CREATININE'] = num(b.Creatinine)!;
-  // Проход 203: СКФ вводится полем бланка (`eGFR` → код склада `EGFR`). Раньше
-  // поля не было вовсе, и триггер «Фильтрация» читал пустой ключ.
-  if (num(b.eGFR) !== undefined) v['EGFR'] = num(b.eGFR)!;
-  if (num(b.CRP) !== undefined) v['CRP'] = num(b.CRP)!;
-  if (num(b.Homocysteine) !== undefined) v['HOMOCYSTEINE'] = num(b.Homocysteine)!;
-  // Insulin (may be in panelBiochem or panelSex depending on lab)
-  const sForIns = (fp.panelSex || {}) as Record<string, any>;
-  const insVal = num(b.Insulin) ?? num(sForIns.Insulin);
-  if (insVal !== undefined) {
-    // HOMA-IR = (glucose mmol/L × insulin μU/mL) / 22.5
-    const glu = v['GLU'];
-    if (glu !== undefined) {
-      v['HOMA'] = Math.round((glu * insVal) / 22.5 * 100) / 100;
-    }
-  }
-
-  // panelLipid: Total Cholesterol, LDL, HDL, Triglycerides, VLDL, ApoB, ApoA1, Lp(a)
-  const lip = (fp.panelLipid || {}) as Record<string, any>;
-  if (num(lip.LDL) !== undefined) v['LDL'] = num(lip.LDL)!;
-  if (num(lip.HDL) !== undefined) v['HDL'] = num(lip.HDL)!;
-  if (num(lip.Triglycerides) !== undefined) v['TG'] = num(lip.Triglycerides)!;
-  if (num(lip['Total Cholesterol']) !== undefined) v['CHOL'] = num(lip['Total Cholesterol'])!;
-
-  // panelHematology: HCT, Hemoglobin, RBC, WBC, Platelets
-  const h = (fp.panelHematology || {}) as Record<string, any>;
-  if (num(h.HCT) !== undefined) v['HCT'] = num(h.HCT)!;
-  if (num(h.Hemoglobin) !== undefined) v['HGB'] = num(h.Hemoglobin)!;
-  if (num(h.Platelets) !== undefined) v['PLT'] = num(h.Platelets)!;
-
-  // panelSex: LH, FSH, Total T, Free T, E2, Prolactin, SHBG, DHT, Progesterone, Cortisol
-  const s = (fp.panelSex || {}) as Record<string, any>;
-  // Проход 106: гормон читается по единице бланка; нет единицы — прежняя догадка
-  // по величине (у женщины E2 без единицы больше не делится).
-  const unitOf = (panel: string, marker: string): string | undefined =>
-    (fp.units?.[panel] as Record<string, string> | undefined)?.[marker];
-  const readHormone = (marker: string, panel: string, raw: number) =>
-    readLabValue(marker, raw, unitOf(panel, marker), sex).value;
-  if (num(s.LH) !== undefined) v['LH'] = num(s.LH)!;
-  if (num(s.FSH) !== undefined) v['FSH'] = num(s.FSH)!;
-  if (num(s['Total T']) !== undefined) v['TT'] = readHormone('Total T', 'panelSex', num(s['Total T'])!);
-  if (num(s.E2) !== undefined) v['E2'] = readHormone('E2', 'panelSex', num(s.E2)!);
-  if (num(s.Prolactin) !== undefined) v['PRL'] = readHormone('Prolactin', 'panelSex', num(s.Prolactin)!);
-  if (num(s.SHBG) !== undefined) v['SHBG'] = num(s.SHBG)!;
-  if (num(s.Cortisol) !== undefined) v['CORTISOL'] = readHormone('Cortisol', 'panelSex', num(s.Cortisol)!);
-
-  // panelThyroid: TSH, T3 free, T4 free
-  const th = (fp.panelThyroid || {}) as Record<string, any>;
-  if (num(th.TSH) !== undefined) v['TSH'] = num(th.TSH)!;
-
-  // panelMineral: Calcium, Phosphorus, Magnesium, Sodium, Potassium, Chloride
-  const min = (fp.panelMineral || {}) as Record<string, any>;
-  if (num(min.Potassium) !== undefined) v['K'] = num(min.Potassium)!;
-  if (num(min.Sodium) !== undefined) v['NA'] = num(min.Sodium)!;
-
-  // panelCoagulation: D-dimer, Fibrinogen, PT, APTT, INR
-  const coag = (fp.panelCoagulation || {}) as Record<string, any>;
-  if (num(coag['D-dimer']) !== undefined) v['D_DIMER'] = num(coag['D-dimer'])!;
-  if (num(coag.Fibrinogen) !== undefined) v['FIBRINOGEN'] = num(coag.Fibrinogen)!;
-
-  // panelCardiac: CK, CK-MB, Troponin I, NT-proBNP
-  // Проход 168: поле называется своим именем. Раньше NT-proBNP уезжал в ключ
-  // `BNP` (другой анализ, другая норма 100), и на экране «Риск» склад с
-  // `NT_PROBNP` не находил значения вовсе — анализ молча не участвовал.
-  const card = (fp.panelCardiac || {}) as Record<string, any>;
-  if (num(card['NT-proBNP']) !== undefined) v['NT_PROBNP'] = num(card['NT-proBNP'])!;
-
-  // panelInflammatory: IL-6, TNF-alpha, hsCRP
-  const infl = (fp.panelInflammatory || {}) as Record<string, any>;
-  // Проход 130: вчСРБ и СРБ — один и тот же белок в одной единице (мг/л).
-  // Раньше при заполненных обоих полях молча выигрывала биохимия: СРБ 1 при
-  // вчСРБ 7 давал «воспаления нет». Берём худшее из двух чисел и не теряем ни одного.
-  const hsCrp = num(infl.hsCRP);
-  if (hsCrp !== undefined) v['CRP'] = v['CRP'] === undefined ? hsCrp : Math.max(v['CRP'], hsCrp);
-
-  // panelTumor: PSA total
-  const tum = (fp.panelTumor || {}) as Record<string, any>;
-  if (num(tum['PSA total']) !== undefined) v['PSA'] = num(tum['PSA total'])!;
-  if (num(tum['PSA free']) !== undefined) v['PSA_FREE'] = num(tum['PSA free'])!;
-
-  // panelUrinalysis: Protein — полоска («следы/+/++») или концентрация (г/л, мг/л)
-  // Проход 130: раньше это число уезжало в `UACR` — альбумин/креатинин мочи в мг/г,
-  // то есть другой анализ в другой единице. Белок 3 г/л (нефротическая
-  // протеинурия) читался как «UACR 3 мг/г» и почечный риск молчал. Теперь это
-  // `PROTEIN_URINE` в г/л — канон каталога UCUM, тиров и моста механизма (ren3).
-  const ua = (fp.panelUrinalysis || {}) as Record<string, any>;
-  if (num(ua.Protein) !== undefined) v['PROTEIN_URINE'] = readHormone('Protein', 'panelUrinalysis', num(ua.Protein)!);
-
-  // panelIron: Ferritin, Iron, TIBC
-  const iron = (fp.panelIron || {}) as Record<string, any>;
-  if (num(iron.Ferritin) !== undefined) v['FERRITIN'] = num(iron.Ferritin)!;
-  if (num(iron.Iron) !== undefined) v['IRON'] = num(iron.Iron)!;
-  if (num(iron.TIBC) !== undefined) v['TIBC'] = num(iron.TIBC)!;
-
-  // panelVitamin: B12, Folate, Vitamin D (25-OH)
-  const vit = (fp.panelVitamin || {}) as Record<string, any>;
-  // Проход 121: витамин D читается по единице бланка (нг/мл против нмоль/л, 2.5).
-  if (num(vit['Vitamin D (25-OH)']) !== undefined) v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin', num(vit['Vitamin D (25-OH)'])!);
-  // Проход 123: B12 тоже читается по единице бланка (пг/мл против пмоль/л).
-  if (num(vit.B12) !== undefined) v['B12'] = readHormone('B12', 'panelVitamin', num(vit.B12)!);
-  // Проход 122: фолат тоже читается по единице бланка (нг/мл против нмоль/л).
-  // Проход 169: фолат — канон `FOL` (код склада), не `FOLATE`.
-  if (num(vit.Folate) !== undefined) v['FOL'] = readHormone('Folate', 'panelVitamin', num(vit.Folate)!);
-
-  // panelAdrenal: DHEA-S, Aldosterone, PTH
-  const adr = (fp.panelAdrenal || {}) as Record<string, any>;
-  if (num(adr['DHEA-S']) !== undefined) v['DHEA_S'] = readHormone('DHEA-S', 'panelAdrenal', num(adr['DHEA-S'])!);
-  if (num(adr.Aldosterone) !== undefined) v['ALDOSTERONE'] = num(adr.Aldosterone)!;
-  if (num(adr.PTH) !== undefined) v['PARATHYROID'] = num(adr.PTH)!;
-
-  // panelMineral: Calcium, Magnesium, Phosphorus
-  if (num(min.Calcium) !== undefined) v['CA'] = num(min.Calcium)!;
-  if (num(min.Magnesium) !== undefined) v['MG'] = num(min.Magnesium)!;
-  if (num(min.Phosphorus) !== undefined) v['P'] = num(min.Phosphorus)!;
-
-  // panelCardiac: CK, CK-MB, Troponin
-  if (num(card.CK) !== undefined) v['CK'] = num(card.CK)!;
-  if (num(card['CK-MB']) !== undefined) v['CKMB'] = num(card['CK-MB'])!;
-  // Проход 180: тропонин пишется кодом склада (`TROPONIN`), как в `UCUM_MAP`,
-  // мосте механизмов и лестницах. Раньше значение уходило в ключ `TROP`,
-  // которого не читал ни один контур: анализ вводился и молча исчезал.
-  if (num(card['Troponin I']) !== undefined) v['TROPONIN'] = num(card['Troponin I'])!;
-
-  // panelInflammatory: IL-6, TNF-alpha
-  if (num(infl['IL-6']) !== undefined) v['IL6'] = num(infl['IL-6'])!;
-  if (num(infl['TNF-alpha']) !== undefined) v['TNF_ALPHA'] = num(infl['TNF-alpha'])!;
-
-  // panelBiochem доп: Urea, Uric acid
-  if (num(b.Urea) !== undefined) v['UREA'] = num(b.Urea)!;
-  if (num(b['Uric acid']) !== undefined) v['UA'] = num(b['Uric acid'])!;
-
-  // panelHematology доп: RBC, WBC
-  if (num(h.RBC) !== undefined) v['RBC'] = num(h.RBC)!;
-  if (num(h.WBC) !== undefined) v['WBC'] = num(h.WBC)!;
-
-  // panelSex доп: Free T, DHT, Progesterone
-  // Проход 119: свободный тестостерон тоже читается по единице бланка —
-  // 30 пмоль/л иначе попадали в движок как 30 пг/мл (втрое выше реального).
-  if (num(s['Free T']) !== undefined) v['FT'] = readHormone('Free T', 'panelSex', num(s['Free T'])!);
-  if (num(s.DHT) !== undefined) v['DHT'] = num(s.DHT)!;
-  // Проход 118: прогестерон читается по единице бланка, как E2/PRL/TT.
-  // Раньше 60 нмоль/л попадали в движок как 60 нг/мл — уровень, при котором
-  // «ановуляции нет» превращалось в «беременность».
-  if (num(s.Progesterone) !== undefined) v['PROG'] = readHormone('Progesterone', 'panelSex', num(s.Progesterone)!);
-
-  // panelThyroid доп: T3 free, T4 free, Anti-TPO
-  // Проход 120: Т3/Т4 читаются по единице бланка (пг/мл против пмоль/л).
-  // Проход 169: свободные гормоны пишутся своими кодами `FT3`/`FT4`; `T3`/`T4`
-  // в складе — ОБЩИЕ гормоны (nmol/L), и пороги cns4 (pmol/L) судили бы не тот анализ.
-  if (num(th['T3 free']) !== undefined) v['FT3'] = readHormone('T3 free', 'panelThyroid', num(th['T3 free'])!);
-  if (num(th['T4 free']) !== undefined) v['FT4'] = readHormone('T4 free', 'panelThyroid', num(th['T4 free'])!);
-  if (num(th['Anti-TPO']) !== undefined) v['TPO_AB'] = num(th['Anti-TPO'])!;
-
-  // eGFR: CKD-EPI 2021 (race-free) — учитывает пол, но не возраст при отсутствии возраста.
-  // Раньше был MDRD без пола/возраста → у женщин СКФ систематически завышалась
-  // (~на 10-15%), и ренальный риск занижался.
-  // Проход 133: сама формула одна на приложение (`lab-norms.engine`, `ckdEpi2021`):
-  // вторая копия в `clinical-indices` считала по смешанным коэффициентам 2009/2021.
-  // Проход 203: расчёт не перекрывает явную СКФ из бланка — лаборатория могла
-  // посчитать её другим методом (цистатин C, Кокрофт), и её число главнее.
-  // Само правило «креатинин → СКФ» тоже одно на приложение
-  // (`lab-norms.engine`, `egfrFromCreatinine`): тот же вывод нужен плану поддержки.
-  if (v['EGFR'] === undefined) {
-    const egfr = egfrFromCreatinine(v['CREATININE'], age, sex);
-    if (egfr !== undefined) v['EGFR'] = egfr;
-  }
-
-  return v;
-}
-
+// Проход 206: своего разбора бланка здесь больше нет. Карту для движка риска и
+// моста механизмов строит тот же читатель, что и всё остальное
+// (`mapper-ctx.labValuesForEngine`): канон формы → мост написаний → производные
+// (HOMA-IR, СКФ по креатинину, худший из СРБ/вчСРБ). Пока разбор был вторым,
+// новый анализ (ЩФ, цистатин C, инсулин) доходил до модели риска только после
+// правки во втором списке панелей — то есть мог молчать годами.
 export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzSpecInput | null {
   const drugs: DrugInput[] = [];
   const aasList = state.pharma.aas;
@@ -1396,7 +1211,8 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
   // Длительность = самый длинный препарат курса (не искусственные 12 недель).
   const allWeeks = aasList.map(a => Number(a.weeks) || 0).filter(w => w > 0);
   const duration = allWeeks.length > 0 ? Math.max(...allWeeks) : 12;
-  const labValues = extractLabValues(state.labs, state.profile?.sex, state.profile?.age);
+  const fp = currentLabSlice(state.labs);
+  const labValues = labValuesForEngine(fp, state.profile?.sex, state.profile?.age);
   const firstDrug = drugs[0];
   // Genetics
   const genetics = state.genetics ? {
@@ -1433,7 +1249,11 @@ export function buildTzInput(state: CalculatorState, supportSubs: string[]): TzS
     dose: firstDrug.dose, duration,
     form: firstDrug.form,
     combinations: Math.max(1, drugs.length),
-    labCoverage: Math.min(1.0, 0.3 + Object.keys(labValues).length * 0.04),
+    // Проход 206: покрытие считает маркеры модели (`riskLabCoverage`), а не строки
+    // бланка: мост синонимов (205) дал бы одному анализу два ключа, производные
+    // (HOMA, СКФ) — балл за число, которого человек не вводил, а ЦЕА или
+    // нейтрофилы — балл за анализ, которого модель не читает.
+    labCoverage: riskLabCoverage(labValues),
     labValues, supportSubstances: supportSubs, drugs,
     genetics, nutrition, training,
     courseWeek: state.courseWeek,
@@ -1469,7 +1289,9 @@ export function buildTzInputCore(params: TzInputCoreParams, supportSubs: string[
     dose: firstDrug.dose, duration: params.duration,
     form: firstDrug.form,
     combinations: Math.max(1, params.drugs.length),
-    labCoverage: Math.min(1.0, 0.3 + Object.keys(params.labs).length * 0.04),
+    // Проход 206: тот же счётчик, что и в `buildTzInput` (`riskLabCoverage`) —
+    // второй формулы покрытия на приложение больше нет.
+    labCoverage: riskLabCoverage(params.labs),
     labValues: params.labs, supportSubstances: supportSubs, drugs: params.drugs,
     genetics: params.genetics, nutrition: params.nutrition, training: params.training,
     courseWeek: params.courseWeek,

@@ -84,7 +84,10 @@ describe('проход 136: число из поля — одно правило
     expect(mapper).toContain('labFieldNumber');
     expect(mapper).not.toContain('parseFloat');
     const helpers = readFileSync(resolve(root, 'engine-helpers.ts'), 'utf8');
-    expect(helpers).toContain('labFieldNumber');
+    // Проход 206: чисел из полей движок больше не разбирает — карта приходит
+    // из `labValuesForEngine`, а разбор один (`labFieldNumber` в `mapper-ctx`).
+    expect(helpers).toContain('labValuesForEngine(');
+    expect(helpers).not.toContain('labFieldNumber');
     // Разбор полей анализов больше не живёт внутри extractLabValues своей копией.
     expect(helpers).not.toContain("val.includes('+')");
   });

@@ -8,6 +8,7 @@
 
 import type { CalculatorState, LabSlice } from './types';
 import { readLabValue } from '../../core/constants';
+import { tierLabView } from '../../data/lab-tier-ranges';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber } from './lab-field-number';
 import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
@@ -52,6 +53,49 @@ export function labSliceToValues(fp: LabSlice | null, sex?: 'male' | 'female'): 
     }
   }
   return out;
+}
+
+/**
+ * Карта анализов для движка риска и моста механизмов (проход 206).
+ *
+ * Проход 205 свёл имена в попапе доменов, но чисел в движке оставалось два
+ * читателя: этот файл (канон формы) и приватный `extractLabValues` в
+ * `support-plan/engine-helpers` со своим разбором панелей. Списки панелей
+ * разошлись — новый анализ (ЩФ, цистатин C, инсулин) доходил до риска, только
+ * если его допишут во второе место, а HOMA-IR жил только там.
+ *
+ * Теперь чтение одно: форма → канон (`labSliceToValues`) → мост написаний
+ * (`tierLabView`). Затем только производные, которых в бланке нет, — они не
+ * подменяют строку бланка и не печатаются как результат анализа:
+ *  - HOMA-IR считается из глюкозы и инсулина (формула одна на приложение);
+ *  - вчСРБ и СРБ — один белок, берётся худшее число, ни одно не теряется;
+ *  - СКФ бланка главнее расчёта, расчёт — `egfrFromCreatinine` (правило 23).
+ *
+ * Мост применяется дважды: после первого прохода известны `GLU`/`INS`, из
+ * которых считается HOMA, а второй проход даёт производным их написания
+ * (`HOMA` → `HOMAIR`) из той же таблицы, без ручных синонимов.
+ */
+export function labValuesForEngine(
+  fp: LabSlice | null,
+  sex?: 'male' | 'female',
+  age?: number,
+): Record<string, number> {
+  const read = tierLabView(labSliceToValues(fp, sex));
+  const derived: Record<string, number> = {};
+  if (read['GLU'] !== undefined && read['INS'] !== undefined) {
+    derived['HOMA'] = Math.round(((read['GLU'] * read['INS']) / 22.5) * 100) / 100;
+  }
+  // Мост уже даёт СРБ под вторым именем, поэтому интересен только случай, когда
+  // введены ОБА числа и они расходятся: риск читает худшее (проход 130), ни одно
+  // не теряется.
+  if (read['CRP'] !== undefined && read['HSCRP'] !== undefined) {
+    derived['CRP'] = Math.max(read['CRP'], read['HSCRP']);
+  }
+  if (read['EGFR'] === undefined) {
+    const egfr = egfrFromCreatinine(read['CREATININE'], age, sex);
+    if (egfr !== undefined) derived['EGFR'] = egfr;
+  }
+  return tierLabView({ ...read, ...derived });
 }
 
 export function buildMapperCtx(

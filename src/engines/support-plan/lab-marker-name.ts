@@ -31,6 +31,10 @@ export const LAB_MARKER_RENAME: Record<string, string> = {
   'Transferrin Sat': 'TRANSFERRIN_SAT', 'CK-MB': 'CK_MB', 'D-dimer': 'D_DIMER',
   'IL-6': 'IL_6', 'TNF-alpha': 'TNF_ALPHA', 'DHEA-S': 'DHEA_S', '3a-ADG': '3A_ADG',
   'PSA total': 'PSA_TOTAL', 'PSA free': 'PSA_FREE', 'CA-125': 'CA_125', 'Lp(a)': 'LP_A',
+  // Проход 206: механическая замена пробелов оставляла в каноне дефис
+  // (`NT-PROBNP`), и ни мост написаний, ни склад его не знали: анализ доходил
+  // до движка как чужое имя и молча выпадал (гард `natriuretic-name`).
+  'NT-proBNP': 'NT_PROBNP',
 };
 
 /**

@@ -27,6 +27,9 @@ export const MARKER_TO_UCUM: Record<string, string> = {
   'Bilirubin': 'BIL', 'Glucose': 'GLU',
   // Проход 205: ЩФ — Ед/л, как в каталоге и лестнице ступеней.
   'ALP': 'ALP',
+  // Проход 206: HbA1c — проценты, как в каталоге и лестнице ступеней. Код
+  // каталога пишется `HbA1c` (не `HBA1C`): это ключ `UCUM_MAP` как он есть.
+  'HbA1c': 'HbA1c',
   'CRP': 'CRP', 'IL-6': 'IL6',
   // ── липиды ──
   'Total Cholesterol': 'CHOL', 'LDL': 'LDL', 'HDL': 'HDL', 'Triglycerides': 'TG',

@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import { labSliceToValues } from '../../../../engines/support-plan/mapper-ctx';
 import { buildTzInput } from '../../../../engines/support-plan/engine-helpers';
-import { getActivatedTzMechs } from '../../../../engines/tz-bridge-marker';
+import { getActivatedTzMechs, MARKER_TO_TZ_MECH, normalizeMarker } from '../../../../engines/tz-bridge-marker';
 import { computeTierAdjustments } from '../../../../data/lab-tier-recommendations';
 import { getLabEntry } from '../../../../data/lab-tier-ranges';
 import { labSeverityCut } from '../../../../engines/tz-mapper-engine';
@@ -56,6 +56,13 @@ function fieldIsRead(panel: string, marker: string): boolean {
 
   const planLabs = labSliceToValues(slice as any, 'male');
   if (getActivatedTzMechs(planLabs as any).length > 0) return true;
+  // Проход 206: правило моста — структурная проверка, а не проба числом.
+  // Проба 5 не переходит порог у ПТГ (65), альдостерона (15) или свободного
+  // ПСА (нижняя граница 0.8), хотя правило у них есть; раньше эти поля
+  // считались «читаемыми» только потому, что любой ввод поднимал долю
+  // проверенных анализами. Теперь покрытие считает маркеры модели
+  // (`riskLabCoverage`), и знание о поле спрашиваем у таблицы правил.
+  if (MARKER_TO_TZ_MECH.some((r) => normalizeMarker(r.marker) === canon)) return true;
 
   const adj = computeTierAdjustments(planLabs, 'male');
   if (adj.alerts.length + adj.addSubs.length + adj.nutrition.length + adj.tierSummary.length > 0) return true;
@@ -73,7 +80,7 @@ function fieldIsRead(panel: string, marker: string): boolean {
 describe('проход 140: карта «не входит в расчёт» совпадает с измерением', () => {
   const fields = FULL_PANELS.flatMap(p => p.markers.map(m => ({ panel: p.key as string, marker: m })));
 
-  it('форма теперь 92 поля — иначе список надо пересматривать', () => {
+  it('форма теперь 93 поля — иначе список надо пересматривать', () => {
     // 140: 88 полей. 196: + ретикулоциты (проценты/промилле бланка) — поле
     // читается ступенями `TIER_RULES.RETICULOCYTES`, поэтому в таблице
     // «не входит в расчёт» его быть не должно.
@@ -81,7 +88,10 @@ describe('проход 140: карта «не входит в расчёт» с�
     // поддержки и лестницей ступеней почки.
     // 205: + ЩФ (`ALP`) — ветка «Холестаза» читала `l.ALP`, которого форма не
     // давала: шкала и совет были, ввести было некуда.
-    expect(fields).toHaveLength(92);
+    // 206: + HbA1c — лестница ступеней (`LAB_TIERS.HBA1C`) и советы были, а
+    // поля не было: гликированный гемоглобин не доходил ни до ступеней, ни до
+    // домена «Глюкоза/IR».
+    expect(fields).toHaveLength(93);
   });
 
   it('каждое поле либо читается, либо названо в таблице', () => {

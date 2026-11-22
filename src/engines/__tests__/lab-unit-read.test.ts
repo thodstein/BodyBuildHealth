@@ -20,6 +20,7 @@ import { resolve } from 'node:path';
 import { readLabValue, normalizeLabValue, LAB_UNIT_CHOICES, LAB_UNIT_READ, LAB_READ_UNIT, UCUM_MAP } from '../../core/constants';
 import { normalizeLabMeasurement } from '../../core/labs-mapping';
 import { evaluateRecommendations } from '../../engines/recommendation-engine';
+import { labValuesForEngine } from '../support-plan/mapper-ctx';
 import { buildLabFindings } from '../support-plan/display';
 import { normalizeCalculatorState } from '../../ui/screens/Calculator/Calc.types';
 
@@ -99,8 +100,13 @@ describe('проход 106: выбор единицы на месте, эври�
     const helpers = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     expect(rec).toContain('readLabValue(key, raw, unit, sex)');
     expect(rec).not.toContain('normalizeLabValue');
-    expect(helpers).toContain('readLabValue(marker, raw, unitOf(panel, marker), sex)');
-    expect(helpers).not.toContain("normalizeLabValue('E2'");
+    // Проход 206: второго читателя бланка в движке больше нет — карта приходит
+    // из `labValuesForEngine`, а единицу в ней читает `labSliceToValues`.
+    const ctx = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/mapper-ctx.ts'), 'utf8');
+    expect(helpers).toContain('labValuesForEngine(');
+    expect(helpers).not.toContain('readHormone(');
+    expect(ctx).toContain('readLabValue(marker, num, units?.[pk]?.[marker], sex)');
+    expect(ctx).not.toContain("normalizeLabValue('E2'");
   });
 });
 
@@ -430,8 +436,12 @@ describe('проход 118: прогестерон читается по еди�
   });
 
   it('движок берёт прогестерон через чтение с единицей, а не сырым числом', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['PROG'] = readHormone('Progesterone', 'panelSex'");
+    const engine = labValuesForEngine(
+      { date: '', panelSex: { Progesterone: '60' }, units: { panelSex: { Progesterone: 'нмоль/л' } } } as any,
+      'male',
+    );
+    expect(engine['PROG']).toBe(readLabValue('Progesterone', 60, 'нмоль/л').value);
+    expect(engine['PROG']).not.toBe(60);
   });
 });
 
@@ -466,8 +476,12 @@ describe('проход 119: свободный тестостерон читае
   });
 
   it('движок берёт свободный тест через чтение с единицей', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['FT'] = readHormone('Free T', 'panelSex'");
+    const engine = labValuesForEngine(
+      { date: '', panelSex: { 'Free T': '30' }, units: { panelSex: { 'Free T': 'пмоль/л' } } } as any,
+      'male',
+    );
+    expect(engine['FT']).toBe(readLabValue('Free T', 30, 'пмоль/л').value);
+    expect(engine['FT']).not.toBe(30);
   });
 });
 
@@ -497,11 +511,18 @@ describe('проход 120: свободные Т3/Т4 читаются по е�
   });
 
   it('движок берёт свободные Т3/Т4 через чтение с единицей', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
     // Проход 169: ключ — канон склада (`FT3`/`FT4`); `T3`/`T4` в `UCUM_MAP` —
     // ОБЩИЕ гормоны (nmol/L), и пороги свободных (pmol/L) судили бы не тот анализ.
-    expect(src).toContain("v['FT3'] = readHormone('T3 free', 'panelThyroid'");
-    expect(src).toContain("v['FT4'] = readHormone('T4 free', 'panelThyroid'");
+    const engine = labValuesForEngine(
+      {
+        date: '',
+        panelThyroid: { 'T3 free': '3.2', 'T4 free': '1.2' },
+        units: { panelThyroid: { 'T3 free': 'пг/мл', 'T4 free': 'пг/мл' } },
+      } as any,
+      'male',
+    );
+    expect(engine['FT3']).toBe(readLabValue('T3 free', 3.2, 'пг/мл').value);
+    expect(engine['FT4']).toBe(readLabValue('T4 free', 1.2, 'пг/мл').value);
   });
 });
 
@@ -554,8 +575,16 @@ describe('проход 121: витамин D читается по единиц�
   });
 
   it('движок берёт витамин D через чтение с единицей', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['VITD'] = readHormone('Vitamin D (25-OH)', 'panelVitamin'");
+    const engine = labValuesForEngine(
+      {
+        date: '',
+        panelVitamin: { 'Vitamin D (25-OH)': '62' },
+        units: { panelVitamin: { 'Vitamin D (25-OH)': 'нмоль/л' } },
+      } as any,
+      'male',
+    );
+    expect(engine['VITD']).toBe(readLabValue('Vitamin D (25-OH)', 62, 'нмоль/л').value);
+    expect(engine['VITD']).not.toBe(62);
   });
 });
 
@@ -581,8 +610,16 @@ describe('проход 122: фолат читается по единице бл
   });
 
   it('движок берёт фолат через чтение с единицей', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['FOL'] = readHormone('Folate', 'panelVitamin'");
+    const engine = labValuesForEngine(
+      {
+        date: '',
+        panelVitamin: { Folate: '15' },
+        units: { panelVitamin: { Folate: 'нмоль/л' } },
+      } as any,
+      'male',
+    );
+    expect(engine['FOL']).toBe(readLabValue('Folate', 15, 'нмоль/л').value);
+    expect(engine['FOL']).not.toBe(15);
   });
 });
 
@@ -608,8 +645,16 @@ describe('проход 123: B12 читается по единице бланк�
   });
 
   it('движок берёт B12 через чтение с единицей', () => {
-    const src = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
-    expect(src).toContain("v['B12'] = readHormone('B12', 'panelVitamin'");
+    const engine = labValuesForEngine(
+      {
+        date: '',
+        panelVitamin: { B12: '300' },
+        units: { panelVitamin: { B12: 'пмоль/л' } },
+      } as any,
+      'male',
+    );
+    expect(engine['B12']).toBe(readLabValue('B12', 300, 'пмоль/л').value);
+    expect(engine['B12']).not.toBe(300);
   });
 });
 

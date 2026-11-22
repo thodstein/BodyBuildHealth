@@ -470,8 +470,9 @@ export function labValueFrom(flat: Record<string, number>, marker: string): numb
  * новое имя получает то же число. Существующие ключи не перезаписываются — если в
  * карте уже стоят два написания с разными числами, второе не прячется.
  *
- * `labCoverage` эту карту не читает: счётчик введённых анализов
- * (`support-plan/engine-helpers`) по-прежнему считает записи, а не синонимы.
+ * `labCoverage` эту карту читает, но считает не ключи, а маркеры модели
+ * (`risk-engine-tz-spec.riskLabCoverage`): синоним одного анализа — один балл,
+ * а поле, которого модель не знает, — ноль баллов.
  */
 export function tierLabView(flat: Record<string, number>): Record<string, number> {
   const out = { ...flat };
