@@ -1790,6 +1790,18 @@ const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
                </div>
 );
             })()}
+            {/* Таймер отдыха уехал вместе с прошлым упражнением (мы прокрутили экран
+                к следующему) — держим счётчик видимым строкой сверху. */}
+            {timerRunning && timerExIdx >= 0 && timerExIdx !== currentExIdx && (
+              <div data-session="rest-strip" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '8px 10px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: `1px solid ${timerSec <= 10 ? 'rgba(245,158,11,0.35)' : 'rgba(0,230,138,0.18)'}` }}>
+                <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>⏱ Отдых</span>
+                <b style={{ fontSize: 15, fontWeight: 800, color: timerSec <= 10 ? '#f59e0b' : ACCENT, fontVariantNumeric: 'tabular-nums', flex: 1 }}>{String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}</b>
+                <button type="button" data-act="rest-strip-skip" onClick={skipRestTimer}
+                  style={{ fontSize: 10, fontWeight: 700, padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', cursor: 'pointer', minHeight: 34 }}>
+                  Пропустить
+                </button>
+              </div>
+            )}
             {/* Всё закрыто — следующий шаг виден сразу, искать «Завершить» не нужно. */}
             {mainProgress.totalSets > 0 && mainProgress.doneSets === mainProgress.totalSets && (
               <button type="button" data-act="all-sets-done" onClick={() => { hapticImpact('medium'); exitSession(); }}

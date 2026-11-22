@@ -718,6 +718,12 @@ describe('SessionPlayer: кнопки доводят от разминки до 
       expect(ok).toBeTruthy();
       fireEvent.click(ok);
       expect(scrollSpy).toHaveBeenCalled();
+      // Отдых начался на прошлом упражнении и остался выше экрана — счётчик виден сверху.
+      const strip = container.querySelector('[data-session="rest-strip"]') as HTMLElement;
+      expect(strip).toBeTruthy();
+      expect(strip.textContent).toContain('Отдых');
+      fireEvent.click(container.querySelector('[data-act="rest-strip-skip"]') as HTMLElement);
+      expect(container.querySelector('[data-session="rest-strip"]')).toBeNull();
       unmount();
     } finally {
       proto.scrollIntoView = orig;
