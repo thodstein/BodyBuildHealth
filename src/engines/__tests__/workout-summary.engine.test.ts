@@ -23,7 +23,11 @@ import {
 } from '../workout-summary.engine';
 import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 
-function mkWorkout(date: string, rows: Array<{ name: string; id?: string; weight: number; reps: number; sets?: number; rir?: number }>, duration = 60): WorkoutLog {
+function mkWorkout(
+  date: string,
+  rows: Array<{ name: string; id?: string; weight: number; reps: number; sets?: number; rir?: number }>,
+  duration = 60,
+): WorkoutLog {
   const exercises: StrengthLogEntry[] = rows.map((r, i) => ({
     id: `${date}_${i}`,
     date,
@@ -80,10 +84,10 @@ describe('workout-summary: сводка по одной тренировке', (
         { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 3, sets: 2 },
       ]),
     ]);
-    const press = s.patterns.find(p => p.pattern === 'horizontal_push')!;
+    const press = s.patterns.find((p) => p.pattern === 'horizontal_push')!;
     expect(press.repZones).toEqual({ strength: 0, hypertrophy: 3, endurance: 0 });
     // Силовая работа своя у каждого движения, а не общая на отчёт.
-    expect(s.patterns.find(p => p.repZones.strength > 0)?.repZones.strength).toBe(2);
+    expect(s.patterns.find((p) => p.repZones.strength > 0)?.repZones.strength).toBe(2);
     const txt = buildWorkoutReportText(s);
     expect(txt).toContain('Горизонтальный жим: 3 подх · 24 повт · 1.9 т');
     expect(txt).toContain('повторы 1–5: 0%, 6–12: 100%, 13+: 0%');
@@ -91,7 +95,7 @@ describe('workout-summary: сводка по одной тренировке', (
 
   it('группирует по мышцам и упражнениям', () => {
     const s = buildWorkoutSummary([w]);
-    const muscles = s.muscles.map(m => m.muscle);
+    const muscles = s.muscles.map((m) => m.muscle);
     expect(muscles).toContain('chest');
     expect(muscles).toContain('quads');
     expect(s.muscles.reduce((x, m) => x + m.sets, 0)).toBe(5);
@@ -101,11 +105,11 @@ describe('workout-summary: сводка по одной тренировке', (
 
   it('показывает движения (паттерны)', () => {
     const s = buildWorkoutSummary([w]);
-    const labels = s.patterns.map(p => p.label);
-    expect(labels.some(l => /Горизонтальный жим/i.test(l))).toBe(true);
-    expect(labels.some(l => /Приседание/i.test(l))).toBe(true);
+    const labels = s.patterns.map((p) => p.label);
+    expect(labels.some((l) => /Горизонтальный жим/i.test(l))).toBe(true);
+    expect(labels.some((l) => /Приседание/i.test(l))).toBe(true);
     // Доля подходов складывается в 100% и не путается с долей тоннажа.
-    expect(s.patterns.map(p => p.setsSharePct)).toEqual([60, 40]);
+    expect(s.patterns.map((p) => p.setsSharePct)).toEqual([60, 40]);
     expect(s.patterns[0].sharePct).not.toBe(s.patterns[0].setsSharePct);
   });
 
@@ -114,13 +118,14 @@ describe('workout-summary: сводка по одной тренировке', (
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 4 }]),
     ]);
-    const bench = s.patterns.find(p => p.pattern === resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern)!;
+    const bench = s.patterns.find((p) => p.pattern === resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern)!;
     expect(bench.weeklySets).toEqual([2, 4]);
     expect(bench.weeklyTrendPct).toBe(100);
     // Одна неделя — базы для тренда нет, нули не выдумываем.
     expect(
-      buildWorkoutSummary([mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }])])
-        .patterns.every(p => p.weeklyTrendPct === null),
+      buildWorkoutSummary([
+        mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
+      ]).patterns.every((p) => p.weeklyTrendPct === null),
     ).toBe(true);
   });
 });
@@ -141,17 +146,17 @@ describe('workout-summary: период из нескольких трениро
     expect(s.dateFrom).toBe('2026-11-02');
     expect(s.dateTo).toBe('2026-11-09');
     // e1RM вырос с 80×8 до 85×8 → это рекорд периода
-    expect(s.prs.some(p => p.exercise.includes('Жим'))).toBe(true);
-    expect(s.exercises.find(e => e.name.includes('Жим'))?.sessions).toBe(2);
+    expect(s.prs.some((p) => p.exercise.includes('Жим'))).toBe(true);
+    expect(s.exercises.find((e) => e.name.includes('Жим'))?.sessions).toBe(2);
   });
 
   it('берёт неделю мезоцикла из журнала, а без неё — null', () => {
     const s = buildWorkoutSummary(workouts);
-    expect(s.sessions.map(x => x.weekNumber)).toEqual([1, 1, 1]);
+    expect(s.sessions.map((x) => x.weekNumber)).toEqual([1, 1, 1]);
     // Неделю не писали — null, а не выдуманная единица.
     const bare = {
       ...workouts[0],
-      exercises: workouts[0].exercises.map(e => ({ ...e, weekNumber: undefined as any })),
+      exercises: workouts[0].exercises.map((e) => ({ ...e, weekNumber: undefined as any })),
     };
     expect(buildWorkoutSummary([bare]).sessions[0].weekNumber).toBeNull();
     // Одна устаревшая строка не переставляет сессию: берём самую частую неделю.
@@ -160,7 +165,9 @@ describe('workout-summary: период из нескольких трениро
       { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5 },
       { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10 },
     ]);
-    mixed.exercises.forEach(e => { e.weekNumber = 3; });
+    mixed.exercises.forEach((e) => {
+      e.weekNumber = 3;
+    });
     mixed.exercises[2].weekNumber = 4;
     expect(buildWorkoutSummary([mixed]).sessions[0].weekNumber).toBe(3);
   });
@@ -171,7 +178,7 @@ describe('workout-summary: период из нескольких трениро
       mkWorkout('2026-11-04', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 }]),
       mkWorkout('2026-11-09', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 }]),
     ]);
-    const chest = s.muscles.find(m => m.muscle === 'chest')!;
+    const chest = s.muscles.find((m) => m.muscle === 'chest')!;
     expect(chest.sessions).toBe(2);
     // 4 подхода за 2 тренировки с грудью, а не за 3 тренировки периода.
     expect(chest.setsPerMuscleSession).toBe(2);
@@ -187,7 +194,7 @@ describe('workout-summary: период из нескольких трениро
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
       mkWorkout('2026-11-04', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 3, sets: 2 }]),
     ]);
-    const chest = s.muscles.find(m => m.muscle === 'chest')!;
+    const chest = s.muscles.find((m) => m.muscle === 'chest')!;
     expect(chest.repZones).toEqual({ strength: 2, hypertrophy: 3, endurance: 0 });
     const dz = dominantRepZone(chest.repZones)!;
     expect(dz).toMatchObject({ label: '6–12', hint: 'гипертрофия', sets: 3, total: 5, pct: 60 });
@@ -197,7 +204,9 @@ describe('workout-summary: период из нескольких трениро
 
   it('не падает на пустом наборе и на битых записях', () => {
     expect(buildWorkoutSummary([]).totals.sessions).toBe(0);
-    const broken = [{ id: 'x', date: '2026-11-10', duration: 0, exercises: [{} as any], overallRPE: 0, recoveryBefore: 0, split: '' }] as WorkoutLog[];
+    const broken = [
+      { id: 'x', date: '2026-11-10', duration: 0, exercises: [{} as any], overallRPE: 0, recoveryBefore: 0, split: '' },
+    ] as WorkoutLog[];
     expect(() => buildWorkoutSummary(broken)).not.toThrow();
     expect(buildWorkoutSummary(broken).totals.sets).toBe(0);
   });
@@ -226,7 +235,10 @@ describe('workout-summary: диапазоны и адаптер сессии', (
 
   it('sessionToWorkoutLog переносит weightKg и считает тоннаж', () => {
     const log = sessionToWorkoutLog({
-      sessionId: 's1', date: '2026-11-10', focus: 'Ноги', durationMin: 55,
+      sessionId: 's1',
+      date: '2026-11-10',
+      focus: 'Ноги',
+      durationMin: 55,
       exercises: [{ exerciseName: 'Приседания', sets: [{ weightKg: 100, reps: 5, rir: 2, rpe: 7 }] }],
     });
     expect(log.exercises[0].sets[0].weight).toBe(100);
@@ -261,7 +273,9 @@ describe('workout-summary: диапазоны и адаптер сессии', (
   });
 
   it('formatSummaryPeriod и набор блоков по умолчанию', () => {
-    const s = buildWorkoutSummary([mkWorkout('2026-11-10', [{ name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10 }])]);
+    const s = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10 }]),
+    ]);
     expect(formatSummaryPeriod(s)).toBe('10.11.2026');
     expect(ALL_REPORT_BLOCKS).toContain('muscles');
     expect(ALL_REPORT_BLOCKS).toContain('movement');
@@ -274,35 +288,43 @@ describe('workout-summary: диапазоны и адаптер сессии', (
 describe('workout-summary: выводы', () => {
   it('ловит перекос жимы/тяги', () => {
     const push = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 4 }]);
-    const pull = mkWorkout('2026-11-11', [{ name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 2 }]);
+    const pull = mkWorkout('2026-11-11', [
+      { name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 2 },
+    ]);
     const ins = buildWorkoutInsights(buildWorkoutSummary([push, pull]));
-    const balance = ins.find(x => x.id === 'pushpull');
+    const balance = ins.find((x) => x.id === 'pushpull');
     expect(balance?.tone).toBe('warn');
     expect(balance?.title).toMatch(/Жимы перевешивают/);
   });
 
   it('хвалит сбалансированные жимы и тяги', () => {
     const push = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
-    const pull = mkWorkout('2026-11-11', [{ name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 3 }]);
+    const pull = mkWorkout('2026-11-11', [
+      { name: 'Тяга штанги в наклоне', id: 'row_bar', weight: 70, reps: 10, sets: 3 },
+    ]);
     const ins = buildWorkoutInsights(buildWorkoutSummary([push, pull]));
-    expect(ins.find(x => x.id === 'pushpull')?.tone).toBe('good');
+    expect(ins.find((x) => x.id === 'pushpull')?.tone).toBe('good');
   });
 
   it('видит провал тоннажа между неделями', () => {
-    const heavy = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 8, sets: 3 }]);
+    const heavy = mkWorkout('2026-11-02', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 100, reps: 8, sets: 3 },
+    ]);
     const light = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 5, sets: 1 }]);
     const ins = buildWorkoutInsights(buildWorkoutSummary([heavy, light]));
-    const trend = ins.find(x => x.id === 'trend');
+    const trend = ins.find((x) => x.id === 'trend');
     expect(trend?.tone).toBe('warn');
     expect(trend?.title).toMatch(/Тоннаж недели -/);
   });
 
   it('предупреждает о работе в отказ (RIR 0)', () => {
-    const hard = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 0 }]);
+    const hard = mkWorkout('2026-11-10', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 0 },
+    ]);
     const summary = buildWorkoutSummary([hard]);
     expect(summary.totals.avgRIR).toBe(0);
     const ins = buildWorkoutInsights(summary);
-    expect(ins.some(x => x.id === 'rir' && x.tone === 'warn')).toBe(true);
+    expect(ins.some((x) => x.id === 'rir' && x.tone === 'warn')).toBe(true);
   });
 
   it('на пустой сводке молчит', () => {
@@ -310,24 +332,24 @@ describe('workout-summary: выводы', () => {
   });
 
   it('видит мышцы ниже MEV по недельному объёму', () => {
-    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map(d =>
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map((d) =>
       mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
     );
     const ins = buildWorkoutInsights(buildWorkoutSummary(weeks), 'intermediate');
-    const under = ins.find(x => x.id === 'under-mev');
+    const under = ins.find((x) => x.id === 'under-mev');
     expect(under?.title).toMatch(/Ниже MEV/);
     expect(under?.title).toMatch(/Грудь/);
   });
 
   it('видит мышцы выше MRV', () => {
-    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map(d =>
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16'].map((d) =>
       mkWorkout(d, [
         { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 12 },
         { name: 'Жим гантелей лёжа', id: 'bench_db', weight: 30, reps: 10, sets: 13 },
       ]),
     );
     const ins = buildWorkoutInsights(buildWorkoutSummary(weeks), 'intermediate');
-    expect(ins.find(x => x.id === 'over-mrv')?.tone).toBe('warn');
+    expect(ins.find((x) => x.id === 'over-mrv')?.tone).toBe('warn');
   });
 });
 
@@ -357,10 +379,14 @@ describe('workout-summary: ориентиры объёма', () => {
 
 describe('workout-summary: детализация подходов', () => {
   it('отдаёт подходы как есть, свежие тренировки первыми', () => {
-    const older = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2, rir: 2 }]);
-    const newer = mkWorkout('2026-11-09', [{ name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3, rir: 1 }]);
+    const older = mkWorkout('2026-11-02', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2, rir: 2 },
+    ]);
+    const newer = mkWorkout('2026-11-09', [
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3, rir: 1 },
+    ]);
     const details = buildSetDetails([older, newer]);
-    expect(details.map(d => d.date)).toEqual(['2026-11-09', '2026-11-02']);
+    expect(details.map((d) => d.date)).toEqual(['2026-11-09', '2026-11-02']);
     expect(details[0].exercises[0].name).toBe('Тяга верхнего блока');
     expect(details[0].exercises[0].sets).toHaveLength(3);
     expect(details[0].exercises[0].sets[0]).toEqual({ weight: 60, reps: 10, rir: 1, rpe: 7, pct1RM: 75 });
@@ -368,12 +394,16 @@ describe('workout-summary: детализация подходов', () => {
   });
 
   it('RIR 0 сохраняется как значение, а не как «нет данных»', () => {
-    const w = mkWorkout('2026-11-10', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0 }]);
+    const w = mkWorkout('2026-11-10', [
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0 },
+    ]);
     expect(buildSetDetails([w])[0].exercises[0].sets[0].rir).toBe(0);
   });
 
   it('показывает интенсивность каждого подхода в % от лучшего e1RM', () => {
-    const w = mkWorkout('2026-11-12', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 2 }]);
+    const w = mkWorkout('2026-11-12', [
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 2 },
+    ]);
     w.exercises[0].sets = [
       { weight: 100, reps: 5, rir: 2, rpe: 8 },
       { weight: 80, reps: 8, rir: 4, rpe: 6 },
@@ -381,7 +411,7 @@ describe('workout-summary: детализация подходов', () => {
     const row = buildSetDetails([w])[0].exercises[0];
     // Лучший e1RM тренировки — 100×5 (117 кг), от него и считаем проценты.
     expect(row.bestE1RM).toBe(117);
-    expect(row.sets.map(s => s.pct1RM)).toEqual([85, 68]);
+    expect(row.sets.map((s) => s.pct1RM)).toEqual([85, 68]);
     const txt = buildWorkoutReportText(buildWorkoutSummary([w]), { details: buildSetDetails([w]) });
     expect(txt).toContain('100×5@2 (85%)');
     expect(txt).toContain('80×8@4 (68%)');
@@ -399,13 +429,17 @@ describe('workout-summary: детализация подходов', () => {
         null,
       ],
     } as any;
-    const details = buildSetDetails([legacy, null as any, { id: 'broken', date: '2026-11-06', exercises: 'oops' } as any]);
+    const details = buildSetDetails([
+      legacy,
+      null as any,
+      { id: 'broken', date: '2026-11-06', exercises: 'oops' } as any,
+    ]);
     expect(details).toHaveLength(2);
-    const day = details.find(d => d.date === '2026-11-05');
+    const day = details.find((d) => d.date === '2026-11-05');
     expect(day?.exercises).toHaveLength(1);
-    expect(day?.exercises[0].sets.map(s => s.weight)).toEqual([30, 0]);
+    expect(day?.exercises[0].sets.map((s) => s.weight)).toEqual([30, 0]);
     expect(day?.exercises[0].sets[1].rir).toBeNull();
-    expect(details.find(d => d.date === '2026-11-06')?.exercises).toEqual([]);
+    expect(details.find((d) => d.date === '2026-11-06')?.exercises).toEqual([]);
   });
 
   it('блок «Подходы» есть в наборе блоков', () => {
@@ -419,17 +453,19 @@ describe('workout-summary: недельная динамика и интенси
 
   it('считает КПШ по неделям', () => {
     const s = buildWorkoutSummary([w1, w2]);
-    expect(s.weeks.map(w => w.reps)).toEqual([24, 40]);
+    expect(s.weeks.map((w) => w.reps)).toEqual([24, 40]);
     // Плотность недели: 1920 кг / 60 мин и 3200 кг / 60 мин.
-    expect(s.weeks.map(w => w.durationMin)).toEqual([60, 60]);
-    expect(s.weeks.map(w => w.densityKgPerMin)).toEqual([32, 53.3]);
+    expect(s.weeks.map((w) => w.durationMin)).toEqual([60, 60]);
+    expect(s.weeks.map((w) => w.densityKgPerMin)).toEqual([32, 53.3]);
   });
 
   it('считает зоны повторов по неделям', () => {
-    const heavy = mkWorkout('2026-11-09', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]);
+    const heavy = mkWorkout('2026-11-09', [
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 },
+    ]);
     const s = buildWorkoutSummary([w1, heavy]);
     // Первая неделя — три подхода на 8, вторая — три на 5: объём тот же, зона другая.
-    expect(s.weeks.map(w => w.repZones)).toEqual([
+    expect(s.weeks.map((w) => w.repZones)).toEqual([
       { strength: 0, hypertrophy: 3, endurance: 0 },
       { strength: 3, hypertrophy: 0, endurance: 0 },
     ]);
@@ -437,7 +473,7 @@ describe('workout-summary: недельная динамика и интенси
 
   it('строит подходы по неделям и тренд по мышце', () => {
     const s = buildWorkoutSummary([w1, w2]);
-    const chest = s.muscles.find(m => m.muscle === 'chest');
+    const chest = s.muscles.find((m) => m.muscle === 'chest');
     expect(chest?.weeklySets).toEqual([3, 5]);
     expect(chest?.weeklyTrendPct).toBe(66.7);
   });
@@ -451,7 +487,7 @@ describe('workout-summary: недельная динамика и интенси
   it('у движения есть сила: лучший e1RM и его тренд по неделям', () => {
     const heavy = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 3 }]);
     const s = buildWorkoutSummary([w1, heavy]);
-    const press = s.patterns.find(p => p.pattern === 'horizontal_push')!;
+    const press = s.patterns.find((p) => p.pattern === 'horizontal_push')!;
     expect(press.bestE1RM).toBe(114);
     // Сила движения принадлежит конкретному упражнению, а не «паттерну».
     expect(press.bestExercise).toBe('Жим штанги лёжа');
@@ -461,11 +497,11 @@ describe('workout-summary: недельная динамика и интенси
   });
 
   it('одна неделя даёт силу, но не её тренд', () => {
-    const press = buildWorkoutSummary([w1]).patterns.find(p => p.pattern === 'horizontal_push')!;
+    const press = buildWorkoutSummary([w1]).patterns.find((p) => p.pattern === 'horizontal_push')!;
     expect(press.bestE1RM).toBe(101);
     expect(press.e1rmTrendPct).toBeNull();
     // Рост объёма без роста веса — это не рост силы: 0, а не «выросло».
-    const press2 = buildWorkoutSummary([w1, w2]).patterns.find(p => p.pattern === 'horizontal_push')!;
+    const press2 = buildWorkoutSummary([w1, w2]).patterns.find((p) => p.pattern === 'horizontal_push')!;
     expect(press2.bestE1RM).toBe(101);
     expect(press2.e1rmTrendPct).toBe(0);
   });
@@ -478,9 +514,7 @@ describe('workout-summary: недельная динамика и интенси
   });
 
   it('считает подходы близко к отказу, а не только средний RIR', () => {
-    const w = mkWorkout('2026-11-02', [
-      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 1 },
-    ]);
+    const w = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 1 }]);
     w.exercises[0].sets = [
       { weight: 80, reps: 8, rir: 4, rpe: 6 },
       { weight: 80, reps: 8, rir: 3, rpe: 7 },
@@ -505,54 +539,59 @@ describe('workout-summary: недельная динамика и интенси
         { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 2, rir: 1 },
       ]),
     ]);
-    const ins = buildWorkoutInsights(s).find(i => i.id === 'hard-sets');
+    const ins = buildWorkoutInsights(s).find((i) => i.id === 'hard-sets');
     expect(ins?.title).toBe('Только 25% подходов близко к отказу');
     expect(ins?.detail).toContain('2 из 8');
     // Все подходы с RIR ≤ 2 — подсказки нет, это нормальный режим.
-    expect(buildWorkoutInsights(buildWorkoutSummary([
-      mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6, rir: 1 }]),
-    ])).some(i => i.id === 'hard-sets')).toBe(false);
+    expect(
+      buildWorkoutInsights(
+        buildWorkoutSummary([
+          mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 6, rir: 1 }]),
+        ]),
+      ).some((i) => i.id === 'hard-sets'),
+    ).toBe(false);
   });
 
   it('выводит тренд объёма мышцы по неделям', () => {
     const ins = buildWorkoutInsights(buildWorkoutSummary([w1, w2]));
-    expect(ins.find(i => i.id === 'muscle-trend')?.title).toContain('+66.7%');
+    expect(ins.find((i) => i.id === 'muscle-trend')?.title).toContain('+66.7%');
   });
 
   it('говорит, когда объём растёт, а сила стоит', () => {
-    const weeks = (weights: number[]) => weights.map((weight, i) => mkWorkout(
-      ['2026-11-02', '2026-11-09', '2026-11-16'][i],
-      [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight, reps: 8, sets: 2 + i * 2 }],
-    ));
-    const gap = buildWorkoutInsights(buildWorkoutSummary(weeks([80, 80, 80])))
-      .find(i => i.id === 'pattern-strength');
+    const weeks = (weights: number[]) =>
+      weights.map((weight, i) =>
+        mkWorkout(['2026-11-02', '2026-11-09', '2026-11-16'][i], [
+          { name: 'Жим штанги лёжа', id: 'bench_bar', weight, reps: 8, sets: 2 + i * 2 },
+        ]),
+      );
+    const gap = buildWorkoutInsights(buildWorkoutSummary(weeks([80, 80, 80]))).find((i) => i.id === 'pattern-strength');
     expect(gap?.title).toContain('Горизонтальный жим');
     expect(gap?.title).toContain('+200%');
     // Тот же вес — сила не выросла; это и есть повод сказать.
     expect(gap?.title).toContain('сила 0%');
     expect(gap?.detail).toContain('Жим штанги лёжа');
     // Объём растёт и вес растёт — это прогресс, вывод не нужен.
-    expect(buildWorkoutInsights(buildWorkoutSummary(weeks([80, 85, 90])))
-      .some(i => i.id === 'pattern-strength')).toBe(false);
+    expect(
+      buildWorkoutInsights(buildWorkoutSummary(weeks([80, 85, 90]))).some((i) => i.id === 'pattern-strength'),
+    ).toBe(false);
   });
 
   it('называет упражнение, которое застряло на месте', () => {
-    const flat = ['2026-11-02', '2026-11-06', '2026-11-09', '2026-11-13']
-      .map(d => mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]));
-    const ins = buildWorkoutInsights(buildWorkoutSummary(flat)).find(i => i.id === 'stalled');
+    const flat = ['2026-11-02', '2026-11-06', '2026-11-09', '2026-11-13'].map((d) =>
+      mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    );
+    const ins = buildWorkoutInsights(buildWorkoutSummary(flat)).find((i) => i.id === 'stalled');
     expect(ins?.title).toContain('Жим штанги лёжа');
     expect(ins?.title).toContain('без роста 4 тренировок');
     expect(ins?.detail).toContain('лучший 80×8');
     // Три тренировки — ещё не плато, а разовая неудача.
-    expect(buildWorkoutInsights(buildWorkoutSummary(flat.slice(0, 3)))
-      .some(i => i.id === 'stalled')).toBe(false);
+    expect(buildWorkoutInsights(buildWorkoutSummary(flat.slice(0, 3))).some((i) => i.id === 'stalled')).toBe(false);
     // Вес растёт — это не плато.
     const grow = flat.map((w, i) => ({
       ...w,
-      exercises: w.exercises.map(e => ({ ...e, sets: e.sets!.map(s => ({ ...s, weight: 80 + i * 2.5 })) })),
+      exercises: w.exercises.map((e) => ({ ...e, sets: e.sets!.map((s) => ({ ...s, weight: 80 + i * 2.5 })) })),
     })) as typeof flat;
-    expect(buildWorkoutInsights(buildWorkoutSummary(grow))
-      .some(i => i.id === 'stalled')).toBe(false);
+    expect(buildWorkoutInsights(buildWorkoutSummary(grow)).some((i) => i.id === 'stalled')).toBe(false);
   });
 
   it('считает подходы по неделям для упражнения', () => {
@@ -577,12 +616,12 @@ describe('workout-summary: недельная динамика и интенси
       ]),
     ]);
     const ins = buildWorkoutInsights(s);
-    const drop = ins.find(i => i.id === 'pattern-drop');
+    const drop = ins.find((i) => i.id === 'pattern-drop');
     expect(drop?.title).toContain('Горизонтальный жим');
     expect(drop?.title).toContain('-66.7%');
     expect(drop?.detail).toContain('Было 6 подх/нед, стало 2');
     // Рост приседаний не подменяет просадку жима.
-    expect(ins.some(i => i.id === 'muscle-trend')).toBe(false);
+    expect(ins.some((i) => i.id === 'muscle-trend')).toBe(false);
   });
 
   it('пропорциональное снижение — это разгрузка, а не выпавшее движение', () => {
@@ -596,7 +635,7 @@ describe('workout-summary: недельная динамика и интенси
         { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
       ]),
     ]);
-    expect(buildWorkoutInsights(s).some(i => i.id === 'pattern-drop')).toBe(false);
+    expect(buildWorkoutInsights(s).some((i) => i.id === 'pattern-drop')).toBe(false);
   });
 
   it('замечает высокую интенсивность', () => {
@@ -604,7 +643,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 3, sets: 3 }]),
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 3, sets: 3 }]),
     ]);
-    expect(buildWorkoutInsights(hi).some(i => i.id === 'intensity')).toBe(true);
+    expect(buildWorkoutInsights(hi).some((i) => i.id === 'intensity')).toBe(true);
   });
 
   it('видит недобор объёма несколько недель подряд', () => {
@@ -613,7 +652,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
       mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
     ]);
-    expect(buildWorkoutInsights(s).find(i => i.id === 'mev-streak')?.title).toContain('3 нед. подряд');
+    expect(buildWorkoutInsights(s).find((i) => i.id === 'mev-streak')?.title).toContain('3 нед. подряд');
   });
 
   it('видит перебор MRV несколько недель подряд', () => {
@@ -621,7 +660,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 21 }]),
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 21 }]),
     ]);
-    expect(buildWorkoutInsights(s).find(i => i.id === 'mrv-streak')?.title).toContain('2 нед. подряд');
+    expect(buildWorkoutInsights(s).find((i) => i.id === 'mrv-streak')?.title).toContain('2 нед. подряд');
   });
 
   it('видит объём в норме, но собранный в одну тренировку в неделю', () => {
@@ -634,7 +673,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-11', [{ name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 3 }]),
     ]);
     const ins = buildWorkoutInsights(s);
-    const split = ins.find(i => i.id === 'split-volume');
+    const split = ins.find((i) => i.id === 'split-volume');
     expect(split?.title).toContain('Грудь: 10 подходов за тренировку, 1×/нед');
     expect(split?.detail).toContain('в норме');
     expect(split?.detail).toContain('Две по 5');
@@ -647,7 +686,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 15, sets: 4 }]),
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 50, reps: 15, sets: 4 }]),
     ]);
-    const ins = buildWorkoutInsights(s).find(i => i.id === 'zone-endurance');
+    const ins = buildWorkoutInsights(s).find((i) => i.id === 'zone-endurance');
     expect(ins?.title).toBe('Грудь: 100% подходов в зоне 13+');
     expect(ins?.detail).toContain('8 из 8');
     // 8–12 повторов — целевая зона, подсказки нет.
@@ -655,7 +694,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 70, reps: 10, sets: 4 }]),
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 70, reps: 10, sets: 4 }]),
     ]);
-    expect(buildWorkoutInsights(normal).some(i => i.id === 'zone-endurance')).toBe(false);
+    expect(buildWorkoutInsights(normal).some((i) => i.id === 'zone-endurance')).toBe(false);
   });
 
   it('не ругает частоту, когда мышца и так тренируется дважды в неделю', () => {
@@ -665,7 +704,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
       mkWorkout('2026-11-11', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 5 }]),
     ]);
-    expect(buildWorkoutInsights(s).some(i => i.id === 'split-volume')).toBe(false);
+    expect(buildWorkoutInsights(s).some((i) => i.id === 'split-volume')).toBe(false);
   });
 
   it('неделя отдыха сбрасывает серию', () => {
@@ -673,7 +712,7 @@ describe('workout-summary: недельная динамика и интенси
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
       mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
     ]);
-    expect(buildWorkoutInsights(s).some(i => i.id === 'mev-streak')).toBe(false);
+    expect(buildWorkoutInsights(s).some((i) => i.id === 'mev-streak')).toBe(false);
   });
 
   it('узнаёт разгрузку по сравнению с прошлым периодом', () => {
@@ -698,7 +737,7 @@ describe('workout-summary: недельная динамика и интенси
       ]),
     ]);
     const cmp = compareWorkoutSummaries(current, previous);
-    const deload = buildWorkoutInsights(current, 'intermediate', cmp).find(i => i.id === 'deload');
+    const deload = buildWorkoutInsights(current, 'intermediate', cmp).find((i) => i.id === 'deload');
     expect(deload).toBeTruthy();
     expect(deload!.title).toContain('-50%');
     expect(deload!.title).toContain('2 мышц');
@@ -719,12 +758,12 @@ describe('workout-summary: недельная динамика и интенси
       ]),
     ]);
     const cmp = compareWorkoutSummaries(cur, prev);
-    const bench = cmp.exercises.find(e => e.name === 'Жим штанги лёжа')!;
+    const bench = cmp.exercises.find((e) => e.name === 'Жим штанги лёжа')!;
     expect(bench.sets.previous).toBe(5);
     expect(bench.sets.current).toBe(3);
     expect(bench.sets.delta).toBe(-2);
     // Свой вес: e1RM не считается, но пропажа подходов всё равно видна.
-    const pullup = cmp.exercises.find(e => e.name === 'Подтягивания')!;
+    const pullup = cmp.exercises.find((e) => e.name === 'Подтягивания')!;
     expect(pullup.e1rm.current).toBe(0);
     expect(pullup.sets.delta).toBe(-2);
     const txt = buildWorkoutReportText(cur, { comparison: cmp, comparisonLabel: 'прошлой тренировкой' });
@@ -746,15 +785,17 @@ describe('workout-summary: недельная динамика и интенси
       ]),
     ]);
     const cmp = compareWorkoutSummaries(current, previous);
-    expect(buildWorkoutInsights(current, 'intermediate', cmp).some(i => i.id === 'deload')).toBe(false);
+    expect(buildWorkoutInsights(current, 'intermediate', cmp).some((i) => i.id === 'deload')).toBe(false);
   });
 
   it('без сравнения разгрузку не выдумывает', () => {
     const s = buildWorkoutSummary([
       mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
     ]);
-    expect(buildWorkoutInsights(s).some(i => i.id === 'deload')).toBe(false);
-    expect(buildWorkoutInsights(s, 'intermediate', compareWorkoutSummaries(s, null)).some(i => i.id === 'deload')).toBe(false);
+    expect(buildWorkoutInsights(s).some((i) => i.id === 'deload')).toBe(false);
+    expect(
+      buildWorkoutInsights(s, 'intermediate', compareWorkoutSummaries(s, null)).some((i) => i.id === 'deload'),
+    ).toBe(false);
   });
 });
 
@@ -762,7 +803,7 @@ describe('workout-summary: прогрессия упражнений', () => {
   it('собирает e1RM по тренировкам и считает прирост', () => {
     const w1 = mkWorkout('2026-11-02', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
     const w2 = mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 3 }]);
-    const ex = buildWorkoutSummary([w1, w2]).exercises.find(e => e.name === 'Жим штанги лёжа');
+    const ex = buildWorkoutSummary([w1, w2]).exercises.find((e) => e.name === 'Жим штанги лёжа');
     expect(ex?.e1rmSeries).toEqual([101, 114]);
     expect(ex?.progressPct).toBe(12.9);
   });
@@ -807,7 +848,7 @@ describe('workout-summary: сравнение периодов', () => {
 
   it('видит пропавшие и новые мышцы', () => {
     const c = compareWorkoutSummaries(current, previous);
-    const byMuscle = new Map(c.muscles.map(m => [m.muscle, m]));
+    const byMuscle = new Map(c.muscles.map((m) => [m.muscle, m]));
     expect(byMuscle.get('chest')?.sets.delta).toBe(0);
     expect(byMuscle.get('chest')?.tonnage).toEqual({ current: 2160, previous: 1920, delta: 240, pct: 12.5 });
     expect(byMuscle.get('back')?.sets).toEqual({ current: 0, previous: 3, delta: -3, pct: -100 });
@@ -816,9 +857,9 @@ describe('workout-summary: сравнение периодов', () => {
 
   it('сравнивает лучший e1RM по упражнениям', () => {
     const c = compareWorkoutSummaries(current, previous);
-    const bench = c.exercises.find(e => e.name === 'Жим штанги лёжа');
+    const bench = c.exercises.find((e) => e.name === 'Жим штанги лёжа');
     expect(bench?.e1rm).toEqual({ current: 114, previous: 101, delta: 13, pct: 12.9 });
-    const squat = c.exercises.find(e => e.name === 'Приседания со штангой');
+    const squat = c.exercises.find((e) => e.name === 'Приседания со штангой');
     expect(squat?.e1rm).toEqual({ current: 117, previous: 0, delta: 117, pct: null });
   });
 
@@ -826,7 +867,7 @@ describe('workout-summary: сравнение периодов', () => {
     const c = compareWorkoutSummaries(current, null);
     expect(c.empty).toBe(true);
     expect(c.metrics.tonnage).toEqual({ current: 3160, previous: 0, delta: 3160, pct: null });
-    expect(c.muscles.every(m => m.sets.previous === 0)).toBe(true);
+    expect(c.muscles.every((m) => m.sets.previous === 0)).toBe(true);
   });
 
   it('сравнивает средний RIR, а без записи молчит', () => {
@@ -889,22 +930,29 @@ describe('workout-summary: сравнение периодов', () => {
     // Меньше 10 п.п. — это разброс одной тренировки, а не смена работы.
     expect(zoneShiftNote({ current: 40, previous: 36, delta: 4, pct: null })).toBeNull();
     expect(zoneShiftNote({ current: 40, previous: 40, delta: 0, pct: null })).toBeNull();
-    expect(zoneShiftNote({ current: 60, previous: 40, delta: 20, pct: null }))
-      .toBe('объём сместился в силу (доля подходов 1–5 +20 п.п.)');
-    expect(zoneShiftNote({ current: 13.3, previous: 46.6, delta: -33.3, pct: null }))
-      .toBe('объём сместился в многоповторку (доля подходов 1–5 -33.3 п.п.)');
+    expect(zoneShiftNote({ current: 60, previous: 40, delta: 20, pct: null })).toBe(
+      'объём сместился в силу (доля подходов 1–5 +20 п.п.)',
+    );
+    expect(zoneShiftNote({ current: 13.3, previous: 46.6, delta: -33.3, pct: null })).toBe(
+      'объём сместился в многоповторку (доля подходов 1–5 -33.3 п.п.)',
+    );
   });
 });
 
 describe('workout-summary: рекорды и подходы без веса', () => {
-  const mkEx = (date: string, name: string, id: string, sets: Array<{ weight: number; reps: number }>): StrengthLogEntry => ({
+  const mkEx = (
+    date: string,
+    name: string,
+    id: string,
+    sets: Array<{ weight: number; reps: number }>,
+  ): StrengthLogEntry => ({
     id: `${date}_${id}`,
     date,
     exerciseId: id,
     exerciseName: name,
     isCompound: true,
     weekNumber: 1,
-    sets: sets.map(s => ({ weight: s.weight, reps: s.reps, rir: 2, rpe: 7 })),
+    sets: sets.map((s) => ({ weight: s.weight, reps: s.reps, rir: 2, rpe: 7 })),
     totalVolume: sets.reduce((a, s) => a + s.weight * s.reps, 0),
     estimated1RM: 0,
   });
@@ -929,16 +977,22 @@ describe('workout-summary: рекорды и подходы без веса', ()
   it('один рекорд на упражнение за тренировку, вес и повторы из одного подхода', () => {
     const s = buildWorkoutSummary([
       wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])]),
-      wrap('2026-11-09', [mkEx('2026-11-09', 'Жим штанги лёжа', 'bench_bar', [
-        { weight: 100, reps: 3 }, { weight: 70, reps: 12 }, { weight: 60, reps: 15 },
-      ])]),
+      wrap('2026-11-09', [
+        mkEx('2026-11-09', 'Жим штанги лёжа', 'bench_bar', [
+          { weight: 100, reps: 3 },
+          { weight: 70, reps: 12 },
+          { weight: 60, reps: 15 },
+        ]),
+      ]),
     ]);
     expect(s.prs).toHaveLength(1);
     expect(s.prs[0]).toMatchObject({ weight: 100, reps: 3, e1rm: 110, deltaPct: 4.8 });
   });
 
   it('с внешней базой рекорд виден и на первой тренировке периода', () => {
-    const baseline = [wrap('2026-10-26', [mkEx('2026-10-26', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])])];
+    const baseline = [
+      wrap('2026-10-26', [mkEx('2026-10-26', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])]),
+    ];
     const s = buildWorkoutSummary(
       [wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 100, reps: 3 }])])],
       baseline,
@@ -952,7 +1006,7 @@ describe('workout-summary: рекорды и подходы без веса', ()
       wrap('2026-11-02', [mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 90, reps: 5 }])]),
       wrap('2026-11-09', [mkEx('2026-11-09', 'Жим штанги лёжа', 'bench_bar', [{ weight: 100, reps: 3 }])]),
     ]);
-    const prs = buildWorkoutInsights(s).find(i => i.id === 'prs');
+    const prs = buildWorkoutInsights(s).find((i) => i.id === 'prs');
     expect(prs?.title).toBe('Рекордов: 1');
     expect(prs?.detail).toContain('Жим штанги лёжа 110 кг');
   });
@@ -960,21 +1014,32 @@ describe('workout-summary: рекорды и подходы без веса', ()
   it('подходы без веса считаются, но не дают тоннажа', () => {
     const s = buildWorkoutSummary([
       wrap('2026-11-02', [
-        mkEx('2026-11-02', 'Подтягивания', 'pullup', [{ weight: 0, reps: 10 }, { weight: 0, reps: 8 }]),
-        mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }]),
+        mkEx('2026-11-02', 'Подтягивания', 'pullup', [
+          { weight: 0, reps: 10 },
+          { weight: 0, reps: 8 },
+        ]),
+        mkEx('2026-11-02', 'Жим штанги лёжа', 'bench_bar', [
+          { weight: 80, reps: 8 },
+          { weight: 80, reps: 8 },
+        ]),
       ]),
     ]);
     expect(s.totals.weightlessSets).toBe(2);
     expect(s.totals.tonnageKg).toBe(1280);
     expect(s.totals.sets).toBe(4);
-    expect(s.exercises.find(e => e.name === 'Подтягивания')?.weightlessSets).toBe(2);
-    expect(s.exercises.find(e => e.name === 'Подтягивания')?.tonnageKg).toBe(0);
+    expect(s.exercises.find((e) => e.name === 'Подтягивания')?.weightlessSets).toBe(2);
+    expect(s.exercises.find((e) => e.name === 'Подтягивания')?.tonnageKg).toBe(0);
   });
 });
 
 describe('workout-summary: что делать с объёмом мышцы', () => {
-  const lm = (weeklySets: number, mev: number, mav: number, mrv: number, status: any) =>
-    ({ weeklySets, mev, mav, mrv, status });
+  const lm = (weeklySets: number, mev: number, mav: number, mrv: number, status: any) => ({
+    weeklySets,
+    mev,
+    mav,
+    mrv,
+    status,
+  });
 
   it('ниже MEV — говорит, сколько добавить', () => {
     const adv = volumeAdvice(lm(4, 8, 14, 20, 'below_mev'));
@@ -1019,19 +1084,29 @@ describe('workout-summary: что делать с объёмом мышцы', ()
 });
 
 describe('workout-summary: план против факта', () => {
-  const actual = () => buildWorkoutSummary([
-    mkWorkout('2026-11-03', [
-      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 },
-      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1 },
-    ]),
-  ]);
+  const actual = () =>
+    buildWorkoutSummary([
+      mkWorkout('2026-11-03', [
+        { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 2 },
+        { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1 },
+      ]),
+    ]);
 
   it('совпадение с планом — всё «по плану»', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
-    ], actual());
-    expect(pva.rows.every(r => r.status === 'done')).toBe(true);
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+      ],
+      actual(),
+    );
+    expect(pva.rows.every((r) => r.status === 'done')).toBe(true);
     expect(pva.setsPct).toBe(100);
     expect(pva.tonnagePct).toBe(100);
     expect(pva.plannedSets).toBe(3);
@@ -1040,19 +1115,38 @@ describe('workout-summary: план против факта', () => {
   });
 
   it('недобор подходов — «не добито» и минус в дельте', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-    ], actual());
-    const row = pva.rows.find(r => r.name === 'Жим штанги лёжа')!;
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+      ],
+      actual(),
+    );
+    const row = pva.rows.find((r) => r.name === 'Жим штанги лёжа')!;
     expect(row.status).toBe('under');
     expect(row.setsDelta).toBe(-1);
     expect(row.setsPct).toBe(66.7);
   });
 
   it('упражнение из плана не сделано — «пропущено» и в списке', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }] },
-    ], actual());
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Тяга штанги в наклоне',
+          sets: [
+            { weight: 60, reps: 10 },
+            { weight: 60, reps: 10 },
+          ],
+        },
+      ],
+      actual(),
+    );
     expect(pva.skipped).toEqual(['Тяга штанги в наклоне']);
     const row = pva.rows[0];
     expect(row.status).toBe('skipped');
@@ -1062,21 +1156,39 @@ describe('workout-summary: план против факта', () => {
   });
 
   it('лишнее упражнение — «не по плану», выполнение выше 100%', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-    ], actual());
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+      ],
+      actual(),
+    );
     expect(pva.unplanned).toEqual(['Приседания со штангой']);
-    expect(pva.rows.find(r => r.name === 'Приседания со штангой')?.setsPct).toBeNull();
+    expect(pva.rows.find((r) => r.name === 'Приседания со штангой')?.setsPct).toBeNull();
     expect(pva.plannedSets).toBe(2);
     expect(pva.actualSets).toBe(3);
     expect(pva.setsPct).toBe(150);
   });
 
   it('склеивает названия по регистру и ё/е', () => {
-    const pva = comparePlanVsActual([
-      { name: 'жим штанги лежа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
-    ], actual());
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'жим штанги лежа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        { name: 'приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+      ],
+      actual(),
+    );
     expect(pva.unplanned).toEqual([]);
     const row = pva.rows[0];
     expect(row.status).toBe('done');
@@ -1088,7 +1200,7 @@ describe('workout-summary: план против факта', () => {
   it('без плана молчит и не выдумывает проценты', () => {
     const pva = comparePlanVsActual(null, actual());
     expect(pva.empty).toBe(true);
-    expect(pva.rows.every(r => r.status === 'unplanned')).toBe(true);
+    expect(pva.rows.every((r) => r.status === 'unplanned')).toBe(true);
     expect(pva.setsPct).toBeNull();
     expect(pva.tonnagePct).toBeNull();
     expect(comparePlanVsActual([], actual()).plannedSets).toBe(0);
@@ -1096,16 +1208,28 @@ describe('workout-summary: план против факта', () => {
 
   it('недобор плана попадает в выводы', () => {
     const summary = actual();
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
-    ], summary);
-    const gap = buildWorkoutInsights(summary, 'intermediate', null, pva).find(i => i.id === 'plan-gap');
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }] },
+      ],
+      summary,
+    );
+    const gap = buildWorkoutInsights(summary, 'intermediate', null, pva).find((i) => i.id === 'plan-gap');
     expect(gap).toBeTruthy();
     expect(gap!.title).toContain('75%');
     expect(gap!.detail).toContain('не добито: Жим штанги лёжа 2/3');
     expect(gap!.detail).toContain('пропущено: Тяга штанги в наклоне');
-    expect(gap!.detail).toContain(`слабее всего — ${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel} 0/1`);
+    expect(gap!.detail).toContain(
+      `слабее всего — ${resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).patternLabel} 0/1`,
+    );
   });
 
   it('план и рекорды не вытесняются балансовыми выводами', () => {
@@ -1116,44 +1240,109 @@ describe('workout-summary: план против факта', () => {
       mkWorkout('2026-11-09', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 85, reps: 8, sets: 4 }]),
       mkWorkout('2026-11-16', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 90, reps: 8, sets: 6 }]),
     ]);
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: Array.from({ length: 20 }, () => ({ weight: 90, reps: 8 })) },
-    ], summary);
+    const pva = comparePlanVsActual(
+      [{ name: 'Жим штанги лёжа', sets: Array.from({ length: 20 }, () => ({ weight: 90, reps: 8 })) }],
+      summary,
+    );
     const ins = buildWorkoutInsights(summary, 'intermediate', null, pva);
     expect(ins).toHaveLength(7);
-    expect(ins.some(i => i.id === 'plan-gap')).toBe(true);
-    expect(ins.some(i => i.id === 'prs')).toBe(true);
+    expect(ins.some((i) => i.id === 'plan-gap')).toBe(true);
+    expect(ins.some((i) => i.id === 'prs')).toBe(true);
     // Важное — первым, общий баланс жимов и тяг уступает место новостям.
     expect(ins[0].id).toBe('plan-gap');
   });
 
   it('сворачивает план по движениям', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }, { weight: 100, reps: 5 }] },
-      { name: 'Тяга штанги в наклоне', sets: [{ weight: 60, reps: 10 }, { weight: 60, reps: 10 }] },
-    ], actual());
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        {
+          name: 'Приседания со штангой',
+          sets: [
+            { weight: 100, reps: 5 },
+            { weight: 100, reps: 5 },
+          ],
+        },
+        {
+          name: 'Тяга штанги в наклоне',
+          sets: [
+            { weight: 60, reps: 10 },
+            { weight: 60, reps: 10 },
+          ],
+        },
+      ],
+      actual(),
+    );
     // Факт: жим 2 подх, присед 1 подх, тяги не было.
     const bench = resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern;
     const squat = resolveExerciseMeta({ name: 'Приседания со штангой' }).pattern;
     const row = resolveExerciseMeta({ name: 'Тяга штанги в наклоне' }).pattern;
-    expect(pva.patterns.find(p => p.pattern === bench)).toMatchObject({ plannedSets: 3, actualSets: 2, setsDelta: -1, setsPct: 66.7 });
-    expect(pva.patterns.find(p => p.pattern === squat)).toMatchObject({ plannedSets: 2, actualSets: 1, setsDelta: -1, setsPct: 50 });
+    expect(pva.patterns.find((p) => p.pattern === bench)).toMatchObject({
+      plannedSets: 3,
+      actualSets: 2,
+      setsDelta: -1,
+      setsPct: 66.7,
+    });
+    expect(pva.patterns.find((p) => p.pattern === squat)).toMatchObject({
+      plannedSets: 2,
+      actualSets: 1,
+      setsDelta: -1,
+      setsPct: 50,
+    });
     // Движение в плане без факта: доля 0%, а не null — план был.
-    expect(pva.patterns.find(p => p.pattern === row)).toMatchObject({ plannedSets: 2, actualSets: 0, setsPct: 0 });
+    expect(pva.patterns.find((p) => p.pattern === row)).toMatchObject({ plannedSets: 2, actualSets: 0, setsPct: 0 });
     // Сортировка: сначала то, что планировали больше.
     expect(pva.patterns[0].pattern).toBe(bench);
   });
 
   it('сворачивает план по мышцам: грудь набрана жимом и разводкой', () => {
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'Разводка гантелями', sets: [{ weight: 14, reps: 12 }, { weight: 14, reps: 12 }] },
-      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }, { weight: 100, reps: 5 }] },
-    ], actual());
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        {
+          name: 'Разводка гантелями',
+          sets: [
+            { weight: 14, reps: 12 },
+            { weight: 14, reps: 12 },
+          ],
+        },
+        {
+          name: 'Приседания со штангой',
+          sets: [
+            { weight: 100, reps: 5 },
+            { weight: 100, reps: 5 },
+          ],
+        },
+      ],
+      actual(),
+    );
     // Факт: жим 2 подх, присед 1 подх. Два упражнения на грудь дают одну строку.
-    expect(pva.muscles.find(m => m.muscle === 'chest')).toMatchObject({ plannedSets: 5, actualSets: 2, setsDelta: -3, setsPct: 40 });
-    expect(pva.muscles.find(m => m.muscle === 'quads')).toMatchObject({ plannedSets: 2, actualSets: 1, setsDelta: -1, setsPct: 50 });
+    expect(pva.muscles.find((m) => m.muscle === 'chest')).toMatchObject({
+      plannedSets: 5,
+      actualSets: 2,
+      setsDelta: -3,
+      setsPct: 40,
+    });
+    expect(pva.muscles.find((m) => m.muscle === 'quads')).toMatchObject({
+      plannedSets: 2,
+      actualSets: 1,
+      setsDelta: -1,
+      setsPct: 50,
+    });
     // Сортировка: сначала мышца с большим планом.
     expect(pva.muscles[0].muscle).toBe('chest');
     expect(pva.muscles[0].label).toBe('Грудь');
@@ -1161,10 +1350,19 @@ describe('workout-summary: план против факта', () => {
 
   it('лишнее упражнение даёт движение «не по плану» с null-долей', () => {
     const squat = resolveExerciseMeta({ name: 'Приседания со штангой' }).pattern;
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-    ], actual());
-    const row = pva.patterns.find(p => p.pattern === squat)!;
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+      ],
+      actual(),
+    );
+    const row = pva.patterns.find((p) => p.pattern === squat)!;
     expect(row).toMatchObject({ plannedSets: 0, actualSets: 1, setsDelta: 1, setsPct: null });
     // Сортировка: сначала то, что планировали больше.
     expect(pva.patterns[0].pattern).toBe(resolveExerciseMeta({ name: 'Жим штанги лёжа' }).pattern);
@@ -1172,13 +1370,22 @@ describe('workout-summary: план против факта', () => {
 
   it('выполненный план вывод не создаёт', () => {
     const summary = actual();
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: [{ weight: 80, reps: 8 }, { weight: 80, reps: 8 }] },
-      { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
-    ], summary);
+    const pva = comparePlanVsActual(
+      [
+        {
+          name: 'Жим штанги лёжа',
+          sets: [
+            { weight: 80, reps: 8 },
+            { weight: 80, reps: 8 },
+          ],
+        },
+        { name: 'Приседания со штангой', sets: [{ weight: 100, reps: 5 }] },
+      ],
+      summary,
+    );
     expect(pva.setsPct).toBe(100);
-    expect(buildWorkoutInsights(summary, 'intermediate', null, pva).some(i => i.id === 'plan-gap')).toBe(false);
-    expect(buildWorkoutInsights(summary).some(i => i.id === 'plan-gap')).toBe(false);
+    expect(buildWorkoutInsights(summary, 'intermediate', null, pva).some((i) => i.id === 'plan-gap')).toBe(false);
+    expect(buildWorkoutInsights(summary).some((i) => i.id === 'plan-gap')).toBe(false);
   });
 });
 
@@ -1212,32 +1419,30 @@ describe('workout-summary: план недели (микроцикл) проти
     expect(wp.actualSessions).toBe(1);
     expect(wp.empty).toBe(false);
     // Числом плана тоже можно: массив подходов и их количество — одно и то же.
-    const chest = wp.rows.find(r => r.muscle === 'chest')!;
+    const chest = wp.rows.find((r) => r.muscle === 'chest')!;
     expect(chest).toMatchObject({ plannedSets: 4, actualSets: 3, setsDelta: -1, setsPct: 75 });
-    const back = wp.rows.find(r => r.muscle === 'back')!;
+    const back = wp.rows.find((r) => r.muscle === 'back')!;
     expect(back).toMatchObject({ plannedSets: 3, actualSets: 2, setsPct: 66.7 });
   });
 
   it('запланированное без факта — ноль, а не «нет данных»', () => {
     const wp = compareWeekPlanVsActual(plan, []);
-    const squat = wp.rows.find(r => r.muscle === 'quads')!;
+    const squat = wp.rows.find((r) => r.muscle === 'quads')!;
     expect(squat.plannedSets).toBe(4);
     expect(squat.actualSets).toBe(0);
     expect(squat.setsPct).toBe(0);
     expect(wp.actualSessions).toBe(0);
-    expect(wp.rows.every(r => r.actualSets === 0)).toBe(true);
+    expect(wp.rows.every((r) => r.actualSets === 0)).toBe(true);
   });
 
   it('без плана блок пуст, а сделанное сверх плана даёт null-долю', () => {
     const week = [
-      mkWorkout('2026-11-03', [
-        { name: 'Подъём штанги на бицепс', id: 'curl_bar', weight: 30, reps: 12, sets: 2 },
-      ]),
+      mkWorkout('2026-11-03', [{ name: 'Подъём штанги на бицепс', id: 'curl_bar', weight: 30, reps: 12, sets: 2 }]),
     ];
     expect(compareWeekPlanVsActual(null, week).empty).toBe(true);
     expect(compareWeekPlanVsActual([], week).setsPct).toBeNull();
     const wp = compareWeekPlanVsActual(plan, week);
-    const extra = wp.rows.find(r => r.muscle === 'biceps')!;
+    const extra = wp.rows.find((r) => r.muscle === 'biceps')!;
     expect(extra).toMatchObject({ plannedSets: 0, actualSets: 2, setsDelta: 2, setsPct: null });
   });
 
@@ -1250,8 +1455,7 @@ describe('workout-summary: план недели (микроцикл) проти
     ];
     const summary = buildWorkoutSummary(week);
     const wp = compareWeekPlanVsActual(plan, week);
-    const ins = buildWorkoutInsights(summary, 'intermediate', null, null, wp)
-      .find(i => i.id === 'week-plan')!;
+    const ins = buildWorkoutInsights(summary, 'intermediate', null, null, wp).find((i) => i.id === 'week-plan')!;
     expect(ins.title).toContain('5 из 11 подходов (45.5%)');
     expect(ins.detail).toContain('Осталось 6 подх');
     expect(ins.tone).toBe('info');
@@ -1291,8 +1495,9 @@ describe('workout-summary: следующая сессия', () => {
   });
 
   it('стоящее на месте упражнение получает разгрузку, а не +1 повтор', () => {
-    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'].map(d =>
-      mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]));
+    const weeks = ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23'].map((d) =>
+      mkWorkout(d, [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    );
     const s = buildWorkoutSummary(weeks);
     const item = buildNextSessionPlan(s)[0];
     expect(item.kind).toBe('deload');
@@ -1304,7 +1509,7 @@ describe('workout-summary: следующая сессия', () => {
 
   it('высокий RPE даёт разгрузку даже без истории плато', () => {
     const w = mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
-    w.exercises[0].sets = w.exercises[0].sets.map(st => ({ ...st, rpe: 9.5 }));
+    w.exercises[0].sets = w.exercises[0].sets.map((st) => ({ ...st, rpe: 9.5 }));
     const item = buildNextSessionPlan(buildWorkoutSummary([w]))[0];
     expect(item).toMatchObject({ kind: 'deload', from: '80×8', to: '72.5×8' });
     expect(item.note).toContain('RPE 9.5');
@@ -1337,10 +1542,11 @@ describe('workout-summary: следующая сессия', () => {
 });
 
 describe('workout-summary: текст отчёта для копирования', () => {
-  const wk = () => mkWorkout('2026-11-03', [
-    { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
-    { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3 },
-  ]);
+  const wk = () =>
+    mkWorkout('2026-11-03', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3 },
+    ]);
 
   it('собирает тот же отчёт, что на экране', () => {
     const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]));
@@ -1386,9 +1592,10 @@ describe('workout-summary: текст отчёта для копирования
 
   it('план и подходы попадают в текст', () => {
     const s = buildWorkoutSummary([wk()]);
-    const pva = comparePlanVsActual([
-      { name: 'Жим штанги лёжа', sets: Array.from({ length: 4 }, () => ({ weight: 80, reps: 8 })) },
-    ], s);
+    const pva = comparePlanVsActual(
+      [{ name: 'Жим штанги лёжа', sets: Array.from({ length: 4 }, () => ({ weight: 80, reps: 8 })) }],
+      s,
+    );
     const txt = buildWorkoutReportText(s, { plan: pva, details: buildSetDetails([wk()]) });
     expect(txt).toContain('План: 4 подх · факт: 6 подх (150%)');
     expect(txt).toContain('Жим штанги лёжа: план 4 → факт 3 (не добито)');
@@ -1420,9 +1627,7 @@ describe('workout-summary: текст отчёта для копирования
     const prev = mkWorkout('2026-10-27', [
       { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 2 },
     ]);
-    const cur = mkWorkout('2026-11-03', [
-      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
-    ]);
+    const cur = mkWorkout('2026-11-03', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]);
     const s = buildWorkoutSummary([cur]);
     const cmp = compareWorkoutSummaries(s, buildWorkoutSummary([prev]));
     const txt = buildWorkoutReportText(s, { comparison: cmp, comparisonLabel: 'прошлой тренировкой' });
@@ -1435,5 +1640,87 @@ describe('workout-summary: текст отчёта для копирования
     expect(txt).toContain('  Движения:');
     expect(txt).toContain('  e1RM по упражнениям:');
     expect(txt).toContain('Жим штанги лёжа: новое · ');
+  });
+});
+
+describe('workout-summary: пустые данные, единицы и выбор блоков', () => {
+  const wk = () =>
+    mkWorkout('2026-11-03', [
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 },
+      { name: 'Тяга верхнего блока', id: 'pulldown', weight: 60, reps: 10, sets: 3 },
+    ]);
+
+  it('контракт текста: шапка, итоги и никаких NaN', () => {
+    const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]));
+    expect(txt.split('\n')[0]).toMatch(/^📊 Отчёт: /);
+    expect(txt).toContain('Тренировок: 1 · подходов: 6 · повторов: 54');
+    expect(txt).toContain('Тоннаж: 3.7 т · время: 60 мин · плотность: 62 кг/мин');
+    expect(txt).not.toMatch(/NaN|Infinity|undefined|null/);
+  });
+
+  it('собирает текст только из выбранных блоков', () => {
+    const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]), { blocks: ['exercises'] });
+    expect(txt).toContain('По упражнениям:');
+    // Выключенные блоки не протекают ни заголовком, ни данными.
+    expect(txt).not.toContain('Тренировок:');
+    expect(txt).not.toContain('По мышцам:');
+    expect(txt).not.toContain('Движения:');
+    expect(txt).not.toContain('Зоны повторов:');
+  });
+
+  it('без блока «Общее» не печатает итоги', () => {
+    const txt = buildWorkoutReportText(buildWorkoutSummary([wk()]), { blocks: ['muscles'] });
+    expect(txt).toContain('По мышцам:');
+    expect(txt).not.toContain('Тренировок:');
+    expect(txt).not.toContain('Тоннаж:');
+  });
+
+  it('сессия без внешнего веса не даёт NaN и не выдумывает e1RM', () => {
+    const bw = mkWorkout('2026-11-18', [{ name: 'Подтягивания', id: 'pullup', weight: 0, reps: 10, sets: 2 }], 0);
+    const s = buildWorkoutSummary([bw]);
+    expect(s.totals.tonnageKg).toBe(0);
+    expect(s.totals.densityKgPerMin).toBe(0);
+    expect(s.totals.avgLoadKg).toBe(0);
+    expect(s.totals.avgIntensityPct).toBeNull();
+    expect(s.prs).toEqual([]);
+    expect(s.exercises[0].bestE1RM).toBe(0);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('Тоннаж: 0 кг · время не записано');
+    expect(txt).toContain('×10');
+    expect(txt).not.toContain('e1RM 0');
+    expect(txt).not.toMatch(/NaN|Infinity/);
+    // Сравнение с такой же сессией: дельты нулевые, а не NaN.
+    const cmp = compareWorkoutSummaries(s, buildWorkoutSummary([bw]));
+    expect(cmp.metrics.tonnage.delta).toBe(0);
+    expect(cmp.metrics.density.delta).toBe(0);
+    expect(JSON.stringify(cmp)).not.toMatch(/NaN|Infinity/);
+  });
+
+  it('нулевая длительность не даёт плотность NaN', () => {
+    const noTime = mkWorkout(
+      '2026-11-18',
+      [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }],
+      0,
+    );
+    const s = buildWorkoutSummary([noTime]);
+    expect(s.totals.durationMin).toBe(0);
+    expect(s.totals.densityKgPerMin).toBe(0);
+    expect(s.sessions[0].density).toBe(0);
+    expect(s.weeks[0].densityKgPerMin).toBe(0);
+    const txt = buildWorkoutReportText(s);
+    expect(txt).toContain('время не записано');
+    expect(txt).not.toMatch(/NaN|Infinity/);
+  });
+
+  it('спад тоннажа в сравнении тоже в тоннах, а не в килограммах', () => {
+    const now = buildWorkoutSummary([
+      mkWorkout('2026-11-10', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 1 }]),
+    ]);
+    const prev = buildWorkoutSummary([
+      mkWorkout('2026-11-03', [{ name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3 }]),
+    ]);
+    const txt = buildWorkoutReportText(now, { comparison: compareWorkoutSummaries(now, prev) });
+    expect(txt).toContain('-1.3 т');
+    expect(txt).not.toMatch(/-1[\s\u00a0]?280/);
   });
 });

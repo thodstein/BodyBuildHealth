@@ -4,9 +4,23 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 import { WorkoutMiniPult, WorkoutDayCard, WorkoutBigMode, WorkoutWidgetsPanel } from '../WorkoutSessionWidgets';
 import { RestTimerPill, IntervalTimer, SessionClock, formatTimer, WorkoutTimersPanel } from '../WorkoutTimersPanel';
-import { buildDayStatus, buildWeekMatrix, buildMonthCells, ScheduleDayStrip, ScheduleWeekMatrix, ScheduleMonthHeat, MedScheduleCalendarPanel } from '../MedScheduleCalendar';
+import {
+  buildDayStatus,
+  buildWeekMatrix,
+  buildMonthCells,
+  ScheduleDayStrip,
+  ScheduleWeekMatrix,
+  ScheduleMonthHeat,
+  MedScheduleCalendarPanel,
+} from '../MedScheduleCalendar';
 
-const DEMO = { dayLabel: 'День 1 · Грудь', exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }, { name: 'Разводка', done: 0, total: 3 }] };
+const DEMO = {
+  dayLabel: 'День 1 · Грудь',
+  exercises: [
+    { name: 'Жим', done: 2, total: 4, weight: 80 },
+    { name: 'Разводка', done: 0, total: 3 },
+  ],
+};
 
 describe('A проведение (3)', () => {
   it('A1 пульт: прогресс + кнопки 44px+', () => {
@@ -21,7 +35,9 @@ describe('A проведение (3)', () => {
     const { render, fireEvent } = await import('@testing-library/react');
     const { requestOpenSession } = await import('../WorkoutSessionWidgets');
     let got = 0;
-    const h = () => { got += 1; };
+    const h = () => {
+      got += 1;
+    };
     window.addEventListener('he-workout-open', h);
     requestOpenSession();
     expect(got).toBe(1);
@@ -46,12 +62,20 @@ describe('A проведение (3)', () => {
       dayLabel: 'Жим',
       exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }],
       live: {
-        sessionId: 's1', focus: 'Грудь', date: '2026-09-13', setsDone: 2, setsPlanned: 4,
-        volumeKg: 1200, currentExercise: 'Жим', progressPct: 50,
+        sessionId: 's1',
+        focus: 'Грудь',
+        date: '2026-09-13',
+        setsDone: 2,
+        setsPlanned: 4,
+        volumeKg: 1200,
+        currentExercise: 'Жим',
+        progressPct: 50,
       },
     };
     let opened = 0;
-    const onOpen = () => { opened += 1; };
+    const onOpen = () => {
+      opened += 1;
+    };
     window.addEventListener('he-workout-open', onOpen);
     const { container, unmount } = render(<WorkoutMiniPult state={LIVE as never} />);
     fireEvent.click(container.querySelector('[data-act="pult-next"]') as HTMLElement);
@@ -68,16 +92,26 @@ describe('A проведение (3)', () => {
       dayLabel: 'Жим',
       exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }],
       live: {
-        sessionId: 's1', focus: 'Грудь', date: '2026-09-13', setsDone: 2, setsPlanned: 4,
-        volumeKg: 1200, currentExercise: 'Жим', progressPct: 50,
+        sessionId: 's1',
+        focus: 'Грудь',
+        date: '2026-09-13',
+        setsDone: 2,
+        setsPlanned: 4,
+        volumeKg: 1200,
+        currentExercise: 'Жим',
+        progressPct: 50,
       },
     };
     // Эмулируем SessionPlayer: обработчик подтверждает, что подход записан.
-    const player = (ev: Event) => { (ev as CustomEvent).detail?.handled?.(); };
+    const player = (ev: Event) => {
+      (ev as CustomEvent).detail?.handled?.();
+    };
     window.addEventListener('he-workout-quick-set', player);
     expect(requestQuickSet()).toBe(true);
     let opened = 0;
-    const onOpen = () => { opened += 1; };
+    const onOpen = () => {
+      opened += 1;
+    };
     window.addEventListener('he-workout-open', onOpen);
     const { container, unmount } = render(<WorkoutMiniPult state={LIVE as never} />);
     fireEvent.click(container.querySelector('[data-act="pult-next"]') as HTMLElement);
@@ -128,6 +162,17 @@ describe('A проведение (3)', () => {
     expect(container.textContent).toContain('1 из 1');
     unmount();
   });
+  it('A1h пустой пульт: понятный статус вместо «Тренировки пока нет · 0/0»', () => {
+    localStorage.clear();
+    const html = renderToStaticMarkup(<WorkoutMiniPult />);
+    expect(html).toContain('data-widget="workout-pult"');
+    expect(html).toContain('Готов к тренировке');
+    expect(html).toContain('Сессия не начата');
+    expect(html).not.toContain('Тренировки пока нет');
+    expect(html).not.toContain('0/0');
+    // Старт остаётся на месте: пустой пульт не должен быть тупиком.
+    expect(html).toContain('data-act="pult-start"');
+  });
   it('A2 карточка дня: упражнения + старт/пропуск', () => {
     const html = renderToStaticMarkup(<WorkoutDayCard state={DEMO} />);
     expect(html).toContain('data-widget="workout-daycard"');
@@ -141,7 +186,9 @@ describe('A проведение (3)', () => {
     const big = renderToStaticMarkup(<WorkoutBigMode state={DEMO} />);
     expect(big).not.toContain('data-act="big-finish"');
     expect(big).toContain('data-act="big-open"');
-    expect(renderToStaticMarkup(<WorkoutBigMode state={DEMO} onFinish={() => {}} />)).toContain('data-act="big-finish"');
+    expect(renderToStaticMarkup(<WorkoutBigMode state={DEMO} onFinish={() => {}} />)).toContain(
+      'data-act="big-finish"',
+    );
   });
   it('A3 BIG: без живой сессии — старт, с сессией — ГОТОВО', () => {
     const idle = renderToStaticMarkup(<WorkoutBigMode state={DEMO} />);
@@ -204,13 +251,20 @@ describe('C календарь (3)', () => {
   it('buildMonthCells уровень 0..3', () => {
     const cells = buildMonthCells(2026, 8, db);
     expect(cells.length).toBeGreaterThan(27);
-    const hit = cells.find(c => c.date === '2026-09-13');
+    const hit = cells.find((c) => c.date === '2026-09-13');
     expect(hit?.level).toBe(3);
   });
   it('АПК §118: хуки виджетов покрыты native-CSS', async () => {
     const fs = await import('node:fs');
     const css = fs.readFileSync('src/styles-native.css', 'utf-8');
-    for (const hook of ['data-widget="workout-pult"', 'data-timer="rest"', 'data-cal="weekmatrix"', 'data-cal="monthheat"', 'prefers-reduced-motion', 'max-width: 380px']) {
+    for (const hook of [
+      'data-widget="workout-pult"',
+      'data-timer="rest"',
+      'data-cal="weekmatrix"',
+      'data-cal="monthheat"',
+      'prefers-reduced-motion',
+      'max-width: 380px',
+    ]) {
       expect(css).toContain(hook);
     }
   });
@@ -234,7 +288,13 @@ describe('C календарь (3)', () => {
     const { SessionWidgetsDock } = await import('../SessionWidgetsDock');
     localStorage.clear();
     let opened = 0;
-    const { container, unmount } = render(<SessionWidgetsDock onOpen={() => { opened += 1; }} />);
+    const { container, unmount } = render(
+      <SessionWidgetsDock
+        onOpen={() => {
+          opened += 1;
+        }}
+      />,
+    );
     fireEvent.click(container.querySelector('[data-act="dock-toggle"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-act="pult-start"]') as HTMLElement);
     expect(opened).toBe(1);
@@ -267,13 +327,37 @@ describe('C календарь (3)', () => {
       const [rp, setRp] = React.useState(0);
       const [ri, setRi] = React.useState(0);
       return (
-        <ExecutionZone tab="runtime" goal="" level="" recovery={0} trainingOutput={null} macrocycle={null}
-          selectedWeek={1} currentMicrocycle={null} runtimeDay={d} setRuntimeDay={setD}
-          runtimeExIdx={e} setRuntimeExIdx={setE} runtimeLogs={l} setRuntimeLogs={setL}
-          runtimeStarted={s} setRuntimeStarted={setS} plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
-          runtimeSetW={w} setRuntimeSetW={setW} runtimeSetR={r} setRuntimeSetR={setR}
-          runtimeSetRP={rp} setRuntimeSetRP={setRp} runtimeSetRI={ri} setRuntimeSetRI={setRi}
-          diary={{} as any} onRefresh={noop} />
+        <ExecutionZone
+          tab="runtime"
+          goal=""
+          level=""
+          recovery={0}
+          trainingOutput={null}
+          macrocycle={null}
+          selectedWeek={1}
+          currentMicrocycle={null}
+          runtimeDay={d}
+          setRuntimeDay={setD}
+          runtimeExIdx={e}
+          setRuntimeExIdx={setE}
+          runtimeLogs={l}
+          setRuntimeLogs={setL}
+          runtimeStarted={s}
+          setRuntimeStarted={setS}
+          plRuntime={null}
+          plRunOpen={o}
+          setPlRunOpen={setO}
+          runtimeSetW={w}
+          setRuntimeSetW={setW}
+          runtimeSetR={r}
+          setRuntimeSetR={setR}
+          runtimeSetRP={rp}
+          setRuntimeSetRP={setRp}
+          runtimeSetRI={ri}
+          setRuntimeSetRI={setRi}
+          diary={{} as any}
+          onRefresh={noop}
+        />
       );
     };
     const { container, unmount } = render(<Wrapper />);
