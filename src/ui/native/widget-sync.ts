@@ -79,6 +79,7 @@ import {
   noteAttachments,
   noteChecklistProgress,
   addCoachNote,
+  isCoachNoteDeleted,
   type CoachNotesStore,
 } from '../../engines/coach/coach-notes.engine';
 
@@ -837,7 +838,10 @@ export function collectCalendar(): {
  * (`NotesWidgetProvider`) читает `files` и рисует «📎».
  */
 export function notesForWidget(store: CoachNotesStore): NotesWidgetSnapshot {
-  const sorted = safe(() => sortCoachNotes(store.items), []);
+  // Корзина — не «заметки на сегодня»: в виджете её быть не должно,
+  // иначе удалённая заметка продолжает висеть на главном экране.
+  const live = store.items.filter(n => !isCoachNoteDeleted(n));
+  const sorted = safe(() => sortCoachNotes(live), []);
   return {
     notes: sorted.slice(0, 5).map(n => {
       const p = noteChecklistProgress(n);
@@ -853,8 +857,8 @@ export function notesForWidget(store: CoachNotesStore): NotesWidgetSnapshot {
         files,
       };
     }),
-    total: store.items.length,
-    pinned: store.items.filter(n => n.pinned).length,
+    total: live.length,
+    pinned: live.filter(n => n.pinned).length,
   };
 }
 

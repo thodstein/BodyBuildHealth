@@ -16,8 +16,10 @@ import {
   COACH_NOTE_ATTACHMENTS_MAX,
   COACH_NOTE_BODY_MAX,
   COACH_NOTE_CHECKLIST_MAX,
+  COACH_NOTE_TAGS_MAX,
   COACH_NOTE_TITLE_MAX,
 } from '../../../../engines/coach/coach-notes.engine';
+import { formatBytes } from '../../../../engines/note-media.engine';
 import {
   addCoachAthlete,
   emptyCoachState,
@@ -149,7 +151,7 @@ describe('поиск, закрепление, удаление', () => {
       target: { value: 'нет такого' },
     });
     const empty = container.querySelector('[data-notes="empty"]');
-    expect(empty?.textContent).toContain('Поиск идёт по заголовку, тексту и пунктам чек-листа');
+    expect(empty?.textContent).toContain('Поиск идёт по заголовку, тексту, пунктам чек-листа и тегам');
     expect(items(container)).toHaveLength(0);
 
     fireEvent.click(container.querySelector('[data-notes="empty-reset"]') as HTMLElement);
@@ -185,13 +187,70 @@ describe('поиск, закрепление, удаление', () => {
     expect(readCoachNotes(localStorage).items.find((n) => n.id === 'n1')?.pinned).toBe(true);
   });
 
-  it('удаление требует подтверждения', () => {
+  it('удаление требует подтверждения и отправляет в корзину', () => {
     seed();
     const { container } = render(<ProfileNotesTab />);
     const del = container.querySelector('[data-note-id="n2"] [data-notes="delete"]') as HTMLElement;
     fireEvent.click(del);
-    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+    expect(readCoachNotes(localStorage).items.every((n) => !n.deletedAt)).toBe(true);
     fireEvent.click(container.querySelector('[data-note-id="n2"] [data-notes="delete"]') as HTMLElement);
+    const after = readCoachNotes(localStorage);
+    // Из хранилища заметка не исчезла: она в корзине, файлы и текст целы.
+    expect(after.items).toHaveLength(2);
+    expect(after.items.find((n) => n.id === 'n2')?.deletedAt).toBeTruthy();
+    // В списке живых её больше нет, и это сказано явно.
+    expect(items(container)).toHaveLength(1);
+    expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('в корзине');
+  });
+
+  it('корзина возвращает заметку и окончательно удаляет только по подтверждению', () => {
+    seed();
+    const { container } = render(<ProfileNotesTab />);
+    const del = () => container.querySelector('[data-note-id="n2"] [data-notes="delete"]') as HTMLElement;
+    fireEvent.click(del());
+    fireEvent.click(del());
+    expect(items(container)).toHaveLength(1);
+
+    // Переключение на корзину показывает удалённую заметку.
+    const trashTab = container.querySelector('[data-notes="view"][data-view="trash"]') as HTMLElement;
+    expect(trashTab.textContent).toContain('Корзина · 1');
+    fireEvent.click(trashTab);
+    expect(items(container)).toHaveLength(1);
+    expect(items(container)[0].getAttribute('data-note-id')).toBe('n2');
+    // В корзине нет «Закрепить/Изменить»: только вернуть или стереть.
+    expect(container.querySelector('[data-notes="pin"]')).toBeNull();
+
+    fireEvent.click(container.querySelector('[data-notes="restore"]') as HTMLElement);
+    expect(readCoachNotes(localStorage).items.find((n) => n.id === 'n2')?.deletedAt).toBeFalsy();
+    expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('восстановлена');
+
+    // Снова в корзину — и теперь окончательно, двумя шагами.
+    fireEvent.click(container.querySelector('[data-notes="view"][data-view="active"]') as HTMLElement);
+    fireEvent.click(del());
+    fireEvent.click(del());
+    fireEvent.click(container.querySelector('[data-notes="view"][data-view="trash"]') as HTMLElement);
+    const purge = () => container.querySelector('[data-notes="purge"]') as HTMLElement;
+    fireEvent.click(purge());
+    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+    expect(purge().textContent).toContain('Точно удалить навсегда');
+    fireEvent.click(purge());
+    expect(readCoachNotes(localStorage).items.map((n) => n.id)).toEqual(['n1']);
+  });
+
+  it('очистка корзины удаляет все заметки из неё, живые остаются', () => {
+    seed();
+    const { container } = render(<ProfileNotesTab />);
+    const del = (id: string) => container.querySelector(`[data-note-id="${id}"] [data-notes="delete"]`) as HTMLElement;
+    fireEvent.click(del('n2'));
+    fireEvent.click(del('n2'));
+    fireEvent.click(container.querySelector('[data-notes="view"][data-view="trash"]') as HTMLElement);
+
+    const clear = () => container.querySelector('[data-notes="purge-trash"]') as HTMLElement;
+    fireEvent.click(clear());
+    // Первый тап — только вопрос, корзина на месте.
+    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+    expect(container.querySelector('[data-notes="purge-cancel"]')).not.toBeNull();
+    fireEvent.click(clear());
     expect(readCoachNotes(localStorage).items.map((n) => n.id)).toEqual(['n1']);
   });
 
@@ -200,15 +259,15 @@ describe('поиск, закрепление, удаление', () => {
     const { container } = render(<ProfileNotesTab />);
     const del = () => container.querySelector('[data-note-id="n1"] [data-notes="delete"]') as HTMLElement;
     fireEvent.click(del());
-    expect(del().textContent).toContain('Точно удалить');
+    expect(del().textContent).toContain('Точно в корзину');
 
     const search = container.querySelector('[data-notes="search"]') as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'Ферритин' } });
     fireEvent.change(search, { target: { value: '' } });
     // Заметка вернулась — но подтверждение уже снято, одного тапа мало.
-    expect(del().textContent).toBe('Удалить');
+    expect(del().textContent).toBe('В корзину');
     fireEvent.click(del());
-    expect(readCoachNotes(localStorage).items).toHaveLength(2);
+    expect(readCoachNotes(localStorage).items.every((n) => !n.deletedAt)).toBe(true);
   });
 
   it('«Новая заметка» снимает подтверждение удаления', () => {
@@ -217,7 +276,7 @@ describe('поиск, закрепление, удаление', () => {
     fireEvent.click(container.querySelector('[data-note-id="n1"] [data-notes="delete"]') as HTMLElement);
     openNew(container);
     fireEvent.click(container.querySelector('[data-notes="cancel"]') as HTMLElement);
-    expect(container.querySelector('[data-note-id="n1"] [data-notes="delete"]')?.textContent).toBe('Удалить');
+    expect(container.querySelector('[data-note-id="n1"] [data-notes="delete"]')?.textContent).toBe('В корзину');
     expect(readCoachNotes(localStorage).items).toHaveLength(2);
   });
 
@@ -406,5 +465,139 @@ describe('лимиты редактора', () => {
     // Диктовка добавляет текст, а не файл — она остаётся рабочей.
     expect((container.querySelector('[data-notes="dictate"]') as HTMLButtonElement).disabled).toBe(false);
     expect(container.querySelector('[data-notes="attach-limit"]')?.textContent).toContain('Достигнут лимит');
+  });
+});
+
+describe('теги, сортировка и метаданные вложений', () => {
+  const seedTags = () => {
+    let s = emptyCoachNotes();
+    s = addCoachNote(
+      s,
+      { title: 'Колено', body: 'не грузить', tags: ['колено', 'зал'] },
+      { id: 'n1', now: '2026-11-01T10:00:00.000Z' },
+    ).store;
+    s = addCoachNote(
+      s,
+      { title: 'Ферритин', body: 'пересдать', tags: ['анализы'] },
+      { id: 'n2', now: '2026-11-02T10:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, s);
+  };
+
+  it('теги из редактора сохраняются без `#`, дублей и сверх лимита', () => {
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'Колено' },
+    });
+    fireEvent.change(container.querySelector('[data-notes="editor-tags"]') as HTMLInputElement, {
+      target: { value: '#колено, ферритин, Колено' },
+    });
+    expect(container.querySelector('[data-notes="tags-count"]')?.textContent).toBe(`2/${COACH_NOTE_TAGS_MAX}`);
+    expect(container.querySelectorAll('[data-notes="editor-tag-list"] [data-notes="note-tag"]')).toHaveLength(2);
+    save(container);
+
+    const saved = readCoachNotes(localStorage).items[0];
+    expect(saved.tags).toEqual(['колено', 'ферритин']);
+    expect(container.querySelector('[data-notes="note-tag"]')?.textContent).toBe('#колено');
+  });
+
+  it('больше 10 тегов не сохраняется: счётчик и чипы показывают ровно лимит', () => {
+    const { container } = render(<ProfileNotesTab />);
+    openNew(container);
+    fireEvent.change(container.querySelector('[data-notes="title"]') as HTMLInputElement, {
+      target: { value: 'Много тегов' },
+    });
+    const many = Array.from({ length: COACH_NOTE_TAGS_MAX + 2 }, (_, i) => `tag${i}`).join(', ');
+    fireEvent.change(container.querySelector('[data-notes="editor-tags"]') as HTMLInputElement, {
+      target: { value: many },
+    });
+    expect(container.querySelector('[data-notes="tags-count"]')?.textContent).toBe(
+      `${COACH_NOTE_TAGS_MAX}/${COACH_NOTE_TAGS_MAX}`,
+    );
+    expect(container.querySelectorAll('[data-notes="editor-tag-list"] [data-notes="note-tag"]')).toHaveLength(
+      COACH_NOTE_TAGS_MAX,
+    );
+    expect(container.querySelector('[data-notes="tags-limit"]')).not.toBeNull();
+    save(container);
+    expect(readCoachNotes(localStorage).items[0].tags).toHaveLength(COACH_NOTE_TAGS_MAX);
+  });
+
+  it('чип тега фильтрует список, повторный тап снимает фильтр', () => {
+    seedTags();
+    const { container } = render(<ProfileNotesTab />);
+    expect(items(container)).toHaveLength(2);
+
+    const chip = () =>
+      container.querySelector('[data-notes="tag-list"] [data-notes="tag-chip"][data-tag="колено"]') as HTMLElement;
+    fireEvent.click(chip());
+    expect(items(container)).toHaveLength(1);
+    expect(items(container)[0].getAttribute('data-note-id')).toBe('n1');
+    expect(container.querySelector('[data-notes="filter-status"]')?.textContent).toContain('Показано 1 из 2');
+
+    fireEvent.click(chip());
+    expect(items(container)).toHaveLength(2);
+  });
+
+  it('поиск находит заметку по тегу, даже если его нет в тексте', () => {
+    seedTags();
+    const { container } = render(<ProfileNotesTab />);
+    fireEvent.change(container.querySelector('[data-notes="search"]') as HTMLInputElement, {
+      target: { value: 'анализы' },
+    });
+    expect(items(container)).toHaveLength(1);
+    expect(items(container)[0].getAttribute('data-note-id')).toBe('n2');
+  });
+
+  it('сортировка переключается и запоминается на устройстве', () => {
+    seedTags();
+    const { container } = render(<ProfileNotesTab />);
+    const order = () => Array.from(items(container)).map((el) => el.getAttribute('data-note-id'));
+    // По умолчанию — сначала изменённые (n2 новее).
+    expect(order()).toEqual(['n2', 'n1']);
+
+    const sort = container.querySelector('[data-notes="sort"]') as HTMLSelectElement;
+    fireEvent.change(sort, { target: { value: 'title' } });
+    expect(order()).toEqual(['n1', 'n2']);
+    expect(localStorage.getItem('he_coach_notes_sort')).toBe('title');
+
+    fireEvent.change(sort, { target: { value: 'created' } });
+    expect(order()).toEqual(['n2', 'n1']);
+    expect(localStorage.getItem('he_coach_notes_sort')).toBe('created');
+  });
+
+  it('выбранная сортировка восстанавливается после перерендера', () => {
+    seedTags();
+    localStorage.setItem('he_coach_notes_sort', 'title');
+    const { container } = render(<ProfileNotesTab />);
+    expect((container.querySelector('[data-notes="sort"]') as HTMLSelectElement).value).toBe('title');
+    expect(items(container)[0].getAttribute('data-note-id')).toBe('n1');
+  });
+
+  it('в редакторе у вложения видны имя и размер', () => {
+    const notes = addCoachNote(
+      emptyCoachNotes(),
+      {
+        title: 'С файлом',
+        attachments: [
+          {
+            id: 'a1',
+            kind: 'photo',
+            mime: 'image/jpeg',
+            size: 2048,
+            name: 'колено.jpg',
+            createdAt: '2026-11-17T09:00:00.000Z',
+          },
+        ],
+      },
+      { id: 'n1' },
+    ).store;
+    writeCoachNotes(localStorage, notes);
+
+    const { container } = render(<ProfileNotesTab />);
+    fireEvent.click(container.querySelector('[data-notes="edit"]') as HTMLElement);
+    const meta = container.querySelector('[data-notes="attach-meta"]');
+    expect(meta?.textContent).toContain('колено.jpg');
+    expect(meta?.textContent).toContain(formatBytes(2048));
   });
 });

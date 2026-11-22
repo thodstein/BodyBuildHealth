@@ -158,7 +158,7 @@ describe('аудио в заметке', () => {
     expect(items(container)[0].textContent).toContain('1 аудио');
   });
 
-  it('удаление заметки убирает её файлы из хранилища', async () => {
+  it('в корзину — файлы целы, окончательное удаление убирает и их', async () => {
     let store = emptyCoachNotes();
     store = addCoachNote(
       store,
@@ -194,6 +194,14 @@ describe('аудио в заметке', () => {
     fireEvent.click(container.querySelector('[data-notes="delete"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-notes="delete"]') as HTMLElement);
     await waitFor(() => expect(items(container)).toHaveLength(0));
+    // В корзине заметка ждёт восстановления — файл ещё нужен.
+    expect(readCoachNotes(localStorage).items[0].deletedAt).toBeTruthy();
+    expect(await listNoteMedia()).toHaveLength(1);
+
+    fireEvent.click(container.querySelector('[data-notes="view"][data-view="trash"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-notes="purge"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-notes="purge"]') as HTMLElement);
+    await waitFor(() => expect(readCoachNotes(localStorage).items).toHaveLength(0));
     await waitFor(async () => expect(await listNoteMedia()).toHaveLength(0));
   });
 });
@@ -333,6 +341,9 @@ describe('вложение можно забрать из приложения',
     expect(saveBlobApk).toHaveBeenCalledTimes(1);
     expect(saveBlobApk.mock.calls[0][0]).toBe('voice.m4a');
     expect((saveBlobApk.mock.calls[0][1] as Blob).size).toBe(3);
+    // Подсказку можно убрать, не дожидаясь следующего действия.
+    fireEvent.click(container.querySelector('[data-notes="share-dismiss"]') as HTMLElement);
+    expect(container.querySelector('[data-notes="share-status"]')).toBeNull();
   });
 
   it('пропавший файл объясняет ошибку прямо в списке, а не молчит', async () => {

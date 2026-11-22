@@ -112,8 +112,10 @@ import {
 import { authenticateWithBiometrics, isBiometricAvailable } from '../../../core/native-bridge';
 import {
   addCoachNote,
+  countLiveCoachNotes,
   countNotesForAthlete,
   emptyCoachNotes,
+  filterCoachNotes,
   readCoachNotes,
   weekNoteFor,
   writeCoachNotes,
@@ -1479,7 +1481,7 @@ export const ProfileCoachTab: React.FC<{
           snapshot: snapshots[a.id],
           adherence: adherence[a.id],
         })),
-        notes: notes.items,
+        notes: filterCoachNotes(notes, {}),
       }),
     [planner.items, state.athletes, snapshots, adherence, notes],
   );
@@ -1693,7 +1695,7 @@ export const ProfileCoachTab: React.FC<{
             {(
               [
                 ['log', 'Журнал', log.items.length],
-                ['notes', 'Заметки', notes.items.length],
+                ['notes', 'Заметки', countLiveCoachNotes(notes)],
                 ['planner', 'Планер', planner.items.filter(t => !t.done).length],
               ] as const
             ).map(([id, label, count]) => (
@@ -2734,7 +2736,7 @@ export const ProfileCoachTab: React.FC<{
                       <CoachReportSheet
                         athlete={a}
                         spaceId={athleteSpaceId(a.id)}
-                        notes={notes.items.filter(n => n.athleteId === a.id)}
+                        notes={filterCoachNotes(notes, { athleteId: a.id })}
                         coachLog={log.items.filter(e => e.athleteId === a.id)}
                         adherenceLine={adherence[a.id] ? adherenceLine(adherence[a.id]) : null}
                         onClose={() => setReportFor(null)}

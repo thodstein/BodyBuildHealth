@@ -40,17 +40,26 @@ import {
   COACH_NOTE_BODY_MAX,
   COACH_NOTE_CHECKLIST_MAX,
   COACH_NOTE_CHECKLIST_TEXT_MAX,
+  COACH_NOTE_TAG_MAX,
+  COACH_NOTE_TAGS_MAX,
   COACH_NOTE_TITLE_MAX,
   COACH_NOTES_MAX,
   addCoachNote,
+  collectCoachNoteTags,
+  countLiveCoachNotes,
   filterCoachNotes,
+  isCoachNoteDeleted,
   noteAttachmentIds,
   noteAttachments,
   noteChecklistProgress,
+  noteTags,
+  purgeCoachNote,
+  purgeCoachTrash,
   readCoachNotes,
-  removeCoachNote,
+  restoreCoachNote,
   toggleCoachNotePin,
   toggleNoteChecklistItem,
+  trashCoachNote,
   updateCoachNote,
   writeCoachNotes,
   type CoachNote,
@@ -58,6 +67,7 @@ import {
   type CoachNoteAttachmentKind,
   type CoachNoteChecklistItem,
   type CoachNotesStore,
+  type CoachNoteSort,
 } from '../../../engines/coach/coach-notes.engine';
 import {
   NOTE_AUDIO_MAX_MS,
@@ -145,6 +155,7 @@ interface EditorState {
   body: string;
   athleteId: string;
   pinned: boolean;
+  tagsText: string;
   checklist: CoachNoteChecklistItem[];
   attachments: DraftAttachment[];
 }
@@ -155,6 +166,7 @@ const EMPTY_EDITOR: EditorState = {
   body: '',
   athleteId: '',
   pinned: false,
+  tagsText: '',
   checklist: [],
   attachments: [],
 };
@@ -215,6 +227,46 @@ const BODY_PREVIEW_CHARS = 320;
 /** Длинный чек-лист в списке показываем первыми пунктами, остальное — по кнопке. */
 const CHECKLIST_PREVIEW_COUNT = 6;
 
+/** Выбранная сортировка запоминается на устройстве — как в списках TickTick. */
+const COACH_NOTES_SORT_KEY = 'he_coach_notes_sort';
+
+const readStoredSort = (): CoachNoteSort => {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(COACH_NOTES_SORT_KEY) : null;
+    return raw === 'created' || raw === 'title' ? raw : 'updated';
+  } catch {
+    return 'updated';
+  }
+};
+
+const writeStoredSort = (sort: CoachNoteSort): void => {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(COACH_NOTES_SORT_KEY, sort);
+  } catch {
+    /* ignore */
+  }
+};
+
+/**
+ * Разбор строки тегов: запятая, опциональный `#`, без пустых. Дубликаты без
+ * учёта регистра схлопываются, лишние сверх лимита отбрасываются. Движок
+ * делает то же самое, но UI обязан показать, что именно сохранится.
+ */
+const parseTagsText = (raw: string): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(',')) {
+    const tag = part.trim().replace(/^#+/, '').trim().slice(0, COACH_NOTE_TAG_MAX);
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(tag);
+    if (out.length >= COACH_NOTE_TAGS_MAX) break;
+  }
+  return out;
+};
+
 const newAttachmentId = (): string => `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const isBlobUrl = (url: string): boolean => typeof url === 'string' && url.startsWith('blob:');
@@ -258,10 +310,20 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     return athletes.some((a) => a.id === initialAthleteId) ? initialAthleteId : 'all';
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
+  /** Активные заметки или корзина — как два списка TickTick. */
+  const [viewMode, setViewMode] = useState<'active' | 'trash'>('active');
+  /** Выбранный тег; 'all' — без фильтра. */
+  const [tagFilter, setTagFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<CoachNoteSort>(readStoredSort);
   const [error, setError] = useState<string | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  /** Подтверждение окончательного удаления — отдельно от «в корзину». */
+  const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
+  const [confirmPurgeTrash, setConfirmPurgeTrash] = useState(false);
+  /** Короткое подтверждение действия («в корзине», «восстановлено»). */
+  const [notice, setNotice] = useState<string | null>(null);
   /** Статус «поделиться/сохранить» для последнего вложения. */
   const [shareNote, setShareNote] = useState<string | null>(null);
   /** Сколько занимают файлы заметок — по нему видно, что квота не бесконечна. */
@@ -325,13 +387,31 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     void noteMediaTotalBytes().then((n) => setMediaTotal(n));
   };
 
+  /** Живые заметки — лимит и счётчик не должны включать корзину. */
+  const liveCount = useMemo(() => countLiveCoachNotes(store), [store]);
+  const trashCount = store.items.length - liveCount;
+  /** Все теги живых заметок — для чипов фильтра. */
+  const tagSummary = useMemo(() => collectCoachNoteTags(store), [store]);
+
   const visible = useMemo(
-    () => filterCoachNotes(store, { query, athleteId: athleteFilter === 'all' ? null : athleteFilter }),
-    [store, query, athleteFilter],
+    () =>
+      filterCoachNotes(store, {
+        query,
+        athleteId: athleteFilter === 'all' ? null : athleteFilter,
+        tag: tagFilter === 'all' ? null : tagFilter,
+        deleted: viewMode === 'trash',
+        sort: sortBy,
+      }),
+    [store, query, athleteFilter, tagFilter, viewMode, sortBy],
   );
+  /** Сколько заметок в текущем списке (живые или корзина) — база для «показано X из Y». */
+  const viewTotal = viewMode === 'trash' ? trashCount : liveCount;
 
   /** Сколько заметок держат файлы: «занято X» — сумма именно по ним. */
-  const notesWithMedia = useMemo(() => store.items.filter((n) => noteAttachments(n).length > 0).length, [store]);
+  const notesWithMedia = useMemo(
+    () => store.items.filter((n) => !n.deletedAt && noteAttachments(n).length > 0).length,
+    [store],
+  );
 
   /* ── Медиа из IndexedDB: кэш по id ───────────────────────────────── */
   // Кэш, а не «перечитать всё при каждом изменении заметок»: иначе сохранение
@@ -407,7 +487,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   // сброса первый же тап по «Удалить» стирает её без второго шага.
   useEffect(() => {
     setConfirmDeleteId(null);
-  }, [query, athleteFilter]);
+    setConfirmPurgeId(null);
+    setConfirmPurgeTrash(false);
+    setConfirmClearMedia(false);
+  }, [query, athleteFilter, tagFilter, viewMode]);
 
   /* ── Esc закрывает просмотр фото (клавиатура/desktop) ─────────────── */
   useEffect(() => {
@@ -487,6 +570,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       body: n.body,
       athleteId: n.athleteId ?? '',
       pinned: n.pinned,
+      tagsText: noteTags(n).join(', '),
       checklist: (n.checklist ?? []).map((c) => ({ ...c })),
       attachments,
     });
@@ -894,6 +978,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       pinned: draft.pinned,
       checklist: trimmedChecklist(draft),
       attachments,
+      // Теги разбираются тем же правилом, что и движок: `#`, дубли и хвосты
+      // сверх лимита не должны доезжать до сохранения незаметно.
+      tags: parseTagsText(draft.tagsText),
     };
     if (draft.id) {
       const next = updateCoachNote(store, draft.id, payload);
@@ -987,15 +1074,58 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     })();
   };
 
+  /**
+   * Удаление — в корзину, а не навсегда: файлы и текст остаются, пока заметку
+   * не удалят окончательно из корзины. Первый тап — подтверждение.
+   */
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
-      apply(removeCoachNote(store, id));
-      void deleteNoteMediaForNote(id).then(refreshMediaTotal);
+      apply(trashCoachNote(store, id));
       setConfirmDeleteId(null);
+      setNotice('Заметка в корзине — её можно вернуть.');
       if (editor?.id === id) closeEditor();
       return;
     }
     setConfirmDeleteId(id);
+  };
+
+  /** Вернуть заметку из корзины — текст, теги и файлы на месте. */
+  const restoreFromTrash = (id: string) => {
+    const next = restoreCoachNote(store, id);
+    if (next === store) {
+      // Движок не даст превысить лимит живых заметок — говорим об этом прямо.
+      setNotice(`Лимит ${COACH_NOTES_MAX} живых заметок: освободите место и попробуйте снова.`);
+      return;
+    }
+    apply(next);
+    setConfirmPurgeId(null);
+    setNotice('Заметка восстановлена.');
+  };
+
+  /** Окончательное удаление одной заметки — здесь и только здесь файлы стираются. */
+  const purgeOne = (id: string) => {
+    if (confirmPurgeId !== id) {
+      setConfirmPurgeId(id);
+      return;
+    }
+    apply(purgeCoachNote(store, id));
+    void deleteNoteMediaForNote(id).then(refreshMediaTotal);
+    setConfirmPurgeId(null);
+    setNotice('Заметка удалена навсегда.');
+  };
+
+  /** Очистить корзину: удаляются все её заметки и их файлы. */
+  const purgeTrash = () => {
+    if (!confirmPurgeTrash) {
+      setConfirmPurgeTrash(true);
+      return;
+    }
+    const ids = store.items.filter((n) => isCoachNoteDeleted(n)).map((n) => n.id);
+    apply(purgeCoachTrash(store));
+    setConfirmPurgeTrash(false);
+    setConfirmPurgeId(null);
+    setNotice('Корзина очищена.');
+    void Promise.all(ids.map((id) => deleteNoteMediaForNote(id))).then(refreshMediaTotal);
   };
 
   /**
@@ -1043,26 +1173,39 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   // Поиск/фильтр — «честные»: видно, сколько скрыто, и есть чем вернуть всё.
   const queryText = query.trim();
-  const filtersActive = queryText.length > 0 || athleteFilter !== 'all';
+  const filtersActive = queryText.length > 0 || athleteFilter !== 'all' || tagFilter !== 'all';
   // Пустые строки чек-листа не сохраняются, поэтому лимит считаем по заполненным:
   // иначе кнопка «+ Пункт» запрещала бы добавление из-за черновиков.
   const checklistUsed = editor ? editor.checklist.filter((c) => c.text.trim().length > 0).length : 0;
   const checklistFull = checklistUsed >= COACH_NOTE_CHECKLIST_MAX;
   const attachmentsFull = editor ? editor.attachments.length >= COACH_NOTE_ATTACHMENTS_MAX : false;
-  const notesAtLimit = store.items.length >= COACH_NOTES_MAX;
+  const editorTags = editor ? parseTagsText(editor.tagsText) : [];
+  const tagsFull = editorTags.length >= COACH_NOTE_TAGS_MAX;
+  const notesAtLimit = liveCount >= COACH_NOTES_MAX;
   const resetFilters = () => {
     setQuery('');
     setAthleteFilter('all');
+    setTagFilter('all');
   };
   const emptyHint = (): string => {
+    if (viewMode === 'trash') {
+      if (queryText) return `В корзине ничего не найдено по запросу «${queryText}».`;
+      if (tagFilter !== 'all') return `В корзине нет заметок с тегом «${tagFilter}».`;
+      return 'Корзина пуста. Удалённые заметки попадают сюда и хранятся, пока вы не очистите корзину.';
+    }
     if (queryText && athleteFilter !== 'all') {
       return `Ничего не найдено по запросу «${queryText}» среди заметок выбранного фильтра.`;
     }
     if (queryText) {
-      return `Ничего не найдено по запросу «${queryText}». Поиск идёт по заголовку, тексту и пунктам чек-листа.`;
+      return `Ничего не найдено по запросу «${queryText}». Поиск идёт по заголовку, тексту, пунктам чек-листа и тегам.`;
+    }
+    if (tagFilter !== 'all') return `Заметок с тегом «${tagFilter}» нет.`;
+    if (liveCount === 0 && trashCount > 0) {
+      return 'Все заметки сейчас в корзине — откройте «Корзина» и восстановите нужные.';
     }
     if (athleteFilter === 'none') return 'Общих заметок без атлета пока нет.';
-    return 'У выбранного атлета заметок пока нет.';
+    if (athleteFilter !== 'all') return 'У выбранного атлета заметок пока нет.';
+    return 'Заметок пока нет. Добавьте первую — она останется на этом устройстве.';
   };
 
   return (
@@ -1076,7 +1219,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Заметки</div>
               <div style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
-                {store.items.length} из {COACH_NOTES_MAX}
+                {liveCount} из {COACH_NOTES_MAX}
+                {trashCount > 0 ? ` · в корзине ${trashCount}` : ''}
                 {mediaTotal > 0 ? ` · файлы ${formatBytes(mediaTotal)}` : ''}
               </div>
             </div>
@@ -1102,8 +1246,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             role="status"
             style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}
           >
-            Достигнут лимит {COACH_NOTES_MAX} заметок: новые не сохранятся, пока не удалите неактуальные. Старые заметки
-            планёр сам не стирает.
+            Достигнут лимит {COACH_NOTES_MAX} заметок: новые не сохранятся, пока не освободите место. Удалённые заметки
+            лежат в корзине и место не освобождают — очистите корзину, если они больше не нужны.
           </div>
         )}
 
@@ -1113,7 +1257,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }}
           >
             <span style={{ fontSize: 11.5, color: colors.textSubtle, fontVariantNumeric: 'tabular-nums' }}>
-              Файлы занимают {formatBytes(mediaTotal)} (заметок с файлами: {notesWithMedia}).
+              Файлы занимают {formatBytes(mediaTotal)} (заметок с файлами, кроме корзины: {notesWithMedia}).
             </span>
             {/* В редакторе файлы «в работе» — уборку там не предлагаем, чтобы не
                 оставить в заметке ссылки на уже удалённое. */}
@@ -1145,12 +1289,56 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        {/* Два списка, как в TickTick: живые заметки и корзина. */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setViewMode('active')}
+            data-notes="view"
+            data-view="active"
+            aria-pressed={viewMode === 'active'}
+            style={{ ...btn(viewMode === 'active' ? 'primary' : 'ghost'), fontSize: 12 }}
+          >
+            Заметки · {liveCount}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // Теги живых заметок в корзине не фильтруют — иначе список
+              // выглядел бы пустым без видимой причины.
+              setTagFilter('all');
+              setViewMode('trash');
+            }}
+            data-notes="view"
+            data-view="trash"
+            aria-pressed={viewMode === 'trash'}
+            style={{ ...btn(viewMode === 'trash' ? 'primary' : 'ghost'), fontSize: 12 }}
+          >
+            Корзина · {trashCount}
+          </button>
+          <select
+            value={sortBy}
+            onChange={(e) => {
+              const next = e.target.value as CoachNoteSort;
+              setSortBy(next);
+              writeStoredSort(next);
+            }}
+            aria-label="Сортировка заметок"
+            data-notes="sort"
+            style={{ ...inputStyle, width: 'auto', flex: '0 1 200px', marginLeft: 'auto' }}
+          >
+            <option value="updated">Сначала изменённые</option>
+            <option value="created">Сначала новые</option>
+            <option value="title">По заголовку (А–Я)</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск по заметкам"
+            placeholder={viewMode === 'trash' ? 'Поиск по корзине' : 'Поиск по заметкам'}
             aria-label="Поиск по заметкам"
             data-notes="search"
             style={{ ...inputStyle, flex: '1 1 170px', width: 'auto' }}
@@ -1173,6 +1361,62 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </select>
           )}
         </div>
+        {tagSummary.length > 0 && viewMode === 'active' && (
+          <div
+            data-notes="tag-list"
+            style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}
+          >
+            <span style={{ fontSize: 10.5, color: colors.textSubtle }}>Теги:</span>
+            <button
+              type="button"
+              onClick={() => setTagFilter('all')}
+              data-notes="tag-chip"
+              data-tag="all"
+              aria-pressed={tagFilter === 'all'}
+              style={{
+                minHeight: 44,
+                padding: '4px 10px',
+                borderRadius: 999,
+                fontSize: 11.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                border: `1px solid ${tagFilter === 'all' ? withAlpha(AMBER, '88') : 'rgba(255,255,255,0.14)'}`,
+                background: tagFilter === 'all' ? withAlpha(AMBER, '26') : 'rgba(255,255,255,0.05)',
+                color: tagFilter === 'all' ? AMBER : 'rgba(255,255,255,0.82)',
+              }}
+            >
+              Все
+            </button>
+            {tagSummary.map(({ tag, count }) => {
+              const active = tagFilter.toLowerCase() === tag.toLowerCase();
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setTagFilter(active ? 'all' : tag)}
+                  data-notes="tag-chip"
+                  data-tag={tag}
+                  aria-pressed={active}
+                  style={{
+                    minHeight: 44,
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: `1px solid ${active ? withAlpha(AMBER, '88') : 'rgba(255,255,255,0.14)'}`,
+                    background: active ? withAlpha(AMBER, '26') : 'rgba(255,255,255,0.05)',
+                    color: active ? AMBER : 'rgba(255,255,255,0.82)',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  #{tag}
+                  {count > 1 ? ` · ${count}` : ''}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {filtersActive && (
           <div
             data-notes="filter-status"
@@ -1187,7 +1431,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             }}
           >
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-              Показано {visible.length} из {store.items.length}
+              Показано {visible.length} из {viewTotal}
             </span>
             <button
               type="button"
@@ -1199,12 +1443,41 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </button>
           </div>
         )}
+        {viewMode === 'trash' && trashCount > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+            <button
+              type="button"
+              onClick={purgeTrash}
+              data-notes="purge-trash"
+              style={{ ...btn(confirmPurgeTrash ? 'danger' : 'ghost'), fontSize: 11.5 }}
+            >
+              {confirmPurgeTrash ? 'Точно очистить корзину?' : `Очистить корзину (${trashCount})`}
+            </button>
+            {confirmPurgeTrash && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setConfirmPurgeTrash(false)}
+                  data-notes="purge-cancel"
+                  style={{ ...btn('ghost'), fontSize: 11.5 }}
+                >
+                  Отмена
+                </button>
+                <span data-notes="purge-hint" style={{ fontSize: 11, color: colors.textSubtle }}>
+                  Все заметки из корзины и их файлы удалятся навсегда.
+                </span>
+              </>
+            )}
+          </div>
+        )}
         {!filtersActive && (
           <div
             data-notes="search-scope"
             style={{ marginTop: 8, fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
           >
-            Поиск идёт по заголовку, тексту и пунктам чек-листа; имена файлов не ищутся.
+            {viewMode === 'trash'
+              ? 'Здесь лежат удалённые заметки: их можно вернуть, текст и файлы сохраняются до окончательного удаления.'
+              : 'Поиск идёт по заголовку, тексту, пунктам чек-листа и тегам; имена файлов не ищутся.'}
           </div>
         )}
       </div>
@@ -1269,6 +1542,64 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           >
             {editor.body.length}/{COACH_NOTE_BODY_MAX}
           </div>
+
+          <label
+            style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}
+            htmlFor="note-tags"
+          >
+            Теги{' '}
+            <span
+              data-notes="tags-count"
+              style={{
+                fontWeight: 600,
+                color: tagsFull ? colors.danger : colors.textSubtle,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {editorTags.length}/{COACH_NOTE_TAGS_MAX}
+            </span>
+          </label>
+          <input
+            id="note-tags"
+            value={editor.tagsText}
+            onChange={(e) => setEditor((s) => (s ? { ...s, tagsText: e.target.value } : s))}
+            placeholder="Через запятую: колено, ферритин"
+            aria-label="Теги заметки через запятую"
+            data-notes="editor-tags"
+            style={inputStyle}
+          />
+          {editorTags.length > 0 && (
+            <div
+              data-notes="editor-tag-list"
+              style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}
+            >
+              {editorTags.map((tag) => (
+                <span
+                  key={tag}
+                  data-notes="note-tag"
+                  style={{
+                    fontSize: 11,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    border: `1px solid ${withAlpha(AMBER, '59')}`,
+                    background: withAlpha(AMBER, '1f'),
+                    color: AMBER,
+                  }}
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {tagsFull && (
+            <div
+              data-notes="tags-limit"
+              style={{ marginTop: 6, fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
+            >
+              Больше {COACH_NOTE_TAGS_MAX} тегов не сохранится: лишние отбрасываются. Удалите ненужный тег, чтобы
+              добавить новый.
+            </div>
+          )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             <button
@@ -1441,6 +1772,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}
                     </div>
                   )}
+                  <div
+                    data-notes="attach-meta"
+                    style={{
+                      marginTop: 4,
+                      fontSize: 10.5,
+                      color: colors.textSubtle,
+                      fontVariantNumeric: 'tabular-nums',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {a.name ?? (a.kind === 'photo' ? 'Фото' : 'Запись')} · {formatBytes(a.size)}
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeDraftAttachment(a.id)}
@@ -1656,9 +1999,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {visible.length === 0 && (
           <div data-notes="empty" style={{ ...cardStyle, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.5 }}>
-            {store.items.length === 0
-              ? 'Заметок пока нет. Сюда удобно писать то, что не влезает в дневники: травмы, ограничения, договорённости с атлетом.'
-              : emptyHint()}
+            {viewMode === 'trash' || store.items.length > 0
+              ? emptyHint()
+              : 'Заметок пока нет. Сюда удобно писать то, что не влезает в дневники: травмы, ограничения, договорённости с атлетом.'}
             {store.items.length > 0 && filtersActive && (
               <button
                 type="button"
@@ -1674,6 +2017,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         {visible.map((n) => {
           const athleteName = nameOf(n.athleteId);
           const isDeleting = confirmDeleteId === n.id;
+          const isPurging = confirmPurgeId === n.id;
+          // Живых уже 500 — восстанавливать некуда: движок не даст превысить лимит.
+          const restoreBlocked = notesAtLimit;
           const attachments = noteAttachments(n);
           const attachBytes = attachmentsBytes(attachments);
           const photos = attachments.filter((a) => a.kind === 'photo');
@@ -1909,7 +2255,11 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                 type="button"
                                 data-notes="checklist-toggle"
                                 data-checked={c.done}
-                                onClick={() => apply(toggleNoteChecklistItem(store, n.id, c.id))}
+                                onClick={() => {
+                                  if (viewMode === 'trash') return;
+                                  apply(toggleNoteChecklistItem(store, n.id, c.id));
+                                }}
+                                disabled={viewMode === 'trash'}
                                 aria-pressed={c.done}
                                 style={{
                                   display: 'flex',
@@ -1970,6 +2320,36 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       );
                     })()}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
+                    {noteTags(n).map((tag) => {
+                      const active = tagFilter.toLowerCase() === tag.toLowerCase();
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          data-notes="note-tag"
+                          data-tag={tag}
+                          aria-pressed={active}
+                          onClick={() => {
+                            setViewMode('active');
+                            setTagFilter(active ? 'all' : tag);
+                          }}
+                          style={{
+                            fontSize: 10.5,
+                            minHeight: 44,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            padding: '3px 10px',
+                            borderRadius: 999,
+                            cursor: 'pointer',
+                            color: AMBER,
+                            background: withAlpha(AMBER, '1f'),
+                            border: `1px solid ${withAlpha(AMBER, '40')}`,
+                          }}
+                        >
+                          #{tag}
+                        </button>
+                      );
+                    })}
                     {athleteName && (
                       <span
                         style={{
@@ -1986,54 +2366,108 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     )}
                     <span style={{ fontSize: 10.5, color: colors.textSubtle }}>{fmtDate(n.updatedAt)}</span>
                     {n.pinned && <span style={{ fontSize: 10.5, color: AMBER, fontWeight: 800 }}>закреплена</span>}
+                    {n.deletedAt && (
+                      <span data-notes="trash-date" style={{ fontSize: 10.5, color: colors.textSubtle }}>
+                        в корзине с {fmtDate(n.deletedAt)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  data-notes="pin"
-                  onClick={() => apply(toggleCoachNotePin(store, n.id))}
-                  style={{ ...btn('ghost'), fontSize: 12 }}
-                >
-                  {n.pinned ? 'Открепить' : 'Закрепить'}
-                </button>
-                <button
-                  type="button"
-                  data-notes="edit"
-                  onClick={() => openEdit(n)}
-                  style={{ ...btn('ghost'), fontSize: 12 }}
-                >
-                  Изменить
-                </button>
-                {speechOutputSupported && (n.title || n.body) && (
-                  <button
-                    type="button"
-                    data-notes="speak"
-                    data-speaking={speakingId === n.id}
-                    onClick={() => toggleSpeak(n)}
-                    style={{ ...btn('ghost'), fontSize: 12 }}
-                  >
-                    {speakingId === n.id ? 'Стоп озвучку' : 'Озвучить'}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  data-notes="delete"
-                  onClick={() => askDelete(n.id)}
-                  style={{ ...btn('danger'), fontSize: 12 }}
-                >
-                  {isDeleting ? 'Точно удалить' : 'Удалить'}
-                </button>
-                {isDeleting && (
-                  <button
-                    type="button"
-                    data-notes="delete-cancel"
-                    onClick={() => setConfirmDeleteId(null)}
-                    style={{ ...btn('ghost'), fontSize: 12 }}
-                  >
-                    Оставить
-                  </button>
+                {viewMode === 'trash' ? (
+                  <>
+                    <button
+                      type="button"
+                      data-notes="restore"
+                      onClick={() => restoreFromTrash(n.id)}
+                      disabled={restoreBlocked}
+                      aria-disabled={restoreBlocked}
+                      style={{
+                        ...btn('primary'),
+                        fontSize: 12,
+                        opacity: restoreBlocked ? 0.5 : 1,
+                        cursor: restoreBlocked ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Восстановить
+                    </button>
+                    <button
+                      type="button"
+                      data-notes="purge"
+                      onClick={() => purgeOne(n.id)}
+                      style={{ ...btn('danger'), fontSize: 12 }}
+                    >
+                      {isPurging ? 'Точно удалить навсегда?' : 'Удалить навсегда'}
+                    </button>
+                    {isPurging && (
+                      <button
+                        type="button"
+                        data-notes="purge-cancel"
+                        onClick={() => setConfirmPurgeId(null)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        Оставить
+                      </button>
+                    )}
+                    {restoreBlocked && (
+                      <div
+                        data-notes="restore-limit"
+                        style={{ flexBasis: '100%', fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
+                      >
+                        Лимит {COACH_NOTES_MAX} живых заметок: сначала уберите одну живую заметку в корзину — место
+                        освободится, и эту можно будет вернуть.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      data-notes="pin"
+                      onClick={() => apply(toggleCoachNotePin(store, n.id))}
+                      style={{ ...btn('ghost'), fontSize: 12 }}
+                    >
+                      {n.pinned ? 'Открепить' : 'Закрепить'}
+                    </button>
+                    <button
+                      type="button"
+                      data-notes="edit"
+                      onClick={() => openEdit(n)}
+                      style={{ ...btn('ghost'), fontSize: 12 }}
+                    >
+                      Изменить
+                    </button>
+                    {speechOutputSupported && (n.title || n.body) && (
+                      <button
+                        type="button"
+                        data-notes="speak"
+                        data-speaking={speakingId === n.id}
+                        onClick={() => toggleSpeak(n)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        {speakingId === n.id ? 'Стоп озвучку' : 'Озвучить'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      data-notes="delete"
+                      onClick={() => askDelete(n.id)}
+                      style={{ ...btn('danger'), fontSize: 12 }}
+                    >
+                      {isDeleting ? 'Точно в корзину?' : 'В корзину'}
+                    </button>
+                    {isDeleting && (
+                      <button
+                        type="button"
+                        data-notes="delete-cancel"
+                        onClick={() => setConfirmDeleteId(null)}
+                        style={{ ...btn('ghost'), fontSize: 12 }}
+                      >
+                        Оставить
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -2093,13 +2527,56 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
         </div>
       )}
 
+      {notice && (
+        <div
+          data-notes="notice"
+          role="status"
+          style={{
+            ...cardStyle,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12,
+            color: colors.textMuted,
+            lineHeight: 1.5,
+          }}
+        >
+          <span style={{ flex: 1 }}>{notice}</span>
+          <button
+            type="button"
+            data-notes="notice-dismiss"
+            onClick={() => setNotice(null)}
+            aria-label="Скрыть сообщение"
+            style={{ ...btn('ghost'), minHeight: 44, padding: '2px 10px', fontSize: 11.5 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {shareNote && (
         <div
           data-notes="share-status"
           role="status"
-          style={{ fontSize: 11.5, color: colors.textMuted, padding: '0 4px' }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 11.5,
+            color: colors.textMuted,
+            padding: '0 4px',
+          }}
         >
-          {shareNote}
+          <span style={{ flex: 1 }}>{shareNote}</span>
+          <button
+            type="button"
+            data-notes="share-dismiss"
+            onClick={() => setShareNote(null)}
+            aria-label="Скрыть статус сохранения"
+            style={{ ...btn('ghost'), minHeight: 44, padding: '2px 10px', fontSize: 11.5 }}
+          >
+            ✕
+          </button>
         </div>
       )}
 
