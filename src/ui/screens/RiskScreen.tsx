@@ -1654,7 +1654,7 @@ const ClinicalRiskDisplay: React.FC = () => {
       ]);
 
       const compounds = course.map(c => (c.substanceId||'').toLowerCase());
-      const markers = labs.map(l => ({ code: l.code || l.name, value: l.value }));
+      const markers = labs.map(l => ({ code: l.code || l.name, value: l.value, unit: l.unit }));
       const genetics = Object.keys(s?.genetics || {}).filter(k => !!(s?.genetics as any)?.[k]);
       const labDates = labs.map(l => l.date).filter(Boolean).sort().reverse();
       const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
@@ -1765,6 +1765,11 @@ const ClinicalRiskDisplay: React.FC = () => {
               {result.overallMaxRisk}%
             </div>
             <div style={{ fontSize: 12, color: '#fff', marginTop:6 }}>{result.markersAnalyzed} маркеров · {result.results.length} патологий</div>
+            {(result.markersUnread?.length ?? 0) > 0 && (
+              <div style={{ fontSize: 11, color: '#f59e0b', marginTop:6, lineHeight:1.4 }}>
+                ⚠️ Не прочитано в единице реестра: {(result.markersUnread || []).map((u: { code: string; unit: string; expectedUnit: string }) => `${u.code}${u.unit ? ` (${u.unit} ≠ ${u.expectedUnit})` : ''}`).join(', ')}
+              </div>
+            )}
           </div>
           <button onClick={handleAnalyze} style={{ width: '100%', minHeight:44, padding: '10px 16px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight:800, marginBottom: 10 }}>
             🔄 Пересчитать

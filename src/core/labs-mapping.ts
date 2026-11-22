@@ -524,7 +524,11 @@ export function normalizeLabMeasurement(code: string, value: number, unit: strin
     if (sourceDim.kind === targetDim.kind) {
       factor = sourceDim.perBase / targetDim.perBase;
       converted = true;
-    } else if (sourceDim.kind !== 'activity' && targetDim.kind !== 'activity') {
+    } else if ((sourceDim.kind === 'mass' || sourceDim.kind === 'mole')
+      && (targetDim.kind === 'mass' || targetDim.kind === 'mole')) {
+      // Проход 199: молярная масса годится только для пары «масса ↔ количество
+      // вещества». Счёт клеток (`10⁹/л`) и доля (`%`) раньше попадали сюда как
+      // «моли» и умножались на молярную массу.
       const molarMass = MOLAR_MASS[canonical];
       if (molarMass) {
         factor = sourceDim.kind === 'mass'
@@ -633,7 +637,11 @@ export function convertToUnit(code: string, value: number, fromUnit: string, toU
   }
   // Активность ↔ масса — только там, где коэффициент вещества известен
   // (пролактин: 1 нг/мл = 21.2 мМЕ/л). Иначе `null`: выдумывать фактор нельзя.
+  // Проход 199: активность пересчитывается только с массой или количеством
+  // вещества — счёт клеток («10⁹/л») и доля («%») к активности не относятся.
   if (sourceDim.kind === 'activity' || targetDim.kind === 'activity') {
+    const other = sourceDim.kind === 'activity' ? targetDim.kind : sourceDim.kind;
+    if (other !== 'mass' && other !== 'mole') return null;
     const perNgPerMl = MASS_ACTIVITY_FACTOR[mapToUcumCode(code).toUpperCase()];
     if (!perNgPerMl) return null;
     if (sourceDim.kind === 'mass') {
@@ -643,6 +651,13 @@ export function convertToUnit(code: string, value: number, fromUnit: string, toU
     const miuPerL = (value * sourceDim.perBase) / 1e-3;
     return round(((miuPerL / perNgPerMl) * 1e-9 * 1000) / targetDim.perBase);
   }
+  // Проход 199: масса ↔ количество вещества — единственная пара, которой нужна
+  // молярная масса. Раньше «не масса» означало «количество вещества», поэтому
+  // счёт клеток и доля пересчитывались как моли: ДГТ 500 в «10⁹/л» превращался
+  // в 500 нмоль/л и выглядел тяжёлым.
+  const crossKind = (sourceDim.kind === 'mass' && targetDim.kind === 'mole')
+    || (sourceDim.kind === 'mole' && targetDim.kind === 'mass');
+  if (!crossKind) return null;
   const canonical = mapToUcumCode(code);
   const molarMass = MOLAR_MASS[canonical] ?? MOLAR_MASS[canonical.toUpperCase()];
   if (!molarMass) return null;

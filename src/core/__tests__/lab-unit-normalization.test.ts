@@ -24,7 +24,7 @@ import { saveParsedLabs, type ParsedLabValue } from '../ocr-engine';
 import { parseLabText as parseProviderAware } from '../lab-auto-parser';
 import { parseLabResults, extractUnitFromLine } from '../../engines/biomarker-regex-engine';
 import { UCUM_MAP } from '../constants';
-import { mapToUcumCode, normalizeLabMeasurement, resolveLabMarker } from '../labs-mapping';
+import { mapToUcumCode, normalizeLabMeasurement, resolveLabMarker, convertToUnit } from '../labs-mapping';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -247,5 +247,31 @@ describe('проход 132: насыщение трансферрина', () => 
     expect(normalizeLabMeasurement('IRON_SAT', 0.3, 'fraction')).toEqual({ value: 30, unit: '%' });
     expect(normalizeLabMeasurement('TRANSFERRIN_SAT', 45, '%')).toEqual({ value: 45, unit: '%' });
     expect(normalizeLabMeasurement('TSAT', 28, '')).toEqual({ value: 28, unit: '%' });
+  });
+});
+
+/**
+ * Проход 199: молярная масса — только для пары «масса ↔ количество вещества».
+ *
+ * Раньше ветка «единицы разных величин» считала «всё, что не масса» за моли,
+ * а `convertToUnit` — то же самое: 500 «10⁹/л» ДГТ превращались в 500 нмоль/л
+ * (×2.9e20 в промежуточной арифметике) и выглядели тяжёлым анализом. Счёт
+ * клеток и доля — не моли: пересчёта между ними нет.
+ */
+describe('проход 199: счёт клеток и доля не пересчитываются как моли', () => {
+  it('нормализация не подписывает счёт клеток каноном массы', () => {
+    expect(normalizeLabMeasurement('DHT', 500, '10⁹/л')).toEqual({ value: 500, unit: '10⁹/л' });
+    expect(normalizeLabMeasurement('HGB', 0.15, '%')).toEqual({ value: 0.15, unit: '%' });
+  });
+
+  it('convertToUnit отказывается от пары «счёт ↔ количество вещества»', () => {
+    expect(convertToUnit('DHT', 500, '10⁹/л', 'нмоль/л')).toBeNull();
+    expect(convertToUnit('HGB', 15, '%', 'г/дл')).toBeNull();
+    expect(convertToUnit('DHT', 500, 'Ед/л', 'нмоль/л')).toBeNull();
+  });
+
+  it('свой пересчёт не потерян: масса ↔ количество вещества работает', () => {
+    expect(convertToUnit('DHT', 726.1, 'пг/мл', 'нмоль/л')).toBeCloseTo(2.5, 2);
+    expect(convertToUnit('HGB', 150, 'г/л', 'г/дл')).toBeCloseTo(15, 2);
   });
 });

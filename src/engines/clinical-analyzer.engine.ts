@@ -14,6 +14,8 @@ import {
   type ClinicalPathology, type CompoundRiskMapping,
 } from '../data/clinical-pathology-db';
 import { ruAdjCount, RU_ADJ_CRITICAL_M, RU_ADJ_HIGH, RU_RISKS } from './ru-plural';
+import { readLabInUnit } from '../core/labs-mapping';
+import { labStorageCode } from '../core/lab-storage-code';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -22,6 +24,21 @@ import { ruAdjCount, RU_ADJ_CRITICAL_M, RU_ADJ_HIGH, RU_RISKS } from './ru-plura
 export interface UserMarker {
   code: string;
   value: number;
+  /**
+   * Проход 199: единица, в которой пришло число. Реестр патологий держит свою
+   * (`CLINICAL_MARKERS[code].unit`, у ДГТ — нмоль/л), а склад отдаёт канон
+   * (пг/мл): без единицы 500 пг/мл ДГТ считались 500 нмоль/л и любая запись
+   * выглядела тяжёлой. Без поля число читается в единице реестра (как раньше).
+   */
+  unit?: string;
+}
+
+/** Маркер, который пришёл, но в единице реестра не читается (проход 199). */
+export interface UnreadMarker {
+  code: string;
+  value: number;
+  unit: string;
+  expectedUnit: string;
 }
 
 export interface PathologyResult {
@@ -75,6 +92,8 @@ export interface ClinicalAnalysisOutput {
   requiredInstrumental: string[];
   markersAnalyzed: number;
   markersMissing: string[];
+  /** Пришли, но в единице реестра не прочитались — не «в норме» и не «нет записи». */
+  markersUnread: UnreadMarker[];
   summary: string;
 }
 
@@ -163,12 +182,22 @@ function normalizeCompoundName(name: string): string {
 
 export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnalysisOutput {
   if (!input) {
-    return { results: [], systems: [], overallMaxRisk: 0, requiredLabPanel: [], requiredInstrumental: [], markersAnalyzed: 0, markersMissing: [], summary: 'Нет данных для анализа.' };
+    return { results: [], systems: [], overallMaxRisk: 0, requiredLabPanel: [], requiredInstrumental: [], markersAnalyzed: 0, markersMissing: [], markersUnread: [], summary: 'Нет данных для анализа.' };
   }
   const results: PathologyResult[] = [];
   const markers = input.markers || [];
-  const allMarkerCodes = new Set(markers.map(m => m.code));
-  const markerValueMap = new Map(markers.map(m => [m.code, m.value]));
+  // Проход 199: реестр патологий зовёт анализы по-английски (`Hematocrit`,
+  // `Testosterone_Total`), склад — кодами (`HCT`, `TT`). Это один анализ под
+  // двумя именами, и мост уже есть — `labStorageCode`. Без него панель
+  // «гематокрит + гемоглобин + эритроциты» читала только RBC, а остальные
+  // маркеры молча числились отсутствующими.
+  const markerByCode = new Map<string, UserMarker>();
+  for (const m of markers) {
+    if (!m || typeof m.code !== 'string') continue;
+    markerByCode.set(labStorageCode(m.code), m);
+  }
+  const markerCodes = new Set(markerByCode.keys());
+  const markersUnread: UnreadMarker[] = [];
 
   // Collect required panels from user's compounds
   const requiredLab = new Set<string>();
@@ -189,8 +218,22 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
     // Find which markers the user has for this pathology
     const userMarkers: { code: string; value: number }[] = [];
     for (const mc of (pathology?.linkedMarkers || [])) {
-      const val = markerValueMap.get(mc);
-      if (val !== undefined) userMarkers.push({ code: mc, value: val });
+      const found = markerByCode.get(labStorageCode(mc));
+      if (!found) continue;
+      const markerDef = CLINICAL_MARKERS[mc];
+      if (!markerDef) continue;
+      // Проход 199: число читается в единице реестра. Не прочиталось — маркер
+      // не «в норме» и не «отсутствует»: он называется отдельным списком.
+      const read = found.unit
+        ? readLabInUnit(mc, found.value, found.unit, markerDef.unit)
+        : found.value;
+      if (read === null) {
+        if (!markersUnread.some(u => u.code === mc)) {
+          markersUnread.push({ code: mc, value: found.value, unit: found.unit || '', expectedUnit: markerDef.unit });
+        }
+        continue;
+      }
+      userMarkers.push({ code: mc, value: read });
     }
 
     if (userMarkers.length === 0) continue;
@@ -333,7 +376,7 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
   for (const [, p] of Object.entries(CLINICAL_PATHOLOGIES || {})) {
     (p?.linkedMarkers || []).forEach(m => allLabMarkers.add(m));
   }
-  const markersMissing = [...allLabMarkers].filter(m => !allMarkerCodes.has(m)).sort();
+  const markersMissing = [...allLabMarkers].filter(m => !markerCodes.has(labStorageCode(m))).sort();
 
   // Summary
   const criticalCount = results.filter(r => r.alertLevel >= 3).length;
@@ -355,6 +398,7 @@ export function analyzeClinicalRisks(input: ClinicalAnalysisInput): ClinicalAnal
     requiredInstrumental: [...requiredInst].sort(),
     markersAnalyzed: new Set(results.flatMap(r => r.markersUsed || [])).size,
     markersMissing,
+    markersUnread,
     summary,
   };
 }

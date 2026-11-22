@@ -62,7 +62,7 @@ export const MapperTab: React.FC = () => {
       const compoundNames = course.length > 0
         ? course.map(c => (c.substanceId||'').toLowerCase())
         : manualDrugs.map(d => d.name);
-      const markers = (linked.labs || []).map(l => ({ code: l.code || l.name, value: l.value }));
+      const markers = (linked.labs || []).map(l => ({ code: l.code || l.name, value: l.value, unit: l.unit }));
       const s2 = linked.profile?.settings;
       const genetics = Object.keys(s2?.genetics || {}).filter(k => !!(s2?.genetics as any)?.[k]);
       const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
@@ -371,6 +371,12 @@ export const MapperTab: React.FC = () => {
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🧪 {clinicalResult.markersAnalyzed ?? 0} маркеров</span>
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>📋 {clinicalResult.requiredLabPanel?.length ?? 0} в панели</span>
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🔬 {clinicalResult.requiredInstrumental?.length ?? 0} иссл.</span>
+              {(clinicalResult.markersUnread?.length ?? 0) > 0 && (
+                <span
+                  title={(clinicalResult.markersUnread || []).map((u: { code: string; value: number; unit: string; expectedUnit: string }) => `${u.code}: ${u.value} ${u.unit} — ждёт ${u.expectedUnit}`).join('\n')}
+                  style={{ background:'rgba(245,158,11,0.12)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(245,158,11,0.3)', color:'#f59e0b' }}
+                >⚠️ {clinicalResult.markersUnread.length} не прочитано</span>
+              )}
             </div>
           </div>
 
