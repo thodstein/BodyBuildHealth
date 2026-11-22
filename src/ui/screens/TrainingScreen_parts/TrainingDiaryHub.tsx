@@ -903,8 +903,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             );
           })()}</>
           </InfoErrorBoundary>
-          <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
-          <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
           <InfoErrorBoundary label="Форма записи">
           <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
             sub={recordSub} onSubChange={setRecordSub}
@@ -912,6 +910,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
           {/* Дополнительные карточки дня — ниже формы: сначала запись, потом контекст */}
           <div data-pl="record-aux" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Привычки недели и миксы — контекст, а не запись: не оттесняют форму */}
+            <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
+            <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
             {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
             <BBContestPrepActiveCard onOpen={() => {
               try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
