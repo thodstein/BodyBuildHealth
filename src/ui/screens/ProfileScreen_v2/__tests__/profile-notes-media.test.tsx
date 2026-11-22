@@ -13,8 +13,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { pickPhoto } from '../../../../core/native-bridge';
 import { ProfileNotesTab } from '../ProfileNotesTab';
-import { addCoachNote, emptyCoachNotes, readCoachNotes, writeCoachNotes } from '../../../../engines/coach/coach-notes.engine';
-import { __resetNoteMediaForTests, listNoteMedia, noteMediaPayload, saveNoteMedia } from '../../../../engines/note-media-store';
+import {
+  addCoachNote,
+  emptyCoachNotes,
+  readCoachNotes,
+  writeCoachNotes,
+} from '../../../../engines/coach/coach-notes.engine';
+import {
+  __resetNoteMediaForTests,
+  deleteNoteMedia,
+  listNoteMedia,
+  noteMediaPayload,
+  saveNoteMedia,
+} from '../../../../engines/note-media-store';
 
 vi.mock('../../../../core/native-bridge', () => ({
   pickPhoto: vi.fn(),
@@ -149,12 +160,29 @@ describe('аудио в заметке', () => {
       store,
       {
         title: 'С голосом',
-        attachments: [{ id: 'm1', kind: 'audio', mime: 'audio/webm', size: 3, durationMs: 5000, createdAt: '2026-11-17T09:00:00.000Z' }],
+        attachments: [
+          {
+            id: 'm1',
+            kind: 'audio',
+            mime: 'audio/webm',
+            size: 3,
+            durationMs: 5000,
+            createdAt: '2026-11-17T09:00:00.000Z',
+          },
+        ],
       },
       { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
     ).store;
     writeCoachNotes(localStorage, store);
-    await saveNoteMedia({ id: 'm1', noteId: 'n1', kind: 'audio', mime: 'audio/webm', size: 3, createdAt: 1, blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' }) });
+    await saveNoteMedia({
+      id: 'm1',
+      noteId: 'n1',
+      kind: 'audio',
+      mime: 'audio/webm',
+      size: 3,
+      createdAt: 1,
+      blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' }),
+    });
 
     const { container } = render(<ProfileNotesTab />);
     expect(container.querySelector('[data-notes="attachments"]')?.textContent).toContain('1 аудио');
@@ -301,6 +329,46 @@ describe('вложение можно забрать из приложения',
     expect(saveBlobApk).toHaveBeenCalledTimes(1);
     expect(saveBlobApk.mock.calls[0][0]).toBe('voice.m4a');
     expect((saveBlobApk.mock.calls[0][1] as Blob).size).toBe(3);
+  });
+
+  it('пропавший файл объясняет ошибку прямо в списке, а не молчит', async () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(
+      store,
+      {
+        title: 'С голосом',
+        attachments: [
+          {
+            id: 'm1',
+            kind: 'audio',
+            mime: 'audio/mp4',
+            size: 3,
+            createdAt: '2026-11-17T09:00:00.000Z',
+          },
+        ],
+      },
+      { id: 'n1', now: '2026-11-17T09:00:00.000Z' },
+    ).store;
+    writeCoachNotes(localStorage, store);
+    await saveNoteMedia({
+      id: 'm1',
+      noteId: 'n1',
+      kind: 'audio',
+      mime: 'audio/mp4',
+      size: 3,
+      createdAt: 1,
+      bytes: new Uint8Array([1, 2, 3]).buffer as ArrayBuffer,
+    });
+
+    const { container } = render(<ProfileNotesTab />);
+    await waitFor(() => expect(container.querySelector('[data-notes="audio-player"]')).not.toBeNull());
+    // Файл исчез уже после отрисовки (квота/ручная уборка): кнопка ещё есть.
+    await deleteNoteMedia(['m1']);
+    fireEvent.click(container.querySelector('[data-notes="share"]') as HTMLElement);
+    await waitFor(() =>
+      expect(container.querySelector('[data-notes="voice-error"]')?.textContent).toContain('Файл не найден'),
+    );
+    expect(container.querySelector('[data-notes="editor"]')).toBeNull();
   });
 });
 

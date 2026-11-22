@@ -38,6 +38,7 @@ import {
   COACH_NOTE_ATTACHMENT_BYTES_MAX,
   COACH_NOTE_ATTACHMENTS_MAX,
   COACH_NOTE_BODY_MAX,
+  COACH_NOTE_CHECKLIST_MAX,
   COACH_NOTE_CHECKLIST_TEXT_MAX,
   COACH_NOTE_TITLE_MAX,
   COACH_NOTES_MAX,
@@ -205,6 +206,12 @@ const fmtDate = (iso: string): string => {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
 
+/**
+ * Длинный текст в списке не разворачиваем целиком: заметка до 8000 символов
+ * иначе занимает несколько экранов и прячет остальные. Превью — 6 строк.
+ */
+const BODY_PREVIEW_CHARS = 320;
+
 const newAttachmentId = (): string => `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 const isBlobUrl = (url: string): boolean => typeof url === 'string' && url.startsWith('blob:');
@@ -237,11 +244,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const athletes = useMemo(() => readCoachState(ls()).athletes, []);
   const [store, setStore] = useState<CoachNotesStore>(() => readCoachNotes(ls()));
   const [query, setQuery] = useState('');
+  /** Развёрнутые длинные тексты — по id заметки, чтобы не трогать соседние. */
+  const [expandedBodies, setExpandedBodies] = useState<Record<string, boolean>>({});
   // Фильтр по атлету, к которому пришли из режима тренера. Если карточку уже
   // удалили — не показываем пустой список «по несуществующему атлету».
   const [athleteFilter, setAthleteFilter] = useState<string>(() => {
     if (!initialAthleteId) return 'all';
-    return athletes.some(a => a.id === initialAthleteId) ? initialAthleteId : 'all';
+    return athletes.some((a) => a.id === initialAthleteId) ? initialAthleteId : 'all';
   });
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -293,15 +302,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const dictationSupported = speech.dictation !== 'none';
   const speechOutputSupported = speech.speak !== 'none';
 
-  const nameOf = (id: string | null): string =>
-    id ? (athletes.find(a => a.id === id)?.name ?? 'атлет удалён') : '';
+  const nameOf = (id: string | null): string => (id ? (athletes.find((a) => a.id === id)?.name ?? 'атлет удалён') : '');
 
   /**
    * Предпросмотр вложения в редакторе: для нового файла — свой dataUrl/blob:,
    * для уже сохранённого — из кэша (он мог догрузиться уже после открытия).
    */
-  const draftPreview = (a: DraftAttachment): string =>
-    a.previewUrl || (a.pending ? '' : (media[a.id]?.src ?? ''));
+  const draftPreview = (a: DraftAttachment): string => a.previewUrl || (a.pending ? '' : (media[a.id]?.src ?? ''));
 
   const apply = (next: CoachNotesStore) => {
     writeCoachNotes(ls(), next);
@@ -310,7 +317,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /** «Сколько занимают файлы» — считаем после каждой записи/удаления. */
   const refreshMediaTotal = () => {
-    void noteMediaTotalBytes().then(n => setMediaTotal(n));
+    void noteMediaTotalBytes().then((n) => setMediaTotal(n));
   };
 
   const visible = useMemo(
@@ -319,10 +326,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   );
 
   /** Сколько заметок держат файлы: «занято X» — сумма именно по ним. */
-  const notesWithMedia = useMemo(
-    () => store.items.filter(n => noteAttachments(n).length > 0).length,
-    [store],
-  );
+  const notesWithMedia = useMemo(() => store.items.filter((n) => noteAttachments(n).length > 0).length, [store]);
 
   /* ── Медиа из IndexedDB: кэш по id ───────────────────────────────── */
   // Кэш, а не «перечитать всё при каждом изменении заметок»: иначе сохранение
@@ -332,7 +336,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   useEffect(() => {
     let alive = true;
-    const ids = store.items.flatMap(n => noteAttachmentIds(n));
+    const ids = store.items.flatMap((n) => noteAttachmentIds(n));
     const wanted = new Set(ids);
     const cache = mediaCacheRef.current;
 
@@ -343,7 +347,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       cache.delete(id);
     }
 
-    const missing = ids.filter(id => !cache.has(id));
+    const missing = ids.filter((id) => !cache.has(id));
     if (!missing.length) {
       setMedia(Object.fromEntries(cache));
       return () => {
@@ -352,9 +356,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     }
 
     void (async () => {
-      const loaded = await Promise.all(
-        missing.map(async id => ({ id, rec: await getNoteMedia(id) })),
-      );
+      const loaded = await Promise.all(missing.map(async (id) => ({ id, rec: await getNoteMedia(id) })));
       const fresh = new Map<string, MediaView>();
       for (const { id, rec } of loaded) {
         const blob = await noteMediaPayload(rec);
@@ -397,17 +399,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /* ── Уборка сирот, постоянное хранилище, нативные возможности ─────── */
   useEffect(() => {
-    void cleanupNoteMedia(new Set(store.items.flatMap(n => noteAttachmentIds(n))));
+    void cleanupNoteMedia(new Set(store.items.flatMap((n) => noteAttachmentIds(n))));
     // Без persist ОС вправе вычистить IndexedDB под давлением квоты — тогда
     // фото и голос исчезли бы «сами».
     void ensurePersistentStorage();
-    void noteMediaTotalBytes().then(n => setMediaTotal(n));
+    void noteMediaTotalBytes().then((n) => setMediaTotal(n));
     let alive = true;
-    void speechSupport().then(next => {
+    void speechSupport().then((next) => {
       if (!alive) return;
-      setSpeech(prev =>
-        prev.dictation === next.dictation && prev.speak === next.speak ? prev : next,
-      );
+      setSpeech((prev) => (prev.dictation === next.dictation && prev.speak === next.speak ? prev : next));
     });
     return () => {
       alive = false;
@@ -435,7 +435,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       // Нативная диктовка/озвучка живут в системе — их тоже гасим, иначе
       // телефон продолжит слушать или говорить после закрытия вкладки.
       stopAllSpeech();
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     },
     [],
@@ -448,7 +448,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   };
 
   const openEdit = (n: CoachNote) => {
-    const attachments: DraftAttachment[] = noteAttachments(n).map(a => {
+    const attachments: DraftAttachment[] = noteAttachments(n).map((a) => {
       const view = media[a.id];
       return {
         ...a,
@@ -462,7 +462,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       body: n.body,
       athleteId: n.athleteId ?? '',
       pinned: n.pinned,
-      checklist: (n.checklist ?? []).map(c => ({ ...c })),
+      checklist: (n.checklist ?? []).map((c) => ({ ...c })),
       attachments,
     });
     setError(null);
@@ -504,7 +504,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   };
 
   const stopTracks = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
   };
 
@@ -529,7 +529,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       setVoiceError(limitMessage);
       return;
     }
-    setEditor(s => (s ? { ...s, attachments: [...s.attachments, draft] } : s));
+    setEditor((s) => (s ? { ...s, attachments: [...s.attachments, draft] } : s));
   };
 
   const addAudioBlob = async (blob: Blob, durationMs: number, name?: string) => {
@@ -584,7 +584,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       const recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
       recorderRef.current = recorder;
       chunksRef.current = [];
-      recorder.ondataavailable = ev => {
+      recorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
       };
       recorder.onstop = () => {
@@ -710,10 +710,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           createdAt: new Date().toISOString(),
           previewUrl: dataUrl,
           pending: true,
-          bytes: decoded.buffer.slice(
-            decoded.byteOffset,
-            decoded.byteOffset + decoded.byteLength,
-          ) as ArrayBuffer,
+          bytes: decoded.buffer.slice(decoded.byteOffset, decoded.byteOffset + decoded.byteLength) as ArrayBuffer,
         },
         `К заметке можно приложить не больше ${COACH_NOTE_ATTACHMENTS_MAX} файлов.`,
       );
@@ -723,11 +720,11 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   };
 
   const removeDraftAttachment = (id: string) => {
-    setEditor(s => {
+    setEditor((s) => {
       if (!s) return s;
-      const target = s.attachments.find(a => a.id === id);
+      const target = s.attachments.find((a) => a.id === id);
       if (target?.pending) revokeBlobUrl(target.previewUrl);
-      return { ...s, attachments: s.attachments.filter(a => a.id !== id) };
+      return { ...s, attachments: s.attachments.filter((a) => a.id !== id) };
     });
   };
 
@@ -778,19 +775,19 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             return;
           }
           setInterim('');
-          setEditor(s => {
+          setEditor((s) => {
             if (!s) return s;
             const base = s.body.trimEnd();
             const body = base ? `${base} ${text}` : text;
             return { ...s, body: body.slice(0, COACH_NOTE_BODY_MAX) };
           });
         },
-        onError: message => {
+        onError: (message) => {
           reported = true;
           setDictation('error');
           setVoiceError(message);
         },
-        onErrorCode: code => {
+        onErrorCode: (code) => {
           // Разрешение выдаётся только в настройках Android — предлагаем путь.
           if (MIC_PERMISSION_CODES.has(code)) setMicSettingsNeeded(true);
         },
@@ -841,7 +838,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       onEnd: () => {
         if (speakSeqRef.current === seq) setSpeakingId(null);
       },
-    }).then(ok => {
+    }).then((ok) => {
       if (ok || speakSeqRef.current !== seq) return;
       setSpeakingId(null);
       setVoiceError('Озвучка недоступна в этом приложении — голосового движка нет.');
@@ -851,10 +848,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   /* ── Сохранение ───────────────────────────────────────────────────── */
 
   const trimmedChecklist = (draft: EditorState): CoachNoteChecklistItem[] =>
-    draft.checklist.map(c => ({ ...c, text: c.text.trim() })).filter(c => c.text.length > 0);
+    draft.checklist.map((c) => ({ ...c, text: c.text.trim() })).filter((c) => c.text.length > 0);
 
   const strippedAttachments = (draft: EditorState): CoachNoteAttachment[] =>
-    draft.attachments.map(a => ({
+    draft.attachments.map((a) => ({
       id: a.id,
       kind: a.kind,
       mime: a.mime,
@@ -906,10 +903,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     const draft = editor;
     const noteId = draft.id ?? `n_${Date.now().toString(36)}_${store.items.length + 1}`;
     const attachments = strippedAttachments(draft);
-    const pending = draft.attachments.filter(a => a.pending && (a.blob || a.bytes));
+    const pending = draft.attachments.filter((a) => a.pending && (a.blob || a.bytes));
 
     const writeMedia = async (): Promise<boolean> => {
-      const records: NoteMediaRecord[] = pending.map(a => ({
+      const records: NoteMediaRecord[] = pending.map((a) => ({
         id: a.id,
         noteId,
         kind: a.kind,
@@ -922,9 +919,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       }));
       const ok = records.length ? await saveNoteMediaMany(records) : true;
       if (!ok) {
-        setError(
-          'Не хватило места в хранилище — вложение не сохранено. Удалите лишние фото/аудио и попробуйте снова.',
-        );
+        setError('Не хватило места в хранилище — вложение не сохранено. Удалите лишние фото/аудио и попробуйте снова.');
         return false;
       }
       return true;
@@ -949,7 +944,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       if (!saved) {
         // Заметка не сохранилась (стала пустой) — только что записанные файлы
         // не должны остаться сиротами в квоте.
-        void deleteNoteMedia(pending.map(a => a.id));
+        void deleteNoteMedia(pending.map((a) => a.id));
         refreshMediaTotal();
         return;
       }
@@ -959,9 +954,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       const keep = new Set(
         // Заметку, которую только что сохранили, считаем по новому набору:
         // убранные вложения не должны попасть в «нужное» (иначе файл повиснет).
-        store.items
-          .filter(n => n.id !== noteId)
-          .flatMap(n => noteAttachmentIds(n)),
+        store.items.filter((n) => n.id !== noteId).flatMap((n) => noteAttachmentIds(n)),
       );
       for (const a of attachments) keep.add(a.id);
       void cleanupNoteMedia(keep);
@@ -992,9 +985,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     setConfirmClearMedia(false);
     void (async () => {
       await deleteAllNoteMedia();
-      const cleaned = store.items.map(n =>
-        noteAttachments(n).length > 0 ? { ...n, attachments: [] } : n,
-      );
+      const cleaned = store.items.map((n) => (noteAttachments(n).length > 0 ? { ...n, attachments: [] } : n));
       apply({ ...store, items: cleaned });
       // Кэш держал файлы в памяти и в blob-URL — отпускаем сразу, а не ждём mount.
       for (const view of mediaCacheRef.current.values()) revokeBlobUrl(view.src ?? '');
@@ -1025,6 +1016,30 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     })();
   };
 
+  // Поиск/фильтр — «честные»: видно, сколько скрыто, и есть чем вернуть всё.
+  const queryText = query.trim();
+  const filtersActive = queryText.length > 0 || athleteFilter !== 'all';
+  // Пустые строки чек-листа не сохраняются, поэтому лимит считаем по заполненным:
+  // иначе кнопка «+ Пункт» запрещала бы добавление из-за черновиков.
+  const checklistUsed = editor ? editor.checklist.filter((c) => c.text.trim().length > 0).length : 0;
+  const checklistFull = checklistUsed >= COACH_NOTE_CHECKLIST_MAX;
+  const attachmentsFull = editor ? editor.attachments.length >= COACH_NOTE_ATTACHMENTS_MAX : false;
+  const notesAtLimit = store.items.length >= COACH_NOTES_MAX;
+  const resetFilters = () => {
+    setQuery('');
+    setAthleteFilter('all');
+  };
+  const emptyHint = (): string => {
+    if (queryText && athleteFilter !== 'all') {
+      return `Ничего не найдено по запросу «${queryText}» среди заметок выбранного фильтра.`;
+    }
+    if (queryText) {
+      return `Ничего не найдено по запросу «${queryText}». Поиск идёт по заголовку, тексту и пунктам чек-листа.`;
+    }
+    if (athleteFilter === 'none') return 'Общих заметок без атлета пока нет.';
+    return 'У выбранного атлета заметок пока нет.';
+  };
+
   return (
     <div className="pf-notes" data-notes="root" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={cardStyle}>
@@ -1041,10 +1056,31 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               </div>
             </div>
           </div>
-          <button type="button" onClick={openNew} data-notes="new" style={btn('primary')}>
+          <button
+            type="button"
+            onClick={openNew}
+            data-notes="new"
+            disabled={notesAtLimit}
+            aria-disabled={notesAtLimit}
+            style={{
+              ...btn('primary'),
+              opacity: notesAtLimit ? 0.5 : 1,
+              cursor: notesAtLimit ? 'not-allowed' : 'pointer',
+            }}
+          >
             + Новая заметка
           </button>
         </div>
+        {notesAtLimit && (
+          <div
+            data-notes="limit-hint"
+            role="status"
+            style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}
+          >
+            Достигнут лимит {COACH_NOTES_MAX} заметок: новые не сохранятся, пока не удалите неактуальные. Старые заметки
+            планёр сам не стирает.
+          </div>
+        )}
 
         {mediaTotal > 0 && (
           <div
@@ -1088,7 +1124,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           <input
             type="search"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск по заметкам"
             aria-label="Поиск по заметкам"
             data-notes="search"
@@ -1097,19 +1133,55 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           {athletes.length > 0 && (
             <select
               value={athleteFilter}
-              onChange={e => setAthleteFilter(e.target.value)}
+              onChange={(e) => setAthleteFilter(e.target.value)}
               aria-label="Фильтр по атлету"
               data-notes="filter"
               style={{ ...inputStyle, width: 'auto', flex: '0 1 190px' }}
             >
               <option value="all">Все атлеты</option>
               <option value="none">Без атлета</option>
-              {athletes.map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+              {athletes.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
           )}
         </div>
+        {filtersActive && (
+          <div
+            data-notes="filter-status"
+            style={{
+              display: 'flex',
+              gap: 8,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              marginTop: 8,
+              fontSize: 11.5,
+              color: colors.textSubtle,
+            }}
+          >
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              Показано {visible.length} из {store.items.length}
+            </span>
+            <button
+              type="button"
+              onClick={resetFilters}
+              data-notes="filter-reset"
+              style={{ ...btn('ghost'), minHeight: 34, padding: '4px 10px', fontSize: 11.5 }}
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        )}
+        {!filtersActive && (
+          <div
+            data-notes="search-scope"
+            style={{ marginTop: 8, fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
+          >
+            Поиск идёт по заголовку, тексту и пунктам чек-листа; имена файлов не ищутся.
+          </div>
+        )}
       </div>
 
       {editor && (
@@ -1117,26 +1189,32 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           <div style={{ fontSize: 12, fontWeight: 800, color: colors.textMuted, marginBottom: 10 }}>
             {editor.id ? 'Правка заметки' : 'Новая заметка'}
           </div>
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, marginBottom: 5 }} htmlFor="note-title">
+          <label
+            style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, marginBottom: 5 }}
+            htmlFor="note-title"
+          >
             Заголовок
           </label>
           <input
             id="note-title"
             value={editor.title}
             maxLength={COACH_NOTE_TITLE_MAX}
-            onChange={e => setEditor(s => (s ? { ...s, title: e.target.value } : s))}
+            onChange={(e) => setEditor((s) => (s ? { ...s, title: e.target.value } : s))}
             placeholder="Коротко: о чём заметка"
             style={inputStyle}
             data-notes="title"
           />
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }} htmlFor="note-body">
+          <label
+            style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}
+            htmlFor="note-body"
+          >
             Текст
           </label>
           <textarea
             id="note-body"
             value={editor.body}
             maxLength={COACH_NOTE_BODY_MAX}
-            onChange={e => setEditor(s => (s ? { ...s, body: e.target.value } : s))}
+            onChange={(e) => setEditor((s) => (s ? { ...s, body: e.target.value } : s))}
             rows={5}
             placeholder="Контекст, ограничения, договорённости"
             style={{ ...inputStyle, minHeight: 120, resize: 'vertical' }}
@@ -1147,20 +1225,29 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <button
               type="button"
               onClick={() => void addPhoto()}
-              disabled={voiceBusy}
+              disabled={voiceBusy || attachmentsFull}
+              aria-disabled={voiceBusy || attachmentsFull}
               data-notes="add-photo"
-              style={{ ...btn('ghost'), fontSize: 12, opacity: voiceBusy ? 0.6 : 1 }}
+              style={{
+                ...btn('ghost'),
+                fontSize: 12,
+                opacity: voiceBusy || attachmentsFull ? 0.5 : 1,
+                cursor: voiceBusy || attachmentsFull ? 'not-allowed' : 'pointer',
+              }}
             >
               Фото
             </button>
             <button
               type="button"
               onClick={toggleVoice}
+              disabled={attachmentsFull && !recording}
+              aria-disabled={attachmentsFull && !recording}
               data-notes="add-voice"
               data-recording={recording}
               style={{
                 ...btn('ghost'),
                 fontSize: 12,
+                opacity: attachmentsFull && !recording ? 0.5 : 1,
                 ...(recording
                   ? { borderColor: 'rgba(239,68,68,0.55)', color: '#fca5a5', background: 'rgba(239,68,68,0.14)' }
                   : {}),
@@ -1171,8 +1258,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <button
               type="button"
               onClick={() => audioInputRef.current?.click()}
+              disabled={attachmentsFull}
+              aria-disabled={attachmentsFull}
               data-notes="add-audio-file"
-              style={{ ...btn('ghost'), fontSize: 12 }}
+              style={{
+                ...btn('ghost'),
+                fontSize: 12,
+                opacity: attachmentsFull ? 0.5 : 1,
+                cursor: attachmentsFull ? 'not-allowed' : 'pointer',
+              }}
             >
               Аудиофайл
             </button>
@@ -1191,6 +1285,14 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   : 'Голос в текст'}
             </button>
           </div>
+          {attachmentsFull && (
+            <div
+              data-notes="attach-limit"
+              style={{ marginTop: 8, fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}
+            >
+              Достигнут лимит — {COACH_NOTE_ATTACHMENTS_MAX} файлов на заметку. Уберите один, чтобы добавить другой.
+            </div>
+          )}
 
           {/* Что именно услышит кнопка и слышит ли она сейчас — видно без логов.
               Нажатие сразу меняет эту строку: «ничего не происходит» больше
@@ -1198,7 +1300,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           {dictationSupported && (
             <div
               data-notes="speech-source"
-              style={{ marginTop: 8, fontSize: 11.5, color: dictation === 'starting' ? AMBER : colors.textSubtle, lineHeight: 1.5 }}
+              style={{
+                marginTop: 8,
+                fontSize: 11.5,
+                color: dictation === 'starting' ? AMBER : colors.textSubtle,
+                lineHeight: 1.5,
+              }}
             >
               {dictation === 'starting'
                 ? 'Запрашиваю доступ к микрофону…'
@@ -1213,7 +1320,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             aria-label="Аудиофайл к заметке"
             data-notes="audio-input"
             style={{ display: 'none' }}
-            onChange={e => {
+            onChange={(e) => {
               void handleAudioFile(e.target.files?.[0] ?? null);
               e.target.value = '';
             }}
@@ -1228,31 +1335,27 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             aria-label="Записать голос диктофоном"
             data-notes="voice-record-input"
             style={{ display: 'none' }}
-            onChange={e => handleVoiceInput(e.currentTarget)}
+            onChange={(e) => handleVoiceInput(e.currentTarget)}
           />
 
           {!dictationSupported && (
-            <div data-notes="dictation-hint" style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}>
-              Речь в текст здесь недоступна. Голос можно записать и приложить к заметке —
-              расшифровка останется за вами.
+            <div
+              data-notes="dictation-hint"
+              style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}
+            >
+              Речь в текст здесь недоступна. Голос можно записать и приложить к заметке — расшифровка останется за вами.
             </div>
           )}
 
           {interim && (
-            <div
-              data-notes="dictation-interim"
-              style={{ marginTop: 8, fontSize: 11.5, color: AMBER, lineHeight: 1.5 }}
-            >
+            <div data-notes="dictation-interim" style={{ marginTop: 8, fontSize: 11.5, color: AMBER, lineHeight: 1.5 }}>
               Слышу: {interim}
             </div>
           )}
 
           {editor.attachments.length > 0 && (
-            <div
-              data-notes="attach-list"
-              style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}
-            >
-              {editor.attachments.map(a => (
+            <div data-notes="attach-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              {editor.attachments.map((a) => (
                 <div
                   key={a.id}
                   data-notes="attach-item"
@@ -1285,7 +1388,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       <audio src={draftPreview(a)} controls preload="metadata" style={{ maxWidth: 190, height: 34 }} />
                     </div>
                   ) : (
-                    <div style={{ fontSize: 11.5, color: colors.textSubtle }}>Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}</div>
+                    <div style={{ fontSize: 11.5, color: colors.textSubtle }}>
+                      Аудио {a.durationMs ? formatDuration(a.durationMs) : ''}
+                    </div>
                   )}
                   <button
                     type="button"
@@ -1315,7 +1420,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           )}
 
           {/* Честная граница: расшифровки уже записанного звука нет — только живая диктовка. */}
-          {editor.attachments.some(a => a.kind === 'audio') && (
+          {editor.attachments.some((a) => a.kind === 'audio') && (
             <div
               data-notes="audio-no-transcript"
               style={{ marginTop: 8, fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.5 }}
@@ -1325,7 +1430,11 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           )}
 
           {voiceError && (
-            <div role="alert" data-notes="voice-error" style={{ marginTop: 8, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}>
+            <div
+              role="alert"
+              data-notes="voice-error"
+              style={{ marginTop: 8, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}
+            >
               {voiceError}
             </div>
           )}
@@ -1345,8 +1454,20 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             </button>
           )}
 
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '12px 0 5px' }}>
-            Чек-лист
+          <label
+            style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '12px 0 5px' }}
+          >
+            Чек-лист{' '}
+            <span
+              data-notes="checklist-count"
+              style={{
+                fontWeight: 600,
+                color: checklistFull ? colors.danger : colors.textSubtle,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {checklistUsed}/{COACH_NOTE_CHECKLIST_MAX}
+            </span>
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-notes="checklist-edit">
             {editor.checklist.map((c, i) => (
@@ -1354,10 +1475,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                 <input
                   value={c.text}
                   maxLength={COACH_NOTE_CHECKLIST_TEXT_MAX}
-                  onChange={e =>
-                    setEditor(s =>
+                  onChange={(e) =>
+                    setEditor((s) =>
                       s
-                        ? { ...s, checklist: s.checklist.map((x, xi) => (xi === i ? { ...x, text: e.target.value } : x)) }
+                        ? {
+                            ...s,
+                            checklist: s.checklist.map((x, xi) => (xi === i ? { ...x, text: e.target.value } : x)),
+                          }
                         : s,
                     )
                   }
@@ -1371,7 +1495,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   aria-label="Удалить пункт"
                   data-notes="checklist-remove"
                   onClick={() =>
-                    setEditor(s => (s ? { ...s, checklist: s.checklist.filter((_, xi) => xi !== i) } : s))
+                    setEditor((s) => (s ? { ...s, checklist: s.checklist.filter((_, xi) => xi !== i) } : s))
                   }
                   style={{ ...btn('ghost'), minHeight: 38, padding: '4px 10px', fontSize: 12 }}
                 >
@@ -1382,8 +1506,10 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <button
               type="button"
               data-notes="checklist-add"
+              disabled={checklistFull}
+              aria-disabled={checklistFull}
               onClick={() =>
-                setEditor(s =>
+                setEditor((s) =>
                   s
                     ? {
                         ...s,
@@ -1395,36 +1521,55 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     : s,
                 )
               }
-              style={{ ...btn('ghost'), alignSelf: 'flex-start', fontSize: 12 }}
+              style={{
+                ...btn('ghost'),
+                alignSelf: 'flex-start',
+                fontSize: 12,
+                opacity: checklistFull ? 0.5 : 1,
+                cursor: checklistFull ? 'not-allowed' : 'pointer',
+              }}
             >
               + Пункт чек-листа
             </button>
+            {checklistFull && (
+              <div data-notes="checklist-limit" style={{ fontSize: 11, color: colors.textSubtle, lineHeight: 1.45 }}>
+                Достигнут лимит — {COACH_NOTE_CHECKLIST_MAX} пунктов. Сверх лимита пункты не сохранятся.
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
             {athletes.length > 0 && (
               <select
                 value={editor.athleteId}
-                onChange={e => setEditor(s => (s ? { ...s, athleteId: e.target.value } : s))}
+                onChange={(e) => setEditor((s) => (s ? { ...s, athleteId: e.target.value } : s))}
                 aria-label="Атлет заметки"
                 data-notes="athlete"
                 style={{ ...inputStyle, width: 'auto', flex: '1 1 160px' }}
               >
                 <option value="">Без атлета (общая)</option>
-                {athletes.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                {athletes.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
                 ))}
               </select>
             )}
             <label
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, cursor: 'pointer',
-                fontSize: 12.5, color: colors.textMuted, padding: '0 4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                minHeight: 44,
+                cursor: 'pointer',
+                fontSize: 12.5,
+                color: colors.textMuted,
+                padding: '0 4px',
               }}
             >
               <input
                 type="checkbox"
                 checked={editor.pinned}
-                onChange={e => setEditor(s => (s ? { ...s, pinned: e.target.checked } : s))}
+                onChange={(e) => setEditor((s) => (s ? { ...s, pinned: e.target.checked } : s))}
                 data-notes="pinned"
                 style={{ width: 18, height: 18, accentColor: AMBER }}
               />
@@ -1440,15 +1585,22 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <button type="button" onClick={save} data-notes="save" style={btn('primary')}>
               {editor.id ? 'Сохранить' : 'Добавить'}
             </button>
-            <button
-              type="button"
-              onClick={closeEditor}
-              data-notes="cancel"
-              style={btn('ghost')}
-            >
+            <button type="button" onClick={closeEditor} data-notes="cancel" style={btn('ghost')}>
               Отмена
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Ошибки шаринга/озвучки случаются и без открытого редактора — раньше
+          они молчали, потому что блок ошибок жил только внутри формы. */}
+      {!editor && voiceError && (
+        <div
+          role="alert"
+          data-notes="voice-error"
+          style={{ ...cardStyle, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}
+        >
+          {voiceError}
         </div>
       )}
 
@@ -1457,16 +1609,26 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           <div data-notes="empty" style={{ ...cardStyle, fontSize: 12.5, color: colors.textMuted, lineHeight: 1.5 }}>
             {store.items.length === 0
               ? 'Заметок пока нет. Сюда удобно писать то, что не влезает в дневники: травмы, ограничения, договорённости с атлетом.'
-              : 'По запросу ничего не найдено.'}
+              : emptyHint()}
+            {store.items.length > 0 && filtersActive && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                data-notes="empty-reset"
+                style={{ ...btn('ghost'), minHeight: 36, marginTop: 10, fontSize: 11.5 }}
+              >
+                Сбросить фильтры
+              </button>
+            )}
           </div>
         )}
-        {visible.map(n => {
+        {visible.map((n) => {
           const athleteName = nameOf(n.athleteId);
           const isDeleting = confirmDeleteId === n.id;
           const attachments = noteAttachments(n);
           const attachBytes = attachmentsBytes(attachments);
-          const photos = attachments.filter(a => a.kind === 'photo');
-          const audios = attachments.filter(a => a.kind === 'audio');
+          const photos = attachments.filter((a) => a.kind === 'photo');
+          const audios = attachments.filter((a) => a.kind === 'audio');
           return (
             <div
               key={n.id}
@@ -1484,7 +1646,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word', minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13.5,
+                        fontWeight: 800,
+                        color: '#fff',
+                        lineHeight: 1.35,
+                        wordBreak: 'break-word',
+                        minWidth: 0,
+                      }}
+                    >
                       {n.title || n.body.split('\n')[0].slice(0, 80) || 'Заметка с вложением'}
                     </div>
                     {attachments.length > 0 && (
@@ -1507,23 +1678,55 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       </span>
                     )}
                   </div>
-                  {n.title && n.body && (
-                    <div
-                      style={{
-                        fontSize: 12.5, color: 'rgba(255,255,255,0.72)', marginTop: 5, lineHeight: 1.5,
-                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      }}
-                    >
-                      {n.body}
-                    </div>
-                  )}
+                  {n.body &&
+                    (n.title || n.body.length > 80) &&
+                    (() => {
+                      const long = n.body.length > BODY_PREVIEW_CHARS;
+                      const open = !long || expandedBodies[n.id] === true;
+                      return (
+                        <div data-notes="body-preview" data-expanded={open}>
+                          <div
+                            style={{
+                              fontSize: 12.5,
+                              color: 'rgba(255,255,255,0.72)',
+                              marginTop: 5,
+                              lineHeight: 1.5,
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {open ? n.body : `${n.body.slice(0, BODY_PREVIEW_CHARS).trimEnd()}…`}
+                          </div>
+                          {long && (
+                            <button
+                              type="button"
+                              data-notes="body-more"
+                              aria-expanded={open}
+                              onClick={() => setExpandedBodies((prev) => ({ ...prev, [n.id]: !open }))}
+                              style={{
+                                ...btn('ghost'),
+                                minHeight: 34,
+                                marginTop: 6,
+                                padding: '4px 10px',
+                                fontSize: 11.5,
+                              }}
+                            >
+                              {open ? 'Свернуть' : `Показать полностью (${n.body.length} символов)`}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                   {attachments.length > 0 && (
-                    <div data-notes="attachments" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div
+                      data-notes="attachments"
+                      style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}
+                    >
                       <div style={{ fontSize: 10.5, color: colors.textSubtle }}>{attachmentSummary(attachments)}</div>
                       {photos.length > 0 && (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {photos.map(a => {
+                          {photos.map((a) => {
                             const view = media[a.id];
                             return view?.src ? (
                               <div key={a.id} style={{ position: 'relative', width: 88, height: 88 }}>
@@ -1535,8 +1738,14 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                     setViewer({ attachmentId: a.id, url: view.src as string, kind: 'photo' })
                                   }
                                   style={{
-                                    padding: 0, width: '100%', height: '100%', border: '1px solid rgba(255,255,255,0.14)',
-                                    borderRadius: 12, background: 'transparent', cursor: 'pointer', overflow: 'hidden',
+                                    padding: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    border: '1px solid rgba(255,255,255,0.14)',
+                                    borderRadius: 12,
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    overflow: 'hidden',
                                   }}
                                 >
                                   <img
@@ -1551,10 +1760,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                                   aria-label="Поделиться фото"
                                   onClick={() => shareAttachment(a)}
                                   style={{
-                                    position: 'absolute', right: 3, bottom: 3, width: 26, height: 26,
-                                    borderRadius: 8, border: '1px solid rgba(255,255,255,0.18)',
-                                    background: 'rgba(0,0,0,0.55)', color: '#fff', cursor: 'pointer',
-                                    fontSize: 12, lineHeight: 1,
+                                    position: 'absolute',
+                                    right: 3,
+                                    bottom: 3,
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 8,
+                                    border: '1px solid rgba(255,255,255,0.18)',
+                                    background: 'rgba(0,0,0,0.55)',
+                                    color: '#fff',
+                                    cursor: 'pointer',
+                                    fontSize: 12,
+                                    lineHeight: 1,
                                   }}
                                 >
                                   ⤓
@@ -1564,7 +1781,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                               <div
                                 key={a.id}
                                 data-notes="media-missing"
-                                style={{ fontSize: 11, color: colors.textSubtle, border: '1px dashed rgba(255,255,255,0.18)', borderRadius: 10, padding: '10px 12px' }}
+                                style={{
+                                  fontSize: 11,
+                                  color: colors.textSubtle,
+                                  border: '1px dashed rgba(255,255,255,0.18)',
+                                  borderRadius: 10,
+                                  padding: '10px 12px',
+                                }}
                               >
                                 Фото не найдено в хранилище
                               </div>
@@ -1572,7 +1795,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                           })}
                         </div>
                       )}
-                      {audios.map(a => {
+                      {audios.map((a) => {
                         const view = media[a.id];
                         return view?.src ? (
                           <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1597,7 +1820,13 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                           <div
                             key={a.id}
                             data-notes="media-missing"
-                            style={{ fontSize: 11, color: colors.textSubtle, border: '1px dashed rgba(255,255,255,0.18)', borderRadius: 10, padding: '8px 12px' }}
+                            style={{
+                              fontSize: 11,
+                              color: colors.textSubtle,
+                              border: '1px dashed rgba(255,255,255,0.18)',
+                              borderRadius: 10,
+                              padding: '8px 12px',
+                            }}
                           >
                             Аудио не найдено в хранилище (файл удалён)
                           </div>
@@ -1606,54 +1835,81 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     </div>
                   )}
 
-                  {(n.checklist?.length ?? 0) > 0 && (() => {
-                    const prog = noteChecklistProgress(n);
-                    return (
-                      <div data-notes="checklist" style={{ marginTop: 8 }}>
-                        <div style={{ fontSize: 10.5, color: colors.textSubtle, marginBottom: 5, fontVariantNumeric: 'tabular-nums' }}>
-                          Чек-лист · {prog.done}/{prog.total}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {(n.checklist ?? []).map(c => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              data-notes="checklist-toggle"
-                              data-checked={c.done}
-                              onClick={() => apply(toggleNoteChecklistItem(store, n.id, c.id))}
-                              aria-pressed={c.done}
-                              style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 8, textAlign: 'left',
-                                minHeight: 32, padding: '4px 6px', borderRadius: 8, cursor: 'pointer',
-                                border: '1px solid rgba(255,255,255,0.08)', background: 'transparent',
-                                color: c.done ? colors.textSubtle : '#fff', fontSize: 12,
-                                textDecoration: c.done ? 'line-through' : undefined,
-                              }}
-                            >
-                              <span
-                                aria-hidden="true"
+                  {(n.checklist?.length ?? 0) > 0 &&
+                    (() => {
+                      const prog = noteChecklistProgress(n);
+                      return (
+                        <div data-notes="checklist" style={{ marginTop: 8 }}>
+                          <div
+                            style={{
+                              fontSize: 10.5,
+                              color: colors.textSubtle,
+                              marginBottom: 5,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            Чек-лист · {prog.done}/{prog.total}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {(n.checklist ?? []).map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                data-notes="checklist-toggle"
+                                data-checked={c.done}
+                                onClick={() => apply(toggleNoteChecklistItem(store, n.id, c.id))}
+                                aria-pressed={c.done}
                                 style={{
-                                  flexShrink: 0, width: 16, height: 16, marginTop: 1, borderRadius: 5,
-                                  border: `1px solid ${c.done ? withAlpha(AMBER, '99') : 'rgba(255,255,255,0.25)'}`,
-                                  background: c.done ? withAlpha(AMBER, '33') : 'transparent',
-                                  color: AMBER, fontSize: 11, lineHeight: '14px', textAlign: 'center',
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: 8,
+                                  textAlign: 'left',
+                                  minHeight: 32,
+                                  padding: '4px 6px',
+                                  borderRadius: 8,
+                                  cursor: 'pointer',
+                                  border: '1px solid rgba(255,255,255,0.08)',
+                                  background: 'transparent',
+                                  color: c.done ? colors.textSubtle : '#fff',
+                                  fontSize: 12,
+                                  textDecoration: c.done ? 'line-through' : undefined,
                                 }}
                               >
-                                {c.done ? '✓' : ''}
-                              </span>
-                              <span style={{ wordBreak: 'break-word' }}>{c.text}</span>
-                            </button>
-                          ))}
+                                <span
+                                  aria-hidden="true"
+                                  style={{
+                                    flexShrink: 0,
+                                    width: 16,
+                                    height: 16,
+                                    marginTop: 1,
+                                    borderRadius: 5,
+                                    border: `1px solid ${c.done ? withAlpha(AMBER, '99') : 'rgba(255,255,255,0.25)'}`,
+                                    background: c.done ? withAlpha(AMBER, '33') : 'transparent',
+                                    color: AMBER,
+                                    fontSize: 11,
+                                    lineHeight: '14px',
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  {c.done ? '✓' : ''}
+                                </span>
+                                <span style={{ wordBreak: 'break-word' }}>{c.text}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
                     {athleteName && (
                       <span
                         style={{
-                          fontSize: 10.5, padding: '3px 8px', borderRadius: 999,
-                          color: AMBER, background: withAlpha(AMBER, '1f'), border: `1px solid ${withAlpha(AMBER, '40')}`,
+                          fontSize: 10.5,
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                          color: AMBER,
+                          background: withAlpha(AMBER, '1f'),
+                          border: `1px solid ${withAlpha(AMBER, '40')}`,
                         }}
                       >
                         {athleteName}
@@ -1673,7 +1929,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                 >
                   {n.pinned ? 'Открепить' : 'Закрепить'}
                 </button>
-                <button type="button" data-notes="edit" onClick={() => openEdit(n)} style={{ ...btn('ghost'), fontSize: 12 }}>
+                <button
+                  type="button"
+                  data-notes="edit"
+                  onClick={() => openEdit(n)}
+                  style={{ ...btn('ghost'), fontSize: 12 }}
+                >
                   Изменить
                 </button>
                 {speechOutputSupported && (n.title || n.body) && (
@@ -1687,7 +1948,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                     {speakingId === n.id ? 'Стоп озвучку' : 'Озвучить'}
                   </button>
                 )}
-                <button type="button" data-notes="delete" onClick={() => askDelete(n.id)} style={{ ...btn('danger'), fontSize: 12 }}>
+                <button
+                  type="button"
+                  data-notes="delete"
+                  onClick={() => askDelete(n.id)}
+                  style={{ ...btn('danger'), fontSize: 12 }}
+                >
                   {isDeleting ? 'Точно удалить' : 'Удалить'}
                 </button>
                 {isDeleting && (
@@ -1713,8 +1979,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           aria-label="Просмотр вложения"
           onClick={() => setViewer(null)}
           style={{
-            position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,0.86)', cursor: 'zoom-out',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            background: 'rgba(0,0,0,0.86)',
+            cursor: 'zoom-out',
           }}
         >
           <img
@@ -1726,17 +1999,24 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             type="button"
             data-notes="viewer-share"
             aria-label="Поделиться вложением"
-            onClick={e => {
+            onClick={(e) => {
               e.stopPropagation();
-              const att = store.items
-                .flatMap(n => noteAttachments(n))
-                .find(a => a.id === viewer.attachmentId);
+              const att = store.items.flatMap((n) => noteAttachments(n)).find((a) => a.id === viewer.attachmentId);
               if (att) shareAttachment(att);
             }}
             style={{
-              position: 'absolute', right: 20, bottom: 28, minHeight: 44, padding: '10px 16px',
-              borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+              position: 'absolute',
+              right: 20,
+              bottom: 28,
+              minHeight: 44,
+              padding: '10px 16px',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              fontSize: 12.5,
+              fontWeight: 800,
+              cursor: 'pointer',
             }}
           >
             ⤓ Сохранить / Поделиться
@@ -1755,9 +2035,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       )}
 
       <div style={{ fontSize: 11.5, color: colors.textSubtle, lineHeight: 1.55, padding: '0 4px' }}>
-        Заметки — это контекст, а не дневник: они не меняют расчёты планов и не попадают в отчёты
-        автоматически. Фото и аудио хранятся на этом устройстве (IndexedDB, шифруются ключом
-        устройства) и входят в резервную копию, пока влезают в её лимит объёма.
+        Заметки — это контекст, а не дневник: они не меняют расчёты планов и не попадают в отчёты автоматически. Фото и
+        аудио хранятся на этом устройстве (IndexedDB, шифруются ключом устройства) и входят в резервную копию, пока
+        влезают в её лимит объёма.
       </div>
     </div>
   );
