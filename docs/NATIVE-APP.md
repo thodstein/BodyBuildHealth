@@ -108,7 +108,7 @@ html.app-telegram .my-block { /* только Mini App */ }
 | Устройство `getDeviceInfo()` | Device-плагин | userAgent-fallback |
 | Кнопка «назад» | `setupNativeBackButton()` (подключена в `App.tsx`) | Telegram BackButton как раньше |
 | Статус-бар/сплэш | `initNativeChrome()` (вызван в `main.tsx`) | no-op |
-| Биометрия `authenticateWithBiometrics()` | WebAuthn platform authenticator | там же, где доступен |
+| Биометрия `authenticateWithBiometrics()` | нативный `BiometryPlugin` → системный BiometricPrompt (`androidx.biometric`) | WebAuthn platform authenticator (браузер/PWA) |
 
 Что сознательно отключено в APK (`main.tsx`): PWA-баннер и ServiceWorker —
 в Capacitor WebView за сплэш/статус/пуши отвечают нативные плагины, SW там
@@ -422,18 +422,26 @@ PRO-палитра натива: `android/.../res/values/colors.xml` 1-в-1 с �
 Всё включается из APK: Главная → «Телефон · APK». В Telegram эти карточки
 не отображаются.
 
-**Биометрия** (`BiometrySetupCard`, механика `native-bridge.ts`,
-без новых native-зависимостей — WebAuthn platform authenticator):
+**Биометрия** (`BiometrySetupCard`, механика `native-bridge.ts`, плагин
+`biometry/BiometryPlugin.java`, зависимость `androidx.biometric`):
+
+WebAuthn в APK не годится: в Android WebView нет платформенного
+аутентификатора (origin `https://localhost` не связан с пакетом через
+Digital Asset Links), поэтому `isUserVerifyingPlatformAuthenticatorAvailable()`
+всегда `false`, а `credentials.create()` падает — биометрия «не работала».
+В native теперь нативный путь (`BiometricManager.canAuthenticate` +
+`BiometricPrompt`), WebAuthn остался фолбэком для браузера/PWA.
 
 1. Сначала в самом Android: Настройки → Безопасность → Блокировка экрана
    (PIN/пароль) → добавить отпечаток или лицо.
 2. В приложении: «🔐 Биометрия» → «Включить вход по биометрии» →
-   подтвердить отпечатком (первый вызов регистрирует ключ
-   `he_webauthn_cred_v1`, дальше — проверка им).
+   подтвердить в системном диалоге (ключей не храним: подтверждение каждый
+   раз системное; `he_webauthn_cred_v1` — только web-фолбэк).
 3. Опционально: «🔒 Блок входа» — приложение показывает экран
    разблокировки при запуске и при возврате из фона (`App.tsx`,
    только native; если биометрия стала недоступна — вход не блокируется).
-4. «Проверить» — тест без изменения настроек; «Выключить» — удаляет ключ.
+   Кнопка «Разблокировать» открывает системный диалог отпечатка/лица.
+4. «Проверить» — тест без изменения настроек; «Выключить» — снимает флаги.
 
 **Остальное** (`NativeFeaturesCard`, все методы уже были в `native-bridge.ts`):
 
@@ -824,8 +832,12 @@ APK запекает `dist/` в момент сборки, поэтому сам
 Лента обновлений — GitHub Releases, проверка — при каждом запуске APK:
 
 1. `AppUpdateBanner` (только native, в TG/web — null) читает установленную
-   версию через `App.getInfo()` и спрашивает фид `fetchLatestRelease()`
-   (по умолчанию `.../releases/latest`, оверрайд — `VITE_APP_UPDATE_URL`).
+   версию через `App.getInfo()` и спрашивает фид `fetchLatestRelease()`.
+   Источников два и они равнозначны: `api.github.com/.../releases/latest`
+   (лимит 60 запросов/час на IP) и публичное CORS-зеркало
+   `ungh.cc/repos/.../releases/latest` (тот же релиз, ассеты под
+   `downloadUrl`). Первый недоступен (RU-сеть/лимит/зависание — у каждого
+   свой таймаут) — берём второй; оверрайд — `VITE_APP_UPDATE_URL`.
 2. Версия новее + не пропущена → баннер «⬇ Обновить» (проверка не чаще
    раза в сутки, пропуск версии запоминается в `he_app_update_v1`).
    Неудачная проверка суточное окно НЕ съедает: нет сети/лимит GitHub —
@@ -835,6 +847,13 @@ APK запекает `dist/` в момент сборки, поэтому сам
    (плагин `AppUpdater`, `MainActivity`), установка — системный установщик
    через FileProvider. Разрешение `REQUEST_INSTALL_PACKAGES` в манифесте;
    без гранта «неизвестные источники» баннер ведёт в настройки.
+   Каждый нативный вызов на пути к результату (`App.getInfo`,
+   `LiveUpdate.getCurrentBundle`) ограничен таймаутом
+   (`src/core/async-timeout.ts`): мост Capacitor иногда не отвечает вовсе,
+   и без таймаута проверка висела навсегда — ни баннера, ни тоста, ни
+   `lastCheck`, снаружи «автообновление не работает».
+   Итог каждой проверки пишется в `he_app_update_v1` (`lastResult`) и виден в
+   настройках («Последняя проверка») — баннер и тост можно пропустить.
 4. CI публикует APK в Release по тегу `v*` **и по ручному запуску**
    workflow `android-apk` (job `publish`): подписанный `app-release.apk`
    приоритетом, иначе debug. Движок предпочитает подписанный ассет

@@ -11,6 +11,7 @@ import {
   parseVersionTag,
   pickApkAssetUrl,
   pickBundleAssetUrl,
+  parseReleasePayload,
   readUpdateState,
   shouldCheckNow,
   writeUpdateState,
@@ -62,26 +63,23 @@ describe('pickApkAssetUrl', () => {
       { name: 'broken.apk' },
     ];
     expect(pickApkAssetUrl(assets)).toBe('https://x/release.apk');
-    expect(
-      pickApkAssetUrl([{ name: 'app-debug.apk', browser_download_url: 'https://x/d.apk' }]),
-    ).toBe('https://x/d.apk');
+    expect(pickApkAssetUrl([{ name: 'app-debug.apk', browser_download_url: 'https://x/d.apk' }])).toBe(
+      'https://x/d.apk',
+    );
     expect(pickApkAssetUrl([])).toBeNull();
     expect(pickApkAssetUrl(null)).toBeNull();
-    expect(
-      pickApkAssetUrl([{ name: 'readme.md', browser_download_url: 'https://x/r' }]),
-    ).toBeNull();
+    expect(pickApkAssetUrl([{ name: 'readme.md', browser_download_url: 'https://x/r' }])).toBeNull();
   });
 });
 
-describe('fetchLatestRelease', () => {  it('5. GitHub-формат: tag + assets + body', async () => {
+describe('fetchLatestRelease', () => {
+  it('5. GitHub-формат: tag + assets + body', async () => {
     const stub = async () => ({
       ok: true,
       json: async () => ({
         tag_name: 'v3.1.0',
         body: 'Фиксы',
-        assets: [
-          { name: 'app-release.apk', browser_download_url: 'https://x/r.apk' },
-        ],
+        assets: [{ name: 'app-release.apk', browser_download_url: 'https://x/r.apk' }],
       }),
     });
     expect(await fetchLatestRelease(stub)).toEqual({
@@ -106,6 +104,42 @@ describe('fetchLatestRelease', () => {  it('5. GitHub-формат: tag + assets
       })),
     ).toBeNull();
   });
+
+  it('6a. формат зеркала ungh.cc: release.tag + assets[].downloadUrl', async () => {
+    expect(
+      parseReleasePayload({
+        release: {
+          tag: 'v3.0.21',
+          markdown: 'фиксы',
+          assets: [
+            { name: 'app-release.apk', downloadUrl: 'https://x/r.apk' },
+            { name: 'web-bundle-v3.0.21.zip', downloadUrl: 'https://x/b.zip' },
+          ],
+        },
+      }),
+    ).toEqual({ version: '3.0.21', apkUrl: 'https://x/r.apk', bundleUrl: 'https://x/b.zip', notes: 'фиксы' });
+    expect(parseReleasePayload({ release: { tag: 'v3.0.21', assets: [] } })).toBeNull();
+    expect(parseReleasePayload(null)).toBeNull();
+  });
+
+  it('6b. первый фид недоступен → берём следующий (не пустой баннер)', async () => {
+    const urls: string[] = [];
+    const stub = async (url: string) => {
+      urls.push(url);
+      if (urls.length === 1) throw new Error('blocked');
+      return {
+        ok: true as const,
+        json: async () => ({
+          release: { tag: 'v3.0.21', assets: [{ name: 'app-release.apk', downloadUrl: 'https://x/r.apk' }] },
+        }),
+      };
+    };
+    const rel = await fetchLatestRelease(stub);
+    expect(rel?.version).toBe('3.0.21');
+    expect(urls.length).toBe(2);
+    expect(urls[0]).toContain('api.github.com');
+    expect(urls[1]).toContain('ungh.cc');
+  });
 });
 
 describe('update state', () => {
@@ -123,6 +157,18 @@ describe('update state', () => {
     } catch {
       /* ignore */
     }
-    expect(readUpdateState()).toEqual({ lastCheck: 0, skippedVersion: '' });
+    expect(readUpdateState()).toEqual({ lastCheck: 0, skippedVersion: '', lastResult: '' });
+  });
+
+  it('9. lastResult — merge без затирания lastCheck/skip + событие для настроек', () => {
+    writeUpdateState({ lastCheck: 123, skippedVersion: '3.1.0' });
+    writeUpdateState({ lastResult: 'Нет связи с GitHub — проверка не удалась' });
+    const st = readUpdateState();
+    expect(st.lastCheck).toBe(123);
+    expect(st.skippedVersion).toBe('3.1.0');
+    expect(st.lastResult).toContain('Нет связи');
+    // Ручной lastCheck не должен теряться при записи итога.
+    writeUpdateState({ lastResult: 'Установлена последняя версия 3.0.20' });
+    expect(readUpdateState().lastCheck).toBe(123);
   });
 });

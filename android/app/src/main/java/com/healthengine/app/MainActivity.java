@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 
 import com.getcapacitor.BridgeActivity;
+import com.healthengine.app.biometry.BiometryPlugin;
 import com.healthengine.app.updater.AppUpdaterPlugin;
 import com.healthengine.app.widgets.WidgetBridgePlugin;
 import com.healthengine.app.widgets.WidgetStore;
@@ -18,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AppUpdaterPlugin.class);
         registerPlugin(DynamicColorPlugin.class);
         registerPlugin(HeSpeechPlugin.class);
+        registerPlugin(BiometryPlugin.class);
         super.onCreate(savedInstanceState);
         ensureNotificationChannels();
         captureWidgetTarget(getIntent());

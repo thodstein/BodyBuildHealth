@@ -2,17 +2,14 @@
  * BiometrySetupCard.tsx — включение биометрии в APK. ТОЛЬКО native.
  * Telegram/web этот компонент не импортируют.
  *
- * Механика (native-bridge): WebAuthn platform authenticator, без новых
- * native-зависимостей. Первое включение = регистрация ключа, дальше — проверка.
+ * Механика (native-bridge): в APK — нативный плагин `Biometry`
+ * (системный BiometricPrompt, androidx.biometric), в браузере/PWA —
+ * WebAuthn platform authenticator. WebAuthn внутри WebView не работает.
  */
 
 import React, { useEffect, useState } from 'react';
 import { NativeIcon } from './NativeIcons';
-import {
-  isBiometricAvailable,
-  authenticateWithBiometrics,
-  disableBiometrics,
-} from '../../core/native-bridge';
+import { isBiometricAvailable, authenticateWithBiometrics, disableBiometrics } from '../../core/native-bridge';
 import { getLocale } from '../../data/interactions-labels';
 
 const ENABLED_KEY = 'he_biometry_enabled';
@@ -171,18 +168,16 @@ export const BiometrySetupCard: React.FC = () => {
   return (
     <div className="native-feature-card" aria-label={T.cardLabel}>
       <div className="native-feature-head">
-        <span className="native-feature-icon" style={{ color: 'var(--accent-contrast)' }}><NativeIcon name="shield" size={20} /></span>
+        <span className="native-feature-icon" style={{ color: 'var(--accent-contrast)' }}>
+          <NativeIcon name="shield" size={20} />
+        </span>
         <div>
           <div className="native-feature-title">{T.title}</div>
-          <div className="native-feature-sub">
-            {checking ? T.checking : supported ? T.supported : T.unsupported}
-          </div>
+          <div className="native-feature-sub">{checking ? T.checking : supported ? T.supported : T.unsupported}</div>
         </div>
         <span className={`native-dot ${checking ? '' : supported ? 'native-dot--ok' : 'native-dot--bad'}`} />
       </div>
-      {!checking && !supported && (
-        <div className="native-feature-how">{T.how}</div>
-      )}
+      {!checking && !supported && <div className="native-feature-how">{T.how}</div>}
       <div className="native-feature-actions">
         {!enabled ? (
           <button className="native-feature-wide" disabled={busy || checking || !supported} onClick={enable}>

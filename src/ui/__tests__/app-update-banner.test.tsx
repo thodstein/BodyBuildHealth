@@ -62,10 +62,7 @@ describe('AppUpdateBanner (волна 20)', () => {
   it('2. градиент и кромка — за акцентом темы, не захардкожены', async () => {
     const fs = await import('fs');
     const path = await import('path');
-    const src = fs.readFileSync(
-      path.join(process.cwd(), 'src', 'ui', 'native', 'AppUpdateBanner.tsx'),
-      'utf-8',
-    );
+    const src = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'native', 'AppUpdateBanner.tsx'), 'utf-8');
     expect(src).toContain('var(--accent)');
     expect(src).toContain('var(--accent-contrast)');
     expect(src).not.toMatch(/#c9f73a/i);
@@ -92,6 +89,52 @@ describe('AppUpdateBanner (волна 20)', () => {
     expect(await screen.findByText(/9\.9\.9/)).not.toBeNull();
   });
 
+  it('7. зависший ответ LiveUpdate не прячет баннер (таймаут, а не вечный висяк)', async () => {
+    (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('native');
+    const lu = await import('../../core/live-update');
+    // Мост Capacitor не ответил вовсе: без таймаута проверка не дошла бы
+    // ни до фида, ни до баннера — снаружи «автообновление не работает».
+    (lu.getLiveBundleId as unknown as { mockReturnValueOnce: (v: Promise<null>) => void }).mockReturnValueOnce(
+      new Promise<null>(() => {}),
+    );
+    vi.useFakeTimers();
+    try {
+      render(<AppUpdateBanner />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(screen.queryByText(/9\.9\.9/)).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('8. ручная проверка всегда отвечает тостом, даже если версия не пришла', async () => {
+    (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('native');
+    const nb = await import('../../core/native-bridge');
+    const hang = () => new Promise<null>(() => {});
+    const deviceInfo = nb.getDeviceInfo as unknown as {
+      mockImplementationOnce: (f: () => Promise<null>) => unknown;
+    };
+    // авто-проверка на монтировании и ручная — обе без ответа плагина
+    deviceInfo.mockImplementationOnce(hang);
+    deviceInfo.mockImplementationOnce(hang);
+    const { toastStore } = await import('../../core/toast');
+    const errorSpy = vi.spyOn(toastStore, 'error');
+    vi.useFakeTimers();
+    try {
+      render(<AppUpdateBanner />);
+      await act(async () => {
+        window.dispatchEvent(new Event('he:check-updates'));
+        await vi.advanceTimersByTimeAsync(7000);
+      });
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('6. неудачная авто-проверка не съедает суточное окно', async () => {
     (getAppPlatform as unknown as { mockReturnValue: (v: string) => void }).mockReturnValue('native');
     const upd = await import('../../core/app-updater');
@@ -108,7 +151,14 @@ describe('AppUpdateBanner (волна 20)', () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     expect(container.querySelector('[aria-label="app-update"]')).toBeNull();
-    expect(writeState.mock.calls).toHaveLength(0);
+    // Суточное окно не съедено: ни в одной записи нет lastCheck. Итог проверки
+    // при этом фиксируется — настройки должны показать «нет связи».
+    const withLastCheck = writeState.mock.calls.filter(
+      (call) => call[0] && typeof call[0] === 'object' && 'lastCheck' in (call[0] as object),
+    );
+    expect(withLastCheck).toHaveLength(0);
+    const results = writeState.mock.calls.map((call) => (call[0] as { lastResult?: string }).lastResult ?? '');
+    expect(results.join(' ')).toContain('Нет связи');
   });
 });
 

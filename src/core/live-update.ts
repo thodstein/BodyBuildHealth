@@ -12,6 +12,15 @@
  */
 
 import { isNewerVersion } from './app-updater';
+import { withTimeout } from './async-timeout';
+
+/**
+ * Мост Capacitor иногда не отвечает вовсе. На пути к результату (проверка
+ * обновлений, старт) такие вызовы ждём ограниченно — иначе «тихий» висяк:
+ * ни баннера, ни тоста, ни записи lastCheck.
+ */
+const PLUGIN_QUERY_TIMEOUT_MS = 4000;
+const PLUGIN_CALL_TIMEOUT_MS = 6000;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LiveUpdatePlugin = any;
@@ -32,7 +41,11 @@ export async function getLiveBundleId(): Promise<string | null> {
   try {
     const plugin = await liveUpdate();
     if (!plugin) return null;
-    const ret = await plugin.getCurrentBundle();
+    const ret = await withTimeout<{ bundleId?: string } | null>(
+      plugin.getCurrentBundle(),
+      PLUGIN_QUERY_TIMEOUT_MS,
+      'LiveUpdate.getCurrentBundle',
+    );
     const id = String(ret?.bundleId ?? '');
     return id ? id : null;
   } catch {
@@ -45,10 +58,7 @@ export async function getLiveBundleId(): Promise<string | null> {
  * Натив меняется редко и только добавлением; мажор = ломающие изменения
  * натива → тогда только полное обновление APK, не OTA.
  */
-export function isBundleCompatible(
-  bundleVersion: string,
-  nativeVersion: string,
-): boolean {
+export function isBundleCompatible(bundleVersion: string, nativeVersion: string): boolean {
   try {
     const norm = (v: string) => (v || '').trim().replace(/^[vV]/, '');
     const b = norm(bundleVersion).split('.')[0];
@@ -75,23 +85,20 @@ export async function stageLiveBundle(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let handle: any = null;
     try {
-      handle = await plugin.addListener(
-        'downloadBundleProgress',
-        (ev: { percent?: number }) => {
-          try {
-            const p = Number(ev?.percent ?? 0);
-            onProgress?.(Math.min(1, Math.max(0, p > 1 ? p / 100 : p)));
-          } catch {
-            /* ignore */
-          }
-        },
-      );
+      handle = await plugin.addListener('downloadBundleProgress', (ev: { percent?: number }) => {
+        try {
+          const p = Number(ev?.percent ?? 0);
+          onProgress?.(Math.min(1, Math.max(0, p > 1 ? p / 100 : p)));
+        } catch {
+          /* ignore */
+        }
+      });
     } catch {
       /* прогресс опционален */
     }
     try {
       await plugin.downloadBundle({ url, bundleId });
-      await plugin.setNextBundle({ bundleId });
+      await withTimeout(plugin.setNextBundle({ bundleId }), PLUGIN_CALL_TIMEOUT_MS, 'LiveUpdate.setNextBundle');
       return true;
     } finally {
       try {
@@ -110,7 +117,7 @@ export async function reloadToLiveBundle(): Promise<boolean> {
   try {
     const plugin = await liveUpdate();
     if (!plugin) return false;
-    await plugin.reload();
+    await withTimeout(plugin.reload(), PLUGIN_CALL_TIMEOUT_MS, 'LiveUpdate.reload');
     return true;
   } catch {
     return false;
@@ -122,7 +129,7 @@ export async function markAppReady(): Promise<void> {
   try {
     const plugin = await liveUpdate();
     if (!plugin) return;
-    await plugin.ready();
+    await withTimeout(plugin.ready(), PLUGIN_QUERY_TIMEOUT_MS, 'LiveUpdate.ready');
   } catch {
     /* ignore */
   }
@@ -133,7 +140,7 @@ export async function resetToBuiltInBundle(): Promise<boolean> {
   try {
     const plugin = await liveUpdate();
     if (!plugin) return false;
-    await plugin.reset();
+    await withTimeout(plugin.reset(), PLUGIN_QUERY_TIMEOUT_MS, 'LiveUpdate.reset');
     return true;
   } catch {
     return false;

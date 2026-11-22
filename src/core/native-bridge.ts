@@ -12,6 +12,7 @@
  */
 
 import { isCapacitorNative } from './app-platform';
+import { withTimeout } from './async-timeout';
 import { hapticImpact as tgHaptic } from './telegram';
 
 export type HapticKind = 'light' | 'medium' | 'heavy';
@@ -33,12 +34,7 @@ export async function haptics(kind: HapticKind = 'light'): Promise<void> {
     try {
       const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
       await Haptics.impact({
-        style:
-          kind === 'heavy'
-            ? ImpactStyle.Heavy
-            : kind === 'medium'
-              ? ImpactStyle.Medium
-              : ImpactStyle.Light,
+        style: kind === 'heavy' ? ImpactStyle.Heavy : kind === 'medium' ? ImpactStyle.Medium : ImpactStyle.Light,
       });
       return;
     } catch {
@@ -66,9 +62,7 @@ export async function haptics(kind: HapticKind = 'light'): Promise<void> {
 export async function notifyLocal(title: string, body: string): Promise<boolean> {
   if (isCapacitorNative()) {
     try {
-      const { LocalNotifications } = await import(
-        '@capacitor/local-notifications'
-      );
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
       try {
         await LocalNotifications.requestPermissions();
       } catch {
@@ -193,14 +187,10 @@ export async function scheduleDailyReminders(items: DailyReminder[]): Promise<nu
  * Инициализация нативных push (APK). В Telegram/web — no-op (там свои механики).
  * onToken — сохранить токен на бэкенде для адресных рассылок (FCM).
  */
-export async function initNativePush(
-  onToken?: (token: string) => void,
-): Promise<boolean> {
+export async function initNativePush(onToken?: (token: string) => void): Promise<boolean> {
   if (!isCapacitorNative()) return false;
   try {
-    const { PushNotifications } = await import(
-      '@capacitor/push-notifications'
-    );
+    const { PushNotifications } = await import('@capacitor/push-notifications');
     const perm = await PushNotifications.requestPermissions();
     if (perm.receive !== 'granted') return false;
     await PushNotifications.register();
@@ -256,9 +246,7 @@ export async function shareText(payload: SharePayload): Promise<boolean> {
     return false;
   }
   try {
-    const text = [payload.title, payload.text, payload.url]
-      .filter(Boolean)
-      .join('\n');
+    const text = [payload.title, payload.text, payload.url].filter(Boolean).join('\n');
     if (text && navigator.clipboard) {
       await navigator.clipboard.writeText(text);
       return true;
@@ -273,10 +261,7 @@ export async function shareText(payload: SharePayload): Promise<boolean> {
  * Сохранить текстовый файл: native — Filesystem (Documents) + Share-диалог,
  * web/telegram — классическое скачивание через <a download>.
  */
-export async function saveTextFile(
-  filename: string,
-  text: string,
-): Promise<boolean> {
+export async function saveTextFile(filename: string, text: string): Promise<boolean> {
   if (isCapacitorNative()) {
     try {
       const { Filesystem, Directory } = await import('@capacitor/filesystem');
@@ -337,18 +322,14 @@ export interface PickedPhoto {
 export async function pickPhoto(): Promise<PickedPhoto | null> {
   if (isCapacitorNative()) {
     try {
-      const { Camera, CameraSource, CameraResultType } = await import(
-        '@capacitor/camera'
-      );
+      const { Camera, CameraSource, CameraResultType } = await import('@capacitor/camera');
       const photo = await Camera.getPhoto({
         source: CameraSource.Prompt,
         resultType: CameraResultType.DataUrl,
         quality: 85,
       });
-      if (photo.dataUrl)
-        return { uri: photo.dataUrl, format: photo.format ?? 'jpeg' };
-      if (photo.webPath)
-        return { uri: photo.webPath, format: photo.format ?? 'jpeg' };
+      if (photo.dataUrl) return { uri: photo.dataUrl, format: photo.format ?? 'jpeg' };
+      if (photo.webPath) return { uri: photo.webPath, format: photo.format ?? 'jpeg' };
       return null;
     } catch {
       return null;
@@ -412,7 +393,10 @@ export async function pickCameraPhoto(): Promise<PickedPhoto | null> {
       input.setAttribute('capture', 'environment');
       input.onchange = () => {
         const file = input.files?.[0];
-        if (!file) { resolve(null); return; }
+        if (!file) {
+          resolve(null);
+          return;
+        }
         const reader = new FileReader();
         reader.onload = () => resolve({ uri: String(reader.result ?? ''), format: file.type.split('/')[1] ?? 'jpeg' });
         reader.onerror = () => resolve(null);
@@ -465,7 +449,7 @@ export interface PickedVideo {
 export async function recordSetVideo(): Promise<PickedVideo | null> {
   if (!isCapacitorNative()) return null;
   try {
-    const { Camera } = await import('@capacitor/camera') as unknown as {
+    const { Camera } = (await import('@capacitor/camera')) as unknown as {
       Camera: { recordVideo?: (o: Record<string, unknown>) => Promise<{ uri?: string }> };
     };
     if (!Camera?.recordVideo) return null;
@@ -486,7 +470,7 @@ export async function playSetVideo(uri: string): Promise<boolean> {
   if (!clean) return false;
   try {
     if (isCapacitorNative()) {
-      const { Camera } = await import('@capacitor/camera') as unknown as {
+      const { Camera } = (await import('@capacitor/camera')) as unknown as {
         Camera: { playVideo?: (o: { uri: string }) => Promise<void> };
       };
       if (!Camera?.playVideo) return false;
@@ -580,11 +564,15 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
             // to expose retry instead of assuming a second probe means ready.
             await scanner.installGoogleBarcodeScannerModule();
             started = true;
-          } catch { /* нет Google-сервисов — модуль не поставится никогда */ }
+          } catch {
+            /* нет Google-сервисов — модуль не поставится никогда */
+          }
           // Устройства без Play Market/Google-сервисов (Huawei, Honor) модуль
           // не ставят НИКОГДА. Раньше UI велел «подождать и нажать ещё раз» —
           // это вечный тупик на устройствах без GMS. Отдаём отдельный код.
-          return started ? { status: 'unavailable', hint: 'installing-module' } : { status: 'unavailable', hint: 'no-gms' };
+          return started
+            ? { status: 'unavailable', hint: 'installing-module' }
+            : { status: 'unavailable', hint: 'no-gms' };
         }
       }
     } catch {
@@ -611,9 +599,11 @@ export async function scanNativeBarcode(): Promise<NativeBarcodeOutcome> {
       if (/cancel|cancell|dismiss|closed|abort/i.test(msg)) return { status: 'cancelled' };
       return { status: 'unavailable', hint: msg.slice(0, 120) };
     }
-    const first = result?.barcodes?.find((entry: { displayValue?: string; rawValue?: string }) =>
-      cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
-    ) || result?.barcodes?.[0];
+    const first =
+      result?.barcodes?.find(
+        (entry: { displayValue?: string; rawValue?: string }) =>
+          cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
+      ) || result?.barcodes?.[0];
     const code = cleanBarcodeDigits(first?.displayValue || first?.rawValue || '');
     if (!code) return { status: 'cancelled' };
     try {
@@ -637,10 +627,18 @@ export async function scanNativeBarcodeImage(path: string): Promise<string | nul
     if (!scanner?.readBarcodesFromImage) return null;
     const result = await scanner.readBarcodesFromImage({
       path,
-      formats: [BarcodeFormat.Ean13, BarcodeFormat.Ean8, BarcodeFormat.UpcA, BarcodeFormat.UpcE, BarcodeFormat.Code128, BarcodeFormat.Itf],
+      formats: [
+        BarcodeFormat.Ean13,
+        BarcodeFormat.Ean8,
+        BarcodeFormat.UpcA,
+        BarcodeFormat.UpcE,
+        BarcodeFormat.Code128,
+        BarcodeFormat.Itf,
+      ],
     });
-    const found = result?.barcodes?.find((entry: { displayValue?: string; rawValue?: string }) =>
-      cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
+    const found = result?.barcodes?.find(
+      (entry: { displayValue?: string; rawValue?: string }) =>
+        cleanBarcodeDigits(entry?.displayValue || entry?.rawValue || '').length >= 8,
     );
     const code = cleanBarcodeDigits(found?.displayValue || found?.rawValue || '');
     return code.length >= 8 ? code : null;
@@ -660,7 +658,8 @@ export async function persistBarcodePhoto(uri: string, format = 'jpeg'): Promise
     const { Filesystem, Directory } = await import('@capacitor/filesystem');
     const bytes = new Uint8Array(await blob.arrayBuffer());
     let binary = '';
-    for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    for (let offset = 0; offset < bytes.length; offset += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     const mime = blob.type || (format.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg');
     const ext = mime === 'image/png' ? 'png' : 'jpg';
     const saved = await Filesystem.writeFile({
@@ -681,11 +680,14 @@ export async function deleteTemporaryBarcodePhoto(path: string): Promise<void> {
     const cacheMarker = '/CACHE/';
     const normalizedPath = path.replace(/\\/g, '/');
     const cacheIndex = normalizedPath.toUpperCase().lastIndexOf(cacheMarker);
-    const relativePath = cacheIndex >= 0
-      ? normalizedPath.slice(cacheIndex + cacheMarker.length)
-      : normalizedPath.split('/').pop() || normalizedPath;
+    const relativePath =
+      cacheIndex >= 0
+        ? normalizedPath.slice(cacheIndex + cacheMarker.length)
+        : normalizedPath.split('/').pop() || normalizedPath;
     await Filesystem.deleteFile({ path: relativePath, directory: Directory.Cache });
-  } catch { /* cache cleanup is best-effort */ }
+  } catch {
+    /* cache cleanup is best-effort */
+  }
 }
 
 /** Открыть настройки приложения (выдать доступ к камере после отказа). Вне native — false. */
@@ -777,10 +779,7 @@ export function watchOnline(cb: (online: boolean) => void): () => void {
 /* ------------------------------------------------------------------ */
 
 /** Статус-бар + сплэш для APK. Вне native — no-op. */
-export async function initNativeChrome(
-  bgColor = '#050b16',
-  style: 'dark' | 'light' = 'dark',
-): Promise<void> {
+export async function initNativeChrome(bgColor = '#050b16', style: 'dark' | 'light' = 'dark'): Promise<void> {
   if (!isCapacitorNative()) return;
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
@@ -828,9 +827,7 @@ export function registerBackInterceptor(fn: () => boolean): () => void {
  * Системная кнопка «назад» Android. Возвращает unsubscribe.
  * В Telegram/web — no-op (там свои BackButton/история).
  */
-export async function setupNativeBackButton(
-  onBack: () => boolean | void,
-): Promise<() => void> {
+export async function setupNativeBackButton(onBack: () => boolean | void): Promise<() => void> {
   if (!isCapacitorNative()) return () => {};
   try {
     const { App } = await import('@capacitor/app');
@@ -839,7 +836,11 @@ export async function setupNativeBackButton(
         // 1) Открытые оверлеи кардио/еды/подтверждений закрываются первыми.
         for (let i = backInterceptors.length - 1; i >= 0; i--) {
           let handled = false;
-          try { handled = backInterceptors[i](); } catch { handled = false; }
+          try {
+            handled = backInterceptors[i]();
+          } catch {
+            handled = false;
+          }
           if (handled) return;
         }
         const handled = onBack();
@@ -864,8 +865,35 @@ export async function setupNativeBackButton(
 }
 
 /* ------------------------------------------------------------------ */
-/* Biometry (WebAuthn platform authenticator, без лишних native-зависимостей) */
+/* Biometry: APK → BiometryPlugin (BiometricPrompt), web → WebAuthn     */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Платформенный WebAuthn в Android WebView НЕ работает: origin Capacitor
+ * (`https://localhost`) не связан с пакетом приложения через Digital Asset
+ * Links, поэтому `isUserVerifyingPlatformAuthenticatorAvailable()` отвечает
+ * false, а `credentials.create()` падает NotAllowedError. Снаружи это
+ * выглядело ровно как «биометрия не работает»: карточка «недоступна»,
+ * отпечаток при входе не предлагается.
+ *
+ * Поэтому в APK спрашиваем нативный плагин `BiometryPlugin`
+ * (`androidx.biometric` → системный BiometricPrompt), а WebAuthn оставляем
+ * фолбэком для браузера/PWA, где платформенный аутентификатор есть.
+ */
+const BIOMETRY_QUERY_TIMEOUT_MS = 4000;
+/** Системный диалог: человеку нужно время, но не бесконечность. */
+const BIOMETRY_PROMPT_TIMEOUT_MS = 90000;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function biometryPlugin(): Promise<any | null> {
+  if (!isCapacitorNative()) return null;
+  try {
+    const { registerPlugin } = await import('@capacitor/core');
+    return registerPlugin('Biometry');
+  } catch {
+    return null;
+  }
+}
 
 function bufToB64url(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
@@ -899,28 +927,40 @@ export function disableBiometrics(): void {
   }
 }
 
-/** Доступна ли платформенная биометрия (отпечаток/Face) в этом WebView. */
-export async function isBiometricAvailable(): Promise<boolean> {
+/** WebAuthn-путь (браузер/PWA): есть ли платформенный аутентификатор. */
+async function isWebAuthnPlatformAvailable(): Promise<boolean> {
   try {
     const PKC = window.PublicKeyCredential;
-    if (!PKC || typeof PKC.isUserVerifyingPlatformAuthenticatorAvailable !== 'function')
-      return false;
+    if (!PKC || typeof PKC.isUserVerifyingPlatformAuthenticatorAvailable !== 'function') return false;
     return await PKC.isUserVerifyingPlatformAuthenticatorAvailable();
   } catch {
     return false;
   }
 }
 
-/**
- * Разблокировка биометрией. Первая успешная регистрация сохраняет credentialId
- * локально; дальше — проверка им. Возвращает true только при реальном
- * подтверждении пользователем. Любая ошибка/отмена = false.
- */
-export async function authenticateWithBiometrics(
-  reason = 'Разблокировка Health Engine',
-): Promise<boolean> {
+/** Доступна ли биометрия: в APK — записанный отпечаток/лицо в системе. */
+export async function isBiometricAvailable(): Promise<boolean> {
+  const plugin = await biometryPlugin();
+  if (plugin) {
+    try {
+      const ret = await withTimeout(
+        plugin.checkAvailability() as Promise<{ available?: boolean }>,
+        BIOMETRY_QUERY_TIMEOUT_MS,
+        'Biometry.checkAvailability',
+      );
+      return ret?.available === true;
+    } catch {
+      return false;
+    }
+  }
+  return isWebAuthnPlatformAvailable();
+}
+
+/** WebAuthn-фолбэк: регистрация ключа при первом входе, дальше — assertion. */
+async function authenticateWebAuthn(reason: string): Promise<boolean> {
   try {
-    if (!(await isBiometricAvailable())) return false;
+    void reason;
+    if (!(await isWebAuthnPlatformAvailable())) return false;
     const stored = (() => {
       try {
         return localStorage.getItem(CRED_KEY);
@@ -958,19 +998,42 @@ export async function authenticateWithBiometrics(
     const assertion = (await navigator.credentials.get({
       publicKey: {
         challenge: randomChallenge() as BufferSource,
-        allowCredentials: [
-          { type: 'public-key', id: b64urlToBuf(stored) as BufferSource },
-        ],
+        allowCredentials: [{ type: 'public-key', id: b64urlToBuf(stored) as BufferSource }],
         userVerification: 'required',
         timeout: 60000,
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     })) as PublicKeyCredential | null;
-    void reason;
     return !!assertion;
   } catch {
     return false;
   }
+}
+
+/**
+ * Разблокировка биометрией. Возвращает true только при реальном
+ * подтверждении пользователем. Любая ошибка/отмена = false.
+ * В APK — системный BiometricPrompt (нативный плагин `Biometry`).
+ */
+export async function authenticateWithBiometrics(reason = 'Разблокировка Health Engine'): Promise<boolean> {
+  const plugin = await biometryPlugin();
+  if (plugin) {
+    try {
+      const en = typeof navigator !== 'undefined' && (navigator.language || '').startsWith('en');
+      const ret = await withTimeout(
+        plugin.authenticate({
+          title: 'Health Engine',
+          reason,
+          cancelText: en ? 'Cancel' : 'Отмена',
+        }) as Promise<{ ok?: boolean }>,
+        BIOMETRY_PROMPT_TIMEOUT_MS,
+        'Biometry.authenticate',
+      );
+      return ret?.ok === true;
+    } catch {
+      return false;
+    }
+  }
+  return authenticateWebAuthn(reason);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1019,10 +1082,7 @@ export async function pollApkDownload(downloadId: number): Promise<ApkDownloadSt
     const status = String(ret?.status ?? 'failed');
     const progress = Number(ret?.progress ?? 0);
     return {
-      status:
-        status === 'done' || status === 'downloading' || status === 'pending'
-          ? status
-          : 'failed',
+      status: status === 'done' || status === 'downloading' || status === 'pending' ? status : 'failed',
       progress: Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0,
     };
   } catch {

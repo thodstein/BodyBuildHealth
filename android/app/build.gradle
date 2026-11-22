@@ -56,6 +56,10 @@ repositories {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    // Биометрия (biometry/BiometryPlugin.java): системный BiometricPrompt.
+    // WebAuthn в Android WebView платформенного аутентификатора не имеет —
+    // отпечаток/Face там недоступны вообще (см. docs/NATIVE-APP.md §11).
+    implementation "androidx.biometric:biometric:$androidxBiometricVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')

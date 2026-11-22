@@ -19,6 +19,7 @@ import {
   type UpdateRelease,
 } from '../../core/app-updater';
 import { toastStore } from '../../core/toast';
+import { withTimeoutOr } from '../../core/async-timeout';
 import {
   getDeviceInfo,
   installDownloadedApk,
@@ -26,14 +27,17 @@ import {
   pollApkDownload,
   startApkDownload,
 } from '../../core/native-bridge';
-import {
-  getLiveBundleId,
-  isBundleCompatible,
-  reloadToLiveBundle,
-  stageLiveBundle,
-} from '../../core/live-update';
+import { getLiveBundleId, isBundleCompatible, reloadToLiveBundle, stageLiveBundle } from '../../core/live-update';
 
 type Phase = 'idle' | 'available' | 'downloading' | 'ready' | 'staged' | 'error';
+
+/**
+ * Бюджеты на нативные вызовы в проверке. Мост Capacitor может не ответить
+ * вовсе — без таймаутов проверка висит до перезапуска: ни баннера, ни тоста,
+ * ни `lastCheck`. Пользователь видит ровно «обновления не работают».
+ */
+const DEVICE_INFO_TIMEOUT_MS = 5000;
+const LIVE_BUNDLE_TIMEOUT_MS = 4000;
 
 function strings(en: boolean) {
   return en
@@ -52,8 +56,7 @@ function strings(en: boolean) {
         allowUnknown:
           'Installation is blocked — allow it: Settings → Apps → Health Engine → Install unknown apps, then tap Install again.',
         openSettings: 'Open settings',
-        failed:
-          'Failed. Check the connection and free space, then try again.',
+        failed: 'Failed. Check the connection and free space, then try again.',
         retry: 'Retry',
       }
     : {
@@ -88,8 +91,7 @@ const cardStyle: React.CSSProperties = {
   border: '1px solid rgba(var(--accent-rgb, 201, 247, 58), 0.35)',
   boxShadow: '0 12px 40px rgba(0, 0, 0, 0.55)',
   color: '#f4f7ff',
-  fontFamily:
-    "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif",
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif",
 };
 
 const btnPrimary: React.CSSProperties = {
@@ -120,39 +122,40 @@ export const AppUpdateBanner: React.FC = () => {
   /** Быстрый путь (OTA-бандл) доступен: есть .zip + мажор совпал + ещё не стоит. */
   const [ota, setOta] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const en =
-    typeof navigator !== 'undefined' && (navigator.language || '').startsWith('en');
+  const en = typeof navigator !== 'undefined' && (navigator.language || '').startsWith('en');
 
   /** Явная проверка (в т.ч. из настроек): показывает результат даже без обновления. */
   const runCheck = useCallback(async (manual: boolean) => {
     try {
       if (!manual && !shouldCheckNow()) return;
-      const info = await getDeviceInfo();
-      const installed = (info.appVersion || '').trim();
+      // Версию и активный OTA-бандл спрашиваем у натива ОГРАНИЧЕННО по времени:
+      // зависший плагин иначе прячет и баннер, и тост, и запись lastCheck.
+      const info = await withTimeoutOr(getDeviceInfo(), DEVICE_INFO_TIMEOUT_MS, null);
+      const installed = (info?.appVersion || '').trim();
       // Без версии сборки сравнивать не с чем — тихо выходим (и не съедаем
       // суточное окно: следующий запуск попробует снова).
       if (!installed) {
-        if (manual) toastStore.error('Не удалось узнать версию приложения');
+        writeUpdateState({ lastResult: 'Версия не определилась — ядро приложения не ответило' });
+        if (manual) toastStore.error('Не удалось узнать версию — приложение не ответило');
         return;
       }
       // Действующая версия = max(APK, применённый OTA): иначе после «быстрого
       // обновления» баннер продолжал бы звать на полный APK каждый день.
-      let liveId: string | null = null;
-      try {
-        liveId = await getLiveBundleId();
-      } catch {
-        /* без OTA — остаётся версия APK */
-      }
+      const liveId = await withTimeoutOr(getLiveBundleId(), LIVE_BUNDLE_TIMEOUT_MS, null);
       const effective = liveId && isNewerVersion(liveId, installed) ? liveId : installed;
       const latest = await fetchLatestRelease();
       if (!latest) {
         // Неудачная проверка НЕ съедает суточное окно: иначе один запуск без
         // сети откладывал бы авто-обновление на сутки вперёд.
+        writeUpdateState({ lastResult: 'Нет связи с сервером обновлений — проверка не удалась' });
         if (manual) toastStore.error('Не удалось проверить обновления — нет связи');
         return;
       }
-      writeUpdateState({ lastCheck: Date.now() });
       if (!isNewerVersion(latest.version, effective)) {
+        writeUpdateState({
+          lastCheck: Date.now(),
+          lastResult: `Установлена последняя версия ${effective}`,
+        });
         if (manual) toastStore.success(`✅ У вас последняя версия ${effective}`);
         return;
       }
@@ -160,17 +163,16 @@ export const AppUpdateBanner: React.FC = () => {
       // проверка — это явная просьба показать, что есть.
       if (!manual && readUpdateState().skippedVersion === latest.version) return;
       // Быстрый путь — только при совместимом мажоре и ещё не применённом бандле.
-      setOta(
-        Boolean(
-          latest.bundleUrl &&
-            isBundleCompatible(latest.version, installed) &&
-            liveId !== latest.version,
-        ),
-      );
+      writeUpdateState({
+        lastCheck: Date.now(),
+        lastResult: `Доступна версия ${latest.version}`,
+      });
+      setOta(Boolean(latest.bundleUrl && isBundleCompatible(latest.version, installed) && liveId !== latest.version));
       setRelease(latest);
       setPhase('available');
       if (manual) toastStore.success(`⬆️ Доступна версия ${latest.version}`);
     } catch {
+      writeUpdateState({ lastResult: 'Проверка не удалась' });
       if (manual) toastStore.error('Не удалось проверить обновления');
     }
   }, []);
@@ -335,9 +337,7 @@ export const AppUpdateBanner: React.FC = () => {
         </div>
       )}
       {phase === 'downloading' && (
-        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>
-          {T.installing(progress)}
-        </div>
+        <div style={{ marginTop: 10, fontSize: 13, opacity: 0.9 }}>{T.installing(progress)}</div>
       )}
       {phase === 'ready' && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
