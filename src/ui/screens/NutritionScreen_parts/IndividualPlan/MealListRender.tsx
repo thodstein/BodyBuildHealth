@@ -4,17 +4,25 @@
  * Хук useRenderMealList() возвращает функцию рендера, которая использует контекст планировщика.
  * В IndividualPlanContext: const renderMealList = useRenderMealList();
  */
-import React, { useState } from "react";
-import { addToCart } from "../../../../core/nutrition-utils";
-import { FOOD_DB, findFoodById, filterFoodsByName } from "../../../../core/nutrition-database";
-import { calcMealDIAAS } from "../../../../engines/product-usefulness-v2.engine";
-import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from "../../../../engines/kbju-food-match.engine";
-import type { PlanCtx } from "./IndividualPlanContext";
-import { PROTEIN_PRESETS } from "./types";
-import { OrganLoadBadgeGroup } from "./OrganLoadBadges";
-import { readDiaryV2, writeDiaryV2 } from "../diary-storage-v2";
-import { kbjuFormulaDeviationPct, RECIPE_PRESETS, recipeMatchesPreset } from "./planner-recipe-mode";
-import { displayAmount, displayFoodName } from "./planner-weight-mode";
+import React, { useState } from 'react';
+import { addToCart } from '../../../../core/nutrition-utils';
+import { FOOD_DB, findFoodById, filterFoodsByName } from '../../../../core/nutrition-database';
+import { calcMealDIAAS } from '../../../../engines/product-usefulness-v2.engine';
+import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from '../../../../engines/kbju-food-match.engine';
+import type { PlanCtx } from './IndividualPlanContext';
+import { PROTEIN_PRESETS } from './types';
+import { OrganLoadBadgeGroup } from './OrganLoadBadges';
+import { readDiaryV2, writeDiaryV2 } from '../diary-storage-v2';
+import { kbjuFormulaDeviationPct, RECIPE_PRESETS, recipeMatchesPreset } from './planner-recipe-mode';
+import { displayAmount, displayFoodName } from './planner-weight-mode';
+import {
+  mealSodiumMg,
+  sodiumToSaltG,
+  sodiumLabel,
+  sodiumTone,
+  SODIUM_RDA_MG,
+  daySodiumMg,
+} from './planner-meal-sodium';
 
 // FIX week-perf: кэш тяжёлых метрик приёма (DIAAS/GL/II) по объекту приёма.
 // Объекты приёмов иммутабельны (заменяются при правках), поэтому WeakMap-кэш всегда валиден
@@ -37,8 +45,8 @@ const _similarFoodsCache = new WeakMap<object, any[]>();
 function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time: string, dayIdx?: number) => void) {
   const planRef = React.useRef<any>(null);
   const dayRef = React.useRef<number>(0);
-  const [edit, setEdit] = React.useState<{ idx:number; value:string } | null>(null);
-  const open = (idx:number, plan?: any, dayIdx?: number) => {
+  const [edit, setEdit] = React.useState<{ idx: number; value: string } | null>(null);
+  const open = (idx: number, plan?: any, dayIdx?: number) => {
     planRef.current = plan;
     dayRef.current = typeof dayIdx === 'number' ? dayIdx : 0;
     const cur = (plan || planRef.current)?.meals?.[idx]?.time || '12:00';
@@ -49,20 +57,91 @@ function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time
     const res = edit.value.trim();
     const mt = res.split(':');
     if (mt.length !== 2) return;
-    const h = parseInt(mt[0],10), mm = parseInt(mt[1],10);
-    if (isNaN(h)||isNaN(mm)||h<0||h>23||mm<0||mm>59) return;
-    applyTime(edit.idx, `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`, dayRef.current);
+    const h = parseInt(mt[0], 10),
+      mm = parseInt(mt[1], 10);
+    if (isNaN(h) || isNaN(mm) || h < 0 || h > 23 || mm < 0 || mm > 59) return;
+    applyTime(edit.idx, `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, dayRef.current);
     setEdit(null);
   };
   const modal = edit ? (
-    <div onClick={e=>{ if(e.target===e.currentTarget) setEdit(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div style={{ width:'100%', maxWidth:340, padding:18, borderRadius:16, background:'linear-gradient(135deg,#1a1c26 0%,#18181b 100%)', border:'1px solid rgba(59,130,246,0.22)', boxShadow:'0 16px 40px rgba(0,0,0,0.5)', backdropFilter:'blur(16px)' }}>
-        <div style={{ fontSize:13, fontWeight:800, color:'#60a5fa', marginBottom:4 }}>🕒 Время приёма</div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:10 }}>ЧЧ:ММ — например 12:30</div>
-        <input type="time" value={edit.value} onChange={e=>setEdit({ ...edit, value:e.target.value })} autoFocus style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:16, outline:'none' }} />
-        <div style={{ display:'flex', gap:8, marginTop:12 }}>
-          <button onClick={()=>setEdit(null)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
-          <button onClick={confirm} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#3b82f6,#60a5fa)', color:'#fff', fontWeight:700, cursor:'pointer' }}>Сохранить</button>
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setEdit(null);
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        background: 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 340,
+          padding: 18,
+          borderRadius: 16,
+          background: 'linear-gradient(135deg,#1a1c26 0%,#18181b 100%)',
+          border: '1px solid rgba(59,130,246,0.22)',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(16px)',
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🕒 Время приёма</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>ЧЧ:ММ — например 12:30</div>
+        <input
+          type="time"
+          value={edit.value}
+          onChange={(e) => setEdit({ ...edit, value: e.target.value })}
+          autoFocus
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: '#202023',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: '#fff',
+            fontSize: 16,
+            outline: 'none',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button
+            onClick={() => setEdit(null)}
+            style={{
+              flex: 1,
+              padding: '10px',
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.7)',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Отмена
+          </button>
+          <button
+            onClick={confirm}
+            style={{
+              flex: 1,
+              padding: '10px',
+              borderRadius: 10,
+              border: 'none',
+              background: 'linear-gradient(135deg,#3b82f6,#60a5fa)',
+              color: '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Сохранить
+          </button>
         </div>
       </div>
     </div>
@@ -95,80 +174,297 @@ function MealItemSheet(props: {
   const [mode, setMode] = useState<'amount' | 'replace'>('amount');
   const [draft, setDraft] = useState<string>(String(Math.max(1, Math.round(amount || item?.amount || 1))));
   const food = findFoodById(item?.id);
-  const per100 = food ? Math.round(food.kcal || 0) : (item?.amount ? Math.round((item?.kcal || 0) / item.amount * 100) : 0);
+  const per100 = food
+    ? Math.round(food.kcal || 0)
+    : item?.amount
+      ? Math.round(((item?.kcal || 0) / item.amount) * 100)
+      : 0;
   const amt = Math.max(1, Math.round(amount || item?.amount || 1));
   const step = amt >= 200 ? 25 : amt >= 100 ? 10 : 5;
-  const setBoth = (v: number) => { const nv = Math.max(1, Math.round(v)); setAmount(nv); setDraft(String(nv)); };
+  const setBoth = (v: number) => {
+    const nv = Math.max(1, Math.round(v));
+    setAmount(nv);
+    setDraft(String(nv));
+  };
   const bump = (d: number) => setBoth(amt + d);
   const scale = (k: number) => setBoth(amt * k);
   const chip = (active: boolean): React.CSSProperties => ({
-    flex: '1 1 44px', minHeight: 44, minWidth: 44, padding: '8px 6px', borderRadius: 10, cursor: 'pointer',
-    fontSize: 11, fontWeight: 700, border: active ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.12)',
-    background: active ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', color: active ? '#00e68a' : '#fff',
+    flex: '1 1 44px',
+    minHeight: 44,
+    minWidth: 44,
+    padding: '8px 6px',
+    borderRadius: 10,
+    cursor: 'pointer',
+    fontSize: 11,
+    fontWeight: 700,
+    border: active ? '1px solid rgba(0,230,138,0.55)' : '1px solid rgba(255,255,255,0.12)',
+    background: active ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
+    color: active ? '#00e68a' : '#fff',
   });
   const act = (color: string): React.CSSProperties => ({
-    width: '100%', minHeight: 48, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
-    textAlign: 'center' as const, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}55`, color,
+    width: '100%',
+    minHeight: 48,
+    padding: '10px 12px',
+    borderRadius: 12,
+    cursor: 'pointer',
+    fontSize: 11.5,
+    fontWeight: 700,
+    textAlign: 'center' as const,
+    background: 'rgba(255,255,255,0.04)',
+    border: `1px solid ${color}55`,
+    color,
   });
   return (
-    <div onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 12 }}>
-      <div style={{ width: '100%', maxWidth: 400, maxHeight: '88vh', overflowY: 'auto', borderRadius: 20, background: 'linear-gradient(180deg,#1e1e22,#141417)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 18px 54px rgba(0,0,0,0.55)' }}>
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'center',
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          maxHeight: '88vh',
+          overflowY: 'auto',
+          borderRadius: 20,
+          background: 'linear-gradient(180deg,#1e1e22,#141417)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 18px 54px rgba(0,0,0,0.55)',
+        }}
+      >
         <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
         <div style={{ padding: '14px 16px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>🍽 {displayFoodName(item?.id, item?.name, weightMode)}</div>
-              <div style={{ fontSize: 10.5, color: '#fff', opacity: 0.75, marginTop: 2 }}>{per100} ккал/100 г · сейчас {item?.amount} г</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>
+                🍽 {displayFoodName(item?.id, item?.name, weightMode)}
+              </div>
+              <div style={{ fontSize: 10.5, color: '#fff', opacity: 0.75, marginTop: 2 }}>
+                {per100} ккал/100 г · сейчас {item?.amount} г
+              </div>
             </div>
-            <button onClick={props.onClose} aria-label="Закрыть" style={{ width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 16, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+            <button
+              onClick={props.onClose}
+              aria-label="Закрыть"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                fontSize: 16,
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
           </div>
 
-          {mode === 'amount' ? (<>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              <button onClick={() => bump(-step)} aria-label="Уменьшить" style={{ width: 48, height: 48, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 20, fontWeight: 800, cursor: 'pointer' }}>−</button>
-              <div style={{ flex: 1, textAlign: 'center', fontSize: 22, fontWeight: 800, color: '#00e68a', fontVariantNumeric: 'tabular-nums' }}>{amt} г</div>
-              <button onClick={() => bump(step)} aria-label="Увеличить" style={{ width: 48, height: 48, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 20, fontWeight: 800, cursor: 'pointer' }}>+</button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-              <button onClick={() => bump(-25)} style={chip(false)}>−25</button>
-              <button onClick={() => bump(25)} style={chip(false)}>+25</button>
-              <button onClick={() => scale(2)} style={chip(false)}>×2</button>
-              <button onClick={() => scale(0.5)} style={chip(false)}>÷2</button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-              {[50, 100, 150, 200, 250].map(v => (
-                <button key={v} onClick={() => setBoth(v)} style={chip(amt === v)}>{v} г</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-              <input type="number" min={1} inputMode="numeric" aria-label="Граммовка" value={draft} onChange={(e) => { setDraft(e.target.value); const v = parseInt(e.target.value, 10); if (Number.isFinite(v) && v > 0) setAmount(v); }} style={{ flex: 1, height: 48, boxSizing: 'border-box', padding: '0 12px', borderRadius: 12, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 16, fontWeight: 700, textAlign: 'center', outline: 'none' }} />
-              <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>грамм</span>
-            </div>
-          </>) : (<>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', marginTop: 12, marginBottom: 6 }}>🔀 Заменить на похожий продукт</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {similarFoods.slice(0, 14).map((f: any) => (
-                <button key={f.id} onClick={() => props.onReplace(f)} style={{ minHeight: 48, padding: '8px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', fontSize: 11.5, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' }}>
-                  {f.name} <span style={{ color: '#fff', opacity: 0.65, fontWeight: 500 }}>· {Math.round(f.kcal || 0)} ккал/100 г</span>
+          {mode === 'amount' ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                <button
+                  onClick={() => bump(-step)}
+                  aria-label="Уменьшить"
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    fontSize: 20,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  −
                 </button>
-              ))}
-              {similarFoods.length === 0 && <div style={{ fontSize: 11, color: '#fff', opacity: 0.7 }}>Похожих продуктов не найдено</div>}
-            </div>
-            <button onClick={() => setMode('amount')} style={{ ...act('#60a5fa'), marginTop: 8 }}>← Назад к порции</button>
-          </>)}
+                <div
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: '#00e68a',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {amt} г
+                </div>
+                <button
+                  onClick={() => bump(step)}
+                  aria-label="Увеличить"
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    fontSize: 20,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  +
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                <button onClick={() => bump(-25)} style={chip(false)}>
+                  −25
+                </button>
+                <button onClick={() => bump(25)} style={chip(false)}>
+                  +25
+                </button>
+                <button onClick={() => scale(2)} style={chip(false)}>
+                  ×2
+                </button>
+                <button onClick={() => scale(0.5)} style={chip(false)}>
+                  ÷2
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {[50, 100, 150, 200, 250].map((v) => (
+                  <button key={v} onClick={() => setBoth(v)} style={chip(amt === v)}>
+                    {v} г
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <input
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  aria-label="Граммовка"
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v) && v > 0) setAmount(v);
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    boxSizing: 'border-box',
+                    padding: '0 12px',
+                    borderRadius: 12,
+                    background: '#202023',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    outline: 'none',
+                  }}
+                />
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>грамм</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', marginTop: 12, marginBottom: 6 }}>
+                🔀 Заменить на похожий продукт
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {similarFoods.slice(0, 14).map((f: any) => (
+                  <button
+                    key={f.id}
+                    onClick={() => props.onReplace(f)}
+                    style={{
+                      minHeight: 48,
+                      padding: '8px 12px',
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: '#fff',
+                    }}
+                  >
+                    {f.name}{' '}
+                    <span style={{ color: '#fff', opacity: 0.65, fontWeight: 500 }}>
+                      · {Math.round(f.kcal || 0)} ккал/100 г
+                    </span>
+                  </button>
+                ))}
+                {similarFoods.length === 0 && (
+                  <div style={{ fontSize: 11, color: '#fff', opacity: 0.7 }}>Похожих продуктов не найдено</div>
+                )}
+              </div>
+              <button onClick={() => setMode('amount')} style={{ ...act('#60a5fa'), marginTop: 8 }}>
+                ← Назад к порции
+              </button>
+            </>
+          )}
 
           {mode === 'amount' && (
-            <button onClick={() => setMode('replace')} style={{ ...act('#fbbf24'), marginTop: 10 }}>🔀 Заменить продукт</button>
+            <button onClick={() => setMode('replace')} style={{ ...act('#fbbf24'), marginTop: 10 }}>
+              🔀 Заменить продукт
+            </button>
           )}
           <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <button onClick={props.onCart} style={{ ...act('#6ee7b7'), flex: 1 }}>🛒 В корзину</button>
-            <button onClick={props.onToggleLock} style={{ ...act('#fbbf24'), flex: 1 }}>{locked ? '🔓 Открепить' : '🔒 Закрепить'}</button>
+            <button onClick={props.onCart} style={{ ...act('#6ee7b7'), flex: 1 }}>
+              🛒 В корзину
+            </button>
+            <button onClick={props.onToggleLock} style={{ ...act('#fbbf24'), flex: 1 }}>
+              {locked ? '🔓 Открепить' : '🔒 Закрепить'}
+            </button>
           </div>
-          <button onClick={props.onExclude} style={{ ...act('#f87171'), marginTop: 6 }}>🚫 Исключить навсегда (не появится в регенерациях)</button>
-          <button onClick={props.onRemove} style={{ ...act('#f87171'), marginTop: 6 }}>✕ Убрать из этого плана</button>
+          <button onClick={props.onExclude} style={{ ...act('#f87171'), marginTop: 6 }}>
+            🚫 Исключить навсегда (не появится в регенерациях)
+          </button>
+          <button onClick={props.onRemove} style={{ ...act('#f87171'), marginTop: 6 }}>
+            ✕ Убрать из этого плана
+          </button>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button onClick={props.onClose} style={{ flex: 1, minHeight: 52, borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
-            <button onClick={() => props.onSave(amt)} style={{ flex: 1, minHeight: 52, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, cursor: 'pointer' }}>✓ Сохранить</button>
+            <button
+              onClick={props.onClose}
+              style={{
+                flex: 1,
+                minHeight: 52,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.04)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              Отмена
+            </button>
+            <button
+              onClick={() => props.onSave(amt)}
+              style={{
+                flex: 1,
+                minHeight: 52,
+                borderRadius: 12,
+                border: 'none',
+                background: 'linear-gradient(135deg,#00e68a,#00c853)',
+                color: '#000',
+                fontWeight: 800,
+                fontSize: 12,
+                cursor: 'pointer',
+              }}
+            >
+              ✓ Сохранить
+            </button>
           </div>
         </div>
       </div>
@@ -177,12 +473,73 @@ function MealItemSheet(props: {
 }
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
-  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, proteinPreset, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, weightMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, removeMealRebalanced, rescaleSecondRecipeInMeal, removeSecondRecipeFromMeal } = ctx as any;
+  const {
+    calcTargets,
+    dayPlan,
+    draggedItem,
+    dropTarget,
+    drugCompatReport,
+    editAmount,
+    editItem,
+    effectiveC,
+    effectiveF,
+    effectiveKcal,
+    effectiveP,
+    excludedFoods,
+    findSimilarFoods,
+    healthIssues,
+    injections,
+    linkToTraining,
+    lockedFoodIds,
+    moveFoodItem,
+    nutritionReport,
+    proteinPreset,
+    phase,
+    plannerMode,
+    preferredFoods,
+    quickAddMealIdx,
+    quickAddSearch,
+    removeFoodItem,
+    replaceFoodItem,
+    saveUndo,
+    setDayPlan: _setDayPlan,
+    setDraggedItem,
+    setDropTarget,
+    setEditAmount: _setEditAmount,
+    setEditItem,
+    setExcludedFoods,
+    setQuickAddMealIdx,
+    setQuickAddSearch,
+    setRecipePickerMeal,
+    toggleLockFood,
+    trainEnd,
+    trainStart,
+    updateItemAmount,
+    waterCalc,
+    weight,
+    weightLogEntries,
+    addFoodToMeal,
+    addSnackComboToMeal,
+    generationMode,
+    weightMode,
+    pickRecipeOption,
+    moreRecipeOptions,
+    refreshRecipeSuggestions,
+    favoriteRecipes,
+    toggleFavoriteRecipe,
+    isFavoriteRecipe,
+    removeMealRebalanced,
+    rescaleSecondRecipeInMeal,
+    removeSecondRecipeFromMeal,
+  } = ctx as any;
   const _weightMode = (weightMode === 'raw' ? 'raw' : 'cooked') as 'cooked' | 'raw';
-  const _proteinPreset = PROTEIN_PRESETS.find(p => p.id === (proteinPreset || 'base'))?.gPerKg || 2.0;
+  const _proteinPreset = PROTEIN_PRESETS.find((p) => p.id === (proteinPreset || 'base'))?.gPerKg || 2.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
-  const timeEdit = useMealTimeEdit(saveUndo, (typeof (ctx as any).updateMealTime === 'function' ? (ctx as any).updateMealTime : (_i: number, _t: string) => {}));
+  const timeEdit = useMealTimeEdit(
+    saveUndo,
+    typeof (ctx as any).updateMealTime === 'function' ? (ctx as any).updateMealTime : (_i: number, _t: string) => {},
+  );
   // UX чипов: пресеты рецептов (масса = большое У, сушка, белок…)
   const [recipePreset, setRecipePreset] = useState<string | null>(null);
   const _planKeyRef = React.useRef<string>('');
@@ -193,25 +550,67 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   } catch {}
   // Чипы пресетов: показывать только если ≥2 активных; рендер-хелпер
   const renderPresetRow = (pool: any[]) => {
-    const activePresets = RECIPE_PRESETS.filter(p => pool.some(o => p.match(o)));
+    const activePresets = RECIPE_PRESETS.filter((p) => pool.some((o) => p.match(o)));
     if (activePresets.length < 2) return null;
     const visibleCount = pool.filter((r: any) => recipeMatchesPreset(r, recipePreset)).length;
     return (
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2, alignItems: 'center' }}>
-        {activePresets.map(p => (
-          <span key={p.id} title={p.hint} onClick={() => setRecipePreset(recipePreset === p.id ? null : p.id)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', padding: '6px 10px', minHeight: 36, borderRadius: 8, fontSize: 10, fontWeight: 700, border: `1px solid ${recipePreset === p.id ? 'rgba(249,115,22,0.55)' : 'rgba(249,115,22,0.18)'}`, background: recipePreset === p.id ? 'rgba(249,115,22,0.15)' : 'transparent', color: recipePreset === p.id ? '#fb923c' : 'rgba(255,255,255,0.6)' }}>{p.label}</span>
+        {activePresets.map((p) => (
+          <span
+            key={p.id}
+            title={p.hint}
+            onClick={() => setRecipePreset(recipePreset === p.id ? null : p.id)}
+            style={{
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '6px 10px',
+              minHeight: 36,
+              borderRadius: 8,
+              fontSize: 10,
+              fontWeight: 700,
+              border: `1px solid ${recipePreset === p.id ? 'rgba(249,115,22,0.55)' : 'rgba(249,115,22,0.18)'}`,
+              background: recipePreset === p.id ? 'rgba(249,115,22,0.15)' : 'transparent',
+              color: recipePreset === p.id ? '#fb923c' : 'rgba(255,255,255,0.6)',
+            }}
+          >
+            {p.label}
+          </span>
         ))}
         {recipePreset && (
           <>
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{visibleCount}/{pool.length}</span>
-            <span onClick={() => setRecipePreset(null)} title="Сбросить фильтр" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 36, fontSize: 11, color: '#fb923c', padding: '6px 8px', fontWeight: 800 }}>✕</span>
+            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>
+              {visibleCount}/{pool.length}
+            </span>
+            <span
+              onClick={() => setRecipePreset(null)}
+              title="Сбросить фильтр"
+              style={{
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                minHeight: 36,
+                fontSize: 11,
+                color: '#fb923c',
+                padding: '6px 8px',
+                fontWeight: 800,
+              }}
+            >
+              ✕
+            </span>
           </>
         )}
       </div>
     );
   };
   // Эпик 6: ручные цели на приём (🎯) — персистентные Б/Ж/У слота
-  const [mealTargetEditor, setMealTargetEditor] = React.useState<{ mi: number; label: string; p: string; f: string; c: string } | null>(null);
+  const [mealTargetEditor, setMealTargetEditor] = React.useState<{
+    mi: number;
+    label: string;
+    p: string;
+    f: string;
+    c: string;
+  } | null>(null);
   const saveMealTarget = (label: string, dayIdx?: number) => {
     try {
       const cur: any[] = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
@@ -219,19 +618,24 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
       const p = parseFloat(mealTargetEditor!.p) || 0;
       const f = parseFloat(mealTargetEditor!.f) || 0;
       const c = parseFloat(mealTargetEditor!.c) || 0;
-      if (p > 0 || f > 0 || c > 0) next.push({ label, p: p > 0 ? p : undefined, f: f > 0 ? f : undefined, c: c > 0 ? c : undefined });
+      if (p > 0 || f > 0 || c > 0)
+        next.push({ label, p: p > 0 ? p : undefined, f: f > 0 ? f : undefined, c: c > 0 ? c : undefined });
       localStorage.setItem('he_meal_target_overrides', JSON.stringify(next));
     } catch {}
     setMealTargetEditor(null);
     // P4b: цель применяется СРАЗУ к текущему дню (рескейл + ребаланс + синк),
     // а не только копится до следующей генерации.
-    try { (ctx as any).applyMealTargetNow?.(label, dayIdx ?? 0); } catch {}
+    try {
+      (ctx as any).applyMealTargetNow?.(label, dayIdx ?? 0);
+    } catch {}
   };
   const readMealTarget = (label: string): { p?: number; f?: number; c?: number } | undefined => {
     try {
       const cur: any[] = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
       return cur.find((o: any) => o && o.label === label);
-    } catch { return undefined; }
+    } catch {
+      return undefined;
+    }
   };
   // P1-UX: один лист порции на экран — рендерится, если открыт чип этого дня.
   const renderItemSheet = (d: any, editable: boolean, dayIdx: number) => {
@@ -241,9 +645,13 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
     if (s.dayIdx !== dayIdx) return null;
     const sheetItem = d?.meals?.[s.mealIdx]?.items?.[s.itemIdx];
     if (!sheetItem) return null;
-    const mi = s.mealIdx, ii = s.itemIdx;
+    const mi = s.mealIdx,
+      ii = s.itemIdx;
     let sim: any[] | undefined = _similarFoodsCache.get(sheetItem);
-    if (!sim) { sim = findSimilarFoods(sheetItem) as any[]; _similarFoodsCache.set(sheetItem, sim as any); }
+    if (!sim) {
+      sim = findSimilarFoods(sheetItem) as any[];
+      _similarFoodsCache.set(sheetItem, sim as any);
+    }
     return (
       <MealItemSheet
         key={`${s.dayIdx}-${mi}-${ii}`}
@@ -254,305 +662,1998 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
         setAmount={setEditAmount}
         locked={lockedFoodIds.has(sheetItem.id)}
         onClose={() => setEditItem(null)}
-        onSave={(v) => { updateItemAmount(dayIdx, mi, ii, v); setEditItem(null); }}
-        onReplace={(f) => { replaceFoodItem(dayIdx, mi, ii, f); setEditItem(null); }}
-        onCart={() => { addToCart({ name: sheetItem.name, kcal: sheetItem.kcal * (sheetItem.amount / 100), amount: sheetItem.amount, category: sheetItem.category }); }}
-        onToggleLock={() => { toggleLockFood(sheetItem.id); }}
-        onExclude={() => { const upd = [...new Set([...excludedFoods, sheetItem.id])]; setExcludedFoods(upd); try { localStorage.setItem('he_excluded_foods', JSON.stringify(upd)); } catch {} removeFoodItem(dayIdx, mi, ii); setEditItem(null); }}
-        onRemove={() => { removeFoodItem(dayIdx, mi, ii); setEditItem(null); }}
+        onSave={(v) => {
+          updateItemAmount(dayIdx, mi, ii, v);
+          setEditItem(null);
+        }}
+        onReplace={(f) => {
+          replaceFoodItem(dayIdx, mi, ii, f);
+          setEditItem(null);
+        }}
+        onCart={() => {
+          addToCart({
+            name: sheetItem.name,
+            kcal: sheetItem.kcal * (sheetItem.amount / 100),
+            amount: sheetItem.amount,
+            category: sheetItem.category,
+          });
+        }}
+        onToggleLock={() => {
+          toggleLockFood(sheetItem.id);
+        }}
+        onExclude={() => {
+          const upd = [...new Set([...excludedFoods, sheetItem.id])];
+          setExcludedFoods(upd);
+          try {
+            localStorage.setItem('he_excluded_foods', JSON.stringify(upd));
+          } catch {}
+          removeFoodItem(dayIdx, mi, ii);
+          setEditItem(null);
+        }}
+        onRemove={() => {
+          removeFoodItem(dayIdx, mi, ii);
+          setEditItem(null);
+        }}
       />
     );
   };
   return (dayData: any, editable = false, dayIdx = 0) => {
     if (!dayData) return null;
-    const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
-    const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0; const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0; const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
+    const d = dayData;
+    const totalKcal = Math.round(d.totals?.kcal || 0);
+    const totalP = Math.round(d.totals?.p || 0);
+    const totalF = Math.round(d.totals?.f || 0);
+    const totalC = Math.round(d.totals?.c || 0);
+    const totalFiber = Math.round(d.totals?.fiber || 0);
+    const pKcalPct = totalKcal > 0 ? ((totalP * 4) / totalKcal) * 100 : 0;
+    const fKcalPct = totalKcal > 0 ? ((totalF * 9) / totalKcal) * 100 : 0;
+    const cKcalPct = totalKcal > 0 ? ((totalC * 4) / totalKcal) * 100 : 0;
     return (
       <div>
         {renderItemSheet(d, editable, dayIdx)}
         {/* per100 — свернут по умолчанию, чтобы не съедать вертикаль дня */}
-        <details style={{
-          marginBottom:8, padding:'7px 10px', borderRadius:12,
-          background:'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(0,200,160,0.03))',
-          border:'1px solid rgba(0,230,138,0.14)', fontSize:10, color:'#fff', lineHeight:1.5,
-          boxShadow:'0 2px 12px rgba(0,230,138,0.06)',
-        }}>
-          <summary style={{ cursor:'pointer', fontSize:10, fontWeight:800, color:'#00e68a', listStyle:'none' }}>ⓘ per100 — КБЖУ на 100 г (готовый · сухой · порошок · как есть)</summary>
-          <div style={{ marginTop:6, color:'rgba(255,255,255,0.82)' }}>
-          КБЖУ на <b>100 г</b> съедобной части: <span style={{color:'#00e68a',fontWeight:700}}>готовый</span> · <span style={{color:'#f59e0b',fontWeight:700}}>сухой</span> · <span style={{color:'#a78bfa',fontWeight:700}}>порошок</span> · <span style={{color:'#60a5fa',fontWeight:700}}>как есть</span>
-          <span style={{color:'#fff', marginLeft:6}}>КБЖУ<sub>порции</sub> = per100 × г/100 — честный вес в указанном виде.</span>
+        <details
+          style={{
+            marginBottom: 8,
+            padding: '7px 10px',
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(0,200,160,0.03))',
+            border: '1px solid rgba(0,230,138,0.14)',
+            fontSize: 10,
+            color: '#fff',
+            lineHeight: 1.5,
+            boxShadow: '0 2px 12px rgba(0,230,138,0.06)',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', fontSize: 10, fontWeight: 800, color: '#00e68a', listStyle: 'none' }}>
+            ⓘ per100 — КБЖУ на 100 г (готовый · сухой · порошок · как есть)
+          </summary>
+          <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.82)' }}>
+            КБЖУ на <b>100 г</b> съедобной части: <span style={{ color: '#00e68a', fontWeight: 700 }}>готовый</span> ·{' '}
+            <span style={{ color: '#f59e0b', fontWeight: 700 }}>сухой</span> ·{' '}
+            <span style={{ color: '#a78bfa', fontWeight: 700 }}>порошок</span> ·{' '}
+            <span style={{ color: '#60a5fa', fontWeight: 700 }}>как есть</span>
+            <span style={{ color: '#fff', marginLeft: 6 }}>
+              КБЖУ<sub>порции</sub> = per100 × г/100 — честный вес в указанном виде.
+            </span>
           </div>
         </details>
-        <div style={{
-          marginBottom:12, borderRadius:16, overflow:'hidden',
-          border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.07)',
-          background: d.isTrainingDay ? 'linear-gradient(180deg, rgba(0,230,138,0.10) 0%, rgba(0,230,138,0.04) 52%, rgba(24,24,27,0.9) 100%)' : 'linear-gradient(180deg, rgba(30,30,35,0.9), rgba(20,20,23,0.96))',
-          boxShadow: d.isTrainingDay ? '0 8px 28px rgba(0,230,138,0.14), inset 0 1px 0 rgba(255,255,255,0.06)' : '0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-          position:'relative',
-        }}>
-          <div style={{position:'absolute', top:0, left:0, right:0, height:1, background: d.isTrainingDay ? 'linear-gradient(90deg, #00e68a 0%, #00e68a22 60%, transparent 100%)' : 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)'}} />
-          <div style={{padding:'10px 12px 8px'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6, flexWrap:'nowrap'}}>
-              <span style={{
-                width:34, height:34, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0,
-                background: d.isTrainingDay ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.10))' : 'rgba(255,255,255,0.06)',
-                border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.08)',
-                boxShadow: d.isTrainingDay ? '0 2px 12px rgba(0,230,138,0.18)' : 'none',
-              }}>{d.isTrainingDay?'🏋️':'😴'}</span>
-              <div style={{flex:1, minWidth:0}}><div style={{fontSize:12.5,fontWeight:900,letterSpacing:'-0.3px', color: d.isTrainingDay ? '#00e68a' : '#fff', lineHeight:1.15, whiteSpace:'normal', overflowWrap:'anywhere'}}>{d.isTrainingDay?'ТРЕНИРОВОЧНЫЙ ДЕНЬ':'ДЕНЬ ОТДЫХА'}</div>
-                <div style={{display:'flex', alignItems:'center', gap:6, marginTop:2}}>
-                  {plannerMode === 'pro' && <span style={{fontSize:9,fontWeight:800,color:'#c4b5fd',background:'rgba(139,92,246,0.14)',padding:'2px 7px',borderRadius:999,border:'1px solid rgba(139,92,246,0.22)', letterSpacing:'0.2px'}}>◆ Pro</span>}
-                  {weightLogEntries.length >= 3 && (() => { const vals = weightLogEntries.map((e: any) => e.weight); const min = Math.min(...vals); const max = Math.max(...vals); const range = max - min || 1; const h = 20; const w = 68; const pts = vals.map((v: number,i: number) => `${Math.round(i/(vals.length-1)*w)},${Math.round(h-(v-min)/range*h)}`).join(' '); const trend = vals.length >= 2 && vals[vals.length-1] < vals[0]; return (<span style={{display:'inline-flex',alignItems:'center',gap:4, padding:'1px 6px', borderRadius:999, background: trend ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', border: `1px solid ${trend ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`}}><svg width={w} height={h} style={{verticalAlign:'middle'}}><polyline points={pts} fill="none" stroke={trend?'#22c55e':'#ef4444'} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round"/></svg><span style={{fontSize:9,color:trend?'#22c55e':'#ef4444',fontWeight:700}}>{trend?'↓':'↑'} {Math.abs(vals[vals.length-1]-vals[0]).toFixed(1)} кг</span></span>); })()}
+        <div
+          style={{
+            marginBottom: 12,
+            borderRadius: 16,
+            overflow: 'hidden',
+            border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.07)',
+            background: d.isTrainingDay
+              ? 'linear-gradient(180deg, rgba(0,230,138,0.10) 0%, rgba(0,230,138,0.04) 52%, rgba(24,24,27,0.9) 100%)'
+              : 'linear-gradient(180deg, rgba(30,30,35,0.9), rgba(20,20,23,0.96))',
+            boxShadow: d.isTrainingDay
+              ? '0 8px 28px rgba(0,230,138,0.14), inset 0 1px 0 rgba(255,255,255,0.06)'
+              : '0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1,
+              background: d.isTrainingDay
+                ? 'linear-gradient(90deg, #00e68a 0%, #00e68a22 60%, transparent 100%)'
+                : 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)',
+            }}
+          />
+          <div style={{ padding: '10px 12px 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'nowrap' }}>
+              <span
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 16,
+                  flexShrink: 0,
+                  background: d.isTrainingDay
+                    ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.10))'
+                    : 'rgba(255,255,255,0.06)',
+                  border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.08)',
+                  boxShadow: d.isTrainingDay ? '0 2px 12px rgba(0,230,138,0.18)' : 'none',
+                }}
+              >
+                {d.isTrainingDay ? '🏋️' : '😴'}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 900,
+                    letterSpacing: '-0.3px',
+                    color: d.isTrainingDay ? '#00e68a' : '#fff',
+                    lineHeight: 1.15,
+                    whiteSpace: 'normal',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {d.isTrainingDay ? 'ТРЕНИРОВОЧНЫЙ ДЕНЬ' : 'ДЕНЬ ОТДЫХА'}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  {plannerMode === 'pro' && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        color: '#c4b5fd',
+                        background: 'rgba(139,92,246,0.14)',
+                        padding: '2px 7px',
+                        borderRadius: 999,
+                        border: '1px solid rgba(139,92,246,0.22)',
+                        letterSpacing: '0.2px',
+                      }}
+                    >
+                      ◆ Pro
+                    </span>
+                  )}
+                  {weightLogEntries.length >= 3 &&
+                    (() => {
+                      const vals = weightLogEntries.map((e: any) => e.weight);
+                      const min = Math.min(...vals);
+                      const max = Math.max(...vals);
+                      const range = max - min || 1;
+                      const h = 20;
+                      const w = 68;
+                      const pts = vals
+                        .map(
+                          (v: number, i: number) =>
+                            `${Math.round((i / (vals.length - 1)) * w)},${Math.round(h - ((v - min) / range) * h)}`,
+                        )
+                        .join(' ');
+                      const trend = vals.length >= 2 && vals[vals.length - 1] < vals[0];
+                      return (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: '1px 6px',
+                            borderRadius: 999,
+                            background: trend ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)',
+                            border: `1px solid ${trend ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                          }}
+                        >
+                          <svg width={w} height={h} style={{ verticalAlign: 'middle' }}>
+                            <polyline
+                              points={pts}
+                              fill="none"
+                              stroke={trend ? '#22c55e' : '#ef4444'}
+                              strokeWidth={1.7}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <span style={{ fontSize: 9, color: trend ? '#22c55e' : '#ef4444', fontWeight: 700 }}>
+                            {trend ? '↓' : '↑'} {Math.abs(vals[vals.length - 1] - vals[0]).toFixed(1)} кг
+                          </span>
+                        </span>
+                      );
+                    })()}
                 </div>
               </div>
-              <div style={{
-                textAlign:'right', padding:'8px 12px', borderRadius:12, flexShrink:0,
-                background: d.isTrainingDay ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.05)',
-                border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.18)' : '1px solid rgba(255,255,255,0.07)',
-                boxShadow:'0 2px 10px rgba(0,0,0,0.15)',
-                whiteSpace:'nowrap',
-              }}>
-                <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.6px', color:Math.abs(totalKcal-(effectiveKcal||0))<=Math.max(50,(effectiveKcal||0)*0.08)?'#00e68a':'#fbbf24',lineHeight:1, whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums'}}>{String(totalKcal)}<span style={{fontSize:10,fontWeight:600,color:'rgba(255,255,255,0.45)', marginLeft:3, whiteSpace:'nowrap'}}>/ {effectiveKcal||'—'}</span></div>
-                {effectiveKcal>0 && (() => { const dk=Math.round(totalKcal-effectiveKcal); const dkp=Math.round((totalKcal-effectiveKcal)/effectiveKcal*100); const ok=Math.abs(dk)<=Math.max(50,Math.round(effectiveKcal*0.05)); return <div style={{fontSize:10,fontWeight:800,marginTop:1, color:ok?'#22c55e':(dk>0?'#f59e0b':'#60a5fa')}}>{dk>=0?'+':''}{dk} ккал · {dk>=0?'+':''}{dkp}% {ok ? '✓' : '•'}</div>; })()}
-                <div style={{fontSize:9,color:'rgba(255,255,255,0.5)', fontWeight:600, letterSpacing:'0.4px', marginTop:1}}>ККАЛ ЗА ДЕНЬ</div>
+              <div
+                style={{
+                  textAlign: 'right',
+                  padding: '8px 12px',
+                  borderRadius: 12,
+                  flexShrink: 0,
+                  background: d.isTrainingDay ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.05)',
+                  border: d.isTrainingDay ? '1px solid rgba(0,230,138,0.18)' : '1px solid rgba(255,255,255,0.07)',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 900,
+                    letterSpacing: '-0.6px',
+                    color:
+                      Math.abs(totalKcal - (effectiveKcal || 0)) <= Math.max(50, (effectiveKcal || 0) * 0.08)
+                        ? '#00e68a'
+                        : '#fbbf24',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {String(totalKcal)}
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: 'rgba(255,255,255,0.45)',
+                      marginLeft: 3,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    / {effectiveKcal || '—'}
+                  </span>
+                </div>
+                {effectiveKcal > 0 &&
+                  (() => {
+                    const dk = Math.round(totalKcal - effectiveKcal);
+                    const dkp = Math.round(((totalKcal - effectiveKcal) / effectiveKcal) * 100);
+                    const ok = Math.abs(dk) <= Math.max(50, Math.round(effectiveKcal * 0.05));
+                    return (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          marginTop: 1,
+                          color: ok ? '#22c55e' : dk > 0 ? '#f59e0b' : '#60a5fa',
+                        }}
+                      >
+                        {dk >= 0 ? '+' : ''}
+                        {dk} ккал · {dk >= 0 ? '+' : ''}
+                        {dkp}% {ok ? '✓' : '•'}
+                      </div>
+                    );
+                  })()}
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.5)',
+                    fontWeight: 600,
+                    letterSpacing: '0.4px',
+                    marginTop: 1,
+                  }}
+                >
+                  ККАЛ ЗА ДЕНЬ
+                </div>
               </div>
             </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center', marginBottom:6}}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
               {(() => {
-                const fmt = (val:number, tgt:number, unit:string, icon:string, col:string) => {
-                  if (!tgt) return <span style={{display:'inline-flex',alignItems:'center',gap:4, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:11}}><span style={{color:col}}>{icon}</span><b style={{color:'#fff'}}>{val}{unit}</b></span>;
+                const fmt = (val: number, tgt: number, unit: string, icon: string, col: string) => {
+                  if (!tgt)
+                    return (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          fontSize: 11,
+                        }}
+                      >
+                        <span style={{ color: col }}>{icon}</span>
+                        <b style={{ color: '#fff' }}>
+                          {val}
+                          {unit}
+                        </b>
+                      </span>
+                    );
                   const d = Math.round(val - tgt);
                   const ok = Math.abs(d) <= Math.max(5, Math.round(tgt * 0.05));
-                  const devCol = ok ? '#22c55e' : (d > 0 ? '#f59e0b' : '#60a5fa');
-                  return <span style={{display:'inline-flex',alignItems:'center',gap:5, padding:'4px 8px', borderRadius:999, background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)', border:`1px solid ${ok ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}`, fontSize:11}}><span style={{color:col}}>{icon}</span><span><b style={{color:'#fff'}}>{val}</b><span style={{color:'rgba(255,255,255,0.42)'}}>/{tgt}</span><span style={{color:devCol, fontWeight:800, marginLeft:4}}>Δ{d>=0?'+':''}{d}</span></span></span>;
+                  const devCol = ok ? '#22c55e' : d > 0 ? '#f59e0b' : '#60a5fa';
+                  return (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 8px',
+                        borderRadius: 999,
+                        background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${ok ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}`,
+                        fontSize: 11,
+                      }}
+                    >
+                      <span style={{ color: col }}>{icon}</span>
+                      <span>
+                        <b style={{ color: '#fff' }}>{val}</b>
+                        <span style={{ color: 'rgba(255,255,255,0.42)' }}>/{tgt}</span>
+                        <span style={{ color: devCol, fontWeight: 800, marginLeft: 4 }}>
+                          Δ{d >= 0 ? '+' : ''}
+                          {d}
+                        </span>
+                      </span>
+                    </span>
+                  );
                 };
-                return <>
-                  {fmt(totalP, effectiveP||0, 'г','●','#3b82f6')}
-                  {fmt(totalF, effectiveF||0, 'г','●','#f59e0b')}
-                  {fmt(totalC, effectiveC||0, 'г','●','#f97316')}
-                  {totalFiber > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:4, padding:'4px 8px', borderRadius:999, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.16)', fontSize:10, fontWeight:700, color:'#22c55e'}}>🌱 {totalFiber} г клетч.</span>}
-                  {totalKcal > 0 && (() => { const dev = Math.round(kbjuFormulaDeviationPct(totalKcal, totalP, totalF, totalC) * 10) / 10; const ok = dev <= 3; return (
-                    <span title={`Расхождение ккал с формулой 4×Б + 9×Ж + 4×У (норма ≤3%): формула ≈ ${Math.round((totalP*4+totalF*9+totalC*4))} ккал`} style={{fontSize:10,fontWeight:800,padding:'3px 8px',borderRadius:999,border:`1px solid ${ok?'rgba(34,197,94,0.28)':'rgba(245,158,11,0.32)'}`,background:ok?'rgba(34,197,94,0.10)':'rgba(245,158,11,0.12)',color:ok?'#86efac':'#fbbf24', display:'inline-flex', alignItems:'center', gap:4}}><span style={{width:6,height:6,borderRadius:'50%', background: ok ? '#22c55e' : '#f59e0b'}}/>⚖️ ±{dev}%</span>
-                  ); })()}
-                </>;
+                return (
+                  <>
+                    {fmt(totalP, effectiveP || 0, 'г', '●', '#3b82f6')}
+                    {fmt(totalF, effectiveF || 0, 'г', '●', '#f59e0b')}
+                    {fmt(totalC, effectiveC || 0, 'г', '●', '#f97316')}
+                    {totalFiber > 0 && (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background: 'rgba(34,197,94,0.08)',
+                          border: '1px solid rgba(34,197,94,0.16)',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#22c55e',
+                        }}
+                      >
+                        🌱 {totalFiber} г клетч.
+                      </span>
+                    )}
+                    {totalKcal > 0 &&
+                      (() => {
+                        const dev = Math.round(kbjuFormulaDeviationPct(totalKcal, totalP, totalF, totalC) * 10) / 10;
+                        const ok = dev <= 3;
+                        return (
+                          <span
+                            title={`Расхождение ккал с формулой 4×Б + 9×Ж + 4×У (норма ≤3%): формула ≈ ${Math.round(totalP * 4 + totalF * 9 + totalC * 4)} ккал`}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: '3px 8px',
+                              borderRadius: 999,
+                              border: `1px solid ${ok ? 'rgba(34,197,94,0.28)' : 'rgba(245,158,11,0.32)'}`,
+                              background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.12)',
+                              color: ok ? '#86efac' : '#fbbf24',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                background: ok ? '#22c55e' : '#f59e0b',
+                              }}
+                            />
+                            ⚖️ ±{dev}%
+                          </span>
+                        );
+                      })()}
+                  </>
+                );
               })()}
-              <span style={{marginLeft:'auto',fontSize:10,fontWeight:700, color:'rgba(255,255,255,0.45)', padding:'3px 8px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)'}}>{weight>0?`${(totalP/weight).toFixed(1)} г/кг белка`:''}</span>
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: 'rgba(255,255,255,0.45)',
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                {weight > 0 ? `${(totalP / weight).toFixed(1)} г/кг белка` : ''}
+              </span>
             </div>
-            <div style={{fontSize:10,color:'rgba(255,255,255,0.38)',lineHeight:1.4, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)'}}>
-              Цель: <b style={{color:'#60a5fa'}}>{calcTargets.protein} г базы</b> <span style={{color:'rgba(255,255,255,0.25)'}}>→</span> <b style={{color:'#00e68a'}}>{_proteinPreset} г/кг</b> <span style={{color:'rgba(255,255,255,0.25)'}}>·</span> фаза <b style={{color:'#c4b5fd'}}>«{phase}»</b>{(injections as any[]).some((i: any)=>i.type==='ААС')?(<><span style={{color:'rgba(255,255,255,0.25)'}}> · </span><span style={{color:'#f472b6'}}>+AAS +{Math.round(weight*0.3)} г</span></>):''} <span style={{color:'rgba(255,255,255,0.25)'}}>→</span> <b style={{color:'#fff'}}>{effectiveP} г</b> / <b style={{color:'#fff'}}>{effectiveKcal} ккал</b>{weight>0?<><span style={{color:'rgba(255,255,255,0.25)'}}> · </span><b style={{color:'#22c55e'}}>{(totalP/weight).toFixed(1)} г/кг</b></>:''}</div>
+            <div
+              style={{
+                fontSize: 10,
+                color: 'rgba(255,255,255,0.38)',
+                lineHeight: 1.4,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.04)',
+              }}
+            >
+              Цель: <b style={{ color: '#60a5fa' }}>{calcTargets.protein} г базы</b>{' '}
+              <span style={{ color: 'rgba(255,255,255,0.25)' }}>→</span>{' '}
+              <b style={{ color: '#00e68a' }}>{_proteinPreset} г/кг</b>{' '}
+              <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span> фаза{' '}
+              <b style={{ color: '#c4b5fd' }}>«{phase}»</b>
+              {(injections as any[]).some((i: any) => i.type === 'ААС') ? (
+                <>
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                  <span style={{ color: '#f472b6' }}>+AAS +{Math.round(weight * 0.3)} г</span>
+                </>
+              ) : (
+                ''
+              )}{' '}
+              <span style={{ color: 'rgba(255,255,255,0.25)' }}>→</span> <b style={{ color: '#fff' }}>{effectiveP} г</b>{' '}
+              / <b style={{ color: '#fff' }}>{effectiveKcal} ккал</b>
+              {weight > 0 ? (
+                <>
+                  <span style={{ color: 'rgba(255,255,255,0.25)' }}> · </span>
+                  <b style={{ color: '#22c55e' }}>{(totalP / weight).toFixed(1)} г/кг</b>
+                </>
+              ) : (
+                ''
+              )}
+            </div>
           </div>
-          {nutritionReport && (() => { const r = nutritionReport; const chip = (ok: boolean, label: string, val: string) => (<div style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 8px',borderRadius:999,fontSize:10,fontWeight:700, background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)', border:`1px solid ${ok?'rgba(34,197,94,0.20)':'rgba(245,158,11,0.22)'}`,color: ok ? '#86efac' : '#fbbf24'}}><span style={{width:6,height:6,borderRadius:'50%',background:ok?'#22c55e':'#f59e0b'}} />{label} <span style={{color:'#fff'}}>{val}</span></div>); const mpsOk = (r.proteinTiming?.evennessScore||0) >= 70; const fibOk = (r.fiberAnalysis?.pct||0) >= 80; const glOk = r.glycemicLoad?.status !== 'high'; const satOk = (r.fatQuality?.satPct||0) <= 15; const nakOk = r.sodiumPotassium?.status === 'ok'; const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild'; const o3 = r.fatQuality?.omega3G||0; const o3Ok = o3 >= 1.6; return (<details style={{margin:'0 12px 10px',padding:'0 10px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.14)'}}><summary style={{cursor:'pointer',padding:'8px 0',fontSize:11,fontWeight:800,color:'#c4b5fd',listStyle:'none'}}>🩺 Диетология · раскрыть</summary><div style={{display:'flex',flexWrap:'wrap',gap:5,paddingBottom:10}}>{chip(mpsOk,'MPS',(r.proteinTiming?.evennessScore||0).toFixed(0)+'%')}{chip(fibOk,'Клетч.',(r.fiberAnalysis?.totalG||0).toFixed(0)+'г')}{chip(glOk,'ГН',r.glycemicLoad?.status==='high'?'выс.':r.glycemicLoad?.status==='low'?'низк.':'норма')}{chip(satOk,'Нас.жир',(r.fatQuality?.satPct||0).toFixed(0)+'%')}{chip(nakOk,'Na:K',(r.sodiumPotassium?.ratio||0).toFixed(1)+':1')}{chip(pralOk,'PRAL',(r.pral?.mEq||0)+'мэкв')}{chip(o3Ok,'Ω3',o3.toFixed(1)+'г')}</div></details>); })()}
-          {drugCompatReport?.warnings && drugCompatReport.warnings.length > 0 && drugCompatReport.warnings[0] && !drugCompatReport.warnings[0].includes('совместимы') && (<div style={{margin:'0 12px 10px',padding:'8px 10px',borderRadius:12,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.14)'}}><div style={{fontSize:10,fontWeight:800,color:'#fca5a5',marginBottom:6, display:'flex', alignItems:'center', gap:6}}><span style={{width:18,height:18,borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(239,68,68,0.14)',fontSize:10}}>⚠</span> Лекарства × питание</div>{drugCompatReport.warnings.slice(0,4).map((w: string, i: number) => <div key={i} style={{fontSize:10,color:'rgba(255,255,255,0.78)',marginBottom:2, lineHeight:1.4}}>• {w}</div>)}</div>)}
+          {nutritionReport &&
+            (() => {
+              const r = nutritionReport;
+              const chip = (ok: boolean, label: string, val: string) => (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)',
+                    border: `1px solid ${ok ? 'rgba(34,197,94,0.20)' : 'rgba(245,158,11,0.22)'}`,
+                    color: ok ? '#86efac' : '#fbbf24',
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: ok ? '#22c55e' : '#f59e0b' }} />
+                  {label} <span style={{ color: '#fff' }}>{val}</span>
+                </div>
+              );
+              const mpsOk = (r.proteinTiming?.evennessScore || 0) >= 70;
+              const fibOk = (r.fiberAnalysis?.pct || 0) >= 80;
+              const glOk = r.glycemicLoad?.status !== 'high';
+              const satOk = (r.fatQuality?.satPct || 0) <= 15;
+              const nakOk = r.sodiumPotassium?.status === 'ok';
+              const pralOk = r.pral?.status === 'ok' || r.pral?.status === 'mild';
+              const o3 = r.fatQuality?.omega3G || 0;
+              const o3Ok = o3 >= 1.6;
+              return (
+                <details
+                  style={{
+                    margin: '0 12px 10px',
+                    padding: '0 10px',
+                    borderRadius: 12,
+                    background: 'rgba(139,92,246,0.06)',
+                    border: '1px solid rgba(139,92,246,0.14)',
+                  }}
+                >
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      padding: '8px 0',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#c4b5fd',
+                      listStyle: 'none',
+                    }}
+                  >
+                    🩺 Диетология · раскрыть
+                  </summary>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, paddingBottom: 10 }}>
+                    {chip(mpsOk, 'MPS', (r.proteinTiming?.evennessScore || 0).toFixed(0) + '%')}
+                    {chip(fibOk, 'Клетч.', (r.fiberAnalysis?.totalG || 0).toFixed(0) + 'г')}
+                    {chip(
+                      glOk,
+                      'ГН',
+                      r.glycemicLoad?.status === 'high' ? 'выс.' : r.glycemicLoad?.status === 'low' ? 'низк.' : 'норма',
+                    )}
+                    {chip(satOk, 'Нас.жир', (r.fatQuality?.satPct || 0).toFixed(0) + '%')}
+                    {chip(nakOk, 'Na:K', (r.sodiumPotassium?.ratio || 0).toFixed(1) + ':1')}
+                    {chip(pralOk, 'PRAL', (r.pral?.mEq || 0) + 'мэкв')}
+                    {chip(o3Ok, 'Ω3', o3.toFixed(1) + 'г')}
+                  </div>
+                </details>
+              );
+            })()}
+          {drugCompatReport?.warnings &&
+            drugCompatReport.warnings.length > 0 &&
+            drugCompatReport.warnings[0] &&
+            !drugCompatReport.warnings[0].includes('совместимы') && (
+              <div
+                style={{
+                  margin: '0 12px 10px',
+                  padding: '8px 10px',
+                  borderRadius: 12,
+                  background: 'rgba(239,68,68,0.06)',
+                  border: '1px solid rgba(239,68,68,0.14)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: '#fca5a5',
+                    marginBottom: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(239,68,68,0.14)',
+                      fontSize: 10,
+                    }}
+                  >
+                    ⚠
+                  </span>{' '}
+                  Лекарства × питание
+                </div>
+                {drugCompatReport.warnings.slice(0, 4).map((w: string, i: number) => (
+                  <div
+                    key={i}
+                    style={{ fontSize: 10, color: 'rgba(255,255,255,0.78)', marginBottom: 2, lineHeight: 1.4 }}
+                  >
+                    • {w}
+                  </div>
+                ))}
+              </div>
+            )}
 
-          <div style={{height:5,display:'flex', gap:1, padding:'0 1px 1px'}}>
-            <div style={{height:'100%',width:`${Math.max(2,pKcalPct)}%`,background:'linear-gradient(90deg,#3b82f6,#60a5fa)',borderRadius:'0 0 0 2px',minWidth:2}}/>
-            <div style={{height:'100%',width:`${Math.max(2,fKcalPct)}%`,background:'linear-gradient(90deg,#f59e0b,#fbbf24)',minWidth:2}}/>
-            <div style={{height:'100%',width:`${Math.max(2,cKcalPct)}%`,background:'linear-gradient(90deg,#f97316,#fb923c)',minWidth:2,flex:1, borderRadius:'0 0 2px 0'}}/>
+          <div style={{ height: 5, display: 'flex', gap: 1, padding: '0 1px 1px' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.max(2, pKcalPct)}%`,
+                background: 'linear-gradient(90deg,#3b82f6,#60a5fa)',
+                borderRadius: '0 0 0 2px',
+                minWidth: 2,
+              }}
+            />
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.max(2, fKcalPct)}%`,
+                background: 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+                minWidth: 2,
+              }}
+            />
+            <div
+              style={{
+                height: '100%',
+                width: `${Math.max(2, cKcalPct)}%`,
+                background: 'linear-gradient(90deg,#f97316,#fb923c)',
+                minWidth: 2,
+                flex: 1,
+                borderRadius: '0 0 2px 0',
+              }}
+            />
           </div>
         </div>
-        {d.allergenWarnings?.length > 0 && <div style={{padding:'8px 12px',borderRadius:12,background:'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))',border:'1px solid rgba(239,68,68,0.18)',fontSize:10,color:'#fca5a5',marginBottom:10,display:'flex',alignItems:'center',gap:8, boxShadow:'0 4px 14px rgba(239,68,68,0.08)'}}><span style={{width:26,height:26,borderRadius:8,background:'rgba(239,68,68,0.14)',border:'1px solid rgba(239,68,68,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12, flexShrink:0}}>⚠️</span><span style={{lineHeight:1.4}}>{d.allergenWarnings.map((w: any) => typeof w === 'string' ? w : `${w.food}: ${w.allergens.join(', ')}`).join(' · ')}</span></div>}
+        {d.allergenWarnings?.length > 0 && (
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))',
+              border: '1px solid rgba(239,68,68,0.18)',
+              fontSize: 10,
+              color: '#fca5a5',
+              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 14px rgba(239,68,68,0.08)',
+            }}
+          >
+            <span
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.14)',
+                border: '1px solid rgba(239,68,68,0.18)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                flexShrink: 0,
+              }}
+            >
+              ⚠️
+            </span>
+            <span style={{ lineHeight: 1.4 }}>
+              {d.allergenWarnings
+                .map((w: any) => (typeof w === 'string' ? w : `${w.food}: ${w.allergens.join(', ')}`))
+                .join(' · ')}
+            </span>
+          </div>
+        )}
         {d.meals.map((m: any, mi: number) => {
-          const mealKcal = Math.round(m.totals?.kcal || 0); const mealP = Math.round(m.totals?.p || 0); const mealF = Math.round(m.totals?.f || 0); const mealC = Math.round(m.totals?.c || 0);
+          const mealKcal = Math.round(m.totals?.kcal || 0);
+          const mealP = Math.round(m.totals?.p || 0);
+          const mealF = Math.round(m.totals?.f || 0);
+          const mealC = Math.round(m.totals?.c || 0);
           // FIX week-perf: метрики считаются один раз на объект приёма (WeakMap)
-           let _mm = plannerMode === 'pro' ? _mealMetricsCache.get(m) : undefined;
-           if (plannerMode === 'pro' && !_mm) {
+          let _mm = plannerMode === 'pro' ? _mealMetricsCache.get(m) : undefined;
+          if (plannerMode === 'pro' && !_mm) {
             _mm = {
-              diaas: calcMealDIAAS((m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 }))).diaas,
-              gl: Math.round((m.items || []).reduce((s: number, it: any) => { const fd = findFoodById(it.id); const gi = fd?.gi || 0; return s + (gi * (it.c || 0) / 100); }, 0)),
-              ii: (() => { let wII = 0, wK = 0; (m.items || []).forEach((it: any) => { const fd = findFoodById(it.id); const ii = fd?.macro_100g?.insulin_index; const k = it.kcal || 0; if (ii != null && k > 0) { wII += ii * k; wK += k; } }); return wK > 0 ? Math.round(wII / wK) : 0; })(),
+              diaas: calcMealDIAAS(
+                (m.items || []).map((it: any) => ({ foodId: it.id || it.name, weightGrams: it.amount || 100 })),
+              ).diaas,
+              gl: Math.round(
+                (m.items || []).reduce((s: number, it: any) => {
+                  const fd = findFoodById(it.id);
+                  const gi = fd?.gi || 0;
+                  return s + (gi * (it.c || 0)) / 100;
+                }, 0),
+              ),
+              ii: (() => {
+                let wII = 0,
+                  wK = 0;
+                (m.items || []).forEach((it: any) => {
+                  const fd = findFoodById(it.id);
+                  const ii = fd?.macro_100g?.insulin_index;
+                  const k = it.kcal || 0;
+                  if (ii != null && k > 0) {
+                    wII += ii * k;
+                    wK += k;
+                  }
+                });
+                return wK > 0 ? Math.round(wII / wK) : 0;
+              })(),
             };
             _mealMetricsCache.set(m, _mm);
           }
-           const mealDiaas = { diaas: _mm?.diaas || 0 };
-           const mealGL = _mm?.gl || 0;
-           const mealII = _mm?.ii || 0;
-          const isPreWorkout = m.label?.toLowerCase().includes('предтрен') || m.type === 'preworkout'; const isPostWorkout = m.label?.toLowerCase().includes('пост-трен') || m.type === 'postworkout'; const isIntraWorkout = m.type === 'intra' || m.label?.toLowerCase().includes('intra'); const accentColor = isPreWorkout ? '#8b5cf6' : isPostWorkout ? '#f59e0b' : isIntraWorkout ? '#22c55e' : '#00e68a';
+          const mealDiaas = { diaas: _mm?.diaas || 0 };
+          const mealGL = _mm?.gl || 0;
+          const mealII = _mm?.ii || 0;
+          const isPreWorkout = m.label?.toLowerCase().includes('предтрен') || m.type === 'preworkout';
+          const isPostWorkout = m.label?.toLowerCase().includes('пост-трен') || m.type === 'postworkout';
+          const isIntraWorkout = m.type === 'intra' || m.label?.toLowerCase().includes('intra');
+          const accentColor = isPreWorkout
+            ? '#8b5cf6'
+            : isPostWorkout
+              ? '#f59e0b'
+              : isIntraWorkout
+                ? '#22c55e'
+                : '#00e68a';
           return (
-            <div key={mi} style={{
-              marginBottom:8, borderRadius:16, overflow:'hidden',
-              border: dropTarget===mi ? '1px solid rgba(0,230,138,0.32)' : isPreWorkout ? '1px solid rgba(139,92,246,0.18)' : isPostWorkout ? '1px solid rgba(245,158,11,0.18)' : isIntraWorkout ? '1px solid rgba(34,197,94,0.18)' : '1px solid rgba(255,255,255,0.07)',
-              background: dropTarget===mi ? 'rgba(0,230,138,0.06)' : 'linear-gradient(180deg, rgba(28,28,32,0.96), rgba(20,20,23,0.98))',
-              boxShadow: dropTarget===mi ? '0 0 0 3px rgba(0,230,138,0.12), 0 8px 24px rgba(0,0,0,0.24)' : '0 4px 16px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04)',
-              transition:'all 0.2s cubic-bezier(0.16,1,0.3,1)', position:'relative',
-            }}
-              onDragOver={e=>{e.preventDefault();setDropTarget(mi);}} onDragLeave={()=>setDropTarget(null)} onDrop={e=>{e.preventDefault();if(draggedItem&&draggedItem.mealIdx!==mi)moveFoodItem(draggedItem.mealIdx,mi,draggedItem.itemIdx, dayIdx);setDropTarget(null);}}>
-              <div style={{
-                padding:'10px 12px 9px',
-                background: isPreWorkout ? 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.03))' : isPostWorkout ? 'linear-gradient(135deg, rgba(245,158,11,0.09), rgba(245,158,11,0.02))' : isIntraWorkout ? 'linear-gradient(135deg, rgba(34,197,94,0.09), rgba(34,197,94,0.02))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
-                display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.05)',flexWrap:'wrap',gap:6,
-                borderLeft:`3px solid ${accentColor}`, wordBreak:'break-word',
-              }}>
-                <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,fontWeight:700,color:'#fff', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:999}}>{m.time}</span>
-                  <span style={{fontSize:12.5,fontWeight:800,color:accentColor, letterSpacing:'-0.2px'}}>{m.label}</span>
-                  {isPreWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(139,92,246,0.15)',color:'#a855f7',fontWeight:600}}>ДО</span>}
-                  {isPostWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(245,158,11,0.15)',color:'#f59e0b',fontWeight:600}}>ПОСЛЕ</span>}
-                  {isIntraWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(34,197,94,0.15)',color:'#22c55e',fontWeight:600}}>ВО ВРЕМЯ</span>}
-                  {totalKcal>0 && mealKcal>0 && (() => { const pct=Math.round(mealKcal/totalKcal*100); const big=pct>=20; return <span title={`Приём ${pct}% дневной калорийности`} style={{fontSize:10,padding:'1px 5px',borderRadius:4,fontWeight:700, background: big?'rgba(0,230,138,0.10)':'rgba(255,255,255,0.05)', border:`1px solid ${big?'rgba(0,230,138,0.2)':'rgba(255,255,255,0.08)'}`, color: big?'#00e68a':'rgba(255,255,255,0.6)'}}>{pct}% дня</span>; })()}
-                  {m.recipeApplied && !!m.recipeAppliedData?.appliedScale && Math.abs((m.recipeAppliedData.appliedScale||1)-1)>0.05 && <span title={`Рецепт масштабирован в ${(m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)} ${((m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)===1?'порцию':((m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)<2?'порции':'порций'))} к цели приёма (исходный рецепт = 1 порция, пропорции авторские)`} style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.22)',color:'#c4b5fd',fontWeight:700}}>🍳 ×{(m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)} {((m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)===1?'порция':((m.recipeAppliedData.portionScale||m.recipeAppliedData.appliedScale||1)<2?'порции':'порций'))}</span>}
-                  {m.recipeApplied2 && <span title={`Второй рецепт приёма: «${m.recipeApplied2}»`} style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(245,158,11,0.12)',border:'1px solid rgba(245,158,11,0.24)',color:'#fbbf24',fontWeight:700}}>🍳 +{m.recipeApplied2}</span>}
-                  {(m.type==='snack'||m.type==='snack2'||m.type==='snack3'||m.type==='snack4'||m.type==='snack5'||m.type==='snack6')&&<span onClick={()=>addSnackComboToMeal(dayIdx, mi)} title="Добавить протеин-порошок + овсяные хлопья" style={{fontSize:10,padding:'6px 10px',minHeight:32,display:'inline-flex',alignItems:'center',borderRadius:8,background:'rgba(167,139,250,0.12)',border:'1px solid rgba(167,139,250,0.25)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🥣 Порошок+хлопья</span>}
+            <div
+              key={mi}
+              style={{
+                marginBottom: 8,
+                borderRadius: 16,
+                overflow: 'hidden',
+                border:
+                  dropTarget === mi
+                    ? '1px solid rgba(0,230,138,0.32)'
+                    : isPreWorkout
+                      ? '1px solid rgba(139,92,246,0.18)'
+                      : isPostWorkout
+                        ? '1px solid rgba(245,158,11,0.18)'
+                        : isIntraWorkout
+                          ? '1px solid rgba(34,197,94,0.18)'
+                          : '1px solid rgba(255,255,255,0.07)',
+                background:
+                  dropTarget === mi
+                    ? 'rgba(0,230,138,0.06)'
+                    : 'linear-gradient(180deg, rgba(28,28,32,0.96), rgba(20,20,23,0.98))',
+                boxShadow:
+                  dropTarget === mi
+                    ? '0 0 0 3px rgba(0,230,138,0.12), 0 8px 24px rgba(0,0,0,0.24)'
+                    : '0 4px 16px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04)',
+                transition: 'all 0.2s cubic-bezier(0.16,1,0.3,1)',
+                position: 'relative',
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDropTarget(mi);
+              }}
+              onDragLeave={() => setDropTarget(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedItem && draggedItem.mealIdx !== mi)
+                  moveFoodItem(draggedItem.mealIdx, mi, draggedItem.itemIdx, dayIdx);
+                setDropTarget(null);
+              }}
+            >
+              <div
+                style={{
+                  padding: '10px 12px 9px',
+                  background: isPreWorkout
+                    ? 'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.03))'
+                    : isPostWorkout
+                      ? 'linear-gradient(135deg, rgba(245,158,11,0.09), rgba(245,158,11,0.02))'
+                      : isIntraWorkout
+                        ? 'linear-gradient(135deg, rgba(34,197,94,0.09), rgba(34,197,94,0.02))'
+                        : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                  borderLeft: `3px solid ${accentColor}`,
+                  wordBreak: 'break-word',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#fff',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                    }}
+                  >
+                    {m.time}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: accentColor, letterSpacing: '-0.2px' }}>
+                    {m.label}
+                  </span>
+                  {isPreWorkout && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(139,92,246,0.15)',
+                        color: '#a855f7',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ДО
+                    </span>
+                  )}
+                  {isPostWorkout && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(245,158,11,0.15)',
+                        color: '#f59e0b',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ПОСЛЕ
+                    </span>
+                  )}
+                  {isIntraWorkout && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(34,197,94,0.15)',
+                        color: '#22c55e',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ВО ВРЕМЯ
+                    </span>
+                  )}
+                  {totalKcal > 0 &&
+                    mealKcal > 0 &&
+                    (() => {
+                      const pct = Math.round((mealKcal / totalKcal) * 100);
+                      const big = pct >= 20;
+                      return (
+                        <span
+                          title={`Приём ${pct}% дневной калорийности`}
+                          style={{
+                            fontSize: 10,
+                            padding: '1px 5px',
+                            borderRadius: 4,
+                            fontWeight: 700,
+                            background: big ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${big ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                            color: big ? '#00e68a' : 'rgba(255,255,255,0.6)',
+                          }}
+                        >
+                          {pct}% дня
+                        </span>
+                      );
+                    })()}
+                  {m.recipeApplied &&
+                    !!m.recipeAppliedData?.appliedScale &&
+                    Math.abs((m.recipeAppliedData.appliedScale || 1) - 1) > 0.05 && (
+                      <span
+                        title={`Рецепт масштабирован в ${m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1} ${(m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1) === 1 ? 'порцию' : (m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1) < 2 ? 'порции' : 'порций'} к цели приёма (исходный рецепт = 1 порция, пропорции авторские)`}
+                        style={{
+                          fontSize: 10,
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          background: 'rgba(139,92,246,0.12)',
+                          border: '1px solid rgba(139,92,246,0.22)',
+                          color: '#c4b5fd',
+                          fontWeight: 700,
+                        }}
+                      >
+                        🍳 ×{m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1}{' '}
+                        {(m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1) === 1
+                          ? 'порция'
+                          : (m.recipeAppliedData.portionScale || m.recipeAppliedData.appliedScale || 1) < 2
+                            ? 'порции'
+                            : 'порций'}
+                      </span>
+                    )}
+                  {m.recipeApplied2 && (
+                    <span
+                      title={`Второй рецепт приёма: «${m.recipeApplied2}»`}
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(245,158,11,0.12)',
+                        border: '1px solid rgba(245,158,11,0.24)',
+                        color: '#fbbf24',
+                        fontWeight: 700,
+                      }}
+                    >
+                      🍳 +{m.recipeApplied2}
+                    </span>
+                  )}
+                  {(m.type === 'snack' ||
+                    m.type === 'snack2' ||
+                    m.type === 'snack3' ||
+                    m.type === 'snack4' ||
+                    m.type === 'snack5' ||
+                    m.type === 'snack6') && (
+                    <span
+                      onClick={() => addSnackComboToMeal(dayIdx, mi)}
+                      title="Добавить протеин-порошок + овсяные хлопья"
+                      style={{
+                        fontSize: 10,
+                        padding: '6px 10px',
+                        minHeight: 32,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        borderRadius: 8,
+                        background: 'rgba(167,139,250,0.12)',
+                        border: '1px solid rgba(167,139,250,0.25)',
+                        color: '#a78bfa',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                    >
+                      🥣 Порошок+хлопья
+                    </span>
+                  )}
                   {d.timingScores?.[mi] && (
-                    <span style={{fontSize:10,padding:'1px 5px',borderRadius:4,fontWeight:600,
-                      background:d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.1)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.1)':'rgba(239,68,68,0.08)',
-                      color:d.timingScores[mi].status==='ideal'?'#22c55e':d.timingScores[mi].status==='good'?'#f59e0b':'#ef4444',
-                      border:`1px solid ${d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.2)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.2)':'rgba(239,68,68,0.12)'}`}}
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        fontWeight: 600,
+                        background:
+                          d.timingScores[mi].status === 'ideal'
+                            ? 'rgba(34,197,94,0.1)'
+                            : d.timingScores[mi].status === 'good'
+                              ? 'rgba(245,158,11,0.1)'
+                              : 'rgba(239,68,68,0.08)',
+                        color:
+                          d.timingScores[mi].status === 'ideal'
+                            ? '#22c55e'
+                            : d.timingScores[mi].status === 'good'
+                              ? '#f59e0b'
+                              : '#ef4444',
+                        border: `1px solid ${d.timingScores[mi].status === 'ideal' ? 'rgba(34,197,94,0.2)' : d.timingScores[mi].status === 'good' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.12)'}`,
+                      }}
                       title={d.timingScores[mi].note}
-                    >★{d.timingScores[mi].score}/10</span>
+                    >
+                      ★{d.timingScores[mi].score}/10
+                    </span>
                   )}
                 </div>
-                <div style={{display:'flex',alignItems:'center',gap:6, overflowX:'auto', maxWidth:'100%', paddingBottom:2, scrollbarWidth:'none', flexWrap:'nowrap'}}>
-                  <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap', flexShrink:0}}>{mealKcal} ккал</span>
-                  <span onClick={()=>{ const ov = readMealTarget(m.label); setMealTargetEditor({ mi, label: m.label, p: ov?.p ? String(ov.p) : '', f: ov?.f ? String(ov.f) : '', c: ov?.c ? String(ov.c) : '' }); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#fb923c',cursor:'pointer',fontWeight:600}} title="Цель приёма (Б/Ж/У слота)">🎯</span>
-                  <span onClick={()=>timeEdit.open(mi, d, dayIdx)} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
-                  <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
-                  <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
-                  <span onClick={()=>{ try { // E7: локальная дата (toISOString уезжал на завтра вечером в UTC+3..+12)
-                    const _d = new Date(); const _iso = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
-                    const data=readDiaryV2(); if(!data[_iso]) data[_iso]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[_iso].meals[label]) data[_iso].meals[label]=[]; (m.items||[]).forEach((it:any)=>{ (data[_iso].meals[label] as any).push({ name:it.name, qty:Number(it.amount) || 100, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`, 'success'); } catch {} }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>
-                  <span onClick={()=>{ /* E2: единый ctx-хелпер — синк в weekPlan/threeDayPlan (B8: с адресацией дня) */ (ctx as any).duplicateMeal?.(mi, dayIdx); }} className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.12)',color:'#818cf8',cursor:'pointer',fontWeight:600}}>📋</span>
-                  <span onClick={()=>removeMealRebalanced(dayIdx, mi)} title="Пропустить приём — день пересоберётся без него" className="plan-mact" style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.12)',color:'#ef4444',cursor:'pointer',fontWeight:600}}>✕</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    overflowX: 'auto',
+                    maxWidth: '100%',
+                    paddingBottom: 2,
+                    scrollbarWidth: 'none',
+                    flexWrap: 'nowrap',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: 'rgba(255,255,255,0.85)',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {mealKcal} ккал
+                  </span>
+                  <span
+                    onClick={() => {
+                      const ov = readMealTarget(m.label);
+                      setMealTargetEditor({
+                        mi,
+                        label: m.label,
+                        p: ov?.p ? String(ov.p) : '',
+                        f: ov?.f ? String(ov.f) : '',
+                        c: ov?.c ? String(ov.c) : '',
+                      });
+                    }}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(249,115,22,0.08)',
+                      border: '1px solid rgba(249,115,22,0.15)',
+                      color: '#fb923c',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                    title="Цель приёма (Б/Ж/У слота)"
+                  >
+                    🎯
+                  </span>
+                  <span
+                    onClick={() => timeEdit.open(mi, d, dayIdx)}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(59,130,246,0.06)',
+                      border: '1px solid rgba(59,130,246,0.12)',
+                      color: '#60a5fa',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                    title="Изменить время приёма"
+                  >
+                    🕒
+                  </span>
+                  <span
+                    onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(139,92,246,0.08)',
+                      border: '1px solid rgba(139,92,246,0.15)',
+                      color: '#a78bfa',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    🍳
+                  </span>
+                  <span
+                    onClick={() => {
+                      setQuickAddMealIdx(mi);
+                      setQuickAddSearch('');
+                    }}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(0,230,138,0.08)',
+                      border: '1px solid rgba(0,230,138,0.15)',
+                      color: '#00e68a',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    +
+                  </span>
+                  <span
+                    onClick={() => {
+                      try {
+                        // E7: локальная дата (toISOString уезжал на завтра вечером в UTC+3..+12)
+                        const _d = new Date();
+                        const _iso = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+                        const data = readDiaryV2();
+                        if (!data[_iso]) data[_iso] = { meals: {} };
+                        const label = m.label || 'Приём пищи';
+                        if (!data[_iso].meals[label]) data[_iso].meals[label] = [];
+                        (m.items || []).forEach((it: any) => {
+                          (data[_iso].meals[label] as any).push({
+                            name: it.name,
+                            qty: Number(it.amount) || 100,
+                            kcal: Math.round(it.kcal || 0),
+                            p: Math.round((it.p || 0) * 10) / 10,
+                            f: Math.round((it.f || 0) * 10) / 10,
+                            c: Math.round((it.c || 0) * 10) / 10,
+                            category: it.category,
+                            foodId: it.id,
+                            micros: it.micros,
+                          });
+                        });
+                        writeDiaryV2(data);
+                        if (typeof (window as any).showToast === 'function')
+                          (window as any).showToast(`📒 ${label} → дневник`, 'success');
+                      } catch {}
+                    }}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(0,230,138,0.06)',
+                      border: '1px solid rgba(0,230,138,0.2)',
+                      color: '#00e68a',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                    title="Добавить приём в дневник"
+                  >
+                    📒
+                  </span>
+                  <span
+                    onClick={() => {
+                      /* E2: единый ctx-хелпер — синк в weekPlan/threeDayPlan (B8: с адресацией дня) */ (
+                        ctx as any
+                      ).duplicateMeal?.(mi, dayIdx);
+                    }}
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(99,102,241,0.06)',
+                      border: '1px solid rgba(99,102,241,0.12)',
+                      color: '#818cf8',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    📋
+                  </span>
+                  <span
+                    onClick={() => removeMealRebalanced(dayIdx, mi)}
+                    title="Пропустить приём — день пересоберётся без него"
+                    className="plan-mact"
+                    style={{
+                      fontSize: 11,
+                      padding: '5px 8px',
+                      minHeight: 40,
+                      minWidth: 40,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      borderRadius: 4,
+                      background: 'rgba(239,68,68,0.06)',
+                      border: '1px solid rgba(239,68,68,0.12)',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✕
+                  </span>
                 </div>
               </div>
-              <div style={{padding:'6px 10px 8px',background:'#18181b'}}>
-                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{m.items.map((it:any,ii:number)=>{return<span key={ii} draggable onDragStart={e=>{e.dataTransfer.setData('text/plain',`${mi}:${ii}`);setDraggedItem({mealIdx:mi,itemIdx:ii});}} role="button" tabIndex={0} aria-label={`Порция: ${it.name} — открыть настройки`} title="Нажмите — порция, замена, корзина, закрепить" onClick={()=>{setEditItem({dayIdx,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setEditItem({dayIdx,mealIdx:mi,itemIdx:ii});setEditAmount(it.amount);}}} style={{padding:'8px 12px',minHeight:44,borderRadius:12,fontSize:11,background:'linear-gradient(180deg, rgba(40,40,46,0.92), rgba(30,30,34,0.96))',border:'1px solid rgba(255,255,255,0.08)',cursor:'pointer',color:'#fff',display:'inline-flex',alignItems:'center',gap:6,flexWrap:'wrap', boxShadow:'0 2px 8px rgba(0,0,0,0.18)', transition:'all 0.15s'}}>
-                    {<><span style={{fontWeight:700, fontSize:11, letterSpacing:'-0.1px'}}>{displayFoodName(it.id, it.name, _weightMode)}</span>{(it as any)._cocktail&&<span style={{fontSize:11,padding:'0 2px'}} title={`${(it as any)._cocktail.name} — единый коктейль-добивка (компоненты назначены вместе, снимать/менять — целиком)`}>{(it as any)._cocktail.kind === 'carb' ? '🍯' : '🥤'}</span>}{preferredFoods.includes(it.id)&&<span style={{fontSize:11,color:'#fbbf24',padding:'0 1px', filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.4))'}} title="Любимый продукт">⭐</span>}<span style={{color:'#fff',fontSize:10, fontWeight:700, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.08)', padding:'1px 6px', borderRadius:999}}>{(() => { const food = findFoodById(it.id); const isPowder = food?.foodState==='powder' || (food?.category==='supplement' && it.amount<=80); if (isPowder) { const perScoop = (()=>{ try{ const m=(food?.servingSize||'').match(/(\d+(\.\d+)?)/); const v=m?parseFloat(m[1]):30; return v>0&&v<100?v:30;}catch{return 30}})(); const scoops=it.amount/perScoop; const sTxt = scoops===1?'1 скуп': scoops<1? scoops.toFixed(1)+' скупы' : Number.isInteger(scoops)? `${scoops} скупов` : `${scoops.toFixed(1)} скупов`; return `${it.amount}г (${sTxt})`; } const _wm = displayAmount(it.id, it.amount, _weightMode); return _wm.suffix ? `${_wm.grams}г ${_wm.suffix}` : `${it.amount}г`; })()}</span>{(() => { const food = findFoodById(it.id); return food ? <OrganLoadBadgeGroup food={food} healthIssues={healthIssues || []} /> : null; })()}{lockedFoodIds.has(it.id)&&<span style={{fontSize:10,color:'#f59e0b',padding:'0 2px'}} title="Закреплено — не изменится при регенерации">🔒</span>}</>}
-                  </span>;})}</div>
-                {m.totals&&<div style={{display:'flex',gap:6,marginTop:8,padding:'6px 8px',borderRadius:10,background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.05)',fontSize:10,alignItems:'center',flexWrap:'wrap'}}>{(() => { const tg = m.target; const fmt = (v: number, t: number|undefined, color: string, floor?: boolean) => { if (!t || t <= 0 || Math.abs(v - t) < 1 || (floor && v > t)) return <span style={{color,fontWeight:700, fontSize:11}}>{v}г</span>; const dev = v - t; const ok = Math.abs(dev) <= 3; return <span style={{color,fontWeight:700, fontSize:11, display:'inline-flex', alignItems:'center', gap:3}}>{v}<span style={{color:'rgba(255,255,255,0.35)'}}>/ {t}г</span>{ok?null:<span style={{fontSize:9,color:dev>0?'#f87171':'#fbbf24',fontWeight:800, background: dev>0?'rgba(239,68,68,0.10)':'rgba(245,158,11,0.10)', padding:'1px 5px', borderRadius:999, border:`1px solid ${dev>0?'rgba(239,68,68,0.18)':'rgba(245,158,11,0.18)'}`}}>{dev>0?('+'+Math.round(dev)):(''+Math.round(dev))}</span>}</span>; }; return <span style={{display:'contents'}}>{fmt(mealP,(tg as any)?.pd ?? tg?.p,'#60a5fa',!!(tg as any)?.pd)}<span style={{color:'rgba(255,255,255,0.14)',margin:'0 4px'}}>·</span>{fmt(mealF,(tg as any)?.fd ?? tg?.f,'#fbbf24')}<span style={{color:'rgba(255,255,255,0.14)',margin:'0 4px'}}>·</span>{fmt(mealC,(tg as any)?.cd ?? tg?.c,'#fb923c')}</span>; })()}{plannerMode === 'pro' && mealDiaas.diaas > 0 && <span style={{fontSize:10,fontWeight:800,color:mealDiaas.diaas >= 1 ? '#86efac' : mealDiaas.diaas >= 0.75 ? '#fbbf24' : '#fca5a5',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.12)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.18)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{plannerMode === 'pro' && mealGL > 0 && <span style={{fontSize:10,fontWeight:800,color:mealGL<10?'#86efac':mealGL<=20?'#fbbf24':'#fca5a5',background:(mealGL<10?'rgba(34,197,94,0.12)':mealGL<=20?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealGL<10?'rgba(34,197,94,0.18)':mealGL<=20?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`}} title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}>GL {mealGL}</span>}{plannerMode === 'pro' && mealII > 0 && <span style={{fontSize:10,fontWeight:800,color:mealII<40?'#86efac':mealII<=70?'#fbbf24':'#fca5a5',background:(mealII<40?'rgba(34,197,94,0.12)':mealII<=70?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)'),padding:'2px 7px',borderRadius:999, border:`1px solid ${mealII<40?'rgba(34,197,94,0.18)':mealII<=70?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`}} title={'Insulin Index (kcal-weighted): ' + mealII}>II {mealII}</span>}{plannerMode === 'pro' && m.mpsCheck && m.mpsCheck.triggers_mTOR && <span style={{fontSize:10,fontWeight:600,color:'#00e68a',background:'rgba(0,230,138,0.08)',padding:'1px 5px',borderRadius:4}} title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}>{'\uD83E\uDDEC mTOR'}</span>}{plannerMode === 'pro' && m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && <span style={{fontSize:10,fontWeight:600,color:'#f59e0b',background:'rgba(245,158,11,0.08)',padding:'1px 5px',borderRadius:4}} title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}>{'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:10,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:10,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
-                {(() => { try { const _sup = (ctx as any).supplementsForMeal?.(String((m as any).type || '')) || []; if (!Array.isArray(_sup) || _sup.length === 0) return null; return (
-                  <div data-meal-supps={String((m as any).type || '')} style={{ marginTop: 6, padding: '5px 8px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
-                    💊 К приёму: {_sup.map((s: any) => `${s.name}${s.dose ? ' — ' + s.dose : ''}`).join(' · ')}
-                  </div>
-                ); } catch { return null; } })()}
-                {Array.isArray(m.recipeOptions) && m.recipeOptions.length > 0 && (
-                  <details style={{marginTop:6,borderRadius:10,border:'1px solid rgba(249,115,22,0.16)',background:'rgba(249,115,22,0.04)',overflow:'hidden'}}>
-                    <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#f97316',listStyle:'none'}}>🍳 Варианты рецептов ({(m.recipeOptions as any[]).length}){m.recipeApplied ? <span style={{color:'#22c55e',fontWeight:700}}> · выбрано «{m.recipeApplied}»{m.recipeApplied2 ? ` + «${m.recipeApplied2}»` : ''}</span> : <span style={{color:'#fff',fontWeight:600}}> · раскрыть</span>}</summary>
-                  <div style={{padding:'0 8px 8px',display:'flex',flexDirection:'column',gap:3}}>
-                    {/* Пресеты подбора (масса = большое У, сушка, белок…) */}
-                    {renderPresetRow(m.recipeOptions as any[])}
-                    {(m.recipeOptions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).map((r: any, ri: number) => {
-                      const selected = m.recipeApplied === r.name || m.recipeApplied2 === r.name;
+              <div style={{ padding: '6px 10px 8px', background: '#18181b' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {m.items.map((it: any, ii: number) => {
+                    return (
+                      <span
+                        key={ii}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', `${mi}:${ii}`);
+                          setDraggedItem({ mealIdx: mi, itemIdx: ii });
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Порция: ${it.name} — открыть настройки`}
+                        title="Нажмите — порция, замена, корзина, закрепить"
+                        onClick={() => {
+                          setEditItem({ dayIdx, mealIdx: mi, itemIdx: ii });
+                          setEditAmount(it.amount);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setEditItem({ dayIdx, mealIdx: mi, itemIdx: ii });
+                            setEditAmount(it.amount);
+                          }
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          minHeight: 44,
+                          borderRadius: 12,
+                          fontSize: 11,
+                          background: 'linear-gradient(180deg, rgba(40,40,46,0.92), rgba(30,30,34,0.96))',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          cursor: 'pointer',
+                          color: '#fff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          flexWrap: 'wrap',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {
+                          <>
+                            <span style={{ fontWeight: 700, fontSize: 11, letterSpacing: '-0.1px' }}>
+                              {displayFoodName(it.id, it.name, _weightMode)}
+                            </span>
+                            {(it as any)._cocktail && (
+                              <span
+                                style={{ fontSize: 11, padding: '0 2px' }}
+                                title={`${(it as any)._cocktail.name} — единый коктейль-добивка (компоненты назначены вместе, снимать/менять — целиком)`}
+                              >
+                                {(it as any)._cocktail.kind === 'carb' ? '🍯' : '🥤'}
+                              </span>
+                            )}
+                            {preferredFoods.includes(it.id) && (
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  color: '#fbbf24',
+                                  padding: '0 1px',
+                                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+                                }}
+                                title="Любимый продукт"
+                              >
+                                ⭐
+                              </span>
+                            )}
+                            <span
+                              style={{
+                                color: '#fff',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                background: 'rgba(255,255,255,0.08)',
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                padding: '1px 6px',
+                                borderRadius: 999,
+                              }}
+                            >
+                              {(() => {
+                                const food = findFoodById(it.id);
+                                const isPowder =
+                                  food?.foodState === 'powder' || (food?.category === 'supplement' && it.amount <= 80);
+                                if (isPowder) {
+                                  const perScoop = (() => {
+                                    try {
+                                      const m = (food?.servingSize || '').match(/(\d+(\.\d+)?)/);
+                                      const v = m ? parseFloat(m[1]) : 30;
+                                      return v > 0 && v < 100 ? v : 30;
+                                    } catch {
+                                      return 30;
+                                    }
+                                  })();
+                                  const scoops = it.amount / perScoop;
+                                  const sTxt =
+                                    scoops === 1
+                                      ? '1 скуп'
+                                      : scoops < 1
+                                        ? scoops.toFixed(1) + ' скупы'
+                                        : Number.isInteger(scoops)
+                                          ? `${scoops} скупов`
+                                          : `${scoops.toFixed(1)} скупов`;
+                                  return `${it.amount}г (${sTxt})`;
+                                }
+                                const _wm = displayAmount(it.id, it.amount, _weightMode);
+                                return _wm.suffix ? `${_wm.grams}г ${_wm.suffix}` : `${it.amount}г`;
+                              })()}
+                            </span>
+                            {(() => {
+                              const food = findFoodById(it.id);
+                              return food ? (
+                                <OrganLoadBadgeGroup food={food} healthIssues={healthIssues || []} />
+                              ) : null;
+                            })()}
+                            {lockedFoodIds.has(it.id) && (
+                              <span
+                                style={{ fontSize: 10, color: '#f59e0b', padding: '0 2px' }}
+                                title="Закреплено — не изменится при регенерации"
+                              >
+                                🔒
+                              </span>
+                            )}
+                          </>
+                        }
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* 🧂 Соль приёма: единый читатель микро (item.na → FOOD_DB-фолбэк).
+                    Показываем ОБА числа — граммы соли крупно и мг натрия, как просил владелец. */}
+                {(() => {
+                  const _na = mealSodiumMg(m as any);
+                  if (!(_na > 0)) return null;
+                  const _salt = sodiumToSaltG(_na);
+                  const _pct = (_na / SODIUM_RDA_MG) * 100;
+                  const _tone = sodiumTone(_pct);
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                      <span
+                        title={`${sodiumLabel(_na)} · ${Math.round(_pct)}% от 2300 мг Na/сут`}
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: _tone.color,
+                          background: _tone.bg,
+                          border: `1px solid ${_tone.color}33`,
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        🧂 {_salt.toFixed(2)} г соли{' '}
+                        <span style={{ opacity: 0.72, fontWeight: 600 }}>· Na {Math.round(_na)} мг</span>
+                      </span>
+                    </div>
+                  );
+                })()}
+                {m.totals && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      marginTop: 8,
+                      padding: '6px 8px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                      fontSize: 10,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {(() => {
+                      const tg = m.target;
+                      const fmt = (v: number, t: number | undefined, color: string, floor?: boolean) => {
+                        if (!t || t <= 0 || Math.abs(v - t) < 1 || (floor && v > t))
+                          return <span style={{ color, fontWeight: 700, fontSize: 11 }}>{v}г</span>;
+                        const dev = v - t;
+                        const ok = Math.abs(dev) <= 3;
+                        return (
+                          <span
+                            style={{
+                              color,
+                              fontWeight: 700,
+                              fontSize: 11,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                          >
+                            {v}
+                            <span style={{ color: 'rgba(255,255,255,0.35)' }}>/ {t}г</span>
+                            {ok ? null : (
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  color: dev > 0 ? '#f87171' : '#fbbf24',
+                                  fontWeight: 800,
+                                  background: dev > 0 ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)',
+                                  padding: '1px 5px',
+                                  borderRadius: 999,
+                                  border: `1px solid ${dev > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)'}`,
+                                }}
+                              >
+                                {dev > 0 ? '+' + Math.round(dev) : '' + Math.round(dev)}
+                              </span>
+                            )}
+                          </span>
+                        );
+                      };
                       return (
-                        <details key={ri} style={{borderRadius:8,background:selected?'rgba(34,197,94,0.08)':'rgba(249,115,22,0.06)',border:`1px solid ${selected?'rgba(34,197,94,0.35)':'rgba(249,115,22,0.12)'}`,overflow:'hidden'}}>
-                          <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,listStyle:'none',display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
-                            <span role="button" aria-label={`Выбрать рецепт ${r.name}`} onClick={(e)=>{e.preventDefault();e.stopPropagation();pickRecipeOption(dayIdx,mi,r.name);}} style={{display:'inline-flex',alignItems:'center',minHeight:36,padding:'6px 10px',borderRadius:8,fontSize:10,border:`1px solid ${selected?'rgba(34,197,94,0.5)':'rgba(249,115,22,0.35)'}`,background:selected?'rgba(34,197,94,0.18)':'rgba(249,115,22,0.12)',color:selected?'#22c55e':'#f97316',fontWeight:800,cursor:'pointer'}}>{selected?'✅ Выбрано':'Выбрать'}</span>
-                            <span role="button" aria-label={isFavoriteRecipe(r.name)?`Убрать ${r.name} из избранного`:`Добавить ${r.name} в избранное`} title="В избранное (⭐ — приоритет в подборе)" onClick={(e)=>{e.preventDefault();e.stopPropagation();toggleFavoriteRecipe(r.name);}} style={{cursor:'pointer',display:'inline-flex',alignItems:'center',minHeight:36,padding:'6px 4px',fontSize:12,color:isFavoriteRecipe(r.name)?'#f59e0b':'rgba(255,255,255,0.35)'}}>{isFavoriteRecipe(r.name)?'⭐':'☆'}</span>
-                            <span style={{fontWeight:600,color:'#fff'}}>{r.name}</span>
-                            <span style={{color:'rgba(255,255,255,0.65)'}}>{r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин</span>
-                            {typeof r.fitPct==='number' && (() => { const ok=r.fitPct>=90&&r.fitPct<=110; const warn=!ok&&(r.fitPct>=75&&r.fitPct<=130); return <span title={`После масштабирования закроет приём на ~${r.fitPct}% целевой калорийности`} style={{fontSize:7,padding:'1px 5px',borderRadius:999,fontWeight:800, background:ok?'rgba(34,197,94,0.12)':warn?'rgba(245,158,11,0.10)':'rgba(239,68,68,0.10)', border:`1px solid ${ok?'rgba(34,197,94,0.3)':warn?'rgba(245,158,11,0.28)':'rgba(239,68,68,0.24)'}`, color:ok?'#22c55e':warn?'#fbbf24':'#f87171'}}>~{r.fitPct}% приёма</span>; })()}
-                          </summary>
-                          <div style={{padding:'4px 6px',fontSize:7,color:'rgba(255,255,255,0.85)',lineHeight:1.5}}>
-                            {r.description && <div style={{marginBottom:3,color:'rgba(255,255,255,0.65)'}}>{r.description}</div>}
-                            {Array.isArray(r.ingredients) && r.ingredients.length > 0 && (
-                              <div style={{marginBottom:3}}>
-                                <span style={{color:'#f97316',fontWeight:600}}>Ингредиенты:</span>
-                                <ul style={{margin:'2px 0 0 12px',padding:0}}>
-                                  {r.ingredients.map((ing: string, ii: number) => <li key={ii} style={{fontSize:7}}>{ing}</li>)}
-                                </ul>
-                              </div>
-                            )}
-                            {Array.isArray(r.instructions) && r.instructions.length > 0 && (
-                              <div>
-                                <span style={{color:'#f97316',fontWeight:600}}>Как готовить:</span>
-                                <ol style={{margin:'2px 0 0 12px',padding:0}}>
-                                  {r.instructions.map((st: string, si: number) => <li key={si} style={{fontSize:7,marginBottom:2}}>{st}</li>)}
-                                </ol>
-                              </div>
-                            )}
-                          </div>
-                        </details>
+                        <span style={{ display: 'contents' }}>
+                          {fmt(mealP, (tg as any)?.pd ?? tg?.p, '#60a5fa', !!(tg as any)?.pd)}
+                          <span style={{ color: 'rgba(255,255,255,0.14)', margin: '0 4px' }}>·</span>
+                          {fmt(mealF, (tg as any)?.fd ?? tg?.f, '#fbbf24')}
+                          <span style={{ color: 'rgba(255,255,255,0.14)', margin: '0 4px' }}>·</span>
+                          {fmt(mealC, (tg as any)?.cd ?? tg?.c, '#fb923c')}
+                        </span>
                       );
-                    })}
-                    <button onClick={()=>moreRecipeOptions(dayIdx,mi)} title="Подобрать другие варианты рецептов" style={{alignSelf:'flex-start',marginTop:1,padding:'6px 10px',borderRadius:8,border:'1px solid rgba(249,115,22,0.25)',background:'transparent',color:'#f97316',cursor:'pointer',fontSize:10,fontWeight:700,minHeight:36}}>🔄 Другие варианты</button>
+                    })()}
+                    {plannerMode === 'pro' && mealDiaas.diaas > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: mealDiaas.diaas >= 1 ? '#86efac' : mealDiaas.diaas >= 0.75 ? '#fbbf24' : '#fca5a5',
+                          background:
+                            mealDiaas.diaas >= 1
+                              ? 'rgba(34,197,94,0.12)'
+                              : mealDiaas.diaas >= 0.75
+                                ? 'rgba(245,158,11,0.12)'
+                                : 'rgba(239,68,68,0.12)',
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          border: `1px solid ${mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.18)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                        }}
+                      >
+                        DIAAS {mealDiaas.diaas.toFixed(2)}
+                      </span>
+                    )}
+                    {plannerMode === 'pro' && mealGL > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: mealGL < 10 ? '#86efac' : mealGL <= 20 ? '#fbbf24' : '#fca5a5',
+                          background:
+                            mealGL < 10
+                              ? 'rgba(34,197,94,0.12)'
+                              : mealGL <= 20
+                                ? 'rgba(245,158,11,0.12)'
+                                : 'rgba(239,68,68,0.12)',
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          border: `1px solid ${mealGL < 10 ? 'rgba(34,197,94,0.18)' : mealGL <= 20 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                        }}
+                        title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}
+                      >
+                        GL {mealGL}
+                      </span>
+                    )}
+                    {plannerMode === 'pro' && mealII > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: mealII < 40 ? '#86efac' : mealII <= 70 ? '#fbbf24' : '#fca5a5',
+                          background:
+                            mealII < 40
+                              ? 'rgba(34,197,94,0.12)'
+                              : mealII <= 70
+                                ? 'rgba(245,158,11,0.12)'
+                                : 'rgba(239,68,68,0.12)',
+                          padding: '2px 7px',
+                          borderRadius: 999,
+                          border: `1px solid ${mealII < 40 ? 'rgba(34,197,94,0.18)' : mealII <= 70 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'}`,
+                        }}
+                        title={'Insulin Index (kcal-weighted): ' + mealII}
+                      >
+                        II {mealII}
+                      </span>
+                    )}
+                    {plannerMode === 'pro' && m.mpsCheck && m.mpsCheck.triggers_mTOR && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: '#00e68a',
+                          background: 'rgba(0,230,138,0.08)',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                        }}
+                        title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}
+                      >
+                        {'\uD83E\uDDEC mTOR'}
+                      </span>
+                    )}
+                    {plannerMode === 'pro' && m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: '#f59e0b',
+                          background: 'rgba(245,158,11,0.08)',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                        }}
+                        title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}
+                      >
+                        {'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}
+                      </span>
+                    )}
+                    {m.synergyNotes && m.synergyNotes.length > 0 && (
+                      <span
+                        style={{ fontSize: 10, color: '#22c55e', fontWeight: 600 }}
+                        title={m.synergyNotes.join('; ')}
+                      >
+                        ✅ {(m.synergyNotes as string[]).length} синерги
+                        {(m.synergyNotes as string[]).length > 1 ? 'й' : 'я'}
+                      </span>
+                    )}
+                    {m.conflictWarnings && m.conflictWarnings.length > 0 && (
+                      <span
+                        style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}
+                        title={m.conflictWarnings.join('; ')}
+                      >
+                        ⚠️ {(m.conflictWarnings as string[]).length} конфликт
+                        {(m.conflictWarnings as string[]).length > 1 ? 'ов' : ''}
+                      </span>
+                    )}
                   </div>
+                )}
+                {(() => {
+                  try {
+                    const _sup = (ctx as any).supplementsForMeal?.(String((m as any).type || '')) || [];
+                    if (!Array.isArray(_sup) || _sup.length === 0) return null;
+                    return (
+                      <div
+                        data-meal-supps={String((m as any).type || '')}
+                        style={{
+                          marginTop: 6,
+                          padding: '5px 8px',
+                          borderRadius: 10,
+                          background: 'rgba(34,197,94,0.06)',
+                          border: '1px solid rgba(34,197,94,0.14)',
+                          fontSize: 10,
+                          color: '#fff',
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        💊 К приёму: {_sup.map((s: any) => `${s.name}${s.dose ? ' — ' + s.dose : ''}`).join(' · ')}
+                      </div>
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
+                {Array.isArray(m.recipeOptions) && m.recipeOptions.length > 0 && (
+                  <details
+                    style={{
+                      marginTop: 6,
+                      borderRadius: 10,
+                      border: '1px solid rgba(249,115,22,0.16)',
+                      background: 'rgba(249,115,22,0.04)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <summary
+                      style={{
+                        cursor: 'pointer',
+                        padding: '8px 10px',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: '#f97316',
+                        listStyle: 'none',
+                      }}
+                    >
+                      🍳 Варианты рецептов ({(m.recipeOptions as any[]).length})
+                      {m.recipeApplied ? (
+                        <span style={{ color: '#22c55e', fontWeight: 700 }}>
+                          {' '}
+                          · выбрано «{m.recipeApplied}»{m.recipeApplied2 ? ` + «${m.recipeApplied2}»` : ''}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#fff', fontWeight: 600 }}> · раскрыть</span>
+                      )}
+                    </summary>
+                    <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {/* Пресеты подбора (масса = большое У, сушка, белок…) */}
+                      {renderPresetRow(m.recipeOptions as any[])}
+                      {(m.recipeOptions as any[])
+                        .filter((r: any) => recipeMatchesPreset(r, recipePreset))
+                        .map((r: any, ri: number) => {
+                          const selected = m.recipeApplied === r.name || m.recipeApplied2 === r.name;
+                          return (
+                            <details
+                              key={ri}
+                              style={{
+                                borderRadius: 8,
+                                background: selected ? 'rgba(34,197,94,0.08)' : 'rgba(249,115,22,0.06)',
+                                border: `1px solid ${selected ? 'rgba(34,197,94,0.35)' : 'rgba(249,115,22,0.12)'}`,
+                                overflow: 'hidden',
+                              }}
+                            >
+                              <summary
+                                style={{
+                                  cursor: 'pointer',
+                                  padding: '3px 6px',
+                                  fontSize: 8,
+                                  listStyle: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                <span
+                                  role="button"
+                                  aria-label={`Выбрать рецепт ${r.name}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    pickRecipeOption(dayIdx, mi, r.name);
+                                  }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    minHeight: 36,
+                                    padding: '6px 10px',
+                                    borderRadius: 8,
+                                    fontSize: 10,
+                                    border: `1px solid ${selected ? 'rgba(34,197,94,0.5)' : 'rgba(249,115,22,0.35)'}`,
+                                    background: selected ? 'rgba(34,197,94,0.18)' : 'rgba(249,115,22,0.12)',
+                                    color: selected ? '#22c55e' : '#f97316',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  {selected ? '✅ Выбрано' : 'Выбрать'}
+                                </span>
+                                <span
+                                  role="button"
+                                  aria-label={
+                                    isFavoriteRecipe(r.name)
+                                      ? `Убрать ${r.name} из избранного`
+                                      : `Добавить ${r.name} в избранное`
+                                  }
+                                  title="В избранное (⭐ — приоритет в подборе)"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    toggleFavoriteRecipe(r.name);
+                                  }}
+                                  style={{
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    minHeight: 36,
+                                    padding: '6px 4px',
+                                    fontSize: 12,
+                                    color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.35)',
+                                  }}
+                                >
+                                  {isFavoriteRecipe(r.name) ? '⭐' : '☆'}
+                                </span>
+                                <span style={{ fontWeight: 600, color: '#fff' }}>{r.name}</span>
+                                <span style={{ color: 'rgba(255,255,255,0.65)' }}>
+                                  {r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин
+                                </span>
+                                {typeof r.fitPct === 'number' &&
+                                  (() => {
+                                    const ok = r.fitPct >= 90 && r.fitPct <= 110;
+                                    const warn = !ok && r.fitPct >= 75 && r.fitPct <= 130;
+                                    return (
+                                      <span
+                                        title={`После масштабирования закроет приём на ~${r.fitPct}% целевой калорийности`}
+                                        style={{
+                                          fontSize: 7,
+                                          padding: '1px 5px',
+                                          borderRadius: 999,
+                                          fontWeight: 800,
+                                          background: ok
+                                            ? 'rgba(34,197,94,0.12)'
+                                            : warn
+                                              ? 'rgba(245,158,11,0.10)'
+                                              : 'rgba(239,68,68,0.10)',
+                                          border: `1px solid ${ok ? 'rgba(34,197,94,0.3)' : warn ? 'rgba(245,158,11,0.28)' : 'rgba(239,68,68,0.24)'}`,
+                                          color: ok ? '#22c55e' : warn ? '#fbbf24' : '#f87171',
+                                        }}
+                                      >
+                                        ~{r.fitPct}% приёма
+                                      </span>
+                                    );
+                                  })()}
+                              </summary>
+                              <div
+                                style={{
+                                  padding: '4px 6px',
+                                  fontSize: 7,
+                                  color: 'rgba(255,255,255,0.85)',
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                {r.description && (
+                                  <div style={{ marginBottom: 3, color: 'rgba(255,255,255,0.65)' }}>
+                                    {r.description}
+                                  </div>
+                                )}
+                                {Array.isArray(r.ingredients) && r.ingredients.length > 0 && (
+                                  <div style={{ marginBottom: 3 }}>
+                                    <span style={{ color: '#f97316', fontWeight: 600 }}>Ингредиенты:</span>
+                                    <ul style={{ margin: '2px 0 0 12px', padding: 0 }}>
+                                      {r.ingredients.map((ing: string, ii: number) => (
+                                        <li key={ii} style={{ fontSize: 7 }}>
+                                          {ing}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {Array.isArray(r.instructions) && r.instructions.length > 0 && (
+                                  <div>
+                                    <span style={{ color: '#f97316', fontWeight: 600 }}>Как готовить:</span>
+                                    <ol style={{ margin: '2px 0 0 12px', padding: 0 }}>
+                                      {r.instructions.map((st: string, si: number) => (
+                                        <li key={si} style={{ fontSize: 7, marginBottom: 2 }}>
+                                          {st}
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  </div>
+                                )}
+                              </div>
+                            </details>
+                          );
+                        })}
+                      <button
+                        onClick={() => moreRecipeOptions(dayIdx, mi)}
+                        title="Подобрать другие варианты рецептов"
+                        style={{
+                          alignSelf: 'flex-start',
+                          marginTop: 1,
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          border: '1px solid rgba(249,115,22,0.25)',
+                          background: 'transparent',
+                          color: '#f97316',
+                          cursor: 'pointer',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          minHeight: 36,
+                        }}
+                      >
+                        🔄 Другие варианты
+                      </button>
+                    </div>
                   </details>
                 )}
                 {m.recipeApplied && (
-                  <button onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
-                    title={m.recipeApplied2 ? `Заменить второй рецепт (сейчас «${m.recipeApplied2}»)` : 'Добавить второе блюдо к этому приёму (не дубль — совместимое)'}
+                  <button
+                    onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
+                    title={
+                      m.recipeApplied2
+                        ? `Заменить второй рецепт (сейчас «${m.recipeApplied2}»)`
+                        : 'Добавить второе блюдо к этому приёму (не дубль — совместимое)'
+                    }
                     style={{
-                      display:'flex', alignItems:'center', gap:6, width:'100%', marginTop:6,
-                      padding:'7px 10px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:700, minHeight:44,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      width: '100%',
+                      marginTop: 6,
+                      padding: '7px 10px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      minHeight: 44,
                       background: m.recipeApplied2 ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)',
                       border: m.recipeApplied2 ? '1px dashed rgba(245,158,11,0.4)' : '1px dashed rgba(139,92,246,0.45)',
                       color: m.recipeApplied2 ? '#fbbf24' : '#c4b5fd',
-                    }}>
+                    }}
+                  >
                     {m.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт в приём'}
                   </button>
                 )}
                 {m.recipeApplied2 && (
-                  <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:6, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:700 }}>Масштаб 2-го:</span>
-                    {[0.5, 1, 1.5, 2].map(s => {
-                      const cur = Number((m as any).recipeAppliedData2?.portionScale ?? (m as any).recipeAppliedData2?.appliedScale ?? 1) || 1;
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', fontWeight: 700 }}>Масштаб 2-го:</span>
+                    {[0.5, 1, 1.5, 2].map((s) => {
+                      const cur =
+                        Number(
+                          (m as any).recipeAppliedData2?.portionScale ??
+                            (m as any).recipeAppliedData2?.appliedScale ??
+                            1,
+                        ) || 1;
                       const active = Math.abs(cur - s) < 0.01;
                       return (
-                        <span key={s} onClick={() => rescaleSecondRecipeInMeal?.(mi, dayIdx, s)} title={`Масштаб второго рецепта ×${s} (первый не трогается, остальные приёмы пересоберутся)`} style={{ fontSize:9, padding:'3px 8px', borderRadius:7, cursor:'pointer', fontWeight:800, minHeight:28, display:'inline-flex', alignItems:'center', background: active ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)', border: active ? '1px solid rgba(245,158,11,0.5)' : '1px solid rgba(255,255,255,0.1)', color: active ? '#fbbf24' : 'rgba(255,255,255,0.7)' }}>×{s}</span>
+                        <span
+                          key={s}
+                          onClick={() => rescaleSecondRecipeInMeal?.(mi, dayIdx, s)}
+                          title={`Масштаб второго рецепта ×${s} (первый не трогается, остальные приёмы пересоберутся)`}
+                          style={{
+                            fontSize: 9,
+                            padding: '3px 8px',
+                            borderRadius: 7,
+                            cursor: 'pointer',
+                            fontWeight: 800,
+                            minHeight: 28,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            background: active ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.05)',
+                            border: active ? '1px solid rgba(245,158,11,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                            color: active ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                          }}
+                        >
+                          ×{s}
+                        </span>
                       );
                     })}
-                    <span onClick={() => removeSecondRecipeFromMeal?.(mi, dayIdx)} title="Убрать второй рецепт (первый остаётся)" style={{ fontSize:9, padding:'3px 8px', borderRadius:7, cursor:'pointer', fontWeight:700, minHeight:28, display:'inline-flex', alignItems:'center', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444' }}>✕ убрать 2-й</span>
+                    <span
+                      onClick={() => removeSecondRecipeFromMeal?.(mi, dayIdx)}
+                      title="Убрать второй рецепт (первый остаётся)"
+                      style={{
+                        fontSize: 9,
+                        padding: '3px 8px',
+                        borderRadius: 7,
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        minHeight: 28,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.2)',
+                        color: '#ef4444',
+                      }}
+                    >
+                      ✕ убрать 2-й
+                    </span>
                   </div>
                 )}
                 {m.recipeSuggestions && Array.isArray(m.recipeSuggestions) && m.recipeSuggestions.length > 0 && (
-                  <details style={{marginTop:6,borderRadius:10,border:'1px solid rgba(249,115,22,0.14)',background:'rgba(249,115,22,0.03)',overflow:'hidden'}}>
-                    <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#f97316',listStyle:'none'}}>🍲 Подсказки рецептов ({(m.recipeSuggestions as any[]).length}) · раскрыть</summary>
-                  <div style={{padding:'0 8px 8px',display:'flex',flexDirection:'column',gap:3}}>
-                    {/* Пресеты подбора — фиксированный набор */}
-                    {renderPresetRow(m.recipeSuggestions as any[])}
-                    {(m.recipeSuggestions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).slice(0, 3).map((r: any, ri: number) => (
-                      <details key={ri} style={{borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.12)',overflow:'hidden'}}>
-                        <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,color:'#f97316',fontWeight:600,listStyle:'none'}}>
-                          <span onClick={(e)=>{e.preventDefault();e.stopPropagation();toggleFavoriteRecipe(r.name);}} title="В избранное (⭐ — приоритет в подборе)" style={{cursor:'pointer',fontSize:10,color:isFavoriteRecipe(r.name)?'#f59e0b':'rgba(255,255,255,0.3)',marginRight:4}}>{isFavoriteRecipe(r.name)?'⭐':'☆'}</span>
-                          {r.name} · {r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин{r.usefulness?` · ⭐${r.usefulness}`:''}
-                        </summary>
-                        <div style={{padding:'4px 6px',fontSize:7,color:'rgba(255,255,255,0.8)',lineHeight:1.5}}>
-                          {r.description && <div style={{marginBottom:3,color:'rgba(255,255,255,0.65)'}}>{r.description}</div>}
-                          {Array.isArray(r.ingredients) && r.ingredients.length > 0 && (
-                            <div style={{marginBottom:3}}>
-                              <span style={{color:'#f97316',fontWeight:600}}>Ингредиенты:</span>
-                              <ul style={{margin:'2px 0 0 12px',padding:0}}>
-                                {r.ingredients.map((ing: string, ii: number) => <li key={ii} style={{fontSize:7}}>{ing}</li>)}
-                              </ul>
+                  <details
+                    style={{
+                      marginTop: 6,
+                      borderRadius: 10,
+                      border: '1px solid rgba(249,115,22,0.14)',
+                      background: 'rgba(249,115,22,0.03)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <summary
+                      style={{
+                        cursor: 'pointer',
+                        padding: '8px 10px',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: '#f97316',
+                        listStyle: 'none',
+                      }}
+                    >
+                      🍲 Подсказки рецептов ({(m.recipeSuggestions as any[]).length}) · раскрыть
+                    </summary>
+                    <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {/* Пресеты подбора — фиксированный набор */}
+                      {renderPresetRow(m.recipeSuggestions as any[])}
+                      {(m.recipeSuggestions as any[])
+                        .filter((r: any) => recipeMatchesPreset(r, recipePreset))
+                        .slice(0, 3)
+                        .map((r: any, ri: number) => (
+                          <details
+                            key={ri}
+                            style={{
+                              borderRadius: 8,
+                              background: 'rgba(249,115,22,0.06)',
+                              border: '1px solid rgba(249,115,22,0.12)',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <summary
+                              style={{
+                                cursor: 'pointer',
+                                padding: '3px 6px',
+                                fontSize: 8,
+                                color: '#f97316',
+                                fontWeight: 600,
+                                listStyle: 'none',
+                              }}
+                            >
+                              <span
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  toggleFavoriteRecipe(r.name);
+                                }}
+                                title="В избранное (⭐ — приоритет в подборе)"
+                                style={{
+                                  cursor: 'pointer',
+                                  fontSize: 10,
+                                  color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.3)',
+                                  marginRight: 4,
+                                }}
+                              >
+                                {isFavoriteRecipe(r.name) ? '⭐' : '☆'}
+                              </span>
+                              {r.name} · {r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин
+                              {r.usefulness ? ` · ⭐${r.usefulness}` : ''}
+                            </summary>
+                            <div
+                              style={{
+                                padding: '4px 6px',
+                                fontSize: 7,
+                                color: 'rgba(255,255,255,0.8)',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {r.description && (
+                                <div style={{ marginBottom: 3, color: 'rgba(255,255,255,0.65)' }}>{r.description}</div>
+                              )}
+                              {Array.isArray(r.ingredients) && r.ingredients.length > 0 && (
+                                <div style={{ marginBottom: 3 }}>
+                                  <span style={{ color: '#f97316', fontWeight: 600 }}>Ингредиенты:</span>
+                                  <ul style={{ margin: '2px 0 0 12px', padding: 0 }}>
+                                    {r.ingredients.map((ing: string, ii: number) => (
+                                      <li key={ii} style={{ fontSize: 7 }}>
+                                        {ing}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {Array.isArray(r.instructions) && r.instructions.length > 0 && (
+                                <div>
+                                  <span style={{ color: '#f97316', fontWeight: 600 }}>Как готовить:</span>
+                                  <ol style={{ margin: '2px 0 0 12px', padding: 0 }}>
+                                    {r.instructions.map((step: string, si: number) => (
+                                      <li key={si} style={{ fontSize: 7, marginBottom: 2 }}>
+                                        {step}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
+                                style={{
+                                  marginTop: 3,
+                                  padding: '6px 10px',
+                                  borderRadius: 8,
+                                  border: '1px solid rgba(249,115,22,0.3)',
+                                  background: 'rgba(249,115,22,0.1)',
+                                  color: '#f97316',
+                                  cursor: 'pointer',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  minHeight: 36,
+                                }}
+                              >
+                                🍳 Заменить приём этим рецептом
+                              </button>
                             </div>
-                          )}
-                          {Array.isArray(r.instructions) && r.instructions.length > 0 && (
-                            <div>
-                              <span style={{color:'#f97316',fontWeight:600}}>Как готовить:</span>
-                              <ol style={{margin:'2px 0 0 12px',padding:0}}>
-                                {r.instructions.map((step: string, si: number) => <li key={si} style={{fontSize:7,marginBottom:2}}>{step}</li>)}
-                              </ol>
-                            </div>
-                          )}
-                          <button onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{marginTop:3,padding:'6px 10px',borderRadius:8,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.1)',color:'#f97316',cursor:'pointer',fontSize:10,fontWeight:700,minHeight:36}}>🍳 Заменить приём этим рецептом</button>
-                        </div>
-                      </details>
-                    ))}
-                  </div>
+                          </details>
+                        ))}
+                    </div>
                   </details>
                 )}
                 {quickAddMealIdx === mi && (
-                  <div style={{padding:'4px 10px 8px',background:'#18181b',borderTop:'1px solid rgba(255,255,255,0.04)'}}>
-                    <input value={quickAddSearch} onChange={e=>setQuickAddSearch(e.target.value)} placeholder="Поиск продукта..." autoFocus style={{width:'100%',padding:'4px 8px',borderRadius:6,border:'1px solid rgba(0,230,138,0.2)',background:'#202023',color:'#fff',fontSize:9,marginBottom:4}} />
-                    <div style={{maxHeight:120,overflowY:'auto',display:'flex',flexWrap:'wrap',gap:3}}>
+                  <div
+                    style={{
+                      padding: '4px 10px 8px',
+                      background: '#18181b',
+                      borderTop: '1px solid rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <input
+                      value={quickAddSearch}
+                      onChange={(e) => setQuickAddSearch(e.target.value)}
+                      placeholder="Поиск продукта..."
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid rgba(0,230,138,0.2)',
+                        background: '#202023',
+                        color: '#fff',
+                        fontSize: 9,
+                        marginBottom: 4,
+                      }}
+                    />
+                    <div style={{ maxHeight: 120, overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                       {(() => {
                         const raw = filterFoodsByName(quickAddSearch).slice(0, 20);
                         const mealTarget = getMealKBJUTarget(d, mi);
                         const mealCur = getMealCurrentKBJU(d, mi);
                         const defaultTarget = mealTarget || { kcal: 600, protein: 40, fat: 20, carbs: 60 };
                         const scored = scoreFoodsForKBJU(raw, defaultTarget, mealCur || undefined, undefined, 10);
-                        const sorted = scored.length > 0 ? scored : raw.slice(0, 10).map(f => ({ foodId: f.id, foodName: f.name, matchScore: 0, color: '#00e68a', kcal: f.kcal, protein: f.protein, fat: f.fat, carbs: f.carbs, fiber: f.fiber || 0 }));
+                        const sorted =
+                          scored.length > 0
+                            ? scored
+                            : raw.slice(0, 10).map((f) => ({
+                                foodId: f.id,
+                                foodName: f.name,
+                                matchScore: 0,
+                                color: '#00e68a',
+                                kcal: f.kcal,
+                                protein: f.protein,
+                                fat: f.fat,
+                                carbs: f.carbs,
+                                fiber: f.fiber || 0,
+                              }));
                         return sorted.map((r: any) => {
                           const food = findFoodById(r.foodId);
                           return (
-                            <span key={r.foodId} onClick={() => { if (!food) return; addFoodToMeal(dayIdx, mi, food); setQuickAddMealIdx(null); setQuickAddSearch(''); }}
-                              style={{padding:'3px 6px',borderRadius:4,fontSize:8,background:'#202023',border:'1px solid rgba(0,230,138,0.1)',color:'#fff',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3}}>
-                              {r.foodName}{r.matchScore > 0 && <span style={{fontSize:6,color:r.color,fontWeight:600}}>{r.matchScore}%</span>}
+                            <span
+                              key={r.foodId}
+                              onClick={() => {
+                                if (!food) return;
+                                addFoodToMeal(dayIdx, mi, food);
+                                setQuickAddMealIdx(null);
+                                setQuickAddSearch('');
+                              }}
+                              style={{
+                                padding: '3px 6px',
+                                borderRadius: 4,
+                                fontSize: 8,
+                                background: '#202023',
+                                border: '1px solid rgba(0,230,138,0.1)',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                              }}
+                            >
+                              {r.foodName}
+                              {r.matchScore > 0 && (
+                                <span style={{ fontSize: 6, color: r.color, fontWeight: 600 }}>{r.matchScore}%</span>
+                              )}
                             </span>
                           );
                         });
                       })()}
                     </div>
-                    <button onClick={() => { setQuickAddMealIdx(null); setQuickAddSearch(''); }} style={{marginTop:4,padding:'3px 8px',borderRadius:4,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.04)',color:'#ef4444',cursor:'pointer',fontSize:8,width:'100%'}}>✕ Закрыть</button>
+                    <button
+                      onClick={() => {
+                        setQuickAddMealIdx(null);
+                        setQuickAddSearch('');
+                      }}
+                      style={{
+                        marginTop: 4,
+                        padding: '3px 8px',
+                        borderRadius: 4,
+                        border: '1px solid rgba(239,68,68,0.2)',
+                        background: 'rgba(239,68,68,0.04)',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontSize: 8,
+                        width: '100%',
+                      }}
+                    >
+                      ✕ Закрыть
+                    </button>
                   </div>
                 )}
               </div>
@@ -560,38 +2661,114 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           );
         })}
         {d.intraWorkout && (
-          <div style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.2)'}}>
-            <div style={{padding:'7px 10px 5px',background:'rgba(34,197,94,0.05)',display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-              <div style={{display:'flex',alignItems:'center',gap:5}}>
-                <span style={{fontSize:8,fontWeight:600,color:'rgba(255,255,255,0.85)'}}>{d.intraWorkout.time}</span>
-                <span style={{width:3,height:12,borderRadius:2,background:'#22c55e'}}/>
-                <span style={{fontSize:10,fontWeight:700,color:'#22c55e'}}>{d.intraWorkout.label}</span>
-                <span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(34,197,94,0.12)',color:'#22c55e',fontWeight:600}}>ВО ВРЕМЯ</span>
+          <div
+            style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(34,197,94,0.2)' }}
+          >
+            <div
+              style={{
+                padding: '7px 10px 5px',
+                background: 'rgba(34,197,94,0.05)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
+                  {d.intraWorkout.time}
+                </span>
+                <span style={{ width: 3, height: 12, borderRadius: 2, background: '#22c55e' }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>{d.intraWorkout.label}</span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 5px',
+                    borderRadius: 4,
+                    background: 'rgba(34,197,94,0.12)',
+                    color: '#22c55e',
+                    fontWeight: 600,
+                  }}
+                >
+                  ВО ВРЕМЯ
+                </span>
               </div>
-              <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{Math.round(d.intraWorkout.totals?.kcal||0)} ккал</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>
+                {Math.round(d.intraWorkout.totals?.kcal || 0)} ккал
+              </span>
             </div>
-            <div style={{padding:'6px 10px 8px',background:'#18181b'}}>
-              <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+            <div style={{ padding: '6px 10px 8px', background: '#18181b' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {d.intraWorkout.items.map((it: any, ii: number) => (
-                  <span key={ii} style={{padding:'3px 6px',borderRadius:6,fontSize:8,background:'#202023',border:'1px solid rgba(34,197,94,0.15)',color:'#fff',display:'inline-flex',alignItems:'center',gap:3}}>
-                    <span style={{fontWeight:600}}>{it.name}</span><span style={{color:'rgba(255,255,255,0.9)',fontSize:10}}>{it.amount}г</span>
+                  <span
+                    key={ii}
+                    style={{
+                      padding: '3px 6px',
+                      borderRadius: 6,
+                      fontSize: 8,
+                      background: '#202023',
+                      border: '1px solid rgba(34,197,94,0.15)',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{it.name}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 10 }}>{it.amount}г</span>
                   </span>
                 ))}
               </div>
-              {d.intraWorkout.note && <div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:3}}>{d.intraWorkout.note}</div>}
+              {d.intraWorkout.note && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{d.intraWorkout.note}</div>
+              )}
             </div>
           </div>
         )}
         {d.nutritionLogic && d.nutritionLogic.length > 0 && (
-          <details style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(168,85,247,0.15)'}}>
-            <summary style={{padding:'7px 10px',background:'rgba(168,85,247,0.04)',cursor:'pointer',fontSize:9,fontWeight:700,color:'#a78bfa',listStyle:'none'}}>🧠 Логика плана: почему выбраны эти продукты</summary>
-            <div style={{padding:'8px 10px',background:'rgba(24,24,27,0.6)'}}>
+          <details
+            style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(168,85,247,0.15)' }}
+          >
+            <summary
+              style={{
+                padding: '7px 10px',
+                background: 'rgba(168,85,247,0.04)',
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 700,
+                color: '#a78bfa',
+                listStyle: 'none',
+              }}
+            >
+              🧠 Логика плана: почему выбраны эти продукты
+            </summary>
+            <div style={{ padding: '8px 10px', background: 'rgba(24,24,27,0.6)' }}>
               {d.nutritionLogic.map((nl: any, nli: number) => (
-                <div key={nli} style={{marginBottom:4,padding:'4px 8px',borderRadius:6,background:'rgba(168,85,247,0.03)',border:'1px solid rgba(168,85,247,0.06)'}}>
-                  <span style={{fontSize:8,fontWeight:700,color:'#c4b5fd'}}>{nl.label}:</span>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:3,marginTop:2}}>
+                <div
+                  key={nli}
+                  style={{
+                    marginBottom: 4,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(168,85,247,0.03)',
+                    border: '1px solid rgba(168,85,247,0.06)',
+                  }}
+                >
+                  <span style={{ fontSize: 8, fontWeight: 700, color: '#c4b5fd' }}>{nl.label}:</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 2 }}>
                     {nl.rules.map((r: string, ri: number) => (
-                      <span key={ri} style={{fontSize:10,color:'rgba(255,255,255,0.6)',background:'rgba(168,85,247,0.06)',padding:'1px 5px',borderRadius:3}}>{r}</span>
+                      <span
+                        key={ri}
+                        style={{
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.6)',
+                          background: 'rgba(168,85,247,0.06)',
+                          padding: '1px 5px',
+                          borderRadius: 3,
+                        }}
+                      >
+                        {r}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -600,43 +2777,338 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           </details>
         )}
         {d.dietDiversity && (
-          <div style={{marginBottom:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(245,158,11,0.15)'}}>
-            <div style={{padding:'6px 10px',background:'rgba(245,158,11,0.04)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontSize:9,fontWeight:700,color:'#f59e0b'}}>🌈 Разнообразие: {d.dietDiversity.uniqueFoods} продуктов</span>
-              <span style={{fontSize:10,fontWeight:600,color:d.dietDiversity.score >= 7 ? '#22c55e' : d.dietDiversity.score >= 4 ? '#f59e0b' : '#ef4444'}}>{d.dietDiversity.note}</span>
+          <div
+            style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(245,158,11,0.15)' }}
+          >
+            <div
+              style={{
+                padding: '6px 10px',
+                background: 'rgba(245,158,11,0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b' }}>
+                🌈 Разнообразие: {d.dietDiversity.uniqueFoods} продуктов
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: d.dietDiversity.score >= 7 ? '#22c55e' : d.dietDiversity.score >= 4 ? '#f59e0b' : '#ef4444',
+                }}
+              >
+                {d.dietDiversity.note}
+              </span>
             </div>
           </div>
         )}
-        <div style={{marginTop:10,borderRadius:16,overflow:'hidden',border:'1px solid rgba(0,230,138,0.16)', background:'linear-gradient(180deg, rgba(22,22,26,0.98), rgba(18,18,20,0.96))', boxShadow:'0 8px 24px rgba(0,0,0,0.22)'}}>
-          <div style={{padding:'12px 14px',background:'linear-gradient(135deg, rgba(0,230,138,0.07) 0%, rgba(0,230,138,0.02) 54%, transparent 100%)'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.55)',letterSpacing:'0.8px'}}>ИТОГО ЗА ДЕНЬ</span><span style={{color:'#00e68a',fontWeight:900,fontSize:18, letterSpacing:'-0.4px'}}>{totalKcal.toLocaleString('ru-RU')} <span style={{fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.45)'}}>ккал</span></span></div>
-            <div style={{display:'flex',gap:10}}>
-              {[{label:'Белки',val:totalP,unit:'г',color:'#60a5fa',bg:'#60a5fa',target:effectiveP},{label:'Жиры',val:totalF,unit:'г',color:'#fbbf24',bg:'#f59e0b',target:effectiveF},{label:'Углеводы',val:totalC,unit:'г',color:'#fb923c',bg:'#f97316',target:effectiveC}].map(m=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.target)*100));const isOver=pct>100;return(<div key={m.label} style={{flex:1, padding:'8px 8px 6px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)'}}><div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:4, alignItems:'center'}}><span style={{color:m.color,fontWeight:700, fontSize:10, display:'inline-flex', alignItems:'center', gap:4}}><span style={{width:6,height:6,borderRadius:'50%', background:m.bg}} />{m.label}</span><span style={{color: isOver ? '#f87171' : '#fff',fontWeight:800, fontSize:10}}>{m.val}<span style={{color:'rgba(255,255,255,0.42)', fontWeight:600}}>/{m.target}</span></span></div><div style={{height:6,borderRadius:999,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.min(100,pct)}%`,borderRadius:999,background: isOver ? '#ef4444' : `linear-gradient(90deg, ${m.bg}, ${m.color})`,transition:'width 0.4s ease', boxShadow: isOver ? '0 0 8px rgba(239,68,68,0.4)' : `0 0 8px ${m.bg}44`}}/></div><div style={{fontSize:10,color: isOver ? '#f87171' : 'rgba(255,255,255,0.55)',textAlign:'right',marginTop:3, fontWeight:700}}>{isOver?`+${pct-100}%`:`${pct}%`}{isOver ? ' • перебор' : pct >= 92 && pct <= 108 ? ' • норма' : ''}</div></div>);})}
+        <div
+          style={{
+            marginTop: 10,
+            borderRadius: 16,
+            overflow: 'hidden',
+            border: '1px solid rgba(0,230,138,0.16)',
+            background: 'linear-gradient(180deg, rgba(22,22,26,0.98), rgba(18,18,20,0.96))',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+          }}
+        >
+          <div
+            style={{
+              padding: '12px 14px',
+              background:
+                'linear-gradient(135deg, rgba(0,230,138,0.07) 0%, rgba(0,230,138,0.02) 54%, transparent 100%)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.8px' }}>
+                ИТОГО ЗА ДЕНЬ
+              </span>
+              <span style={{ color: '#00e68a', fontWeight: 900, fontSize: 18, letterSpacing: '-0.4px' }}>
+                {totalKcal.toLocaleString('ru-RU')}{' '}
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>ккал</span>
+              </span>
             </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[
+                { label: 'Белки', val: totalP, unit: 'г', color: '#60a5fa', bg: '#60a5fa', target: effectiveP },
+                { label: 'Жиры', val: totalF, unit: 'г', color: '#fbbf24', bg: '#f59e0b', target: effectiveF },
+                { label: 'Углеводы', val: totalC, unit: 'г', color: '#fb923c', bg: '#f97316', target: effectiveC },
+              ].map((m) => {
+                const pct = Math.min(100, Math.round((m.val / Math.max(1, m.target)) * 100));
+                const isOver = pct > 100;
+                return (
+                  <div
+                    key={m.label}
+                    style={{
+                      flex: 1,
+                      padding: '8px 8px 6px',
+                      borderRadius: 12,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 10,
+                        marginBottom: 4,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: m.color,
+                          fontWeight: 700,
+                          fontSize: 10,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: m.bg }} />
+                        {m.label}
+                      </span>
+                      <span style={{ color: isOver ? '#f87171' : '#fff', fontWeight: 800, fontSize: 10 }}>
+                        {m.val}
+                        <span style={{ color: 'rgba(255,255,255,0.42)', fontWeight: 600 }}>/{m.target}</span>
+                      </span>
+                    </div>
+                    <div
+                      style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${Math.min(100, pct)}%`,
+                          borderRadius: 999,
+                          background: isOver ? '#ef4444' : `linear-gradient(90deg, ${m.bg}, ${m.color})`,
+                          transition: 'width 0.4s ease',
+                          boxShadow: isOver ? '0 0 8px rgba(239,68,68,0.4)' : `0 0 8px ${m.bg}44`,
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: isOver ? '#f87171' : 'rgba(255,255,255,0.55)',
+                        textAlign: 'right',
+                        marginTop: 3,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {isOver ? `+${pct - 100}%` : `${pct}%`}
+                      {isOver ? ' • перебор' : pct >= 92 && pct <= 108 ? ' • норма' : ''}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* 🧂 Соль за день — ОБА числа (граммы соли + мг натрия), единый читатель микро. */}
+            {(() => {
+              const _dayNa = daySodiumMg(d);
+              if (!(_dayNa > 0)) return null;
+              const _salt = sodiumToSaltG(_dayNa);
+              const _pct = Math.round((_dayNa / SODIUM_RDA_MG) * 100);
+              const _tone = sodiumTone(_pct);
+              return (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    marginTop: 8,
+                    padding: '6px 10px',
+                    borderRadius: 10,
+                    background: _tone.bg,
+                    border: `1px solid ${_tone.color}33`,
+                  }}
+                  title={`${sodiumLabel(_dayNa)} · ${_pct}% от 2300 мг Na/сут (IOM DRI)`}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 800, color: _tone.color, letterSpacing: '0.4px' }}>
+                    🧂 Соль за день
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 900, color: _tone.color }}>
+                    {_salt.toFixed(2)} г{' '}
+                    <span style={{ fontWeight: 600, opacity: 0.8 }}>
+                      · Na {Math.round(_dayNa)} мг · {_pct}% от 2300
+                    </span>
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
-        {d.meals && (() => { // FIX week-perf: микро-сводка дня кэшируется по объекту дня (WeakMap)
-          let _mc = _dayMicrosCache.get(d);
-          if (_mc === undefined) {
-            const allItems = d.meals.flatMap((m: any) => (m.items || []).map((it: any) => ({...it, food: findFoodById(it.id)})));
-            const calcMicro = (field: string, factor: number) => Math.round(allItems.reduce((s: number, it: any) => s + ((it.food?.micros?.[field] || it.food?.['trace_elements_100g']?.[field] || it.food?.electrolytes_100g?.[field] || 0) * (it.amount||100) / 100), 0));
-            const micros = [ {label:'Ca',val:calcMicro('Ca',1),rda:1000,unit:'мг'}, {label:'Fe',val:calcMicro('Fe',1),rda:18,unit:'мг'}, {label:'Mg',val:calcMicro('Mg',1),rda:400,unit:'мг'}, {label:'Zn',val:calcMicro('Zn',1),rda:15,unit:'мг'}, {label:'K',val:calcMicro('K',1),rda:3500,unit:'мг'}, {label:'Omega3',val:Math.round(allItems.reduce((s:number,it:any)=>s+((it.food?.macro_100g?.omega_3_mg||it.food?.micros?.Omega3||0)*(it.amount||100)/100),0)),rda:1600,unit:'мг'} ];
-            const visibleMicros = micros.filter(m => m.val > 0).slice(0, 5);
-            _mc = visibleMicros.length > 0 ? { visibleMicros } : null;
-            _dayMicrosCache.set(d, _mc);
-          }
-          const visibleMicros = _mc ? _mc.visibleMicros : [];
-          return visibleMicros.length > 0 ? (<details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(34,197,94,0.15)'}}><summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#22c55e',listStyle:'none'}}>🧪 Микронутриенты ({visibleMicros.length}) · раскрыть</summary><div style={{padding:'0 10px 10px',background:'rgba(34,197,94,0.03)'}}><div style={{display:'flex',flexWrap:'wrap',gap:4}}>{visibleMicros.map((m,i)=>{const pct=Math.min(100,Math.round(m.val/Math.max(1,m.rda)*100));return(<div key={i} style={{display:'flex',alignItems:'center',gap:3,fontSize:9,padding:'3px 7px',borderRadius:6,background:'rgba(34,197,94,0.06)',border:'1px solid rgba(34,197,94,0.1)',overflowWrap:'break-word',minWidth:0}}><span style={{fontWeight:700,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444'}}>{m.label}</span><span style={{color:'#fff'}}>{m.val}{m.unit}</span><span style={{fontSize:10,color:pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444',fontWeight:600}}>{pct}%</span></div>)})}</div></div></details>) : null; })()}
+        {d.meals &&
+          (() => {
+            // FIX week-perf: микро-сводка дня кэшируется по объекту дня (WeakMap)
+            let _mc = _dayMicrosCache.get(d);
+            if (_mc === undefined) {
+              const allItems = d.meals.flatMap((m: any) =>
+                (m.items || []).map((it: any) => ({ ...it, food: findFoodById(it.id) })),
+              );
+              const calcMicro = (field: string, factor: number) =>
+                Math.round(
+                  allItems.reduce(
+                    (s: number, it: any) =>
+                      s +
+                      ((it.food?.micros?.[field] ||
+                        it.food?.['trace_elements_100g']?.[field] ||
+                        it.food?.electrolytes_100g?.[field] ||
+                        0) *
+                        (it.amount || 100)) /
+                        100,
+                    0,
+                  ),
+                );
+              const micros = [
+                { label: 'Ca', val: calcMicro('Ca', 1), rda: 1000, unit: 'мг' },
+                { label: 'Fe', val: calcMicro('Fe', 1), rda: 18, unit: 'мг' },
+                { label: 'Mg', val: calcMicro('Mg', 1), rda: 400, unit: 'мг' },
+                { label: 'Zn', val: calcMicro('Zn', 1), rda: 15, unit: 'мг' },
+                { label: 'K', val: calcMicro('K', 1), rda: 3500, unit: 'мг' },
+                {
+                  label: 'Omega3',
+                  val: Math.round(
+                    allItems.reduce(
+                      (s: number, it: any) =>
+                        s +
+                        ((it.food?.macro_100g?.omega_3_mg || it.food?.micros?.Omega3 || 0) * (it.amount || 100)) / 100,
+                      0,
+                    ),
+                  ),
+                  rda: 1600,
+                  unit: 'мг',
+                },
+              ];
+              const visibleMicros = micros.filter((m) => m.val > 0).slice(0, 5);
+              _mc = visibleMicros.length > 0 ? { visibleMicros } : null;
+              _dayMicrosCache.set(d, _mc);
+            }
+            const visibleMicros = _mc ? _mc.visibleMicros : [];
+            return visibleMicros.length > 0 ? (
+              <details
+                style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(34,197,94,0.15)' }}
+              >
+                <summary
+                  style={{
+                    cursor: 'pointer',
+                    padding: '8px 10px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: '#22c55e',
+                    listStyle: 'none',
+                  }}
+                >
+                  🧪 Микронутриенты ({visibleMicros.length}) · раскрыть
+                </summary>
+                <div style={{ padding: '0 10px 10px', background: 'rgba(34,197,94,0.03)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {visibleMicros.map((m, i) => {
+                      const pct = Math.min(100, Math.round((m.val / Math.max(1, m.rda)) * 100));
+                      return (
+                        <div
+                          key={i}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            fontSize: 9,
+                            padding: '3px 7px',
+                            borderRadius: 6,
+                            background: 'rgba(34,197,94,0.06)',
+                            border: '1px solid rgba(34,197,94,0.1)',
+                            overflowWrap: 'break-word',
+                            minWidth: 0,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                            }}
+                          >
+                            {m.label}
+                          </span>
+                          <span style={{ color: '#fff' }}>
+                            {m.val}
+                            {m.unit}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {pct}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </details>
+            ) : null;
+          })()}
         {d.supplementTimeline && d.supplementTimeline.length > 0 && (
-          <details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(139,92,246,0.2)'}}>
-            <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#a78bfa',listStyle:'none',background:'rgba(139,92,246,0.04)'}}>💊 Добавки по времени ({d.supplementTimeline.length}) · раскрыть</summary>
-            <div style={{padding:'0 10px 10px',background:'rgba(139,92,246,0.04)'}}>
+          <details
+            style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.2)' }}
+          >
+            <summary
+              style={{
+                cursor: 'pointer',
+                padding: '8px 10px',
+                fontSize: 11,
+                fontWeight: 800,
+                color: '#a78bfa',
+                listStyle: 'none',
+                background: 'rgba(139,92,246,0.04)',
+              }}
+            >
+              💊 Добавки по времени ({d.supplementTimeline.length}) · раскрыть
+            </summary>
+            <div style={{ padding: '0 10px 10px', background: 'rgba(139,92,246,0.04)' }}>
               {d.supplementTimeline.map((st: any, si: number) => (
-                <div key={si} style={{display:'flex',alignItems:'flex-start',gap:6,marginBottom:4,padding:'4px 6px',borderRadius:6,background:'rgba(139,92,246,0.04)'}}>
-                  <span style={{fontSize:10,color:'#a78bfa',fontWeight:600,minWidth:32}}>{st.time}</span>
-                  <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+                <div
+                  key={si}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 6,
+                    marginBottom: 4,
+                    padding: '4px 6px',
+                    borderRadius: 6,
+                    background: 'rgba(139,92,246,0.04)',
+                  }}
+                >
+                  <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600, minWidth: 32 }}>{st.time}</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                     {st.items.map((s: any, ii: number) => (
-                      <span key={ii} style={{fontSize:11,padding:'5px 8px',minHeight:40,minWidth:40,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0,borderRadius:4,background:'rgba(139,92,246,0.1)',border:'1px solid rgba(139,92,246,0.15)',color:'#c4b5fd',fontWeight:600}} title={s.note}>{s.name} {s.dose}</span>
+                      <span
+                        key={ii}
+                        style={{
+                          fontSize: 11,
+                          padding: '5px 8px',
+                          minHeight: 40,
+                          minWidth: 40,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          borderRadius: 4,
+                          background: 'rgba(139,92,246,0.1)',
+                          border: '1px solid rgba(139,92,246,0.15)',
+                          color: '#c4b5fd',
+                          fontWeight: 600,
+                        }}
+                        title={s.note}
+                      >
+                        {s.name} {s.dose}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -645,89 +3117,313 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           </details>
         )}
         {d.waterTimeline && d.waterTimeline.length > 0 && (
-          <details style={{marginTop:6,borderRadius:10,overflow:'hidden',border:'1px solid rgba(59,130,246,0.2)'}}>
-            <summary style={{cursor:'pointer',padding:'8px 10px',fontSize:11,fontWeight:800,color:'#60a5fa',listStyle:'none',background:'rgba(59,130,246,0.04)'}}>💧 Гидратация (~{d.waterTimeline.reduce((s:number,w:any)=>s+w.ml,0)} мл/день) · раскрыть</summary>
-            <div style={{padding:'0 10px 10px',background:'rgba(59,130,246,0.04)'}}>
-              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+          <details
+            style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(59,130,246,0.2)' }}
+          >
+            <summary
+              style={{
+                cursor: 'pointer',
+                padding: '8px 10px',
+                fontSize: 11,
+                fontWeight: 800,
+                color: '#60a5fa',
+                listStyle: 'none',
+                background: 'rgba(59,130,246,0.04)',
+              }}
+            >
+              💧 Гидратация (~{d.waterTimeline.reduce((s: number, w: any) => s + w.ml, 0)} мл/день) · раскрыть
+            </summary>
+            <div style={{ padding: '0 10px 10px', background: 'rgba(59,130,246,0.04)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {d.waterTimeline.map((w: any, wi: number) => (
-                  <span key={wi} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.12)',color:'#93c5fd',fontWeight:600}} title={w.note}>{w.time} — {w.ml}мл</span>
+                  <span
+                    key={wi}
+                    style={{
+                      fontSize: 10,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: 'rgba(59,130,246,0.08)',
+                      border: '1px solid rgba(59,130,246,0.12)',
+                      color: '#93c5fd',
+                      fontWeight: 600,
+                    }}
+                    title={w.note}
+                  >
+                    {w.time} — {w.ml}мл
+                  </span>
                 ))}
               </div>
               {waterCalc?.electrolytes && (
-                <div style={{marginTop:6,padding:'5px 8px',borderRadius:6,background:'rgba(59,130,246,0.06)',fontSize:10}}>
-                  <span style={{color:'#93c5fd',fontWeight:600}}>⚡ Na {waterCalc.electrolytes.sodiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'#fff'}}>|</span>
-                  <span style={{color:'#f59e0b',fontWeight:600}}>K {waterCalc.electrolytes.potassiumMg}мг</span>
-                  <span style={{margin:'0 6px',color:'#fff'}}>|</span>
-                  <span style={{color:'#a78bfa',fontWeight:600}}>Mg {waterCalc.electrolytes.magnesiumMg}мг</span>
-                  <div style={{color:'#fff',marginTop:2,overflowWrap:'break-word'}}>{waterCalc.electrolytes.note}</div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '5px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(59,130,246,0.06)',
+                    fontSize: 10,
+                  }}
+                >
+                  <span style={{ color: '#93c5fd', fontWeight: 600 }}>⚡ Na {waterCalc.electrolytes.sodiumMg}мг</span>
+                  <span style={{ margin: '0 6px', color: '#fff' }}>|</span>
+                  <span style={{ color: '#f59e0b', fontWeight: 600 }}>K {waterCalc.electrolytes.potassiumMg}мг</span>
+                  <span style={{ margin: '0 6px', color: '#fff' }}>|</span>
+                  <span style={{ color: '#a78bfa', fontWeight: 600 }}>Mg {waterCalc.electrolytes.magnesiumMg}мг</span>
+                  <div style={{ color: '#fff', marginTop: 2, overflowWrap: 'break-word' }}>
+                    {waterCalc.electrolytes.note}
+                  </div>
                 </div>
               )}
             </div>
           </details>
         )}
-        {d.meals && d.meals.length > 0 && (() => {
-          const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-          const mealMins = d.meals.map((m: any) => toMin(m.time));
-          const startMin = Math.min(...mealMins, 360);
-          const lastMeal = Math.max(...mealMins);
-          const endMin = Math.max(lastMeal + 90, 1380);
-          const span = Math.max(60, endMin - startMin);
-          const pos = (min: number) => Math.max(0, Math.min(100, ((min - startMin) / span) * 100));
-          const mealPts = d.meals.map((m: any) => ({ ...m, min: toMin(m.time) })).sort((a: any, b: any) => a.min - b.min);
-          const trainMin = (linkToTraining && d.isTrainingDay && trainStart && trainStart.includes(':')) ? toMin(trainStart) : null;
-          const trainEndMin = (trainMin != null && trainEnd && trainEnd.includes(':')) ? toMin(trainEnd) : (trainMin != null ? trainMin + 90 : null);
-          const hourTicks: number[] = []; for (let t = Math.floor(startMin / 60) * 60; t <= endMin; t += 60) hourTicks.push(t);
-          return (
-            <details style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}>
-              <summary style={{cursor:'pointer', padding: '8px 10px', fontSize: 11, fontWeight: 800, color: '#00e68a', listStyle:'none', background: 'rgba(0,230,138,0.04)'}}>🕒 Таймлайн дня · раскрыть</summary>
-              <div style={{ padding: '0 10px 10px', background: 'rgba(0,230,138,0.04)' }}>
-                {/* Горизонтальная шкала — скролл если много приёмов, перенос на след строку через flex-wrap */}
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6, padding:'8px 6px', background:'#202023', borderRadius:6, border:'1px solid rgba(255,255,255,0.06)' }}>
-                  {mealPts.map((m: any, i: number) => {
-                    const isW = m.label && (m.label.toLowerCase().includes('предтрен') || m.label.toLowerCase().includes('пост') || m.label.toLowerCase().includes('intra'));
-                    const col = isW ? '#8b5cf6' : '#00e68a';
-                    const bg = isW ? 'rgba(139,92,246,0.12)' : 'rgba(0,230,138,0.10)';
-                    return (
-                      <div key={i} style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 8px', borderRadius:8, background:bg, border:`1px solid ${col}30`, minWidth:110, flex:'1 0 120px' }} title={m.time + ' — ' + m.label + ' · ' + Math.round(m.totals?.kcal || 0) + ' ккал'}>
-                        <span style={{fontSize:10, fontWeight:800, color:col}}>{m.time}</span>
-                        <span style={{width:6,height:6,borderRadius:'50%', background:col, flexShrink:0}}/>
-                        <span style={{fontSize:8, fontWeight:700, color:'#fff', whiteSpace:'normal', overflowWrap:'anywhere', lineHeight:1.2}}>{m.label}</span>
-                        <span style={{marginLeft:'auto', fontSize:7, color:'rgba(255,255,255,0.6)'}}>{Math.round(m.totals?.kcal||0)}ккал</span>
-                      </div>
-                    );
-                  })}
-                  {(injections || []).filter((i:any)=>i.time&&i.time.includes(':')).map((inj:any,idx:number)=>{
-                    const iGlyph = (inj.type||'').includes('инсулин')?'💉':(inj.type||'')==='ГР'?'🌙':'⚡';
-                    return <div key={'inj'+idx} style={{display:'flex', alignItems:'center', gap:4, padding:'4px 8px', borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', fontSize:8}} title={(inj.time||'')+' — укол '+(inj.name||inj.type)}><span>{iGlyph}</span><span style={{fontWeight:700}}>{inj.time}</span><span style={{color:'rgba(255,255,255,0.7)'}}>{inj.name||inj.type}</span></div>;
-                  })}
+        {d.meals &&
+          d.meals.length > 0 &&
+          (() => {
+            const toMin = (t: string) => {
+              const [h, m] = (t || '00:00').split(':').map(Number);
+              return (h || 0) * 60 + (m || 0);
+            };
+            const mealMins = d.meals.map((m: any) => toMin(m.time));
+            const startMin = Math.min(...mealMins, 360);
+            const lastMeal = Math.max(...mealMins);
+            const endMin = Math.max(lastMeal + 90, 1380);
+            const span = Math.max(60, endMin - startMin);
+            const pos = (min: number) => Math.max(0, Math.min(100, ((min - startMin) / span) * 100));
+            const mealPts = d.meals
+              .map((m: any) => ({ ...m, min: toMin(m.time) }))
+              .sort((a: any, b: any) => a.min - b.min);
+            const trainMin =
+              linkToTraining && d.isTrainingDay && trainStart && trainStart.includes(':') ? toMin(trainStart) : null;
+            const trainEndMin =
+              trainMin != null && trainEnd && trainEnd.includes(':')
+                ? toMin(trainEnd)
+                : trainMin != null
+                  ? trainMin + 90
+                  : null;
+            const hourTicks: number[] = [];
+            for (let t = Math.floor(startMin / 60) * 60; t <= endMin; t += 60) hourTicks.push(t);
+            return (
+              <details
+                style={{ marginTop: 6, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(0,230,138,0.18)' }}
+              >
+                <summary
+                  style={{
+                    cursor: 'pointer',
+                    padding: '8px 10px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: '#00e68a',
+                    listStyle: 'none',
+                    background: 'rgba(0,230,138,0.04)',
+                  }}
+                >
+                  🕒 Таймлайн дня · раскрыть
+                </summary>
+                <div style={{ padding: '0 10px 10px', background: 'rgba(0,230,138,0.04)' }}>
+                  {/* Горизонтальная шкала — скролл если много приёмов, перенос на след строку через flex-wrap */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      padding: '8px 6px',
+                      background: '#202023',
+                      borderRadius: 6,
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    {mealPts.map((m: any, i: number) => {
+                      const isW =
+                        m.label &&
+                        (m.label.toLowerCase().includes('предтрен') ||
+                          m.label.toLowerCase().includes('пост') ||
+                          m.label.toLowerCase().includes('intra'));
+                      const col = isW ? '#8b5cf6' : '#00e68a';
+                      const bg = isW ? 'rgba(139,92,246,0.12)' : 'rgba(0,230,138,0.10)';
+                      return (
+                        <div
+                          key={i}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '5px 8px',
+                            borderRadius: 8,
+                            background: bg,
+                            border: `1px solid ${col}30`,
+                            minWidth: 110,
+                            flex: '1 0 120px',
+                          }}
+                          title={m.time + ' — ' + m.label + ' · ' + Math.round(m.totals?.kcal || 0) + ' ккал'}
+                        >
+                          <span style={{ fontSize: 10, fontWeight: 800, color: col }}>{m.time}</span>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                          <span
+                            style={{
+                              fontSize: 8,
+                              fontWeight: 700,
+                              color: '#fff',
+                              whiteSpace: 'normal',
+                              overflowWrap: 'anywhere',
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {m.label}
+                          </span>
+                          <span style={{ marginLeft: 'auto', fontSize: 7, color: 'rgba(255,255,255,0.6)' }}>
+                            {Math.round(m.totals?.kcal || 0)}ккал
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {(injections || [])
+                      .filter((i: any) => i.time && i.time.includes(':'))
+                      .map((inj: any, idx: number) => {
+                        const iGlyph = (inj.type || '').includes('инсулин')
+                          ? '💉'
+                          : (inj.type || '') === 'ГР'
+                            ? '🌙'
+                            : '⚡';
+                        return (
+                          <div
+                            key={'inj' + idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '4px 8px',
+                              borderRadius: 8,
+                              background: 'rgba(245,158,11,0.08)',
+                              border: '1px solid rgba(245,158,11,0.18)',
+                              fontSize: 8,
+                            }}
+                            title={(inj.time || '') + ' — укол ' + (inj.name || inj.type)}
+                          >
+                            <span>{iGlyph}</span>
+                            <span style={{ fontWeight: 700 }}>{inj.time}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.7)' }}>{inj.name || inj.type}</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 9, color: '#fff', flexWrap: 'wrap' }}>
+                    <span>
+                      <span style={{ color: '#00e68a' }}>●</span> Приёмы
+                    </span>
+                    <span>
+                      <span style={{ color: '#8b5cf6' }}>●</span> Peri-workout
+                    </span>
+                    {trainMin != null && (
+                      <span>
+                        <span style={{ color: '#ef4444' }}>●</span> Тренировка
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 9, color: '#fff', flexWrap:'wrap' }}>
-                  <span><span style={{ color: '#00e68a' }}>●</span> Приёмы</span>
-                  <span><span style={{ color: '#8b5cf6' }}>●</span> Peri-workout</span>
-                  {trainMin != null && <span><span style={{ color: '#ef4444' }}>●</span> Тренировка</span>}
-                </div>
-              </div>
-            </details>
-          );
-        })()}
+              </details>
+            );
+          })()}
         {timeEdit.modal}
         {mealTargetEditor && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }} onClick={() => setMealTargetEditor(null)}>
-            <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 340, padding: 16, borderRadius: 16, background: '#18181b', border: '1px solid rgba(249,115,22,0.2)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#fb923c', marginBottom: 8, textAlign: 'center' }}>🎯 Цель приёма «{mealTargetEditor.label}»</div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginBottom: 8, textAlign: 'center', lineHeight: 1.5 }}>Граммы Б/Ж/У слота (0 = не менять). Применяется СРАЗУ к текущему дню (рескейл приёма 0.7–1.4×, день держится в ±5%) и при следующих генерациях.</div>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 210,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.7)',
+            }}
+            onClick={() => setMealTargetEditor(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '90%',
+                maxWidth: 340,
+                padding: 16,
+                borderRadius: 16,
+                background: '#18181b',
+                border: '1px solid rgba(249,115,22,0.2)',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fb923c', marginBottom: 8, textAlign: 'center' }}>
+                🎯 Цель приёма «{mealTargetEditor.label}»
+              </div>
+              <div
+                style={{
+                  fontSize: 8,
+                  color: 'rgba(255,255,255,0.65)',
+                  marginBottom: 8,
+                  textAlign: 'center',
+                  lineHeight: 1.5,
+                }}
+              >
+                Граммы Б/Ж/У слота (0 = не менять). Применяется СРАЗУ к текущему дню (рескейл приёма 0.7–1.4×, день
+                держится в ±5%) и при следующих генерациях.
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
-                {(['p', 'f', 'c'] as const).map(k => (
+                {(['p', 'f', 'c'] as const).map((k) => (
                   <div key={k}>
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', marginBottom: 3, textAlign: 'center' }}>{k === 'p' ? '🥩 Белок' : k === 'f' ? '🧈 Жиры' : '🍚 Углеводы'} (г)</div>
-                    <input type="number" min={0} value={mealTargetEditor[k]} onChange={e => setMealTargetEditor({ ...mealTargetEditor, [k]: e.target.value })} placeholder="0" style={{ width: '100%', padding: '7px 4px', borderRadius: 8, textAlign: 'center', background: '#202023', border: '1px solid rgba(249,115,22,0.25)', color: '#fb923c', fontSize: 13, fontWeight: 700, outline: 'none', boxSizing: 'border-box' }} />
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', marginBottom: 3, textAlign: 'center' }}>
+                      {k === 'p' ? '🥩 Белок' : k === 'f' ? '🧈 Жиры' : '🍚 Углеводы'} (г)
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      value={mealTargetEditor[k]}
+                      onChange={(e) => setMealTargetEditor({ ...mealTargetEditor, [k]: e.target.value })}
+                      placeholder="0"
+                      style={{
+                        width: '100%',
+                        padding: '7px 4px',
+                        borderRadius: 8,
+                        textAlign: 'center',
+                        background: '#202023',
+                        border: '1px solid rgba(249,115,22,0.25)',
+                        color: '#fb923c',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
                   </div>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setMealTargetEditor(null)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: '#202023', color: 'rgba(255,255,255,0.85)', fontSize: 10 }}>Отмена</button>
-                <button onClick={() => saveMealTarget(mealTargetEditor.label, dayIdx)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontSize: 10, fontWeight: 700 }}>✓ Сохранить</button>
+                <button
+                  onClick={() => setMealTargetEditor(null)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: '#202023',
+                    color: 'rgba(255,255,255,0.85)',
+                    fontSize: 10,
+                  }}
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => saveMealTarget(mealTargetEditor.label, dayIdx)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: 'linear-gradient(135deg,#f97316,#fb923c)',
+                    color: '#fff',
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  ✓ Сохранить
+                </button>
               </div>
             </div>
           </div>

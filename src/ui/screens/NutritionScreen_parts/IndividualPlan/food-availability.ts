@@ -22,65 +22,177 @@ export { isCannedFoodId, isSauceCondimentFood, CANNED_SUBSTITUTE };
 // ─── 1. Экзотика: из генерации полностью ──────────────────────────────
 export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   // моллюски/деликатесы, которых нет в рознице
-  'seafood_geoduck', 'seafood_conch', 'whelk', 'protein_whelk', 'seafood_abalone',
-  'seafood_sea_urchin', 'seafood_lobster', 'seafood_oysters',
+  'seafood_geoduck',
+  'seafood_conch',
+  'whelk',
+  'protein_whelk',
+  'seafood_abalone',
+  'seafood_sea_urchin',
+  'seafood_lobster',
+  'seafood_oysters',
   // P1a: улитки-эскарго — деликатес, не тарелка автоплана (лезли в предтрен).
-  'escargot', 'exotic_escargots', 'snails', 'seafood_snails',
+  'escargot',
+  'exotic_escargots',
+  'snails',
+  'seafood_snails',
   // фрукты
-  'fruit_cherimoya', 'fruit_jackfruit', 'fruit_jackfruit_fresh', 'fruit_durian_fresh',
-  'fruit_lychee', 'fruit_lychee_fresh', 'fruit_rambutan', 'fruit_rambutan_fresh',
-  'fruit_mangosteen_fresh', 'fruit_starfruit', 'fruit_soursop', 'fruit_ugli_fruit',
-  'fruit_passion_fruit', 'fruit_dragonfruit', 'fruit_medlar', 'fruit_acai',
-  'fruit_goji_berries', 'fruit_goji_dried', 'fruit_pawpaw', 'fruit_sapodilla',
-  'fruit_boysenberry', 'fruit_cloudberry', 'fruit_loganberry', 'fruit_elderberry',
-  'berry_boysenberry', 'berry_cloudberry', 'berry_loganberry', 'berry_elderberry', 'berry_acerola',
-  'berry_golden_berry', 'fruit_cactus_pear', 'fruit_cornelian_cherry_dogwood', 'fruit_mulberry',
-  'root_scorzonera', 'root_lotus_root', 'dried_papaya',
+  'fruit_cherimoya',
+  'fruit_jackfruit',
+  'fruit_jackfruit_fresh',
+  'fruit_durian_fresh',
+  'fruit_lychee',
+  'fruit_lychee_fresh',
+  'fruit_rambutan',
+  'fruit_rambutan_fresh',
+  'fruit_mangosteen_fresh',
+  'fruit_starfruit',
+  'fruit_soursop',
+  'fruit_ugli_fruit',
+  'fruit_passion_fruit',
+  'fruit_dragonfruit',
+  'fruit_medlar',
+  'fruit_acai',
+  'fruit_goji_berries',
+  'fruit_goji_dried',
+  'fruit_pawpaw',
+  'fruit_sapodilla',
+  'fruit_boysenberry',
+  'fruit_cloudberry',
+  'fruit_loganberry',
+  'fruit_elderberry',
+  'berry_boysenberry',
+  'berry_cloudberry',
+  'berry_loganberry',
+  'berry_elderberry',
+  'berry_acerola',
+  'berry_golden_berry',
+  'fruit_cactus_pear',
+  'fruit_cornelian_cherry_dogwood',
+  'fruit_mulberry',
+  'root_scorzonera',
+  'root_lotus_root',
+  'dried_papaya',
   // овощи
-  'veg_jicama', 'veg_jicama_mexican', 'veg_purslane', 'veg_bamboo_shoots_canned',
-  'veg_collard_greens', 'veg_okra', 'veg_samphire',
+  'veg_jicama',
+  'veg_jicama_mexican',
+  'veg_purslane',
+  'veg_bamboo_shoots_canned',
+  'veg_collard_greens',
+  'veg_okra',
+  'veg_samphire',
   // орехи/семена
-  'nut_kukui', 'nut_pili', 'nut_hickory', 'nut_brazil', 'seed_coriander', 'seed_fennel', 'fennel_seeds',
-  'tiger_nuts', 'mustard_seeds',
+  'nut_kukui',
+  'nut_pili',
+  'nut_hickory',
+  'nut_brazil',
+  'seed_coriander',
+  'seed_fennel',
+  'fennel_seeds',
+  'tiger_nuts',
+  'mustard_seeds',
   // субпродукты-диковины (печень оставляем — классика ББ)
-  'lamb_kidney', 'lamb_kidney_organ', 'beef_kidney', 'beef_kidney_cooked', 'pork_kidney',
-  'meat_heart_tripe', 'meat_brain', 'meat_sweetbread', 'meat_tongue',
+  'lamb_kidney',
+  'lamb_kidney_organ',
+  'beef_kidney',
+  'beef_kidney_cooked',
+  'pork_kidney',
+  'meat_heart_tripe',
+  'meat_brain',
+  'meat_sweetbread',
+  'meat_tongue',
   // крупы-диковины и джанк-лапша
-  'grain_freekeh', 'grain_kamut', 'grain_einkorn', 'grain_teff', 'grain_sorghum', 'cereal_sorghum',
-  'grain_glutinous_rice', 'pasta_ramen', 'legume_pigeon_pea',
+  'grain_freekeh',
+  'grain_kamut',
+  'grain_einkorn',
+  'grain_teff',
+  'grain_sorghum',
+  'cereal_sorghum',
+  'grain_glutinous_rice',
+  'pasta_ramen',
+  'legume_pigeon_pea',
   // масла-джанк (не для тарелки автогенерации)
-  'oil_palm', 'oil_cocoa', 'butter_cocoa', 'sauce_cheese', 'cheese_sauce', 'sauce_cheddar',
-  'duck_fat', 'oil_chili', 'flaxseed_oil', 'avocado_oil',
+  'oil_palm',
+  'oil_cocoa',
+  'butter_cocoa',
+  'sauce_cheese',
+  'cheese_sauce',
+  'sauce_cheddar',
+  'duck_fat',
+  'oil_chili',
+  'flaxseed_oil',
+  'avocado_oil',
   // рыба-диковина
   'crucian',
   // прочее
-  'meat_ostrich', 'meat_kangaroo', 'meat_alligator', 'meat_bison_ribeye',
+  'meat_ostrich',
+  'meat_kangaroo',
+  'meat_alligator',
+  'meat_bison_ribeye',
   // FIX base-2026-09: реальные id экзотики из FOOD_DB (иначе «кенгуру в предтрен»).
-  'exotic_kangaroo_loin', 'exotic_crocodile', 'exotic_ostrich',
+  'exotic_kangaroo_loin',
+  'exotic_crocodile',
+  'exotic_ostrich',
   // CENSUS-2026-09 (волна-3): закрыты 5 дрейф-двойников, найденных цензом
   // (изначальный эксперимент: `sea_urchin`, `abalone`, `ostrich_egg`, `berry_acai`,
   // `fruit_durian` — канонические двойники были гейчены, эти id генерация видела 'core').
   // Позиционная замена в пулах — SPECIALTY_POSITION_SUBSTITUTE (длина/индексы seeded-пулов целы).
-  'sea_urchin', 'abalone', 'ostrich_egg', 'berry_acai', 'fruit_durian',
+  'sea_urchin',
+  'abalone',
+  'ostrich_egg',
+  'berry_acai',
+  'fruit_durian',
 ]);
 
 // ─── 2. Specialty: только по явному предпочтению пользователя ─────────
 export const SPECIALTY_FOOD_IDS: ReadonlySet<string> = new Set([
-  'wakame', 'seaweed_nori', 'spirulina', 'chlorella', 'moringa',
-  'fruit_papaya', 'fruit_feijoa', 'fruit_pomelo', 'fruit_kumquat',
-  'veg_chard', 'veg_radicchio', 'veg_watercress', 'veg_artichoke_globe',
+  'wakame',
+  'seaweed_nori',
+  'spirulina',
+  'chlorella',
+  'moringa',
+  'fruit_papaya',
+  'fruit_feijoa',
+  'fruit_pomelo',
+  'fruit_kumquat',
+  'veg_chard',
+  'veg_radicchio',
+  'veg_watercress',
+  'veg_artichoke_globe',
   // P1-realism (проба 16 дней): реальные id шардов, мимо которых дрейфовал гейт
   // (канонические двойники уже заблокированы, но генерация видела эти id как 'core'):
   // тамаринд 3×, локва 2×, жеруха 2×, салак/папайя/маракуйя/драгонфрут ежедневно.
-  'fruit_salak', 'fruit_passion', 'passion_fruit', 'fruit_dragon_fruit',
-  'fruit_papaya_fresh', 'papaya', 'fruit_tamarind', 'fruit_loquat', 'greens_watercress',
+  'fruit_salak',
+  'fruit_passion',
+  'passion_fruit',
+  'fruit_dragon_fruit',
+  'fruit_papaya_fresh',
+  'papaya',
+  'fruit_tamarind',
+  'fruit_loquat',
+  'greens_watercress',
   // Фенхель (проба: 4×/16 дней): нишевый овощ (Азбука/ВкусВилл), не массовая розница РФ.
-  'veg_fennel', 'veg_fennel_bulb',
-  'grain_quinoa_puffed', 'quinoa_flakes', 'amaranth_grain', 'teff_grain',
-  'spelt_bread', 'khorasan_pasta', 'lentil_pasta', 'chickpea_pasta',
-  'bison_ground', 'venison_steak', 'boar_meat',
-  'fruit_mangosteen', 'fruit_pitaya', 'fruit_longan',
-  'oil_mct', 'supp_mct_powder', 'fat_goose', 'goose_fat', 'oil_ghee', 'butter_ghee',
+  'veg_fennel',
+  'veg_fennel_bulb',
+  'grain_quinoa_puffed',
+  'quinoa_flakes',
+  'amaranth_grain',
+  'teff_grain',
+  'spelt_bread',
+  'khorasan_pasta',
+  'lentil_pasta',
+  'chickpea_pasta',
+  'bison_ground',
+  'venison_steak',
+  'boar_meat',
+  'fruit_mangosteen',
+  'fruit_pitaya',
+  'fruit_longan',
+  'oil_mct',
+  'supp_mct_powder',
+  'fat_goose',
+  'goose_fat',
+  'oil_ghee',
+  'butter_ghee',
 ]);
 
 // ─── 3. Травы и специи: приправы, не тарелка ──────────────────────────
@@ -89,25 +201,56 @@ export function isHerbSpiceId(id: string): boolean {
   if (id.startsWith('herb_')) return true;
   if (id.startsWith('spice_')) return true;
   if (/^(seed|seeds)_?(fennel|anise|caraway|cumin|coriander|mustard|dill|celery)$/.test(id)) return true;
-  return id === 'veg_garlic' || id === 'veg_ginger' || id === 'veg_horseradish'
-    || id === 'veg_samphire' || id === 'veg_parsley' || id === 'seed_dill' || id === 'dill_seeds';
+  return (
+    id === 'veg_garlic' ||
+    id === 'veg_ginger' ||
+    id === 'veg_horseradish' ||
+    id === 'veg_samphire' ||
+    id === 'veg_parsley' ||
+    id === 'seed_dill' ||
+    id === 'dill_seeds'
+  );
 }
 
 // ─── 4. Добавки: не еда ───────────────────────────────────────────────
 /** Спортпит, легально попадающий в приёмы (белковые порошки/углеводные окна). */
 export const MEAL_LEGAL_SUPPLEMENT_IDS: ReadonlySet<string> = new Set([
   // белковые порошки
-  'whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar',
-  'supp_hydrolyzed_whey', 'supp_goat_whey', 'supp_beef_protein', 'supp_beef_protein_iso',
-  'supp_egg_protein', 'supp_egg_white_powder', 'supp_soy_isolate', 'supp_pea_protein',
-  'supp_pea_protein_iso', 'supp_rice_protein', 'supp_hemp_protein', 'supp_pumpkin_protein',
-  'supp_collagen_peptides', 'collagen_hydrolysate', 'supp_collagen_hydro', 'supp_gelatin',
+  'whey_protein',
+  'whey_isolate',
+  'whey_concentrate',
+  'casein',
+  'casein_micellar',
+  'supp_hydrolyzed_whey',
+  'supp_goat_whey',
+  'supp_beef_protein',
+  'supp_beef_protein_iso',
+  'supp_egg_protein',
+  'supp_egg_white_powder',
+  'supp_soy_isolate',
+  'supp_pea_protein',
+  'supp_pea_protein_iso',
+  'supp_rice_protein',
+  'supp_hemp_protein',
+  'supp_pumpkin_protein',
+  'supp_collagen_peptides',
+  'collagen_hydrolysate',
+  'supp_collagen_hydro',
+  'supp_gelatin',
   'supp_bone_broth_protein',
   // углеводные окна / аминокислоты
-  'supp_eaa', 'bcaa', 'aminos_complex', 'amylopectin', 'dextrose', 'isotonic',
-  'maltodextrin', 'vitargo', 'cyclic_dextrin',
+  'supp_eaa',
+  'bcaa',
+  'aminos_complex',
+  'amylopectin',
+  'dextrose',
+  'isotonic',
+  'maltodextrin',
+  'vitargo',
+  'cyclic_dextrin',
   // батончики как перекус (кап по SUPPLEMENT_MAX_G)
-  'protein_bar', 'bar_protein',
+  'protein_bar',
+  'bar_protein',
 ]);
 
 /** Все остальные category === 'supplement' — НЕ еда (креатин/витамины/стимуляторы/…).
@@ -120,12 +263,30 @@ export function isPureSupplementId(id: string, category?: string): boolean {
 
 /** id, которые считаются «протеиновым порошком» для дневного лимита. */
 const POWDER_PROTEIN_IDS: ReadonlySet<string> = new Set([
-  'whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar',
-  'supp_hydrolyzed_whey', 'supp_goat_whey', 'supp_beef_protein', 'supp_beef_protein_iso',
-  'supp_egg_protein', 'supp_egg_white_powder', 'supp_soy_isolate', 'supp_pea_protein',
-  'supp_pea_protein_iso', 'supp_rice_protein', 'supp_hemp_protein', 'supp_pumpkin_protein',
-  'supp_mass_gainer', 'mass_gainer', 'egg_white_dried', 'egg_white_powder', 'egg_protein_dried',
-  'milk_powder_full', 'milk_powder_skim',
+  'whey_protein',
+  'whey_isolate',
+  'whey_concentrate',
+  'casein',
+  'casein_micellar',
+  'supp_hydrolyzed_whey',
+  'supp_goat_whey',
+  'supp_beef_protein',
+  'supp_beef_protein_iso',
+  'supp_egg_protein',
+  'supp_egg_white_powder',
+  'supp_soy_isolate',
+  'supp_pea_protein',
+  'supp_pea_protein_iso',
+  'supp_rice_protein',
+  'supp_hemp_protein',
+  'supp_pumpkin_protein',
+  'supp_mass_gainer',
+  'mass_gainer',
+  'egg_white_dried',
+  'egg_white_powder',
+  'egg_protein_dried',
+  'milk_powder_full',
+  'milk_powder_skim',
 ]);
 
 export function isProteinPowderId(id: string): boolean {
@@ -139,9 +300,26 @@ export function isProteinPowderId(id: string): boolean {
  * используем овощи с максимальной клетчаткой на 100 ккал.
  */
 export const LOW_KCAL_COMPACT_VEGGIES: ReadonlySet<string> = new Set([
-  'broccoli', 'cauliflower', 'spinach', 'cabbage', 'bell_pepper', 'pepper',
-  'cucumber', 'tomato', 'zucchini', 'eggplant', 'lettuce', 'salad',
-  'arugula', 'kale', 'brussels_sprouts', 'green_beans', 'green_bean', 'peas_green', 'asparagus', 'mushrooms',
+  'broccoli',
+  'cauliflower',
+  'spinach',
+  'cabbage',
+  'bell_pepper',
+  'pepper',
+  'cucumber',
+  'tomato',
+  'zucchini',
+  'eggplant',
+  'lettuce',
+  'salad',
+  'arugula',
+  'kale',
+  'brussels_sprouts',
+  'green_beans',
+  'green_bean',
+  'peas_green',
+  'asparagus',
+  'mushrooms',
 ]);
 
 /**
@@ -150,7 +328,12 @@ export const LOW_KCAL_COMPACT_VEGGIES: ReadonlySet<string> = new Set([
  * blackberries/cranberries в БД отсутствуют и матчили только в тесте.
  */
 export const LOW_KCAL_BERRIES: ReadonlySet<string> = new Set([
-  'raspberries', 'blackberries', 'strawberries', 'blueberries', 'cranberries', 'berries',
+  'raspberries',
+  'blackberries',
+  'strawberries',
+  'blueberries',
+  'cranberries',
+  'berries',
 ]);
 
 /**
@@ -174,7 +357,8 @@ export function stapleFamilyOf(id: string): string | null {
   if (/buckwheat|grechka/.test(id)) return 'buckwheat';
   if (/pasta|noodle|spaghetti|macaroni/.test(id)) return 'pasta';
   if (/potato/.test(id)) return 'potato';
-  if (/bulgur|couscous|quinoa|millet|barley|pearl|polenta|corn_grits|cereal|muesli|granola/.test(id)) return 'other_grain';
+  if (/bulgur|couscous|quinoa|millet|barley|pearl|polenta|corn_grits|cereal|muesli|granola/.test(id))
+    return 'other_grain';
   if (/bread/.test(id)) return 'bread';
   // орехи/семена
   if (/nut|almond|walnut|cashew|pistachio|hazelnut|funduk|pecan|macadamia|peanut/.test(id)) return 'nuts';
@@ -212,7 +396,8 @@ export function isCreamId(id: string): boolean {
   return /cream_of_rice|rice_cream/.test(id || '');
 }
 
-const FLESH_PROTEIN_RE = /chicken|turkey|tuna|cod|pollock|hake|beef|pork|shrimp|salmon|trout|fish|meat|duck|lamb|veal|crab|squid|octopus|seafood/i;
+const FLESH_PROTEIN_RE =
+  /chicken|turkey|tuna|cod|pollock|hake|beef|pork|shrimp|salmon|trout|mackerel|herring|sardine|halibut|fish|meat|duck|lamb|veal|crab|squid|octopus|seafood/i;
 const DAIRY_EGG_RE = /egg|milk|kefir|yogurt|yoghurt|cheese|cottage|curd|whey|casein|isolate|protein_powder|supp_egg/i;
 /** Мясо/рыба (тунец, курица...) — НЕ молочка/яйца/порошок (те с кремом дружат). */
 export function isFleshProteinId(id: string): boolean {
@@ -221,7 +406,8 @@ export function isFleshProteinId(id: string): boolean {
   return FLESH_PROTEIN_RE.test(id);
 }
 
-const SWEET_CARB_RE = /cream_of_rice|rice_cream|honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|dates|raisins|dried_/i;
+const SWEET_CARB_RE =
+  /cream_of_rice|rice_cream|honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|dates|raisins|dried_/i;
 /** Сладкий углевод (крем, мёд, джем, пряники, финики, сухофрукты). */
 export function isSweetCarbId(id: string): boolean {
   return SWEET_CARB_RE.test(id || '');
@@ -260,16 +446,20 @@ export function isFlakeId(id: string): boolean {
 
 /** В приёме есть мясной белок (не порошок/яйца/молочка)? */
 export function mealHasMeatProtein(meal: { items?: Array<{ id?: string; role?: string }> }): boolean {
-  return ((meal as any)?.items || []).some((x: any) =>
-    (x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein')
-    && isMeatProteinId(x.id));
+  return ((meal as any)?.items || []).some(
+    (x: any) =>
+      (x.role === 'protein' || x.role === 'fast_protein' || x.role === 'slow_protein') && isMeatProteinId(x.id),
+  );
 }
 
 /** Мясо/субпродукты как белковый пункт (порошок/яйца/молочка — нет). */
 export function isMeatProteinId(id: string): boolean {
   if (!id) return false;
-  if (/whey|casein|isolate|protein_powder|egg|milk|kefir|yogurt|cottage|cheese|creatine|eaa|bcaa/i.test(id)) return false;
-  return /chicken|turkey|beef|pork|duck|lamb|veal|tuna|cod|pollock|salmon|trout|shrimp|liver|heart|tongue|pate|sardine|mackerel|venison|rabbit|quail|mintai|tilapia|seafood/i.test(id);
+  if (/whey|casein|isolate|protein_powder|egg|milk|kefir|yogurt|cottage|cheese|creatine|eaa|bcaa/i.test(id))
+    return false;
+  return /chicken|turkey|beef|pork|duck|lamb|veal|tuna|cod|pollock|salmon|trout|shrimp|liver|heart|tongue|pate|sardine|mackerel|venison|rabbit|quail|mintai|tilapia|seafood/i.test(
+    id,
+  );
 }
 /** Сколько приёмов дня может нести рисовый крем (входит в кап рисового семейства).
  *  Масштаб цели: 900-1500У крем — главный сухой стейпл, 2 → 3 при цели ≥1.5. */
@@ -380,8 +570,29 @@ export const SPECIALTY_POSITION_SUBSTITUTE: Record<string, string> = {
  * (100 г изюма = 65 г сахаров одним пунктом). Единая точка для движка и корректора.
  */
 export const CONCENTRATE_FOOD_IDS: readonly string[] = [
-  'dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey', 'fruit_date_medjool', 'pryaniki', 'jam', 'zefir', 'pastila', 'sushki', 'sugar_cookies', 'marmalade', 'prunes', 'dates_dried',
-  'dried_pineapple', 'dried_mango', 'dried_cranberry', 'dried_blueberry', 'dried_kiwi', 'dried_pear', 'dried_peach', 'dried_banana_chips',
+  'dates',
+  'raisins',
+  'dried_apricots',
+  'dried_apple_rings',
+  'honey',
+  'fruit_date_medjool',
+  'pryaniki',
+  'jam',
+  'zefir',
+  'pastila',
+  'sushki',
+  'sugar_cookies',
+  'marmalade',
+  'prunes',
+  'dates_dried',
+  'dried_pineapple',
+  'dried_mango',
+  'dried_cranberry',
+  'dried_blueberry',
+  'dried_kiwi',
+  'dried_pear',
+  'dried_peach',
+  'dried_banana_chips',
 ];
 export function isConcentrateFoodId(id: string, carbs?: number, fiber?: number, category?: string): boolean {
   if (!id) return false;
@@ -393,11 +604,11 @@ export const CONCENTRATE_PORTION_CAP_G = 50;
 
 /** Дневные квоты реалистичной тарелки (эпик B). */
 export interface DailyQuotaState {
-  powderMeals: number;      // приёмы с протеиновым порошком
+  powderMeals: number; // приёмы с протеиновым порошком
   familyUses: Map<string, number>; // семейство → число приёмов
   familyGrams: Map<string, number>; // семейство → сумма граммов за день
-  fruitMeals: number;       // приёмы с фруктом
-  eggWhGrams: number;       // суммарные граммы яиц (egg_whole)
+  fruitMeals: number; // приёмы с фруктом
+  eggWhGrams: number; // суммарные граммы яиц (egg_whole)
   /** B8 (Эпик B): масштаб грамм-лимитов от веса (80 кг = 1.0, кламп 0.75–1.6).
    *  120+ кг атлет на 5000+ ккал не должен упираться в орехово-масляный потолок 80-кг атлета. */
   weightScale: number;
@@ -444,7 +655,14 @@ export function quotaMealCap(base: number, targetScale: number, max: number): nu
  */
 export type HvStyle = 'real' | 'practical' | 'mixed';
 export const HV_PRACTICAL_CARB_IDS: readonly string[] = [
-  'cream_of_rice', 'corn_flakes', 'rice_basmati', 'bread_white', 'banana', 'dates', 'raisins', 'dried_apricots',
+  'cream_of_rice',
+  'corn_flakes',
+  'rice_basmati',
+  'bread_white',
+  'banana',
+  'dates',
+  'raisins',
+  'dried_apricots',
 ];
 export function hvStyleWidensTopups(hvStyle: string | undefined): boolean {
   return hvStyle === 'practical' || hvStyle === 'mixed';
@@ -456,7 +674,11 @@ export function createDailyQuota(
   opts?: { targetKcal?: number; targetCarbsG?: number; targetProteinG?: number },
 ): DailyQuotaState {
   return {
-    powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0,
+    powderMeals: 0,
+    familyUses: new Map(),
+    familyGrams: new Map(),
+    fruitMeals: 0,
+    eggWhGrams: 0,
     weightScale: quotaWeightScale(weightKg),
     targetScale: Math.max(1, Math.min(1.6, Number(targetScale) || 1)),
     targetKcal: opts?.targetKcal,
@@ -475,9 +697,11 @@ export const QUOTA_LIMITS = {
   /** Овсяное семейство разрешено 2 приёма (завтрак + перекус) — это завтрак-стейпл. */
   maxOatsFamilyMeals: 2,
   /** Орехи/семена: максимум приёмов и граммов в день (2 приёма × ~20 г + Mg-доза pre-sleep). */
-  maxNutMeals: 2, maxNutsGramsPerDay: 60,
+  maxNutMeals: 2,
+  maxNutsGramsPerDay: 60,
   /** Масла/жирные заправки: максимум приёмов в день и суммарных граммов. */
-  maxOilMeals: 2, maxOilGramsPerDay: 25,
+  maxOilMeals: 2,
+  maxOilGramsPerDay: 25,
   /** Фрукты: максимум приёмов в день (3 + melatonin-порция pre-sleep). */
   maxFruitMeals: 4,
   /** Яйца целиком: максимум граммов в день (~4 шт). */
@@ -511,15 +735,22 @@ export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string):
     for (const id of POWDER_PROTEIN_IDS) blocked.add(id);
   }
   const _famCap = ext ? ext.family : quotaMealCap(QUOTA_LIMITS.maxFamilyMeals, ts, 5);
-  const familyMealCap = (fam: string) => (fam === 'oats' ? quotaMealCap(QUOTA_LIMITS.maxOatsFamilyMeals, ts, 3) : _famCap);
+  const familyMealCap = (fam: string) =>
+    fam === 'oats' ? quotaMealCap(QUOTA_LIMITS.maxOatsFamilyMeals, ts, 3) : _famCap;
   for (const [fam, uses] of q.familyUses) {
-    const cap = fam === 'nuts' || fam === 'seeds' ? quotaMealCap(QUOTA_LIMITS.maxNutMeals, ts, 3)
-      : fam === 'oils' ? quotaMealCap(QUOTA_LIMITS.maxOilMeals, ts, 3)
-      : familyMealCap(fam);
+    const cap =
+      fam === 'nuts' || fam === 'seeds'
+        ? quotaMealCap(QUOTA_LIMITS.maxNutMeals, ts, 3)
+        : fam === 'oils'
+          ? quotaMealCap(QUOTA_LIMITS.maxOilMeals, ts, 3)
+          : familyMealCap(fam);
     if (uses >= cap) markFamilyBlocked(blocked, fam);
   }
   const nutGrams = (q.familyGrams.get('nuts') || 0) + (q.familyGrams.get('seeds') || 0);
-  if (nutGrams >= nutCapG) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
+  if (nutGrams >= nutCapG) {
+    markFamilyBlocked(blocked, 'nuts');
+    markFamilyBlocked(blocked, 'seeds');
+  }
   if ((q.familyGrams.get('oils') || 0) >= oilCapG) markFamilyBlocked(blocked, 'oils');
   const fruitCap = ext ? ext.fruit : quotaMealCap(QUOTA_LIMITS.maxFruitMeals, ts, 5);
   if (q.fruitMeals >= fruitCap) blocked.add('__ALL_FRUIT__');
@@ -573,7 +804,8 @@ export function foodAvailableWithQuota(
   const id = f.id || '';
   if (allowIds && allowIds.has(id)) return true;
   if (blocked.has(id)) return false;
-  if (blocked.has('__ALL_FRUIT__') && f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.fiber || 0) >= 1.5) return false;
+  if (blocked.has('__ALL_FRUIT__') && f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.fiber || 0) >= 1.5)
+    return false;
   for (const b of blocked) {
     if (b.startsWith('__FAM__') && stapleFamilyOf(id) === b.slice(7)) return false;
   }
@@ -581,8 +813,12 @@ export function foodAvailableWithQuota(
 }
 
 /** Регистрация собранного приёма в дневных квотах. */
-export function registerMealInQuota(q: DailyQuotaState, items: { id?: string; amount: number; role?: string; category?: string; carbs?: number; fiber?: number }[]): { usedPowder: boolean; usedFruit: boolean } {
-  let usedPowder = false, usedFruit = false;
+export function registerMealInQuota(
+  q: DailyQuotaState,
+  items: { id?: string; amount: number; role?: string; category?: string; carbs?: number; fiber?: number }[],
+): { usedPowder: boolean; usedFruit: boolean } {
+  let usedPowder = false,
+    usedFruit = false;
   const famsTouched = new Map<string, number>();
   for (const it of items) {
     const id = it.id || '';
@@ -593,7 +829,8 @@ export function registerMealInQuota(q: DailyQuotaState, items: { id?: string; am
     }
     if (isProteinPowderId(id)) usedPowder = true;
     if (id === 'egg_whole') q.eggWhGrams += it.amount;
-    if (it.role === 'fruit' || (it.category === 'veg_fruit' && (it.carbs || 0) >= 8 && (it.fiber || 0) >= 1.5 && !fam)) usedFruit = true;
+    if (it.role === 'fruit' || (it.category === 'veg_fruit' && (it.carbs || 0) >= 8 && (it.fiber || 0) >= 1.5 && !fam))
+      usedFruit = true;
   }
   if (usedPowder) q.powderMeals += 1;
   if (usedFruit) q.fruitMeals += 1;
@@ -641,9 +878,17 @@ export function isPeriLikeMeal(m: { type?: string } | null | undefined): boolean
 // остальное (перловка/гречка/киноа/батат/крахмалы/мука) — объём/клетчатка/ЖКТ.
 /** HV-степлы вне сборки: объёмные/клетчаточные/ингредиенты (перловка/гречка/киноа/батат/крахмал/мука). */
 export const HV_STAPLE_BAN: ReadonlySet<string> = new Set([
-  'buckwheat', 'barley', 'grain_barley_pearl', 'quinoa', 'grain_quinoa_flakes',
-  'grain_oat_bran', 'grain_rice_bran', 'sweet_potato',
-  'grain_tapioca_starch', 'grain_arrowroot_starch', 'grain_coconut_flour',
+  'buckwheat',
+  'barley',
+  'grain_barley_pearl',
+  'quinoa',
+  'grain_quinoa_flakes',
+  'grain_oat_bran',
+  'grain_rice_bran',
+  'sweet_potato',
+  'grain_tapioca_starch',
+  'grain_arrowroot_starch',
+  'grain_coconut_flour',
 ]);
 /** true если гарнир запрещён в HV-сборке (объём/клетчатка/ингредиент). */
 export function isHvStapleBanned(id: string): boolean {
@@ -654,7 +899,8 @@ export function isHvStapleBanned(id: string): boolean {
  * PRO-типология (все дни, не только HV): картошка/рис-гарнир/фунчоза в завтраке — мусорная
  * корзина (кейсы MC3: potato_baked 150г в творог; P60: glass_noodles в обед + potato ведром).
  * Завтрак = овсяная семья (oats/corn_flakes/cream_of_rice/rice_cream/muesli/хлеб), не гарнир. */
-const BREAKFAST_BAN_RE = /pasta|noodle|macaroni|spaghetti|couscous|quinoa|tapioca|arrowroot|potato|glass|funchose|ramen|udon|soba|lagman/;
+const BREAKFAST_BAN_RE =
+  /pasta|noodle|macaroni|spaghetti|couscous|quinoa|tapioca|arrowroot|potato|glass|funchose|ramen|udon|soba|lagman/;
 export function isBreakfastBannedCarb(id: string): boolean {
   if (!id) return false;
   const lid = id.toLowerCase();
@@ -668,7 +914,8 @@ export function isBreakfastBannedCarb(id: string): boolean {
 }
 /** В завтраке никогда как белок: мясо/птица/рыба (курица/говядина/тунец/лосось в кашу — мусор).
  * Завтрак = яйца/творог/йогурт/сыворотка/казеин/тофу. */
-const BREAKFAST_MEAT_RE = /chicken|turkey|beef|pork|tuna|salmon|trout|mackerel|cod|hake|pollock|tilapia|minced|farsh|sausage|bacon|ham|duck|goose|lamb|veal|rabbit|sardine|herring|sprat/;
+const BREAKFAST_MEAT_RE =
+  /chicken|turkey|beef|pork|tuna|salmon|trout|mackerel|cod|hake|pollock|tilapia|minced|farsh|sausage|bacon|ham|duck|goose|lamb|veal|rabbit|sardine|herring|sprat/;
 export function isBreakfastBannedProtein(id: string): boolean {
   if (!id) return false;
   return BREAKFAST_MEAT_RE.test(id.toLowerCase());
@@ -685,11 +932,18 @@ export function isBreakfastBannedFat(id: string): boolean {
 export function isHeavyAnimalFat(id: string): boolean {
   if (!id) return false;
   const lid = id.toLowerCase();
-  return lid === 'tallow' || lid.includes('tallow') || lid.includes('lard') || lid.includes('goose_fat') || lid.includes('duck_fat');
+  return (
+    lid === 'tallow' ||
+    lid.includes('tallow') ||
+    lid.includes('lard') ||
+    lid.includes('goose_fat') ||
+    lid.includes('duck_fat')
+  );
 }
 /** Сладость как основа гарнира — никогда (печенье 40г + фунчоза 300г в обед — мусор).
  * Сладости — только топ-ап ≤30г, не второй гарнир. */
-const SWEET_BASE_RE = /honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|cookie|chocolate|candy|halva|waffle/;
+const SWEET_BASE_RE =
+  /honey|jam|marmalade|zefir|pastila|pryaniki|sushki|sugar_cookies|cookie|chocolate|candy|halva|waffle/;
 export function isSweetBaseId(id: string): boolean {
   if (!id) return false;
   return SWEET_BASE_RE.test(id.toLowerCase());
@@ -704,18 +958,69 @@ export function countCarbItems(m: { items?: Array<{ role?: string }> } | null | 
 // на работу/в дорогу БЕЗ разогрева: порошки/хлопья/мюсли/хлеб/рисовые хлебцы, фрукты/ягоды,
 // орехи/масла, молочка в упаковке (йогурт/творог/кефир), консервированная рыба, варёные яйца.
 // Супы/горячие каши/жареное/фастфуд — НЕ портативны (их исключаем при portableMode).
-const NON_PORTABLE_TOKENS = ['soup','porridge_','kfc','mcd','bk_','big_mac','royale','whopper','big_smoke','pizza','french_fries','fried','cheburek','pyanse','khachapuri','shaurma','ramen','gyros','falafel_pita','pancake','pelmeni','blini','pirozhok','borscht','hot_dog','hamburger','manti','samsa','kebab','shawarma','mayonnaise','ketchup','cream_sauce','bouillon_cube','ice_cream','marmalade','cookie','chocolate','coca_cola','soda','juice_apple','juice_orange'];
+const NON_PORTABLE_TOKENS = [
+  'soup',
+  'porridge_',
+  'kfc',
+  'mcd',
+  'bk_',
+  'big_mac',
+  'royale',
+  'whopper',
+  'big_smoke',
+  'pizza',
+  'french_fries',
+  'fried',
+  'cheburek',
+  'pyanse',
+  'khachapuri',
+  'shaurma',
+  'ramen',
+  'gyros',
+  'falafel_pita',
+  'pancake',
+  'pelmeni',
+  'blini',
+  'pirozhok',
+  'borscht',
+  'hot_dog',
+  'hamburger',
+  'manti',
+  'samsa',
+  'kebab',
+  'shawarma',
+  'mayonnaise',
+  'ketchup',
+  'cream_sauce',
+  'bouillon_cube',
+  'ice_cream',
+  'marmalade',
+  'cookie',
+  'chocolate',
+  'coca_cola',
+  'soda',
+  'juice_apple',
+  'juice_orange',
+];
 /** Портативный ли продукт для рабочего окна (единая точка — движок, корректор, ребаланс). */
 export function isPortableFood(f: { id: string; name?: string; category?: string }): boolean {
   const lid = (f.id || '').toLowerCase();
   const lname = (f.name || '').toLowerCase();
-  if (NON_PORTABLE_TOKENS.some(t => lid.includes(t) || lname.includes(t))) return false;
-  if (f.category === 'supplement') return true;        // порошки/батончики
-  if (f.category === 'veg_fruit') return true;          // фрукты/ягоды/сырые овощи
+  if (NON_PORTABLE_TOKENS.some((t) => lid.includes(t) || lname.includes(t))) return false;
+  if (f.category === 'supplement') return true; // порошки/батончики
+  if (f.category === 'veg_fruit') return true; // фрукты/ягоды/сырые овощи
   if (f.category === 'fat') {
     // Орехи/семечки — можно есть руками. Масла/пасты — нет (нужна ложка, пачкают).
-    if (lid.includes('oil') || lid.includes('butter') || lid.includes('paste') || lid.includes('mayonnaise') || lid.includes('cream_sauce') || lid.includes('spread')) return false;
-    return true;  // орехи/семечки/сухофрукты — едим руками
+    if (
+      lid.includes('oil') ||
+      lid.includes('butter') ||
+      lid.includes('paste') ||
+      lid.includes('mayonnaise') ||
+      lid.includes('cream_sauce') ||
+      lid.includes('spread')
+    )
+      return false;
+    return true; // орехи/семечки/сухофрукты — едим руками
   }
   if (f.category === 'dairy') {
     // Только питьевые молочные (молоко/кефир в бутылке) — можно пить на работе.
@@ -727,14 +1032,35 @@ export function isPortableFood(f: { id: string; name?: string; category?: string
     // «Хлопья на работе» = БЕЗ разогрева, БЕЗ запаха, БЕЗ контейнера.
     // Только протеиновый порошок (сыворотка/казеин/вега) — разводится водой в шейкере.
     // Никакого мяса, рыбы, яиц, творога — всё это требует контейнера, вилки, пахнет.
-    if (lid.includes('whey') || lid.includes('casein') || lid.includes('isolate') || lid.includes('pea_protein') || lid.includes('soy_isolate') || lid.includes('rice_protein') || lid.includes('supp_eaa') || lid.includes('bcaa') || lid.includes('collagen')) return true;
+    if (
+      lid.includes('whey') ||
+      lid.includes('casein') ||
+      lid.includes('isolate') ||
+      lid.includes('pea_protein') ||
+      lid.includes('soy_isolate') ||
+      lid.includes('rice_protein') ||
+      lid.includes('supp_eaa') ||
+      lid.includes('bcaa') ||
+      lid.includes('collagen')
+    )
+      return true;
     return false;
   }
   if (f.category === 'grain' || f.category === 'carb') {
     // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
     // buckwheat/barley (гречка/ячка — горячие) — НЕ портативны, требуют варки
     // 'bar' убран — иначе barley ложно портативен (barley contains 'bar')
-    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','flakes','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
+    return [
+      'oats',
+      'cereal',
+      'muesli',
+      'rice_cream',
+      'bread',
+      'rice_cake',
+      'crispbread',
+      'flakes',
+      'cream_of_rice',
+    ].some((k) => lid.includes(k) || lname.includes(k));
   }
   return false;
 }

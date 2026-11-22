@@ -49,10 +49,12 @@ describe('E1.7 / A15: подпись под диапазоном белка — 
     // подпись в разметке заменить своим текстом (проверено мутацией). Поэтому требуем
     // ИМЕННО узел рендера: отдельная строка, равная интерполяции.
     const lines = ui.split('\n');
-    const renderSites = lines.filter(l => l.trim() === '{PROTEIN_G_PER_KG_RANGE_NOTE}');
+    const renderSites = lines.filter((l) => l.trim() === '{PROTEIN_G_PER_KG_RANGE_NOTE}');
     expect(renderSites.length).toBeGreaterThan(0);
     // и импортируется из types (единый источник), а не скопирован текстом
-    expect(ui).toMatch(/import\s*\{[^}]*PROTEIN_G_PER_KG_RANGE_NOTE[^}]*\}\s*from\s*"\.\/types"/);
+    // Кавычки/переносы — дело форматтера (Prettier иногда ставит ' вместо "),
+    // проверяем именно импорт из единого источника types.
+    expect(ui).toMatch(/import\s*\{[^}]*PROTEIN_G_PER_KG_RANGE_NOTE[^}]*\}\s*from\s*['"]\.\/types['"]/);
   });
 
   it('регрессия: пресеты белка не вылезают за коридор', () => {
@@ -69,12 +71,11 @@ describe('E1.7 / A15: подпись под диапазоном белка — 
     // языком («цель/нужно/норма/съедай»). Комментарии и подпись-оговорка не считаются:
     // там число как раз объясняется и отводится от роли цели.
     const lines = ui.split('\n');
-    const asTarget = lines.filter(l =>
-      /30[–-]35/.test(l) && /(цель|нужно|норма|съедай|добавка)/i.test(l));
+    const asTarget = lines.filter((l) => /30[–-]35/.test(l) && /(цель|нужно|норма|съедай|добавка)/i.test(l));
     expect(asTarget).toEqual([]);
     // и подстраховка: число встречается в файле только внутри комментария-объяснения
-    const mentions = lines.filter(l => /30[–-]35/.test(l));
+    const mentions = lines.filter((l) => /30[–-]35/.test(l));
     expect(mentions.length).toBeGreaterThan(0); // оговорка не потеряна
-    expect(mentions.every(l => /Li 2026/.test(l))).toBe(true); // и она про то самое число
+    expect(mentions.every((l) => /Li 2026/.test(l))).toBe(true); // и она про то самое число
   });
 });

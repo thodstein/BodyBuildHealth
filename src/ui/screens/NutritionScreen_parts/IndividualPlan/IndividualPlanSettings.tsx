@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from "react";
-import { FOOD_DB, findFoodById } from "../../../../core/nutrition-database";
-import { PHARMA_DB } from "../../../../core/pharma-database";
-import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
+import React, { useState, useEffect } from 'react';
+import { FOOD_DB, findFoodById } from '../../../../core/nutrition-database';
+import { PHARMA_DB } from '../../../../core/pharma-database';
+import { ALL_SUBSTANCES } from '../../../../data/support-substances';
+import { SUPPORT_CATALOG_DATA } from '../../../../data/support-catalog-data';
 import {
-  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, PROTEIN_G_PER_KG_RANGE, PROTEIN_G_PER_KG_RANGE_NOTE, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
-  ALLERGEN_LIST, HEALTH_ISSUES, type PlanType,
-} from "./types";
-import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
-import { usePlanCtx } from "./IndividualPlanContext";
-import { getProfile } from "../../../../core/profile-manager";
-import { categoriesForSex } from "./planner-categories";
+  GOALS,
+  PHASES,
+  BUDGET_LEVELS,
+  PROTEIN_PRESETS,
+  PROTEIN_G_PER_KG_RANGE,
+  PROTEIN_G_PER_KG_RANGE_NOTE,
+  CARB_PERIODIZATION_OPTIONS,
+  VARIETY_LEVELS,
+  PLAN_TYPES,
+  ALLERGEN_LIST,
+  HEALTH_ISSUES,
+  type PlanType,
+  PROTEIN_SOURCE_MODES,
+  PROTEIN_ANCHOR_OPTIONS,
+} from './types';
+import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from './ui';
+import { usePlanCtx } from './IndividualPlanContext';
+import { getProfile } from '../../../../core/profile-manager';
+import { categoriesForSex } from './planner-categories';
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
 import { recommendMealCount, planMealStructure } from './planner-meal-count';
@@ -21,7 +33,7 @@ import { recommendMealCount, planMealStructure } from './planner-meal-count';
  * поэтому фильтрация по вводу — один `includes` на продукт. Семантика та же:
  * совпадение по имени ИЛИ по id.
  */
-const FOOD_SEARCH_INDEX: { food: (typeof FOOD_DB)[number]; hay: string }[] = FOOD_DB.map(f => ({
+const FOOD_SEARCH_INDEX: { food: (typeof FOOD_DB)[number]; hay: string }[] = FOOD_DB.map((f) => ({
   food: f,
   hay: `${f.name || ''}\u0000${f.id || ''}`.toLowerCase(),
 }));
@@ -45,16 +57,38 @@ function searchFoods(query: string, limit = 60) {
 function importLabsToV2(labs: any[], v2Labs: Record<string, string>): Record<string, string> {
   const newLabs: Record<string, string> = { ...v2Labs };
   const codeMap: Record<string, string> = {
-    ALT: 'alt', AST: 'ast', GGT: 'ggt', LDL: 'ldl', HDL: 'hdl',
-    TRIGLYCERIDES: 'triglycerides', CRP: 'crp', CREATININE: 'creatinine',
-    HEMOGLOBIN: 'hemoglobin', HEMATOCRIT: 'hematocrit',
-    ESTRADIOL: 'estradiol', TESTOSTERONE_TOTAL: 'testosterone',
-    TESTOSTERONE_FREE: 'testosterone_free', GLUCOSE: 'glucose',
-    TSH: 'tsh', T3: 't3', T4: 't4', PROLACTIN: 'prolactin',
-    LH: 'lh', FSH: 'fsh', BILIRUBIN_TOTAL: 'bilirubin', BILIRUBIN: 'bilirubin',
-    CHOLESTEROL: 'cholesterol', UREA: 'urea', URIC_ACID: 'uric_acid',
-    INSULIN: 'insulin', FERRITIN: 'ferritin', IRON: 'iron',
-    VITAMIN_D: 'vitamin_d', HOMOCYSTEINE: 'homocysteine', APOB: 'apob', APO_B: 'apob',
+    ALT: 'alt',
+    AST: 'ast',
+    GGT: 'ggt',
+    LDL: 'ldl',
+    HDL: 'hdl',
+    TRIGLYCERIDES: 'triglycerides',
+    CRP: 'crp',
+    CREATININE: 'creatinine',
+    HEMOGLOBIN: 'hemoglobin',
+    HEMATOCRIT: 'hematocrit',
+    ESTRADIOL: 'estradiol',
+    TESTOSTERONE_TOTAL: 'testosterone',
+    TESTOSTERONE_FREE: 'testosterone_free',
+    GLUCOSE: 'glucose',
+    TSH: 'tsh',
+    T3: 't3',
+    T4: 't4',
+    PROLACTIN: 'prolactin',
+    LH: 'lh',
+    FSH: 'fsh',
+    BILIRUBIN_TOTAL: 'bilirubin',
+    BILIRUBIN: 'bilirubin',
+    CHOLESTEROL: 'cholesterol',
+    UREA: 'urea',
+    URIC_ACID: 'uric_acid',
+    INSULIN: 'insulin',
+    FERRITIN: 'ferritin',
+    IRON: 'iron',
+    VITAMIN_D: 'vitamin_d',
+    HOMOCYSTEINE: 'homocysteine',
+    APOB: 'apob',
+    APO_B: 'apob',
   };
   (labs || []).forEach((lp: any) => {
     const field = codeMap[String(lp?.code || '').toUpperCase()];
@@ -72,14 +106,30 @@ function importLabsToV2(labs: any[], v2Labs: Record<string, string>): Record<str
  * инсулина был мёртв. Мапа метка → канонический id (фолбэк — прежний дефолт 24ч).
  */
 const INJ_LABEL_TO_PHARMA: Record<string, string> = {
-  'инсулин': 'ins_short', 'ГР': 'hgh', 'ИФР-1': 'igf1_lr3', 'MGF': 'mgf',
-  'IGF-1 DES': 'igf1_des', 'IGF-1 LR3': 'igf1_lr3', 'HCG': 'hcg',
-  'GHRP': 'ghrp6', 'CJC': 'cjc1295', 'BPC-157': 'bpc157', 'TB-500': 'tb500',
-  'меланотан': 'melanotan2', 'семаглутид': 'semaglutide', 'тирзепатид': 'tirzepatide',
-  'пептид': 'bpc157', 'ААС': 'testosterone_enanthate',
+  инсулин: 'ins_short',
+  ГР: 'hgh',
+  'ИФР-1': 'igf1_lr3',
+  MGF: 'mgf',
+  'IGF-1 DES': 'igf1_des',
+  'IGF-1 LR3': 'igf1_lr3',
+  HCG: 'hcg',
+  GHRP: 'ghrp6',
+  CJC: 'cjc1295',
+  'BPC-157': 'bpc157',
+  'TB-500': 'tb500',
+  меланотан: 'melanotan2',
+  семаглутид: 'semaglutide',
+  тирзепатид: 'tirzepatide',
+  пептид: 'bpc157',
+  ААС: 'testosterone_enanthate',
 };
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
-import { readSpecialMeals, addSpecialMeals, removeSpecialMeal, subscribeSpecialMeals } from './planner-special-meals-store';
+import {
+  readSpecialMeals,
+  addSpecialMeals,
+  removeSpecialMeal,
+  subscribeSpecialMeals,
+} from './planner-special-meals-store';
 import { PLANNER_BOUNDS, validatePlannerInputs } from './planner-input-validation';
 import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHASE_RU } from './planner-cycle-calendar';
 import { computeEnergyAvailability } from './planner-female-cycle';
@@ -87,7 +137,6 @@ import { checkTargetsConsistency, PLANNER_CONVERGENCE_PCT } from './day-target-c
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { CardioKcalNote } from './CardioKcalNote';
 import { ruAdjCount, RU_ADJ_TRAINING, RU_DAYS } from '../../../../engines/ru-plural';
-
 
 // P3.2: Collapsible section for compact settings
 // B34 (аудит 2026-10): удалён мёртвый `CollapsibleSection` и ключ `he_plan_settings_collapsed`.
@@ -101,94 +150,283 @@ export { recommendMealCount } from './planner-meal-count';
 
 export const IndividualPlanSettings: React.FC = () => {
   const {
-    weight, setWeight, height, setHeight, age, setAge, sex, setSex,
-    dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
-    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking,
-    trainType, setTrainType, trainIntensity, setTrainIntensity,
-    intraWorkoutEnabled, setIntraWorkoutEnabled,
-    householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
-    sleepHours, setSleepHours, sleepQuality, setSleepQuality,
-    stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
-    weightAdaptMode, setWeightAdaptMode,
-    expectedLossKgWeek, setExpectedLossKgWeek,
-    showWeightAdaptModal, setShowWeightAdaptModal,
-    weightLogEntries, setWeightLogEntries,
-    weightLogPeriod, setWeightLogPeriod,
-    metabolicAdaptEnabled, setMetabolicAdaptEnabled, metabolicAdaptPct, setMetabolicAdaptPct,
-    manualGPerKg, setManualGPerKg,
-    goal, setGoal, autoGoal, goalUserSet, setGoalUserSet,
-    phase, setPhase,
-    injections, setInjections,
-    injName, setInjName, injTime, setInjTime, injDose, setInjDose,
-    injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
+    weight,
+    setWeight,
+    height,
+    setHeight,
+    age,
+    setAge,
+    sex,
+    setSex,
+    dailySteps,
+    setDailySteps,
+    cookTimeMin,
+    setCookTimeMin,
+    cookingSkill,
+    setCookingSkill,
+    cookingFrequency,
+    setCookingFrequency,
+    batchCooking,
+    setBatchCooking,
+    trainType,
+    setTrainType,
+    trainIntensity,
+    setTrainIntensity,
+    intraWorkoutEnabled,
+    setIntraWorkoutEnabled,
+    householdActivity,
+    setHouseholdActivity,
+    bodyFatPct,
+    setBodyFatPct,
+    sleepHours,
+    setSleepHours,
+    sleepQuality,
+    setSleepQuality,
+    stressLevel,
+    setStressLevel,
+    cyclePhase,
+    setCyclePhase,
+    bbCategory,
+    setBBCategory,
+    bbPrepConfig,
+    applyBBPeakToPlan,
+    planTab,
+    setPlanTab,
+    lifeStage,
+    setLifeStage,
+    weightAdaptMode,
+    setWeightAdaptMode,
+    expectedLossKgWeek,
+    setExpectedLossKgWeek,
+    showWeightAdaptModal,
+    setShowWeightAdaptModal,
+    weightLogEntries,
+    setWeightLogEntries,
+    weightLogPeriod,
+    setWeightLogPeriod,
+    metabolicAdaptEnabled,
+    setMetabolicAdaptEnabled,
+    metabolicAdaptPct,
+    setMetabolicAdaptPct,
+    manualGPerKg,
+    setManualGPerKg,
+    goal,
+    setGoal,
+    autoGoal,
+    goalUserSet,
+    setGoalUserSet,
+    phase,
+    setPhase,
+    injections,
+    setInjections,
+    injName,
+    setInjName,
+    injTime,
+    setInjTime,
+    injDose,
+    setInjDose,
+    injUnit,
+    setInjUnit,
+    injType,
+    setInjType,
+    injEster,
+    setInjEster,
     injectDrugTypes,
-    calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown,
-    carbCapClipped, carbCapGPerKg, rawCarbsForCap,
-    kbjuMode, setKbjuMode, switchKbjuMode,
-    manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
-    budget, setBudget, proteinPreset, setProteinPreset,
-    diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, hvStyle, setHvStyle, carbCapOverride, setCarbCapOverride,
-    wakeTime, setWakeTime, bedTime, setBedTime,
-    lunchTime, setLunchTime, dinnerTime, setDinnerTime,
-    workFood, setWorkFood, mealsCount,
-    morningTrainLoad, setMorningTrainLoad,
-    allergens, toggleAllergen,
-    healthIssues, toggleHealthIssue,
-    eveningLowCarb, setEveningLowCarb, nightCarbs, setNightCarbs,
-    addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
-    planType, setPlanType,
-    preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
-    intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
-    customNotes, setCustomNotes,
-    carbPeriodization, setCarbPeriodization, trainingDays, setTrainingDays, DAY_LABELS,
-    heavyTrainDay, setHeavyTrainDay,
-    workScheduleEnabled, setWorkScheduleEnabled,
-    workStartTime, setWorkStartTime, workEndTime, setWorkEndTime,
-    workDays, setWorkDays, workScheduleType, setWorkScheduleType,
-    cravingMode, setCravingMode, cravingDays, setCravingDays,
-    lazyDayMode, setLazyDayMode, lazyDayDays, setLazyDayDays,
-    surplusPct, setSurplusPct,
-    specialMealMode, setSpecialMealMode,
-    specialMealGoal, setSpecialMealGoal,
-    specialMealProteinG, setSpecialMealProteinG,
-    specialMealFatG, setSpecialMealFatG,
-    specialMealCarbsG, setSpecialMealCarbsG,
-    specialMealTiming, setSpecialMealTiming,
-    specialMealReplaceMode, setSpecialMealReplaceMode,
-    specialMealReplaceTarget, setSpecialMealReplaceTarget,
-    s, courseEntries, profile,
-    showAddDrug, setShowAddDrug,
-    showDrugTypePicker, setShowDrugTypePicker,
-    takenSupplements, setTakenSupplements,
-    showSuppPicker, setShowSuppPicker, suppSearch, setSuppSearch,
-    linkToTraining, setLinkToTraining,
-    trainStart, setTrainStart, trainEnd, setTrainEnd,
-    trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern,
-    v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
-    histamineSensitive, setHistamineSensitive,
-    plannerMode, setPlannerMode,
-    generationMode, setGenerationMode,
-    weightMode, setWeightMode,
-    dietPrefs, setDietPrefs,
-    userRecipes, labAnalysis, labs,
-    errorMsg, setErrorMsg,
+    calcTargets,
+    profileTargets,
+    effectiveKcal,
+    effectiveP,
+    effectiveF,
+    effectiveC,
+    dayTargetsBreakdown,
+    carbCapClipped,
+    carbCapGPerKg,
+    rawCarbsForCap,
+    kbjuMode,
+    setKbjuMode,
+    switchKbjuMode,
+    manualKcal,
+    setManualKcal,
+    manualP,
+    setManualP,
+    manualF,
+    setManualF,
+    manualC,
+    setManualC,
+    budget,
+    setBudget,
+    proteinPreset,
+    setProteinPreset,
+    diaryAdaptation,
+    setDiaryAdaptation,
+    varietyStrictness,
+    setVarietyStrictness,
+    varietyLevel,
+    setVarietyLevel,
+    hvStyle,
+    setHvStyle,
+    carbCapOverride,
+    setCarbCapOverride,
+    wakeTime,
+    setWakeTime,
+    bedTime,
+    setBedTime,
+    lunchTime,
+    setLunchTime,
+    dinnerTime,
+    setDinnerTime,
+    workFood,
+    setWorkFood,
+    mealsCount,
+    morningTrainLoad,
+    setMorningTrainLoad,
+    allergens,
+    toggleAllergen,
+    healthIssues,
+    toggleHealthIssue,
+    eveningLowCarb,
+    setEveningLowCarb,
+    nightCarbs,
+    setNightCarbs,
+    addMilkToBreakfast,
+    setAddMilkToBreakfast,
+    breakfastStyle,
+    setBreakfastStyle,
+    breakfastTemplate,
+    setBreakfastTemplate,
+    planType,
+    setPlanType,
+    preferredFoods,
+    setPreferredFoods,
+    preferredByMeal,
+    setPreferredByMeal,
+    excludedFoods,
+    setExcludedFoods,
+    intolerances,
+    setIntolerances,
+    tasteProfile,
+    setTasteProfile,
+    excludedCategories,
+    setExcludedCategories,
+    customNotes,
+    setCustomNotes,
+    carbPeriodization,
+    setCarbPeriodization,
+    trainingDays,
+    setTrainingDays,
+    DAY_LABELS,
+    heavyTrainDay,
+    setHeavyTrainDay,
+    workScheduleEnabled,
+    setWorkScheduleEnabled,
+    workStartTime,
+    setWorkStartTime,
+    workEndTime,
+    setWorkEndTime,
+    workDays,
+    setWorkDays,
+    workScheduleType,
+    setWorkScheduleType,
+    cravingMode,
+    setCravingMode,
+    cravingDays,
+    setCravingDays,
+    lazyDayMode,
+    setLazyDayMode,
+    lazyDayDays,
+    setLazyDayDays,
+    surplusPct,
+    setSurplusPct,
+    specialMealMode,
+    setSpecialMealMode,
+    specialMealGoal,
+    setSpecialMealGoal,
+    specialMealProteinG,
+    setSpecialMealProteinG,
+    specialMealFatG,
+    setSpecialMealFatG,
+    specialMealCarbsG,
+    setSpecialMealCarbsG,
+    specialMealTiming,
+    setSpecialMealTiming,
+    specialMealReplaceMode,
+    setSpecialMealReplaceMode,
+    specialMealReplaceTarget,
+    setSpecialMealReplaceTarget,
+    s,
+    courseEntries,
+    profile,
+    showAddDrug,
+    setShowAddDrug,
+    showDrugTypePicker,
+    setShowDrugTypePicker,
+    takenSupplements,
+    setTakenSupplements,
+    showSuppPicker,
+    setShowSuppPicker,
+    suppSearch,
+    setSuppSearch,
+    linkToTraining,
+    setLinkToTraining,
+    periSync,
+    setPeriSync,
+    periSyncState,
+    periSyncStale,
+    syncPeriFromPlan,
+    resetPeriSync,
+    proteinSourceMode,
+    setProteinSourceMode,
+    proteinAnchors,
+    setProteinAnchors,
+    trainStart,
+    setTrainStart,
+    trainEnd,
+    setTrainEnd,
+    trainScheduleType,
+    setTrainScheduleType,
+    trainPattern,
+    setTrainPattern,
+    v2Phase,
+    setV2Phase,
+    v2Labs,
+    setV2Labs,
+    v2Pharma,
+    setV2Pharma,
+    histamineSensitive,
+    setHistamineSensitive,
+    plannerMode,
+    setPlannerMode,
+    generationMode,
+    setGenerationMode,
+    weightMode,
+    setWeightMode,
+    dietPrefs,
+    setDietPrefs,
+    userRecipes,
+    labAnalysis,
+    labs,
+    errorMsg,
+    setErrorMsg,
     generatePlan,
-    autofillFromProfile, saveToProfile,
+    autofillFromProfile,
+    saveToProfile,
   } = usePlanCtx();
 
   // P1-11: валидация ввода перед генерацией (TMA-роль: не позволить абсурдные комбинации).
   // FIX B27 (аудит 2026-10): проверки вынесены в `planner-input-validation.ts`, чтобы
   // границы возраста/веса/роста были ОДНИМ источником правды для инпутов и валидации
   // (раньше инпут возраста разрешал 120, а валидация отклоняла всё >100).
-  const _validatePlannerInput = (): string | null => validatePlannerInputs({
-    weight, height, age,
-    sex: sex as 'male' | 'female',
-    bodyFatPct,
-    lifeStage,
-    goal,
-    sleepHours,
-  });
-
+  const _validatePlannerInput = (): string | null =>
+    validatePlannerInputs({
+      weight,
+      height,
+      age,
+      sex: sex as 'male' | 'female',
+      bodyFatPct,
+      lifeStage,
+      goal,
+      sleepHours,
+    });
 
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
   const [showPrefFoodModal, setShowPrefFoodModal] = useState(false);
@@ -201,47 +439,151 @@ export const IndividualPlanSettings: React.FC = () => {
   const [specialMealType, setSpecialMealType] = useState<'cheat_meal' | 'refeed' | 'fast'>('cheat_meal');
   // D-28 П3 fix: ЛОКАЛЬНАЯ дата (не UTC toISOString) — иначе календарь спец-приёмов не совпадал
   // с isoToday() движка (в UTC+3..+12 вечером toISOString уходил на предыдущий день).
-  const _toLocalIso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const _toLocalIso = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const [specialMealDate, setSpecialMealDate] = useState(() => _toLocalIso(new Date()));
   const [specialMealNotes, setSpecialMealNotes] = useState('');
   const [selectedMealToReplace, setSelectedMealToReplace] = useState('');
-  const [specialMeals, setSpecialMeals] = useState<{ type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]>(() => readSpecialMeals() as any);
+  const [specialMeals, setSpecialMeals] = useState<
+    { type: string; typeLabel: string; date: string; notes: string; replaceMeal?: string }[]
+  >(() => readSpecialMeals() as any);
   // FIX B18 (аудит 2026-10): подписка на изменения ключа из других мест (календарь
   // рефидов). Раньше снимок читался ОДИН раз при монтировании, поэтому добавленные
   // календарём рефиды не показывались здесь — и затирались при следующей записи.
-  React.useEffect(() => subscribeSpecialMeals(list => setSpecialMeals(list as any)), []);
+  React.useEffect(() => subscribeSpecialMeals((list) => setSpecialMeals(list as any)), []);
   // FIX audit (dead-code): 5 picker-состояний удалены — заменены PopupSelect,
   // их сеттеры никогда не вызывались.
   const [showWorkFoodPicker, setShowWorkFoodPicker] = useState(false);
-  const pickerBtn = (label: string, opts: {value:string,label:string}[], cur: string, setShow: (v:boolean)=>void) => (
-    <div onClick={() => setShow(true)} style={{...selectStyle, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', minHeight:32, boxSizing:'border-box'}}>
-      <span>{opts.find(o => o.value === cur)?.label || cur}</span>
-      <span style={{fontSize:10, opacity:0.4, marginLeft:4}}>▼</span>
+  const pickerBtn = (
+    label: string,
+    opts: { value: string; label: string }[],
+    cur: string,
+    setShow: (v: boolean) => void,
+  ) => (
+    <div
+      onClick={() => setShow(true)}
+      style={{
+        ...selectStyle,
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '7px 10px',
+        minHeight: 32,
+        boxSizing: 'border-box',
+      }}
+    >
+      <span>{opts.find((o) => o.value === cur)?.label || cur}</span>
+      <span style={{ fontSize: 10, opacity: 0.4, marginLeft: 4 }}>▼</span>
     </div>
   );
-  const pickerModal = (label: string, opts: {value:string,label:string}[], cur: string, onChange: (...args:any[])=>void, show: boolean, setShow: (v:boolean)=>void) => show ? (
-    <div key={label} style={{position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)'}} onClick={() => setShow(false)}>
-      <div onClick={e => e.stopPropagation()} style={{width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)'}}>
-        <div style={{fontSize:14, fontWeight:700, color:'#fff', marginBottom:8, textAlign:'center'}}>{label}</div>
-        {opts.map(o => (
-          <div key={o.value} onClick={() => { onChange(o.value as any); setShow(false); }} style={{padding:'8px 10px', borderRadius:8, cursor:'pointer', fontSize:10, background: cur === o.value ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: cur === o.value ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent', color: cur === o.value ? '#00e68a' : 'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', gap:6, marginBottom:3}}>
-            <span>{cur === o.value ? '✓' : '○'}</span><span>{o.label}</span>
+  const pickerModal = (
+    label: string,
+    opts: { value: string; label: string }[],
+    cur: string,
+    onChange: (...args: any[]) => void,
+    show: boolean,
+    setShow: (v: boolean) => void,
+  ) =>
+    show ? (
+      <div
+        key={label}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(0,0,0,0.8)',
+        }}
+        onClick={() => setShow(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '92%',
+            maxWidth: 380,
+            padding: 16,
+            borderRadius: 16,
+            background: '#18181b',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 8, textAlign: 'center' }}>
+            {label}
           </div>
-        ))}
-        <button onClick={() => setShow(false)} style={{width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:10}}>Готово</button>
+          {opts.map((o) => (
+            <div
+              key={o.value}
+              onClick={() => {
+                onChange(o.value as any);
+                setShow(false);
+              }}
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 10,
+                background: cur === o.value ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+                border: cur === o.value ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                color: cur === o.value ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 3,
+              }}
+            >
+              <span>{cur === o.value ? '✓' : '○'}</span>
+              <span>{o.label}</span>
+            </div>
+          ))}
+          <button
+            onClick={() => setShow(false)}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              padding: '8px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.15)',
+              background: '#202023',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: 10,
+            }}
+          >
+            Готово
+          </button>
+        </div>
       </div>
-    </div>
-  ) : null;
+    ) : null;
 
-  const goalLabels: Record<string,string> = { pre_workout:'🏋️ Предтреник', post_workout:'💪 Пост-треник', before_bed:'🌙 На ночь (каз.)', high_protein:'🥩 Высокобелк.', keto:'🥑 Кето', low_cal_day:'📉 Мало-кал.', custom:'⚙️ Своё' };
-  const timingLabels: Record<string,string> = { breakfast:'🌅 Завтрак', lunch:'☀️ Обед', dinner:'🌆 Ужин', snack:'🍪 Перекус', before_bed:'🌙 Перед сном' };
+  const goalLabels: Record<string, string> = {
+    pre_workout: '🏋️ Предтреник',
+    post_workout: '💪 Пост-треник',
+    before_bed: '🌙 На ночь (каз.)',
+    high_protein: '🥩 Высокобелк.',
+    keto: '🥑 Кето',
+    low_cal_day: '📉 Мало-кал.',
+    custom: '⚙️ Своё',
+  };
+  const timingLabels: Record<string, string> = {
+    breakfast: '🌅 Завтрак',
+    lunch: '☀️ Обед',
+    dinner: '🌆 Ужин',
+    snack: '🍪 Перекус',
+    before_bed: '🌙 Перед сном',
+  };
   const specialMealGoalLabel = goalLabels[specialMealGoal] || specialMealGoal;
   const specialMealTimingLabel = timingLabels[specialMealTiming] || specialMealTiming;
   useEffect(() => {
     const templates: Record<string, { p: number; f: number; c: number }> = {
-      pre_workout: { p: 25, f: 5, c: 40 }, post_workout: { p: 35, f: 3, c: 55 },
-      before_bed: { p: 35, f: 15, c: 5 }, high_protein: { p: 50, f: 10, c: 20 },
-      keto: { p: 30, f: 35, c: 5 }, low_cal_day: { p: 20, f: 5, c: 15 },
+      pre_workout: { p: 25, f: 5, c: 40 },
+      post_workout: { p: 35, f: 3, c: 55 },
+      before_bed: { p: 35, f: 15, c: 5 },
+      high_protein: { p: 50, f: 10, c: 20 },
+      keto: { p: 30, f: 35, c: 5 },
+      low_cal_day: { p: 20, f: 5, c: 15 },
     };
     const tpl = templates[specialMealGoal];
     if (tpl && (specialMealProteinG !== tpl.p || specialMealFatG !== tpl.f || specialMealCarbsG !== tpl.c)) {
@@ -250,7 +592,11 @@ export const IndividualPlanSettings: React.FC = () => {
       setSpecialMealCarbsG(tpl.c);
     }
   }, [specialMealGoal]);
-  const TIME_OPTIONS = Array.from({length:48},(_,i)=>{const h=Math.floor(i/2);const m=i%2===0?'00':'30';return{id:`${String(h).padStart(2,'0')}:${m}`,label:`${String(h).padStart(2,'0')}:${m}`};});
+  const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+    const h = Math.floor(i / 2);
+    const m = i % 2 === 0 ? '00' : '30';
+    return { id: `${String(h).padStart(2, '0')}:${m}`, label: `${String(h).padStart(2, '0')}:${m}` };
+  });
 
   const [recentPreset, setRecentPreset] = useState<string | null>(null);
   // FIX button-audit: локальный toast вместо alert() (window.showToast нигде не определён)
@@ -276,8 +622,16 @@ export const IndividualPlanSettings: React.FC = () => {
   const setManualGramValue = (kind: 'protein' | 'fat' | 'carbs', grams: number | null) => {
     _setGramState(kind, grams);
     // Держим г/кг в синхроне, иначе две карточки показывают разные числа.
-    setManualGPerKg((prev: Record<string, number>) => ({ ...prev, [kind]: grams !== null && weight > 0 ? Math.round((grams / weight) * 100) / 100 : 0 }));
-    const next = { p: manualP, f: manualF, c: manualC, [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams } as any;
+    setManualGPerKg((prev: Record<string, number>) => ({
+      ...prev,
+      [kind]: grams !== null && weight > 0 ? Math.round((grams / weight) * 100) / 100 : 0,
+    }));
+    const next = {
+      p: manualP,
+      f: manualF,
+      c: manualC,
+      [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams,
+    } as any;
     _syncKcalFromMacros(next.p, next.f, next.c);
   };
   const setManualGPerKgValue = (kind: 'protein' | 'fat' | 'carbs', v: number) => {
@@ -288,27 +642,55 @@ export const IndividualPlanSettings: React.FC = () => {
     if (v > 0) {
       const grams = _gramsFromGPerKg(v);
       _setGramState(kind, grams);
-      const next = { p: manualP, f: manualF, c: manualC, [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams } as any;
+      const next = {
+        p: manualP,
+        f: manualF,
+        c: manualC,
+        [kind === 'protein' ? 'p' : kind === 'fat' ? 'f' : 'c']: grams,
+      } as any;
       _syncKcalFromMacros(next.p, next.f, next.c);
     }
   };
   const [hematAdv, setHematAdv] = React.useState<any>(null);
-  React.useEffect(()=>{
-    try{ const raw=localStorage.getItem('he_hematology_advice'); if(raw) setHematAdv(JSON.parse(raw)); }catch{}
-    const h=(e:any)=>{ try{ const r=localStorage.getItem('he_hematology_advice'); if(r) setHematAdv(JSON.parse(r)); else setHematAdv(null); }catch{} };
-    window.addEventListener('storage', h); window.addEventListener('he-hematology-advice', h as any);
-    return ()=>{ window.removeEventListener('storage', h); window.removeEventListener('he-hematology-advice', h as any); };
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_hematology_advice');
+      if (raw) setHematAdv(JSON.parse(raw));
+    } catch {}
+    const h = (e: any) => {
+      try {
+        const r = localStorage.getItem('he_hematology_advice');
+        if (r) setHematAdv(JSON.parse(r));
+        else setHematAdv(null);
+      } catch {}
+    };
+    window.addEventListener('storage', h);
+    window.addEventListener('he-hematology-advice', h as any);
+    return () => {
+      window.removeEventListener('storage', h);
+      window.removeEventListener('he-hematology-advice', h as any);
+    };
   }, []);
   // FIX audit (dead-code): переменная settingsSection ('all') удалена — нигде не читалась.
   const persistPlannerValue = (key: string, value: unknown) => {
-    try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
+    try {
+      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+    } catch {}
   };
   // Локальный тост (конфликт-подсказки P6 и т.п.): window.showToast если есть + inline-чип
   const flash = (m: string) => {
     setToastMsg(m);
-    if (typeof (window as any).showToast === 'function') { try { (window as any).showToast(m, 'warning'); } catch {} }
+    if (typeof (window as any).showToast === 'function') {
+      try {
+        (window as any).showToast(m, 'warning');
+      } catch {}
+    }
   };
-  React.useEffect(() => { if (!toastMsg) return; const t = setTimeout(() => setToastMsg(null), 4200); return () => clearTimeout(t); }, [toastMsg]);
+  React.useEffect(() => {
+    if (!toastMsg) return;
+    const t = setTimeout(() => setToastMsg(null), 4200);
+    return () => clearTimeout(t);
+  }, [toastMsg]);
 
   // Чистка-2026 (P7): тройная настройка завтрака (основа + шаблон + молоко) → один пресет.
   // Пресет атомарно выставляет breakfastStyle + breakfastTemplate + addMilkToBreakfast (движок читает все три).
@@ -333,7 +715,11 @@ export const IndividualPlanSettings: React.FC = () => {
     setBreakfastStyle(m.s as any);
     setBreakfastTemplate(m.t as any);
     setAddMilkToBreakfast(m.milk);
-    try { localStorage.setItem('he_breakfast_style', m.s); localStorage.setItem('he_breakfast_template', m.t); localStorage.setItem('he_add_milk_breakfast', m.milk ? 'true' : 'false'); } catch {}
+    try {
+      localStorage.setItem('he_breakfast_style', m.s);
+      localStorage.setItem('he_breakfast_template', m.t);
+      localStorage.setItem('he_add_milk_breakfast', m.milk ? 'true' : 'false');
+    } catch {}
   };
 
   // Чистка-2026 (P5): вегетарианство — один источник = тип плана. Смена типа синхронизирует
@@ -342,119 +728,444 @@ export const IndividualPlanSettings: React.FC = () => {
     setPlanType(pt);
     const prefs = Array.isArray(dietPrefs) ? dietPrefs : [];
     const has = prefs.includes('vegetarian');
-    if (pt === 'vegetarian' && !has) { const upd = [...prefs, 'vegetarian']; setDietPrefs(upd); persistPlannerValue('he_diet_preferences', upd); }
-    else if (pt !== 'vegetarian' && has) { const upd = prefs.filter(p => p !== 'vegetarian'); setDietPrefs(upd); persistPlannerValue('he_diet_preferences', upd); }
+    if (pt === 'vegetarian' && !has) {
+      const upd = [...prefs, 'vegetarian'];
+      setDietPrefs(upd);
+      persistPlannerValue('he_diet_preferences', upd);
+    } else if (pt !== 'vegetarian' && has) {
+      const upd = prefs.filter((p) => p !== 'vegetarian');
+      setDietPrefs(upd);
+      persistPlannerValue('he_diet_preferences', upd);
+    }
   };
   // legacy-данные: сохранённый planType='vegetarian' без флага в dietPrefs — дозаполняем
   React.useEffect(() => {
     if (planType === 'vegetarian' && Array.isArray(dietPrefs) && !dietPrefs.includes('vegetarian')) {
       const upd = [...dietPrefs, 'vegetarian'];
-      setDietPrefs(upd); persistPlannerValue('he_diet_preferences', upd);
+      setDietPrefs(upd);
+      persistPlannerValue('he_diet_preferences', upd);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planType]);
 
   if (plannerMode === 'minimal') {
     // Быстрый режим: только 3 ключевые цели (масса / сушка / поддержание) + Здоровье
-    const MINIMAL_GOALS = GOALS.filter(g => g.id === 'mass' || g.id === 'cutting' || g.id === 'maintenance' || g.id === 'health');
+    const MINIMAL_GOALS = GOALS.filter(
+      (g) => g.id === 'mass' || g.id === 'cutting' || g.id === 'maintenance' || g.id === 'health',
+    );
     return (
       <>
         <GlassCard title="⚡ Быстрый КБЖУ" icon="⚡" color="#f59e0b">
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.72)', lineHeight:1.5, marginBottom:8 }}>
-            Минимальный режим: только базовые данные и расчёт сухого КБЖУ. Расширенные настройки сохранены и доступны после возврата в Pro.
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5, marginBottom: 8 }}>
+            Минимальный режим: только базовые данные и расчёт сухого КБЖУ. Расширенные настройки сохранены и доступны
+            после возврата в Pro.
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, marginBottom:6 }}>
-            <PopupNumber label="Вес" value={weight} min={PLANNER_BOUNDS.weight.min} max={PLANNER_BOUNDS.weight.max} suffix="кг" onChange={setWeight} />
-            <PopupNumber label="Рост" value={height} min={PLANNER_BOUNDS.height.min} max={PLANNER_BOUNDS.height.max} suffix="см" onChange={setHeight} />
-            <PopupNumber label="Возраст" value={age} min={PLANNER_BOUNDS.age.min} max={PLANNER_BOUNDS.age.max} suffix="лет" onChange={setAge} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 6 }}>
+            <PopupNumber
+              label="Вес"
+              value={weight}
+              min={PLANNER_BOUNDS.weight.min}
+              max={PLANNER_BOUNDS.weight.max}
+              suffix="кг"
+              onChange={setWeight}
+            />
+            <PopupNumber
+              label="Рост"
+              value={height}
+              min={PLANNER_BOUNDS.height.min}
+              max={PLANNER_BOUNDS.height.max}
+              suffix="см"
+              onChange={setHeight}
+            />
+            <PopupNumber
+              label="Возраст"
+              value={age}
+              min={PLANNER_BOUNDS.age.min}
+              max={PLANNER_BOUNDS.age.max}
+              suffix="лет"
+              onChange={setAge}
+            />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
-            <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 5, marginBottom: 6 }}>
+            <PopupSelect
+              label="Пол"
+              value={sex}
+              options={[
+                { id: 'male', label: 'Мужской' },
+                { id: 'female', label: 'Женский' },
+              ]}
+              onChange={(v) => setSex(v as 'male' | 'female')}
+            />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
-            <PopupSelect label="Еда на работе" value={workFood} options={[{id:'any',label:'Любая (можно разогреть)'},{id:'portable',label:'Только порошок/хлопья/протеин'}]} onChange={v=>setWorkFood(v as any)} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 5, marginBottom: 6 }}>
+            <PopupSelect
+              label="Еда на работе"
+              value={workFood}
+              options={[
+                { id: 'any', label: 'Любая (можно разогреть)' },
+                { id: 'portable', label: 'Только порошок/хлопья/протеин' },
+              ]}
+              onChange={(v) => setWorkFood(v as any)}
+            />
           </div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
-            {MINIMAL_GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+            {MINIMAL_GOALS.map((g) => (
+              <PillBtn
+                key={g.id}
+                active={goal === g.id}
+                onClick={() => {
+                  setGoal(g.id);
+                  setGoalUserSet(true);
+                }}
+                color="#f59e0b"
+              >
+                {g.icon} {g.label}
+              </PillBtn>
+            ))}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
-            <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:9, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
-            <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:9, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 7 }}>
+            <div
+              style={{
+                padding: 7,
+                borderRadius: 8,
+                background: 'rgba(0,230,138,0.06)',
+                border: '1px solid rgba(0,230,138,0.15)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#00e68a' }}>{effectiveKcal}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)' }}>ккал</div>
+            </div>
+            <div
+              style={{
+                padding: 7,
+                borderRadius: 8,
+                background: 'rgba(59,130,246,0.06)',
+                border: '1px solid rgba(59,130,246,0.15)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: 17, fontWeight: 800, color: '#3b82f6' }}>
+                Б {effectiveP} / Ж {effectiveF} / У {effectiveC}
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)' }}>граммы в день</div>
+            </div>
           </div>
           {carbCapClipped && (
-            <div style={{ fontSize:9, color:'#fbbf24', padding:'6px 8px', marginBottom:7, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:8, lineHeight:1.5 }}>
-              ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Кнопка ниже снимает ограничение (P1-9, план NUTRITION-VARIETY-PLAN).
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fbbf24',
+                padding: '6px 8px',
+                marginBottom: 7,
+                background: 'rgba(245,158,11,0.07)',
+                border: '1px solid rgba(245,158,11,0.25)',
+                borderRadius: 8,
+                lineHeight: 1.5,
+              }}
+            >
+              ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На
+              массе потолок растёт с объёмом тренировок (7-8 г/кг). Кнопка ниже снимает ограничение (P1-9, план
+              NUTRITION-VARIETY-PLAN).
               {/* P1-9 (план NUTRITION-VARIETY-PLAN §3.1): явный чекпоинт достижимости
                   800-1500У — вместо пассивного warning'а кнопка «Снять потолок» */}
-              <button onClick={() => { setCarbCapOverride(true); try { (window as any).showToast?.('🔓 Потолок углей снят — цель 800–1500У теперь достижима (ручной контроль)', 'success'); } catch {} }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24' }}>🔓 Снять потолок (цель {Math.round(rawCarbsForCap / Math.max(1, weight))} г/кг &gt; потолка)</button>
+              <button
+                onClick={() => {
+                  setCarbCapOverride(true);
+                  try {
+                    (window as any).showToast?.(
+                      '🔓 Потолок углей снят — цель 800–1500У теперь достижима (ручной контроль)',
+                      'success',
+                    );
+                  } catch {}
+                }}
+                style={{
+                  display: 'block',
+                  marginTop: 4,
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 800,
+                  background: 'rgba(245,158,11,0.14)',
+                  border: '1px solid rgba(245,158,11,0.4)',
+                  color: '#fbbf24',
+                }}
+              >
+                🔓 Снять потолок (цель {Math.round(rawCarbsForCap / Math.max(1, weight))} г/кг &gt; потолка)
+              </button>
             </div>
           )}
           {Array.isArray(dayTargetsBreakdown) && dayTargetsBreakdown.length > 0 && (
-            <details style={{ fontSize:9, color:'rgba(255,255,255,0.75)', padding:'6px 8px', marginBottom:7, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, lineHeight:1.6 }}>
-              <summary style={{ cursor:'pointer', fontWeight:700, color:'#93c5fd' }}>🧮 Как считаются цели (TDEE → модификаторы → макросы)</summary>
-              <div style={{ marginTop:5 }}>
-                {dayTargetsBreakdown.map((s: string, i: number) => <div key={i} style={{ color: s.startsWith('⚠') ? '#fbbf24' : 'rgba(255,255,255,0.72)' }}>{s}</div>)}
+            <details
+              style={{
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.75)',
+                padding: '6px 8px',
+                marginBottom: 7,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: 8,
+                lineHeight: 1.6,
+              }}
+            >
+              <summary style={{ cursor: 'pointer', fontWeight: 700, color: '#93c5fd' }}>
+                🧮 Как считаются цели (TDEE → модификаторы → макросы)
+              </summary>
+              <div style={{ marginTop: 5 }}>
+                {dayTargetsBreakdown.map((s: string, i: number) => (
+                  <div key={i} style={{ color: s.startsWith('⚠') ? '#fbbf24' : 'rgba(255,255,255,0.72)' }}>
+                    {s}
+                  </div>
+                ))}
               </div>
             </details>
           )}
           {(() => {
             // П2 (Роунд-2): совет автокоррекции калорий по темпу веса (план → факт → коррекция)
-            const weights = (weightLogEntries || []).map((e: any) => e.weight).filter((w: any) => Number.isFinite(w) && w > 0);
+            const weights = (weightLogEntries || [])
+              .map((e: any) => e.weight)
+              .filter((w: any) => Number.isFinite(w) && w > 0);
             if (weights.length < 4 || kbjuMode === 'manual') return null;
             const advice = plannerWeightAdjustAdvice({ weightLog: weights, goal, sex, kcalTarget: effectiveKcal });
             if (!advice || advice.status === 'no_data') return null;
             const applyable = advice.kcalDelta !== 0;
             const col = advice.status === 'ok' ? '#22c55e' : advice.kcalDelta > 0 ? '#60a5fa' : '#fbbf24';
             return (
-              <div style={{ fontSize:9, color:col, padding:'6px 8px', marginBottom:7, background: advice.status === 'ok' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border:`1px solid ${advice.status === 'ok' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.25)'}`, borderRadius:8, lineHeight:1.5 }}>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: col,
+                  padding: '6px 8px',
+                  marginBottom: 7,
+                  background: advice.status === 'ok' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)',
+                  border: `1px solid ${advice.status === 'ok' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.25)'}`,
+                  borderRadius: 8,
+                  lineHeight: 1.5,
+                }}
+              >
                 ⚖️ {advice.reason}
-                {applyable && <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, effectiveKcal + advice.kcalDelta)); }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(96,165,250,0.14)', border:'1px solid rgba(96,165,250,0.35)', color:'#60a5fa' }}>⚖️ Применить {advice.kcalDelta > 0 ? '+' : ''}{advice.kcalDelta} ккал</button>}
+                {applyable && (
+                  <button
+                    onClick={() => {
+                      switchKbjuMode('manual');
+                      setManualKcal(Math.max(1200, effectiveKcal + advice.kcalDelta));
+                    }}
+                    style={{
+                      display: 'block',
+                      marginTop: 4,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      background: 'rgba(96,165,250,0.14)',
+                      border: '1px solid rgba(96,165,250,0.35)',
+                      color: '#60a5fa',
+                    }}
+                  >
+                    ⚖️ Применить {advice.kcalDelta > 0 ? '+' : ''}
+                    {advice.kcalDelta} ккал
+                  </button>
+                )}
               </div>
             );
           })()}
-          <div style={{ marginBottom:7 }}>
-            <button onClick={() => switchKbjuMode(kbjuMode === 'manual' ? 'auto' : 'manual')} style={{ padding:'7px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, background: kbjuMode === 'manual' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: kbjuMode === 'manual' ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)', color: kbjuMode === 'manual' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>✏️ Ручное КБЖУ: {kbjuMode === 'manual' ? 'ВКЛ' : 'ВЫКЛ'}</button>
+          <div style={{ marginBottom: 7 }}>
+            <button
+              onClick={() => switchKbjuMode(kbjuMode === 'manual' ? 'auto' : 'manual')}
+              style={{
+                padding: '7px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 700,
+                background: kbjuMode === 'manual' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)',
+                border: kbjuMode === 'manual' ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)',
+                color: kbjuMode === 'manual' ? '#f59e0b' : 'rgba(255,255,255,0.75)',
+              }}
+            >
+              ✏️ Ручное КБЖУ: {kbjuMode === 'manual' ? 'ВКЛ' : 'ВЫКЛ'}
+            </button>
           </div>
           {kbjuMode === 'manual' && (
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:7 }}>
-              <PopupNumber label="Ккал" value={manualKcal ?? effectiveKcal} min={500} max={8000} step={50} suffix="ккал" onChange={v => setManualKcal(v)} />
-              <PopupNumber label="Белки" value={manualP ?? effectiveP} min={0} max={500} step={5} suffix="г" onChange={v => setManualP(v)} />
-              <PopupNumber label="Жиры" value={manualF ?? effectiveF} min={0} max={300} step={5} suffix="г" onChange={v => setManualF(v)} />
-              <PopupNumber label="Углеводы" value={manualC ?? effectiveC} min={0} max={1200} step={5} suffix="г" onChange={v => setManualC(v)} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 7 }}>
+              <PopupNumber
+                label="Ккал"
+                value={manualKcal ?? effectiveKcal}
+                min={500}
+                max={8000}
+                step={50}
+                suffix="ккал"
+                onChange={(v) => setManualKcal(v)}
+              />
+              <PopupNumber
+                label="Белки"
+                value={manualP ?? effectiveP}
+                min={0}
+                max={500}
+                step={5}
+                suffix="г"
+                onChange={(v) => setManualP(v)}
+              />
+              <PopupNumber
+                label="Жиры"
+                value={manualF ?? effectiveF}
+                min={0}
+                max={300}
+                step={5}
+                suffix="г"
+                onChange={(v) => setManualF(v)}
+              />
+              <PopupNumber
+                label="Углеводы"
+                value={manualC ?? effectiveC}
+                min={0}
+                max={1200}
+                step={5}
+                suffix="г"
+                onChange={(v) => setManualC(v)}
+              />
             </div>
           )}
-          {kbjuMode === 'manual' && (() => {
-            // E0.3 (feasibility-гейт): ккал обязан ≈ 4Б+4У+9Ж. Иначе день сведётся к
-            // FIX B20 (аудит 2026-10): раньше здесь честно писалось «день сойдётся по
-            // макросам, ккал-ось — лучший достижимый вариант», т.е. интерфейс ПРИЗНАВАЛ,
-            // что сходимости не будет. После правки buildDayTargets ккал-цель в ручном
-            // режиме ВСЕГДА приводится к 4Б+4У+9Ж (набор целей не может быть
-            // противоречивым), поэтому текст говорит ровно то, что произойдёт.
-            const c = checkTargetsConsistency(manualKcal ?? effectiveKcal, manualP ?? effectiveP, manualF ?? effectiveF, manualC ?? effectiveC);
-            if (c.consistent) return null;
-            return (
-              <div data-kbju-feasibility="1" role="alert" style={{ fontSize:9, color:'#fff', padding:'5px 8px', marginBottom:7, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.35)', borderRadius:6, lineHeight:1.4 }}>
-                ⚖️ Введено {manualKcal ?? effectiveKcal} ккал, но 4Б+4У+9Ж = {c.atwaterKcal} ккал (расхождение {c.devPct}%). Калорийность будет приведена к БЖУ — {c.atwaterKcal} ккал, чтобы день реально сходился (канон ≤{PLANNER_CONVERGENCE_PCT}%). Если нужны именно {manualKcal ?? effectiveKcal} ккал — измените белки/жиры/углеводы.
-              </div>
-            );
-          })()}
+          {kbjuMode === 'manual' &&
+            (() => {
+              // E0.3 (feasibility-гейт): ккал обязан ≈ 4Б+4У+9Ж. Иначе день сведётся к
+              // FIX B20 (аудит 2026-10): раньше здесь честно писалось «день сойдётся по
+              // макросам, ккал-ось — лучший достижимый вариант», т.е. интерфейс ПРИЗНАВАЛ,
+              // что сходимости не будет. После правки buildDayTargets ккал-цель в ручном
+              // режиме ВСЕГДА приводится к 4Б+4У+9Ж (набор целей не может быть
+              // противоречивым), поэтому текст говорит ровно то, что произойдёт.
+              const c = checkTargetsConsistency(
+                manualKcal ?? effectiveKcal,
+                manualP ?? effectiveP,
+                manualF ?? effectiveF,
+                manualC ?? effectiveC,
+              );
+              if (c.consistent) return null;
+              return (
+                <div
+                  data-kbju-feasibility="1"
+                  role="alert"
+                  style={{
+                    fontSize: 9,
+                    color: '#fff',
+                    padding: '5px 8px',
+                    marginBottom: 7,
+                    background: 'rgba(245,158,11,0.10)',
+                    border: '1px solid rgba(245,158,11,0.35)',
+                    borderRadius: 6,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  ⚖️ Введено {manualKcal ?? effectiveKcal} ккал, но 4Б+4У+9Ж = {c.atwaterKcal} ккал (расхождение{' '}
+                  {c.devPct}%). Калорийность будет приведена к БЖУ — {c.atwaterKcal} ккал, чтобы день реально сходился
+                  (канон ≤{PLANNER_CONVERGENCE_PCT}%). Если нужны именно {manualKcal ?? effectiveKcal} ккал — измените
+                  белки/жиры/углеводы.
+                </div>
+              );
+            })()}
           {kbjuMode === 'manual' && (
             // FIX B20: показываем РЕАЛЬНЫЕ цели, которые получит движок (после приведения
             // ккал к БЖУ и применения физиологического минимума жира). Раньше пользователь
             // видел только свои введённые числа и не понимал, что план собирается по другим.
-            <div data-kbju-effective="1" style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'5px 8px', marginBottom:7, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.18)', borderRadius:6, lineHeight:1.45 }}>
-              🎯 План будет собран на: <b style={{color:'#00e68a'}}>{Math.round(effectiveKcal)} ккал</b> · <b style={{color:'#3b82f6'}}>Б {Math.round(effectiveP)}</b> · <b style={{color:'#f59e0b'}}>Ж {Math.round(effectiveF)}</b> · <b style={{color:'#f97316'}}>У {Math.round(effectiveC)}</b>
-              {(() => { const aw = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4); const dev = effectiveKcal > 0 ? Math.abs(aw - effectiveKcal) / effectiveKcal * 100 : 0; const ok = dev <= PLANNER_CONVERGENCE_PCT; return (
-                <span style={{ marginLeft:6, fontWeight:800, color: ok ? '#86efac' : '#fbbf24' }}>{ok ? `✓ согласовано (±${Math.round(dev)}%)` : `⚠ БЖУ=${aw} ккал, расхождение ${Math.round(dev)}%`}</span>
-              ); })()}
+            <div
+              data-kbju-effective="1"
+              style={{
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.85)',
+                padding: '5px 8px',
+                marginBottom: 7,
+                background: 'rgba(0,230,138,0.06)',
+                border: '1px solid rgba(0,230,138,0.18)',
+                borderRadius: 6,
+                lineHeight: 1.45,
+              }}
+            >
+              🎯 План будет собран на: <b style={{ color: '#00e68a' }}>{Math.round(effectiveKcal)} ккал</b> ·{' '}
+              <b style={{ color: '#3b82f6' }}>Б {Math.round(effectiveP)}</b> ·{' '}
+              <b style={{ color: '#f59e0b' }}>Ж {Math.round(effectiveF)}</b> ·{' '}
+              <b style={{ color: '#f97316' }}>У {Math.round(effectiveC)}</b>
+              {(() => {
+                const aw = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+                const dev = effectiveKcal > 0 ? (Math.abs(aw - effectiveKcal) / effectiveKcal) * 100 : 0;
+                const ok = dev <= PLANNER_CONVERGENCE_PCT;
+                return (
+                  <span style={{ marginLeft: 6, fontWeight: 800, color: ok ? '#86efac' : '#fbbf24' }}>
+                    {ok ? `✓ согласовано (±${Math.round(dev)}%)` : `⚠ БЖУ=${aw} ккал, расхождение ${Math.round(dev)}%`}
+                  </span>
+                );
+              })()}
             </div>
           )}
-          {errorMsg && <div style={{ fontSize:9, color:'#ef4444', padding:'5px 8px', marginBottom:6, background:'rgba(239,68,68,0.06)', borderRadius:6 }}>⚠️ {errorMsg}</div>}
-          <button onClick={() => { try { const err = _validatePlannerInput(); if (err) { setErrorMsg(err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } }} style={{ ...greenBtn, width:'100%' }}>⚡ Рассчитать и создать рацион</button>
+          {errorMsg && (
+            <div
+              style={{
+                fontSize: 9,
+                color: '#ef4444',
+                padding: '5px 8px',
+                marginBottom: 6,
+                background: 'rgba(239,68,68,0.06)',
+                borderRadius: 6,
+              }}
+            >
+              ⚠️ {errorMsg}
+            </div>
+          )}
+          <button
+            onClick={() => {
+              try {
+                const err = _validatePlannerInput();
+                if (err) {
+                  setErrorMsg(err);
+                  return;
+                }
+                setErrorMsg(null);
+                generatePlan(1);
+                setPlanTab('plan');
+              } catch (e: any) {
+                setErrorMsg('Ошибка: ' + (e?.message || String(e)));
+              }
+            }}
+            style={{ ...greenBtn, width: '100%' }}
+          >
+            ⚡ Рассчитать и создать рацион
+          </button>
         </GlassCard>
         <GlassCard title="Режим планировщика" icon="🧬" color="#60a5fa">
-          <button onClick={() => setPlannerMode('simple')} style={{ width:'100%', padding:9, borderRadius:8, cursor:'pointer', background:'#202023', border:'1px solid rgba(96,165,250,0.3)', color:'#60a5fa', fontSize:10, fontWeight:700 }}>🍽 Перейти в простой режим</button>
-          <button onClick={() => setPlannerMode('pro')} style={{ width:'100%', padding:9, marginTop:5, borderRadius:8, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a', fontSize:10, fontWeight:700 }}>🧬 Вернуться в Pro</button>
+          <button
+            onClick={() => setPlannerMode('simple')}
+            style={{
+              width: '100%',
+              padding: 9,
+              borderRadius: 8,
+              cursor: 'pointer',
+              background: '#202023',
+              border: '1px solid rgba(96,165,250,0.3)',
+              color: '#60a5fa',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            🍽 Перейти в простой режим
+          </button>
+          <button
+            onClick={() => setPlannerMode('pro')}
+            style={{
+              width: '100%',
+              padding: 9,
+              marginTop: 5,
+              borderRadius: 8,
+              cursor: 'pointer',
+              background: 'rgba(0,230,138,0.08)',
+              border: '1px solid rgba(0,230,138,0.25)',
+              color: '#00e68a',
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            🧬 Вернуться в Pro
+          </button>
         </GlassCard>
       </>
     );
@@ -462,1232 +1173,3318 @@ export const IndividualPlanSettings: React.FC = () => {
 
   return (
     <>
-
       {/* Кнопки синхронизации с Профилем (Aug 5 2026) */}
       <GlassCard title="🔄 Синхронизация с Профилем" icon="🔄" color="#3b82f6">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
           Поля ниже ЛОКАЛЬНЫЕ — не пишут в Профиль автоматически.
-          <br/>📋 <b>Автозаполнение</b> — загрузить значения из Профиля.
-          <br/>💾 <b>Сохранить в Профиль</b> — записать текущие значения обратно.
+          <br />
+          📋 <b>Автозаполнение</b> — загрузить значения из Профиля.
+          <br />
+          💾 <b>Сохранить в Профиль</b> — записать текущие значения обратно.
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
-            onClick={() => { autofillFromProfile(); }}
-            style={{
-              flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)',
-              color: '#3b82f6', cursor: 'pointer', minHeight: 40,
+            onClick={() => {
+              autofillFromProfile();
             }}
-          >📋 Автозаполнение из профиля</button>
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              background: 'rgba(59,130,246,0.12)',
+              border: '1px solid rgba(59,130,246,0.3)',
+              color: '#3b82f6',
+              cursor: 'pointer',
+              minHeight: 40,
+            }}
+          >
+            📋 Автозаполнение из профиля
+          </button>
           <button
-            onClick={() => { saveToProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('✓ Сохранено в профиль', 'success'); }}
-            style={{
-              flex: 1, padding: '10px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)',
-              color: '#00e68a', cursor: 'pointer', minHeight: 40,
+            onClick={() => {
+              saveToProfile();
+              if (typeof (window as any).showToast === 'function')
+                (window as any).showToast('✓ Сохранено в профиль', 'success');
             }}
-          >💾 Сохранить в профиль</button>
+            style={{
+              flex: 1,
+              padding: '10px 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 600,
+              background: 'rgba(0,230,138,0.12)',
+              border: '1px solid rgba(0,230,138,0.3)',
+              color: '#00e68a',
+              cursor: 'pointer',
+              minHeight: 40,
+            }}
+          >
+            💾 Сохранить в профиль
+          </button>
         </div>
       </GlassCard>
 
       {toastMsg && (
-        <div role="status" style={{ position: 'fixed', bottom: 76, left: '50%', transform: 'translateX(-50%)', zIndex: 300, maxWidth: '90%', padding: '9px 14px', borderRadius: 12, background: 'rgba(245,158,11,0.95)', color: '#1a1a1a', fontSize: 11, fontWeight: 700, boxShadow: '0 6px 24px rgba(0,0,0,0.4)', textAlign: 'center' }}>{toastMsg}</div>
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            bottom: 76,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 300,
+            maxWidth: '90%',
+            padding: '9px 14px',
+            borderRadius: 12,
+            background: 'rgba(245,158,11,0.95)',
+            color: '#1a1a1a',
+            fontSize: 11,
+            fontWeight: 700,
+            boxShadow: '0 6px 24px rgba(0,0,0,0.4)',
+            textAlign: 'center',
+          }}
+        >
+          {toastMsg}
+        </div>
       )}
 
-      {hematAdv && hematAdv.hct!=null && (
-        <GlassCard title={`🩸 Гематокрит ${hematAdv.hct}% — ${hematAdv.zone ?? hematAdv.ironRec}`} icon="🩸" color={hematAdv.hct>54 ? '#ef4444' : hematAdv.hct>51 ? '#f59e0b' : '#eab308'}>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.45, marginBottom:6 }}>
-            <b>Метаболик-хаб → Кровь:</b> HCT {hematAdv.hct}% · вода {hematAdv.waterTargetMl}мл · {hematAdv.ironRec==='zero' ? '⛔ ZERO железо' : hematAdv.ironRec==='cap_15' ? '⚠ кап 15мг' : 'железо норма'} · {hematAdv.donation?.needed ? `🩸 ${hematAdv.donation.text}` : 'донация не требуется'}
+      {hematAdv && hematAdv.hct != null && (
+        <GlassCard
+          title={`🩸 Гематокрит ${hematAdv.hct}% — ${hematAdv.zone ?? hematAdv.ironRec}`}
+          icon="🩸"
+          color={hematAdv.hct > 54 ? '#ef4444' : hematAdv.hct > 51 ? '#f59e0b' : '#eab308'}
+        >
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, marginBottom: 6 }}>
+            <b>Метаболик-хаб → Кровь:</b> HCT {hematAdv.hct}% · вода {hematAdv.waterTargetMl}мл ·{' '}
+            {hematAdv.ironRec === 'zero'
+              ? '⛔ ZERO железо'
+              : hematAdv.ironRec === 'cap_15'
+                ? '⚠ кап 15мг'
+                : 'железо норма'}{' '}
+            · {hematAdv.donation?.needed ? `🩸 ${hematAdv.donation.text}` : 'донация не требуется'}
           </div>
-          {hematAdv.ironRec==='zero' && <div style={{ fontSize:9, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:6, padding:'5px 7px', marginBottom:6 }}>⛔ При HCT&gt;51 гемовое железо (говядина/печень) штрафуется в скоринге. План автоматически деприоритизирует красное мясо — выбирай курицу/индейку/рыбу.</div>}
-          <div style={{ display:'flex', gap:6 }}>
-            <button onClick={()=>{
-              try{ localStorage.removeItem('he_hematology_advice'); setHematAdv(null); }catch{}
-            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:9, fontWeight:600, cursor:'pointer' }}>✕ Скрыть</button>
-            <button onClick={()=>{
-              if(hematAdv.ironRec==='zero'){
-                const highIronIds=['beef_lean','beef_minced','liver','pork_liver','beef_liver'];
-                const cur=new Set(excludedFoods||[]); highIronIds.forEach(id=> cur.add(id)); setExcludedFoods([...cur]);
-              }
-            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(249,115,22,0.18)', background:'rgba(249,115,22,0.08)', color:'#f97316', fontSize:9, fontWeight:600, cursor:'pointer' }}>🍽 Применить к плану</button>
+          {hematAdv.ironRec === 'zero' && (
+            <div
+              style={{
+                fontSize: 9,
+                color: '#ef4444',
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.15)',
+                borderRadius: 6,
+                padding: '5px 7px',
+                marginBottom: 6,
+              }}
+            >
+              ⛔ При HCT&gt;51 гемовое железо (говядина/печень) штрафуется в скоринге. План автоматически
+              деприоритизирует красное мясо — выбирай курицу/индейку/рыбу.
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => {
+                try {
+                  localStorage.removeItem('he_hematology_advice');
+                  setHematAdv(null);
+                } catch {}
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 7,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'rgba(255,255,255,0.6)',
+                fontSize: 9,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              ✕ Скрыть
+            </button>
+            <button
+              onClick={() => {
+                if (hematAdv.ironRec === 'zero') {
+                  const highIronIds = ['beef_lean', 'beef_minced', 'liver', 'pork_liver', 'beef_liver'];
+                  const cur = new Set(excludedFoods || []);
+                  highIronIds.forEach((id) => cur.add(id));
+                  setExcludedFoods([...cur]);
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 7,
+                border: '1px solid rgba(249,115,22,0.18)',
+                background: 'rgba(249,115,22,0.08)',
+                color: '#f97316',
+                fontSize: 9,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              🍽 Применить к плану
+            </button>
           </div>
         </GlassCard>
       )}
 
       {/* Кнопка генерации (Pro Engine — единый движок) */}
-      {(
-       <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
-         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:4, marginBottom:8 }}>
-           {[
-             { id:'pro' as const, label:'🧬 Pro', color:'#00e68a', hint:'Полный V2-анализ' },
-             { id:'simple' as const, label:'🍽 Простой', color:'#60a5fa', hint:'КБЖУ без V2-оценок' },
-             { id:'minimal' as const, label:'⚡ Быстрый', color:'#f59e0b', hint:'Минимум данных' },
-           ].map(mode => <button key={mode.id} onClick={() => setPlannerMode(mode.id)} title={mode.hint} style={{ padding:'7px 3px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700, background: plannerMode === mode.id ? `${mode.color}22` : '#202023', border: plannerMode === mode.id ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.06)', color: plannerMode === mode.id ? mode.color : 'rgba(255,255,255,0.7)' }}>{mode.label}</button>)}
-         </div>
-         <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', marginBottom:8 }}>{plannerMode === 'pro' ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.' : plannerMode === 'simple' ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.' : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}</div>
-        {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
-        {/* Два режима генерации: «по продуктам» (классика) и «по рецептам» */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '8px 0' }}>
-          <button
-            onClick={() => setGenerationMode('products')}
-            aria-pressed={generationMode === 'products'}
-            title="Классический рацион из продуктов с точными КБЖУ"
-            style={{
-              textAlign: 'left', padding: '12px 10px', borderRadius: 12, cursor: 'pointer',
-              background: generationMode === 'products' ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.10))' : '#202023',
-              border: generationMode === 'products' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-              boxShadow: generationMode === 'products' ? '0 4px 16px rgba(0,230,138,0.15)' : 'none',
-              minHeight: 64,
-            }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'products' ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>🥩 По продуктам · быстрый</div>
-            <div style={{ fontSize: 9, color: generationMode === 'products' ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
-              Классический план из продуктов с точными КБЖУ и круглыми порциями (молоко 250/500/750 г)
+      {
+        <GlassCard title="🧬 Генерация плана" icon="🧬" color="#00e68a">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 4, marginBottom: 8 }}>
+            {[
+              { id: 'pro' as const, label: '🧬 Pro', color: '#00e68a', hint: 'Полный V2-анализ' },
+              { id: 'simple' as const, label: '🍽 Простой', color: '#60a5fa', hint: 'КБЖУ без V2-оценок' },
+              { id: 'minimal' as const, label: '⚡ Быстрый', color: '#f59e0b', hint: 'Минимум данных' },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setPlannerMode(mode.id)}
+                title={mode.hint}
+                style={{
+                  padding: '7px 3px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  background: plannerMode === mode.id ? `${mode.color}22` : '#202023',
+                  border: plannerMode === mode.id ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.06)',
+                  color: plannerMode === mode.id ? mode.color : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 8 }}>
+            {plannerMode === 'pro'
+              ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.'
+              : plannerMode === 'simple'
+                ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.'
+                : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}
+          </div>
+          {errorMsg && (
+            <div
+              style={{
+                fontSize: 9,
+                color: '#ef4444',
+                padding: '4px 8px',
+                background: 'rgba(239,68,68,0.06)',
+                borderRadius: 6,
+                marginBottom: 6,
+              }}
+            >
+              ⚠️ {errorMsg}
             </div>
-          </button>
-          <button
-            onClick={() => setGenerationMode('recipes')}
-            aria-pressed={generationMode === 'recipes'}
-            title="Основные приёмы собираются из готовых рецептов"
+          )}
+          {/* Два режима генерации: «по продуктам» (классика) и «по рецептам» */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '8px 0' }}>
+            <button
+              onClick={() => setGenerationMode('products')}
+              aria-pressed={generationMode === 'products'}
+              title="Классический рацион из продуктов с точными КБЖУ"
+              style={{
+                textAlign: 'left',
+                padding: '12px 10px',
+                borderRadius: 12,
+                cursor: 'pointer',
+                background:
+                  generationMode === 'products'
+                    ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.10))'
+                    : '#202023',
+                border: generationMode === 'products' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                boxShadow: generationMode === 'products' ? '0 4px 16px rgba(0,230,138,0.15)' : 'none',
+                minHeight: 64,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: generationMode === 'products' ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                }}
+              >
+                🥩 По продуктам · быстрый
+              </div>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: generationMode === 'products' ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.55)',
+                  marginTop: 3,
+                  lineHeight: 1.45,
+                }}
+              >
+                Классический план из продуктов с точными КБЖУ и круглыми порциями (молоко 250/500/750 г)
+              </div>
+            </button>
+            <button
+              onClick={() => setGenerationMode('recipes')}
+              aria-pressed={generationMode === 'recipes'}
+              title="Основные приёмы собираются из готовых рецептов"
+              style={{
+                textAlign: 'left',
+                padding: '12px 10px',
+                borderRadius: 12,
+                cursor: 'pointer',
+                background:
+                  generationMode === 'recipes'
+                    ? 'linear-gradient(135deg, rgba(249,115,22,0.16), rgba(245,158,11,0.10))'
+                    : '#202023',
+                border: generationMode === 'recipes' ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
+                boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.18)' : 'none',
+                minHeight: 64,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: generationMode === 'recipes' ? '#f97316' : 'rgba(255,255,255,0.85)',
+                }}
+              >
+                👨‍🍳 По рецептам · ПРО ⭐
+              </div>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: generationMode === 'recipes' ? 'rgba(253,186,116,0.95)' : 'rgba(255,255,255,0.55)',
+                  marginTop: 3,
+                  lineHeight: 1.45,
+                }}
+              >
+                Про-режим: завтрак/обед/ужин — готовые блюда (2–3 варианта на приём), день сходится в КБЖУ ±3%. Перекусы
+                — продуктами. Рекомендуется
+              </div>
+            </button>
+          </div>
+          <div
             style={{
-              textAlign: 'left', padding: '12px 10px', borderRadius: 12, cursor: 'pointer',
-              background: generationMode === 'recipes' ? 'linear-gradient(135deg, rgba(249,115,22,0.16), rgba(245,158,11,0.10))' : '#202023',
-              border: generationMode === 'recipes' ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
-              boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.18)' : 'none',
-              minHeight: 64,
-            }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'recipes' ? '#f97316' : 'rgba(255,255,255,0.85)' }}>👨‍🍳 По рецептам · ПРО ⭐</div>
-            <div style={{ fontSize: 9, color: generationMode === 'recipes' ? 'rgba(253,186,116,0.95)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
-              Про-режим: завтрак/обед/ужин — готовые блюда (2–3 варианта на приём), день сходится в КБЖУ ±3%. Перекусы — продуктами. Рекомендуется
-            </div>
-          </button>
-        </div>
-        <div style={{ fontSize: 9, color: generationMode === 'recipes' ? 'rgba(253,186,116,0.9)' : 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
-          {generationMode === 'recipes'
-            ? '🍲 Генерация будет ТОЛЬКО по рецептам: каждый основной приём — цельное блюдо с ингредиентами и пошаговой готовкой. После выбора варианта рацион автоматически перестраивается (без недобора и перебора), закупки и процесс готовки обновятся под рецепты.'
-            : '✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин'}
-        </div>
-        {/* G1 (сырое/готовое): единый режим веса плана — математика КБЖУ не меняется, только отображение граммовок */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {([
-            { id: 'cooked' as const, label: '🍚 Вес готовый', hint: 'Граммовки как на тарелке' },
-            { id: 'raw' as const, label: '🌾 Вес сухой', hint: 'Крупу взвешивать сухой' },
-          ]).map(m => <button key={m.id} onClick={() => setWeightMode(m.id)} aria-pressed={weightMode === m.id} title={m.hint} style={{ flex: 1, padding: '7px 3px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: weightMode === m.id ? 'rgba(96,165,250,0.14)' : '#202023', border: weightMode === m.id ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.06)', color: weightMode === m.id ? '#60a5fa' : 'rgba(255,255,255,0.7)' }}>{m.label}</button>)}
-        </div>
-        <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
-          width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
-          fontSize: 12, fontWeight: 700,
-          background: generationMode === 'recipes' ? 'linear-gradient(135deg,#f97316,#ea580c)' : 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#fff',
-          boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.25)' : '0 4px 16px rgba(0,230,138,0.2)',
-        }}>{generationMode === 'recipes' ? '🍳 Сгенерировать план по рецептам →' : '✨ Сгенерировать план питания →'}</button>
-      </GlassCard>
-      )}
-
-      {(
-      <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupNumber label="⚖️ Вес (кг)" value={weight} min={PLANNER_BOUNDS.weight.min} max={PLANNER_BOUNDS.weight.max} suffix="кг" onChange={setWeight} />
-          <PopupNumber label="📏 Рост (см)" value={height} min={PLANNER_BOUNDS.height.min} max={PLANNER_BOUNDS.height.max} suffix="см" onChange={setHeight} />
-          {/* FIX B27: границы возраста — из общего PLANNER_BOUNDS (раньше здесь стояло 120,
-              а валидация отклоняла >100: ввод принимался, а генерация падала с ошибкой). */}
-          <PopupNumber label="🎂 Возраст" value={age} min={PLANNER_BOUNDS.age.min} max={PLANNER_BOUNDS.age.max} suffix="лет" onChange={setAge} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupSelect label="🧑 Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
-          <PopupNumber label="🚶 Шагов/день" value={dailySteps} min={0} max={50000} step={500} suffix="шаг" onChange={setDailySteps} />
-        </div>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-          {/* Чистка-2026 (C2): дубль «Заполнить из профиля» удалён — синк живёт в
-              верхней карточке «Синхронизация с Профилем» (аутфилл/сохранить). */}
-          <button onClick={() => {
-            if ((labs || []).length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
-            setV2Labs(importLabsToV2(labs || [], v2Labs));
-          }} style={{
-            flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
-            background: (labs || []).length > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
-            border: (labs || []).length > 0 ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
-            color: (labs || []).length > 0 ? '#00e68a' : 'rgba(255,255,255,0.5)',
-            opacity: (labs || []).length > 0 ? 1 : 0.5,
-          }}>🩸 Заполнить анализы ({(labs || []).length})</button>
-        </div>
-        <div style={{ marginBottom: 6 }}>
-          <PopupNumber label="🍳 Время на готовку" value={cookTimeMin} min={0} max={300} step={5} suffix="мин" onChange={setCookTimeMin} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupSelect label="👨‍🍳 Навык готовки" value={cookingSkill} options={[{id:'basic',label:'Базовый (простые блюда)'},{id:'medium',label:'Средний (готовлю регулярно)'},{id:'advanced',label:'Продвинутый (сложные рецепты)'}]} onChange={v => setCookingSkill(v as any)} />
-          <PopupSelect label="📅 Частота готовки" value={cookingFrequency} options={[{id:'daily',label:'Каждый день'},{id:'every_3_days',label:'Раз в 3 дня'},{id:'weekly',label:'Раз в неделю (meal prep)'}]} onChange={v => setCookingFrequency(v as any)} />
-        </div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-          <button onClick={() => setBatchCooking(!batchCooking)} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, textAlign: 'left', background: batchCooking ? 'rgba(34,197,94,0.08)' : '#202023', border: `1px solid ${batchCooking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: batchCooking ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
-            🍳 Готовка впрок: {batchCooking ? 'ВКЛ' : 'ВЫКЛ'}
-          </button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />
-          <PopupSelect label="📊 Интенсивность" value={trainIntensity} options={[{id:'low',label:'Низкая'},{id:'medium',label:'Средняя'},{id:'high',label:'Высокая'}]} onChange={v => setTrainIntensity(v as string)} />
-        </div>
-        {/* Кардио-дневник → питание: справочно, цели КБЖУ не меняются (PAL уже их учёл). */}
-        <CardioKcalNote compact />
-        <div style={{ marginBottom: 6 }}>
-          <button onClick={() => setIntraWorkoutEnabled(!intraWorkoutEnabled)} style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: intraWorkoutEnabled ? 'rgba(34,197,94,0.08)' : '#202023', border:`1px solid ${intraWorkoutEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: intraWorkoutEnabled ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
-            🏋️ Intra-workout (углеводы+изотоник во время тренировки): {intraWorkoutEnabled ? 'ВКЛ' : 'ВЫКЛ'}
-          </button>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupNumber label="🧈 % жира" value={bodyFatPct} min={3} max={60} step={0.5} suffix="%" onChange={setBodyFatPct} />
-          <PopupSelect label="🏠 Быт. активность" value={householdActivity} options={[{id:'sedentary',label:'Сидячий'},{id:'light',label:'Лёгкая'},{id:'moderate',label:'Умеренная'},{id:'active',label:'Активная'}]} onChange={v => setHouseholdActivity(v as string)} />
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <PopupNumber label="😴 Сон (часы)" value={sleepHours} min={3} max={14} step={0.5} suffix="ч" onChange={setSleepHours} />
-          <PopupNumber label="🌟 Качество сна" value={sleepQuality} min={1} max={10} suffix="/10" onChange={setSleepQuality} />
-          <PopupNumber label="😰 Стресс" value={stressLevel} min={1} max={10} suffix="/10" onChange={setStressLevel} />
-        </div>
-        <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, opacity: 0.9 }}>
-          Сон и стресс дают заметки по восстановлению/микронутриентам (триптофан, Mg, тарт-вишня) — калораж и макросы они не меняют (те идут из TDEE/цели/фармы).
-        </div>
-        {sex === 'female' && (
-          <div style={{ marginBottom: 6 }}>
-            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана (авто по календарю)'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as any)} />
-            {/* Эпик 7: календарь цикла — лог начал периодов → авто-фаза */}
-            {(() => {
-              const cal = autoCyclePhase();
-              const logLen = getCycleLog().length;
-              return (
-                <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: logLen > 0 ? 'rgba(236,72,153,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${logLen > 0 ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.05)'}` }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-                    {logLen > 0
-                      ? `📅 Календарь: ${logLen} ${logLen === 1 ? 'отметка' : 'отметок'} · длина цикла ~${cal.length} дн · сейчас: ${CYCLE_PHASE_RU[cal.phase]}${cyclePhase && cyclePhase !== 'none' ? ' (ручной оверрайд)' : ' (авто)'}`
-                      : '📅 Календарь цикла: отметьте день начала периода — фаза будет рассчитываться автоматически.'}
-                  </div>
-                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-                    <button onClick={() => { saveCyclePeriod(_toLocalIso(new Date())); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.25)', color: '#f472b6' }}>📅 Отметить начало (сегодня)</button>
-                    {logLen > 0 && <button onClick={() => { clearCycleLog(); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Сбросить лог</button>}
-                  </div>
-                </div>
-              );
-            })()}
-            {/* Эпик 7б: энергетическая доступность (RED-S) — карточка + действие */}
-            {(() => {
+              fontSize: 9,
+              color: generationMode === 'recipes' ? 'rgba(253,186,116,0.9)' : 'rgba(255,255,255,0.7)',
+              marginBottom: 8,
+              lineHeight: 1.5,
+            }}
+          >
+            {generationMode === 'recipes'
+              ? '🍲 Генерация будет ТОЛЬКО по рецептам: каждый основной приём — цельное блюдо с ингредиентами и пошаговой готовкой. После выбора варианта рацион автоматически перестраивается (без недобора и перебора), закупки и процесс готовки обновятся под рецепты.'
+              : '✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин'}
+          </div>
+          {/* G1 (сырое/готовое): единый режим веса плана — математика КБЖУ не меняется, только отображение граммовок */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            {[
+              { id: 'cooked' as const, label: '🍚 Вес готовый', hint: 'Граммовки как на тарелке' },
+              { id: 'raw' as const, label: '🌾 Вес сухой', hint: 'Крупу взвешивать сухой' },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setWeightMode(m.id)}
+                aria-pressed={weightMode === m.id}
+                title={m.hint}
+                style={{
+                  flex: 1,
+                  padding: '7px 3px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  background: weightMode === m.id ? 'rgba(96,165,250,0.14)' : '#202023',
+                  border: weightMode === m.id ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.06)',
+                  color: weightMode === m.id ? '#60a5fa' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => {
               try {
-                const _bf = bodyFatPct > 3 ? bodyFatPct : 22;
-                const _lbm = weight * (1 - _bf / 100);
-                const _ea = computeEnergyAvailability(kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal), weight, _lbm, true, 60, (trainIntensity as any) || 'medium', 'female');
-                if (!_ea || _ea.status === 'optimal') return null;
-                const col = _ea.status === 'risk' ? '#ef4444' : '#f59e0b';
+                const _err = _validatePlannerInput();
+                if (_err) {
+                  setErrorMsg(_err);
+                  return;
+                }
+                setErrorMsg(null);
+                generatePlan(1);
+                setPlanTab('plan');
+              } catch (e: any) {
+                try {
+                  setErrorMsg('Ошибка: ' + (e?.message || String(e)));
+                } catch {}
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 700,
+              background:
+                generationMode === 'recipes'
+                  ? 'linear-gradient(135deg,#f97316,#ea580c)'
+                  : 'linear-gradient(135deg,#00e68a,#00c8a0)',
+              border: 'none',
+              color: '#fff',
+              boxShadow:
+                generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.25)' : '0 4px 16px rgba(0,230,138,0.2)',
+            }}
+          >
+            {generationMode === 'recipes' ? '🍳 Сгенерировать план по рецептам →' : '✨ Сгенерировать план питания →'}
+          </button>
+        </GlassCard>
+      }
+
+      {
+        <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupNumber
+              label="⚖️ Вес (кг)"
+              value={weight}
+              min={PLANNER_BOUNDS.weight.min}
+              max={PLANNER_BOUNDS.weight.max}
+              suffix="кг"
+              onChange={setWeight}
+            />
+            <PopupNumber
+              label="📏 Рост (см)"
+              value={height}
+              min={PLANNER_BOUNDS.height.min}
+              max={PLANNER_BOUNDS.height.max}
+              suffix="см"
+              onChange={setHeight}
+            />
+            {/* FIX B27: границы возраста — из общего PLANNER_BOUNDS (раньше здесь стояло 120,
+              а валидация отклоняла >100: ввод принимался, а генерация падала с ошибкой). */}
+            <PopupNumber
+              label="🎂 Возраст"
+              value={age}
+              min={PLANNER_BOUNDS.age.min}
+              max={PLANNER_BOUNDS.age.max}
+              suffix="лет"
+              onChange={setAge}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupSelect
+              label="🧑 Пол"
+              value={sex}
+              options={[
+                { id: 'male', label: 'Мужской' },
+                { id: 'female', label: 'Женский' },
+              ]}
+              onChange={(v) => setSex(v as 'male' | 'female')}
+            />
+            <PopupNumber
+              label="🚶 Шагов/день"
+              value={dailySteps}
+              min={0}
+              max={50000}
+              step={500}
+              suffix="шаг"
+              onChange={setDailySteps}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+            {/* Чистка-2026 (C2): дубль «Заполнить из профиля» удалён — синк живёт в
+              верхней карточке «Синхронизация с Профилем» (аутфилл/сохранить). */}
+            <button
+              onClick={() => {
+                if ((labs || []).length === 0) {
+                  setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.');
+                  return;
+                }
+                setV2Labs(importLabsToV2(labs || [], v2Labs));
+              }}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 600,
+                background: (labs || []).length > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
+                border: (labs || []).length > 0 ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: (labs || []).length > 0 ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                opacity: (labs || []).length > 0 ? 1 : 0.5,
+              }}
+            >
+              🩸 Заполнить анализы ({(labs || []).length})
+            </button>
+          </div>
+          <div style={{ marginBottom: 6 }}>
+            <PopupNumber
+              label="🍳 Время на готовку"
+              value={cookTimeMin}
+              min={0}
+              max={300}
+              step={5}
+              suffix="мин"
+              onChange={setCookTimeMin}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupSelect
+              label="👨‍🍳 Навык готовки"
+              value={cookingSkill}
+              options={[
+                { id: 'basic', label: 'Базовый (простые блюда)' },
+                { id: 'medium', label: 'Средний (готовлю регулярно)' },
+                { id: 'advanced', label: 'Продвинутый (сложные рецепты)' },
+              ]}
+              onChange={(v) => setCookingSkill(v as any)}
+            />
+            <PopupSelect
+              label="📅 Частота готовки"
+              value={cookingFrequency}
+              options={[
+                { id: 'daily', label: 'Каждый день' },
+                { id: 'every_3_days', label: 'Раз в 3 дня' },
+                { id: 'weekly', label: 'Раз в неделю (meal prep)' },
+              ]}
+              onChange={(v) => setCookingFrequency(v as any)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <button
+              onClick={() => setBatchCooking(!batchCooking)}
+              style={{
+                flex: 1,
+                padding: '6px 8px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 600,
+                textAlign: 'left',
+                background: batchCooking ? 'rgba(34,197,94,0.08)' : '#202023',
+                border: `1px solid ${batchCooking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                color: batchCooking ? '#22c55e' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              🍳 Готовка впрок: {batchCooking ? 'ВКЛ' : 'ВЫКЛ'}
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupSelect
+              label="🏋️ Тип тренировок"
+              value={trainType}
+              options={[
+                { id: 'strength', label: 'Силовые' },
+                { id: 'cardio', label: 'Кардио' },
+                { id: 'mixed', label: 'Смешанные' },
+                { id: 'hiit', label: 'HIIT' },
+              ]}
+              onChange={(v) => setTrainType(v as string)}
+            />
+            <PopupSelect
+              label="📊 Интенсивность"
+              value={trainIntensity}
+              options={[
+                { id: 'low', label: 'Низкая' },
+                { id: 'medium', label: 'Средняя' },
+                { id: 'high', label: 'Высокая' },
+              ]}
+              onChange={(v) => setTrainIntensity(v as string)}
+            />
+          </div>
+          {/* Кардио-дневник → питание: справочно, цели КБЖУ не меняются (PAL уже их учёл). */}
+          <CardioKcalNote compact />
+          <div style={{ marginBottom: 6 }}>
+            <button
+              onClick={() => setIntraWorkoutEnabled(!intraWorkoutEnabled)}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 600,
+                textAlign: 'left',
+                background: intraWorkoutEnabled ? 'rgba(34,197,94,0.08)' : '#202023',
+                border: `1px solid ${intraWorkoutEnabled ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                color: intraWorkoutEnabled ? '#22c55e' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              🏋️ Intra-workout (углеводы+изотоник во время тренировки): {intraWorkoutEnabled ? 'ВКЛ' : 'ВЫКЛ'}
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupNumber
+              label="🧈 % жира"
+              value={bodyFatPct}
+              min={3}
+              max={60}
+              step={0.5}
+              suffix="%"
+              onChange={setBodyFatPct}
+            />
+            <PopupSelect
+              label="🏠 Быт. активность"
+              value={householdActivity}
+              options={[
+                { id: 'sedentary', label: 'Сидячий' },
+                { id: 'light', label: 'Лёгкая' },
+                { id: 'moderate', label: 'Умеренная' },
+                { id: 'active', label: 'Активная' },
+              ]}
+              onChange={(v) => setHouseholdActivity(v as string)}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+            <PopupNumber
+              label="😴 Сон (часы)"
+              value={sleepHours}
+              min={3}
+              max={14}
+              step={0.5}
+              suffix="ч"
+              onChange={setSleepHours}
+            />
+            <PopupNumber
+              label="🌟 Качество сна"
+              value={sleepQuality}
+              min={1}
+              max={10}
+              suffix="/10"
+              onChange={setSleepQuality}
+            />
+            <PopupNumber
+              label="😰 Стресс"
+              value={stressLevel}
+              min={1}
+              max={10}
+              suffix="/10"
+              onChange={setStressLevel}
+            />
+          </div>
+          <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, opacity: 0.9 }}>
+            Сон и стресс дают заметки по восстановлению/микронутриентам (триптофан, Mg, тарт-вишня) — калораж и макросы
+            они не меняют (те идут из TDEE/цели/фармы).
+          </div>
+          {sex === 'female' && (
+            <div style={{ marginBottom: 6 }}>
+              <PopupSelect
+                label="🌸 Фаза цикла"
+                value={cyclePhase}
+                options={[
+                  { id: 'none', label: 'Не указана (авто по календарю)' },
+                  { id: 'follicular', label: 'Фолликулярная' },
+                  { id: 'ovulation', label: 'Овуляция' },
+                  { id: 'luteal', label: 'Лютеиновая' },
+                  { id: 'menstrual', label: 'Менструация' },
+                ]}
+                onChange={(v) => setCyclePhase(v as any)}
+              />
+              {/* Эпик 7: календарь цикла — лог начал периодов → авто-фаза */}
+              {(() => {
+                const cal = autoCyclePhase();
+                const logLen = getCycleLog().length;
                 return (
-                  <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: `${col}0a`, border: `1px solid ${col}22` }}>
-                    <div style={{ fontSize: 9, color: col, lineHeight: 1.5 }}>⚠️ {_ea.note}</div>
-                    <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, (manualKcal ?? effectiveKcal) + 250)); }} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: `${col}14`, border: `1px solid ${col}30`, color: col }}>⚡ +250 ккал к цели (защита энергии)</button>
+                  <div
+                    style={{
+                      padding: '6px 8px',
+                      borderRadius: 8,
+                      marginTop: 4,
+                      background: logLen > 0 ? 'rgba(236,72,153,0.05)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${logLen > 0 ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.05)'}`,
+                    }}
+                  >
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                      {logLen > 0
+                        ? `📅 Календарь: ${logLen} ${logLen === 1 ? 'отметка' : 'отметок'} · длина цикла ~${cal.length} дн · сейчас: ${CYCLE_PHASE_RU[cal.phase]}${cyclePhase && cyclePhase !== 'none' ? ' (ручной оверрайд)' : ' (авто)'}`
+                        : '📅 Календарь цикла: отметьте день начала периода — фаза будет рассчитываться автоматически.'}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                      <button
+                        onClick={() => {
+                          saveCyclePeriod(_toLocalIso(new Date()));
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '4px 6px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          background: 'rgba(236,72,153,0.12)',
+                          border: '1px solid rgba(236,72,153,0.25)',
+                          color: '#f472b6',
+                        }}
+                      >
+                        📅 Отметить начало (сегодня)
+                      </button>
+                      {logLen > 0 && (
+                        <button
+                          onClick={() => {
+                            clearCycleLog();
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '4px 6px',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            fontSize: 9,
+                            fontWeight: 600,
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            color: 'rgba(255,255,255,0.6)',
+                          }}
+                        >
+                          Сбросить лог
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
-              } catch { return null; }
-            })()}
-            {/* Чистка-2026 (P10): bbCategory/lifeStage перенесены в «Contest Prep · тапер ББ» */}
-          </div>
-        )}
-        {/* Эпик 8: legacy peak-week UI (кнопка+день шоу) удалён — единый путь «🏁 Тапер ББ» (bbPrepConfig) */}
-        {/* Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал (+10% белка при голоде) */}
-      </GlassCard>
-      )}
+              })()}
+              {/* Эпик 7б: энергетическая доступность (RED-S) — карточка + действие */}
+              {(() => {
+                try {
+                  const _bf = bodyFatPct > 3 ? bodyFatPct : 22;
+                  const _lbm = weight * (1 - _bf / 100);
+                  const _ea = computeEnergyAvailability(
+                    kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal),
+                    weight,
+                    _lbm,
+                    true,
+                    60,
+                    (trainIntensity as any) || 'medium',
+                    'female',
+                  );
+                  if (!_ea || _ea.status === 'optimal') return null;
+                  const col = _ea.status === 'risk' ? '#ef4444' : '#f59e0b';
+                  return (
+                    <div
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        marginTop: 4,
+                        background: `${col}0a`,
+                        border: `1px solid ${col}22`,
+                      }}
+                    >
+                      <div style={{ fontSize: 9, color: col, lineHeight: 1.5 }}>⚠️ {_ea.note}</div>
+                      <button
+                        onClick={() => {
+                          switchKbjuMode('manual');
+                          setManualKcal(Math.max(1200, (manualKcal ?? effectiveKcal) + 250));
+                        }}
+                        style={{
+                          marginTop: 4,
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          background: `${col}14`,
+                          border: `1px solid ${col}30`,
+                          color: col,
+                        }}
+                      >
+                        ⚡ +250 ккал к цели (защита энергии)
+                      </button>
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+              {/* Чистка-2026 (P10): bbCategory/lifeStage перенесены в «Contest Prep · тапер ББ» */}
+            </div>
+          )}
+          {/* Эпик 8: legacy peak-week UI (кнопка+день шоу) удалён — единый путь «🏁 Тапер ББ» (bbPrepConfig) */}
+          {/* Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал (+10% белка при голоде) */}
+        </GlassCard>
+      }
 
       {/* 🏁 Contest Prep — статус (единый план) + контест-настройки, перенесённые из «Пользователь» (P10) */}
-       {(plannerMode === 'pro' || !!bbPrepConfig || sex === 'female') && (
+      {(plannerMode === 'pro' || !!bbPrepConfig || sex === 'female') && (
         <GlassCard title="Contest Prep · тапер ББ" icon="🏁" color="#f59e0b">
-           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.45 }}>
-             Контест-настройки собраны здесь: категория шоу и жизненный этап (гейт сушки) + пикинг ниже.
-           </div>
-           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-             <PopupSelect label="🏋 Категория шоу" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
-             {sex === 'female' && (
-               <PopupSelect label="🌿 Жизненный этап" value={lifeStage} options={[{id:'none',label:'Нет'},{id:'pregnancy',label:'Беременность'},{id:'lactation',label:'Лактация'},{id:'menopause',label:'Менопауза'},{id:'contraception',label:'Контрацепция'}]} onChange={v => setLifeStage(v as any)} />
-             )}
-           </div>
-           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 8, lineHeight: 1.45 }}>
-             {bbPrepConfig
-               ? `● Активен: шоу ${bbPrepConfig.showDate} · ${bbPrepConfig.category} · тапер ${bbPrepConfig.weeksOut} нед. Настройка — во вкладке «🏁 Тапер ББ».`
-               : 'Пикинг к шоу настраивается во вкладке «🏁 Тапер ББ» (полный редактор).'}
-           </div>
-             {bbPrepConfig ? (
-               <button
-                 onClick={() => applyBBPeakToPlan(null)}
-                 style={{
-                   flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
-                   background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444',
-                 }}
-               >
-                 ✕ Отключить тапер
-               </button>
-             ) : (
-                /* Чистка-2026 (C4) + распил-2: стендалон — внутренняя вкладка peak;
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6, lineHeight: 1.45 }}>
+            Контест-настройки собраны здесь: категория шоу и жизненный этап (гейт сушки) + пикинг ниже.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+            <PopupSelect
+              label="🏋 Категория шоу"
+              value={bbCategory}
+              options={[
+                { id: 'none', label: 'Не указана' },
+                ...categoriesForSex(sex).map((c) => ({ id: c.id, label: c.label })),
+              ]}
+              onChange={(v) => setBBCategory(v as any)}
+            />
+            {sex === 'female' && (
+              <PopupSelect
+                label="🌿 Жизненный этап"
+                value={lifeStage}
+                options={[
+                  { id: 'none', label: 'Нет' },
+                  { id: 'pregnancy', label: 'Беременность' },
+                  { id: 'lactation', label: 'Лактация' },
+                  { id: 'menopause', label: 'Менопауза' },
+                  { id: 'contraception', label: 'Контрацепция' },
+                ]}
+                onChange={(v) => setLifeStage(v as any)}
+              />
+            )}
+          </div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 8, lineHeight: 1.45 }}>
+            {bbPrepConfig
+              ? `● Активен: шоу ${bbPrepConfig.showDate} · ${bbPrepConfig.category} · тапер ${bbPrepConfig.weeksOut} нед. Настройка — во вкладке «🏁 Тапер ББ».`
+              : 'Пикинг к шоу настраивается во вкладке «🏁 Тапер ББ» (полный редактор).'}
+          </div>
+          {bbPrepConfig ? (
+            <button
+              onClick={() => applyBBPeakToPlan(null)}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 700,
+                minHeight: 44,
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.35)',
+                color: '#ef4444',
+              }}
+            >
+              ✕ Отключить тапер
+            </button>
+          ) : (
+            /* Чистка-2026 (C4) + распил-2: стендалон — внутренняя вкладка peak;
                    embedded (NutritionScreen) — топ-таб через событие (внутренней peak там нет). */
-                <button
-                  onClick={() => { try { setPlanTab('peak'); } catch {} try { window.dispatchEvent(new CustomEvent('nutrition-open-tab', { detail: 'peak' })); } catch {} }}
-                 style={{
-                   flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
-                   background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.35)', color: '#22c55e',
-                 }}
-               >
-                 🏁 Настроить тапер (пикинг к шоу)
-               </button>
-             )}
+            <button
+              onClick={() => {
+                try {
+                  setPlanTab('peak');
+                } catch {}
+                try {
+                  window.dispatchEvent(new CustomEvent('nutrition-open-tab', { detail: 'peak' }));
+                } catch {}
+              }}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 700,
+                minHeight: 44,
+                background: 'rgba(34,197,94,0.10)',
+                border: '1px solid rgba(34,197,94,0.35)',
+                color: '#22c55e',
+              }}
+            >
+              🏁 Настроить тапер (пикинг к шоу)
+            </button>
+          )}
         </GlassCard>
       )}
 
-        {/* Чистка-2026 (P13): карточка «💧 Электролиты» удалена из настроек — читалка профиля
+      {/* Чистка-2026 (P13): карточка «💧 Электролиты» удалена из настроек — читалка профиля
             (дневные цели натрия/калия/магния приходят из Профиля/анализов в v2Labs автоматически). */}
 
-        {/* v2 Scoring Profile — moved to top */}
-       {plannerMode === 'pro' && (
-         <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
+      {/* v2 Scoring Profile — moved to top */}
+      {plannerMode === 'pro' && (
+        <GlassCard title="🧬 v2 Скоринг" icon="🧬" color="#00e68a">
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.3 }}>
-            <div style={{ marginBottom: 4 }}>Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки, профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового скоринга каждого приёма пищи.</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'#22c55e', fontSize:10 }}>7–10 — 🟢 Отлично</span>
-              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(245,158,11,0.08)', color:'#f59e0b', fontSize:10 }}>4–6 — 🟡 Средне</span>
-              <span style={{ padding:'2px 6px', borderRadius:4, background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:10 }}>1–3 — 🔴 Низко</span>
+            <div style={{ marginBottom: 4 }}>
+              Качество рациона оценивается по шкале 0–10 на основе: состава макронутриентов, содержания клетчатки,
+              профиля аминокислот и микронутриентной плотности. Результат влияет на подбор продуктов и расчёт итогового
+              скоринга каждого приёма пищи.
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(0,230,138,0.08)',
+                  color: '#22c55e',
+                  fontSize: 10,
+                }}
+              >
+                7–10 — 🟢 Отлично
+              </span>
+              <span
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(245,158,11,0.08)',
+                  color: '#f59e0b',
+                  fontSize: 10,
+                }}
+              >
+                4–6 — 🟡 Средне
+              </span>
+              <span
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(239,68,68,0.08)',
+                  color: '#ef4444',
+                  fontSize: 10,
+                }}
+              >
+                1–3 — 🔴 Низко
+              </span>
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фаза (V2-скоринг — не путать с «💉 Фазой и препаратами»)</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
+              Фаза (V2-скоринг — не путать с «💉 Фазой и препаратами»)
+            </div>
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
-                <button key={ph} onClick={() => setV2Phase(ph)} style={{
-                  padding: '4px 10px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                  background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                  border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                  color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
-                }}>{ph === 'LEAN_MASS' ? '💪 Набор' : ph === 'EXTREME_CUT' ? '🔥 Сушка' : ph === 'PEAK_WEEK' ? '⚡ Пик' : ph === 'POST_CYCLE' ? '🔄 ПКТ' : '🌉 Мост'}</button>
+              {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map((ph) => (
+                <button
+                  key={ph}
+                  onClick={() => setV2Phase(ph)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 10,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: v2Phase === ph ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                    border: v2Phase === ph ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                    color: v2Phase === ph ? '#000' : 'rgba(255,255,255,0.7)',
+                  }}
+                >
+                  {ph === 'LEAN_MASS'
+                    ? '💪 Набор'
+                    : ph === 'EXTREME_CUT'
+                      ? '🔥 Сушка'
+                      : ph === 'PEAK_WEEK'
+                        ? '⚡ Пик'
+                        : ph === 'POST_CYCLE'
+                          ? '🔄 ПКТ'
+                          : '🌉 Мост'}
+                </button>
               ))}
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
             {/* Чистка-2026 (P11): фарм-чипы перенесены в «Фаза и препараты» — один ввод курса */}
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 2, lineHeight: 1.4 }}>
-              💊 Фармакология (ААС/ГР/инсулин/диуретики/…) — единый ввод в карточке «Фаза и препараты» (фарм-флаги V2-скоринга — там же).
+              💊 Фармакология (ААС/ГР/инсулин/диуретики/…) — единый ввод в карточке «Фаза и препараты» (фарм-флаги
+              V2-скоринга — там же).
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Лабораторные (v2)</div>
-            <button onClick={() => {
-              // FIX audit (C1): единый helper (дубль ~30 строк удалён)
-              if ((labs || []).length === 0) { setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.'); return; }
-              setV2Labs(importLabsToV2(labs || [], v2Labs));
-              setErrorMsg(null);
-            }} style={{
-              width: '100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
-              background: (labs || []).length > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
-              border: (labs || []).length > 0 ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: (labs || []).length > 0 ? '#00e68a' : 'rgba(255,255,255,0.5)',
-              marginBottom: 6,
-            }}>🩸 Заполнить из анализов ({(labs || []).length})</button>
+            <button
+              onClick={() => {
+                // FIX audit (C1): единый helper (дубль ~30 строк удалён)
+                if ((labs || []).length === 0) {
+                  setErrorMsg('Нет анализов в «Лаборатория». Откройте вкладку анализов и загрузите результаты.');
+                  return;
+                }
+                setV2Labs(importLabsToV2(labs || [], v2Labs));
+                setErrorMsg(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 600,
+                background: (labs || []).length > 0 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)',
+                border: (labs || []).length > 0 ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: (labs || []).length > 0 ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                marginBottom: 6,
+              }}
+            >
+              🩸 Заполнить из анализов ({(labs || []).length})
+            </button>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-              <PopupNumber label="Гематокрит" value={parseFloat(v2Labs.hematocrit)||0} min={0} max={70} step={0.1} suffix="%" onChange={v=>setV2Labs((p:any)=>({...p,hematocrit:String(v)}))} />
-              <PopupNumber label="Гемоглобин" value={parseFloat(v2Labs.hemoglobin)||0} min={0} max={250} step={1} suffix="г/л" onChange={v=>setV2Labs((p:any)=>({...p,hemoglobin:String(v)}))} />
-              <PopupNumber label="ЛПВП" value={parseFloat(v2Labs.hdl)||0} min={0} max={3} step={0.1} suffix="ммоль/л" onChange={v=>setV2Labs((p:any)=>({...p,hdl:String(v)}))} />
-              <PopupNumber label="ЛПНП" value={parseFloat(v2Labs.ldl)||0} min={0} max={10} step={0.1} suffix="ммоль/л" onChange={v=>setV2Labs((p:any)=>({...p,ldl:String(v)}))} />
-              <PopupNumber label="АЛТ" value={parseFloat(v2Labs.alt)||0} min={0} max={500} step={1} suffix="Ед/л" onChange={v=>setV2Labs((p:any)=>({...p,alt:String(v)}))} />
-              <PopupNumber label="АСТ" value={parseFloat(v2Labs.ast)||0} min={0} max={500} step={1} suffix="Ед/л" onChange={v=>setV2Labs((p:any)=>({...p,ast:String(v)}))} />
-              <PopupNumber label="СРБ" value={parseFloat(v2Labs.crp)||0} min={0} max={200} step={0.5} suffix="мг/л" onChange={v=>setV2Labs((p:any)=>({...p,crp:String(v)}))} />
-              <PopupNumber label="Тестостерон" value={parseFloat(v2Labs.testosterone)||0} min={0} max={60} step={0.5} suffix="нмоль/л" onChange={v=>setV2Labs((p:any)=>({...p,testosterone:String(v)}))} />
+              <PopupNumber
+                label="Гематокрит"
+                value={parseFloat(v2Labs.hematocrit) || 0}
+                min={0}
+                max={70}
+                step={0.1}
+                suffix="%"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, hematocrit: String(v) }))}
+              />
+              <PopupNumber
+                label="Гемоглобин"
+                value={parseFloat(v2Labs.hemoglobin) || 0}
+                min={0}
+                max={250}
+                step={1}
+                suffix="г/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, hemoglobin: String(v) }))}
+              />
+              <PopupNumber
+                label="ЛПВП"
+                value={parseFloat(v2Labs.hdl) || 0}
+                min={0}
+                max={3}
+                step={0.1}
+                suffix="ммоль/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, hdl: String(v) }))}
+              />
+              <PopupNumber
+                label="ЛПНП"
+                value={parseFloat(v2Labs.ldl) || 0}
+                min={0}
+                max={10}
+                step={0.1}
+                suffix="ммоль/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, ldl: String(v) }))}
+              />
+              <PopupNumber
+                label="АЛТ"
+                value={parseFloat(v2Labs.alt) || 0}
+                min={0}
+                max={500}
+                step={1}
+                suffix="Ед/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, alt: String(v) }))}
+              />
+              <PopupNumber
+                label="АСТ"
+                value={parseFloat(v2Labs.ast) || 0}
+                min={0}
+                max={500}
+                step={1}
+                suffix="Ед/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, ast: String(v) }))}
+              />
+              <PopupNumber
+                label="СРБ"
+                value={parseFloat(v2Labs.crp) || 0}
+                min={0}
+                max={200}
+                step={0.5}
+                suffix="мг/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, crp: String(v) }))}
+              />
+              <PopupNumber
+                label="Тестостерон"
+                value={parseFloat(v2Labs.testosterone) || 0}
+                min={0}
+                max={60}
+                step={0.5}
+                suffix="нмоль/л"
+                onChange={(v) => setV2Labs((p: any) => ({ ...p, testosterone: String(v) }))}
+              />
             </div>
           </div>
           {/* Чистка дублей (план единого источника, остаток): единый контрол гистамина —
               чип «Гистамин» в карточке «Исключения» (🚫 Непереносимость, ниже). Здесь —
               только строка-ссылка на тот же сеттер histamineSensitive. */}
           <div style={{ marginBottom: 6, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-            Чувствительность к гистамину: {histamineSensitive ? '⚠️ да' : 'нет'} — переключается чипом «Гистамин» в карточке «Исключения».
+            Чувствительность к гистамину: {histamineSensitive ? '⚠️ да' : 'нет'} — переключается чипом «Гистамин» в
+            карточке «Исключения».
           </div>
         </GlassCard>
       )}
 
       {/* v6: Диетические паузы → объединены в «Периодизация углеводов» (см. карту Циклирование) */}
 
-      {(
-      <GlassCard title="Цель" icon="🎯" color="#00e68a">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-          {GOALS.map(g => (
-            <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color={goal === g.id ? '#00e68a' : undefined}>
-              {g.icon} {g.label}
-              {autoGoal === g.id && !goalUserSet && <span style={{ marginLeft: 3, fontSize: 9, color: '#00e68a', fontWeight: 800 }}>⚡</span>}
-            </PillBtn>
-          ))}
-        </div>
-        {autoGoal !== goal && goalUserSet && (
-          <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
-            Профиль → рекомендована цель «{GOALS.find(g => g.id === autoGoal)?.label}».
-            <span onClick={() => { setGoal(autoGoal); setGoalUserSet(false); }} style={{ color: '#00e68a', cursor: 'pointer', fontWeight: 600, marginLeft: 2 }}>Применить</span>
-          </div>
-        )}
-        {goal === 'mass' && (
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 9, fontWeight: 600, color: '#00e68a' }}>📈 Профицит: +{surplusPct}%</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#00e68a', background: 'rgba(0,230,138,0.1)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.15)' }}>
-                +{Math.round((kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal)) * surplusPct / 100)} ккал
-              </span>
-              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>{surplusPct < 10 ? 'Мягкий' : surplusPct < 18 ? 'Умеренный' : 'Агрессивный'}</span>
-            </div>
-            <input type="range" min="5" max="25" value={surplusPct} onChange={e => { const v = +e.target.value; setSurplusPct(v); try { localStorage.setItem('he_surplus_pct', v.toString()); } catch {} }} style={{ width:'100%', margin:'2px 0' }} />
-            <div style={{ display:'flex', justifyContent:'space-between', fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
-              <span>+5% (мин.)</span>
-              <span>+15%</span>
-              <span>+25% (макс.)</span>
-            </div>
-          </div>
-        )}
-      </GlassCard>
-      )}
-
-      {plannerMode === 'pro' && (
-      <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 6, lineHeight: 1.5 }}>
-          Фаза — фарма-контекст (курс/ПКТ/мост/восстановление): влияет на фарма-гейты и рекомендации, но НЕ меняет направление калорий — его задаёт цель выше. Препараты и инъекции (ААС/инсулин/ГР/GLP) применяют свои правила белка и жиров автоматически. <span style={{ color: '#00e68a' }}>Не путать с «Фазой (V2-скоринг)» в карточке 🧬 — та влияет только на оценку качества рациона, не на состав дня.</span>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
-          {PHASES.map(p => (
-            <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>{p.icon} {p.label}</PillBtn>
-          ))}
-        </div>
-        {courseEntries.length > 0 && (
-          <div style={{ fontSize: 9, color: '#a78bfa', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            📋 Загружено {courseEntries.length} препаратов из курса
-          </div>
-        )}
-        <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, marginBottom: 6 }}>Добавленные инъекции:</div>
-        <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {injections.map((inj, i) => {
-            const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
-            return (
-            <div key={inj.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#fff' }}>
-                <span>💉</span>
-                <strong style={{ color: '#06b6d4' }}>{inj.time}</strong>
-                <span style={{ fontWeight: 600 }}>{inj.name}</span>
-                <span style={{ color: 'rgba(255,255,255,0.9)' }}>{inj.dose}{inj.unit}</span>
-                {inj.esterType !== 'none' && <span style={{color:'rgba(255,255,255,0.8)',fontSize:9}}>({inj.esterType})</span>}
-                {canLink && (
-                  <button onClick={() => {
-                    if (!linkToTraining) setLinkToTraining(true);
-                    setInjections(injections.map((j2, j) => j === i ? { ...j2, trainLinked: !j2.trainLinked, trainTiming: !j2.trainLinked ? 'before' : 'none' } : j2));
-                  }} style={{
-                    fontSize: 9, padding: '2px 5px', borderRadius: 4, cursor: 'pointer', fontWeight: 600,
-                    background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
-                    border: inj.trainLinked ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: inj.trainLinked ? '#00e68a' : '#fff',
-                  }}>🏋️</button>
+      {
+        <GlassCard title="Цель" icon="🎯" color="#00e68a">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {GOALS.map((g) => (
+              <PillBtn
+                key={g.id}
+                active={goal === g.id}
+                onClick={() => {
+                  setGoal(g.id);
+                  setGoalUserSet(true);
+                }}
+                color={goal === g.id ? '#00e68a' : undefined}
+              >
+                {g.icon} {g.label}
+                {autoGoal === g.id && !goalUserSet && (
+                  <span style={{ marginLeft: 3, fontSize: 9, color: '#00e68a', fontWeight: 800 }}>⚡</span>
                 )}
-                {canLink && inj.trainLinked && (['before', 'after', 'both'] as const).map(t => (
-                  <button key={t} onClick={() => setInjections(injections.map((j2, j) => j === i ? { ...j2, trainTiming: t } : j2))} style={{
-                    fontSize: 11, padding: '6px 10px', minHeight: 40, borderRadius: 8, cursor: 'pointer', fontWeight: 600,
-                    background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: inj.trainTiming === t ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: inj.trainTiming === t ? '#60a5fa' : '#fff',
-                  }}>{t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}</button>
-                ))}
-                <button onClick={() => setInjections(injections.filter((_, j) => j !== i))} style={{ marginLeft: 'auto', background: 'rgba(239,68,68,0.1)', border: 'none', color: '#ef4444', fontSize: 10, cursor: 'pointer', borderRadius: 4, padding: '2px 6px' }}>✕</button>
-              </div>
-            </div>);
-          })}
-        </div>
-        <button onClick={() => setShowAddDrug(true)} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(6,182,212,0.2)', background:'rgba(6,182,212,0.06)', color:'#06b6d4', fontSize:9, fontWeight:600 }}>
-          + Добавить инъекцию
-        </button>
-        {showAddDrug && (
-          <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)' }}
-            onClick={() => setShowAddDrug(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:340, padding:20, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-              <div style={{ fontSize:15, fontWeight:700, color:'#fff', marginBottom:14, textAlign:'center', letterSpacing:-0.3 }}>💉 Добавить инъекцию</div>
-              <div style={{ marginBottom:10 }}>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Тип препарата:</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-                  {[
-                    { id:'инсулин', icon:'💉' }, { id:'ГР', icon:'📈' }, { id:'ИФР-1', icon:'🧬' },
-                    { id:'пептид', icon:'🔬' }, { id:'ААС', icon:'⚡' }, { id:'другое', icon:'📦' },
-                  ].map(dt => (
-                    <button key={dt.id} onClick={() => { setInjType(dt.id); setInjName(dt.id); }} style={{
-                      padding:'8px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
-                      background: injType === dt.id ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)',
-                      border: injType === dt.id ? '1px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
-                      color: injType === dt.id ? '#06b6d4' : 'rgba(255,255,255,0.7)',
-                      fontWeight: injType === dt.id ? 700 : 400, fontSize:10, transition:'all 0.15s',
-                    }}>
-                      <div style={{ fontSize:14 }}>{dt.icon}</div>
-                      <div>{dt.id}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button onClick={() => setShowDrugTypePicker(true)} style={{
-                width:'100%', padding:'6px', borderRadius:8, cursor:'pointer', fontSize:9, marginBottom:10,
-                background:'rgba(139,92,246,0.08)', border:'1px dashed rgba(139,92,246,0.25)', color:'#a78bfa', fontWeight:600,
-              }}>📋 Все типы препаратов ({injectDrugTypes.length})</button>
-              <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Доза</div>
-                  <input type="number" min={0} step="any" value={injDose} onChange={e => setInjDose(Math.max(0, +e.target.value || 0))} style={{ ...inputStyle, width:'100%', fontSize:12, padding:'8px 10px', boxSizing:'border-box' }} />
-                </div>
-                <div style={{ width:70 }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:2 }}>Время</div>
-                  <input type="time" value={injTime} onChange={e => setInjTime(e.target.value)} style={{ ...inputStyle, width:'100%', fontSize:10, padding:'8px 6px', boxSizing:'border-box' }} />
-                </div>
-              </div>
-              {/* P1-UX: единицы — чипы 44px вместо нативного select (мелкий тач-таргет в плотной строке) */}
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:3 }}>Единицы</div>
-                <div style={{ display:'flex', gap:4 }}>
-                  {['mg','mcg','IU','ml'].map(u => (
-                    <button key={u} onClick={() => setInjUnit(u)} aria-pressed={injUnit === u} style={{
-                      flex:1, minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700,
-                      background: injUnit === u ? 'rgba(139,92,246,0.14)' : 'rgba(255,255,255,0.03)',
-                      border: injUnit === u ? '1px solid rgba(139,92,246,0.45)' : '1px solid rgba(255,255,255,0.08)',
-                      color: injUnit === u ? '#a78bfa' : '#fff',
-                    }}>{u}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ marginBottom:10 }}>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:3 }}>Эфир:</div>
-                <div style={{ display:'flex', gap:3 }}>
-                  {[
-                    { id:'none', label:'Авто' },
-                    { id:'rapid', label:'Быстрый' },
-                    { id:'short', label:'Короткий' },
-                    { id:'long', label:'Длинный' },
-                  ].map(e => (
-                    <button key={e.id} onClick={() => setInjEster(e.id as any)} style={{
-                      flex:1, padding:'5px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
-                      background: injEster === e.id ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
-                      border: injEster === e.id ? '1px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
-                      color: injEster === e.id ? '#06b6d4' : 'rgba(255,255,255,0.7)',
-                    }}>{e.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => setShowAddDrug(false)} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>
-                <button onClick={() => {
-                  const name = injName.trim() || injType;
-                  if (!name) return;
-                  // FIX input-audit: доза должна быть > 0 (0/отрицательная давала «На 0г углеводов»)
-                  if (!Number.isFinite(injDose) || injDose <= 0) { setErrorMsg('Укажите дозу больше 0'); return; }
-                  // FIX audit (B3): метка типа → канонический id PHARMA_DB (см. INJ_LABEL_TO_PHARMA)
-                  const sub = PHARMA_DB[INJ_LABEL_TO_PHARMA[name] || '']; const hl = sub?.pk?.halfLifeHours || 24;
-                  let dt = injType, de = injEster;
-                  if (sub?.class === 'insulin') { dt = 'инсулин'; de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long'; }
-                  let autoTime = +injTime.split(':')[0] * 60 + +injTime.split(':')[1] > 0 ? injTime : '08:00';
-                  if (dt === 'инсулин' && de === 'long') autoTime = '22:00';
-                  if (injEster !== 'none') de = injEster;
-                  const newInj = { id: Date.now().toString(), name, time: autoTime, dose: injDose, unit: injUnit, type: dt, esterType: de, halfLifeHours: hl, trainLinked: false, trainTiming: 'none' as const };
-                  setInjections([...injections, newInj]);
-                  setInjName(''); setShowAddDrug(false);
-                }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700 }}>✓ Добавить</button>
-              </div>
-            </div>
-          </div>
-        )}
-        {showDrugTypePicker && (
-          <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-            onClick={() => setShowDrugTypePicker(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:'90%', maxWidth:380, maxHeight:'80vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)', overflowY:'auto' }}>
-              <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:10, textAlign:'center' }}>📋 Выберите тип препарата</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-                {injectDrugTypes.map(d => {
-                  const icons: Record<string,string> = { инсулин:'💉', ГР:'📈', 'ИФР-1':'🧬', MGF:'🔬', 'IGF-1 DES':'🧬', 'IGF-1 LR3':'🧬', HMG:'💊', HCG:'💊', GHRP:'🧪', CJC:'🧪', 'BPC-157':'🩹', 'TB-500':'🩹', меланотан:'🎨', семаглутид:'⚖️', тирзепатид:'⚖️', другое:'📦', пептид:'🔬', ААС:'⚡' };
-                  return (
-                    <button key={d} onClick={() => { setInjType(d); setInjName(d); setShowDrugTypePicker(false); }} style={{
-                      display:'flex', flexDirection:'column', alignItems:'center', gap:4,
-                      padding:'10px 4px', borderRadius:10, cursor:'pointer', textAlign:'center',
-                      background: injType === d ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)',
-                      border: injType === d ? '2px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
-                      color: injType === d ? '#06b6d4' : 'rgba(255,255,255,0.8)',
-                      fontWeight: injType === d ? 700 : 400, fontSize:9, transition:'all 0.1s',
-                    }}>
-                      <span style={{ fontSize:18 }}>{icons[d] || '📦'}</span>
-                      <span>{d}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              <button onClick={() => setShowDrugTypePicker(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:10 }}>Закрыть</button>
-            </div>
-          </div>
-        )}
-        {/* Чистка-2026 (P11): фарм-флаги V2-скоринга здесь — единый ввод курса с инъекциями выше */}
-        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.1)' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>💊 Фарм-флаги (V2-скоринг качества рациона)</div>
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            {[
-              { id: 'AAS_ORAL', label: '💊 Оральные ААС', color: '#ef4444' },
-              { id: 'AAS_INJECTABLE', label: '💉 Инъекционные ААС', color: '#ef4444' },
-              { id: 'HGH', label: '🧬 HGH/Пептиды', color: '#8b5cf6' },
-              { id: 'DIURETICS', label: '💧 Диуретики', color: '#f59e0b' },
-              { id: 'STIMULATORS', label: '⚡ Стимуляторы', color: '#f97316' },
-              { id: 'INSULIN_USE', label: '💉 Инсулин', color: '#8b5cf6' },
-              { id: 'LIVER_SUPPORT', label: '🫁 Гепатопротекторы', color: '#22c55e' },
-              { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
-            ].map(p => (
-              <button key={p.id} onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))} style={{
-                padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 600, cursor: 'pointer',
-                background: v2Pharma[p.id] ? p.color + '20' : '#202023',
-                border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
-                color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
-              }}>{p.label}</button>
+              </PillBtn>
             ))}
           </div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>Инъекции из курса выше учитываются автоматически; флаги — дополнение для V2-оценки качества рациона.</div>
-        </div>
-        <div style={{ marginTop:10, padding:'10px 12px', borderRadius:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.1)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-            <span style={{ fontSize:10, fontWeight:600, color:'#c4b5fd' }}>🌿 Принимаю БАД: {takenSupplements.length}</span>
-            <button onClick={() => { setSuppSearch(''); setShowSuppPicker(true); }} style={{
-              padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
-              background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa',
-            }}>+ Выбрать</button>
-          </div>
-          {takenSupplements.length > 0 && (
-            // FIX B28 (аудит 2026-10): стоял `slice(0,12)` — при 13+ БАДах остальные
-            // прятались за «+N» и их НЕЛЬЗЯ было удалить из профиля. Теперь рендерятся
-            // все; при большом списке контейнер прокручивается.
-            <div style={{ display:'flex', flexWrap:'wrap', gap:2, maxHeight: takenSupplements.length > 12 ? 120 : undefined, overflowY: takenSupplements.length > 12 ? 'auto' : undefined, paddingRight: takenSupplements.length > 12 ? 4 : undefined }}>
-              {takenSupplements.map(sid => {
-                const sub = SUPPORT_CATALOG_DATA[sid] || ALL_SUBSTANCES.find(s => s.id === sid);
-                return (
-                  <span key={sid} style={{ fontSize:9, padding:'2px 6px', borderRadius:4, background:'rgba(139,92,246,0.08)', color:'#a78bfa', display:'flex', alignItems:'center', gap:4 }}>
-                    {sub?.name || sid}
-                    <span onClick={() => setTakenSupplements(takenSupplements.filter(x => x !== sid))} title="Убрать из профиля" style={{ cursor:'pointer', color:'#ef4444', fontWeight:700 }}>×</span>
-                  </span>
-                );
-              })}
+          {autoGoal !== goal && goalUserSet && (
+            <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
+              Профиль → рекомендована цель «{GOALS.find((g) => g.id === autoGoal)?.label}».
+              <span
+                onClick={() => {
+                  setGoal(autoGoal);
+                  setGoalUserSet(false);
+                }}
+                style={{ color: '#00e68a', cursor: 'pointer', fontWeight: 600, marginLeft: 2 }}
+              >
+                Применить
+              </span>
             </div>
           )}
-        </div>
-        {showSuppPicker && (
-          <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-            onClick={() => setShowSuppPicker(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.15)', overflowY:'auto' }}>
-              <div style={{ fontSize:14, fontWeight:700, color:'#c4b5fd', marginBottom:8, textAlign:'center' }}>🌿 Выберите принимаемые БАД</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                <input value={suppSearch} onChange={e => setSuppSearch(e.target.value)} placeholder="Поиск БАД..." style={{ ...inputStyle, flex: 1, fontSize:11, padding:'8px 10px', boxSizing:'border-box' }} />
-                <button onClick={() => {
+          {goal === 'mass' && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: 'rgba(0,230,138,0.04)',
+                border: '1px solid rgba(0,230,138,0.08)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 9, fontWeight: 600, color: '#00e68a' }}>📈 Профицит: +{surplusPct}%</span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#00e68a',
+                    background: 'rgba(0,230,138,0.1)',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    border: '1px solid rgba(0,230,138,0.15)',
+                  }}
+                >
+                  +
+                  {Math.round(
+                    ((kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal)) * surplusPct) / 100,
+                  )}{' '}
+                  ккал
+                </span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>
+                  {surplusPct < 10 ? 'Мягкий' : surplusPct < 18 ? 'Умеренный' : 'Агрессивный'}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="25"
+                value={surplusPct}
+                onChange={(e) => {
+                  const v = +e.target.value;
+                  setSurplusPct(v);
                   try {
-                    // Общий план (he_general_plan) = калькулятор ∪ внешние вещества (миксы/питание)
-                    const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
-                    let merged: string[] = (generalData && Array.isArray(generalData)) ? generalData : [];
-                    // Фолбэк: если общий план ещё не сформирован — берём план калькулятора + внешние
-                    if (merged.length === 0) {
-                      const planData = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
-                      const planIds: string[] = (planData && Array.isArray(planData)) ? planData : [];
-                      let extIds: string[] = [];
-                      try { const _raw = localStorage.getItem('he_support_external_subs'); const _entries = _raw ? JSON.parse(_raw) : []; if (Array.isArray(_entries)) { extIds = _entries.flatMap((e: any) => (e && Array.isArray(e.ids)) ? e.ids : []); } } catch {}
-                      merged = [...new Set([...planIds, ...extIds])];
-                    }
-                    const newIds = merged.filter((id: string) => !takenSupplements.includes(id));
-                    if (newIds.length > 0) setTakenSupplements([...takenSupplements, ...newIds]);
+                    localStorage.setItem('he_surplus_pct', v.toString());
                   } catch {}
-                }} style={{
-                  padding:'6px 10px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, whiteSpace:'nowrap',
-                  background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa',
-                }}>📋 Из плана</button>
+                }}
+                style={{ width: '100%', margin: '2px 0' }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.75)',
+                }}
+              >
+                <span>+5% (мин.)</span>
+                <span>+15%</span>
+                <span>+25% (макс.)</span>
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-                {ALL_SUBSTANCES.filter(s => !suppSearch || (s.name||'').toLowerCase().includes(suppSearch.toLowerCase()) || (s.id||'').toLowerCase().includes(suppSearch.toLowerCase())).slice(0,80).map(s => {
-                  const sel = takenSupplements.includes(s.id);
-                  return (
-                    <div key={s.id} onClick={() => sel ? setTakenSupplements(takenSupplements.filter(x => x !== s.id)) : setTakenSupplements([...takenSupplements, s.id])} style={{
-                      padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
-                      background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
-                      border: sel ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
-                      color: sel ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
-                      display:'flex', alignItems:'center', gap:6,
-                    }}>
-                      <span style={{ fontSize:9, minWidth:12 }}>{sel ? '✓' : '○'}</span>
-                      <span>{s.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <button onClick={() => setShowSuppPicker(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', cursor:'pointer', fontSize:10 }}>Готово ({takenSupplements.length})</button>
             </div>
-          </div>
-        )}
-      </GlassCard>
-      )}
+          )}
+        </GlassCard>
+      }
 
-      {(
-      <GlassCard title="Привязка к тренировке" icon="🏋️" color="#22c55e">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <button onClick={() => setLinkToTraining(!linkToTraining)} style={{
-            width: 36, height: 20, borderRadius: 10, cursor: 'pointer', border: 'none',
-            background: linkToTraining ? '#00e68a' : 'rgba(255,255,255,0.7)',
-            position: 'relative' as const, transition: 'background 0.2s',
-          }}>
-            <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: linkToTraining ? 18 : 2, transition: 'left 0.2s' }} />
+      {plannerMode === 'pro' && (
+        <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 6, lineHeight: 1.5 }}>
+            Фаза — фарма-контекст (курс/ПКТ/мост/восстановление): влияет на фарма-гейты и рекомендации, но НЕ меняет
+            направление калорий — его задаёт цель выше. Препараты и инъекции (ААС/инсулин/ГР/GLP) применяют свои правила
+            белка и жиров автоматически.{' '}
+            <span style={{ color: '#00e68a' }}>
+              Не путать с «Фазой (V2-скоринг)» в карточке 🧬 — та влияет только на оценку качества рациона, не на состав
+              дня.
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
+            {PHASES.map((p) => (
+              <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>
+                {p.icon} {p.label}
+              </PillBtn>
+            ))}
+          </div>
+          {courseEntries.length > 0 && (
+            <div
+              style={{
+                fontSize: 9,
+                color: '#a78bfa',
+                marginBottom: 6,
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'rgba(139,92,246,0.08)',
+                border: '1px solid rgba(139,92,246,0.15)',
+              }}
+            >
+              📋 Загружено {courseEntries.length} препаратов из курса
+            </div>
+          )}
+          <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 10, marginBottom: 6 }}>Добавленные инъекции:</div>
+          <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {injections.map((inj, i) => {
+              const canLink = inj.type === 'инсулин' || inj.type === 'ИФР-1';
+              return (
+                <div
+                  key={inj.id}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(6,182,212,0.04)',
+                    border: '1px solid rgba(6,182,212,0.1)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#fff' }}>
+                    <span>💉</span>
+                    <strong style={{ color: '#06b6d4' }}>{inj.time}</strong>
+                    <span style={{ fontWeight: 600 }}>{inj.name}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.9)' }}>
+                      {inj.dose}
+                      {inj.unit}
+                    </span>
+                    {inj.esterType !== 'none' && (
+                      <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 9 }}>({inj.esterType})</span>
+                    )}
+                    {canLink && (
+                      <button
+                        onClick={() => {
+                          if (!linkToTraining) setLinkToTraining(true);
+                          setInjections(
+                            injections.map((j2, j) =>
+                              j === i
+                                ? {
+                                    ...j2,
+                                    trainLinked: !j2.trainLinked,
+                                    trainTiming: !j2.trainLinked ? 'before' : 'none',
+                                  }
+                                : j2,
+                            ),
+                          );
+                        }}
+                        style={{
+                          fontSize: 9,
+                          padding: '2px 5px',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          background: inj.trainLinked ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
+                          border: inj.trainLinked
+                            ? '1px solid rgba(0,230,138,0.3)'
+                            : '1px solid rgba(255,255,255,0.06)',
+                          color: inj.trainLinked ? '#00e68a' : '#fff',
+                        }}
+                      >
+                        🏋️
+                      </button>
+                    )}
+                    {canLink &&
+                      inj.trainLinked &&
+                      (['before', 'after', 'both'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() =>
+                            setInjections(injections.map((j2, j) => (j === i ? { ...j2, trainTiming: t } : j2)))
+                          }
+                          style={{
+                            fontSize: 11,
+                            padding: '6px 10px',
+                            minHeight: 40,
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            background: inj.trainTiming === t ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
+                            border:
+                              inj.trainTiming === t
+                                ? '1px solid rgba(59,130,246,0.3)'
+                                : '1px solid rgba(255,255,255,0.06)',
+                            color: inj.trainTiming === t ? '#60a5fa' : '#fff',
+                          }}
+                        >
+                          {t === 'before' ? 'До' : t === 'after' ? 'После' : 'До+После'}
+                        </button>
+                      ))}
+                    <button
+                      onClick={() => setInjections(injections.filter((_, j) => j !== i))}
+                      style={{
+                        marginLeft: 'auto',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: 'none',
+                        color: '#ef4444',
+                        fontSize: 10,
+                        cursor: 'pointer',
+                        borderRadius: 4,
+                        padding: '2px 6px',
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setShowAddDrug(true)}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              border: '1px solid rgba(6,182,212,0.2)',
+              background: 'rgba(6,182,212,0.06)',
+              color: '#06b6d4',
+              fontSize: 9,
+              fontWeight: 600,
+            }}
+          >
+            + Добавить инъекцию
           </button>
-          <span style={{ fontSize: 10, color: linkToTraining ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>Привязать рацион к тренировке</span>
-        </div>
-        {linkToTraining && (
-          <>
-            <div style={{ display: 'flex', gap: 4, fontSize: 9, marginBottom: 6 }}>
-              <div><label style={{ color: 'rgba(255,255,255,0.85)' }}>Начало</label><input type="time" value={trainStart} onChange={e => setTrainStart(e.target.value)} style={inputStyle} /></div>
-              <div><label style={{ color: 'rgba(255,255,255,0.85)' }}>Конец</label><input type="time" value={trainEnd} onChange={e => setTrainEnd(e.target.value)} style={inputStyle} /></div>
-            </div>
-            {/* FIX train-bind: плавающий график — недельный / через день / цикл N+M */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-              {([
-                { id: 'weekly' as const, label: '📅 Неделя' },
-                { id: 'eod' as const, label: '🔁 Через день' },
-                { id: 'pattern' as const, label: '🔢 Цикл N+M' },
-              ]).map(opt => (
-                <button key={opt.id} onClick={() => setTrainScheduleType(opt.id)} style={{
-                  flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                  background: trainScheduleType === opt.id ? 'rgba(34,197,94,0.2)' : '#202023',
-                  border: trainScheduleType === opt.id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
-                  color: trainScheduleType === opt.id ? '#22c55e' : 'rgba(255,255,255,0.7)',
-                }}>{opt.label}</button>
-              ))}
-            </div>
-            {trainScheduleType === 'pattern' && (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6, fontSize: 9 }}>
-                <span style={{ color: 'rgba(255,255,255,0.85)' }}>Цикл:</span>
-                <input type="number" min={1} max={7} value={trainPattern.work} onChange={e => { const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1)); setTrainPattern({ ...trainPattern, work: v }); }} style={{ ...inputStyle, width: 48 }} aria-label="Тренировочных дней в цикле" />
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>тр +</span>
-                <input type="number" min={1} max={7} value={trainPattern.off} onChange={e => { const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1)); setTrainPattern({ ...trainPattern, off: v }); }} style={{ ...inputStyle, width: 48 }} aria-label="Дней отдыха в цикле" />
-                <span style={{ color: 'rgba(255,255,255,0.6)' }}>отдых</span>
+          {showAddDrug && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 100,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.7)',
+              }}
+              onClick={() => setShowAddDrug(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: 340,
+                  padding: 20,
+                  borderRadius: 16,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: '#fff',
+                    marginBottom: 14,
+                    textAlign: 'center',
+                    letterSpacing: -0.3,
+                  }}
+                >
+                  💉 Добавить инъекцию
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Тип препарата:</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                    {[
+                      { id: 'инсулин', icon: '💉' },
+                      { id: 'ГР', icon: '📈' },
+                      { id: 'ИФР-1', icon: '🧬' },
+                      { id: 'пептид', icon: '🔬' },
+                      { id: 'ААС', icon: '⚡' },
+                      { id: 'другое', icon: '📦' },
+                    ].map((dt) => (
+                      <button
+                        key={dt.id}
+                        onClick={() => {
+                          setInjType(dt.id);
+                          setInjName(dt.id);
+                        }}
+                        style={{
+                          padding: '8px 4px',
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          background: injType === dt.id ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: injType === dt.id ? '1px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
+                          color: injType === dt.id ? '#06b6d4' : 'rgba(255,255,255,0.7)',
+                          fontWeight: injType === dt.id ? 700 : 400,
+                          fontSize: 10,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <div style={{ fontSize: 14 }}>{dt.icon}</div>
+                        <div>{dt.id}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDrugTypePicker(true)}
+                  style={{
+                    width: '100%',
+                    padding: '6px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    marginBottom: 10,
+                    background: 'rgba(139,92,246,0.08)',
+                    border: '1px dashed rgba(139,92,246,0.25)',
+                    color: '#a78bfa',
+                    fontWeight: 600,
+                  }}
+                >
+                  📋 Все типы препаратов ({injectDrugTypes.length})
+                </button>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Доза</div>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={injDose}
+                      onChange={(e) => setInjDose(Math.max(0, +e.target.value || 0))}
+                      style={{
+                        ...inputStyle,
+                        width: '100%',
+                        fontSize: 12,
+                        padding: '8px 10px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div style={{ width: 70 }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Время</div>
+                    <input
+                      type="time"
+                      value={injTime}
+                      onChange={(e) => setInjTime(e.target.value)}
+                      style={{
+                        ...inputStyle,
+                        width: '100%',
+                        fontSize: 10,
+                        padding: '8px 6px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+                {/* P1-UX: единицы — чипы 44px вместо нативного select (мелкий тач-таргет в плотной строке) */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Единицы</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {['mg', 'mcg', 'IU', 'ml'].map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => setInjUnit(u)}
+                        aria-pressed={injUnit === u}
+                        style={{
+                          flex: 1,
+                          minHeight: 44,
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: injUnit === u ? 'rgba(139,92,246,0.14)' : 'rgba(255,255,255,0.03)',
+                          border:
+                            injUnit === u ? '1px solid rgba(139,92,246,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                          color: injUnit === u ? '#a78bfa' : '#fff',
+                        }}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Эфир:</div>
+                  <div style={{ display: 'flex', gap: 3 }}>
+                    {[
+                      { id: 'none', label: 'Авто' },
+                      { id: 'rapid', label: 'Быстрый' },
+                      { id: 'short', label: 'Короткий' },
+                      { id: 'long', label: 'Длинный' },
+                    ].map((e) => (
+                      <button
+                        key={e.id}
+                        onClick={() => setInjEster(e.id as any)}
+                        style={{
+                          flex: 1,
+                          padding: '5px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 9,
+                          fontWeight: 600,
+                          background: injEster === e.id ? 'rgba(6,182,212,0.12)' : 'rgba(255,255,255,0.03)',
+                          border: injEster === e.id ? '1px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
+                          color: injEster === e.id ? '#06b6d4' : 'rgba(255,255,255,0.7)',
+                        }}
+                      >
+                        {e.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setShowAddDrug(false)}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: '#202023',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={() => {
+                      const name = injName.trim() || injType;
+                      if (!name) return;
+                      // FIX input-audit: доза должна быть > 0 (0/отрицательная давала «На 0г углеводов»)
+                      if (!Number.isFinite(injDose) || injDose <= 0) {
+                        setErrorMsg('Укажите дозу больше 0');
+                        return;
+                      }
+                      // FIX audit (B3): метка типа → канонический id PHARMA_DB (см. INJ_LABEL_TO_PHARMA)
+                      const sub = PHARMA_DB[INJ_LABEL_TO_PHARMA[name] || ''];
+                      const hl = sub?.pk?.halfLifeHours || 24;
+                      let dt = injType,
+                        de = injEster;
+                      if (sub?.class === 'insulin') {
+                        dt = 'инсулин';
+                        de = hl < 2 ? 'rapid' : hl <= 8 ? 'short' : 'long';
+                      }
+                      let autoTime = +injTime.split(':')[0] * 60 + +injTime.split(':')[1] > 0 ? injTime : '08:00';
+                      if (dt === 'инсулин' && de === 'long') autoTime = '22:00';
+                      if (injEster !== 'none') de = injEster;
+                      const newInj = {
+                        id: Date.now().toString(),
+                        name,
+                        time: autoTime,
+                        dose: injDose,
+                        unit: injUnit,
+                        type: dt,
+                        esterType: de,
+                        halfLifeHours: hl,
+                        trainLinked: false,
+                        trainTiming: 'none' as const,
+                      };
+                      setInjections([...injections, newInj]);
+                      setInjName('');
+                      setShowAddDrug(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                      color: '#000',
+                      fontSize: 10,
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✓ Добавить
+                  </button>
+                </div>
               </div>
-            )}
-            {trainScheduleType === 'weekly' && (
-              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', marginBottom: 6 }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Выберите тренировочные дни:</div>
-                <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                  {DAY_LABELS.map((label, idx) => {
-                    const isTrain = trainingDays[idx];
+            </div>
+          )}
+          {showDrugTypePicker && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.8)',
+              }}
+              onClick={() => setShowDrugTypePicker(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '90%',
+                  maxWidth: 380,
+                  maxHeight: '80vh',
+                  padding: 16,
+                  borderRadius: 16,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 10, textAlign: 'center' }}>
+                  📋 Выберите тип препарата
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+                  {injectDrugTypes.map((d) => {
+                    const icons: Record<string, string> = {
+                      инсулин: '💉',
+                      ГР: '📈',
+                      'ИФР-1': '🧬',
+                      MGF: '🔬',
+                      'IGF-1 DES': '🧬',
+                      'IGF-1 LR3': '🧬',
+                      HMG: '💊',
+                      HCG: '💊',
+                      GHRP: '🧪',
+                      CJC: '🧪',
+                      'BPC-157': '🩹',
+                      'TB-500': '🩹',
+                      меланотан: '🎨',
+                      семаглутид: '⚖️',
+                      тирзепатид: '⚖️',
+                      другое: '📦',
+                      пептид: '🔬',
+                      ААС: '⚡',
+                    };
                     return (
-                      <button key={idx} onClick={() => {
-                        setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
-                      }} style={{
-                        width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
-                        border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
-                        background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
-                        color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.85)',
-                        fontSize: 9, fontWeight: isTrain ? 800 : 500,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}>{label}</button>
+                      <button
+                        key={d}
+                        onClick={() => {
+                          setInjType(d);
+                          setInjName(d);
+                          setShowDrugTypePicker(false);
+                        }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '10px 4px',
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          background: injType === d ? 'rgba(6,182,212,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: injType === d ? '2px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
+                          color: injType === d ? '#06b6d4' : 'rgba(255,255,255,0.8)',
+                          fontWeight: injType === d ? 700 : 400,
+                          fontSize: 9,
+                          transition: 'all 0.1s',
+                        }}
+                      >
+                        <span style={{ fontSize: 18 }}>{icons[d] || '📦'}</span>
+                        <span>{d}</span>
+                      </button>
                     );
                   })}
                 </div>
+                <button
+                  onClick={() => setShowDrugTypePicker(false)}
+                  style={{
+                    width: '100%',
+                    marginTop: 8,
+                    padding: '8px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: '#202023',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                  }}
+                >
+                  Закрыть
+                </button>
               </div>
-            )}
-            <div style={{ fontSize: 9, color: '#22c55e', marginBottom: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)' }}>
-              {trainScheduleType === 'eod' && '🔁 Через день (EOD): 3-4 тренировки в неделе'}
-              {trainScheduleType === 'pattern' && `🔢 Цикл ${trainPattern.work}+${trainPattern.off}: ${trainPattern.work} тр / ${trainPattern.off} отдых`}
-              {trainScheduleType === 'weekly' && `📅 ${ruAdjCount(trainingDays.filter(Boolean).length, RU_ADJ_TRAINING, RU_DAYS)}: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
             </div>
-            {/* Эпик 6: день тяжёлых ног/объёма — угли +25%, ккал +5% */}
-            {trainScheduleType === 'weekly' && (
-              <div style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🏋️ День тяжёлых ног/объёма (углеводы +25%):</div>
-                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                  {DAY_LABELS.map((label, idx) => (
-                    <button key={idx} onClick={() => setHeavyTrainDay(heavyTrainDay === label ? '' : label)} style={{
-                      padding: '3px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700,
-                      background: heavyTrainDay === label ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
-                      border: heavyTrainDay === label ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
-                      color: heavyTrainDay === label ? '#fb923c' : 'rgba(255,255,255,0.7)',
-                    }}>{label}</button>
-                  ))}
-                </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.</div>
-              </div>
-            )}
-            {/* Синхронизация с профилем — только по кнопке. FIX audit (C3): заголовки
-                обещали синк «графика тренировок», а вызывался полный синк профиля —
-                переименованы честно (тот же ctx.autofillFromProfile/saveToProfile). */}
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Полный автозаполнение всех полей планировщика из Профиля">📋 Из профиля (весь профиль)</button>
-              <button onClick={saveToProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a' }} title="Полное сохранение всех полей планировщика в Профиль">💾 Сохранить (весь профиль)</button>
+          )}
+          {/* Чистка-2026 (P11): фарм-флаги V2-скоринга здесь — единый ввод курса с инъекциями выше */}
+          <div
+            style={{
+              marginTop: 10,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'rgba(6,182,212,0.04)',
+              border: '1px solid rgba(6,182,212,0.1)',
+            }}
+          >
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+              💊 Фарм-флаги (V2-скоринг качества рациона)
             </div>
-          </>
-        )}
-      </GlassCard>
-      )}
-
-      {(
-      <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
-        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-          {(['auto', 'manual', 'profile'] as const).map(mode => {
-            const labels: Record<string, string> = { auto: '🤖 Авторасчёт', manual: '✏️ Ручной ввод', profile: '👤 Из профиля' };
-            const colors: Record<string, string> = { auto: '#00e68a', manual: '#f59e0b', profile: '#60a5fa' };
-            return (
-              <button key={mode} onClick={() => switchKbjuMode(mode)} style={{
-                flex: 1, padding: '5px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600,
-                background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
-                border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid rgba(255,255,255,0.06)',
-                color: kbjuMode === mode ? '#000' : 'rgba(255,255,255,0.7)',
-              }}>{labels[mode]}</button>
-            );
-          })}
-        </div>
-        {(() => {
-          // FIX 1.5: предупреждение, если метрики тела = дефолтам (профиль не заполнен).
-          // Профиль читаем напрямую, чтобы не зависеть от локальных правок в планировщике.
-          let _incomplete = false;
-          try {
-            const _p = getProfile()?.settings as any;
-            const _pers = _p?.personal || {};
-            if (!_pers.weight || !_pers.height || !_pers.age || !_pers.sex) _incomplete = true;
-          } catch {}
-          if (!_incomplete) return null;
-          return (
-            <div style={{ fontSize: 9, color: '#f59e0b', marginBottom: 8, padding: '5px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)' }}>
-              ⚠️ В профиле не заполнены метрики тела (вес/рост/возраст/пол) — КБЖУ считается по дефолтам (80кг / 180см / 30л). Откройте «Профиль → Пользователь» или нажмите «👤 Из профиля».
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {[
+                { id: 'AAS_ORAL', label: '💊 Оральные ААС', color: '#ef4444' },
+                { id: 'AAS_INJECTABLE', label: '💉 Инъекционные ААС', color: '#ef4444' },
+                { id: 'HGH', label: '🧬 HGH/Пептиды', color: '#8b5cf6' },
+                { id: 'DIURETICS', label: '💧 Диуретики', color: '#f59e0b' },
+                { id: 'STIMULATORS', label: '⚡ Стимуляторы', color: '#f97316' },
+                { id: 'INSULIN_USE', label: '💉 Инсулин', color: '#8b5cf6' },
+                { id: 'LIVER_SUPPORT', label: '🫁 Гепатопротекторы', color: '#22c55e' },
+                { id: 'GUT_SUPPORT', label: '🫃 Поддержка ЖКТ', color: '#22c55e' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setV2Pharma((prev: Record<string, boolean>) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 8,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: v2Pharma[p.id] ? p.color + '20' : '#202023',
+                    border: v2Pharma[p.id] ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.04)',
+                    color: v2Pharma[p.id] ? p.color : 'rgba(255,255,255,0.5)',
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-          );
-        })()}
-        {kbjuMode !== 'manual' ? (
-          <div>
-            {(() => {
-              // D-22: nutrMult already folded into effective* in IndividualPlanContext — do NOT multiply again.
-              const dispKcal = effectiveKcal;
-              const dispP = effectiveP;
-              const dispF = effectiveF;
-              const dispC = effectiveC;
-              return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
-                {[
-                   { l:'Калории', v: dispKcal, c:'#00e68a', unit:'ккал', perKg: Math.round(dispKcal / Math.max(1, weight)) },
-                   { l:'Белки', v: dispP, c:'#3b82f6', unit:'г', perKg: Math.round(dispP / Math.max(1, weight)) },
-                   { l:'Жиры', v: dispF, c:'#f59e0b', unit:'г', perKg: Math.round(dispF / Math.max(1, weight)) },
-                   { l:'Углеводы', v: dispC, c:'#f97316', unit:'г', perKg: Math.round(dispC / Math.max(1, weight)) },
-                ].map(m => {
-                  const pct = dispKcal > 0 && m.l !== 'Калории'
-                    ? Math.round(({ 'Калории': dispKcal, 'Белки': dispP * 4, 'Жиры': dispF * 9, 'Углеводы': dispC * 4 }[m.l] || 0) / dispKcal * 100)
-                    : null;
-                  return (
-                  <div key={m.l} style={{
-                    textAlign:'center', borderRadius:10, padding:'8px 4px',
-                    background: `linear-gradient(135deg, ${m.c}12, transparent)`,
-                    border: `1px solid ${m.c}25`,
-                    position:'relative', overflow:'hidden',
-                  }}>
-                    <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                    <div style={{ fontSize:18, fontWeight:800, color:m.c, lineHeight:1.2 }}>{m.v}</div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:1 }}>{m.unit}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', marginTop:1 }}>
-                      {m.perKg} / кг
-                      {pct !== null && ` · ${pct}%`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>;
-            })()}
-            {(() => {
-              // FIX 1.3: подпись BMR/TDEE/Коррекция должна отражать ТОТ ЖЕ источник, что и цифры.
-              // Раньше всегда показывался auto-calc даже в режиме 'profile' — визуальное противоречие.
-              const _src = kbjuMode === 'profile' ? profileTargets : calcTargets;
-              const _bmr = _src?.bmr || 0;
-              const _tdee = _src?.tdee || 0;
-              const _adj = _src?.adjustment || 0;
-              if (_bmr <= 0) return null;
-              return (
-                <div style={{ display:'flex', gap:6, marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.9)' }}>
-                  <span>BMR: <b style={{color:'#00e68a'}}>{_bmr}</b> ккал</span>
-                  <span>TDEE: <b style={{color:'#60a5fa'}}>{_tdee}</b> ккал</span>
-                  {_adj !== 0 && <span>Коррекция: <b style={{color: _adj > 0 ? '#f59e0b' : '#22c55e'}}>{_adj > 0 ? '+' : ''}{_adj}</b> ккал</span>}
-                </div>
-              );
-            })()}
-            {(() => {
-              // D-22: nutrMult already folded into effective* — do NOT multiply again.
-              const pKcal = effectiveP * 4;
-              const fKcal = effectiveF * 9;
-              const cKcal = effectiveC * 4;
-              const total = pKcal + fKcal + cKcal || 1;
-              const pPct = pKcal / total * 100;
-              const fPct = fKcal / total * 100;
-              const cPct = cKcal / total * 100;
-              return (
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
-                  <div style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}>
-                    <div style={{ height: '100%', width: `${pPct}%`, background: '#3b82f6', transition: 'width 0.3s', minWidth: 2 }} title={`Белки ${Math.round(pPct)}%`} />
-                    <div style={{ height: '100%', width: `${fPct}%`, background: '#f59e0b', transition: 'width 0.3s', minWidth: 2 }} title={`Жиры ${Math.round(fPct)}%`} />
-                    <div style={{ height: '100%', width: `${cPct}%`, background: '#f97316', transition: 'width 0.3s', minWidth: 2 }} title={`Углеводы ${Math.round(cPct)}%`} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
-                    <span style={{ color: '#3b82f6' }}>● Б {Math.round(pPct)}%</span>
-                    <span style={{ color: '#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
-                    <span style={{ color: '#f97316' }}>● У {Math.round(cPct)}%</span>
-                  </div>
-                </div>
-              );
-            })()}
-            {carbPeriodization !== 'none' && (() => {
-              // Эпик 1: единая периодизация — реальные моды дня из одной функции.
-              const _t = applyCarbPeriodizationMods(carbPeriodization, 0, true);
-              const _r = applyCarbPeriodizationMods(carbPeriodization, 0, false);
-              const trainDayK = Math.round(effectiveKcal * _t.dayKcalMod);
-              const trainDayC = Math.round(effectiveC * _t.dayCarbMod);
-              const restDayK = Math.round(effectiveKcal * _r.dayKcalMod);
-              const restDayC = Math.round(effectiveC * _r.dayCarbMod);
-              return <div style={{ fontSize: 9, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{carbPeriodizationLabel(carbPeriodization)}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
-            })()}
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>
+              Инъекции из курса выше учитываются автоматически; флаги — дополнение для V2-оценки качества рациона.
+            </div>
           </div>
-        ) : (
-          <div>
-            {(() => {
-              const mvKcal = manualKcal ?? effectiveKcal;
-              const mvP = manualP ?? effectiveP;
-              const mvF = manualF ?? effectiveF;
-              const mvC = manualC ?? effectiveC;
-              const pKcal = mvP * 4; const fKcal = mvF * 9; const cKcal = mvC * 4;
-              const total = pKcal + fKcal + cKcal || 1;
-              const pPct = pKcal / total * 100; const fPct = fKcal / total * 100; const cPct = cKcal / total * 100;
-              const perKgKcal = Math.round(mvKcal / weight);
-              const perKgP = Math.round(mvP / weight);
-              const perKgF = Math.round(mvF / weight);
-              const perKgC = Math.round(mvC / weight);
-              const hasGPerKg = manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0;
-              return <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
-                  {[
-                    { l:'Калории', v: mvKcal, c:'#00e68a', unit:'ккал', perKg: perKgKcal, setter: setManualKcal },
-                    { l:'Белки', v: mvP, c:'#3b82f6', unit:'г', perKg: perKgP, setter: (v: any) => setManualGramValue('protein', v) },
-                    { l:'Жиры', v: mvF, c:'#f59e0b', unit:'г', perKg: perKgF, setter: (v: any) => setManualGramValue('fat', v) },
-                    { l:'Углеводы', v: mvC, c:'#f97316', unit:'г', perKg: perKgC, setter: (v: any) => setManualGramValue('carbs', v) },
-                  ].map(m => {
-                    const pct = mvKcal > 0 && m.l !== 'Калории'
-                      ? Math.round(({ 'Калории': mvKcal, 'Белки': mvP * 4, 'Жиры': mvF * 9, 'Углеводы': mvC * 4 }[m.l] || 0) / mvKcal * 100)
-                      : null;
-                    return (
-                    <div key={m.l} style={{
-                      textAlign:'center', borderRadius:10, padding:'8px 4px',
-                      background: `linear-gradient(135deg, ${m.c}12, transparent)`,
-                      border: `1px solid ${m.c}25`,
-                      position:'relative', overflow:'hidden',
-                    }}>
-                      <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" min={0} step="any" value={m.v === 0 ? 0 : m.v || ''} onChange={e => m.setter(e.target.value === '' ? null : Math.max(0, +e.target.value))} style={{
-                        width:'100%', fontSize:18, fontWeight:800, color:m.c,
-                        textAlign:'center', background:'transparent', border:'none',
-                        outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
-                      }} />
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:1 }}>{m.unit}</div>
-                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', marginTop:1 }}>
-                        {m.perKg} / кг
-                        {pct !== null && ` · ${pct}%`}
-                      </div>
-                    </div>
+          <div
+            style={{
+              marginTop: 10,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'rgba(139,92,246,0.04)',
+              border: '1px solid rgba(139,92,246,0.1)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#c4b5fd' }}>
+                🌿 Принимаю БАД: {takenSupplements.length}
+              </span>
+              <button
+                onClick={() => {
+                  setSuppSearch('');
+                  setShowSuppPicker(true);
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  background: 'rgba(139,92,246,0.1)',
+                  border: '1px solid rgba(139,92,246,0.2)',
+                  color: '#a78bfa',
+                }}
+              >
+                + Выбрать
+              </button>
+            </div>
+            {takenSupplements.length > 0 && (
+              // FIX B28 (аудит 2026-10): стоял `slice(0,12)` — при 13+ БАДах остальные
+              // прятались за «+N» и их НЕЛЬЗЯ было удалить из профиля. Теперь рендерятся
+              // все; при большом списке контейнер прокручивается.
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 2,
+                  maxHeight: takenSupplements.length > 12 ? 120 : undefined,
+                  overflowY: takenSupplements.length > 12 ? 'auto' : undefined,
+                  paddingRight: takenSupplements.length > 12 ? 4 : undefined,
+                }}
+              >
+                {takenSupplements.map((sid) => {
+                  const sub = SUPPORT_CATALOG_DATA[sid] || ALL_SUBSTANCES.find((s) => s.id === sid);
+                  return (
+                    <span
+                      key={sid}
+                      style={{
+                        fontSize: 9,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        background: 'rgba(139,92,246,0.08)',
+                        color: '#a78bfa',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      {sub?.name || sid}
+                      <span
+                        onClick={() => setTakenSupplements(takenSupplements.filter((x) => x !== sid))}
+                        title="Убрать из профиля"
+                        style={{ cursor: 'pointer', color: '#ef4444', fontWeight: 700 }}
+                      >
+                        ×
+                      </span>
+                    </span>
                   );
                 })}
               </div>
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Распределение макронутриентов</div>
-                  <div style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}>
-                    <div style={{ height:'100%', width:`${pPct}%`, background:'#3b82f6', transition:'width 0.3s', minWidth:2 }} />
-                    <div style={{ height:'100%', width:`${fPct}%`, background:'#f59e0b', transition:'width 0.3s', minWidth:2 }} />
-                    <div style={{ height:'100%', width:`${cPct}%`, background:'#f97316', transition:'width 0.3s', minWidth:2 }} />
-                  </div>
-                  <div style={{ display:'flex', gap:8, fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:2 }}>
-                    <span style={{ color:'#3b82f6' }}>● Б {Math.round(pPct)}%</span>
-                    <span style={{ color:'#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
-                    <span style={{ color:'#f97316' }}>● У {Math.round(cPct)}%</span>
-                  </div>
-                </div>
-                <div style={{ marginTop:10, marginBottom:6, fontSize:9, color:'rgba(255,255,255,0.8)', letterSpacing:0.5, textTransform:'uppercase' }}>Ввод в г/кг веса{hasGPerKg ? ` (${Math.round(mvKcal)} ккал)` : ''}</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:5, marginBottom:8 }}>
-                  {[
-                    { l:'Белки', v: manualGPerKg.protein, c:'#3b82f6', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('protein', val) },
-                    { l:'Жиры', v: manualGPerKg.fat, c:'#f59e0b', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('fat', val) },
-                    { l:'Углеводы', v: manualGPerKg.carbs, c:'#f97316', unit:'г/кг', setter: (val: number) => setManualGPerKgValue('carbs', val) },
-                  ].map(m => (
-                    <div key={m.l} style={{
-                      textAlign:'center', borderRadius:10, padding:'8px 4px',
-                      background: `linear-gradient(135deg, ${m.c}12, transparent)`,
-                      border: `1px solid ${m.c}25`,
-                      position:'relative', overflow:'hidden',
-                    }}>
-                      <div style={{ position:'absolute', top:0, left:0, right:0, height:2, background: m.c }} />
-                      <input type="number" min={0} step="0.1" value={m.v > 0 ? m.v : ''} onChange={e => m.setter(e.target.value === '' ? 0 : Math.max(0, +e.target.value))} placeholder="0.0" style={{
-                        width:'100%', fontSize:18, fontWeight:800, color:m.c,
-                        textAlign:'center', background:'transparent', border:'none',
-                        outline:'none', padding:0, lineHeight:1.2, MozAppearance:'textfield',
-                      }} />
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginTop:1 }}>{m.unit}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4}}>Введите любые значения — недостающие рассчитаются автоматически</div>
-                <div style={{ fontSize: 9, color: 'rgba(96,165,250,0.75)', marginBottom: 4, lineHeight: 1.4 }}>🔗 Граммы и г/кг связаны: значение в г/кг × вес = граммы того же макроса (правка в любой карточке применяется сразу).</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.</div>
-                {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
-                {/* FIX audit (B1): кнопка «✓ Применить» была no-op (setKbjuMode('manual') внутри
-                    уже-manual ветки) — значения сохраняются автоматически (авто-сейв контекста) */}
-                <div style={greenBtn}>✓ Введённые значения применяются автоматически</div>
-              </>;
-            })()}
+            )}
           </div>
-        )}
-      </GlassCard>
+          {showSuppPicker && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.8)',
+              }}
+              onClick={() => setShowSuppPicker(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '92%',
+                  maxWidth: 400,
+                  maxHeight: '85vh',
+                  padding: 16,
+                  borderRadius: 16,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#c4b5fd', marginBottom: 8, textAlign: 'center' }}>
+                  🌿 Выберите принимаемые БАД
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  <input
+                    value={suppSearch}
+                    onChange={(e) => setSuppSearch(e.target.value)}
+                    placeholder="Поиск БАД..."
+                    style={{ ...inputStyle, flex: 1, fontSize: 11, padding: '8px 10px', boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={() => {
+                      try {
+                        // Общий план (he_general_plan) = калькулятор ∪ внешние вещества (миксы/питание)
+                        const generalData = JSON.parse(localStorage.getItem('he_general_plan') || 'null');
+                        let merged: string[] = generalData && Array.isArray(generalData) ? generalData : [];
+                        // Фолбэк: если общий план ещё не сформирован — берём план калькулятора + внешние
+                        if (merged.length === 0) {
+                          const planData = JSON.parse(localStorage.getItem('he_support_plan_result') || 'null');
+                          const planIds: string[] = planData && Array.isArray(planData) ? planData : [];
+                          let extIds: string[] = [];
+                          try {
+                            const _raw = localStorage.getItem('he_support_external_subs');
+                            const _entries = _raw ? JSON.parse(_raw) : [];
+                            if (Array.isArray(_entries)) {
+                              extIds = _entries.flatMap((e: any) => (e && Array.isArray(e.ids) ? e.ids : []));
+                            }
+                          } catch {}
+                          merged = [...new Set([...planIds, ...extIds])];
+                        }
+                        const newIds = merged.filter((id: string) => !takenSupplements.includes(id));
+                        if (newIds.length > 0) setTakenSupplements([...takenSupplements, ...newIds]);
+                      } catch {}
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      background: 'rgba(139,92,246,0.1)',
+                      border: '1px solid rgba(139,92,246,0.2)',
+                      color: '#a78bfa',
+                    }}
+                  >
+                    📋 Из плана
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: '50vh', overflowY: 'auto' }}>
+                  {ALL_SUBSTANCES.filter(
+                    (s) =>
+                      !suppSearch ||
+                      (s.name || '').toLowerCase().includes(suppSearch.toLowerCase()) ||
+                      (s.id || '').toLowerCase().includes(suppSearch.toLowerCase()),
+                  )
+                    .slice(0, 80)
+                    .map((s) => {
+                      const sel = takenSupplements.includes(s.id);
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() =>
+                            sel
+                              ? setTakenSupplements(takenSupplements.filter((x) => x !== s.id))
+                              : setTakenSupplements([...takenSupplements, s.id])
+                          }
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 9,
+                            background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
+                            border: sel ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
+                            color: sel ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 9, minWidth: 12 }}>{sel ? '✓' : '○'}</span>
+                          <span>{s.name}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+                <button
+                  onClick={() => setShowSuppPicker(false)}
+                  style={{
+                    width: '100%',
+                    marginTop: 8,
+                    padding: '8px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: '#202023',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    fontSize: 10,
+                  }}
+                >
+                  Готово ({takenSupplements.length})
+                </button>
+              </div>
+            </div>
+          )}
+        </GlassCard>
       )}
 
-      {plannerMode === 'pro' && (
-      <GlassCard title="Целевое КБЖУ" icon="📊" color="#00e68a">
-        {(() => {
-          // FIX audit (B2): «Скользящие графики» показывали «Факт» как ХАРДКОД-мок
-          // (×0.87 цели) с подписью «среднее потребление за последние дни» — ложь.
-          // Фактический разбор — в Дневнике питания; здесь остаётся честная цель.
-          const tKcal = kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal);
-          const tP = kbjuMode !== 'manual' ? effectiveP : (manualP ?? effectiveP);
-          const tF = kbjuMode !== 'manual' ? effectiveF : (manualF ?? effectiveF);
-          const tC = kbjuMode !== 'manual' ? effectiveC : (manualC ?? effectiveC);
-          const items = [
-            { label:'Калории', target:tKcal, unit:'ккал', color:'#00e68a' },
-            { label:'Белки', target:tP, unit:'г', color:'#3b82f6' },
-            { label:'Жиры', target:tF, unit:'г', color:'#f59e0b' },
-            { label:'Углеводы', target:tC, unit:'г', color:'#f97316' },
-          ];
-          return <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', marginBottom:4, lineHeight:1.6, padding:'6px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <div>🎯 Цель — рассчитанная норма КБЖУ на день</div>
-              <div style={{ color:'rgba(255,255,255,0.5)' }}>Факт по дням — в «📓 Дневнике питания»</div>
-            </div>
-            {items.map(m => (
-              <div key={m.label} style={{ marginBottom:4 }}>
-                <div style={{ fontSize:9, fontWeight:600, color:m.color, marginBottom:3 }}>{m.label}</div>
-                <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:2 }}>
-                  <span style={{ fontSize:6, color:'rgba(255,255,255,0.75)', minWidth:38, whiteSpace:'nowrap' }}>🎯 Цель</span>
-                  <div style={{ flex:1, height:6, borderRadius:3, background:'rgba(32,32,35,0.8)', position:'relative' }}>
-                    <div style={{ height:'100%', width:'100%', borderRadius:3, background:m.color, opacity:0.15 }} />
-                  </div>
-                  <span style={{ fontSize:10, fontWeight:600, color:m.color, minWidth:52, textAlign:'right', whiteSpace:'nowrap' }}>{m.target} <span style={{ fontSize:10, color:'rgba(255,255,255,0.2)' }}>{m.unit}</span></span>
+      {
+        <GlassCard title="Привязка к тренировке" icon="🏋️" color="#22c55e">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <button
+              onClick={() => setLinkToTraining(!linkToTraining)}
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 10,
+                cursor: 'pointer',
+                border: 'none',
+                background: linkToTraining ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                position: 'relative' as const,
+                transition: 'background 0.2s',
+              }}
+            >
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  position: 'absolute',
+                  top: 2,
+                  left: linkToTraining ? 18 : 2,
+                  transition: 'left 0.2s',
+                }}
+              />
+            </button>
+            <span style={{ fontSize: 10, color: linkToTraining ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+              Привязать рацион к тренировке
+            </span>
+          </div>
+          {linkToTraining && (
+            <>
+              <div style={{ display: 'flex', gap: 4, fontSize: 9, marginBottom: 6 }}>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.85)' }}>Начало</label>
+                  <input
+                    type="time"
+                    value={trainStart}
+                    onChange={(e) => setTrainStart(e.target.value)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={{ color: 'rgba(255,255,255,0.85)' }}>Конец</label>
+                  <input
+                    type="time"
+                    value={trainEnd}
+                    onChange={(e) => setTrainEnd(e.target.value)}
+                    style={inputStyle}
+                  />
                 </div>
               </div>
-            ))}
-          </div>;
-        })()}
+              {/* FIX train-bind: плавающий график — недельный / через день / цикл N+M */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                {[
+                  { id: 'weekly' as const, label: '📅 Неделя' },
+                  { id: 'eod' as const, label: '🔁 Через день' },
+                  { id: 'pattern' as const, label: '🔢 Цикл N+M' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setTrainScheduleType(opt.id)}
+                    style={{
+                      flex: 1,
+                      padding: '5px 4px',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      background: trainScheduleType === opt.id ? 'rgba(34,197,94,0.2)' : '#202023',
+                      border: trainScheduleType === opt.id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+                      color: trainScheduleType === opt.id ? '#22c55e' : 'rgba(255,255,255,0.7)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {trainScheduleType === 'pattern' && (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6, fontSize: 9 }}>
+                  <span style={{ color: 'rgba(255,255,255,0.85)' }}>Цикл:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={7}
+                    value={trainPattern.work}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1));
+                      setTrainPattern({ ...trainPattern, work: v });
+                    }}
+                    style={{ ...inputStyle, width: 48 }}
+                    aria-label="Тренировочных дней в цикле"
+                  />
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>тр +</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={7}
+                    value={trainPattern.off}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(7, parseInt(e.target.value) || 1));
+                      setTrainPattern({ ...trainPattern, off: v });
+                    }}
+                    style={{ ...inputStyle, width: 48 }}
+                    aria-label="Дней отдыха в цикле"
+                  />
+                  <span style={{ color: 'rgba(255,255,255,0.6)' }}>отдых</span>
+                </div>
+              )}
+              {trainScheduleType === 'weekly' && (
+                <div
+                  style={{
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(34,197,94,0.06)',
+                    border: '1px solid rgba(34,197,94,0.12)',
+                    marginBottom: 6,
+                  }}
+                >
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                    Выберите тренировочные дни:
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                    {DAY_LABELS.map((label, idx) => {
+                      const isTrain = trainingDays[idx];
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setTrainingDays(trainingDays.map((d, i) => (i === idx ? !d : d)));
+                          }}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            border: isTrain ? '2px solid #22c55e' : '2px solid #3f3f46',
+                            background: isTrain ? 'rgba(34,197,94,0.2)' : '#202023',
+                            color: isTrain ? '#22c55e' : 'rgba(255,255,255,0.85)',
+                            fontSize: 9,
+                            fontWeight: isTrain ? 800 : 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div
+                style={{
+                  fontSize: 9,
+                  color: '#22c55e',
+                  marginBottom: 6,
+                  padding: '5px 8px',
+                  borderRadius: 8,
+                  background: 'rgba(34,197,94,0.08)',
+                }}
+              >
+                {trainScheduleType === 'eod' && '🔁 Через день (EOD): 3-4 тренировки в неделе'}
+                {trainScheduleType === 'pattern' &&
+                  `🔢 Цикл ${trainPattern.work}+${trainPattern.off}: ${trainPattern.work} тр / ${trainPattern.off} отдых`}
+                {trainScheduleType === 'weekly' &&
+                  `📅 ${ruAdjCount(trainingDays.filter(Boolean).length, RU_ADJ_TRAINING, RU_DAYS)}: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
+              </div>
+              {/* Эпик 6: день тяжёлых ног/объёма — угли +25%, ккал +5% */}
+              {trainScheduleType === 'weekly' && (
+                <div
+                  style={{
+                    marginBottom: 6,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(249,115,22,0.05)',
+                    border: '1px solid rgba(249,115,22,0.1)',
+                  }}
+                >
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                    🏋️ День тяжёлых ног/объёма (углеводы +25%):
+                  </div>
+                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                    {DAY_LABELS.map((label, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setHeavyTrainDay(heavyTrainDay === label ? '' : label)}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 9,
+                          fontWeight: 700,
+                          background: heavyTrainDay === label ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
+                          border: heavyTrainDay === label ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
+                          color: heavyTrainDay === label ? '#fb923c' : 'rgba(255,255,255,0.7)',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>
+                    Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.
+                  </div>
+                </div>
+              )}
+              {/* Синхронизация с профилем — только по кнопке. FIX audit (C3): заголовки
+                обещали синк «графика тренировок», а вызывался полный синк профиля —
+                переименованы честно (тот же ctx.autofillFromProfile/saveToProfile). */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={autofillFromProfile}
+                  style={{
+                    flex: 1,
+                    padding: '6px 4px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    background: '#202023',
+                    border: '1px solid rgba(96,165,250,0.3)',
+                    color: '#60a5fa',
+                  }}
+                  title="Полный автозаполнение всех полей планировщика из Профиля"
+                >
+                  📋 Из профиля (весь профиль)
+                </button>
+                <button
+                  onClick={saveToProfile}
+                  style={{
+                    flex: 1,
+                    padding: '6px 4px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    background: 'rgba(0,230,138,0.1)',
+                    border: '1px solid rgba(0,230,138,0.3)',
+                    color: '#00e68a',
+                  }}
+                  title="Полное сохранение всех полей планировщика в Профиль"
+                >
+                  💾 Сохранить (весь профиль)
+                </button>
+              </div>
+            </>
+          )}
+        </GlassCard>
+      }
+
+      {/* ─── Синхронизация с пери-воркаут (по кнопке) ─── */}
+      <GlassCard title="Синхронизация с пери-воркаут" icon="🔗" color="#00e68a">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <button
+            onClick={() => setPeriSync(!periSync)}
+            aria-pressed={periSync}
+            aria-label="Синхронизировать пери-воркаут с планом тренировок"
+            style={{
+              width: 36,
+              height: 20,
+              borderRadius: 10,
+              cursor: 'pointer',
+              border: 'none',
+              background: periSync ? '#00e68a' : 'rgba(255,255,255,0.7)',
+              position: 'relative' as const,
+              transition: 'background 0.2s',
+            }}
+          >
+            <div
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: '#fff',
+                position: 'absolute',
+                top: 2,
+                left: periSync ? 18 : 2,
+                transition: 'left 0.2s',
+              }}
+            />
+          </button>
+          <span style={{ fontSize: 10, color: periSync ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+            Брать пери-окна из плана тренировок
+          </span>
+        </div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, marginBottom: 8 }}>
+          Тоннаж и длительность берутся из плана тренировок, окна «до / во время / после» становятся такими же, как в
+          карточке «Пери-воркаут». Синхронизация — только по кнопке: рацион сам не меняется. Дневная сумма углеводов
+          сохраняется (КБЖУ не расходится больше 3%).
+        </div>
+        {periSyncState ? (
+          <div
+            style={{
+              padding: '8px 10px',
+              borderRadius: 8,
+              background: 'rgba(0,230,138,0.06)',
+              border: '1px solid rgba(0,230,138,0.14)',
+              marginBottom: 8,
+            }}
+          >
+            <div style={{ fontSize: 10, color: '#00e68a', fontWeight: 700 }}>
+              {periSyncState.dayLabel || 'День из плана'}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)' }}>
+              {Math.round(periSyncState.tonnageKg).toLocaleString('ru-RU')} кг·повт · {periSyncState.durationMin} мин
+              {periSyncState.sets ? ` · ${periSyncState.sets} сетов` : ''}
+              {' · '}
+              {periSyncState.source === 'plan'
+                ? 'из плана'
+                : periSyncState.source === 'manual'
+                  ? 'ручной ввод'
+                  : 'последняя сессия'}
+            </div>
+            {periSyncStale && (
+              <div style={{ fontSize: 9, color: '#fbbf24', fontWeight: 700, marginTop: 4 }}>
+                ⚠ План тренировок изменился — синхронизируйте заново
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+            Синка нет — окна считаются по последней завершённой сессии.
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={() => {
+              try {
+                const ok = syncPeriFromPlan();
+                if (!ok) setErrorMsg('План тренировок не найден — заполните план в разделе «Тренировки»');
+              } catch {}
+            }}
+            style={{
+              flex: 1,
+              padding: '8px 6px',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 9,
+              fontWeight: 700,
+              background: 'rgba(0,230,138,0.12)',
+              border: '1px solid rgba(0,230,138,0.3)',
+              color: '#00e68a',
+            }}
+          >
+            🔄 Взять из плана тренировок
+          </button>
+          {periSyncState && (
+            <button
+              onClick={resetPeriSync}
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 9,
+                fontWeight: 600,
+                background: '#202023',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.7)',
+              }}
+            >
+              Сбросить
+            </button>
+          )}
+        </div>
       </GlassCard>
+
+      {
+        <GlassCard title="КБЖУ" icon="📊" color="#00e68a">
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+            {(['auto', 'manual', 'profile'] as const).map((mode) => {
+              const labels: Record<string, string> = {
+                auto: '🤖 Авторасчёт',
+                manual: '✏️ Ручной ввод',
+                profile: '👤 Из профиля',
+              };
+              const colors: Record<string, string> = { auto: '#00e68a', manual: '#f59e0b', profile: '#60a5fa' };
+              return (
+                <button
+                  key={mode}
+                  onClick={() => switchKbjuMode(mode)}
+                  style={{
+                    flex: 1,
+                    padding: '5px 4px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    background: kbjuMode === mode ? `${colors[mode]}20` : '#202023',
+                    border: kbjuMode === mode ? `1px solid ${colors[mode]}` : '1px solid rgba(255,255,255,0.06)',
+                    color: kbjuMode === mode ? '#000' : 'rgba(255,255,255,0.7)',
+                  }}
+                >
+                  {labels[mode]}
+                </button>
+              );
+            })}
+          </div>
+          {(() => {
+            // FIX 1.5: предупреждение, если метрики тела = дефолтам (профиль не заполнен).
+            // Профиль читаем напрямую, чтобы не зависеть от локальных правок в планировщике.
+            let _incomplete = false;
+            try {
+              const _p = getProfile()?.settings as any;
+              const _pers = _p?.personal || {};
+              if (!_pers.weight || !_pers.height || !_pers.age || !_pers.sex) _incomplete = true;
+            } catch {}
+            if (!_incomplete) return null;
+            return (
+              <div
+                style={{
+                  fontSize: 9,
+                  color: '#f59e0b',
+                  marginBottom: 8,
+                  padding: '5px 8px',
+                  borderRadius: 8,
+                  background: 'rgba(245,158,11,0.1)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                }}
+              >
+                ⚠️ В профиле не заполнены метрики тела (вес/рост/возраст/пол) — КБЖУ считается по дефолтам (80кг / 180см
+                / 30л). Откройте «Профиль → Пользователь» или нажмите «👤 Из профиля».
+              </div>
+            );
+          })()}
+          {kbjuMode !== 'manual' ? (
+            <div>
+              {(() => {
+                // D-22: nutrMult already folded into effective* in IndividualPlanContext — do NOT multiply again.
+                const dispKcal = effectiveKcal;
+                const dispP = effectiveP;
+                const dispF = effectiveF;
+                const dispC = effectiveC;
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                    {[
+                      {
+                        l: 'Калории',
+                        v: dispKcal,
+                        c: '#00e68a',
+                        unit: 'ккал',
+                        perKg: Math.round(dispKcal / Math.max(1, weight)),
+                      },
+                      { l: 'Белки', v: dispP, c: '#3b82f6', unit: 'г', perKg: Math.round(dispP / Math.max(1, weight)) },
+                      { l: 'Жиры', v: dispF, c: '#f59e0b', unit: 'г', perKg: Math.round(dispF / Math.max(1, weight)) },
+                      {
+                        l: 'Углеводы',
+                        v: dispC,
+                        c: '#f97316',
+                        unit: 'г',
+                        perKg: Math.round(dispC / Math.max(1, weight)),
+                      },
+                    ].map((m) => {
+                      const pct =
+                        dispKcal > 0 && m.l !== 'Калории'
+                          ? Math.round(
+                              (({ Калории: dispKcal, Белки: dispP * 4, Жиры: dispF * 9, Углеводы: dispC * 4 }[m.l] ||
+                                0) /
+                                dispKcal) *
+                                100,
+                            )
+                          : null;
+                      return (
+                        <div
+                          key={m.l}
+                          style={{
+                            textAlign: 'center',
+                            borderRadius: 10,
+                            padding: '8px 4px',
+                            background: `linear-gradient(135deg, ${m.c}12, transparent)`,
+                            border: `1px solid ${m.c}25`,
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: m.c }}
+                          />
+                          <div style={{ fontSize: 18, fontWeight: 800, color: m.c, lineHeight: 1.2 }}>{m.v}</div>
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{m.unit}</div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
+                            {m.perKg} / кг
+                            {pct !== null && ` · ${pct}%`}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              {(() => {
+                // FIX 1.3: подпись BMR/TDEE/Коррекция должна отражать ТОТ ЖЕ источник, что и цифры.
+                // Раньше всегда показывался auto-calc даже в режиме 'profile' — визуальное противоречие.
+                const _src = kbjuMode === 'profile' ? profileTargets : calcTargets;
+                const _bmr = _src?.bmr || 0;
+                const _tdee = _src?.tdee || 0;
+                const _adj = _src?.adjustment || 0;
+                if (_bmr <= 0) return null;
+                return (
+                  <div
+                    style={{ display: 'flex', gap: 6, marginBottom: 6, fontSize: 9, color: 'rgba(255,255,255,0.9)' }}
+                  >
+                    <span>
+                      BMR: <b style={{ color: '#00e68a' }}>{_bmr}</b> ккал
+                    </span>
+                    <span>
+                      TDEE: <b style={{ color: '#60a5fa' }}>{_tdee}</b> ккал
+                    </span>
+                    {_adj !== 0 && (
+                      <span>
+                        Коррекция:{' '}
+                        <b style={{ color: _adj > 0 ? '#f59e0b' : '#22c55e' }}>
+                          {_adj > 0 ? '+' : ''}
+                          {_adj}
+                        </b>{' '}
+                        ккал
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+              {(() => {
+                // D-22: nutrMult already folded into effective* — do NOT multiply again.
+                const pKcal = effectiveP * 4;
+                const fKcal = effectiveF * 9;
+                const cKcal = effectiveC * 4;
+                const total = pKcal + fKcal + cKcal || 1;
+                const pPct = (pKcal / total) * 100;
+                const fPct = (fKcal / total) * 100;
+                const cPct = (cKcal / total) * 100;
+                return (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                      Распределение макронутриентов
+                    </div>
+                    <div
+                      style={{ height: 8, borderRadius: 4, background: '#202023', overflow: 'hidden', display: 'flex' }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${pPct}%`,
+                          background: '#3b82f6',
+                          transition: 'width 0.3s',
+                          minWidth: 2,
+                        }}
+                        title={`Белки ${Math.round(pPct)}%`}
+                      />
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${fPct}%`,
+                          background: '#f59e0b',
+                          transition: 'width 0.3s',
+                          minWidth: 2,
+                        }}
+                        title={`Жиры ${Math.round(fPct)}%`}
+                      />
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${cPct}%`,
+                          background: '#f97316',
+                          transition: 'width 0.3s',
+                          minWidth: 2,
+                        }}
+                        title={`Углеводы ${Math.round(cPct)}%`}
+                      />
+                    </div>
+                    <div
+                      style={{ display: 'flex', gap: 8, fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}
+                    >
+                      <span style={{ color: '#3b82f6' }}>● Б {Math.round(pPct)}%</span>
+                      <span style={{ color: '#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
+                      <span style={{ color: '#f97316' }}>● У {Math.round(cPct)}%</span>
+                    </div>
+                  </div>
+                );
+              })()}
+              {carbPeriodization !== 'none' &&
+                (() => {
+                  // Эпик 1: единая периодизация — реальные моды дня из одной функции.
+                  const _t = applyCarbPeriodizationMods(carbPeriodization, 0, true);
+                  const _r = applyCarbPeriodizationMods(carbPeriodization, 0, false);
+                  const trainDayK = Math.round(effectiveKcal * _t.dayKcalMod);
+                  const trainDayC = Math.round(effectiveC * _t.dayCarbMod);
+                  const restDayK = Math.round(effectiveKcal * _r.dayKcalMod);
+                  const restDayC = Math.round(effectiveC * _r.dayCarbMod);
+                  return (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: 'rgba(59,130,246,0.5)',
+                        marginTop: 2,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        background: 'rgba(59,130,246,0.04)',
+                        border: '1px solid rgba(59,130,246,0.08)',
+                      }}
+                    >
+                      {carbPeriodizationLabel(carbPeriodization)}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г
+                      угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.
+                    </div>
+                  );
+                })()}
+            </div>
+          ) : (
+            <div>
+              {(() => {
+                const mvKcal = manualKcal ?? effectiveKcal;
+                const mvP = manualP ?? effectiveP;
+                const mvF = manualF ?? effectiveF;
+                const mvC = manualC ?? effectiveC;
+                const pKcal = mvP * 4;
+                const fKcal = mvF * 9;
+                const cKcal = mvC * 4;
+                const total = pKcal + fKcal + cKcal || 1;
+                const pPct = (pKcal / total) * 100;
+                const fPct = (fKcal / total) * 100;
+                const cPct = (cKcal / total) * 100;
+                const perKgKcal = Math.round(mvKcal / weight);
+                const perKgP = Math.round(mvP / weight);
+                const perKgF = Math.round(mvF / weight);
+                const perKgC = Math.round(mvC / weight);
+                const hasGPerKg = manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0;
+                return (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                      {[
+                        {
+                          l: 'Калории',
+                          v: mvKcal,
+                          c: '#00e68a',
+                          unit: 'ккал',
+                          perKg: perKgKcal,
+                          setter: setManualKcal,
+                        },
+                        {
+                          l: 'Белки',
+                          v: mvP,
+                          c: '#3b82f6',
+                          unit: 'г',
+                          perKg: perKgP,
+                          setter: (v: any) => setManualGramValue('protein', v),
+                        },
+                        {
+                          l: 'Жиры',
+                          v: mvF,
+                          c: '#f59e0b',
+                          unit: 'г',
+                          perKg: perKgF,
+                          setter: (v: any) => setManualGramValue('fat', v),
+                        },
+                        {
+                          l: 'Углеводы',
+                          v: mvC,
+                          c: '#f97316',
+                          unit: 'г',
+                          perKg: perKgC,
+                          setter: (v: any) => setManualGramValue('carbs', v),
+                        },
+                      ].map((m) => {
+                        const pct =
+                          mvKcal > 0 && m.l !== 'Калории'
+                            ? Math.round(
+                                (({ Калории: mvKcal, Белки: mvP * 4, Жиры: mvF * 9, Углеводы: mvC * 4 }[m.l] || 0) /
+                                  mvKcal) *
+                                  100,
+                              )
+                            : null;
+                        return (
+                          <div
+                            key={m.l}
+                            style={{
+                              textAlign: 'center',
+                              borderRadius: 10,
+                              padding: '8px 4px',
+                              background: `linear-gradient(135deg, ${m.c}12, transparent)`,
+                              border: `1px solid ${m.c}25`,
+                              position: 'relative',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <div
+                              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: m.c }}
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              value={m.v === 0 ? 0 : m.v || ''}
+                              onChange={(e) => m.setter(e.target.value === '' ? null : Math.max(0, +e.target.value))}
+                              style={{
+                                width: '100%',
+                                fontSize: 18,
+                                fontWeight: 800,
+                                color: m.c,
+                                textAlign: 'center',
+                                background: 'transparent',
+                                border: 'none',
+                                outline: 'none',
+                                padding: 0,
+                                lineHeight: 1.2,
+                                MozAppearance: 'textfield',
+                              }}
+                            />
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{m.unit}</div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.9)', marginTop: 1 }}>
+                              {m.perKg} / кг
+                              {pct !== null && ` · ${pct}%`}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                        Распределение макронутриентов
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          borderRadius: 4,
+                          background: '#202023',
+                          overflow: 'hidden',
+                          display: 'flex',
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${pPct}%`,
+                            background: '#3b82f6',
+                            transition: 'width 0.3s',
+                            minWidth: 2,
+                          }}
+                        />
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${fPct}%`,
+                            background: '#f59e0b',
+                            transition: 'width 0.3s',
+                            minWidth: 2,
+                          }}
+                        />
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${cPct}%`,
+                            background: '#f97316',
+                            transition: 'width 0.3s',
+                            minWidth: 2,
+                          }}
+                        />
+                      </div>
+                      <div
+                        style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}
+                      >
+                        <span style={{ color: '#3b82f6' }}>● Б {Math.round(pPct)}%</span>
+                        <span style={{ color: '#f59e0b' }}>● Ж {Math.round(fPct)}%</span>
+                        <span style={{ color: '#f97316' }}>● У {Math.round(cPct)}%</span>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 10,
+                        marginBottom: 6,
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.8)',
+                        letterSpacing: 0.5,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Ввод в г/кг веса{hasGPerKg ? ` (${Math.round(mvKcal)} ккал)` : ''}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                      {[
+                        {
+                          l: 'Белки',
+                          v: manualGPerKg.protein,
+                          c: '#3b82f6',
+                          unit: 'г/кг',
+                          setter: (val: number) => setManualGPerKgValue('protein', val),
+                        },
+                        {
+                          l: 'Жиры',
+                          v: manualGPerKg.fat,
+                          c: '#f59e0b',
+                          unit: 'г/кг',
+                          setter: (val: number) => setManualGPerKgValue('fat', val),
+                        },
+                        {
+                          l: 'Углеводы',
+                          v: manualGPerKg.carbs,
+                          c: '#f97316',
+                          unit: 'г/кг',
+                          setter: (val: number) => setManualGPerKgValue('carbs', val),
+                        },
+                      ].map((m) => (
+                        <div
+                          key={m.l}
+                          style={{
+                            textAlign: 'center',
+                            borderRadius: 10,
+                            padding: '8px 4px',
+                            background: `linear-gradient(135deg, ${m.c}12, transparent)`,
+                            border: `1px solid ${m.c}25`,
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <div
+                            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: m.c }}
+                          />
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            value={m.v > 0 ? m.v : ''}
+                            onChange={(e) => m.setter(e.target.value === '' ? 0 : Math.max(0, +e.target.value))}
+                            placeholder="0.0"
+                            style={{
+                              width: '100%',
+                              fontSize: 18,
+                              fontWeight: 800,
+                              color: m.c,
+                              textAlign: 'center',
+                              background: 'transparent',
+                              border: 'none',
+                              outline: 'none',
+                              padding: 0,
+                              lineHeight: 1.2,
+                              MozAppearance: 'textfield',
+                            }}
+                          />
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{m.unit}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                      Введите любые значения — недостающие рассчитаются автоматически
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(96,165,250,0.75)', marginBottom: 4, lineHeight: 1.4 }}>
+                      🔗 Граммы и г/кг связаны: значение в г/кг × вес = граммы того же макроса (правка в любой карточке
+                      применяется сразу).
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 4, lineHeight: 1.4 }}>
+                      💡 Бюджет и пресет белка скрыты — в ручном режиме они не применяются.
+                    </div>
+                    {/* Keep manual mode active: switching to auto here discarded the user's values on generation. */}
+                    {/* FIX audit (B1): кнопка «✓ Применить» была no-op (setKbjuMode('manual') внутри
+                    уже-manual ветки) — значения сохраняются автоматически (авто-сейв контекста) */}
+                    <div style={greenBtn}>✓ Введённые значения применяются автоматически</div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </GlassCard>
+      }
+
+      {plannerMode === 'pro' && (
+        <GlassCard title="Целевое КБЖУ" icon="📊" color="#00e68a">
+          {(() => {
+            // FIX audit (B2): «Скользящие графики» показывали «Факт» как ХАРДКОД-мок
+            // (×0.87 цели) с подписью «среднее потребление за последние дни» — ложь.
+            // Фактический разбор — в Дневнике питания; здесь остаётся честная цель.
+            const tKcal = kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal);
+            const tP = kbjuMode !== 'manual' ? effectiveP : (manualP ?? effectiveP);
+            const tF = kbjuMode !== 'manual' ? effectiveF : (manualF ?? effectiveF);
+            const tC = kbjuMode !== 'manual' ? effectiveC : (manualC ?? effectiveC);
+            const items = [
+              { label: 'Калории', target: tKcal, unit: 'ккал', color: '#00e68a' },
+              { label: 'Белки', target: tP, unit: 'г', color: '#3b82f6' },
+              { label: 'Жиры', target: tF, unit: 'г', color: '#f59e0b' },
+              { label: 'Углеводы', target: tC, unit: 'г', color: '#f97316' },
+            ];
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: 'rgba(255,255,255,0.8)',
+                    marginBottom: 4,
+                    lineHeight: 1.6,
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                  }}
+                >
+                  <div>🎯 Цель — рассчитанная норма КБЖУ на день</div>
+                  <div style={{ color: 'rgba(255,255,255,0.5)' }}>Факт по дням — в «📓 Дневнике питания»</div>
+                </div>
+                {items.map((m) => (
+                  <div key={m.label} style={{ marginBottom: 4 }}>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: m.color, marginBottom: 3 }}>{m.label}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <span
+                        style={{ fontSize: 6, color: 'rgba(255,255,255,0.75)', minWidth: 38, whiteSpace: 'nowrap' }}
+                      >
+                        🎯 Цель
+                      </span>
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 6,
+                          borderRadius: 3,
+                          background: 'rgba(32,32,35,0.8)',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{ height: '100%', width: '100%', borderRadius: 3, background: m.color, opacity: 0.15 }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: m.color,
+                          minWidth: 52,
+                          textAlign: 'right',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {m.target} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>{m.unit}</span>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </GlassCard>
       )}
 
       {/* Чистка-2026 (P9): в ручном КБЖУ бюджет не действует — скрываем, чтобы не вводил в заблуждение */}
       {plannerMode === 'pro' && kbjuMode !== 'manual' && (
-      <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Определяет качество продуктов: низкий = базовые продукты, средний = сбалансированный, максимум = топ по рейтингу <span style={{ color:'#f59e0b', fontWeight:700 }}>bb_quality_score</span>, усиленный = только элитные.
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-          {BUDGET_LEVELS.map(b => {
-            const isActive = budget === b.id;
-            const scoreRange = b.id === 'low' ? '1–5' : b.id === 'medium' ? '5–8' : b.id === 'max' ? '8–10' : '9–10';
-            return (
-              <button key={b.id} onClick={() => setBudget(b.id)} style={{
-                padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-                background: isActive ? `${b.color}18` : '#202023',
-                border: isActive ? `2px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
-                color: isActive ? b.color : 'rgba(255,255,255,0.85)',
-                fontWeight: isActive ? 700 : 500,
-                transition: 'all 0.2s',
-              }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <span style={{ fontSize:12 }}>{b.icon} {b.label}</span>
-                  <span style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.8)' }}>★{scoreRange}</span>
-                </div>
-                <div style={{ fontSize:9, color: isActive ? `${b.color}aa` : 'rgba(255,255,255,0.85)', marginTop:3 }}>{b.desc}</div>
-              </button>
-            );
-          })}
-        </div>
-      </GlassCard>
+        <GlassCard title="Уровень бюджета" icon="💰" color="#f59e0b">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+            Определяет качество продуктов: низкий = базовые продукты, средний = сбалансированный, максимум = топ по
+            рейтингу <span style={{ color: '#f59e0b', fontWeight: 700 }}>bb_quality_score</span>, усиленный = только
+            элитные.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {BUDGET_LEVELS.map((b) => {
+              const isActive = budget === b.id;
+              const scoreRange = b.id === 'low' ? '1–5' : b.id === 'medium' ? '5–8' : b.id === 'max' ? '8–10' : '9–10';
+              return (
+                <button
+                  key={b.id}
+                  onClick={() => setBudget(b.id)}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    background: isActive ? `${b.color}18` : '#202023',
+                    border: isActive ? `2px solid ${b.color}` : '1px solid rgba(255,255,255,0.06)',
+                    color: isActive ? b.color : 'rgba(255,255,255,0.85)',
+                    fontWeight: isActive ? 700 : 500,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12 }}>
+                      {b.icon} {b.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'rgba(255,255,255,0.8)',
+                      }}
+                    >
+                      ★{scoreRange}
+                    </span>
+                  </div>
+                  <div
+                    style={{ fontSize: 9, color: isActive ? `${b.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 3 }}
+                  >
+                    {b.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </GlassCard>
       )}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Разнообразие" icon="🎲" color="#8b5cf6">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Два регулятора: <b>уровень</b> (размер пула продуктов на категорию) и <b>жёсткость ротации</b>. Базовый — мало продуктов; максимум — полный пул.
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
-          {VARIETY_LEVELS.map(v => (
-            <button key={v.id} onClick={() => setVarietyLevel(v.id)} style={{
-              padding: '10px 8px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-              background: varietyLevel === v.id ? `${v.color}18` : '#202023',
-              border: varietyLevel === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
-              color: varietyLevel === v.id ? '#fff' : 'rgba(255,255,255,0.7)',
-              fontWeight: varietyLevel === v.id ? 700 : 500, fontSize: 10,
-            }}>
-              <div style={{ fontSize: 14, marginBottom: 2 }}>{v.icon}</div>
-              <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label}</div>
-              <div style={{ fontSize: 9, color: varietyLevel === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
-            </button>
-          ))}
-        </div>
-        {/* Чистка-2026 (P4): строгая ротация — второй регулятор разнообразия (variety свёден к level) */}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', margin: '8px 0 4px' }}>🔒 Жёсткость ротации</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
-          {([
-            ['soft', '🙂 Мягкая', 'Жёсткое окно повторов выключено: продукты 1–2 дней могут вернуться'],
-            ['strict', '🔒 Строгая', 'Продукты последних 1–2 дней жёстко исключены из подбора'],
-          ] as ['soft' | 'strict', string, string][]).map(([id, label, desc]) => (
-            <button key={id} onClick={() => setVarietyStrictness(id)} style={{
-              padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-              background: varietyStrictness === id ? 'rgba(139,92,246,0.14)' : '#202023',
-              border: varietyStrictness === id ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
-              color: varietyStrictness === id ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
-            </button>
-          ))}
-        </div>
-        {/* P1-6 (HV-экстремумы 800-1500У/500Б, план NUTRITION-VARIETY-PLAN §3.1):
+        <GlassCard title="Разнообразие" icon="🎲" color="#8b5cf6">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+            Два регулятора: <b>уровень</b> (размер пула продуктов на категорию) и <b>жёсткость ротации</b>. Базовый —
+            мало продуктов; максимум — полный пул.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+            {VARIETY_LEVELS.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setVarietyLevel(v.id)}
+                style={{
+                  padding: '10px 8px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  background: varietyLevel === v.id ? `${v.color}18` : '#202023',
+                  border: varietyLevel === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
+                  color: varietyLevel === v.id ? '#fff' : 'rgba(255,255,255,0.7)',
+                  fontWeight: varietyLevel === v.id ? 700 : 500,
+                  fontSize: 10,
+                }}
+              >
+                <div style={{ fontSize: 14, marginBottom: 2 }}>{v.icon}</div>
+                <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label}</div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: varietyLevel === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)',
+                    marginTop: 2,
+                  }}
+                >
+                  {v.desc}
+                </div>
+              </button>
+            ))}
+          </div>
+          {/* Чистка-2026 (P4): строгая ротация — второй регулятор разнообразия (variety свёден к level) */}
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', margin: '8px 0 4px' }}>🔒 Жёсткость ротации</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+            {(
+              [
+                ['soft', '🙂 Мягкая', 'Жёсткое окно повторов выключено: продукты 1–2 дней могут вернуться'],
+                ['strict', '🔒 Строгая', 'Продукты последних 1–2 дней жёстко исключены из подбора'],
+              ] as ['soft' | 'strict', string, string][]
+            ).map(([id, label, desc]) => (
+              <button
+                key={id}
+                onClick={() => setVarietyStrictness(id)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: varietyStrictness === id ? 'rgba(139,92,246,0.14)' : '#202023',
+                  border: varietyStrictness === id ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.06)',
+                  color: varietyStrictness === id ? '#c4b5fd' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+              </button>
+            ))}
+          </div>
+          {/* P1-6 (HV-экстремумы 800-1500У/500Б, план NUTRITION-VARIETY-PLAN §3.1):
             стиль закрытия высокоуглеводных целей. real = как раньше (байт-в-байт);
             practical/mixed расширяют топапы плотными носителями (крем/хлопья/сухофрукты). */}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', margin: '8px 0 4px' }}>⚡ Стиль High-Volume (800–1500 г углей)</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
-          {([
-            ['real', '🍳 Реальная еда', 'Как сейчас: цельная еда в основных приёмах'],
-            ['practical', '⚡ Практичный', 'Плотные топапы (крем/хлопья/сухофрукты) — без 3 кг каши'],
-            ['mixed', '🔀 Смешанный', 'Реальная еда в основных + практичная в перекусах'],
-          ] as ['real' | 'practical' | 'mixed', string, string][]).map(([id, label, desc]) => (
-            <button key={id} onClick={() => setHvStyle(id)} style={{
-              padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-              background: hvStyle === id ? 'rgba(34,197,94,0.14)' : '#202023',
-              border: hvStyle === id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
-              color: hvStyle === id ? '#86efac' : 'rgba(255,255,255,0.7)',
-            }}>
-              <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
-            </button>
-          ))}
-        </div>
-      </GlassCard>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', margin: '8px 0 4px' }}>
+            ⚡ Стиль High-Volume (800–1500 г углей)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+            {(
+              [
+                ['real', '🍳 Реальная еда', 'Как сейчас: цельная еда в основных приёмах'],
+                ['practical', '⚡ Практичный', 'Плотные топапы (крем/хлопья/сухофрукты) — без 3 кг каши'],
+                ['mixed', '🔀 Смешанный', 'Реальная еда в основных + практичная в перекусах'],
+              ] as ['real' | 'practical' | 'mixed', string, string][]
+            ).map(([id, label, desc]) => (
+              <button
+                key={id}
+                onClick={() => setHvStyle(id)}
+                style={{
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: hvStyle === id ? 'rgba(34,197,94,0.14)' : '#202023',
+                  border: hvStyle === id ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.06)',
+                  color: hvStyle === id ? '#86efac' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 700 }}>{label}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+              </button>
+            ))}
+          </div>
+        </GlassCard>
       )}
 
       {/* Чистка-2026 (P9): в ручном КБЖУ пресет белка не действует — скрываем */}
       {plannerMode === 'pro' && kbjuMode !== 'manual' && (
-      <GlassCard title="Белок · пресет" icon="🥩" color="#22c55e">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Базовый диапазон белка: {PROTEIN_G_PER_KG_RANGE.min}–{PROTEIN_G_PER_KG_RANGE.max} г/кг массы. Жиры фиксированы на 0.8 г/кг, угли — остаток в диетпотолке.
-          Нужно больше или меньше — переключи «✏️ Ручное КБЖУ» и введи свои граммы: ручной режим не ограничен диапазоном.
-        </div>
-        {/* 26 сен 2026 (E1.7 / A15): подпись под диапазоном. Без неё «1.8–2.4 г/кг»
+        <GlassCard title="Белок · пресет" icon="🥩" color="#22c55e">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+            Базовый диапазон белка: {PROTEIN_G_PER_KG_RANGE.min}–{PROTEIN_G_PER_KG_RANGE.max} г/кг массы. Жиры
+            фиксированы на 0.8 г/кг, угли — остаток в диетпотолке. Нужно больше или меньше — переключи «✏️ Ручное КБЖУ»
+            и введи свои граммы: ручной режим не ограничен диапазоном.
+          </div>
+          {/* 26 сен 2026 (E1.7 / A15): подпись под диапазоном. Без неё «1.8–2.4 г/кг»
             выглядит цитатой из источника, хотя это выбранный нами коридор; и рядом стоит
             другое число (30–35 г ДОБАВЛЕННОГО сывороточного, Li 2026), которое нельзя
             выдавать за обоснование 2.4 г/кг. Белый текст по правилу 1 проекта. */}
-        <div style={{ fontSize: 9, color: '#fff', marginBottom: 8, lineHeight: 1.5, padding: '5px 7px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', borderLeft: '2px solid #f59e0b' }}>
-          {PROTEIN_G_PER_KG_RANGE_NOTE}
-        </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 1.8} г/кг пресет</div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PROTEIN_PRESETS.length}, 1fr)`, gap: 5 }}>
-          {PROTEIN_PRESETS.map(p => (
-            <button key={p.id} onClick={() => setProteinPreset(p.id)} style={{
-              padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-              background: proteinPreset === p.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              border: proteinPreset === p.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-              color: proteinPreset === p.id ? '#000' : 'rgba(255,255,255,0.7)',
-              fontWeight: proteinPreset === p.id ? 800 : 500, fontSize: 10,
-              transition: 'all 0.2s',
-            }}>
-              <div style={{ fontSize: 14, marginBottom: 2 }}>{p.icon}</div>
-              <div style={{ fontWeight: 700 }}>{p.label}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{p.desc}</div>
-              <div style={{ fontSize: 9, color: proteinPreset === p.id ? '#00e68a' : 'rgba(255,255,255,0.8)', marginTop: 1 }}>{p.gPerKg} г/кг</div>
-            </button>
-          ))}
-        </div>
-      </GlassCard>
+          <div
+            style={{
+              fontSize: 9,
+              color: '#fff',
+              marginBottom: 8,
+              lineHeight: 1.5,
+              padding: '5px 7px',
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.03)',
+              borderLeft: '2px solid #f59e0b',
+            }}
+          >
+            {PROTEIN_G_PER_KG_RANGE_NOTE}
+          </div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+            Сейчас: {effectiveP} г белка · {weight > 0 ? (effectiveP / weight).toFixed(2) : '–'} г/кг ·{' '}
+            {PROTEIN_PRESETS.find((p) => p.id === proteinPreset)?.gPerKg || 1.8} г/кг пресет
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${PROTEIN_PRESETS.length}, 1fr)`, gap: 5 }}>
+            {PROTEIN_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setProteinPreset(p.id)}
+                style={{
+                  padding: '10px 6px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  background: proteinPreset === p.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                  border: proteinPreset === p.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                  color: proteinPreset === p.id ? '#000' : 'rgba(255,255,255,0.7)',
+                  fontWeight: proteinPreset === p.id ? 800 : 500,
+                  fontSize: 10,
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ fontSize: 14, marginBottom: 2 }}>{p.icon}</div>
+                <div style={{ fontWeight: 700 }}>{p.label}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{p.desc}</div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: proteinPreset === p.id ? '#00e68a' : 'rgba(255,255,255,0.8)',
+                    marginTop: 1,
+                  }}
+                >
+                  {p.gPerKg} г/кг
+                </div>
+              </button>
+            ))}
+          </div>
+          {/* Источник белка: «Мясо и рыба» — мягкий приоритет flesh в обед/ужин. */}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Источник белка</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 6 }}>
+              {PROTEIN_SOURCE_MODES.map((m) => {
+                const active = proteinSourceMode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setProteinSourceMode(m.id)}
+                    aria-pressed={active}
+                    style={{
+                      padding: '9px 6px',
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                      border: active ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                      color: active ? '#000' : 'rgba(255,255,255,0.7)',
+                      fontWeight: active ? 800 : 500,
+                      fontSize: 10,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <div style={{ fontSize: 14, marginBottom: 2 }}>{m.icon}</div>
+                    <div style={{ fontWeight: 800 }}>{m.label}</div>
+                    <div
+                      style={{
+                        fontSize: 8,
+                        color: active ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.75)',
+                        marginTop: 2,
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {m.desc}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {proteinSourceMode === 'meat_fish' && (
+              <>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
+                  Якоря режима — с них начинается выбор белка в обед и ужин:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {PROTEIN_ANCHOR_OPTIONS.map((o) => {
+                    const on = proteinAnchors.includes(o.id);
+                    return (
+                      <button
+                        key={o.id}
+                        onClick={() =>
+                          setProteinAnchors(on ? proteinAnchors.filter((x) => x !== o.id) : [...proteinAnchors, o.id])
+                        }
+                        aria-pressed={on}
+                        style={{
+                          padding: '5px 8px',
+                          borderRadius: 999,
+                          cursor: 'pointer',
+                          fontSize: 9,
+                          fontWeight: on ? 800 : 600,
+                          background: on ? 'rgba(0,230,138,0.14)' : '#202023',
+                          border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+                          color: on ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                        }}
+                      >
+                        {o.icon} {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 5, lineHeight: 1.4 }}>
+                  Мягкий режим: завтрак и перекусы сохраняют яйца/творог/сыворотку (MPS-типология), порошок не запрещён
+                  — он просто не главный белок обеда/ужина. Если мясо/рыба исключены диетой или аллергией, день не
+                  ломается: берётся следующий доступный источник белка.
+                </div>
+              </>
+            )}
+          </div>
+        </GlassCard>
       )}
 
-      {(
-      <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
-          <PopupSelect label="Пробуждение" value={wakeTime} options={TIME_OPTIONS} onChange={setWakeTime} />
-          <PopupSelect label="Обед" value={lunchTime} options={TIME_OPTIONS} onChange={setLunchTime} />
-          <PopupSelect label="Ужин" value={dinnerTime} options={TIME_OPTIONS} onChange={setDinnerTime} />
-          <PopupSelect label="Отход ко сну" value={bedTime} options={TIME_OPTIONS} onChange={setBedTime} />
-          <div style={{ gridColumn: 'span 2' }}>
-            {/* Чистка-2026 (P6): взаимоисключение с «Вечерним режимом» (ужин ×3.0 углеводов vs ×0.5) */}
-            <button
-              onClick={() => { const nv = !morningTrainLoad; setMorningTrainLoad(nv); if (nv && eveningLowCarb) { setEveningLowCarb(false); flash('🌙 Вечерний режим выключен: конфликтует с загрузкой под утреннюю тренировку (ужин ×3.0 углеводов vs ×0.5)'); } }}
-              style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: morningTrainLoad ? 'rgba(59,130,246,0.12)' : '#202023', border:`1px solid ${morningTrainLoad ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.1)'}`, color: morningTrainLoad ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}
-            >
-              🌅 Загрузка под утреннюю тренировку: {morningTrainLoad ? 'ВКЛ' : 'ВЫКЛ'}
-            </button>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
-              При утренней тренировке (старт до 14:00) вечером — много углеводов, минимум жиров, умеренный белок (гликоген к утренней сессии).
-              {morningTrainLoad && <span style={{ color: '#fbbf24' }}> ⚠ Взаимоисключает «Вечерний режим» — он выключен автоматически.</span>}
+      {
+        <GlassCard title="Расписание" icon="⏰" color="#06b6d4">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+            <PopupSelect label="Пробуждение" value={wakeTime} options={TIME_OPTIONS} onChange={setWakeTime} />
+            <PopupSelect label="Обед" value={lunchTime} options={TIME_OPTIONS} onChange={setLunchTime} />
+            <PopupSelect label="Ужин" value={dinnerTime} options={TIME_OPTIONS} onChange={setDinnerTime} />
+            <PopupSelect label="Отход ко сну" value={bedTime} options={TIME_OPTIONS} onChange={setBedTime} />
+            <div style={{ gridColumn: 'span 2' }}>
+              {/* Чистка-2026 (P6): взаимоисключение с «Вечерним режимом» (ужин ×3.0 углеводов vs ×0.5) */}
+              <button
+                onClick={() => {
+                  const nv = !morningTrainLoad;
+                  setMorningTrainLoad(nv);
+                  if (nv && eveningLowCarb) {
+                    setEveningLowCarb(false);
+                    flash(
+                      '🌙 Вечерний режим выключен: конфликтует с загрузкой под утреннюю тренировку (ужин ×3.0 углеводов vs ×0.5)',
+                    );
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  background: morningTrainLoad ? 'rgba(59,130,246,0.12)' : '#202023',
+                  border: `1px solid ${morningTrainLoad ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  color: morningTrainLoad ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                🌅 Загрузка под утреннюю тренировку: {morningTrainLoad ? 'ВКЛ' : 'ВЫКЛ'}
+              </button>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
+                При утренней тренировке (старт до 14:00) вечером — много углеводов, минимум жиров, умеренный белок
+                (гликоген к утренней сессии).
+                {morningTrainLoad && (
+                  <span style={{ color: '#fbbf24' }}>
+                    {' '}
+                    ⚠ Взаимоисключает «Вечерний режим» — он выключен автоматически.
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        <div>
-          <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:4,display:'block'}}>Количество приёмов пищи — автоматически</label>
+          <div>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4, display: 'block' }}>
+              Количество приёмов пищи — автоматически
+            </label>
             {(() => {
-              const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
+              const toMin = (t: string) =>
+                t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
               const wMin = toMin(wakeTime);
               const bMin = toMin(bedTime);
               const awakeH = Math.round((bMin - wMin) / 60);
               // Единый источник с движком (E1): те же входы — курс (порог белка 0.45→0.55 г/кг),
               // болюсы (окна инсулина), тренировочные peri. Раньше карточка считала без курса
               // и без peri/окон — число в UI расходилось с фактической сборкой дня.
-              const _onCourse = phase === 'course' || (injections || []).some((i: any) => /инсулин|аас|тест|трен|нандрол|болд|мастер|станаз|метан|оксандр/i.test(String(i?.type || i?.name || '')));
-              const _boluses = (injections || []).filter((i: any) => /инсулин/i.test(String(i?.type || i?.name || ''))).length;
+              const _onCourse =
+                phase === 'course' ||
+                (injections || []).some((i: any) =>
+                  /инсулин|аас|тест|трен|нандрол|болд|мастер|станаз|метан|оксандр/i.test(
+                    String(i?.type || i?.name || ''),
+                  ),
+                );
+              const _boluses = (injections || []).filter((i: any) =>
+                /инсулин/i.test(String(i?.type || i?.name || '')),
+              ).length;
               const st = planMealStructure({
-                awakeH, proteinG: effectiveP, carbsG: effectiveC, kcal: effectiveKcal, weightKg: weight,
-                onCourse: _onCourse, insulinBoluses: _boluses,
+                awakeH,
+                proteinG: effectiveP,
+                carbsG: effectiveC,
+                kcal: effectiveKcal,
+                weightKg: weight,
+                onCourse: _onCourse,
+                insulinBoluses: _boluses,
                 isTrainingDay: plannerMode === 'pro' && !!linkToTraining,
                 allowIntraWorkout: plannerMode === 'pro' && intraWorkoutEnabled && trainIntensity !== 'low',
               });
-              const why = st.binding === 'protein' ? `белок ${Math.round(effectiveP)} г` : st.binding === 'carbs' ? `угли ${Math.round(effectiveC)} г` : st.binding === 'kcal' ? `${Math.round(effectiveKcal)} ккал` : st.binding === 'insulin' ? `${st.insulinWindows} болюс(а) инсулина` : `день ${awakeH} ч`;
+              const why =
+                st.binding === 'protein'
+                  ? `белок ${Math.round(effectiveP)} г`
+                  : st.binding === 'carbs'
+                    ? `угли ${Math.round(effectiveC)} г`
+                    : st.binding === 'kcal'
+                      ? `${Math.round(effectiveKcal)} ккал`
+                      : st.binding === 'insulin'
+                        ? `${st.insulinWindows} болюс(а) инсулина`
+                        : `день ${awakeH} ч`;
               const _total = st.regularMeals + st.periMeals + st.insulinWindows;
-              return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>🍽 Нормальная тарелка: ≤{st.pCap} г белка{_onCourse ? ' (на курсе)' : ''} · ≤130 г углей · ≤950 ккал → <b>{st.regularMeals} основных</b>{st.periMeals > 0 ? ` + ${st.periMeals} peri` : ''}{st.insulinWindows > 0 ? ` + ${st.insulinWindows} окон инсулина` : ''} = <b>{_total} приёмов</b> ({why}).<br />Тренировочные peri-окна и окна болюсов идут СВЕРХ основных — в дне они видны отдельными приёмами. Число не настраивается вручную.<br />🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}</div>;
+              return (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>
+                  🍽 Нормальная тарелка: ≤{st.pCap} г белка{_onCourse ? ' (на курсе)' : ''} · ≤130 г углей · ≤950 ккал →{' '}
+                  <b>{st.regularMeals} основных</b>
+                  {st.periMeals > 0 ? ` + ${st.periMeals} peri` : ''}
+                  {st.insulinWindows > 0 ? ` + ${st.insulinWindows} окон инсулина` : ''} = <b>{_total} приёмов</b> (
+                  {why}).
+                  <br />
+                  Тренировочные peri-окна и окна болюсов идут СВЕРХ основных — в дне они видны отдельными приёмами.
+                  Число не настраивается вручную.
+                  <br />
+                  🍳 Завтрак около {wakeTime} · 🥗 Обед в {lunchTime} · 🍽 Ужин в {dinnerTime}
+                </div>
+              );
             })()}
-        </div>
-      </GlassCard>
-      )}
+          </div>
+        </GlassCard>
+      }
 
-        {/* Work Schedule — доступно во всех режимах (еда на работе нужна всем) */}
-        {(
+      {/* Work Schedule — доступно во всех режимах (еда на работе нужна всем) */}
+      {
         <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div>
-                <div style={{ fontSize:10, fontWeight:700, color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}>График работы</div>
-                {!workScheduleEnabled && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Рабочие дни, время, смены</div>}
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+                  }}
+                >
+                  График работы
+                </div>
+                {!workScheduleEnabled && (
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>Рабочие дни, время, смены</div>
+                )}
               </div>
             </div>
-            <button onClick={() => setWorkScheduleEnabled(!workScheduleEnabled)} style={{
-              padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-              background: workScheduleEnabled ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)',
-              border: workScheduleEnabled ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)',
-            }}>{workScheduleEnabled ? '✓ Вкл' : 'Выкл'}</button>
+            <button
+              onClick={() => setWorkScheduleEnabled(!workScheduleEnabled)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 8,
+                fontSize: 9,
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: workScheduleEnabled ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)',
+                border: workScheduleEnabled ? '1px solid rgba(96,165,250,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: workScheduleEnabled ? '#60a5fa' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {workScheduleEnabled ? '✓ Вкл' : 'Выкл'}
+            </button>
           </div>
           {workScheduleEnabled && (
-            <div style={{ marginTop:8 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:4 }}>Тип графика</div>
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Тип графика</div>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                 {[
-                  { id:'standard', label:'📅 Стандарт' },
-                  { id:'sliding', label:'🔄 Скользящий' },
-                  { id:'shift_1_3', label:'1/3' },
-                  { id:'shift_2_2', label:'2/2' },
-                  { id:'shift_day_night', label:'🌙 День/Ночь' },
-                  { id:'shift_2_1', label:'2/1' },
-                  { id:'shift_3_1', label:'3/1' },
-                  { id:'custom', label:'⚙️ Свой' },
-                ].map(t => (
-                  <button key={t.id} onClick={() => setWorkScheduleType(t.id)} style={{
-                    padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', fontWeight: workScheduleType === t.id ? 700 : 400,
-                    background: workScheduleType === t.id ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: workScheduleType === t.id ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: workScheduleType === t.id ? '#60a5fa' : 'rgba(255,255,255,0.6)',
-                  }}>{t.label}</button>
+                  { id: 'standard', label: '📅 Стандарт' },
+                  { id: 'sliding', label: '🔄 Скользящий' },
+                  { id: 'shift_1_3', label: '1/3' },
+                  { id: 'shift_2_2', label: '2/2' },
+                  { id: 'shift_day_night', label: '🌙 День/Ночь' },
+                  { id: 'shift_2_1', label: '2/1' },
+                  { id: 'shift_3_1', label: '3/1' },
+                  { id: 'custom', label: '⚙️ Свой' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setWorkScheduleType(t.id)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      fontSize: 10,
+                      cursor: 'pointer',
+                      fontWeight: workScheduleType === t.id ? 700 : 400,
+                      background: workScheduleType === t.id ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.03)',
+                      border:
+                        workScheduleType === t.id
+                          ? '1px solid rgba(96,165,250,0.3)'
+                          : '1px solid rgba(255,255,255,0.06)',
+                      color: workScheduleType === t.id ? '#60a5fa' : 'rgba(255,255,255,0.6)',
+                    }}
+                  >
+                    {t.label}
+                  </button>
                 ))}
               </div>
-              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-                <div style={{ flex:1 }}>
-                  <PopupSelect label="Начало работы" value={workStartTime} options={TIME_OPTIONS} onChange={setWorkStartTime} />
+              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <div style={{ flex: 1 }}>
+                  <PopupSelect
+                    label="Начало работы"
+                    value={workStartTime}
+                    options={TIME_OPTIONS}
+                    onChange={setWorkStartTime}
+                  />
                 </div>
-                <div style={{ flex:1 }}>
-                  <PopupSelect label="Конец работы" value={workEndTime} options={TIME_OPTIONS} onChange={setWorkEndTime} />
+                <div style={{ flex: 1 }}>
+                  <PopupSelect
+                    label="Конец работы"
+                    value={workEndTime}
+                    options={TIME_OPTIONS}
+                    onChange={setWorkEndTime}
+                  />
                 </div>
               </div>
               {(() => {
@@ -1702,1038 +4499,2954 @@ export const IndividualPlanSettings: React.FC = () => {
                   custom: 'Ручной выбор рабочих дней',
                 };
                 return (
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:6 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}>
                     {descs[workScheduleType] || ''}
                   </div>
                 );
               })()}
               {(workScheduleType === 'standard' || workScheduleType === 'sliding' || workScheduleType === 'custom') && (
-                <div style={{ marginTop:6 }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', marginBottom:4 }}>Рабочие дни</div>
-                  <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Рабочие дни</div>
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                     {DAY_LABELS.map((label, idx) => {
                       const sel = workDays[idx];
                       return (
-                        <button key={idx} onClick={() => {
-                          const updated = [...workDays];
-                          updated[idx] = !updated[idx];
-                          setWorkDays(updated);
-                        }} style={{
-                          width:32, height:32, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight: sel ? 800 : 500,
-                          background: sel ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.03)',
-                          border: sel ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
-                          color: sel ? '#60a5fa' : 'rgba(255,255,255,0.7)',
-                          transition:'all 0.15s',
-                        }}>{label}</button>
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const updated = [...workDays];
+                            updated[idx] = !updated[idx];
+                            setWorkDays(updated);
+                          }}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                            fontSize: 9,
+                            fontWeight: sel ? 800 : 500,
+                            background: sel ? 'rgba(96,165,250,0.2)' : 'rgba(255,255,255,0.03)',
+                            border: sel ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
+                            color: sel ? '#60a5fa' : 'rgba(255,255,255,0.7)',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          {label}
+                        </button>
                       );
                     })}
                   </div>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.85)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: 4,
+                      fontSize: 9,
+                      color: 'rgba(255,255,255,0.85)',
+                    }}
+                  >
                     <span>💼 {workDays.filter(Boolean).length} рабочих</span>
-                    <span>🌴 {workDays.filter(d => !d).length} выходных</span>
+                    <span>🌴 {workDays.filter((d) => !d).length} выходных</span>
                   </div>
                 </div>
               )}
               {workScheduleType.startsWith('shift_') && (
-                <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(96,165,250,0.04)', border:'1px solid rgba(96,165,250,0.08)', fontSize:10, color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>
-                  🔄 Питание будет адаптировано под сменный график: время приёмов сдвинется относительно начала/конца смены, перекусы на работе включены в план.
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(96,165,250,0.04)',
+                    border: '1px solid rgba(96,165,250,0.08)',
+                    fontSize: 10,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  🔄 Питание будет адаптировано под сменный график: время приёмов сдвинется относительно начала/конца
+                  смены, перекусы на работе включены в план.
                 </div>
               )}
             </div>
           )}
-          <div style={{ marginTop:8 }}>
-            <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
-            {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
-            {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
-            <div style={{fontSize:9,color:'rgba(255,255,255,0.6)',marginTop:3,lineHeight:1.35}}>
-              «Только порошок/хлопья/протеин» — в рабочие часы только портативная еда (протеин, хлопья, орехи, фрукты, хлеб, йогурт). Супы, каши, жареное — исключаются.
+          <div style={{ marginTop: 8 }}>
+            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3, display: 'block' }}>
+              Еда на работе
+            </label>
+            {pickerBtn(
+              'Еда на работе',
+              [
+                { value: 'any', label: 'Любая (можно разогреть)' },
+                { value: 'portable', label: 'Только порошок/хлопья/протеин' },
+              ],
+              workFood,
+              setShowWorkFoodPicker,
+            )}
+            {pickerModal(
+              'Еда на работе',
+              [
+                { value: 'any', label: 'Любая (можно разогреть)' },
+                { value: 'portable', label: 'Только порошок/хлопья/протеин' },
+              ],
+              workFood,
+              setWorkFood,
+              showWorkFoodPicker,
+              setShowWorkFoodPicker,
+            )}
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3, lineHeight: 1.35 }}>
+              «Только порошок/хлопья/протеин» — в рабочие часы только портативная еда (протеин, хлопья, орехи, фрукты,
+              хлеб, йогурт). Супы, каши, жареное — исключаются.
+            </div>
+          </div>
+        </GlassCard>
+      }
+
+      {/* Чистка-2026 (P3): единая карточка «Исключения» — аллергены + исключённые продукты +
+          диеты + непереносимости + нелюбимые категории (ранее 4 карточки редактировали пересекающиеся наборы) */}
+      {
+        <GlassCard title="Исключения" icon="🚫" color="#ef4444">
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Аллергены</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
+            {ALLERGEN_LIST.map((a) => (
+              <PillBtn
+                key={a.id}
+                active={allergens.includes(a.id)}
+                onClick={() => toggleAllergen(a.id)}
+                color={allergens.includes(a.id) ? '#ef4444' : undefined}
+              >
+                {allergens.includes(a.id) ? '✕ ' : '○ '}
+                {a.icon} {a.label}
+              </PillBtn>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+                🚫 Исключённые продукты ({excludedFoods.length})
+              </label>
+              <button
+                onClick={() => {
+                  setExclSearch('');
+                  setShowExclFoodModal(true);
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  background: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  color: '#ef4444',
+                }}
+              >
+                + Редактировать
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {(() => {
+                const allRecipes = [...getRecipes(), ...(userRecipes || [])] as Recipe[];
+                const findName = (id: string): string | null => {
+                  const food = findFoodById(id);
+                  if (food) return food.name;
+                  if (id.startsWith('__recipe__')) {
+                    const r = allRecipes.find((r) => '__recipe__' + r.name === id);
+                    if (r) return '🍳 ' + r.name;
+                  }
+                  if (id.startsWith('__user_recipe__')) {
+                    const r = allRecipes.find((r) => '__user_recipe__' + r.name === id);
+                    if (r) return '👨‍🍳 ' + r.name;
+                  }
+                  return null;
+                };
+                return excludedFoods.map((ef) => {
+                  const name = findName(ef);
+                  return name ? (
+                    <span
+                      key={ef}
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontSize: 9,
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.15)',
+                        color: '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                    >
+                      {name}
+                      <span
+                        onClick={() => {
+                          const upd = excludedFoods.filter((p) => p !== ef);
+                          setExcludedFoods(upd);
+                          persistPlannerValue('he_excluded_foods', upd);
+                        }}
+                        style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}
+                      >
+                        ✕
+                      </span>
+                    </span>
+                  ) : null;
+                });
+              })()}
+              {excludedFoods.length === 0 && (
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>Не выбраны</span>
+              )}
+            </div>
+            {excludedFoods.length > 12 && (
+              <div
+                style={{
+                  fontSize: 10,
+                  color: '#f59e0b',
+                  padding: '3px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(245,158,11,0.06)',
+                  border: '1px solid rgba(245,158,11,0.15)',
+                  marginTop: 4,
+                }}
+              >
+                ⚠️ Исключено {excludedFoods.length} продуктов — разнообразие рациона ограничено. Рекомендуется не более
+                10-15 исключений.
+              </div>
+            )}
+          </div>
+
+          {dietPrefs.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 4, marginBottom: 4 }}>
+              {dietPrefs.map((p) => (
+                <span
+                  key={p}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 5px',
+                    borderRadius: 4,
+                    background: 'rgba(34,197,94,0.08)',
+                    border: '1px solid rgba(34,197,94,0.15)',
+                    color: '#22c55e',
+                  }}
+                >
+                  {(
+                    {
+                      no_dairy: '🚫 Без молочных',
+                      no_gluten: '🚫 Без глютена',
+                      vegetarian: '🌱 Вегетарианское (тип плана)',
+                      min_processed: '🔬 Минимум обработки',
+                      min_sugar: '🍬 Минимум сахара',
+                    } as Record<string, string>
+                  )[p] || p}
+                </span>
+              ))}
+              <span
+                onClick={() => setShowExclFoodModal(true)}
+                style={{
+                  fontSize: 10,
+                  padding: '1px 5px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  background: 'rgba(34,197,94,0.04)',
+                  border: '1px dashed rgba(34,197,94,0.2)',
+                  color: '#22c55e',
+                }}
+              >
+                +
+              </span>
+            </div>
+          )}
+          <div style={{ marginTop: 4, marginBottom: 10 }}>
+            {/* Чистка-2026 (P5): «Вегетарианское» задается типом плана (карточка «Тип плана питания») — чип убран */}
+            {[
+              { id: 'no_dairy', label: '🚫 Без молочных' },
+              { id: 'no_gluten', label: '🚫 Без глютена' },
+              { id: 'min_processed', label: '🔬 Минимум обраб.' },
+              { id: 'min_sugar', label: '🍬 Минимум сахара' },
+            ].map((opt) => {
+              const sel = dietPrefs.includes(opt.id);
+              return (
+                <span
+                  key={opt.id}
+                  onClick={() => {
+                    const upd = sel ? dietPrefs.filter((p) => p !== opt.id) : [...dietPrefs, opt.id];
+                    setDietPrefs(upd);
+                    persistPlannerValue('he_diet_preferences', upd);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    marginRight: 3,
+                    marginBottom: 3,
+                    padding: '2px 6px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    background: sel ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: sel ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: sel ? '#22c55e' : 'rgba(255,255,255,0.5)',
+                  }}
+                >
+                  {opt.label}
+                </span>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🧪 Непереносимость</div>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+            {/* FIX audit (C5): «Гистамин» = синхронизированный алиас histamineSensitive
+              (раньше чип включал гейт, а v2-карточка показывала «не чувствителен») */}
+            {(
+              [
+                ['lowFODMAP', 'Фодмап'],
+                ['lowHistamine', 'Гистамин'],
+                ['lowOxalate', 'Оксалаты'],
+              ] as [string, string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => {
+                  if (key === 'lowHistamine' && typeof setHistamineSensitive === 'function') {
+                    setHistamineSensitive(!(intolerances as any)[key]);
+                    return;
+                  }
+                  setIntolerances((prev: any) => ({ ...prev, [key]: !prev[key] }));
+                }}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  background: (intolerances as any)[key] ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)',
+                  border: (intolerances as any)[key]
+                    ? '1px solid rgba(239,68,68,0.25)'
+                    : '1px solid rgba(255,255,255,0.06)',
+                  color: (intolerances as any)[key] ? '#ef4444' : 'rgba(255,255,255,0.7)',
+                }}
+              >
+                {(intolerances as any)[key] ? '✅ ' : ''}
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#a78bfa', marginBottom: 4 }}>🚫 Не люблю категорию</div>
+          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+            {(
+              [
+                ['fish', '🐟 Рыба'],
+                ['dairy', '🥛 Молочное'],
+                ['legumes', '🫘 Бобовые'],
+                ['cabbage', '🥬 Капуста'],
+                ['nuts', '🥜 Орехи'],
+                ['pork', '🥓 Свинина'],
+                ['shellfish', '🦐 Морепродукты'],
+                ['mushroom', '🍄 Грибы'],
+              ] as [string, string][]
+            ).map(([cat, ruLabel]) => {
+              const sel = excludedCategories.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    const upd = sel ? excludedCategories.filter((c) => c !== cat) : [...excludedCategories, cat];
+                    setExcludedCategories(upd);
+                  }}
+                  style={{
+                    padding: '3px 6px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background: sel ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: sel ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                    color: sel ? '#a78bfa' : 'rgba(255,255,255,0.7)',
+                  }}
+                >
+                  {sel ? '✅ ' : ''}
+                  {ruLabel}
+                </button>
+              );
+            })}
+          </div>
+        </GlassCard>
+      }
+
+      {
+        <GlassCard title="Проблемы со здоровьем" icon="🩺" color="#06b6d4">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+            Отметьте проблемы — план автоматически исключит продукты, которые их усугубляют. Например, отёки → снижение
+            натрия, диабет → низкий GI, подагра → низкие пурины.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {HEALTH_ISSUES.map((h) => {
+              const active = healthIssues.includes(h.id);
+              return (
+                <button
+                  key={h.id}
+                  onClick={() => toggleHealthIssue(h.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    padding: '8px 10px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    background: active ? 'rgba(6,182,212,0.25)' : '#202023',
+                    boxShadow: active ? '0 2px 12px rgba(6,182,212,0.3)' : 'none',
+                    border: active ? '1.5px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      background: active ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.04)',
+                      fontSize: 16,
+                    }}
+                  >
+                    {h.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: 11, color: active ? '#06b6d4' : '#fff', marginBottom: 1 }}>
+                      {h.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: active ? 'rgba(6,182,212,0.8)' : 'rgba(255,255,255,0.7)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {h.desc}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      background: active ? '#06b6d4' : 'rgba(255,255,255,0.06)',
+                      color: active ? '#000' : 'rgba(255,255,255,0.5)',
+                      fontWeight: 800,
+                      fontSize: 10,
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    {active ? '✓' : ''}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </GlassCard>
+      }
+
+      {plannerMode === 'pro' && (
+        <GlassCard title="🌙 Вечерний режим" icon="🌙" color="#6366f1">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
+            Автоматически включается при выборе «Отёки» или «Диабет». Снижает количество углеводов в вечернем приёме
+            пищи, перенося их на обед.
+            <span style={{ color: '#fbbf24' }}>
+              {' '}
+              ⚠ Взаимоисключает «🌅 Загрузку под утреннюю тренировку» — включение одного автоматически выключает другое.
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 10px',
+              borderRadius: 10,
+              background: eveningLowCarb ? 'rgba(99,102,241,0.12)' : '#202023',
+              border: `1px solid ${eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.06)'}`,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: eveningLowCarb ? '#6366f1' : '#fff' }}>
+                Вечер — минимум углеводов
+              </div>
+              <div style={{ fontSize: 9, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>
+                Углеводы ужина → обед
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const nv = !eveningLowCarb;
+                setEveningLowCarb(nv);
+                try {
+                  localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false');
+                } catch {}
+                if (nv && morningTrainLoad) {
+                  setMorningTrainLoad(false);
+                  flash(
+                    '🌅 Загрузка под утреннюю тренировку выключена: конфликтует с вечерним режимом (ужин ×0.5 углеводов vs ×3.0)',
+                  );
+                }
+              }}
+              style={{
+                width: 48,
+                height: 24,
+                borderRadius: 12,
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'all 0.2s',
+                background: eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.15)',
+              }}
+            >
+              <div
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  position: 'absolute',
+                  top: 3,
+                  transition: 'all 0.2s',
+                  left: eveningLowCarb ? 27 : 3,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                }}
+              />
+            </button>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 6,
+              marginTop: 6,
+              padding: '8px 10px',
+              borderRadius: 10,
+              background: '#202023',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>Ночь — угли</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>
+                0 — только казеин · 20/40 — хлеб+мёд к казеину
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[0, 20, 40].map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setNightCarbs(v)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 7,
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    border: nightCarbs === v ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                    background: nightCarbs === v ? 'rgba(99,102,241,0.2)' : 'transparent',
+                    color: nightCarbs === v ? '#a5b4fc' : 'rgba(255,255,255,0.55)',
+                  }}
+                >
+                  {v}
+                </button>
+              ))}
             </div>
           </div>
         </GlassCard>
       )}
 
-      {/* Чистка-2026 (P3): единая карточка «Исключения» — аллергены + исключённые продукты +
-          диеты + непереносимости + нелюбимые категории (ранее 4 карточки редактировали пересекающиеся наборы) */}
-      {(
-      <GlassCard title="Исключения" icon="🚫" color="#ef4444">
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠️ Аллергены</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
-          {ALLERGEN_LIST.map(a => (
-            <PillBtn key={a.id} active={allergens.includes(a.id)} onClick={() => toggleAllergen(a.id)} color={allergens.includes(a.id) ? '#ef4444' : undefined}>
-              {allergens.includes(a.id) ? '✕ ' : '○ '}{a.icon} {a.label}
-            </PillBtn>
-          ))}
-        </div>
-
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🚫 Исключённые продукты ({excludedFoods.length})</label>
-            <button onClick={() => { setExclSearch(''); setShowExclFoodModal(true); }} style={{
-              padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
-              background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)', color:'#ef4444',
-            }}>+ Редактировать</button>
+      {
+        <GlassCard title="Тип плана питания" icon="📋" color="#a855f7">
+          {/* Чистка-2026 (P5): вегетарианство — один источник (тип плана), dietPrefs синхронизируется автоматически */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            {PLAN_TYPES.map((pt) => (
+              <PillBtn key={pt.id} active={planType === pt.id} onClick={() => applyPlanType(pt.id)}>
+                {pt.icon} {pt.label}
+              </PillBtn>
+            ))}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {(() => {
-              const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
-              const findName = (id: string): string | null => {
-                const food = findFoodById(id);
-                if (food) return food.name;
-                if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
-                if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }
-                return null;
-              };
-              return excludedFoods.map(ef => {
-                const name = findName(ef);
-                return name ? (
-                  <span key={ef} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 3 }}>
-                    {name}
-                    <span onClick={() => { const upd = excludedFoods.filter(p => p !== ef); setExcludedFoods(upd); persistPlannerValue('he_excluded_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
-                  </span>
-                ) : null;
-              });
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
+            🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка.
+            Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул
+            (рыба/оливки/овощи). 🌱 «Вегетарианский» — единый ввод растительного питания (в «Исключениях» чип не нужен).
+          </div>
+          {/* Эпик-хвост (5): кето-цель не сходится жирами — действие переключения */}
+          {planType === 'keto' &&
+            (() => {
+              const ketoOk = (() => {
+                try {
+                  return !dayTargetsBreakdown.some((s: string) => s.includes('угли подняты до минимума закрытия'));
+                } catch {
+                  return true;
+                }
+              })();
+              if (ketoOk) return null;
+              return (
+                <div
+                  style={{
+                    marginTop: 6,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(249,115,22,0.07)',
+                    border: '1px solid rgba(249,115,22,0.2)',
+                  }}
+                >
+                  <div style={{ fontSize: 9, color: '#fbbf24', lineHeight: 1.5, marginBottom: 4 }}>
+                    ⚠ Кето-цель не закрывается жирами в безопасном капе 3 г/кг — угли подняты до минимума закрытия. Для
+                    полного кето снизьте цель калорий (дефицит), либо переключитесь на высоко-углеводный профиль.
+                  </div>
+                  <button
+                    onClick={() => setPlanType('highcarb')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      background: 'rgba(249,115,22,0.14)',
+                      border: '1px solid rgba(249,115,22,0.35)',
+                      color: '#fb923c',
+                    }}
+                  >
+                    🍚 Переключить на «Высоко-углеводный»
+                  </button>
+                </div>
+              );
             })()}
-            {excludedFoods.length === 0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Не выбраны</span>}
-          </div>
-          {excludedFoods.length > 12 && (
-            <div style={{ fontSize:10, color:'#f59e0b', padding:'3px 6px', borderRadius:4, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)', marginTop:4 }}>
-              ⚠️ Исключено {excludedFoods.length} продуктов — разнообразие рациона ограничено. Рекомендуется не более 10-15 исключений.
-            </div>
-          )}
-        </div>
-
-        {dietPrefs.length > 0 && (
-          <div style={{ display:'flex', flexWrap:'wrap', gap:2, marginTop:4, marginBottom:4 }}>
-            {dietPrefs.map(p => (
-              <span key={p} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.15)', color:'#22c55e' }}>
-                {({ no_dairy:'🚫 Без молочных', no_gluten:'🚫 Без глютена', vegetarian:'🌱 Вегетарианское (тип плана)', min_processed:'🔬 Минимум обработки', min_sugar:'🍬 Минимум сахара' } as Record<string,string>)[p] || p}
-              </span>
-            ))}
-            <span onClick={() => setShowExclFoodModal(true)} style={{ fontSize:10, padding:'1px 5px', borderRadius:4, cursor:'pointer', background:'rgba(34,197,94,0.04)', border:'1px dashed rgba(34,197,94,0.2)', color:'#22c55e' }}>+</span>
-          </div>
-        )}
-        <div style={{ marginTop:4, marginBottom: 10 }}>
-          {/* Чистка-2026 (P5): «Вегетарианское» задается типом плана (карточка «Тип плана питания») — чип убран */}
-          {[
-            { id:'no_dairy', label:'🚫 Без молочных' },
-            { id:'no_gluten', label:'🚫 Без глютена' },
-            { id:'min_processed', label:'🔬 Минимум обраб.' },
-            { id:'min_sugar', label:'🍬 Минимум сахара' },
-          ].map(opt => {
-            const sel = dietPrefs.includes(opt.id);
-            return (
-              <span key={opt.id} onClick={() => {
-                const upd = sel ? dietPrefs.filter(p => p !== opt.id) : [...dietPrefs, opt.id];
-                setDietPrefs(upd);
-                persistPlannerValue('he_diet_preferences', upd);
-              }} style={{
-                display:'inline-flex', alignItems:'center', gap:3, marginRight:3, marginBottom:3,
-                padding:'2px 6px', borderRadius:6, cursor:'pointer', fontSize:10,
-                background: sel ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
-                border: sel ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                color: sel ? '#22c55e' : 'rgba(255,255,255,0.5)',
-              }}>
-                {opt.label}
-              </span>
-            );
-          })}
-        </div>
-
-        <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
-        <div style={{ display:'flex', gap:4, marginBottom:10, flexWrap:'wrap' }}>
-          {/* FIX audit (C5): «Гистамин» = синхронизированный алиас histamineSensitive
-              (раньше чип включал гейт, а v2-карточка показывала «не чувствителен») */}
-          {([['lowFODMAP','Фодмап'],['lowHistamine','Гистамин'],['lowOxalate','Оксалаты']] as [string,string][]).map(([key,label]) => (
-            <button key={key} onClick={() => {
-              if (key === 'lowHistamine' && typeof setHistamineSensitive === 'function') { setHistamineSensitive(!(intolerances as any)[key]); return; }
-              setIntolerances((prev:any) => ({ ...prev, [key]: !prev[key] }));
-            }} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:600, background: (intolerances as any)[key]?'rgba(239,68,68,0.12)':'rgba(255,255,255,0.03)', border: (intolerances as any)[key]?'1px solid rgba(239,68,68,0.25)':'1px solid rgba(255,255,255,0.06)', color: (intolerances as any)[key]?'#ef4444':'rgba(255,255,255,0.7)' }}>{(intolerances as any)[key]?'✅ ':''}{label}</button>
-          ))}
-        </div>
-
-        <div style={{ fontSize:9, fontWeight:700, color:'#a78bfa', marginBottom:4 }}>🚫 Не люблю категорию</div>
-        <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-          {([['fish','🐟 Рыба'],['dairy','🥛 Молочное'],['legumes','🫘 Бобовые'],['cabbage','🥬 Капуста'],['nuts','🥜 Орехи'],['pork','🥓 Свинина'],['shellfish','🦐 Морепродукты'],['mushroom','🍄 Грибы']] as [string,string][]).map(([cat,ruLabel]) => {
-            const sel = excludedCategories.includes(cat);
-            return (<button key={cat} onClick={() => { const upd = sel ? excludedCategories.filter(c => c !== cat) : [...excludedCategories, cat]; setExcludedCategories(upd); }} style={{ padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:600, background: sel?'rgba(167,139,250,0.15)':'rgba(255,255,255,0.03)', border: sel?'1px solid rgba(167,139,250,0.3)':'1px solid rgba(255,255,255,0.06)', color: sel?'#a78bfa':'rgba(255,255,255,0.7)' }}>{sel?'✅ ':''}{ruLabel}</button>);
-          })}
-        </div>
-      </GlassCard>
-      )}
-
-      {(
-      <GlassCard title="Проблемы со здоровьем" icon="🩺" color="#06b6d4">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Отметьте проблемы — план автоматически исключит продукты, которые их усугубляют. Например, отёки → снижение натрия, диабет → низкий GI, подагра → низкие пурины.
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {HEALTH_ISSUES.map(h => {
-            const active = healthIssues.includes(h.id);
-            return (
-              <button key={h.id} onClick={() => toggleHealthIssue(h.id)} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', width: '100%',
-                background: active ? 'rgba(6,182,212,0.25)' : '#202023', boxShadow: active ? '0 2px 12px rgba(6,182,212,0.3)' : 'none',
-                border: active ? '1.5px solid #06b6d4' : '1px solid rgba(255,255,255,0.06)',
-                transition: 'all 0.2s',
-              }}>
-                <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: active ? 'rgba(6,182,212,0.2)' : 'rgba(255,255,255,0.04)', fontSize: 16 }}>{h.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 11, color: active ? '#06b6d4' : '#fff', marginBottom: 1 }}>{h.label}</div>
-                  <div style={{ fontSize: 9, color: active ? 'rgba(6,182,212,0.8)' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{h.desc}</div>
-                </div>
-                <div style={{ width: 20, height: 20, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: active ? '#06b6d4' : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.5)', fontWeight: 800, fontSize: 10, transition: 'all 0.2s' }}>
-                  {active ? '✓' : ''}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </GlassCard>
-      )}
+        </GlassCard>
+      }
 
       {plannerMode === 'pro' && (
-      <GlassCard title="🌙 Вечерний режим" icon="🌙" color="#6366f1">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Автоматически включается при выборе «Отёки» или «Диабет». Снижает количество углеводов в вечернем приёме пищи, перенося их на обед.
-          <span style={{ color: '#fbbf24' }}> ⚠ Взаимоисключает «🌅 Загрузку под утреннюю тренировку» — включение одного автоматически выключает другое.</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: 10, background: eveningLowCarb ? 'rgba(99,102,241,0.12)' : '#202023', border: `1px solid ${eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.06)'}` }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: eveningLowCarb ? '#6366f1' : '#fff' }}>Вечер — минимум углеводов</div>
-            <div style={{ fontSize: 9, color: eveningLowCarb ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.6)' }}>Углеводы ужина → обед</div>
-          </div>
-          <button onClick={() => { const nv = !eveningLowCarb; setEveningLowCarb(nv); try { localStorage.setItem('he_evening_low_carb', nv ? 'true' : 'false'); } catch {} if (nv && morningTrainLoad) { setMorningTrainLoad(false); flash('🌅 Загрузка под утреннюю тренировку выключена: конфликтует с вечерним режимом (ужин ×0.5 углеводов vs ×3.0)'); } }} style={{
-            width: 48, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', position: 'relative', transition: 'all 0.2s',
-            background: eveningLowCarb ? '#6366f1' : 'rgba(255,255,255,0.15)',
-          }}>
-            <div style={{
-              width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, transition: 'all 0.2s',
-              left: eveningLowCarb ? 27 : 3, boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-            }} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>Ночь — угли</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)' }}>0 — только казеин · 20/40 — хлеб+мёд к казеину</div>
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[0, 20, 40].map(v => (
-              <button key={v} onClick={() => setNightCarbs(v)} style={{ padding: '4px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, border: nightCarbs === v ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.1)', background: nightCarbs === v ? 'rgba(99,102,241,0.2)' : 'transparent', color: nightCarbs === v ? '#a5b4fc' : 'rgba(255,255,255,0.55)' }}>{v}</button>
-            ))}
-          </div>
-        </div>
-      </GlassCard>
-      )}
-
-      {(
-      <GlassCard title="Тип плана питания" icon="📋" color="#a855f7">
-        {/* Чистка-2026 (P5): вегетарианство — один источник (тип плана), dietPrefs синхронизируется автоматически */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-          {PLAN_TYPES.map(pt => (
-            <PillBtn key={pt.id} active={planType === pt.id} onClick={() => applyPlanType(pt.id)}>
-              {pt.icon} {pt.label}
-            </PillBtn>
-          ))}
-        </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
-          🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка. Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул (рыба/оливки/овощи). 🌱 «Вегетарианский» — единый ввод растительного питания (в «Исключениях» чип не нужен).
-        </div>
-        {/* Эпик-хвост (5): кето-цель не сходится жирами — действие переключения */}
-        {planType === 'keto' && (() => {
-          const ketoOk = (() => { try { return !dayTargetsBreakdown.some((s: string) => s.includes('угли подняты до минимума закрытия')); } catch { return true; } })();
-          if (ketoOk) return null;
-          return (
-            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.2)' }}>
-              <div style={{ fontSize: 9, color: '#fbbf24', lineHeight: 1.5, marginBottom: 4 }}>
-                ⚠ Кето-цель не закрывается жирами в безопасном капе 3 г/кг — угли подняты до минимума закрытия. Для полного кето снизьте цель калорий (дефицит), либо переключитесь на высоко-углеводный профиль.
+        <GlassCard title="🏭 Вкусовой профиль и адаптация" icon="🏭" color="#06b6d4">
+          {/* Чистка-2026 (P3): непереносимости/категории переехали в «Исключения» — здесь только вкусы и адаптация */}
+          {/* Адаптация по дневнику + строгая вариативность */}
+          <div
+            style={{
+              marginBottom: 8,
+              padding: '8px 10px',
+              borderRadius: 10,
+              background: 'rgba(16,185,129,0.06)',
+              border: '1px solid rgba(16,185,129,0.18)',
+            }}
+          >
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#10b981', marginBottom: 6 }}>
+              📊 Адаптация и 7-дневная вариативность
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: diaryAdaptation ? '#10b981' : '#fff' }}>
+                  Компенсация по дневнику
+                </div>
+                <div style={{ fontSize: 9, color: diaryAdaptation ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.6)' }}>
+                  Недобор/перебор вчера → сегодня
+                </div>
               </div>
-              <button onClick={() => setPlanType('highcarb')} style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.14)', border: '1px solid rgba(249,115,22,0.35)', color: '#fb923c' }}>🍚 Переключить на «Высоко-углеводный»</button>
+              <button
+                onClick={() => setDiaryAdaptation(!diaryAdaptation)}
+                style={{
+                  width: 36,
+                  height: 20,
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  background: diaryAdaptation ? '#10b981' : 'rgba(255,255,255,0.15)',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    left: diaryAdaptation ? 19 : 3,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    transition: 'left 0.15s',
+                  }}
+                />
+              </button>
             </div>
-          );
-        })()}
-      </GlassCard>
-      )}
-
-      {plannerMode === 'pro' && (
-            <GlassCard title="🏭 Вкусовой профиль и адаптация" icon="🏭" color="#06b6d4">
-        {/* Чистка-2026 (P3): непереносимости/категории переехали в «Исключения» — здесь только вкусы и адаптация */}
-        {/* Адаптация по дневнику + строгая вариативность */}
-        <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.18)' }}>
-          <div style={{ fontSize:9, fontWeight:700, color:'#10b981', marginBottom:6 }}>📊 Адаптация и 7-дневная вариативность</div>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-            <div>
-              <div style={{ fontSize:10, fontWeight:600, color: diaryAdaptation ? '#10b981' : '#fff' }}>Компенсация по дневнику</div>
-              <div style={{ fontSize:9, color: diaryAdaptation ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.6)' }}>Недобор/перебор вчера → сегодня</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
+              Вариативность теперь в карточке «Разнообразие» выше (пул + ротация).
             </div>
-            <button onClick={() => setDiaryAdaptation(!diaryAdaptation)} style={{ width:36, height:20, borderRadius:10, border:'none', cursor:'pointer', position:'relative', background: diaryAdaptation ? '#10b981' : 'rgba(255,255,255,0.15)' }}>
-              <span style={{ position:'absolute', top:2, left: diaryAdaptation ? 19 : 3, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.3)', transition:'left 0.15s' }} />
-            </button>
           </div>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Вариативность теперь в карточке «Разнообразие» выше (пул + ротация).</div>
-        </div>
-        {/* E: Intolerances → перенесено в «Исключения» (P3) */}
-        {/* A: Taste profile */}
-        <div style={{ fontSize:9, fontWeight:700, color:'#f59e0b', marginBottom:4 }}>👫 Вкусовые предпочтения</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:8 }}>
-          {([['spicy','🌶️ Острое'],['sweet','🍬 Сладкое'],['salty','🥢 Солёное'],['sour','🍋 Кислое'],['umami','🍄 Умами']] as [string,string][]).map(([key,label]) => (
-            <div key={key} style={{ display:'flex', alignItems:'center', gap:4 }}>
-              <span style={{ fontSize:10, color:'rgba(255,255,255,0.7)', minWidth:50 }}>{label}</span>
-              <input type='range' min={0} max={3} value={(tasteProfile as any)[key]||0} onChange={e => setTasteProfile((prev:any) => ({ ...prev, [key]: +e.target.value }))} style={{ flex:1, height:4 }} />
-              <span style={{ fontSize:10, color:'#f59e0b', minWidth:8 }}>{(tasteProfile as any)[key]||0}</span>
+          {/* E: Intolerances → перенесено в «Исключения» (P3) */}
+          {/* A: Taste profile */}
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+            👫 Вкусовые предпочтения
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
+            {(
+              [
+                ['spicy', '🌶️ Острое'],
+                ['sweet', '🍬 Сладкое'],
+                ['salty', '🥢 Солёное'],
+                ['sour', '🍋 Кислое'],
+                ['umami', '🍄 Умами'],
+              ] as [string, string][]
+            ).map(([key, label]) => (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', minWidth: 50 }}>{label}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={3}
+                  value={(tasteProfile as any)[key] || 0}
+                  onChange={(e) => setTasteProfile((prev: any) => ({ ...prev, [key]: +e.target.value }))}
+                  style={{ flex: 1, height: 4 }}
+                />
+                <span style={{ fontSize: 10, color: '#f59e0b', minWidth: 8 }}>{(tasteProfile as any)[key] || 0}</span>
+              </div>
+            ))}
+          </div>
+          {/* C: Excluded categories → перенесено в «Исключения» (P3) */}
+        </GlassCard>
+      )}
+      {plannerMode === 'pro' && (
+        <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
+          {/* P2.1: 3 categories, 12 presets */}
+          {(
+            [
+              {
+                cat: '🎯 По цели',
+                color: '#00e68a',
+                presets: [
+                  {
+                    id: 'cut',
+                    label: '🔥 Сушка',
+                    desc: 'Дефицит, высокий белок, низкий GI',
+                    fn: () => {
+                      const foods = [
+                        'chicken_breast',
+                        'turkey_breast',
+                        'cod',
+                        'egg_white',
+                        'cottage_cheese_5',
+                        'broccoli',
+                        'spinach',
+                        'cucumber',
+                      ];
+                      setGoal('cutting');
+                      setBudget('medium');
+                      setVarietyLevel('high');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'mass',
+                    label: '💪 Масса',
+                    desc: 'Профицит, 2г/кг, высоко-углеводные',
+                    fn: () => {
+                      const foods = [
+                        'beef_lean',
+                        'chicken_breast',
+                        'salmon',
+                        'egg_whole',
+                        'rice_white',
+                        'buckwheat',
+                        'pasta_durum',
+                        'banana',
+                        'nuts_almonds',
+                      ];
+                      setGoal('mass');
+                      setBudget('medium');
+                      setVarietyLevel('high');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'recomp',
+                    label: '🔄 Рекомпозиция',
+                    desc: 'Maintenance, carb cycling',
+                    fn: () => {
+                      const foods = [
+                        'chicken_breast',
+                        'salmon',
+                        'egg_whole',
+                        'cottage_cheese_5',
+                        'rice_brown',
+                        'quinoa',
+                        'broccoli',
+                        'avocado',
+                        'olive_oil',
+                      ];
+                      setGoal('recomposition');
+                      setBudget('medium');
+                      setVarietyLevel('high');
+                      setCarbPeriodization('carb_cycle');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'maint',
+                    label: '⚖️ Поддержание',
+                    desc: 'Баланс 30/25/45',
+                    fn: () => {
+                      const foods = [
+                        'chicken_breast',
+                        'beef_lean',
+                        'salmon',
+                        'egg_whole',
+                        'rice_brown',
+                        'buckwheat',
+                        'broccoli',
+                        'tomato',
+                        'olive_oil',
+                        'yogurt_greek',
+                      ];
+                      setGoal('maintenance');
+                      setBudget('medium');
+                      setVarietyLevel('medium');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                ],
+              },
+              {
+                cat: '🥗 По типу питания',
+                color: '#3b82f6',
+                presets: [
+                  {
+                    id: 'meat',
+                    label: '🥩 Мясной',
+                    desc: 'Курица, говядина, индейка',
+                    fn: () => {
+                      const foods = ['chicken_breast', 'beef_lean', 'turkey_breast', 'rice_white', 'broccoli'];
+                      applyPlanType('classic');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'fish',
+                    label: '🐟 Рыбный',
+                    desc: 'Лосось, тунец, треска',
+                    fn: () => {
+                      const foods = ['salmon', 'tuna_canned', 'cod', 'rice_brown', 'broccoli', 'olive_oil'];
+                      applyPlanType('mediterranean');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'vegan',
+                    label: '🌱 Веган',
+                    desc: 'Бобовые, тофу, киноа',
+                    fn: () => {
+                      const foods = ['tofu', 'tempeh', 'lentils', 'quinoa', 'broccoli', 'avocado'];
+                      applyPlanType('vegetarian');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'budget',
+                    label: '💰 Бюджет',
+                    desc: 'Яйца, курица, гречка',
+                    fn: () => {
+                      const foods = ['egg_whole', 'chicken_thigh', 'buckwheat', 'cabbage', 'apple'];
+                      setBudget('low');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'max',
+                    label: '🚀 Максимум',
+                    desc: 'Топ-рейтинг + макс. разнообразие',
+                    fn: () => {
+                      setBudget('max');
+                      setProteinPreset('enhanced');
+                      setVarietyLevel('high');
+                    },
+                  },
+                ],
+              },
+              {
+                cat: '💉 По фазе',
+                color: '#a78bfa',
+                presets: [
+                  {
+                    id: 'course',
+                    label: '💉 Курс',
+                    desc: 'Высокий белок, печень-суппорт',
+                    fn: () => {
+                      const foods = [
+                        'chicken_breast',
+                        'beef_lean',
+                        'salmon',
+                        'egg_whole',
+                        'rice_white',
+                        'buckwheat',
+                        'broccoli',
+                        'spinach',
+                        'cottage_cheese_5',
+                        'olive_oil',
+                      ];
+                      setPhase('course');
+                      setGoal('mass');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'pct',
+                    label: '🔄 ПКТ',
+                    desc: 'Цинк, витамин D, антиоксиданты',
+                    fn: () => {
+                      const foods = [
+                        'beef_lean',
+                        'egg_whole',
+                        'oysters',
+                        'pumpkin_seeds',
+                        'nuts_almonds',
+                        'broccoli',
+                        'spinach',
+                        'salmon',
+                        'yogurt_greek',
+                        'kiwi',
+                      ];
+                      setPhase('pct');
+                      setGoal('maintenance');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                  {
+                    id: 'train',
+                    label: '🏋️ Тренировочный',
+                    desc: 'Peri-workout акцент, carb cycling',
+                    fn: () => {
+                      const foods = [
+                        'chicken_breast',
+                        'whey_protein',
+                        'rice_white',
+                        'banana',
+                        'salmon',
+                        'sweet_potato',
+                        'broccoli',
+                      ];
+                      setLinkToTraining(true);
+                      setCarbPeriodization('carb_cycle');
+                      setPreferredFoods(foods);
+                      persistPlannerValue('he_preferred_foods', foods);
+                    },
+                  },
+                ],
+              },
+            ] as {
+              cat: string;
+              color: string;
+              presets: { id: string; label: string; desc: string; fn: () => void }[];
+            }[]
+          ).map((group) => (
+            <div key={group.cat} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>
+                {group.cat}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {group.presets.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      p.fn();
+                      setRecentPreset(p.id);
+                    }}
+                    style={{
+                      flex: 1,
+                      minWidth: 75,
+                      padding: '7px 5px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: recentPreset === p.id ? group.color : '#202023',
+                      border: recentPreset === p.id ? '2px solid ' + group.color : '1px solid rgba(255,255,255,0.06)',
+                      color: recentPreset === p.id ? '#000' : 'rgba(255,255,255,0.85)',
+                      fontSize: 9,
+                      fontWeight: recentPreset === p.id ? 800 : 600,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = group.color + '30';
+                      (e.currentTarget as HTMLElement).style.borderColor = group.color;
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = '#202023';
+                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)';
+                    }}
+                  >
+                    <div style={{ fontSize: 14, marginBottom: 2 }}>{p.label.slice(0, 2)}</div>
+                    <div>{p.label.slice(2)}</div>
+                    <div style={{ fontSize: 5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{p.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           ))}
-        </div>
-        {/* C: Excluded categories → перенесено в «Исключения» (P3) */}
-      </GlassCard>
-      )}
-      {plannerMode === 'pro' && (
-      <GlassCard title="⚡ Быстрые пресеты" icon="⚡" color="#f97316">
-        {/* P2.1: 3 categories, 12 presets */}
-        {([
-          { cat: '🎯 По цели', color: '#00e68a', presets: [
-            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, высокий белок, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { const foods = ['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']; setGoal('mass'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVarietyLevel('high'); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']; setGoal('maintenance'); setBudget('medium'); setVarietyLevel('medium'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-          ]},
-          { cat: '🥗 По типу питания', color: '#3b82f6', presets: [
-             { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { const foods = ['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']; applyPlanType('classic'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { const foods = ['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']; applyPlanType('mediterranean'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { const foods = ['tofu','tempeh','lentils','quinoa','broccoli','avocado']; applyPlanType('vegetarian'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { const foods = ['egg_whole','chicken_thigh','buckwheat','cabbage','apple']; setBudget('low'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setProteinPreset('enhanced'); setVarietyLevel('high'); } },
-          ]},
-          { cat: '💉 По фазе', color: '#a78bfa', presets: [
-             { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil']; setPhase('course'); setGoal('mass'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'pct', label: '🔄 ПКТ', desc: 'Цинк, витамин D, антиоксиданты', fn: () => { const foods = ['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi']; setPhase('pct'); setGoal('maintenance'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-              { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { const foods = ['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli']; setLinkToTraining(true); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-          ]},
-        ] as { cat: string; color: string; presets: { id: string; label: string; desc: string; fn: () => void }[] }[]).map(group => (
-          <div key={group.cat} style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: group.color, marginBottom: 4, letterSpacing: 0.3 }}>{group.cat}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {group.presets.map(p => (
-                <button key={p.id} onClick={() => { p.fn(); setRecentPreset(p.id); }} style={{ flex: 1, minWidth: 75, padding: '7px 5px', borderRadius: 10, cursor: 'pointer', textAlign: 'center', background: recentPreset === p.id ? group.color : '#202023', border: recentPreset === p.id ? '2px solid '+group.color : '1px solid rgba(255,255,255,0.06)', color: recentPreset === p.id ? '#000' : 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: recentPreset === p.id ? 800 : 600, transition: 'all 0.15s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = group.color + '30'; (e.currentTarget as HTMLElement).style.borderColor = group.color; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#202023'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'; }}>
-                  <div style={{ fontSize: 14, marginBottom: 2 }}>{p.label.slice(0,2)}</div>
-                  <div>{p.label.slice(2)}</div>
-                  <div style={{ fontSize: 5, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{p.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </GlassCard>
+        </GlassCard>
       )}
 
       {/* Чистка-2026 (P3): «Предпочтения и исключения» → «Предпочтения» (исключения — в отдельной карточке) */}
-      {(
-      <GlassCard title="Предпочтения" icon="🍎" color="#f59e0b">
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-            <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🌟 Любимые продукты ({preferredFoods.length})</label>
-            <button onClick={() => { setPrefSearch(''); setShowPrefFoodModal(true); }} style={{
-              padding:'4px 10px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:600,
-              background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a',
-            }}>+ Редактировать</button>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {(() => {
-              const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
-              const findName = (id: string): string | null => {
-                const food = findFoodById(id);
-                if (food) return food.name;
-                if (id.startsWith('__recipe__')) { const r = allRecipes.find(r => '__recipe__' + r.name === id); if (r) return '🍳 ' + r.name; }
-                if (id.startsWith('__user_recipe__')) { const r = allRecipes.find(r => '__user_recipe__' + r.name === id); if (r) return '👨‍🍳 ' + r.name; }
-                return null;
-              };
-              return preferredFoods.slice(0, 10).map(pf => {
-                const name = findName(pf);
-                return name ? (
-                  <span key={pf} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 9, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#00e68a', display: 'flex', alignItems: 'center', gap: 3 }}>
-                    {name}
-                    <span onClick={() => { const upd = preferredFoods.filter(p => p !== pf); setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); }} style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}>✕</span>
-                  </span>
-                ) : null;
-              });
-            })()}
-            {preferredFoods.length === 0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Не выбраны</span>}
-          </div>
-        </div>
-        {/* Чистка-2026 (P3): исключённые продукты/диеты переехали в единую карточку «Исключения» */}
-        {preferredFoods.length > 0 && (
-          <div style={{ fontSize:10, color:'#00e68a', padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', marginBottom:6 }}>
-            ⭐ Любимых продуктов: {preferredFoods.length} — они будут приоритетны при генерации плана (белок, углеводы, жиры, овощи, фрукты).
-          </div>
-        )}
-        {/* Чистка-2026 (P7): тройная настройка завтрака (молоко + основа + шаблон) → один пресет */}
-        <div style={{ marginTop: 4 }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🍳 Завтрак — пресет (основа + шаблон + молоко одним выбором)</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-            {[
-              { id: 'auto', label: 'Авто' },
-              { id: 'style:porridge', label: '🥣 Каша (свободно)' },
-              { id: 'style:flakes', label: '🌾 Хлопья (свободно)' },
-              { id: 'style:eggs', label: '🍳 Яйца (свободно)' },
-              { id: 'style:cottage', label: '🥛 Творог (свободно)' },
-              { id: 'classic_oat', label: '🥣 Овсянка+банан+ягоды' },
-              { id: 'protein_flakes', label: '🌾 Хлопья+протеин' },
-              { id: 'eggs_toast', label: '🍳 Яйца+тост' },
-              { id: 'cottage_berries', label: '🥛 Творог+черника' },
-            ].map(o => (
-              <span key={o.id} onClick={() => applyBreakfastPreset(o.id)} style={{
-                display:'inline-flex', alignItems:'center', padding:'3px 8px', borderRadius:7, cursor:'pointer', fontSize:9,
-                background: breakfastPresetActive(o.id) ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)',
-                border: breakfastPresetActive(o.id) ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                color: breakfastPresetActive(o.id) ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
-                fontWeight: breakfastPresetActive(o.id) ? 700 : 400,
-              }}>{o.label}</span>
-            ))}
-          </div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>
-            Молоко включено в пресеты каши/хлопьев и не добавляется при «Без молочных». Пресеты с блюдом задают точный шаблон завтрака; «(свободно)» — пул основы без фиксированных ингредиентов.
-          </div>
-        </div>
-        <PopupText label="📝 Заметки по питанию" value={customNotes} onChange={v => { setCustomNotes(v); persistPlannerValue('he_nutrition_notes', v); }} placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..." />
-      </GlassCard>
-      )}
-
-      {(() => {
-        const allRecipes = [...getRecipes(), ...(userRecipes||[])] as Recipe[];
-        const prefRecipeRows = (setFn: (v: string[]) => void, current: string[], lsKey: string, search: string) =>
-          allRecipes.filter(r => !search || r.name.toLowerCase().includes(search.trim().toLowerCase())).map(r => {
-            const rid = '__recipe__' + r.name;
-            const urid = '__user_recipe__' + r.name;
-            const sel = current.includes(rid) || current.includes(urid);
-            return (
-              <div key={rid} onClick={() => {
-                const id = r.name.startsWith('user_') ? urid : rid;
-                const upd = sel ? current.filter(x => x !== id) : [...current, id];
-                    setFn(upd); persistPlannerValue(lsKey, upd);
-              }} style={{
-                padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
-                background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
-                border: sel ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
-                color: sel ? '#a78bfa' : 'rgba(255,255,255,0.7)',
-                display:'flex', alignItems:'center', gap:6,
-              }}>
-                <span style={{ fontSize:9, minWidth:12 }}>{sel ? '✓' : '○'}</span>
-                <span>🍳 {r.name}</span>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginLeft:'auto' }}>{r.kcal} ккал</span>
-              </div>
-            );
-          });
-        return <>
-      {/* Preferred foods modal */}
-      {showPrefFoodModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setShowPrefFoodModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', overflowY:'auto' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:8, textAlign:'center' }}>🌟 Любимые продукты и рецепты</div>
-            <input value={prefSearch} onChange={e => setPrefSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
-            <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {searchFoods(prefSearch).map(f => {
-                const sel = preferredFoods.includes(f.id);
-                const mealBound = (['Завтрак','Обед','Ужин','Полдник']).find(m => (preferredByMeal[m]||[]).includes(f.id));
-                return (
-                  <div key={f.id} style={{ padding:'6px 8px', borderRadius:8, fontSize:9, background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent', color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-                    <span onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); if (sel) { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); } }} style={{ cursor:'pointer', fontSize:9, minWidth:12 }}>{sel ? '✅' : '○'}</span>
-                    <span style={{ cursor:'pointer' }} onClick={() => { const upd = sel ? preferredFoods.filter(x => x !== f.id) : [...preferredFoods, f.id]; setPreferredFoods(upd); persistPlannerValue('he_preferred_foods', upd); }}>{f.name}</span>
-                    {sel && (<div style={{ display:'flex', gap:2, marginLeft:'auto' }}>{[['Завтрак','🌅'],['Обед','☀️'],['Ужин','🌙'],['Полдник','🍏']].map(([m,icon]) => { const isB = (preferredByMeal[m]||[]).includes(f.id); return (<span key={m} onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); bm[m] = [...(bm[m]||[]), f.id]; setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:9, padding:'1px 4px', borderRadius:4, background: isB ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.03)', border: isB ? '1px solid rgba(0,230,138,0.4)' : '1px solid transparent' }}>{icon}</span>); })}{mealBound && <span onClick={() => { const bm = {...preferredByMeal}; Object.keys(bm).forEach(k => bm[k] = (bm[k]||[]).filter(x => x !== f.id)); setPreferredByMeal(bm); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.4)' }} title='Любой приём'>★</span>}</div>)}
-                  </div>
-                );
-              })}
-              {allRecipes.length > 0 && !prefSearch && <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', padding:'6px 0 2px', borderTop:'1px solid rgba(139,92,246,0.15)', marginTop:4 }}>🍳 Рецепты</div>}
-              {prefRecipeRows(setPreferredFoods, preferredFoods, 'he_preferred_foods', prefSearch)}
+      {
+        <GlassCard title="Предпочтения" icon="🍎" color="#f59e0b">
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <label style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+                🌟 Любимые продукты ({preferredFoods.length})
+              </label>
+              <button
+                onClick={() => {
+                  setPrefSearch('');
+                  setShowPrefFoodModal(true);
+                }}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  background: 'rgba(0,230,138,0.1)',
+                  border: '1px solid rgba(0,230,138,0.2)',
+                  color: '#00e68a',
+                }}
+              >
+                + Редактировать
+              </button>
             </div>
-            <button onClick={() => setShowPrefFoodModal(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>✓ Готово ({preferredFoods.length})</button>
-          </div>
-        </div>
-      )}
-
-      {/* Excluded foods modal */}
-      {showExclFoodModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setShowExclFoodModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:400, maxHeight:'85vh', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(239,68,68,0.12)', overflowY:'auto' }}>
-            <div style={{ fontSize:14, fontWeight:700, color:'#ef4444', marginBottom:8, textAlign:'center' }}>🚫 Исключённые продукты и рецепты</div>
-            <input value={exclSearch} onChange={e => setExclSearch(e.target.value)} placeholder="Поиск продуктов и рецептов..." style={{ ...inputStyle, marginBottom:8, fontSize:11, padding:'8px 10px', boxSizing:'border-box', width:'100%' }} />
-            <div style={{ display:'flex', flexDirection:'column', gap:3, maxHeight:'50vh', overflowY:'auto' }}>
-              {searchFoods(exclSearch).map(f => {
-                const sel = excludedFoods.includes(f.id);
-                return (
-                  <div key={f.id} onClick={() => {
-                    const upd = sel ? excludedFoods.filter(x => x !== f.id) : [...excludedFoods, f.id];
-                    setExcludedFoods(upd); persistPlannerValue('he_excluded_foods', upd);
-                  }} style={{
-                    padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9,
-                    background: sel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)',
-                    border: sel ? '1px solid rgba(239,68,68,0.3)' : '1px solid transparent',
-                    color: sel ? '#ef4444' : 'rgba(255,255,255,0.7)',
-                    display:'flex', alignItems:'center', gap:6,
-                  }}>
-                    <span style={{ fontSize:9, minWidth:12 }}>{sel ? '✓' : '○'}</span>
-                    <span>{f.name}</span>
-                  </div>
-                );
-              })}
-              {allRecipes.length > 0 && !exclSearch && <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', padding:'6px 0 2px', borderTop:'1px solid rgba(139,92,246,0.15)', marginTop:4 }}>🍳 Рецепты</div>}
-              {prefRecipeRows(setExcludedFoods, excludedFoods, 'he_excluded_foods', exclSearch)}
-            </div>
-            <button onClick={() => setShowExclFoodModal(false)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:600 }}>✓ Готово ({excludedFoods.length})</button>
-          </div>
-        </div>
-      )}
-      </>;
-      })()}
-
-      {plannerMode === 'pro' && (
-      <GlassCard title="⚡ Периодизация и адаптация" icon="🔄" color="#3b82f6">
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Углеводная периодизация, адаптация веса/метаболизма, гибкие дни и спецприём — в одной карточке (общие для дня механизмы).</div>
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>🔄 Периодизация углеводов</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
-          {CARB_PERIODIZATION_OPTIONS.map(opt => (
-            <PillBtn key={opt.id} active={carbPeriodization === opt.id} onClick={() => setCarbPeriodization(opt.id)} color={carbPeriodization === opt.id ? '#3b82f6' : undefined}>
-              {opt.icon} {opt.label}
-            </PillBtn>
-          ))}
-        </div>
-        {carbPeriodization !== 'none' && (
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-            {CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.desc}
-          </div>
-        )}
-        {/* Чистка-2026 (P8): потолок углеводов может ограничивать режим периодизации — честная подсказка */}
-        {carbPeriodization !== 'none' && carbCapClipped && (
-          <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', fontSize: 9, color: '#fbbf24', lineHeight: 1.5 }}>
-            ⚠ Диетологический потолок углеводов {carbCapGPerKg} г/кг ограничивает режим «{CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.label}» — цели тренировочных дней могут не дотягиваться до волны. Потолок задаётся стилем питания (кето/высоко-углеводный); снять — в ручном КБЖУ.
-            {/* Чистка дублей (план единого источника, остаток): кнопка «Снять потолок» —
-                единый источник в карточке «КБЖУ» выше (тот же оверрайд carbCapOverride).
-                Здесь — только строка-ссылка. */}
-            <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>Снять потолок — в карточке «КБЖУ» выше (единый переключатель).</div>
-          </div>
-        )}
-        {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
-          <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-            {/* Чистка дублей (план единого источника, остаток): тренировочные дни —
-                единый источник в карточке «Тренировки» выше (тот же сеттер trainingDays). */}
-            📅 Тренировочные дни ({trainingDays.filter(Boolean).length} тр / {trainingDays.filter(d => !d).length} отдых) задаются в карточке «Тренировки» выше — единый источник для периодизации.
-          </div>
-        )}
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.08)', fontSize: 9, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>⚖️ Адаптация и гибкие дни</div>
-        <div style={{ marginTop: 4, padding: 12, borderRadius: 12, background: weightAdaptMode ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.02)', border: weightAdaptMode ? '1px solid rgba(167,139,250,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: weightAdaptMode ? 8 : 0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>⚖️</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: weightAdaptMode ? '#a78bfa' : 'rgba(255,255,255,0.5)' }}>Адаптация веса</div>
-                {!weightAdaptMode && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Автокоррекция КБЖУ по динамике веса</div>}
-              </div>
-            </div>
-            {/* P1-UX: нативный чекбокс 40×22 → свитч role=switch (тач-таргет 44px+) */}
-            <button role="switch" aria-checked={weightAdaptMode} aria-label="Адаптация веса" onClick={() => { const next = !weightAdaptMode; setWeightAdaptMode(next); if (next) setShowWeightAdaptModal(true); }} style={{ width:52, minHeight:44, padding:0, border:'none', background:'transparent', cursor:'pointer', display:'inline-flex', alignItems:'center', flexShrink:0 }}>
-              <span style={{
-                position:'relative', width:52, height:32, borderRadius:16, transition:'0.2s',
-                background: weightAdaptMode ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)',
-              }}>
-                <span style={{
-                  position:'absolute', top:2, left: weightAdaptMode ? 22 : 2, width:28, height:28, borderRadius:'50%',
-                  background:'#fff', transition:'0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </span>
-            </button>
-          </div>
-          {weightAdaptMode && (
-            <>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:8 }}>
-                {[
-                  { label:'Записей', value:`${weightLogEntries.length}`, color:'#a78bfa' },
-                  { label:'Период', value: weightLogPeriod === 'daily' ? 'день' : weightLogPeriod === 'every2' ? '2 дня' : weightLogPeriod === 'every3' ? '3 дня' : 'нед', color:'#60a5fa' },
-                  { label:'Цель', value:`${expectedLossKgWeek} кг/нед`, color:'#f59e0b' },
-                ].map(s => (
-                  <div key={s.label} style={{ padding:'6px 4px', borderRadius:8, textAlign:'center', background:'rgba(255,255,255,0.03)' }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:s.color }}>{s.value}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-              {weightLogEntries.length >= 2 && (() => {
-                const diff = weightLogEntries[weightLogEntries.length-1].weight - weightLogEntries[0].weight;
-                return (
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:6, textAlign:'center' }}>
-                    Динамика: <strong style={{color: diff < 0 ? '#22c55e' : diff > 0 ? '#ef4444' : '#fff'}}>{diff > 0 ? '+' : ''}{diff.toFixed(1)} кг</strong>
-                  </div>
-                );
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+              {(() => {
+                const allRecipes = [...getRecipes(), ...(userRecipes || [])] as Recipe[];
+                const findName = (id: string): string | null => {
+                  const food = findFoodById(id);
+                  if (food) return food.name;
+                  if (id.startsWith('__recipe__')) {
+                    const r = allRecipes.find((r) => '__recipe__' + r.name === id);
+                    if (r) return '🍳 ' + r.name;
+                  }
+                  if (id.startsWith('__user_recipe__')) {
+                    const r = allRecipes.find((r) => '__user_recipe__' + r.name === id);
+                    if (r) return '👨‍🍳 ' + r.name;
+                  }
+                  return null;
+                };
+                return preferredFoods.slice(0, 10).map((pf) => {
+                  const name = findName(pf);
+                  return name ? (
+                    <span
+                      key={pf}
+                      style={{
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        fontSize: 9,
+                        background: 'rgba(0,230,138,0.08)',
+                        border: '1px solid rgba(0,230,138,0.15)',
+                        color: '#00e68a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                    >
+                      {name}
+                      <span
+                        onClick={() => {
+                          const upd = preferredFoods.filter((p) => p !== pf);
+                          setPreferredFoods(upd);
+                          persistPlannerValue('he_preferred_foods', upd);
+                        }}
+                        style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 7 }}
+                      >
+                        ✕
+                      </span>
+                    </span>
+                  ) : null;
+                });
               })()}
-              <button onClick={() => setShowWeightAdaptModal(true)} style={{
-                width:'100%', padding:'6px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
-                background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.15)', color:'#a78bfa',
-              }}>✏️ Настроить замеры</button>
-            </>
-          )}
-        </div>
-
-        {/* Metabolic adaptation */}
-        {(() => {
-          return <>
-            <div style={{ marginTop:12, padding:12, borderRadius:12, background: metabolicAdaptEnabled ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)', border: metabolicAdaptEnabled ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span style={{ fontSize:14 }}>🔄</span>
-                  <div>
-                    <div style={{ fontSize:10, fontWeight:700, color: metabolicAdaptEnabled ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>Метаболическая адаптация</div>
-                    {!metabolicAdaptEnabled && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Снижение TDEE при длительном дефиците</div>}
-                  </div>
-                </div>
-                <button onClick={() => setShowMetaModal(true)} style={{
-                  padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-                  background: metabolicAdaptEnabled ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
-                  border: metabolicAdaptEnabled ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)',
-                  color: metabolicAdaptEnabled ? '#f59e0b' : 'rgba(255,255,255,0.5)',
-                }}>{metabolicAdaptEnabled ? '✏️ Настроить' : '⚙️ Настроить'}</button>
-              </div>
-              {metabolicAdaptEnabled && (
-                <div style={{ marginTop:8, padding:'6px 10px', borderRadius:8, background:'rgba(245,158,11,0.04)', textAlign:'center' }}>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>TDEE снижен на <strong style={{ color:'#f59e0b' }}>{metabolicAdaptPct}%</strong></span>
-                </div>
+              {preferredFoods.length === 0 && (
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>Не выбраны</span>
               )}
             </div>
+          </div>
+          {/* Чистка-2026 (P3): исключённые продукты/диеты переехали в единую карточку «Исключения» */}
+          {preferredFoods.length > 0 && (
+            <div
+              style={{
+                fontSize: 10,
+                color: '#00e68a',
+                padding: '3px 6px',
+                borderRadius: 4,
+                background: 'rgba(0,230,138,0.06)',
+                border: '1px solid rgba(0,230,138,0.15)',
+                marginBottom: 6,
+              }}
+            >
+              ⭐ Любимых продуктов: {preferredFoods.length} — они будут приоритетны при генерации плана (белок,
+              углеводы, жиры, овощи, фрукты).
+            </div>
+          )}
+          {/* Чистка-2026 (P7): тройная настройка завтрака (молоко + основа + шаблон) → один пресет */}
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+              🍳 Завтрак — пресет (основа + шаблон + молоко одним выбором)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+              {[
+                { id: 'auto', label: 'Авто' },
+                { id: 'style:porridge', label: '🥣 Каша (свободно)' },
+                { id: 'style:flakes', label: '🌾 Хлопья (свободно)' },
+                { id: 'style:eggs', label: '🍳 Яйца (свободно)' },
+                { id: 'style:cottage', label: '🥛 Творог (свободно)' },
+                { id: 'classic_oat', label: '🥣 Овсянка+банан+ягоды' },
+                { id: 'protein_flakes', label: '🌾 Хлопья+протеин' },
+                { id: 'eggs_toast', label: '🍳 Яйца+тост' },
+                { id: 'cottage_berries', label: '🥛 Творог+черника' },
+              ].map((o) => (
+                <span
+                  key={o.id}
+                  onClick={() => applyBreakfastPreset(o.id)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '3px 8px',
+                    borderRadius: 7,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    background: breakfastPresetActive(o.id) ? 'rgba(167,139,250,0.15)' : 'rgba(255,255,255,0.03)',
+                    border: breakfastPresetActive(o.id)
+                      ? '1px solid rgba(167,139,250,0.4)'
+                      : '1px solid rgba(255,255,255,0.06)',
+                    color: breakfastPresetActive(o.id) ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
+                    fontWeight: breakfastPresetActive(o.id) ? 700 : 400,
+                  }}
+                >
+                  {o.label}
+                </span>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>
+              Молоко включено в пресеты каши/хлопьев и не добавляется при «Без молочных». Пресеты с блюдом задают точный
+              шаблон завтрака; «(свободно)» — пул основы без фиксированных ингредиентов.
+            </div>
+          </div>
+          <PopupText
+            label="📝 Заметки по питанию"
+            value={customNotes}
+            onChange={(v) => {
+              setCustomNotes(v);
+              persistPlannerValue('he_nutrition_notes', v);
+            }}
+            placeholder="Например: не ем после 20:00, аллергия на пенициллин, проблемы с ЖКТ..."
+          />
+        </GlassCard>
+      }
 
-            {/* Metabolic adaptation modal */}
-            {showMetaModal && (
-              <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-                onClick={() => setShowMetaModal(false)}>
-                <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, borderRadius:20, background:'#18181b', border:'1px solid rgba(245,158,11,0.12)', overflow:'hidden', boxShadow:'0 16px 60px rgba(0,0,0,0.5)' }}>
-                  <div style={{ height:3, background:'linear-gradient(90deg,#f59e0b,#f97316)' }} />
-                  <div style={{ padding:'16px 20px 20px' }}>
-                    <div style={{ fontSize:17, fontWeight:700, color:'#f59e0b', marginBottom:2, letterSpacing:-0.3 }}>🔄 Метаболическая адаптация</div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:14, lineHeight:1.4 }}>
-                      При длительном дефиците калорий метаболизм замедляется. Система скорректирует TDEE на указанный процент, чтобы план оставался реалистичным.
-                    </div>
-
-                    <div style={{ padding:'12px 14px', borderRadius:10, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)', marginBottom:14 }}>
-                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)' }}>Снижение TDEE</span>
-                        <span style={{ fontSize:16, fontWeight:800, color:'#f59e0b' }}>{metabolicAdaptPct}%</span>
-                      </div>
-                      <input type="range" min="0" max="30" step="1" value={metabolicAdaptPct} onChange={e => setMetabolicAdaptPct(+e.target.value)} style={{ width:'100%' }} />
-                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.2)' }}>
-                        <span>0% — выкл</span>
-                        <span>15% — умеренно</span>
-                        <span>30% — макс</span>
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.5, marginBottom:14, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.02)' }}>
-                      Рекомендуется 5–15% при дефиците дольше 4–6 недель. Более 20% только под наблюдением.
-                    </div>
-
-                    <div style={{ display:'flex', gap:6 }}>
-                      <button onClick={() => { setMetabolicAdaptEnabled(false); setMetabolicAdaptPct(0); setShowMetaModal(false); }} style={{
-                        flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:600,
-                        border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'rgba(255,255,255,0.85)',
-                      }}>Отключить</button>
-                      <button onClick={() => { setMetabolicAdaptEnabled(metabolicAdaptPct > 0); setShowMetaModal(false); }} style={{
-                        flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:700,
-                        border:'none', background:'linear-gradient(135deg,#f59e0b,#f97316)', color:'#fff',
-                        boxShadow:'0 4px 12px rgba(245,158,11,0.2)',
-                      }}>✓ Применить</button>
-                    </div>
+      {(() => {
+        const allRecipes = [...getRecipes(), ...(userRecipes || [])] as Recipe[];
+        const prefRecipeRows = (setFn: (v: string[]) => void, current: string[], lsKey: string, search: string) =>
+          allRecipes
+            .filter((r) => !search || r.name.toLowerCase().includes(search.trim().toLowerCase()))
+            .map((r) => {
+              const rid = '__recipe__' + r.name;
+              const urid = '__user_recipe__' + r.name;
+              const sel = current.includes(rid) || current.includes(urid);
+              return (
+                <div
+                  key={rid}
+                  onClick={() => {
+                    const id = r.name.startsWith('user_') ? urid : rid;
+                    const upd = sel ? current.filter((x) => x !== id) : [...current, id];
+                    setFn(upd);
+                    persistPlannerValue(lsKey, upd);
+                  }}
+                  style={{
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.02)',
+                    border: sel ? '1px solid rgba(139,92,246,0.3)' : '1px solid transparent',
+                    color: sel ? '#a78bfa' : 'rgba(255,255,255,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 9, minWidth: 12 }}>{sel ? '✓' : '○'}</span>
+                  <span>🍳 {r.name}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginLeft: 'auto' }}>
+                    {r.kcal} ккал
+                  </span>
+                </div>
+              );
+            });
+        return (
+          <>
+            {/* Preferred foods modal */}
+            {showPrefFoodModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.8)',
+                }}
+                onClick={() => setShowPrefFoodModal(false)}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: '92%',
+                    maxWidth: 400,
+                    maxHeight: '85vh',
+                    padding: 16,
+                    borderRadius: 16,
+                    background: '#18181b',
+                    border: '1px solid rgba(0,230,138,0.12)',
+                    overflowY: 'auto',
+                  }}
+                >
+                  <div
+                    style={{ fontSize: 14, fontWeight: 700, color: '#00e68a', marginBottom: 8, textAlign: 'center' }}
+                  >
+                    🌟 Любимые продукты и рецепты
                   </div>
+                  <input
+                    value={prefSearch}
+                    onChange={(e) => setPrefSearch(e.target.value)}
+                    placeholder="Поиск продуктов и рецептов..."
+                    style={{
+                      ...inputStyle,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      padding: '8px 10px',
+                      boxSizing: 'border-box',
+                      width: '100%',
+                    }}
+                  />
+                  <div
+                    style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: '50vh', overflowY: 'auto' }}
+                  >
+                    {searchFoods(prefSearch).map((f) => {
+                      const sel = preferredFoods.includes(f.id);
+                      const mealBound = ['Завтрак', 'Обед', 'Ужин', 'Полдник'].find((m) =>
+                        (preferredByMeal[m] || []).includes(f.id),
+                      );
+                      return (
+                        <div
+                          key={f.id}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: 8,
+                            fontSize: 9,
+                            background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+                            border: sel ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                            color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span
+                            onClick={() => {
+                              const upd = sel ? preferredFoods.filter((x) => x !== f.id) : [...preferredFoods, f.id];
+                              setPreferredFoods(upd);
+                              persistPlannerValue('he_preferred_foods', upd);
+                              if (sel) {
+                                const bm = { ...preferredByMeal };
+                                Object.keys(bm).forEach((k) => (bm[k] = (bm[k] || []).filter((x) => x !== f.id)));
+                                setPreferredByMeal(bm);
+                              }
+                            }}
+                            style={{ cursor: 'pointer', fontSize: 9, minWidth: 12 }}
+                          >
+                            {sel ? '✅' : '○'}
+                          </span>
+                          <span
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                              const upd = sel ? preferredFoods.filter((x) => x !== f.id) : [...preferredFoods, f.id];
+                              setPreferredFoods(upd);
+                              persistPlannerValue('he_preferred_foods', upd);
+                            }}
+                          >
+                            {f.name}
+                          </span>
+                          {sel && (
+                            <div style={{ display: 'flex', gap: 2, marginLeft: 'auto' }}>
+                              {[
+                                ['Завтрак', '🌅'],
+                                ['Обед', '☀️'],
+                                ['Ужин', '🌙'],
+                                ['Полдник', '🍏'],
+                              ].map(([m, icon]) => {
+                                const isB = (preferredByMeal[m] || []).includes(f.id);
+                                return (
+                                  <span
+                                    key={m}
+                                    onClick={() => {
+                                      const bm = { ...preferredByMeal };
+                                      Object.keys(bm).forEach((k) => (bm[k] = (bm[k] || []).filter((x) => x !== f.id)));
+                                      bm[m] = [...(bm[m] || []), f.id];
+                                      setPreferredByMeal(bm);
+                                    }}
+                                    style={{
+                                      cursor: 'pointer',
+                                      fontSize: 9,
+                                      padding: '1px 4px',
+                                      borderRadius: 4,
+                                      background: isB ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.03)',
+                                      border: isB ? '1px solid rgba(0,230,138,0.4)' : '1px solid transparent',
+                                    }}
+                                  >
+                                    {icon}
+                                  </span>
+                                );
+                              })}
+                              {mealBound && (
+                                <span
+                                  onClick={() => {
+                                    const bm = { ...preferredByMeal };
+                                    Object.keys(bm).forEach((k) => (bm[k] = (bm[k] || []).filter((x) => x !== f.id)));
+                                    setPreferredByMeal(bm);
+                                  }}
+                                  style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}
+                                  title="Любой приём"
+                                >
+                                  ★
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {allRecipes.length > 0 && !prefSearch && (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#a78bfa',
+                          padding: '6px 0 2px',
+                          borderTop: '1px solid rgba(139,92,246,0.15)',
+                          marginTop: 4,
+                        }}
+                      >
+                        🍳 Рецепты
+                      </div>
+                    )}
+                    {prefRecipeRows(setPreferredFoods, preferredFoods, 'he_preferred_foods', prefSearch)}
+                  </div>
+                  <button
+                    onClick={() => setShowPrefFoodModal(false)}
+                    style={{
+                      width: '100%',
+                      marginTop: 8,
+                      padding: '8px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(0,230,138,0.2)',
+                      background: 'rgba(0,230,138,0.08)',
+                      color: '#00e68a',
+                      cursor: 'pointer',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ Готово ({preferredFoods.length})
+                  </button>
                 </div>
               </div>
             )}
-          </>;
-        })()}
 
-        {/* Хочу сладкое */}
-        <div style={{ marginTop:12, padding:12, borderRadius:12, background: cravingMode ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)', border: cravingMode ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>🍬</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.5)' }}>Хочу сладкое</div>
-                {!cravingMode && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Разовый десерт в выбранные дни</div>}
-              </div>
-            </div>
-            <button onClick={() => setCravingMode(!cravingMode)} style={{
-              padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-              background: cravingMode ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-              border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.5)',
-            }}>{cravingMode ? '✓ Вкл' : 'Выкл'}</button>
-          </div>
-          {cravingMode && (
-            <>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
-                Формирует отдельный десерт-план на выбранное число дней (кнопка «🍬 Хочу сладкое» в выдаче).
-                Основной рацион не меняется — сладкое вписывайте в КБЖУ.
-              </div>
-              {/* FIX button-audit (B7): круги дней выглядели как выбор конкретных дней,
-                  а движок получает только ЧИСЛО дней — честный счётчик вместо кругов */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-                <button onClick={() => setCravingDays(Math.max(1, cravingDays - 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>−</button>
-                <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', minWidth:22, textAlign:'center' }}>{cravingDays}</div>
-                <button onClick={() => setCravingDays(Math.min(7, cravingDays + 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#ef4444', fontSize:14, fontWeight:800 }}>＋</button>
-              </div>
-              <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
-                {cravingDays} {cravingDays === 1 ? 'день' : 'дней'} с десертом в неделю
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Ленивый день */}
-        <div style={{ marginTop:8, padding:12, borderRadius:12, background: lazyDayMode ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>🛋</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>Ленивый день</div>
-                {!lazyDayMode && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Минимум готовки в выбранные дни</div>}
-              </div>
-            </div>
-            <button onClick={() => setLazyDayMode(!lazyDayMode)} style={{
-              padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-              background: lazyDayMode ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
-              border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.5)',
-            }}>{lazyDayMode ? '✓ Вкл' : 'Выкл'}</button>
-          </div>
-          {lazyDayMode && (
-            <>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, marginBottom:6, lineHeight:1.4 }}>
-                Отдельный план готовки на выбранное число дней — протеиновый коктейль, творог, хлопья.
-                Основной рацион не меняется; снижает нагрузку, когда нет сил или времени.
-              </div>
-              {/* FIX button-audit (B7): счётчик вместо кругов (движок получает число дней) */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
-                <button onClick={() => setLazyDayDays(Math.max(1, lazyDayDays - 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>−</button>
-                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b', minWidth:22, textAlign:'center' }}>{lazyDayDays}</div>
-                <button onClick={() => setLazyDayDays(Math.min(7, lazyDayDays + 1))} style={{ width:44, height:44, borderRadius:'50%', cursor:'pointer', border:'2px solid #3f3f46', background:'#202023', color:'#f59e0b', fontSize:14, fontWeight:800 }}>＋</button>
-              </div>
-              <div style={{ textAlign:'center', marginTop:4, fontSize:9, color:'rgba(255,255,255,0.8)' }}>
-                {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} без готовки в неделю
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* v6: Периодизация диеты → объединена в «Периодизация углеводов» (wave) */}
-
-        {/* Special Meal — collapsed card + popup */}
-        <div style={{ marginTop:8, padding:12, borderRadius:12, background: specialMealMode ? 'rgba(249,115,22,0.05)' : 'rgba(255,255,255,0.02)', border: specialMealMode ? '1px solid rgba(249,115,22,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>🍽️</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)' }}>Постоянный спецприём (шаблон)</div>
-                {specialMealMode ? (
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>
-                    {specialMealGoalLabel} · {specialMealTimingLabel} · {specialMealProteinG + specialMealFatG + specialMealCarbsG}г · ∑ {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал
+            {/* Excluded foods modal */}
+            {showExclFoodModal && (
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 200,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(0,0,0,0.8)',
+                }}
+                onClick={() => setShowExclFoodModal(false)}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    width: '92%',
+                    maxWidth: 400,
+                    maxHeight: '85vh',
+                    padding: 16,
+                    borderRadius: 16,
+                    background: '#18181b',
+                    border: '1px solid rgba(239,68,68,0.12)',
+                    overflowY: 'auto',
+                  }}
+                >
+                  <div
+                    style={{ fontSize: 14, fontWeight: 700, color: '#ef4444', marginBottom: 8, textAlign: 'center' }}
+                  >
+                    🚫 Исключённые продукты и рецепты
                   </div>
-                ) : (
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Отдельный приём с заданными макросами</div>
-                )}
-              </div>
-            </div>
-            <div style={{ display:'flex', gap:4 }}>
-              {specialMealMode && (
-                <button onClick={() => setShowSpecialMealModal(true)} style={{
-                  padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-                  background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#f97316',
-                }}>⚙️ Настроить</button>
-              )}
-              <button onClick={() => setSpecialMealMode(!specialMealMode)} style={{
-                padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-                background: specialMealMode ? 'rgba(249,115,22,0.1)' : 'rgba(255,255,255,0.04)',
-                border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)',
-                color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)',
-              }}>{specialMealMode ? '✓ Вкл' : 'Выкл'}</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Special Meal — popup */}
-        {showSpecialMealModal && (
-          <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-            onClick={() => setShowSpecialMealModal(false)}>
-            <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, maxHeight:'85vh', borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', overflow:'hidden', boxShadow:'0 16px 60px rgba(0,0,0,0.5)' }}>
-              <div style={{ height:3, background:'linear-gradient(90deg,#f97316,#fb923c)' }} />
-              <div style={{ padding:'16px 20px 20px', overflowY:'auto', maxHeight:'calc(85vh - 23px)' }}>
-                <div style={{ fontSize:17, fontWeight:700, color:'#f97316', marginBottom:14, letterSpacing:-0.3 }}>🍽️ Настройка спецприёма</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-                  <div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Цель приёма</div>
-                    {Object.entries(goalLabels).map(([k,v]) => (
-                      <button key={k} onClick={() => setSpecialMealGoal(k)} style={{
-                        display:'block', width:'100%', padding:'8px 10px', marginBottom:3, borderRadius:8, cursor:'pointer', textAlign:'left', fontSize:9, fontWeight:600,
-                        background: specialMealGoal === k ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.02)',
-                        border: specialMealGoal === k ? '1.5px solid #f97316' : '1px solid rgba(255,255,255,0.05)',
-                        color: specialMealGoal === k ? '#f97316' : 'rgba(255,255,255,0.7)',
-                      }}>{v}</button>
-                    ))}
-                  </div>
-                  <div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Время приёма</div>
-                    {Object.entries(timingLabels).map(([k,v]) => (
-                      <button key={k} onClick={() => setSpecialMealTiming(k)} style={{
-                        display:'block', width:'100%', padding:'8px 10px', marginBottom:3, borderRadius:8, cursor:'pointer', textAlign:'left', fontSize:9, fontWeight:600,
-                        background: specialMealTiming === k ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.02)',
-                        border: specialMealTiming === k ? '1.5px solid #f97316' : '1px solid rgba(255,255,255,0.05)',
-                        color: specialMealTiming === k ? '#f97316' : 'rgba(255,255,255,0.7)',
-                      }}>{v}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ marginBottom:12 }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:6 }}>Макросы (г)</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-                    {[
-                      { key:'p', label:'🥩 Белок', val:specialMealProteinG, set:setSpecialMealProteinG, color:'#22c55e' },
-                      { key:'f', label:'🧈 Жиры', val:specialMealFatG, set:setSpecialMealFatG, color:'#f59e0b' },
-                      { key:'c', label:'🍚 Углеводы', val:specialMealCarbsG, set:setSpecialMealCarbsG, color:'#3b82f6' },
-                    ].map(m => (
-                      <div key={m.key}>
-                        <input type="number" min={0} step="any" value={m.val} onChange={e => m.set(Math.max(0, Math.round(parseFloat(e.target.value) || 0)))} style={{
-                          width:'100%', padding:'8px 6px', borderRadius:8, fontSize:11, fontWeight:700, textAlign:'center',
-                          background:'#202023', border:`1px solid ${m.color}30`, color:m.color, outline:'none', boxSizing:'border-box',
-                        }} />
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', textAlign:'center', marginTop:2 }}>{m.label}</div>
+                  <input
+                    value={exclSearch}
+                    onChange={(e) => setExclSearch(e.target.value)}
+                    placeholder="Поиск продуктов и рецептов..."
+                    style={{
+                      ...inputStyle,
+                      marginBottom: 8,
+                      fontSize: 11,
+                      padding: '8px 10px',
+                      boxSizing: 'border-box',
+                      width: '100%',
+                    }}
+                  />
+                  <div
+                    style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: '50vh', overflowY: 'auto' }}
+                  >
+                    {searchFoods(exclSearch).map((f) => {
+                      const sel = excludedFoods.includes(f.id);
+                      return (
+                        <div
+                          key={f.id}
+                          onClick={() => {
+                            const upd = sel ? excludedFoods.filter((x) => x !== f.id) : [...excludedFoods, f.id];
+                            setExcludedFoods(upd);
+                            persistPlannerValue('he_excluded_foods', upd);
+                          }}
+                          style={{
+                            padding: '6px 8px',
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            fontSize: 9,
+                            background: sel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.02)',
+                            border: sel ? '1px solid rgba(239,68,68,0.3)' : '1px solid transparent',
+                            color: sel ? '#ef4444' : 'rgba(255,255,255,0.7)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 9, minWidth: 12 }}>{sel ? '✓' : '○'}</span>
+                          <span>{f.name}</span>
+                        </div>
+                      );
+                    })}
+                    {allRecipes.length > 0 && !exclSearch && (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: '#a78bfa',
+                          padding: '6px 0 2px',
+                          borderTop: '1px solid rgba(139,92,246,0.15)',
+                          marginTop: 4,
+                        }}
+                      >
+                        🍳 Рецепты
                       </div>
-                    ))}
+                    )}
+                    {prefRecipeRows(setExcludedFoods, excludedFoods, 'he_excluded_foods', exclSearch)}
                   </div>
-                </div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', textAlign:'center', marginBottom:12 }}>
-                  ∑ {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал · {specialMealProteinG + specialMealFatG + specialMealCarbsG}г общ.
-                </div>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-                  <button onClick={() => setShowReplaceMealPopup(true)} style={{
-                    flex:1, padding:'10px 12px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:600, display:'flex', alignItems:'center', gap:6, justifyContent:'center',
-                    background: specialMealReplaceMode ? 'rgba(0,230,138,0.1)' : 'rgba(0,230,138,0.04)',
-                    border: specialMealReplaceMode ? '1.5px solid #00e68a' : '1px solid rgba(0,230,138,0.15)',
-                    color: specialMealReplaceMode ? '#00e68a' : 'rgba(0,230,138,0.7)',
-                    transition:'all 0.12s',
-                  }}>
-                    🔄 Заменить приём{specialMealReplaceMode ? ` (${specialMealReplaceTarget})` : ''}
+                  <button
+                    onClick={() => setShowExclFoodModal(false)}
+                    style={{
+                      width: '100%',
+                      marginTop: 8,
+                      padding: '8px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(239,68,68,0.2)',
+                      background: 'rgba(239,68,68,0.08)',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ Готово ({excludedFoods.length})
                   </button>
                 </div>
-                <button onClick={() => setShowSpecialMealModal(false)} style={{
-                  width:'100%', padding:'11px', borderRadius:10, cursor:'pointer', border:'none',
-                  background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:11, fontWeight:700,
-                  boxShadow:'0 4px 12px rgba(249,115,22,0.2)',
-                }}>✓ Готово</button>
-                {showReplaceMealPopup && (
-                  <div style={{ position:'fixed', inset:0, zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-                    onClick={() => setShowReplaceMealPopup(false)}>
-                    <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(0,230,138,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                        <div style={{ fontSize:15, fontWeight:700, color:'#00e68a', letterSpacing:-0.3 }}>🔄 Заменить приём</div>
-                        <button onClick={() => setShowReplaceMealPopup(false)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.85)', fontSize:18, cursor:'pointer', padding:'0 4px', lineHeight:1 }}>×</button>
+              </div>
+            )}
+          </>
+        );
+      })()}
+
+      {plannerMode === 'pro' && (
+        <GlassCard title="⚡ Периодизация и адаптация" icon="🔄" color="#3b82f6">
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>
+            Углеводная периодизация, адаптация веса/метаболизма, гибкие дни и спецприём — в одной карточке (общие для
+            дня механизмы).
+          </div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>
+            🔄 Периодизация углеводов
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+            {CARB_PERIODIZATION_OPTIONS.map((opt) => (
+              <PillBtn
+                key={opt.id}
+                active={carbPeriodization === opt.id}
+                onClick={() => setCarbPeriodization(opt.id)}
+                color={carbPeriodization === opt.id ? '#3b82f6' : undefined}
+              >
+                {opt.icon} {opt.label}
+              </PillBtn>
+            ))}
+          </div>
+          {carbPeriodization !== 'none' && (
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+              {CARB_PERIODIZATION_OPTIONS.find((o) => o.id === carbPeriodization)?.desc}
+            </div>
+          )}
+          {/* Чистка-2026 (P8): потолок углеводов может ограничивать режим периодизации — честная подсказка */}
+          {carbPeriodization !== 'none' && carbCapClipped && (
+            <div
+              style={{
+                marginTop: 6,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(245,158,11,0.07)',
+                border: '1px solid rgba(245,158,11,0.22)',
+                fontSize: 9,
+                color: '#fbbf24',
+                lineHeight: 1.5,
+              }}
+            >
+              ⚠ Диетологический потолок углеводов {carbCapGPerKg} г/кг ограничивает режим «
+              {CARB_PERIODIZATION_OPTIONS.find((o) => o.id === carbPeriodization)?.label}» — цели тренировочных дней
+              могут не дотягиваться до волны. Потолок задаётся стилем питания (кето/высоко-углеводный); снять — в ручном
+              КБЖУ.
+              {/* Чистка дублей (план единого источника, остаток): кнопка «Снять потолок» —
+                единый источник в карточке «КБЖУ» выше (тот же оверрайд carbCapOverride).
+                Здесь — только строка-ссылка. */}
+              <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
+                Снять потолок — в карточке «КБЖУ» выше (единый переключатель).
+              </div>
+            </div>
+          )}
+          {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(59,130,246,0.05)',
+                border: '1px solid rgba(59,130,246,0.12)',
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.85)',
+              }}
+            >
+              {/* Чистка дублей (план единого источника, остаток): тренировочные дни —
+                единый источник в карточке «Тренировки» выше (тот же сеттер trainingDays). */}
+              📅 Тренировочные дни ({trainingDays.filter(Boolean).length} тр / {trainingDays.filter((d) => !d).length}{' '}
+              отдых) задаются в карточке «Тренировки» выше — единый источник для периодизации.
+            </div>
+          )}
+          <div
+            style={{
+              marginTop: 10,
+              paddingTop: 10,
+              borderTop: '1px dashed rgba(255,255,255,0.08)',
+              fontSize: 9,
+              fontWeight: 700,
+              color: '#a78bfa',
+              marginBottom: 6,
+            }}
+          >
+            ⚖️ Адаптация и гибкие дни
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              padding: 12,
+              borderRadius: 12,
+              background: weightAdaptMode ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.02)',
+              border: weightAdaptMode ? '1px solid rgba(167,139,250,0.15)' : '1px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: weightAdaptMode ? 8 : 0,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>⚖️</span>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: weightAdaptMode ? '#a78bfa' : 'rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    Адаптация веса
+                  </div>
+                  {!weightAdaptMode && (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>
+                      Автокоррекция КБЖУ по динамике веса
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* P1-UX: нативный чекбокс 40×22 → свитч role=switch (тач-таргет 44px+) */}
+              <button
+                role="switch"
+                aria-checked={weightAdaptMode}
+                aria-label="Адаптация веса"
+                onClick={() => {
+                  const next = !weightAdaptMode;
+                  setWeightAdaptMode(next);
+                  if (next) setShowWeightAdaptModal(true);
+                }}
+                style={{
+                  width: 52,
+                  minHeight: 44,
+                  padding: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    position: 'relative',
+                    width: 52,
+                    height: 32,
+                    borderRadius: 16,
+                    transition: '0.2s',
+                    background: weightAdaptMode ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 2,
+                      left: weightAdaptMode ? 22 : 2,
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: '#fff',
+                      transition: '0.2s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    }}
+                  />
+                </span>
+              </button>
+            </div>
+            {weightAdaptMode && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
+                  {[
+                    { label: 'Записей', value: `${weightLogEntries.length}`, color: '#a78bfa' },
+                    {
+                      label: 'Период',
+                      value:
+                        weightLogPeriod === 'daily'
+                          ? 'день'
+                          : weightLogPeriod === 'every2'
+                            ? '2 дня'
+                            : weightLogPeriod === 'every3'
+                              ? '3 дня'
+                              : 'нед',
+                      color: '#60a5fa',
+                    },
+                    { label: 'Цель', value: `${expectedLossKgWeek} кг/нед`, color: '#f59e0b' },
+                  ].map((s) => (
+                    <div
+                      key={s.label}
+                      style={{
+                        padding: '6px 4px',
+                        borderRadius: 8,
+                        textAlign: 'center',
+                        background: 'rgba(255,255,255,0.03)',
+                      }}
+                    >
+                      <div style={{ fontSize: 9, fontWeight: 700, color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {weightLogEntries.length >= 2 &&
+                  (() => {
+                    const diff = weightLogEntries[weightLogEntries.length - 1].weight - weightLogEntries[0].weight;
+                    return (
+                      <div
+                        style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}
+                      >
+                        Динамика:{' '}
+                        <strong style={{ color: diff < 0 ? '#22c55e' : diff > 0 ? '#ef4444' : '#fff' }}>
+                          {diff > 0 ? '+' : ''}
+                          {diff.toFixed(1)} кг
+                        </strong>
                       </div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:3, marginBottom:12 }}>
-                        {[
-                          { id:'Завтрак', icon:'🌅' },
-                          { id:'Обед', icon:'☀️' },
-                          { id:'Ужин', icon:'🌆' },
-                          { id:'Перекус', icon:'🍪' },
-                          { id:'Полдник', icon:'🧁' },
-                          { id:'Второй завтрак', icon:'🥐' },
-                        ].map(m => {
-                          const sel = specialMealReplaceTarget === m.id && specialMealReplaceMode;
-                          return (
-                            <div key={m.id} onClick={() => { setSpecialMealReplaceTarget(m.id); setSpecialMealReplaceMode(true); setShowReplaceMealPopup(false); }} style={{
-                              padding:'10px 12px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:500,
-                              background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
-                              border: sel ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid transparent',
-                              color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)',
-                              display:'flex', alignItems:'center', gap:8,
-                            }}>
-                              <span style={{ fontSize:14 }}>{m.icon}</span>
-                              <span>{m.id}</span>
-                              {sel && <span style={{ marginLeft:'auto', color:'#00e68a', fontSize:10, fontWeight:700 }}>✓</span>}
-                            </div>
-                          );
-                        })}
+                    );
+                  })()}
+                <button
+                  onClick={() => setShowWeightAdaptModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '6px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    background: 'rgba(167,139,250,0.08)',
+                    border: '1px solid rgba(167,139,250,0.15)',
+                    color: '#a78bfa',
+                  }}
+                >
+                  ✏️ Настроить замеры
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Metabolic adaptation */}
+          {(() => {
+            return (
+              <>
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    borderRadius: 12,
+                    background: metabolicAdaptEnabled ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)',
+                    border: metabolicAdaptEnabled
+                      ? '1px solid rgba(245,158,11,0.15)'
+                      : '1px solid rgba(255,255,255,0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>🔄</span>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: metabolicAdaptEnabled ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+                          }}
+                        >
+                          Метаболическая адаптация
+                        </div>
+                        {!metabolicAdaptEnabled && (
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>
+                            Снижение TDEE при длительном дефиците
+                          </div>
+                        )}
                       </div>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button onClick={() => { setSpecialMealReplaceMode(false); setShowReplaceMealPopup(false); }} style={{
-                          flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:10, fontWeight:600,
-                        }}>Отмена</button>
-                        <button onClick={() => setShowReplaceMealPopup(false)} style={{
-                          flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:10, fontWeight:700,
-                        }}>✓ Готово</button>
+                    </div>
+                    <button
+                      onClick={() => setShowMetaModal(true)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: 8,
+                        fontSize: 9,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        background: metabolicAdaptEnabled ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+                        border: metabolicAdaptEnabled
+                          ? '1px solid rgba(245,158,11,0.2)'
+                          : '1px solid rgba(255,255,255,0.06)',
+                        color: metabolicAdaptEnabled ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+                      }}
+                    >
+                      {metabolicAdaptEnabled ? '✏️ Настроить' : '⚙️ Настроить'}
+                    </button>
+                  </div>
+                  {metabolicAdaptEnabled && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(245,158,11,0.04)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+                        TDEE снижен на <strong style={{ color: '#f59e0b' }}>{metabolicAdaptPct}%</strong>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Metabolic adaptation modal */}
+                {showMetaModal && (
+                  <div
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 200,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'rgba(0,0,0,0.8)',
+                    }}
+                    onClick={() => setShowMetaModal(false)}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '92%',
+                        maxWidth: 380,
+                        borderRadius: 20,
+                        background: '#18181b',
+                        border: '1px solid rgba(245,158,11,0.12)',
+                        overflow: 'hidden',
+                        boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      <div style={{ height: 3, background: 'linear-gradient(90deg,#f59e0b,#f97316)' }} />
+                      <div style={{ padding: '16px 20px 20px' }}>
+                        <div
+                          style={{
+                            fontSize: 17,
+                            fontWeight: 700,
+                            color: '#f59e0b',
+                            marginBottom: 2,
+                            letterSpacing: -0.3,
+                          }}
+                        >
+                          🔄 Метаболическая адаптация
+                        </div>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 14, lineHeight: 1.4 }}>
+                          При длительном дефиците калорий метаболизм замедляется. Система скорректирует TDEE на
+                          указанный процент, чтобы план оставался реалистичным.
+                        </div>
+
+                        <div
+                          style={{
+                            padding: '12px 14px',
+                            borderRadius: 10,
+                            background: 'rgba(245,158,11,0.04)',
+                            border: '1px solid rgba(245,158,11,0.08)',
+                            marginBottom: 14,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: 4,
+                            }}
+                          >
+                            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Снижение TDEE</span>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b' }}>
+                              {metabolicAdaptPct}%
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="30"
+                            step="1"
+                            value={metabolicAdaptPct}
+                            onChange={(e) => setMetabolicAdaptPct(+e.target.value)}
+                            style={{ width: '100%' }}
+                          />
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              fontSize: 10,
+                              color: 'rgba(255,255,255,0.2)',
+                            }}
+                          >
+                            <span>0% — выкл</span>
+                            <span>15% — умеренно</span>
+                            <span>30% — макс</span>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: 9,
+                            color: 'rgba(255,255,255,0.45)',
+                            lineHeight: 1.5,
+                            marginBottom: 14,
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            background: 'rgba(255,255,255,0.02)',
+                          }}
+                        >
+                          Рекомендуется 5–15% при дефиците дольше 4–6 недель. Более 20% только под наблюдением.
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => {
+                              setMetabolicAdaptEnabled(false);
+                              setMetabolicAdaptPct(0);
+                              setShowMetaModal(false);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              fontSize: 10,
+                              fontWeight: 600,
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: '#202023',
+                              color: 'rgba(255,255,255,0.85)',
+                            }}
+                          >
+                            Отключить
+                          </button>
+                          <button
+                            onClick={() => {
+                              setMetabolicAdaptEnabled(metabolicAdaptPct > 0);
+                              setShowMetaModal(false);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              fontSize: 10,
+                              fontWeight: 700,
+                              border: 'none',
+                              background: 'linear-gradient(135deg,#f59e0b,#f97316)',
+                              color: '#fff',
+                              boxShadow: '0 4px 12px rgba(245,158,11,0.2)',
+                            }}
+                          >
+                            ✓ Применить
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
+              </>
+            );
+          })()}
+
+          {/* Хочу сладкое */}
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 12,
+              background: cravingMode ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)',
+              border: cravingMode ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🍬</span>
+                <div>
+                  <div
+                    style={{ fontSize: 10, fontWeight: 700, color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.5)' }}
+                  >
+                    Хочу сладкое
+                  </div>
+                  {!cravingMode && (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>Разовый десерт в выбранные дни</div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setCravingMode(!cravingMode)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 8,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: cravingMode ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                  color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {cravingMode ? '✓ Вкл' : 'Выкл'}
+              </button>
+            </div>
+            {cravingMode && (
+              <>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.45)',
+                    marginTop: 6,
+                    marginBottom: 6,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Формирует отдельный десерт-план на выбранное число дней (кнопка «🍬 Хочу сладкое» в выдаче). Основной
+                  рацион не меняется — сладкое вписывайте в КБЖУ.
+                </div>
+                {/* FIX button-audit (B7): круги дней выглядели как выбор конкретных дней,
+                  а движок получает только ЧИСЛО дней — честный счётчик вместо кругов */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <button
+                    onClick={() => setCravingDays(Math.max(1, cravingDays - 1))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      border: '2px solid #3f3f46',
+                      background: '#202023',
+                      color: '#ef4444',
+                      fontSize: 14,
+                      fontWeight: 800,
+                    }}
+                  >
+                    −
+                  </button>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444', minWidth: 22, textAlign: 'center' }}>
+                    {cravingDays}
+                  </div>
+                  <button
+                    onClick={() => setCravingDays(Math.min(7, cravingDays + 1))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      border: '2px solid #3f3f46',
+                      background: '#202023',
+                      color: '#ef4444',
+                      fontSize: 14,
+                      fontWeight: 800,
+                    }}
+                  >
+                    ＋
+                  </button>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>
+                  {cravingDays} {cravingDays === 1 ? 'день' : 'дней'} с десертом в неделю
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Ленивый день */}
+          <div
+            style={{
+              marginTop: 8,
+              padding: 12,
+              borderRadius: 12,
+              background: lazyDayMode ? 'rgba(245,158,11,0.05)' : 'rgba(255,255,255,0.02)',
+              border: lazyDayMode ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🛋</span>
+                <div>
+                  <div
+                    style={{ fontSize: 10, fontWeight: 700, color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}
+                  >
+                    Ленивый день
+                  </div>
+                  {!lazyDayMode && (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>Минимум готовки в выбранные дни</div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setLazyDayMode(!lazyDayMode)}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 8,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: lazyDayMode ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                  color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {lazyDayMode ? '✓ Вкл' : 'Выкл'}
+              </button>
+            </div>
+            {lazyDayMode && (
+              <>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.45)',
+                    marginTop: 6,
+                    marginBottom: 6,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Отдельный план готовки на выбранное число дней — протеиновый коктейль, творог, хлопья. Основной рацион
+                  не меняется; снижает нагрузку, когда нет сил или времени.
+                </div>
+                {/* FIX button-audit (B7): счётчик вместо кругов (движок получает число дней) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <button
+                    onClick={() => setLazyDayDays(Math.max(1, lazyDayDays - 1))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      border: '2px solid #3f3f46',
+                      background: '#202023',
+                      color: '#f59e0b',
+                      fontSize: 14,
+                      fontWeight: 800,
+                    }}
+                  >
+                    −
+                  </button>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b', minWidth: 22, textAlign: 'center' }}>
+                    {lazyDayDays}
+                  </div>
+                  <button
+                    onClick={() => setLazyDayDays(Math.min(7, lazyDayDays + 1))}
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      border: '2px solid #3f3f46',
+                      background: '#202023',
+                      color: '#f59e0b',
+                      fontSize: 14,
+                      fontWeight: 800,
+                    }}
+                  >
+                    ＋
+                  </button>
+                </div>
+                <div style={{ textAlign: 'center', marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>
+                  {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} без готовки в неделю
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* v6: Периодизация диеты → объединена в «Периодизация углеводов» (wave) */}
+
+          {/* Special Meal — collapsed card + popup */}
+          <div
+            style={{
+              marginTop: 8,
+              padding: 12,
+              borderRadius: 12,
+              background: specialMealMode ? 'rgba(249,115,22,0.05)' : 'rgba(255,255,255,0.02)',
+              border: specialMealMode ? '1px solid rgba(249,115,22,0.15)' : '1px solid rgba(255,255,255,0.04)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🍽️</span>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)',
+                    }}
+                  >
+                    Постоянный спецприём (шаблон)
+                  </div>
+                  {specialMealMode ? (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                      {specialMealGoalLabel} · {specialMealTimingLabel} ·{' '}
+                      {specialMealProteinG + specialMealFatG + specialMealCarbsG}г · ∑{' '}
+                      {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>
+                      Отдельный приём с заданными макросами
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {specialMealMode && (
+                  <button
+                    onClick={() => setShowSpecialMealModal(true)}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: 8,
+                      fontSize: 9,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      background: 'rgba(249,115,22,0.1)',
+                      border: '1px solid rgba(249,115,22,0.2)',
+                      color: '#f97316',
+                    }}
+                  >
+                    ⚙️ Настроить
+                  </button>
+                )}
+                <button
+                  onClick={() => setSpecialMealMode(!specialMealMode)}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 8,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: specialMealMode ? 'rgba(249,115,22,0.1)' : 'rgba(255,255,255,0.04)',
+                    border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                    color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.5)',
+                  }}
+                >
+                  {specialMealMode ? '✓ Вкл' : 'Выкл'}
+                </button>
               </div>
             </div>
           </div>
-        )}
 
-      </GlassCard>
+          {/* Special Meal — popup */}
+          {showSpecialMealModal && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 200,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.8)',
+              }}
+              onClick={() => setShowSpecialMealModal(false)}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '92%',
+                  maxWidth: 380,
+                  maxHeight: '85vh',
+                  borderRadius: 16,
+                  background: '#18181b',
+                  border: '1px solid rgba(249,115,22,0.12)',
+                  overflow: 'hidden',
+                  boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
+                }}
+              >
+                <div style={{ height: 3, background: 'linear-gradient(90deg,#f97316,#fb923c)' }} />
+                <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(85vh - 23px)' }}>
+                  <div
+                    style={{ fontSize: 17, fontWeight: 700, color: '#f97316', marginBottom: 14, letterSpacing: -0.3 }}
+                  >
+                    🍽️ Настройка спецприёма
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Цель приёма</div>
+                      {Object.entries(goalLabels).map(([k, v]) => (
+                        <button
+                          key={k}
+                          onClick={() => setSpecialMealGoal(k)}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '8px 10px',
+                            marginBottom: 3,
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontSize: 9,
+                            fontWeight: 600,
+                            background: specialMealGoal === k ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.02)',
+                            border: specialMealGoal === k ? '1.5px solid #f97316' : '1px solid rgba(255,255,255,0.05)',
+                            color: specialMealGoal === k ? '#f97316' : 'rgba(255,255,255,0.7)',
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Время приёма</div>
+                      {Object.entries(timingLabels).map(([k, v]) => (
+                        <button
+                          key={k}
+                          onClick={() => setSpecialMealTiming(k)}
+                          style={{
+                            display: 'block',
+                            width: '100%',
+                            padding: '8px 10px',
+                            marginBottom: 3,
+                            borderRadius: 8,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontSize: 9,
+                            fontWeight: 600,
+                            background: specialMealTiming === k ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.02)',
+                            border:
+                              specialMealTiming === k ? '1.5px solid #f97316' : '1px solid rgba(255,255,255,0.05)',
+                            color: specialMealTiming === k ? '#f97316' : 'rgba(255,255,255,0.7)',
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>Макросы (г)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      {[
+                        {
+                          key: 'p',
+                          label: '🥩 Белок',
+                          val: specialMealProteinG,
+                          set: setSpecialMealProteinG,
+                          color: '#22c55e',
+                        },
+                        { key: 'f', label: '🧈 Жиры', val: specialMealFatG, set: setSpecialMealFatG, color: '#f59e0b' },
+                        {
+                          key: 'c',
+                          label: '🍚 Углеводы',
+                          val: specialMealCarbsG,
+                          set: setSpecialMealCarbsG,
+                          color: '#3b82f6',
+                        },
+                      ].map((m) => (
+                        <div key={m.key}>
+                          <input
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={m.val}
+                            onChange={(e) => m.set(Math.max(0, Math.round(parseFloat(e.target.value) || 0)))}
+                            style={{
+                              width: '100%',
+                              padding: '8px 6px',
+                              borderRadius: 8,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              textAlign: 'center',
+                              background: '#202023',
+                              border: `1px solid ${m.color}30`,
+                              color: m.color,
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          <div
+                            style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginTop: 2 }}
+                          >
+                            {m.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginBottom: 12 }}>
+                    ∑ {specialMealProteinG * 4 + specialMealFatG * 9 + specialMealCarbsG * 4} ккал ·{' '}
+                    {specialMealProteinG + specialMealFatG + specialMealCarbsG}г общ.
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <button
+                      onClick={() => setShowReplaceMealPopup(true)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        fontSize: 9,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        justifyContent: 'center',
+                        background: specialMealReplaceMode ? 'rgba(0,230,138,0.1)' : 'rgba(0,230,138,0.04)',
+                        border: specialMealReplaceMode ? '1.5px solid #00e68a' : '1px solid rgba(0,230,138,0.15)',
+                        color: specialMealReplaceMode ? '#00e68a' : 'rgba(0,230,138,0.7)',
+                        transition: 'all 0.12s',
+                      }}
+                    >
+                      🔄 Заменить приём{specialMealReplaceMode ? ` (${specialMealReplaceTarget})` : ''}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowSpecialMealModal(false)}
+                    style={{
+                      width: '100%',
+                      padding: '11px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'linear-gradient(135deg,#f97316,#fb923c)',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      boxShadow: '0 4px 12px rgba(249,115,22,0.2)',
+                    }}
+                  >
+                    ✓ Готово
+                  </button>
+                  {showReplaceMealPopup && (
+                    <div
+                      style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 300,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.8)',
+                      }}
+                      onClick={() => setShowReplaceMealPopup(false)}
+                    >
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '92%',
+                          maxWidth: 380,
+                          padding: 16,
+                          borderRadius: 16,
+                          background: '#18181b',
+                          border: '1px solid rgba(0,230,138,0.12)',
+                          boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div style={{ fontSize: 15, fontWeight: 700, color: '#00e68a', letterSpacing: -0.3 }}>
+                            🔄 Заменить приём
+                          </div>
+                          <button
+                            onClick={() => setShowReplaceMealPopup(false)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'rgba(255,255,255,0.85)',
+                              fontSize: 18,
+                              cursor: 'pointer',
+                              padding: '0 4px',
+                              lineHeight: 1,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 12 }}>
+                          {[
+                            { id: 'Завтрак', icon: '🌅' },
+                            { id: 'Обед', icon: '☀️' },
+                            { id: 'Ужин', icon: '🌆' },
+                            { id: 'Перекус', icon: '🍪' },
+                            { id: 'Полдник', icon: '🧁' },
+                            { id: 'Второй завтрак', icon: '🥐' },
+                          ].map((m) => {
+                            const sel = specialMealReplaceTarget === m.id && specialMealReplaceMode;
+                            return (
+                              <div
+                                key={m.id}
+                                onClick={() => {
+                                  setSpecialMealReplaceTarget(m.id);
+                                  setSpecialMealReplaceMode(true);
+                                  setShowReplaceMealPopup(false);
+                                }}
+                                style={{
+                                  padding: '10px 12px',
+                                  borderRadius: 10,
+                                  cursor: 'pointer',
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  background: sel ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)',
+                                  border: sel ? '1.5px solid rgba(0,230,138,0.3)' : '1px solid transparent',
+                                  color: sel ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                }}
+                              >
+                                <span style={{ fontSize: 14 }}>{m.icon}</span>
+                                <span>{m.id}</span>
+                                {sel && (
+                                  <span style={{ marginLeft: 'auto', color: '#00e68a', fontSize: 10, fontWeight: 700 }}>
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => {
+                              setSpecialMealReplaceMode(false);
+                              setShowReplaceMealPopup(false);
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: '#202023',
+                              color: 'rgba(255,255,255,0.85)',
+                              fontSize: 10,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Отмена
+                          </button>
+                          <button
+                            onClick={() => setShowReplaceMealPopup(false)}
+                            style={{
+                              flex: 1,
+                              padding: '10px',
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              border: 'none',
+                              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                              color: '#000',
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                          >
+                            ✓ Готово
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </GlassCard>
       )}
 
       {/* Weight adaptation modal */}
       {showWeightAdaptModal && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setShowWeightAdaptModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, maxHeight:'80vh', borderRadius:20, background:'#18181b', border:'1px solid rgba(167,139,250,0.12)', overflow:'hidden', boxShadow:'0 16px 60px rgba(0,0,0,0.5)' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)',
+          }}
+          onClick={() => setShowWeightAdaptModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '92%',
+              maxWidth: 380,
+              maxHeight: '80vh',
+              borderRadius: 20,
+              background: '#18181b',
+              border: '1px solid rgba(167,139,250,0.12)',
+              overflow: 'hidden',
+              boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
+            }}
+          >
             {/* Header accent */}
-            <div style={{ height:3, background:'linear-gradient(90deg,#a78bfa,#7c3aed)' }} />
-            <div style={{ padding:'16px 20px 20px', overflowY:'auto', maxHeight:'calc(80vh - 23px)' }}>
-              <div style={{ fontSize:17, fontWeight:700, color:'#a78bfa', marginBottom:2, letterSpacing:-0.3 }}>⚖️ Адаптация веса</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:14, lineHeight:1.4 }}>
+            <div style={{ height: 3, background: 'linear-gradient(90deg,#a78bfa,#7c3aed)' }} />
+            <div style={{ padding: '16px 20px 20px', overflowY: 'auto', maxHeight: 'calc(80vh - 23px)' }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#a78bfa', marginBottom: 2, letterSpacing: -0.3 }}>
+                ⚖️ Адаптация веса
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 14, lineHeight: 1.4 }}>
                 Система скорректирует калорийность, если фактическая динамика веса отличается от ожидаемой.
               </div>
 
               {/* Period selector — styled pills */}
-              <div style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.85)', marginBottom:6 }}>📅 Периодичность замеров</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5, marginBottom:14 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+                📅 Периодичность замеров
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 14 }}>
                 {[
-                  { id:'daily', label:'Ежедневно', slots:7, icon:'📆' },
-                  { id:'every2', label:'Каждые 2 дня', slots:4, icon:'📅' },
-                  { id:'every3', label:'Каждые 3 дня', slots:3, icon:'📅' },
-                  { id:'weekly', label:'Еженедельно', slots:2, icon:'📋' },
-                ].map(p => (
-                  <button key={p.id} onClick={() => {
-                    setWeightLogPeriod(p.id);
-                    // FIX button-audit: при смене периода сохраняем введённые пользователем веса по датам
-                    // (раньше все замеры перезаписывались заглушками с одинаковым весом)
-                    const existing = [...weightLogEntries];
-                    const lastWeight = existing.length > 0 ? existing[existing.length - 1].weight : 80;
-                    const byDate = new Map(existing.map(e => [e.date, e.weight]));
-                     const entries: { date: string; weight: number; synthetic?: boolean }[] = [];
-                     const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
-                     for (let i = 0; i < p.slots; i++) {
-                       const d = new Date(); d.setDate(d.getDate() - (p.slots - 1 - i) * step);
-                       {/* FIX UTC-audit (B4): локальная дата, не UTC (около полуночи UTC+ съезжала на день) */}
-                       const ds = _toLocalIso(d);
-                       const _known = byDate.has(ds);
-                       // P1-фикс: автозаполнение периодов НЕ пишет копии веса в канонический
-                       // лог «Профиль → Вес» (кнопка «Ежедневно» плодила фальшивые замеры).
-                       entries.push({ date: ds, weight: _known ? byDate.get(ds) as number : lastWeight, ...(_known ? {} : { synthetic: true }) });
-                     }
-                    setWeightLogEntries(entries);
-                  }} style={{
-                    padding:'12px 8px', borderRadius:12, cursor:'pointer', textAlign:'center',
-                    background: weightLogPeriod === p.id ? 'rgba(167,139,250,0.1)' : 'rgba(255,255,255,0.02)',
-                    border: weightLogPeriod === p.id ? '1.5px solid rgba(167,139,250,0.35)' : '1px solid rgba(255,255,255,0.05)',
-                    color: weightLogPeriod === p.id ? '#a78bfa' : 'rgba(255,255,255,0.6)',
-                    fontWeight: weightLogPeriod === p.id ? 700 : 400, fontSize:9,
-                    transition:'all 0.12s',
-                  }}>
-                    <div style={{ fontSize:16, marginBottom:2 }}>{p.icon}</div>
-                    <div style={{ fontSize:11, fontWeight:600 }}>{p.label}</div>
-                    <div style={{ fontSize:9, color: weightLogPeriod === p.id ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.3)', marginTop:1 }}>{p.slots} замер{p.slots > 1 ? 'ов' : ''}</div>
+                  { id: 'daily', label: 'Ежедневно', slots: 7, icon: '📆' },
+                  { id: 'every2', label: 'Каждые 2 дня', slots: 4, icon: '📅' },
+                  { id: 'every3', label: 'Каждые 3 дня', slots: 3, icon: '📅' },
+                  { id: 'weekly', label: 'Еженедельно', slots: 2, icon: '📋' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setWeightLogPeriod(p.id);
+                      // FIX button-audit: при смене периода сохраняем введённые пользователем веса по датам
+                      // (раньше все замеры перезаписывались заглушками с одинаковым весом)
+                      const existing = [...weightLogEntries];
+                      const lastWeight = existing.length > 0 ? existing[existing.length - 1].weight : 80;
+                      const byDate = new Map(existing.map((e) => [e.date, e.weight]));
+                      const entries: { date: string; weight: number; synthetic?: boolean }[] = [];
+                      const step = p.id === 'daily' ? 1 : p.id === 'every2' ? 2 : p.id === 'every3' ? 3 : 4;
+                      for (let i = 0; i < p.slots; i++) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - (p.slots - 1 - i) * step);
+                        {
+                          /* FIX UTC-audit (B4): локальная дата, не UTC (около полуночи UTC+ съезжала на день) */
+                        }
+                        const ds = _toLocalIso(d);
+                        const _known = byDate.has(ds);
+                        // P1-фикс: автозаполнение периодов НЕ пишет копии веса в канонический
+                        // лог «Профиль → Вес» (кнопка «Ежедневно» плодила фальшивые замеры).
+                        entries.push({
+                          date: ds,
+                          weight: _known ? (byDate.get(ds) as number) : lastWeight,
+                          ...(_known ? {} : { synthetic: true }),
+                        });
+                      }
+                      setWeightLogEntries(entries);
+                    }}
+                    style={{
+                      padding: '12px 8px',
+                      borderRadius: 12,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: weightLogPeriod === p.id ? 'rgba(167,139,250,0.1)' : 'rgba(255,255,255,0.02)',
+                      border:
+                        weightLogPeriod === p.id
+                          ? '1.5px solid rgba(167,139,250,0.35)'
+                          : '1px solid rgba(255,255,255,0.05)',
+                      color: weightLogPeriod === p.id ? '#a78bfa' : 'rgba(255,255,255,0.6)',
+                      fontWeight: weightLogPeriod === p.id ? 700 : 400,
+                      fontSize: 9,
+                      transition: 'all 0.12s',
+                    }}
+                  >
+                    <div style={{ fontSize: 16, marginBottom: 2 }}>{p.icon}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600 }}>{p.label}</div>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: weightLogPeriod === p.id ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.3)',
+                        marginTop: 1,
+                      }}
+                    >
+                      {p.slots} замер{p.slots > 1 ? 'ов' : ''}
+                    </div>
                   </button>
                 ))}
               </div>
 
               {/* Expected loss */}
-              <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.08)', marginBottom:14 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap' }}>🎯 Ожидаемое снижение:</span>
-                  <input type="number" min={0} step="0.1" value={expectedLossKgWeek} onChange={e => setExpectedLossKgWeek(Math.max(0, +e.target.value || 0))} style={{ ...inputStyle, width:65, textAlign:'center', fontWeight:700 }} />
-                  <span style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>кг/нед</span>
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(245,158,11,0.04)',
+                  border: '1px solid rgba(245,158,11,0.08)',
+                  marginBottom: 14,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>
+                    🎯 Ожидаемое снижение:
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.1"
+                    value={expectedLossKgWeek}
+                    onChange={(e) => setExpectedLossKgWeek(Math.max(0, +e.target.value || 0))}
+                    style={{ ...inputStyle, width: 65, textAlign: 'center', fontWeight: 700 }}
+                  />
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>кг/нед</span>
                 </div>
               </div>
 
               {/* Weight entries */}
-              <div style={{ fontSize:10, fontWeight:600, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>📊 Замеры веса</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginBottom:8, lineHeight:1.3 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                📊 Замеры веса
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.3 }}>
                 Вводите вес в разные дни. Не обязательно заполнять всё сразу — записи сохраняются автоматически.
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
                 {weightLogEntries.map((entry, idx) => (
-                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', padding:'7px 10px', borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.75)', minWidth:16, fontWeight:600 }}>#{idx+1}</span>
-                    <input type="date" value={entry.date} onChange={e => {
-                      const nw = [...weightLogEntries]; nw[idx] = { ...nw[idx], date: e.target.value }; setWeightLogEntries(nw);
-                    }} style={{ ...inputStyle, flex:1, fontSize:10, padding:'6px 8px' }} />
-                    <input type="number" min={30} max={300} step="0.1" value={entry.weight} onChange={e => {
-                      // FIX input-audit: clamp 30-300 — вес 0/отрицательный давал ложный «сброс веса»
-                      // и молча поднимал калораж до +20%
-                      const nw = [...weightLogEntries]; nw[idx] = { ...nw[idx], weight: Math.max(30, Math.min(300, +e.target.value || 30)) }; setWeightLogEntries(nw);
-                    }} placeholder="Вес" style={{ ...inputStyle, width:80, fontSize:12, fontWeight:700, textAlign:'center', padding:'6px 8px' }} />
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.25)' }}>кг</span>
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      alignItems: 'center',
+                      padding: '7px 10px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.05)',
+                    }}
+                  >
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', minWidth: 16, fontWeight: 600 }}>
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="date"
+                      value={entry.date}
+                      onChange={(e) => {
+                        const nw = [...weightLogEntries];
+                        nw[idx] = { ...nw[idx], date: e.target.value };
+                        setWeightLogEntries(nw);
+                      }}
+                      style={{ ...inputStyle, flex: 1, fontSize: 10, padding: '6px 8px' }}
+                    />
+                    <input
+                      type="number"
+                      min={30}
+                      max={300}
+                      step="0.1"
+                      value={entry.weight}
+                      onChange={(e) => {
+                        // FIX input-audit: clamp 30-300 — вес 0/отрицательный давал ложный «сброс веса»
+                        // и молча поднимал калораж до +20%
+                        const nw = [...weightLogEntries];
+                        nw[idx] = { ...nw[idx], weight: Math.max(30, Math.min(300, +e.target.value || 30)) };
+                        setWeightLogEntries(nw);
+                      }}
+                      placeholder="Вес"
+                      style={{
+                        ...inputStyle,
+                        width: 80,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        padding: '6px 8px',
+                      }}
+                    />
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>кг</span>
                     {weightLogEntries.length > 1 && (
-                      <button onClick={() => setWeightLogEntries(weightLogEntries.filter((_, i) => i !== idx))} style={{
-                        background:'rgba(239,68,68,0.08)', border:'none', color:'#ef4444', fontSize:10, cursor:'pointer', borderRadius:6, padding:'3px 7px',
-                      }}>✕</button>
+                      <button
+                        onClick={() => setWeightLogEntries(weightLogEntries.filter((_, i) => i !== idx))}
+                        style={{
+                          background: 'rgba(239,68,68,0.08)',
+                          border: 'none',
+                          color: '#ef4444',
+                          fontSize: 10,
+                          cursor: 'pointer',
+                          borderRadius: 6,
+                          padding: '3px 7px',
+                        }}
+                      >
+                        ✕
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
 
               {/* Add entry button */}
-              <button onClick={() => {
-                // FIX button-audit: guard на Invalid Date (пустая дата последней записи → RangeError)
-                const _rawLast = weightLogEntries.length > 0 ? new Date(weightLogEntries[weightLogEntries.length - 1].date) : null;
-                const lastDate = (_rawLast && Number.isFinite(_rawLast.getTime())) ? _rawLast : new Date();
-                const nextDate = new Date(lastDate); nextDate.setDate(nextDate.getDate() + 1);
-                // FIX UTC-audit (B4): toISOString уводил дату на день назад около полуночи (UTC+)
-                setWeightLogEntries([...weightLogEntries, { date: _toLocalIso(nextDate), weight: weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80 }]);
-              }} style={{
-                width:'100%', padding:'8px', borderRadius:9, cursor:'pointer', fontSize:9, fontWeight:600, marginBottom:12,
-                background:'rgba(167,139,250,0.05)', border:'1.5px dashed rgba(167,139,250,0.2)', color:'#a78bfa',
-              }}>+ Добавить замер на следующий день</button>
+              <button
+                onClick={() => {
+                  // FIX button-audit: guard на Invalid Date (пустая дата последней записи → RangeError)
+                  const _rawLast =
+                    weightLogEntries.length > 0 ? new Date(weightLogEntries[weightLogEntries.length - 1].date) : null;
+                  const lastDate = _rawLast && Number.isFinite(_rawLast.getTime()) ? _rawLast : new Date();
+                  const nextDate = new Date(lastDate);
+                  nextDate.setDate(nextDate.getDate() + 1);
+                  // FIX UTC-audit (B4): toISOString уводил дату на день назад около полуночи (UTC+)
+                  setWeightLogEntries([
+                    ...weightLogEntries,
+                    {
+                      date: _toLocalIso(nextDate),
+                      weight: weightLogEntries.length > 0 ? weightLogEntries[weightLogEntries.length - 1].weight : 80,
+                    },
+                  ]);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  borderRadius: 9,
+                  cursor: 'pointer',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  marginBottom: 12,
+                  background: 'rgba(167,139,250,0.05)',
+                  border: '1.5px dashed rgba(167,139,250,0.2)',
+                  color: '#a78bfa',
+                }}
+              >
+                + Добавить замер на следующий день
+              </button>
 
               {/* Summary */}
-              {weightLogEntries.length >= 2 && (() => {
-                const firstW = weightLogEntries[0].weight;
-                const lastW = weightLogEntries[weightLogEntries.length - 1].weight;
-                const diff = lastW - firstW;
-                // FIX button-audit: guard на Invalid Date — пустые даты не дают NaN-темп
-                const _t1 = new Date(weightLogEntries[0].date).getTime();
-                const _t2 = new Date(weightLogEntries[weightLogEntries.length-1].date).getTime();
-                const daysBetween = (Number.isFinite(_t1) && Number.isFinite(_t2)) ? Math.round((_t2 - _t1) / 86400000) : 0;
-                const weeklyRate = daysBetween > 0 ? diff / daysBetween * 7 : 0;
-                const onTrack = weeklyRate < 0 && expectedLossKgWeek > 0 && Math.abs(weeklyRate) >= expectedLossKgWeek * 0.7 && Math.abs(weeklyRate) <= expectedLossKgWeek * 1.3;
-                return (
-                  <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(167,139,250,0.03)', border:'1px solid rgba(167,139,250,0.08)', marginBottom:14 }}>
-                    <div style={{ fontSize:9, fontWeight:600, color:'#a78bfa', marginBottom:4, display:'flex', alignItems:'center', gap:4 }}>
-                      <span>📈 Динамика</span>
-                      {onTrack && <span style={{ fontSize:10, padding:'1px 6px', borderRadius:4, background:'rgba(34,197,94,0.12)', color:'#22c55e', fontWeight:700 }}>В ЦЕЛИ</span>}
+              {weightLogEntries.length >= 2 &&
+                (() => {
+                  const firstW = weightLogEntries[0].weight;
+                  const lastW = weightLogEntries[weightLogEntries.length - 1].weight;
+                  const diff = lastW - firstW;
+                  // FIX button-audit: guard на Invalid Date — пустые даты не дают NaN-темп
+                  const _t1 = new Date(weightLogEntries[0].date).getTime();
+                  const _t2 = new Date(weightLogEntries[weightLogEntries.length - 1].date).getTime();
+                  const daysBetween =
+                    Number.isFinite(_t1) && Number.isFinite(_t2) ? Math.round((_t2 - _t1) / 86400000) : 0;
+                  const weeklyRate = daysBetween > 0 ? (diff / daysBetween) * 7 : 0;
+                  const onTrack =
+                    weeklyRate < 0 &&
+                    expectedLossKgWeek > 0 &&
+                    Math.abs(weeklyRate) >= expectedLossKgWeek * 0.7 &&
+                    Math.abs(weeklyRate) <= expectedLossKgWeek * 1.3;
+                  return (
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        background: 'rgba(167,139,250,0.03)',
+                        border: '1px solid rgba(167,139,250,0.08)',
+                        marginBottom: 14,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 600,
+                          color: '#a78bfa',
+                          marginBottom: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <span>📈 Динамика</span>
+                        {onTrack && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              background: 'rgba(34,197,94,0.12)',
+                              color: '#22c55e',
+                              fontWeight: 700,
+                            }}
+                          >
+                            В ЦЕЛИ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.35)' }}>{weightLogEntries[0].date}</span>
+                        <span style={{ color: 'rgba(255,255,255,0.25)', margin: '0 3px' }}>→</span>
+                        <span style={{ color: 'rgba(255,255,255,0.35)' }}>
+                          {weightLogEntries[weightLogEntries.length - 1].date}
+                        </span>
+                        :{' '}
+                        <strong style={{ color: diff < 0 ? '#22c55e' : diff > 0 ? '#ef4444' : '#fff', fontSize: 10 }}>
+                          {diff > 0 ? '+' : ''}
+                          {diff.toFixed(1)} кг
+                        </strong>
+                        <br />
+                        Темп:{' '}
+                        <strong style={{ color: weeklyRate < 0 ? '#22c55e' : '#ef4444', fontSize: 10 }}>
+                          {weeklyRate > 0 ? '+' : ''}
+                          {weeklyRate.toFixed(2)} кг/нед
+                        </strong>
+                        {expectedLossKgWeek > 0 && (
+                          <span style={{ color: 'rgba(255,255,255,0.75)' }}> · цель {expectedLossKgWeek} кг/нед</span>
+                        )}
+                        {weeklyRate < 0 &&
+                          expectedLossKgWeek > 0 &&
+                          Math.abs(weeklyRate) < expectedLossKgWeek * 0.7 && (
+                            <div
+                              style={{
+                                color: '#f59e0b',
+                                marginTop: 3,
+                                padding: '3px 6px',
+                                borderRadius: 4,
+                                background: 'rgba(245,158,11,0.06)',
+                                fontSize: 10,
+                              }}
+                            >
+                              ⚠️ Темп ниже цели — калорийность будет снижена
+                            </div>
+                          )}
+                        {weeklyRate < 0 &&
+                          expectedLossKgWeek > 0 &&
+                          Math.abs(weeklyRate) > expectedLossKgWeek * 1.3 && (
+                            <div
+                              style={{
+                                color: '#f59e0b',
+                                marginTop: 3,
+                                padding: '3px 6px',
+                                borderRadius: 4,
+                                background: 'rgba(245,158,11,0.06)',
+                                fontSize: 10,
+                              }}
+                            >
+                              ⚠️ Темп выше цели — калорийность будет повышена
+                            </div>
+                          )}
+                      </div>
                     </div>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1.6 }}>
-                      <span style={{ color:'rgba(255,255,255,0.35)' }}>{weightLogEntries[0].date}</span>
-                      <span style={{ color:'rgba(255,255,255,0.25)', margin:'0 3px' }}>→</span>
-                      <span style={{ color:'rgba(255,255,255,0.35)' }}>{weightLogEntries[weightLogEntries.length-1].date}</span>
-                      : <strong style={{color: diff < 0 ? '#22c55e' : diff > 0 ? '#ef4444' : '#fff', fontSize:10}}>{diff > 0 ? '+' : ''}{diff.toFixed(1)} кг</strong>
-                      <br />
-                      Темп: <strong style={{color: weeklyRate < 0 ? '#22c55e' : '#ef4444', fontSize:10}}>{weeklyRate > 0 ? '+' : ''}{weeklyRate.toFixed(2)} кг/нед</strong>
-                      {expectedLossKgWeek > 0 && <span style={{ color:'rgba(255,255,255,0.75)' }}> · цель {expectedLossKgWeek} кг/нед</span>}
-                      {weeklyRate < 0 && expectedLossKgWeek > 0 && Math.abs(weeklyRate) < expectedLossKgWeek * 0.7 && (
-                        <div style={{ color:'#f59e0b', marginTop:3, padding:'3px 6px', borderRadius:4, background:'rgba(245,158,11,0.06)', fontSize:10 }}>⚠️ Темп ниже цели — калорийность будет снижена</div>
-                      )}
-                      {weeklyRate < 0 && expectedLossKgWeek > 0 && Math.abs(weeklyRate) > expectedLossKgWeek * 1.3 && (
-                        <div style={{ color:'#f59e0b', marginTop:3, padding:'3px 6px', borderRadius:4, background:'rgba(245,158,11,0.06)', fontSize:10 }}>⚠️ Темп выше цели — калорийность будет повышена</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
               {/* Active toggle */}
-              <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => { setWeightAdaptMode(false); setShowWeightAdaptModal(false); }} style={{
-                  flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:600,
-                  border:'1px solid rgba(255,255,255,0.1)', background:'#202023', color:'rgba(255,255,255,0.85)',
-                }}>Отключить</button>
-                <button onClick={() => {
-                  setWeightAdaptMode(true);
-                  setShowWeightAdaptModal(false);
-                }} style={{
-                  flex:1, padding:'10px', borderRadius:10, cursor:'pointer', fontSize:10, fontWeight:700,
-                  border:'none', background:'linear-gradient(135deg,#a78bfa,#7c3aed)', color:'#fff',
-                  boxShadow:'0 4px 12px rgba(167,139,250,0.2)',
-                }}>✓ Применить</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => {
+                    setWeightAdaptMode(false);
+                    setShowWeightAdaptModal(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: '#202023',
+                    color: 'rgba(255,255,255,0.85)',
+                  }}
+                >
+                  Отключить
+                </button>
+                <button
+                  onClick={() => {
+                    setWeightAdaptMode(true);
+                    setShowWeightAdaptModal(false);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    border: 'none',
+                    background: 'linear-gradient(135deg,#a78bfa,#7c3aed)',
+                    color: '#fff',
+                    boxShadow: '0 4px 12px rgba(167,139,250,0.2)',
+                  }}
+                >
+                  ✓ Применить
+                </button>
               </div>
             </div>
           </div>
@@ -2742,120 +7455,314 @@ export const IndividualPlanSettings: React.FC = () => {
 
       {/* B1 — SpecialMealPopup */}
       {plannerMode === 'pro' && (
-      <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">
-        <button onClick={() => {
-          setSpecialMealType('cheat_meal');
-          // FIX UTC-audit (B4): локальная дата, не UTC
-          setSpecialMealDate(_toLocalIso(new Date()));
-          setSpecialMealNotes('');
-          setShowSpecialMealPopup(true);
-        }} style={{
-          width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:600,
-          background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.2)', color:'#f97316',
-        }}>➕ Добавить спецприём</button>
-        {specialMeals.length > 0 && (
-          <div style={{ marginTop:8 }}>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Сохранённые:</div>
-            {specialMeals.map((m, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 8px', borderRadius:6, background:'rgba(249,115,22,0.04)', border:'1px solid rgba(249,115,22,0.08)', marginBottom:4, fontSize:9 }}>
-                <div>
-                  <span style={{ fontWeight:700, color:'#f97316' }}>{m.typeLabel}</span>
-                  <span style={{ color:'rgba(255,255,255,0.8)', marginLeft:4 }}>{m.date}</span>
-                  {m.replaceMeal && <span style={{ color:'#00e68a', marginLeft:4, fontSize:10, background:'rgba(0,230,138,0.08)', padding:'1px 5px', borderRadius:4 }}>↻ {m.replaceMeal}</span>}
-                  {m.notes && <div style={{ color:'rgba(255,255,255,0.85)', marginTop:2, fontSize:10 }}>{m.notes}</div>}
+        <GlassCard title="➕ Спецприём" icon="🍽️" color="#f97316">
+          <button
+            onClick={() => {
+              setSpecialMealType('cheat_meal');
+              // FIX UTC-audit (B4): локальная дата, не UTC
+              setSpecialMealDate(_toLocalIso(new Date()));
+              setSpecialMealNotes('');
+              setShowSpecialMealPopup(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              fontSize: 9,
+              fontWeight: 600,
+              background: 'rgba(249,115,22,0.1)',
+              border: '1px solid rgba(249,115,22,0.2)',
+              color: '#f97316',
+            }}
+          >
+            ➕ Добавить спецприём
+          </button>
+          {specialMeals.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Сохранённые:</div>
+              {specialMeals.map((m, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(249,115,22,0.04)',
+                    border: '1px solid rgba(249,115,22,0.08)',
+                    marginBottom: 4,
+                    fontSize: 9,
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: 700, color: '#f97316' }}>{m.typeLabel}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.8)', marginLeft: 4 }}>{m.date}</span>
+                    {m.replaceMeal && (
+                      <span
+                        style={{
+                          color: '#00e68a',
+                          marginLeft: 4,
+                          fontSize: 10,
+                          background: 'rgba(0,230,138,0.08)',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                        }}
+                      >
+                        ↻ {m.replaceMeal}
+                      </span>
+                    )}
+                    {m.notes && (
+                      <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 2, fontSize: 10 }}>{m.notes}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const res = removeSpecialMeal(m);
+                      setSpecialMeals(res.list as any);
+                    }}
+                    style={{
+                      background: 'rgba(239,68,68,0.1)',
+                      border: 'none',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      borderRadius: 4,
+                      padding: '2px 6px',
+                      fontSize: 9,
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <button onClick={() => { const res = removeSpecialMeal(m); setSpecialMeals(res.list as any); }} style={{ background:'rgba(239,68,68,0.1)', border:'none', color:'#ef4444', cursor:'pointer', borderRadius:4, padding:'2px 6px', fontSize:9 }}>✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </GlassCard>
+              ))}
+            </div>
+          )}
+        </GlassCard>
       )}
 
-        {/* v2 Scoring Profile moved to top */}
+      {/* v2 Scoring Profile moved to top */}
 
       {showSpecialMealPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setShowSpecialMealPopup(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'92%', maxWidth:380, padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ fontSize:15, fontWeight:700, color:'#f97316', marginBottom:14, textAlign:'center' }}>➕ Спецприём</div>
-            <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Тип</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)',
+          }}
+          onClick={() => setShowSpecialMealPopup(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '92%',
+              maxWidth: 380,
+              padding: 16,
+              borderRadius: 16,
+              background: '#18181b',
+              border: '1px solid rgba(249,115,22,0.12)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#f97316', marginBottom: 14, textAlign: 'center' }}>
+              ➕ Спецприём
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Тип</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                 {[
-                  { id:'cheat_meal' as const, label:'🍔 Читмил' },
-                  { id:'refeed' as const, label:'🍝 Рефид' },
-                  { id:'fast' as const, label:'⏳ Фастинг' },
-                ].map(t => (
-                  <button key={t.id} onClick={() => setSpecialMealType(t.id)} style={{
-                    padding:'8px 4px', borderRadius:10, cursor:'pointer', textAlign:'center', fontSize:9, fontWeight:600,
-                    background: specialMealType === t.id ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
-                    border: specialMealType === t.id ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
-                    color: specialMealType === t.id ? '#f97316' : 'rgba(255,255,255,0.7)',
-                  }}>{t.label}</button>
+                  { id: 'cheat_meal' as const, label: '🍔 Читмил' },
+                  { id: 'refeed' as const, label: '🍝 Рефид' },
+                  { id: 'fast' as const, label: '⏳ Фастинг' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSpecialMealType(t.id)}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      background: specialMealType === t.id ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: specialMealType === t.id ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
+                      color: specialMealType === t.id ? '#f97316' : 'rgba(255,255,255,0.7)',
+                    }}
+                  >
+                    {t.label}
+                  </button>
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Дата</div>
-              <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Дата</div>
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                 {DAY_LABELS.map((label, idx) => {
-                  const now = new Date(); const curr = now.getDay() - 1; const dayOff = (idx - curr + 7) % 7;
-                  const target = new Date(now); target.setDate(now.getDate() + dayOff);
+                  const now = new Date();
+                  const curr = now.getDay() - 1;
+                  const dayOff = (idx - curr + 7) % 7;
+                  const target = new Date(now);
+                  target.setDate(now.getDate() + dayOff);
                   const dateStr = _toLocalIso(target);
                   const sel = specialMealDate === dateStr;
                   return (
-                    <button key={idx} onClick={() => setSpecialMealDate(dateStr)} style={{
-                      width:44, height:44, borderRadius:'50%', cursor:'pointer', fontSize:9, fontWeight:sel?800:500,
-                      background: sel ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
-                      border: sel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
-                      color: sel ? '#f97316' : 'rgba(255,255,255,0.7)',
-                      transition:'all 0.15s',
-                    }}>{label}</button>
+                    <button
+                      key={idx}
+                      onClick={() => setSpecialMealDate(dateStr)}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        cursor: 'pointer',
+                        fontSize: 9,
+                        fontWeight: sel ? 800 : 500,
+                        background: sel ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
+                        border: sel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
+                        color: sel ? '#f97316' : 'rgba(255,255,255,0.7)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {label}
+                    </button>
                   );
                 })}
               </div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', textAlign:'center', marginTop:4 }}>{specialMealDate}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginTop: 4 }}>
+                {specialMealDate}
+              </div>
             </div>
-            <div style={{ marginBottom:10 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:4 }}>Заметки</div>
-              <textarea value={specialMealNotes} onChange={e => setSpecialMealNotes(e.target.value)} placeholder="Описание..." style={{ ...inputStyle, width:'100%', minHeight:50, resize:'vertical', boxSizing:'border-box', fontSize:9 }} rows={2} />
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Заметки</div>
+              <textarea
+                value={specialMealNotes}
+                onChange={(e) => setSpecialMealNotes(e.target.value)}
+                placeholder="Описание..."
+                style={{
+                  ...inputStyle,
+                  width: '100%',
+                  minHeight: 50,
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                  fontSize: 9,
+                }}
+                rows={2}
+              />
             </div>
-            <div style={{ marginBottom:10 }}>
+            <div style={{ marginBottom: 10 }}>
               {/* P1-UX: попап-выбор вместо нативного select */}
-              <PopupSelect label="Заменить приём" value={selectedMealToReplace}
-                options={[{ id: '', label: '— Без замены (добавить) —' }, ...['Завтрак', 'Обед', 'Ужин', 'Перекус'].map(m => ({ id: m, label: m }))]}
-                onChange={v => setSelectedMealToReplace(v)} />
+              <PopupSelect
+                label="Заменить приём"
+                value={selectedMealToReplace}
+                options={[
+                  { id: '', label: '— Без замены (добавить) —' },
+                  ...['Завтрак', 'Обед', 'Ужин', 'Перекус'].map((m) => ({ id: m, label: m })),
+                ]}
+                onChange={(v) => setSelectedMealToReplace(v)}
+              />
             </div>
-            <div style={{ display:'flex', gap:6 }}>
-              <button onClick={() => setShowSpecialMealPopup(false)} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>Отмена</button>
-              <button onClick={() => {
-                const typeLabels: Record<string, string> = { cheat_meal:'🍔 Читмил', refeed:'🍝 Рефид', fast:'⏳ Фастинг' };
-                const newItem = { type: specialMealType, typeLabel: typeLabels[specialMealType], date: specialMealDate, notes: specialMealNotes, replaceMeal: selectedMealToReplace || undefined };
-                // FIX B18: read-modify-write от АКТУАЛЬНОГО содержимого ключа в момент клика.
-                // Раньше писался `[...снимок_из_state, newItem]` — и рефиды, добавленные
-                // не закрывалась и повторный клик плодил дубликаты)
-                const res = addSpecialMeals([newItem]);
-                setSelectedMealToReplace('');
-                setShowSpecialMealPopup(false);
-                setSpecialMeals(res.list as any);
-                if (!res.persisted) flash('Не удалось сохранить: хранилище недоступно (приватный режим?).');
-                else if (res.added === 0) flash('Такой приём на эту дату уже есть — дубль не создан.');
-              }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:700 }}>✓ Сохранить</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => setShowSpecialMealPopup(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: '#202023',
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  const typeLabels: Record<string, string> = {
+                    cheat_meal: '🍔 Читмил',
+                    refeed: '🍝 Рефид',
+                    fast: '⏳ Фастинг',
+                  };
+                  const newItem = {
+                    type: specialMealType,
+                    typeLabel: typeLabels[specialMealType],
+                    date: specialMealDate,
+                    notes: specialMealNotes,
+                    replaceMeal: selectedMealToReplace || undefined,
+                  };
+                  // FIX B18: read-modify-write от АКТУАЛЬНОГО содержимого ключа в момент клика.
+                  // Раньше писался `[...снимок_из_state, newItem]` — и рефиды, добавленные
+                  // не закрывалась и повторный клик плодил дубликаты)
+                  const res = addSpecialMeals([newItem]);
+                  setSelectedMealToReplace('');
+                  setShowSpecialMealPopup(false);
+                  setSpecialMeals(res.list as any);
+                  if (!res.persisted) flash('Не удалось сохранить: хранилище недоступно (приватный режим?).');
+                  else if (res.added === 0) flash('Такой приём на эту дату уже есть — дубль не создан.');
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#f97316,#fb923c)',
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
+                ✓ Сохранить
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {/* Кнопка генерации внизу настроек — плавающая (FAB): TG sticky, APK fixed над пилюлей (§114) */}
-      <button className="plan-generate-fab" data-fab="plan-generate" onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
-        width: '100%', padding: '14px', borderRadius: 12, cursor: 'pointer',
-        fontSize: 13, fontWeight: 700,
-        background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-        boxShadow: '0 4px 20px rgba(0,230,138,0.25)',
-        position: 'sticky', bottom: 8, zIndex: 10,
-      }}>✨ Сгенерировать план питания →</button>
-
+      <button
+        className="plan-generate-fab"
+        data-fab="plan-generate"
+        onClick={() => {
+          try {
+            const _err = _validatePlannerInput();
+            if (_err) {
+              setErrorMsg(_err);
+              return;
+            }
+            setErrorMsg(null);
+            generatePlan(1);
+            setPlanTab('plan');
+          } catch (e: any) {
+            try {
+              setErrorMsg('Ошибка: ' + (e?.message || String(e)));
+            } catch {}
+          }
+        }}
+        style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: 12,
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 700,
+          background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+          border: 'none',
+          color: '#000',
+          boxShadow: '0 4px 20px rgba(0,230,138,0.25)',
+          position: 'sticky',
+          bottom: 8,
+          zIndex: 10,
+        }}
+      >
+        ✨ Сгенерировать план питания →
+      </button>
     </>
   );
 };

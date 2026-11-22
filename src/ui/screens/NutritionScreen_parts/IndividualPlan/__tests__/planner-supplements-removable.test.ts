@@ -12,10 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const src = readFileSync(
-  join(__dirname, '..', 'IndividualPlanSettings.tsx'),
-  'utf8',
-);
+const src = readFileSync(join(__dirname, '..', 'IndividualPlanSettings.tsx'), 'utf8');
 
 describe('B28: все БАДы видны и удаляемы', () => {
   it('нет обрезки списка БАДов до 12', () => {
@@ -30,7 +27,8 @@ describe('B28: все БАДы видны и удаляемы', () => {
     // именно `takenSupplements.map(` + удаление по sid внутри того же блока
     const block = src.slice(src.indexOf('Принимаю БАД'), src.indexOf('showSuppPicker &&', src.indexOf('Принимаю БАД')));
     expect(block).toMatch(/takenSupplements\.map\(/);
-    expect(block).toMatch(/takenSupplements\.filter\(x\s*=>\s*x\s*!==\s*sid\)/);
+    // Скобки вокруг параметра стрелки ставит форматтер — намерение то же.
+    expect(block).toMatch(/takenSupplements\.filter\(\(?x\)?\s*=>\s*x\s*!==\s*sid\)/);
   });
 
   it('большой список ограничен по высоте, а не по количеству', () => {

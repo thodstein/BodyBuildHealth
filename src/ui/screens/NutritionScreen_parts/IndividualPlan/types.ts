@@ -1,15 +1,45 @@
 // --- Types & Constants ---
 // ─── Types ───
-export type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab' | 'health';
-export type PhaseId = 'course' | 'bridge' | 'pct' | 'recovery' | 'cutting' | 'maintenance' | 'recomp' | 'fat_loss' | 'post_cut';
+export type GoalId =
+  'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab' | 'health';
+export type PhaseId =
+  'course' | 'bridge' | 'pct' | 'recovery' | 'cutting' | 'maintenance' | 'recomp' | 'fat_loss' | 'post_cut';
 export type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 export type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 export type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
 export type PlannerMode = 'pro' | 'simple' | 'minimal';
 
-export interface DrugInjection { id: string; name: string; time: string; dose: number; unit: string; type: string; esterType: 'rapid' | 'short' | 'long' | 'none'; halfLifeHours: number; trainLinked: boolean; trainTiming: 'before' | 'after' | 'both' | 'none'; }
-export interface MealPrepStep { step: number; action: string; duration: number; items: string[]; items_standby?: boolean; items_parallel?: boolean; items_can_boil_simultaneously?: boolean; }
-export interface SavedPlan { id: number; date: string; name?: string; dayPlan: any; threeDayPlan: any; weekPlan: any; shoppingList: any; waterCalc: any; }
+export interface DrugInjection {
+  id: string;
+  name: string;
+  time: string;
+  dose: number;
+  unit: string;
+  type: string;
+  esterType: 'rapid' | 'short' | 'long' | 'none';
+  halfLifeHours: number;
+  trainLinked: boolean;
+  trainTiming: 'before' | 'after' | 'both' | 'none';
+}
+export interface MealPrepStep {
+  step: number;
+  action: string;
+  duration: number;
+  items: string[];
+  items_standby?: boolean;
+  items_parallel?: boolean;
+  items_can_boil_simultaneously?: boolean;
+}
+export interface SavedPlan {
+  id: number;
+  date: string;
+  name?: string;
+  dayPlan: any;
+  threeDayPlan: any;
+  weekPlan: any;
+  shoppingList: any;
+  waterCalc: any;
+}
 
 export const GOALS: { id: GoalId; label: string; icon: string; desc: string }[] = [
   { id: 'mass', label: 'Массонабор', icon: '💪', desc: 'Профицит калорий, рост мышц' },
@@ -63,10 +93,10 @@ export const PROTEIN_G_PER_KG_RANGE = { min: 1.8, max: 2.4 } as const;
  *  белок (плато отклика), а НЕ общий суточный белок. Основанием для верхней границы 2.4
  *  г/кг оно не является, и смешивать эти два числа нельзя. */
 export const PROTEIN_G_PER_KG_RANGE_NOTE =
-  'Диапазон 1.8–2.4 г/кг — решение этого приложения, а не цитата из одного источника: '
-  + 'Morton 2018 / ISSN сходятся к ~1.6 г/кг и выше у тренирующихся, но конкретный коридор выбран нами. '
-  + 'Число Li 2026 (30–35 г/сут) относится к ДОБАВЛЕННОМУ сывороточному белку, а не к общему '
-  + 'суточному, поэтому верхней границей 2.4 г/кг оно не обосновано.';
+  'Диапазон 1.8–2.4 г/кг — решение этого приложения, а не цитата из одного источника: ' +
+  'Morton 2018 / ISSN сходятся к ~1.6 г/кг и выше у тренирующихся, но конкретный коридор выбран нами. ' +
+  'Число Li 2026 (30–35 г/сут) относится к ДОБАВЛЕННОМУ сывороточному белку, а не к общему ' +
+  'суточному, поэтому верхней границей 2.4 г/кг оно не обосновано.';
 
 export const PROTEIN_PRESETS: { id: NutritionLevel; label: string; icon: string; gPerKg: number; desc: string }[] = [
   { id: 'base', label: 'База', icon: '🟢', gPerKg: 1.8, desc: '1.8 г/кг' },
@@ -74,8 +104,53 @@ export const PROTEIN_PRESETS: { id: NutritionLevel; label: string; icon: string;
   { id: 'enhanced', label: 'Актив', icon: '🟠', gPerKg: 2.4, desc: '2.4 г/кг' },
 ];
 
+// ─── Источник белка (решение владельца 2026-11): «слишком много белка не из мяса/рыбы —
+// это нездорово». Второй режим делает основным белком мясо/рыбу, а порошок/обезжиренные
+// источники отодвигает в снаки/добор.
+//
+// МЯГКИЙ режим (согласовано): flesh-first в главных приёмах, порошок остаётся там, где он
+// уместен (перекус, пост-трен). Жёсткий «порошок запрещён» ломает вегетарианские дни и
+// быстрое окно после тренировки, поэтому выбран мягкий.
+export type ProteinSourceMode = 'balanced' | 'meat_fish';
+
+export const PROTEIN_SOURCE_MODES: { id: ProteinSourceMode; label: string; icon: string; desc: string }[] = [
+  {
+    id: 'balanced',
+    label: 'Сбалансированный',
+    icon: '⚖️',
+    desc: 'Мясо, рыба, яйца, молочка, порошок — как в обычном плане',
+  },
+  {
+    id: 'meat_fish',
+    label: 'Мясо и рыба',
+    icon: '🥩🐟',
+    desc: 'Основной белок главных приёмов — мясо/рыба (порошок — только перекус/окно)',
+  },
+];
+
+/**
+ * Якоря режима «Мясо и рыба». Это НЕ «любимые продукты» (одноразовый пресет), а
+ * постоянный приоритет: белок обеда/ужина берётся отсюда, пока продукт доступен
+ * (не исключён аллергией/диетой). Порядок = приоритет.
+ */
+export const PROTEIN_ANCHOR_OPTIONS: { id: string; label: string; icon: string; fish: boolean }[] = [
+  { id: 'salmon', label: 'Лосось', icon: '🐟', fish: true },
+  { id: 'beef_lean', label: 'Говядина (нежирная)', icon: '🥩', fish: false },
+  { id: 'beef_minced', label: 'Говяжий фарш', icon: '🥩', fish: false },
+  { id: 'cod', label: 'Треска', icon: '🐟', fish: true },
+  { id: 'pollock', label: 'Минтай', icon: '🐟', fish: true },
+  { id: 'tuna_canned', label: 'Тунец', icon: '🐟', fish: true },
+  { id: 'mackerel', label: 'Скумбрия', icon: '🐟', fish: true },
+  { id: 'turkey_breast', label: 'Индейка', icon: '🦃', fish: false },
+  { id: 'chicken_breast', label: 'Курица', icon: '🍗', fish: false },
+  { id: 'pork_tenderloin', label: 'Свиная вырезка', icon: '🥓', fish: false },
+];
+
+export const DEFAULT_PROTEIN_ANCHORS = ['salmon', 'beef_lean'];
+
 // ─── v6: Единая периодизация углеводов (cyclingMode+dietPause+periodizationEnabled → одно) ──
-export type CarbPeriodization = 'none' | 'refeed' | 'carb_cycle' | 'butch' | 'flex_80_20' | 'two_one' | 'five_two' | 'wave';
+export type CarbPeriodization =
+  'none' | 'refeed' | 'carb_cycle' | 'butch' | 'flex_80_20' | 'two_one' | 'five_two' | 'wave';
 export const CARB_PERIODIZATION_OPTIONS: { id: CarbPeriodization; label: string; icon: string; desc: string }[] = [
   { id: 'none', label: 'Без периодизации', icon: '⏹️', desc: 'Ровные КБЖУ каждый день' },
   { id: 'refeed', label: 'Рефид 1×/нед', icon: '🍝', desc: '1 день/нед углеводы ×2.2 (лептин/гликоген)' },
@@ -124,12 +199,228 @@ export const ALLERGEN_LIST = [
 ];
 
 export const HEALTH_ISSUES = [
-  { id: 'oedema', label: 'Отёки', icon: '🫧', desc: 'Задержка жидкости, склонность к отёкам', foodIds: ['salt','soy_sauce','kfc_wings','kfc_soup','kfc_bucket','bk_whopper','mcd_big_mac','mcd_royale','vt_big_smoke','french_fries','bread_white','pizza_margherita','sausage'] },
-  { id: 'lactose_intolerance', label: 'Непереносимость лактозы', icon: '🥛', desc: 'Вздутие, дискомфорт от молочных продуктов', foodIds: ['milk','cheese','yogurt','kefir','cheese_cream','sour_cream','condensed_milk','ice_cream','cottage_cheese_5','cottage_cheese_2','cottage_cheese_0','yogurt_greek','ricotta','mozzarella','parmesan','feta'] },
-  { id: 'gluten_intolerance', label: 'Непереносимость глютена', icon: '🌾', desc: 'Реакция на пшеницу, рожь, ячмень', foodIds: ['bread_white','bread_rye','pasta','mantua','bread_protein','pancakes','pita','lavash','muesli','oats_instant','pelmeni','pizza_margherita','chebureki','pyanse','ramen_egg','falafel_pita','greek_gyros','tortilla_corn','cornmeal','rice_cakes'] },
-  { id: 'diabetes', label: 'Диабет / Преддиабет', icon: '💉', desc: 'Контроль гликемии, низкий GI', foodIds: ['sugar','honey','syrup','bread_white','rice_white','rice_cakes','pasta','potato_mashed','potato_baked','french_fries','pancakes','pizza_margherita','ice_cream','watermelon','dates','banana','coca_cola','juice_apple','juice_orange','muesli','chocolate','cookie','marmalade'] },
-  { id: 'hypertension', label: 'Гипертония', icon: '❤️', desc: 'Повышенное давление, ограничение натрия', foodIds: ['salt','soy_sauce','kfc_wings','kfc_bucket','bk_whopper','mcd_big_mac','mcd_royale','vt_big_smoke','french_fries','sausage','bacon','ham','ketchup','mayonnaise','chips','pickles','olives','suluguni','cheese_processed','bouillon_cube'] },
-  { id: 'gi_issues', label: 'Проблемы с ЖКТ', icon: '🫀', desc: 'Гастрит, вздутие, синдром раздражённого кишечника', foodIds: ['cabbage','broccoli','cauliflower','brussels_sprouts','beans','lentils','chickpeas','peas','cornmeal','pancakes','pizza_margherita','french_fries','fried_rice_egg','chicken_curry_rice','soda','chebureki','pyanse','khachapuri','shaurma','mayonnaise','ketchup','cream_sauce','milk','ice_cream','onion_raw'] },
-  { id: 'gout', label: 'Подагра', icon: '🦶', desc: 'Повышенная мочевая кислота, низкие пурины', foodIds: ['liver','kidneys','sardines','anchovies','mussels','beef_liver','chicken_liver','pork_liver','beef_kidney','green_peas','spinach','mushrooms','cauliflower','broccoli','asparagus','beer','red_meat','bacon','ham','sausage','tuna_canned','sprats','broth_bone'] },
-  { id: 'kidney_stones', label: 'Камни в почках', icon: '🫘', desc: 'Оксалаты, ограничение кальция/оксалатов', foodIds: ['spinach','rhubarb','beetroot','nuts','almonds','walnuts','cashews','peanuts','chocolate','sweet_potato','okra','swiss_chard','parsley','poppy_seeds','sesame','soy_flour','buckwheat','millet','bran','berries'] },
+  {
+    id: 'oedema',
+    label: 'Отёки',
+    icon: '🫧',
+    desc: 'Задержка жидкости, склонность к отёкам',
+    foodIds: [
+      'salt',
+      'soy_sauce',
+      'kfc_wings',
+      'kfc_soup',
+      'kfc_bucket',
+      'bk_whopper',
+      'mcd_big_mac',
+      'mcd_royale',
+      'vt_big_smoke',
+      'french_fries',
+      'bread_white',
+      'pizza_margherita',
+      'sausage',
+    ],
+  },
+  {
+    id: 'lactose_intolerance',
+    label: 'Непереносимость лактозы',
+    icon: '🥛',
+    desc: 'Вздутие, дискомфорт от молочных продуктов',
+    foodIds: [
+      'milk',
+      'cheese',
+      'yogurt',
+      'kefir',
+      'cheese_cream',
+      'sour_cream',
+      'condensed_milk',
+      'ice_cream',
+      'cottage_cheese_5',
+      'cottage_cheese_2',
+      'cottage_cheese_0',
+      'yogurt_greek',
+      'ricotta',
+      'mozzarella',
+      'parmesan',
+      'feta',
+    ],
+  },
+  {
+    id: 'gluten_intolerance',
+    label: 'Непереносимость глютена',
+    icon: '🌾',
+    desc: 'Реакция на пшеницу, рожь, ячмень',
+    foodIds: [
+      'bread_white',
+      'bread_rye',
+      'pasta',
+      'mantua',
+      'bread_protein',
+      'pancakes',
+      'pita',
+      'lavash',
+      'muesli',
+      'oats_instant',
+      'pelmeni',
+      'pizza_margherita',
+      'chebureki',
+      'pyanse',
+      'ramen_egg',
+      'falafel_pita',
+      'greek_gyros',
+      'tortilla_corn',
+      'cornmeal',
+      'rice_cakes',
+    ],
+  },
+  {
+    id: 'diabetes',
+    label: 'Диабет / Преддиабет',
+    icon: '💉',
+    desc: 'Контроль гликемии, низкий GI',
+    foodIds: [
+      'sugar',
+      'honey',
+      'syrup',
+      'bread_white',
+      'rice_white',
+      'rice_cakes',
+      'pasta',
+      'potato_mashed',
+      'potato_baked',
+      'french_fries',
+      'pancakes',
+      'pizza_margherita',
+      'ice_cream',
+      'watermelon',
+      'dates',
+      'banana',
+      'coca_cola',
+      'juice_apple',
+      'juice_orange',
+      'muesli',
+      'chocolate',
+      'cookie',
+      'marmalade',
+    ],
+  },
+  {
+    id: 'hypertension',
+    label: 'Гипертония',
+    icon: '❤️',
+    desc: 'Повышенное давление, ограничение натрия',
+    foodIds: [
+      'salt',
+      'soy_sauce',
+      'kfc_wings',
+      'kfc_bucket',
+      'bk_whopper',
+      'mcd_big_mac',
+      'mcd_royale',
+      'vt_big_smoke',
+      'french_fries',
+      'sausage',
+      'bacon',
+      'ham',
+      'ketchup',
+      'mayonnaise',
+      'chips',
+      'pickles',
+      'olives',
+      'suluguni',
+      'cheese_processed',
+      'bouillon_cube',
+    ],
+  },
+  {
+    id: 'gi_issues',
+    label: 'Проблемы с ЖКТ',
+    icon: '🫀',
+    desc: 'Гастрит, вздутие, синдром раздражённого кишечника',
+    foodIds: [
+      'cabbage',
+      'broccoli',
+      'cauliflower',
+      'brussels_sprouts',
+      'beans',
+      'lentils',
+      'chickpeas',
+      'peas',
+      'cornmeal',
+      'pancakes',
+      'pizza_margherita',
+      'french_fries',
+      'fried_rice_egg',
+      'chicken_curry_rice',
+      'soda',
+      'chebureki',
+      'pyanse',
+      'khachapuri',
+      'shaurma',
+      'mayonnaise',
+      'ketchup',
+      'cream_sauce',
+      'milk',
+      'ice_cream',
+      'onion_raw',
+    ],
+  },
+  {
+    id: 'gout',
+    label: 'Подагра',
+    icon: '🦶',
+    desc: 'Повышенная мочевая кислота, низкие пурины',
+    foodIds: [
+      'liver',
+      'kidneys',
+      'sardines',
+      'anchovies',
+      'mussels',
+      'beef_liver',
+      'chicken_liver',
+      'pork_liver',
+      'beef_kidney',
+      'green_peas',
+      'spinach',
+      'mushrooms',
+      'cauliflower',
+      'broccoli',
+      'asparagus',
+      'beer',
+      'red_meat',
+      'bacon',
+      'ham',
+      'sausage',
+      'tuna_canned',
+      'sprats',
+      'broth_bone',
+    ],
+  },
+  {
+    id: 'kidney_stones',
+    label: 'Камни в почках',
+    icon: '🫘',
+    desc: 'Оксалаты, ограничение кальция/оксалатов',
+    foodIds: [
+      'spinach',
+      'rhubarb',
+      'beetroot',
+      'nuts',
+      'almonds',
+      'walnuts',
+      'cashews',
+      'peanuts',
+      'chocolate',
+      'sweet_potato',
+      'okra',
+      'swiss_chard',
+      'parsley',
+      'poppy_seeds',
+      'sesame',
+      'soy_flour',
+      'buckwheat',
+      'millet',
+      'bran',
+      'berries',
+    ],
+  },
 ];
