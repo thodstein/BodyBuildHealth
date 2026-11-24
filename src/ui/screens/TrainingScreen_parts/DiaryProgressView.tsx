@@ -1,4 +1,4 @@
-/** DiaryProgressView.tsx � ����� ��������� ���� �������� (������ + PR, ������� �� TrainingDiaryHub). */
+/** DiaryProgressView.tsx — вкладка «Прогресс» дневника тренировок (PR и графики, вынесена из TrainingDiaryHub). */
 import React from 'react';
 import { localIsoDate } from '../../../core/local-date';
 import { epley1RM } from '../../../engines/e1rm';

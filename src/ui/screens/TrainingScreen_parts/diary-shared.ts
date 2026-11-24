@@ -100,7 +100,7 @@ function catalogNameHit(ex: CatalogEntry, q: string): boolean {
   const id = ((ex as { id?: string }).id || '').toLowerCase();
   if (name.includes(q) || (id && id.includes(q))) return true;
   try {
-    return getAliasesForExercise((ex as { id: string }).id).some(a => a.toLowerCase().includes(q));
+    return getAliasesForExercise((ex as { id: string }).id).some((a) => a.toLowerCase().includes(q));
   } catch {
     return false;
   }
@@ -116,15 +116,15 @@ export function searchExerciseCatalog(query: string, limit = 8): CatalogEntry[] 
   if (!q) return [];
   // «Ноги» — семейство групп каталога, а не одна группа.
   if (q === 'ноги' || q === 'legs') {
-    return EXERCISE_CATALOG.filter(e => LEG_FAMILY.includes((e as { group?: string }).group || '')).slice(0, 30);
+    return EXERCISE_CATALOG.filter((e) => LEG_FAMILY.includes((e as { group?: string }).group || '')).slice(0, 30);
   }
   const groupId = groupIdForQuery(q);
   if (groupId) {
-    const inGroup = EXERCISE_CATALOG.filter(e => (e as { group?: string }).group === groupId);
-    const rest = EXERCISE_CATALOG.filter(e => (e as { group?: string }).group !== groupId && catalogNameHit(e, q));
+    const inGroup = EXERCISE_CATALOG.filter((e) => (e as { group?: string }).group === groupId);
+    const rest = EXERCISE_CATALOG.filter((e) => (e as { group?: string }).group !== groupId && catalogNameHit(e, q));
     return [...inGroup, ...rest].slice(0, 30);
   }
-  return EXERCISE_CATALOG.filter(e => catalogNameHit(e, q)).slice(0, limit);
+  return EXERCISE_CATALOG.filter((e) => catalogNameHit(e, q)).slice(0, limit);
 }
 
 export interface NewExerciseSeed {
@@ -144,7 +144,7 @@ export function seedForNewExercise(
 ): NewExerciseSeed {
   const prev = getPreviousWorkoutData(historyWorkouts, exerciseName);
   return {
-    weight: isBodyweight ? 0 : (prev?.weight || 0),
+    weight: isBodyweight ? 0 : prev?.weight || 0,
     reps: prev?.reps || 10,
     rir: prev?.rir ?? 2,
   };
@@ -167,7 +167,7 @@ export function mrvBaseForLevel(level: string, onCourse: boolean): number {
  * Реализация — общий канон проекта `src/core/local-date.ts`; здесь реэкспорт,
  * чтобы существующие импорты дневников продолжали работать.
  */
-import { localIsoDate as localIsoDateCanon } from '../../../core/local-date';
+import { localIsoDate as localIsoDateCanon, parseLocalIsoDate } from '../../../core/local-date';
 export function localIsoDate(d: Date = new Date()): string {
   return localIsoDateCanon(d);
 }
@@ -205,4 +205,46 @@ export function csvCell(v: unknown): string {
 export function weekdayMon0(dateStr: string): number {
   const d = new Date(`${dateStr}T12:00:00`);
   return (d.getDay() + 6) % 7;
+}
+
+/**
+ * Понедельник недели, в которую попадает `iso` (YYYY-MM-DD) — единый ключ
+ * недели для дневника и аналитики. Раньше «недели» резались по номеру дня
+ * месяца (день 7 мешался с 8–14) и начинались с воскресенья, поэтому сб/вс
+ * попадали не в тот бакет, что показывает дневник. Дату разбираем по
+ * ЛОКАЛЬНЫМ компонентам: `new Date('YYYY-MM-DD')` берёт полночь UTC и к
+ * западу от UTC отдаёт предыдущий день.
+ */
+export function weekStartIsoMon(iso: string): string {
+  const iso10 = String(iso ?? '').slice(0, 10);
+  const day = parseLocalIsoDate(iso10);
+  if (!day) return iso;
+  day.setDate(day.getDate() - weekdayMon0(iso10));
+  return localIsoDate(day);
+}
+
+const WEEKDAY_RU = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+/**
+ * Индекс «сегодняшнего» дня ВНУТРИ переданного списка тренировочных дней, -1 —
+ * сегодня отдых. Сравниваем метку дня микроцикла (`Пн`…`Вс`, её ставит
+ * `generateWeekDays`) с днём недели даты.
+ *
+ * Почему не номер дня из плана: `he_pl_runtime` и микроцикл — разные источники.
+ * Индекс плана (4 дня), зажатый в длину микроцикла (3 дня), открывал в
+ * ExecutionZone чужой день, а подсветка «Сегодня» врала о выбранном дне.
+ * Заодно модуль перестал тянуть `widget-sync` (нативные снапшоты, БД продуктов)
+ * в каждый потребитель дневника.
+ */
+export function todayTrainingDayIndex(
+  dayLabels: Array<string | undefined | null>,
+  iso: string = localIsoDate(),
+): number {
+  const want = WEEKDAY_RU[weekdayMon0(iso)];
+  return dayLabels.findIndex(
+    (label) =>
+      String(label ?? '')
+        .trim()
+        .slice(0, 2) === want,
+  );
 }

@@ -513,44 +513,6 @@ export function getMesocycleOverview(
   };
 }
 
-/** Простой генератор синтетического плана (fallback, если нет BridgeSession) */
-export function generateSyntheticPlan(
-  year: number, month: number,
-  daysPerWeek: number,
-  split: string,
-): Map<string, PlannedSession> {
-  const map = new Map<string, PlannedSession>();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const trainingDays: number[] = [];
-  if (daysPerWeek >= 6) {
-    for (let d = 0; d < 7; d++) if (d !== 6) trainingDays.push(d);
-  } else if (daysPerWeek >= 4) {
-    trainingDays.push(0, 1, 3, 4);
-  } else {
-    trainingDays.push(0, 2, 4);
-  }
-
-  let firstDow = new Date(year, month, 1).getDay();
-  firstDow = firstDow === 0 ? 6 : firstDow - 1;
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dow = (firstDow + day - 1) % 7;
-    if (trainingDays.includes(dow)) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const focus = getDayTrainingFocus(dow, split);
-      map.set(dateStr, {
-        date: dateStr,
-        focus,
-        exercises: [`Основное (${focus})`, 'Подсобка'],
-        sets: 15,
-        volume: 3000,
-        duration: 60,
-      });
-    }
-  }
-  return map;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. Water & Hydration Tracker
 // ═══════════════════════════════════════════════════════════════════════════

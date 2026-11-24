@@ -16,7 +16,7 @@ function mkExercise(
   date: string,
   exerciseId: string,
   exerciseName: string,
-  sets: { weight: number; reps: number; rir: number }[],
+  sets: { weight: number; reps: number; rir: number; rpe?: number }[],
 ): StrengthLogEntry {
   return {
     id: `${date}_${exerciseId}`,
@@ -69,9 +69,25 @@ describe('diary analytics — честность', () => {
     expect(html).toContain('hamstrings');
   });
 
-  it('RPE не фабрикуется: у подходов без RPE средний RPE = 0', () => {
+  it('RPE не фабрикуется: без RPE в подходах интенсивность — «—», а не зона 70/85', () => {
     const html = renderToStaticMarkup(<AnalyticsTab sessions={minimalHistory} />);
-    expect(html).toContain('RPE avg: 0');
+    // Подпись честно говорит, что оценки нет…
+    expect(html).toContain('RPE не оценён');
+    // …и никакого числа «средний RPE»/процента интенсивности не подставляется.
+    expect(html).not.toContain('средний RPE');
+    expect(html).not.toContain('RPE avg');
+  });
+
+  it('RPE из подхода переводится в интенсивность ×10, а не берётся из зоны повторов', () => {
+    const withRpe: WorkoutLog[] = [
+      mkWorkout(isoDay(-1), [
+        mkExercise(isoDay(-1), 'squat', 'Приседания со штангой', [{ weight: 100, reps: 5, rir: 2, rpe: 8 }]),
+      ]),
+    ];
+    const html = renderToStaticMarkup(<AnalyticsTab sessions={withRpe} />);
+    expect(html).toContain('>80%<');
+    expect(html).toContain('средний RPE 8');
+    expect(html).not.toContain('RPE не оценён');
   });
 });
 

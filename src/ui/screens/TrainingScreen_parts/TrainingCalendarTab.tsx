@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   generateTrainingCalendar,
-  generateSyntheticPlan,
   buildPlannedMapFromBridgeSessions,
   buildActualMapFromWorkoutLogs,
   getMesocycleOverview,
@@ -64,26 +63,81 @@ export function manualVirtualLog(date: string): WorkoutLog {
   return { id: 'cal_man_' + date, date, exercises: [], duration: 60, overallRPE: 7, recoveryBefore: 5, split: 'manual' } as WorkoutLog;
 }
 
+/** ISO-дата (YYYY-MM-DD) или null: произвольную строку датой не считаем. */
+function isoDateOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const iso = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
+/**
+ * Честная дата дня плана: явная ISO-дата важнее расчёта `startDate + dayOfWeek`
+ * (0=Пн…6=Вс). Если ни даты, ни старта с днём недели нет — null: дата по индексу
+ * массива ставила бы план на 1/2/3-е число, и календарь объявлял бы эти дни
+ * пропущенными, хотя тренировки были в другие даты.
+ */
+function resolvePlannedDate(day: any, startDate?: unknown): string | null {
+  const explicit = isoDateOrNull(day?.date);
+  if (explicit) return explicit;
+  const start = isoDateOrNull(startDate ?? day?.startDate);
+  const rawDow = day?.dayOfWeek;
+  const dow = Number(rawDow);
+  if (!start || rawDow == null || !Number.isInteger(dow) || dow < 0 || dow > 6) return null;
+  const d = new Date(`${start}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + dow);
+  return localIsoDate(d);
+}
+
+/** Объём и число подходов дня плана — только из реальных targetSets, без «3000/15». */
+function summarizeTargetSets(exercises: unknown): { totalVolume: number; totalSets: number } {
+  const list = Array.isArray(exercises) ? exercises : [];
+  let totalVolume = 0;
+  let totalSets = 0;
+  for (const exercise of list as any[]) {
+    const sets = Array.isArray(exercise?.targetSets)
+      ? exercise.targetSets
+      : Array.isArray(exercise?.sets)
+        ? exercise.sets
+        : [];
+    for (const set of sets as any[]) {
+      totalVolume += (Number(set?.weight ?? set?.weightKg) || 0) * (Number(set?.reps) || 0);
+      totalSets += 1;
+    }
+  }
+  return { totalVolume, totalSets };
+}
+
 export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: number) {
   if (!runtime || !Array.isArray(runtime.days) || runtime.days.length === 0) return null;
   const startWeek = Number(runtime.week) > 0 ? Number(runtime.week) : 1;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  return runtime.days.map((day: any, index: number) => {
+  const sessions: any[] = [];
+  runtime.days.forEach((day: any, index: number) => {
+    // День без выводимой даты пропускаем: показать план на выдуманном числе и
+    // пометить его «пропущено» хуже, чем не показать день вовсе.
+    const date = resolvePlannedDate(day, runtime.startDate);
+    if (!date) return;
     const exercises = Array.isArray(day.exercises) ? day.exercises : [];
     const bridgeExercises = exercises.map((exercise: any, exerciseIndex: number) => {
       const sets = Array.isArray(exercise.targetSets) ? exercise.targetSets : [];
-      const bridgeSets = sets.map((set: any, setIndex: number) => ({
-        setNumber: setIndex + 1,
-        weightKg: Number(set.weight) || 0,
-        reps: Number(set.reps) || 0,
-        rpe: 10 - (Number(set.rir) || 0),
-         rir: Number(set.rir) || 0,
-         isPR: false,
-         notes: '',
-         plannedWeight: set.weight == null || !Number.isFinite(Number(set.weight)) ? undefined : Number(set.weight),
-         plannedReps: set.reps == null || !Number.isFinite(Number(set.reps)) ? undefined : Number(set.reps),
-         plannedRir: set.rir == null || !Number.isFinite(Number(set.rir)) ? undefined : Number(set.rir),
-      }));
+      const bridgeSets = sets.map((set: any, setIndex: number) => {
+        // Плановый подход без RIR не получает выдуманных «RIR 0 / RPE 10»:
+        // раньше `Number(undefined) || 0` писал «до отказа» там, где плана не было.
+        const rirNum = Number(set?.rir);
+        const hasRir = set?.rir != null && set.rir !== '' && Number.isFinite(rirNum);
+        return {
+          setNumber: setIndex + 1,
+          weightKg: Number(set.weight) || 0,
+          reps: Number(set.reps) || 0,
+          rpe: hasRir ? Math.max(0, Math.min(10, 10 - rirNum)) : undefined,
+          rir: hasRir ? rirNum : undefined,
+          isPR: false,
+          notes: '',
+          plannedWeight: set.weight == null || !Number.isFinite(Number(set.weight)) ? undefined : Number(set.weight),
+          plannedReps: set.reps == null || !Number.isFinite(Number(set.reps)) ? undefined : Number(set.reps),
+          plannedRir: hasRir ? rirNum : undefined,
+        };
+      });
       return {
         exerciseId: `runtime-${index}-${exerciseIndex}`,
         exerciseName: exercise.name || 'Упражнение',
@@ -96,25 +150,53 @@ export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: n
         avgRPE: 0,
       };
     });
-     const track = String(runtime.track || '').toLowerCase();
-     const source = track === 'bb' ? 'BB' : track === 'arm' || track === 'armlifting' ? 'ARM' : 'SRC';
-     const sessionId = `runtime-${index}`;
-     return {
-       sessionId,
-       date: `${year}-${String(month + 1).padStart(2, '0')}-${String((index % daysInMonth) + 1).padStart(2, '0')}`,
-       focus: day.label || runtime.focus || 'Тренировка',
-       exercises: bridgeExercises,
-       totalVolume: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.totalVolume, 0),
-       totalSets: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.length, 0),
-       totalReps: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.reduce((inner: number, set: any) => inner + set.reps, 0), 0),
-       weekNumber: startWeek,
-       planned: true,
-       source,
-       provenanceSource: source,
-       plannedSessionId: sessionId,
-       duration: typeof day.durationMin === 'number' ? day.durationMin : undefined,
-     };
+    const track = String(runtime.track || '').toLowerCase();
+    const source = track === 'bb' ? 'BB' : track === 'arm' || track === 'armlifting' ? 'ARM' : 'SRC';
+    const sessionId = `runtime-${index}`;
+    sessions.push({
+      sessionId,
+      date,
+      focus: day.label || runtime.focus || 'Тренировка',
+      exercises: bridgeExercises,
+      totalVolume: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.totalVolume, 0),
+      totalSets: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.length, 0),
+      totalReps: bridgeExercises.reduce((sum: number, exercise: any) => sum + exercise.sets.reduce((inner: number, set: any) => inner + set.reps, 0), 0),
+      weekNumber: startWeek,
+      planned: true,
+      source,
+      provenanceSource: source,
+      plannedSessionId: sessionId,
+      duration: typeof day.durationMin === 'number' ? day.durationMin : undefined,
+    });
   });
+  return sessions;
+}
+
+/**
+ * Сессии плана из массива: дата — явная или startDate+dayOfWeek, иначе день
+ * пропускается; объём и подходы — реальные суммы targetSets, а не «3000/15».
+ */
+export function plannedEntriesToBridgeSessions(entries: any[]) {
+  if (!Array.isArray(entries)) return [];
+  const sessions: any[] = [];
+  for (const entry of entries) {
+    const date = resolvePlannedDate(entry, entry?.startDate);
+    if (!date) continue;
+    const exercises = Array.isArray(entry?.exercises) ? entry.exercises : [];
+    const summary = summarizeTargetSets(exercises);
+    sessions.push({
+      ...entry,
+      date,
+      focus: entry?.focus || 'Тренировка',
+      exercises: exercises.map((exercise: any) => ({
+        ...exercise,
+        exerciseName: exercise?.exerciseName || exercise?.name || 'Упражнение',
+      })),
+      totalVolume: summary.totalVolume,
+      totalSets: summary.totalSets,
+    });
+  }
+  return sessions;
 }
 
 export const TrainingCalendarTab: React.FC = () => {
@@ -173,30 +255,19 @@ export const TrainingCalendarTab: React.FC = () => {
   const plannedData = useMemo(() => {
     try {
       const runtime = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
-      if (runtime && Array.isArray(runtime) && runtime.length > 0) {
-        const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-        const endDate = new Date(year, month + 1, 0);
-        const endStr = localIsoDate(endDate);
-        return buildPlannedMapFromBridgeSessions(runtime.map((r: any, i: number) => ({
-          ...r,
-          date: r.date || `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
-          totalVolume: r.totalVolume || 3000,
-          totalSets: r.totalSets || 15,
-          focus: r.focus || 'Тренировка',
-        })), startStr, endStr);
+      const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+      const endDate = new Date(year, month + 1, 0);
+      const endStr = localIsoDate(endDate);
+      if (Array.isArray(runtime) && runtime.length > 0) {
+        return buildPlannedMapFromBridgeSessions(plannedEntriesToBridgeSessions(runtime), startStr, endStr);
       }
       const runtimeSessions = runtimeDaysToBridgeSessions(runtime, year, month);
       if (runtimeSessions?.length) {
-        const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-        const endDate = new Date(year, month + 1, 0);
-        const endStr = localIsoDate(endDate);
         return buildPlannedMapFromBridgeSessions(runtimeSessions, startStr, endStr);
       }
     } catch { /* ignore */ }
     return null;
   }, [monthKey]);
-
-  const syntheticPlan = useMemo(() => generateSyntheticPlan(year, month, 4, 'ppl'), [monthKey]);
 
   const actualMap = useMemo(() => {
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
@@ -206,9 +277,11 @@ export const TrainingCalendarTab: React.FC = () => {
   }, [monthKey, historyWorkouts]);
 
   const cal = useMemo(() => {
-    const plannedMap = plannedData || syntheticPlan;
+    // Только настоящий план: демо-план PPL выдавал себя за план пользователя и
+    // помечал прошедшие дни «пропущено». Нет плана — пустой календарь без выдумок.
+    const plannedMap = plannedData || new Map();
     return generateTrainingCalendar(year, month, plannedMap, actualMap);
-  }, [monthKey, plannedData, syntheticPlan, actualMap]);
+  }, [monthKey, plannedData, actualMap]);
 
   // Даты с психо-чек-инами и мобильностью (бейджи на ячейках календаря)
   const mindDates = useMemo(() => {
