@@ -27,6 +27,8 @@ import { NativeIcon } from '../../native/NativeIcons';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
 import { todayTrainingDayIndex } from './diary-shared';
+import { pickPlanDayIndex } from '../../../engines/training-day.engine';
+import { getProfile } from '../../../core/profile-manager';
 import { ruCount, RU_APPROACHES, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
@@ -62,7 +64,7 @@ const playerDayFromMicro = (day: any): PlayerDay => {
 };
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
-type PlRuntime = { days: PlayerDay[]; focus: string; week: number; track: string };
+type PlRuntime = { days: PlayerDay[]; focus: string; week: number; track: string; startDate?: string };
 
 interface Props {
   tab: TrainingTab;
@@ -132,6 +134,27 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   } = p;
   const plRuntime =
     _plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days) ? _plRuntime : null;
+  /**
+   * День плана на сегодня — по единому правилу движка: якорь `startDate` из
+   * `he_pl_runtime` плюс график тренировок профиля. Раньше плеер всегда
+   * открывался на первом дне, хотя виджет уже показывал «сегодняшний»: на
+   * длинном BB-цикле это был чужой день.
+   */
+  const initialPlanDay = React.useMemo(() => {
+    if (!plRuntime || plRuntime.days.length === 0) return 0;
+    let training: any = null;
+    try {
+      training = (getProfile() as any)?.settings?.training ?? null;
+    } catch {
+      training = null;
+    }
+    return pickPlanDayIndex({
+      iso: localIsoDate(),
+      training,
+      planDays: plRuntime.days.length,
+      startDate: plRuntime.startDate,
+    });
+  }, [plRuntime]);
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<
     { work: number; rest: number; rounds: number } | undefined
   >(undefined);
@@ -377,6 +400,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     days={plRuntime.days}
                     weekNumber={plRuntime.week}
                     focus={plRuntime.focus}
+                    initialDayIndex={initialPlanDay}
                     onSaved={loadDiaryStats}
                   />
                 </div>

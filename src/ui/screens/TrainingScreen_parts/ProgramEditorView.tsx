@@ -45,6 +45,8 @@ import { buildProgramCsv, downloadCsv, buildProgramXlsx, downloadXlsx, buildProg
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
+import { localIsoDate } from '../../../core/local-date';
+import { notifyPlRuntimeSaved } from '../../../core/pl-runtime-events';
 import { detectLift } from '../../../engines/lms/lms-to-pl';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
@@ -632,13 +634,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       return;
     }
     try {
-      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir }));
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir, startDate: localIsoDate() }));
+      notifyPlRuntimeSaved();
     } catch (err) {
       // P0: QuotaExceededError — очищаем старые данные и пробуем снова
       if (err instanceof DOMException && err.name === 'QuotaExceededError') {
         try {
           localStorage.removeItem('he_pl_runtime');
-          localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir }));
+          localStorage.setItem('he_pl_runtime', JSON.stringify({ days, focus: program.meta.title || 'Моя программа', week: execWeek, track: dir, startDate: localIsoDate() }));
+          notifyPlRuntimeSaved();
         } catch {
           showToast('⚠ Недостаточно места в localStorage для сохранения данных тренировки', 'warning');
           return;

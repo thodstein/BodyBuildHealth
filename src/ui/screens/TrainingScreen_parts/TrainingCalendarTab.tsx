@@ -13,6 +13,9 @@ import {
 import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
 import { localIsoDate } from './diary-shared';
+import { onPlRuntimeSaved } from '../../../core/pl-runtime-events';
+import { planDatesForIndexes } from '../../../engines/training-day.engine';
+import { getProfile } from '../../../core/profile-manager';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -111,11 +114,18 @@ function summarizeTargetSets(exercises: unknown): { totalVolume: number; totalSe
 export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: number) {
   if (!runtime || !Array.isArray(runtime.days) || runtime.days.length === 0) return null;
   const startWeek = Number(runtime.week) > 0 ? Number(runtime.week) : 1;
+  // Якорь плана: N-й день — N-й тренировочный день от `startDate` по графику
+  // профиля. Индекс берём по исходному массиву runtime.days (его не фильтруем).
+  let anchoredDates: string[] | null = null;
+  try {
+    const training = (getProfile() as any)?.settings?.training;
+    anchoredDates = planDatesForIndexes({ planDays: runtime.days.length, startDate: runtime.startDate, training });
+  } catch { anchoredDates = null; }
   const sessions: any[] = [];
   runtime.days.forEach((day: any, index: number) => {
     // День без выводимой даты пропускаем: показать план на выдуманном числе и
     // пометить его «пропущено» хуже, чем не показать день вовсе.
-    const date = resolvePlannedDate(day, runtime.startDate);
+    const date = resolvePlannedDate(day, runtime.startDate) ?? anchoredDates?.[index] ?? null;
     if (!date) return;
     const exercises = Array.isArray(day.exercises) ? day.exercises : [];
     const bridgeExercises = exercises.map((exercise: any, exerciseIndex: number) => {
@@ -252,6 +262,12 @@ export const TrainingCalendarTab: React.FC = () => {
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
 
+  // План, перегенерированный в том же месяце, должен появиться без смены
+  // месяца: слушаем запись `he_pl_runtime` — и событие своего окна, и
+  // `storage` из другой вкладки (общий сигнал продюсеров плана).
+  const [runtimeVersion, setRuntimeVersion] = useState(0);
+  useEffect(() => onPlRuntimeSaved(() => setRuntimeVersion(v => v + 1)), []);
+
   const plannedData = useMemo(() => {
     try {
       const runtime = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
@@ -267,7 +283,7 @@ export const TrainingCalendarTab: React.FC = () => {
       }
     } catch { /* ignore */ }
     return null;
-  }, [monthKey]);
+  }, [monthKey, runtimeVersion]);
 
   const actualMap = useMemo(() => {
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
@@ -708,7 +724,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
   const hasCool = !!coolDates && coolDates.has(day.date);
 
   return (
-    <div className="cal-cell" data-status={day.status} data-today={isToday ? 'true' : 'false'} onClick={onClick} title={[
+    <div className="cal-cell" data-status={day.status} data-date={day.date} data-today={isToday ? 'true' : 'false'} onClick={onClick} title={[
       STATUS_LABELS[day.status] || '',
       hasMind ? '🧠 психо-чек-ин' : '',
       hasMob ? '🧘 мобильность выполнена' : '',

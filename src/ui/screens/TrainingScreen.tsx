@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { HeroImg } from '../HeroImg';
 import { localIsoDate } from '../../core/local-date';
+import { onPlRuntimeSaved } from '../../core/pl-runtime-events';
 import { EXERCISE_CATALOG, getExercisesByGroup, getSubstitutes, canReplace, getExerciseById } from '../../core/exercise-catalog';
 import { calcTraining, calcExercisePrescription, EXERCISE_DB, TRAINING_SPLITS, TRAINING_LEVEL_CONFIGS, LEVEL_VOLUMES } from '../../engines/training.engine';
 import { generateMacrocycle, generateBlockPlan, getCurrentWeekPlan, BLOCK_SEQUENCES, type MacrocyclePlan, type Microcycle, type MacrocycleInput } from '../../engines/training-periodization.engine';
@@ -214,6 +215,9 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       setZone(zoneForTab(t));
       setTab(t);
       setPage('tabs');
+      // Новый план с новым якорем `startDate`: перечитываем рантайм сразу,
+      // иначе при уже открытой вкладке плеер остаётся на старом плане.
+      setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
     };
     window.addEventListener('training-exit-constructor', h);
     return () => window.removeEventListener('training-exit-constructor', h);
@@ -429,12 +433,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   }, [historyWorkouts, tprofile?.daysPerWeek]);
 
   // Runtime (live workout) state
-  const [runtimeDay, setRuntimeDay] = useState<number>(() => { try { const v = JSON.parse(localStorage.getItem('he_runtime_day') || '1'); return typeof v === 'number' ? v : 1; } catch { return 1; } });
+  // Индекс дня микроцикла 0-based (Пн = 0): дефолт 1 молча открывал второй день недели.
+  const [runtimeDay, setRuntimeDay] = useState<number>(() => { try { const v = JSON.parse(localStorage.getItem('he_runtime_day') || '0'); return typeof v === 'number' ? v : 0; } catch { return 0; } });
   useEffect(() => { try { localStorage.setItem('he_runtime_day', JSON.stringify(runtimeDay)); } catch { /* ignore */ } }, [runtimeDay]);
   const [runtimeExIdx, setRuntimeExIdx] = useState(0);
   const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
   const [runtimeStarted, setRuntimeStarted] = useState(false);
-  const safeParsePlRuntime = (raw: string | null): { days: PlayerDay[]; focus: string; week: number; track: string } | null => {
+  const safeParsePlRuntime = (raw: string | null): { days: PlayerDay[]; focus: string; week: number; track: string; startDate?: string } | null => {
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw);
@@ -444,17 +449,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       return null;
     } catch { return null; }
   };
-  const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string } | null>(() => safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
+  const [plRuntime, setPlRuntime] = useState<{ days: PlayerDay[]; focus: string; week: number; track: string; startDate?: string } | null>(() => safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
   const [plRunOpen, setPlRunOpen] = useState(false);
   useEffect(() => { if (tab === 'runtime') { setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime'))); } }, [tab]);
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== 'he_pl_runtime' && event.key !== null) return;
-      setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime')));
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
+  // План перезаписали: событие своего окна (продюсеры плана зовут
+  // notifyPlRuntimeSaved) или `storage` из другой вкладки. Без этого плеер
+  // держал старый план до перемонтирования экрана.
+  useEffect(() => onPlRuntimeSaved(() => setPlRuntime(safeParsePlRuntime(localStorage.getItem('he_pl_runtime')))), []);
   /* Виджеты проведения (пульт/карточка дня/BIG) и дневник стартуют через
      событие he-workout-open. ExecutionZone ловит его только когда смонтирован,
      поэтому экран тренировок тоже слушает: кнопка старта работает из любого места. */

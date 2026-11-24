@@ -48,3 +48,16 @@ export function shiftIsoDate(iso: string, days: number): string {
   if (!d) return String(iso ?? '');
   return localIsoDateOffset(days, d);
 }
+
+/**
+ * Настоящая календарная дата YYYY-MM-DD.
+ *
+ * `/^\d{4}-\d{2}-\d{2}$/` пропускает `2026-13-99` и `2026-02-31`: `Date` молча
+ * переносит месяц и день. Поэтому сверяем разбор обратной записью — иначе такой
+ * «якорь» уезжает в расчёты дня плана.
+ */
+export function isIsoDate(value: unknown): boolean {
+  const iso = typeof value === 'string' ? value : '';
+  const parsed = parseLocalIsoDate(iso);
+  return !!parsed && localIsoDate(parsed) === iso;
+}

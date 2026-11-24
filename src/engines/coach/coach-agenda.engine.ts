@@ -32,6 +32,11 @@
  *    стоит на старте каждого цикла.
  */
 import { localIsoDate, parseLocalIsoDate, shiftIsoDate } from '../../core/local-date';
+import {
+  isTrainingDayFor as engineTrainingDay,
+  pickPlanDayIndex as enginePickPlanDayIndex,
+  type TrainingSettingsLike,
+} from '../training-day.engine';
 import { supportNameRu } from '../../data/support-names';
 import { cardioSessionsForDate, type CardioCycle } from '../lms/cardio.engine';
 import {
@@ -337,13 +342,6 @@ interface MealPlanLike {
   shoppingList?: unknown;
 }
 
-interface TrainingScheduleLike {
-  enabled?: boolean;
-  scheduleType?: string;
-  weeklyDays?: unknown;
-  startTime?: unknown;
-  pattern?: { work?: unknown; off?: unknown };
-}
 
 interface AgendaContext {
   today: string;
@@ -556,15 +554,6 @@ const pushEvent = (
    1. Тренировки
    ═══════════════════════════════════════════════════════════════════════ */
 
-const WEEKDAY_PATTERN: Record<number, number[]> = {
-  1: [2],
-  2: [0, 3],
-  3: [0, 2, 4],
-  4: [0, 1, 3, 4],
-  5: [0, 1, 2, 3, 4],
-  6: [0, 1, 2, 3, 4, 5],
-  7: [0, 1, 2, 3, 4, 5, 6],
-};
 
 function clampInt(v: unknown, min: number, max: number, fallback: number): number {
   const n = Math.trunc(num(v));
@@ -573,86 +562,43 @@ function clampInt(v: unknown, min: number, max: number, fallback: number): numbe
 }
 
 /**
- * Дни недели по графику профиля. `null` — график «work/off», его считаем по дате.
- * Возвращает null и когда в профиле нет осмысленного расписания.
+ * Тренировочный ли день — ЕДИНОЕ правило `engines/training-day.engine`: график
+ * недели, «через день» и цикл «работа/отдых». Якорь цикла — старт плана
+ * (`he_pl_runtime.startDate`): без него виджет и плеер считали фазу иначе, чем
+ * планёр. Своя копия здесь расходилась с ними (дни 4–5 плана, дни отдыха).
  */
-function trainingWeekdays(training: JsonRecord | null): boolean[] | null {
-  const schedule = isRecord(training?.schedule) ? (training!.schedule as TrainingScheduleLike) : null;
-  if (schedule && schedule.enabled === true) {
-    if (schedule.scheduleType === 'pattern') return null; // считается по циклу work/off
-    if (schedule.scheduleType === 'weekly') {
-      const list = asArray(schedule.weeklyDays);
-      if (list.length === 7) return list.map(v => v === true);
-    } else if (schedule.scheduleType === 'eod') {
-      // Пн/Ср/Пт/Вс — «через день» от понедельника.
-      return [0, 1, 2, 3, 4, 5, 6].map(i => i % 2 === 0);
-    }
-  }
-  // Нет включённого графика (или он неполный) — раскладка по daysPerWeek.
-  const perWeek = clampInt(training?.daysPerWeek, 1, 7, 3);
-  const days = WEEKDAY_PATTERN[perWeek] ?? WEEKDAY_PATTERN[3];
-  return Array.from({ length: 7 }, (_, i) => days.includes(i));
-}
-
-/** Цикл «работа/отдых»: тренировочный ли день. */
-function patternTrainingToday(training: JsonRecord | null, iso: string): boolean {
-  const schedule = isRecord(training?.schedule) ? (training!.schedule as TrainingScheduleLike) : null;
-  const pattern = isRecord(schedule?.pattern) ? schedule!.pattern! : null;
-  const work = clampInt(pattern?.work, 1, 14, 2);
-  const off = clampInt(pattern?.off, 0, 14, 1);
-  if (off === 0) return true;
-  const epoch = Date.UTC(2024, 0, 1);
-  const [y, m, d] = iso.split('-').map(Number);
-  const dayMs = Date.UTC(y, m - 1, d) - epoch;
-  const pos = ((Math.floor(dayMs / DAY_MS) % (work + off)) + (work + off)) % (work + off);
-  return pos < work;
-}
-
-function isTrainingDayFor(training: JsonRecord | null, iso: string): boolean {
-  if (!training) return false;
-  const schedule = isRecord(training.schedule) ? (training.schedule as TrainingScheduleLike) : null;
-  if (schedule?.enabled === true && schedule.scheduleType === 'pattern') {
-    return patternTrainingToday(training, iso);
-  }
-  const weekly = trainingWeekdays(training);
-  return !!weekly?.[mondayIndex(iso)];
+function isTrainingDayFor(training: JsonRecord | null, iso: string, anchorIso?: unknown): boolean {
+  return engineTrainingDay(training as unknown as TrainingSettingsLike, iso, anchorIso);
 }
 
 /** Какой день плана (`he_pl_runtime.days`) соответствует дате. */
 function pickTrainingDayIndex(ctx: AgendaContext, training: JsonRecord, iso: string, planDays: number): number {
-  if (planDays <= 0) return 0;
-  const schedule = isRecord(training.schedule) ? (training.schedule as TrainingScheduleLike) : null;
-  if (schedule?.enabled === true && schedule.scheduleType === 'pattern') {
-    const weekStart = shiftIsoDate(iso, -mondayIndex(iso));
-    let done = 0;
-    for (const date of ctx.sessionDates) {
-      if (date >= weekStart && date <= iso) done += 1;
-    }
-    return done % planDays;
+  // Число сессий недели нужно только старому пути без якоря (`pattern`-ротация).
+  const weekStart = shiftIsoDate(iso, -mondayIndex(iso));
+  let doneThisWeek = 0;
+  for (const date of ctx.sessionDates) {
+    if (date >= weekStart && date <= iso) doneThisWeek += 1;
   }
-  const weekly = trainingWeekdays(training);
-  if (!weekly) return 0;
-  const positions = weekly.map((v, i) => (v ? i : -1)).filter(i => i >= 0);
-  if (positions.length === 0) return 0;
-  const dow = mondayIndex(iso);
-  const exact = positions.indexOf(dow);
-  if (exact >= 0) return exact % planDays;
-  // Отдых: показываем ближайший тренировочный день программы (по кругу).
-  const next = positions.find(p => p > dow) ?? positions[0];
-  return positions.indexOf(next) % planDays;
+  return enginePickPlanDayIndex({
+    iso,
+    training: training as unknown as TrainingSettingsLike,
+    planDays,
+    startDate: ctx.runtime?.startDate,
+    sessionsThisWeek: doneThisWeek,
+  });
 }
 
 function trainingEvents(ctx: AgendaContext, from: string, to: string): CoachAgendaEvent[] {
   const training = ctx.profile?.training;
   // Без профиля и без рантайма плана — не выдумываем тренировки.
   if (!training || ctx.runtimeDays.length === 0) return [];
-  const schedule = isRecord(training.schedule) ? (training.schedule as TrainingScheduleLike) : null;
+  const schedule = isRecord(training.schedule) ? (training.schedule as { startTime?: unknown }) : null;
   const startTime = validTime(schedule?.startTime);
   const focus = text(ctx.runtime?.focus, 60);
   const out: CoachAgendaEvent[] = [];
 
   eachDate(from, to, iso => {
-    if (!isTrainingDayFor(training, iso)) return;
+    if (!isTrainingDayFor(training, iso, ctx.runtime?.startDate)) return;
     const idx = pickTrainingDayIndex(ctx, training, iso, ctx.runtimeDays.length);
     const day = ctx.runtimeDays[idx % ctx.runtimeDays.length];
     if (!isRecord(day)) return;
@@ -945,7 +891,7 @@ function supplementEvents(ctx: AgendaContext, from: string, to: string): CoachAg
       timing = buildSupplementTiming({
         supplements,
         meals,
-        isTrainingDay: isTrainingDayFor(training, iso),
+        isTrainingDay: isTrainingDayFor(training, iso, ctx.runtime?.startDate),
         weightKg,
         sex,
         goal,

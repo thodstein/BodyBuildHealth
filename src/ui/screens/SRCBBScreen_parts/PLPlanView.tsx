@@ -75,6 +75,8 @@ import {
   buildPLComplianceHtml,
 } from '../../../engines/lms/pl-season-pro.engine';
 import { saveCsvApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { localIsoDate } from '../../../core/local-date';
+import { notifyPlRuntimeSaved } from '../../../core/pl-runtime-events';
 import type { PMAutoRegMode } from '../../../engines/lms/pm-autoreg.engine';
 import {
   plBlockGroups,
@@ -2593,8 +2595,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       // План уже пишется в he_pl_runtime эффектом выше; фиксируем выбранную неделю явно.
                       localStorage.setItem(
                         'he_pl_runtime',
-                        JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: 'pl' }),
+                        JSON.stringify({ days: playerDays, focus: runFocus, week: srcWeek, track: 'pl', startDate: localIsoDate() }),
                       );
+                      notifyPlRuntimeSaved();
                       localStorage.setItem('he_training_tab', 'runtime');
                       if (typeof (window as any).__navigateToTrainingTab === 'function') {
                         (window as any).__navigateToTrainingTab('runtime');

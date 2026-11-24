@@ -101,6 +101,7 @@ import { applyPLDeload, planHasDeload, type PLDeloadRequest } from '../../engine
 import { buildDiaryAutoreg, type AutoRegMode, type DiaryAutoregResult } from '../../engines/pro/diary-autoreg.engine';
 import { pmDiaryMultiplier, type PMAutoRegMode } from '../../engines/lms/pm-autoreg.engine';
 import { getProfile } from '../../core/profile-manager';
+import { notifyPlRuntimeSaved, anchorForWrite, readPlRuntime } from '../../core/pl-runtime-events';
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
 import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
@@ -2430,8 +2431,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             focus: runFocus,
             week: mainTab === 'bb' ? bbWeekSel : srcWeek,
             track: mainTab,
+            // Зеркальная запись при монтировании/перерисовке не должна сдвигать
+            // якорь уже отправленного плана: тот же массив дней — прежний startDate.
+            startDate: anchorForWrite(readPlRuntime(), playerDays),
           }),
         );
+        // Своё окно `storage`-событие не получает: без сигнала календарь и плеер
+        // держали старый план до перемонтирования.
+        notifyPlRuntimeSaved();
       } catch {
         /* ignore */
       }

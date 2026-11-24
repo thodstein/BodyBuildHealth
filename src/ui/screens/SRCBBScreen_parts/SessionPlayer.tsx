@@ -293,11 +293,30 @@ export interface SessionPlayerProps {
   focus: string;
   /** Вызывается после успешного сохранения сессии в дневник (обновление внешних данных). */
   onSaved?: () => void;
+  /**
+   * День плана (0-based), на котором открыть плеер. Считает вызывающий по якорю
+   * плана (`he_pl_runtime.startDate` + график профиля), поэтому на 48-дневном
+   * BB-цикле плеер открывается на «сегодня», а не всегда на первом дне.
+   */
+  initialDayIndex?: number;
 }
 
-export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, focus, onSaved }) => {
+export const SessionPlayer: React.FC<SessionPlayerProps> = ({
+  days,
+  weekNumber,
+  focus,
+  onSaved,
+  initialDayIndex = 0,
+}) => {
   const [profile] = useTrainingProfile();
-  const [dayIdx, setDayIdx] = useState(0);
+  /** Индекс дня в границах массива: план мог укоротиться, чужой индекс не роняем. */
+  const clampDayIndex = (index: number): number => {
+    if (days.length === 0) return 0;
+    const n = Math.trunc(Number(index));
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(n, days.length - 1));
+  };
+  const [dayIdx, setDayIdx] = useState(() => clampDayIndex(initialDayIndex));
   const [dayDetailsOpen, setDayDetailsOpen] = useState(true);
   // Аналитика объёма в основной части свёрнута: в зале она отодвигала подходы.
   const [volOpen, setVolOpen] = useState(false);
@@ -312,6 +331,17 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({ days, weekNumber, 
   // Экран не гаснет mid-set. Внутри хука — гейт на APK; в TG/web no-op.
   useNativeWakeLock(phase === 'warmup' || phase === 'main' || phase === 'cooldown');
   const [session, setSession] = useState<WorkoutSession | null>(null);
+  // План пересобрали (другой якорь) — открываем сегодняшний день, а не день,
+  // выбранный в прошлом плане. Переключаем только на «готов» без активной
+  // сессии: план, пришедший из другого окна, иначе менял день под уже начатой
+  // тренировкой (подходы записаны в день 3, а селектор показывал день 1).
+  const initialDayRef = useRef(initialDayIndex);
+  useEffect(() => {
+    if (initialDayRef.current === initialDayIndex) return;
+    if (phase !== 'ready' || session) return;
+    initialDayRef.current = initialDayIndex;
+    setDayIdx(clampDayIndex(initialDayIndex));
+  }, [initialDayIndex, days.length, phase, session]);
   // Последняя ошибка логирования подхода (вес 0 / сверх лимита) — показываем,
   // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
   const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);

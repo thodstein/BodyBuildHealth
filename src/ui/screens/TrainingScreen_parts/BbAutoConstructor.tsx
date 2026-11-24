@@ -96,7 +96,8 @@ import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile } from '../../../core/profile-manager';
-import { localIsoDate } from '../../../core/local-date';
+import { isIsoDate, localIsoDate } from '../../../core/local-date';
+import { notifyPlRuntimeSaved } from '../../../core/pl-runtime-events';
 import { getWeightLog } from '../../../engines/profile-store';
 import { loadPrepWeekCheckins, savePrepWeekCheckin, prepWeekRefs, prepStrengthTrend, avgWeight7d, avgSleep7d, type PrepWeekCheckin } from '../../../engines/bb/bb-prep-weekly-log';
 import { getPostShowLog } from '../../../engines/bb/bb-prep-post-show-log.engine';
@@ -601,6 +602,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const diffPlan = diffVariantId ? savedPlans.find(v => v.id === diffVariantId)?.plan : null;
   // Фаза 4.23: дата старта мезоцикла → календарные диапазоны недель + «📍 текущая неделя».
   const [startDateInput, setStartDateInput] = useState<string>(() => { try { return localIsoDate(); } catch { return ''; } });
+  /**
+   * Якорь выполнения плана (`he_pl_runtime.startDate`) — выбранная здесь дата
+   * старта мезоцикла: от неё же считаются недели, ICS и печать. Момент клика
+   * сдвигал план на неделю относительно того, что показывает конструктор.
+   */
+  const planAnchorIso = (): string => (isIsoDate(startDateInput) ? startDateInput : localIsoDate());
   // 🔄 «Начать заново»: подтверждение сброса сборки.
   const [resetAsk, setResetAsk] = useState(false);
   // 4.4: a11y inline-модалок (фокус на диалог, Escape закрывает, возврат фокуса).
@@ -3135,7 +3142,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             };
           }),
         })));
-        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
+        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
+        notifyPlRuntimeSaved();
       }
     } catch { /* runtime — не критично для отображения плана */ }
 
@@ -3843,7 +3851,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           };
         }),
       })));
-       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb' }));
+       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
+       notifyPlRuntimeSaved();
       // План, ушедший в плеер, должен пережить закрытие/ремаунт конструктора:
       // раньше этот путь НЕ писал he_bb_plan_saved (в отличие от «Сохранить»), и
       // при следующем открытии восстанавливался прежний план из хранилища.

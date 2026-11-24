@@ -8,7 +8,12 @@
  *  - подход без RPE/RIR не получает выдуманный RPE 10.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyWidgetQueue, resolveWorkoutPlan, setWorkoutPlayerActive } from '../../ui/native/widget-sync';
+import {
+  applyWidgetQueue,
+  collectCalendar,
+  resolveWorkoutPlan,
+  setWorkoutPlayerActive,
+} from '../../ui/native/widget-sync';
 import { finishSession, loadActiveSession, loadSessions, saveActiveSession } from '../../engines/workout-logger.engine';
 
 const PLAN = {
@@ -249,5 +254,104 @@ describe('виджет: подходы и завершение', () => {
     const sets = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets || [];
     expect(sets[0]?.rpe).toBe(8);
     expect(sets[1]?.rpe).toBe(9.5);
+  });
+});
+
+/**
+ * День плана на дату берётся из единого движка `training-day.engine`:
+ * `he_pl_runtime.startDate` — якорь, старые payload'ы без него идут прежним путём.
+ */
+describe('виджет: день плана на дату по якорю startDate', () => {
+  const planOf = (labels: string[]) => ({
+    days: labels.map((label) => ({
+      label,
+      exercises: [{ name: `Упражнение ${label}`, muscleGroup: 'chest', targetSets: [{ weight: 50, reps: 8, rir: 2 }] }],
+    })),
+    focus: 'upper',
+    week: 1,
+    track: 'bb',
+  });
+
+  const seedTraining = (training: Record<string, unknown>) => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { training } }));
+  };
+
+  // 3 тренировки в неделю: Пн / Ср / Пт.
+  const threePerWeek = {
+    daysPerWeek: 3,
+    schedule: { enabled: true, scheduleType: 'weekly', weeklyDays: [true, false, true, false, true, false, false] },
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('план из 5 дней и 3 тренировки в неделю: недели дают дни 1,2,3 затем 4,5', () => {
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({ ...planOf(['День 1', 'День 2', 'День 3', 'День 4', 'День 5']), startDate: '2026-01-05' }),
+    );
+    seedTraining(threePerWeek);
+
+    // 2026-01-05 — понедельник, дальше Ср/Пт первой недели и Пн/Ср второй.
+    const labels = ['2026-01-05', '2026-01-07', '2026-01-09', '2026-01-12', '2026-01-14'].map(
+      (iso) => resolveWorkoutPlan(iso)?.label,
+    );
+    expect(labels).toEqual(['День 1', 'День 2', 'День 3', 'День 4', 'День 5']);
+  });
+
+  it('pattern «2 через 1»: в день отдыха цикла календарь тренировку не объявляет, план — следующая', () => {
+    // 2026-01-05 (Пн) — старт: 5 и 6 января тренировки, 7 января — отдых.
+    localStorage.setItem('he_pl_runtime', JSON.stringify({ ...planOf(['A', 'B', 'C']), startDate: '2026-01-05' }));
+    seedTraining({
+      daysPerWeek: 3,
+      schedule: { enabled: true, scheduleType: 'pattern', pattern: { work: 2, off: 1 } },
+    });
+    vi.setSystemTime(new Date(2026, 0, 7, 10, 0, 0)); // Ср 2026-01-07, день отдыха цикла
+
+    const cal = collectCalendar();
+    expect(cal.items.some((i) => i.id === 'tr:2026-01-06')).toBe(true);
+    expect(cal.items.some((i) => i.id === 'tr:2026-01-07')).toBe(false);
+    expect(cal.items.some((i) => i.id === 'tr:2026-01-08')).toBe(true);
+
+    const plan = resolveWorkoutPlan('2026-01-07');
+    expect(plan?.dayIndex).toBe(2);
+    expect(plan?.label).toBe('C');
+  });
+
+  it('payload без startDate: прежнее поведение по дню недели', () => {
+    localStorage.setItem('he_pl_runtime', JSON.stringify(planOf(['A', 'B', 'C', 'D', 'E'])));
+    seedTraining(threePerWeek);
+
+    expect(resolveWorkoutPlan('2026-01-05')?.dayIndex).toBe(0); // Пн
+    expect(resolveWorkoutPlan('2026-01-07')?.dayIndex).toBe(1); // Ср
+    expect(resolveWorkoutPlan('2026-01-09')?.dayIndex).toBe(2); // Пт
+    // Без якоря новая неделя снова начинается с первого дня плана.
+    expect(resolveWorkoutPlan('2026-01-12')?.dayIndex).toBe(0);
+  });
+
+  it('пик-неделя: пустой день («отдых») остаётся слотом плана — индекс как у плеера', () => {
+    // Так пишет SRCBBScreen: 4 слота, два из них без упражнений (тапёр пик-недели).
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          { label: 'Д1 грудь', exercises: [{ name: 'Жим', targetSets: [{ weight: 50, reps: 8, rir: 2 }] }] },
+          { label: 'Д2 отдых', exercises: [] },
+          { label: 'Д3 спина', exercises: [{ name: 'Тяга', targetSets: [{ weight: 60, reps: 8, rir: 2 }] }] },
+          { label: 'Д4 отдых', exercises: [] },
+        ],
+        focus: 'BB',
+        week: 1,
+        track: 'bb',
+        startDate: '2026-01-05',
+      }),
+    );
+    seedTraining(threePerWeek);
+    // Раньше виджет выбрасывал пустые дни и на третьей тренировке недели
+    // показывал слот 1 («спина») вместо слота 2 — индекс расходился с плеером.
+    expect(resolveWorkoutPlan('2026-01-05')).toMatchObject({ dayIndex: 0, planDays: 4, label: 'Д1 грудь' });
+    expect(resolveWorkoutPlan('2026-01-07')).toMatchObject({ dayIndex: 1, label: 'Д2 отдых' });
+    expect(resolveWorkoutPlan('2026-01-09')).toMatchObject({ dayIndex: 2, label: 'Д3 спина' });
   });
 });

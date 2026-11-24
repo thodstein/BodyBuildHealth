@@ -6,6 +6,7 @@
  */
 
 import { getProfile } from '../../core/profile-manager';
+import { isIsoDate } from '../../core/local-date';
 import {
   getWorkoutStats,
   getLastSession,
@@ -23,6 +24,7 @@ import {
   type WorkoutSession,
 } from '../../engines/workout-logger.engine';
 import { isBodyweightExercise } from '../../engines/movement-pattern';
+import { isTrainingDayFor, mondayIndex, pickPlanDayIndex, weeklyTrainingDays } from '../../engines/training-day.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { derivePAL } from '../../core/energy-pal';
@@ -630,15 +632,22 @@ function readJsonArray(key: string): any[] {
   }
 }
 
+/** День плана по индексу движка; индекс всегда держим в границах массива. */
+function planDayAt(days: any[], index: number): any {
+  const i = Math.max(0, Math.min(days.length - 1, Math.trunc(Number(index)) || 0));
+  return days[i];
+}
+
 /** Подпись дня плана для конкретной даты (или общая «Тренировка»). */
 function planLabelForDate(
   days: any[],
   training: any,
   isoDate: string,
+  startDate?: unknown,
 ): { label: string; exerciseCount: number; plannedSets: number } | null {
   if (!days.length) return { label: 'Тренировка', exerciseCount: 0, plannedSets: 0 };
-  const index = pickPlanDayIndex(isoDate, training, days.length);
-  const day = days[index % days.length];
+  const index = pickPlanDayIndex({ iso: isoDate, training, planDays: days.length, startDate });
+  const day = planDayAt(days, index);
   if (!day) return null;
   const exercises = Array.isArray(day.exercises) ? day.exercises : [];
   const plannedSets = exercises.reduce(
@@ -658,19 +667,30 @@ function trainingCalendarItems(from: string, to: string, playedDates: Set<string
   const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
   const weekly = trainingWeekdays(training);
   if (!weekly.some(Boolean)) return out;
-  const days = safe(() => {
-    const runtime = JSON.parse(localStorageRef()?.getItem('he_pl_runtime') ?? 'null');
-    return Array.isArray(runtime?.days) ? runtime.days.filter((d: any) => Array.isArray(d?.exercises)) : [];
-  }, [] as any[]);
+  // Профиль и рантайм читаем один раз: в цикле — только расчёт дня.
+  const runtime = safe<{ days?: any[]; startDate?: string } | null>(
+    () => JSON.parse(localStorageRef()?.getItem('he_pl_runtime') ?? 'null'),
+    null,
+  );
+  const days = Array.isArray(runtime?.days) ? runtime!.days.filter((d: any) => Array.isArray(d?.exercises)) : [];
+  const startDate = runtime?.startDate;
   const startTime =
     training?.schedule?.enabled && typeof training.schedule.startTime === 'string'
       ? String(training.schedule.startTime).slice(0, 5)
       : '';
+  // `pattern` живёт фазой цикла от старта плана: без этого виджет объявлял
+  // тренировку в день отдыха. Нет профиля — прежняя раскладка по дням недели.
+  const isTrainingDay = (date: string) =>
+    training ? isTrainingDayFor(training, date, startDate) : weekly[mondayIndex(date)];
+  // До якоря плана дней плана нет: движок для такой даты возвращает 0, и виджет
+  // раньше помечал «день 1» каждый день за прошлые 90 дней — календарь виджета
+  // расходился с календарём приложения. Заодно не сканируем эти дни.
+  const anchorStart = typeof startDate === 'string' && isIsoDate(startDate.slice(0, 10)) ? startDate.slice(0, 10) : '';
 
-  let iso = from;
+  let iso = anchorStart && anchorStart > from ? anchorStart : from;
   for (let guard = 0; guard < 400 && iso <= to; guard++) {
-    if (weekly[mondayIndex(iso)]) {
-      const plan = planLabelForDate(days, training, iso);
+    if (isTrainingDay(iso)) {
+      const plan = planLabelForDate(days, training, iso, startDate);
       if (plan) {
         const parts = [plan.label];
         if (plan.exerciseCount > 0) parts.push(`${plan.exerciseCount} упр.`);
@@ -911,9 +931,10 @@ interface PlanExercise {
 /**
  * Разрешённый план дня: что делать сегодня.
  *
- * `he_pl_runtime` не хранит дат — только массив дней. День выбирается по
- * графику тренировок профиля (какой по счёту тренировочный день недели),
- * а если графика нет — ротацией по числу сессий на этой неделе.
+ * День плана выбирает единый движок `pickPlanDayIndex`: при наличии
+ * `he_pl_runtime.startDate` это N-й тренировочный день от старта плана, без
+ * якоря (старые записи) — прежняя позиция дня недели, а без графика — ротация
+ * по числу сессий на этой неделе.
  */
 export interface ResolvedWorkoutPlan {
   dayIndex: number;
@@ -926,72 +947,11 @@ export interface ResolvedWorkoutPlan {
   planDays: number;
 }
 
-const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-
-/** Индекс дня недели 0=Пн..6=Вс для локальной даты YYYY-MM-DD. */
-function mondayIndex(iso: string): number {
-  try {
-    const [y, m, d] = iso.split('-').map(Number);
-    if (!y || !m || !d) return 0;
-    return (new Date(y, m - 1, d).getDay() + 6) % 7;
-  } catch {
-    return 0;
-  }
-}
-
 /**
- * Тренировочные дни недели (Пн..Вс) — из профиля, если график включён,
- * иначе раскладка `daysPerWeek` по общепринятому шаблону.
+ * Тренировочные дни недели (Пн..Вс) — тонкая обёртка над единым движком
+ * `training-day.engine` (имя сохранено: его импортирует widget-bridge.test).
  */
-export function trainingWeekdays(training: any): boolean[] {
-  const sched = training?.schedule;
-  const fromList = (list: number[]) => WEEKDAY_LABELS.map((_, i) => list.includes(i));
-
-  if (sched && sched.enabled) {
-    if (sched.scheduleType === 'weekly' && Array.isArray(sched.weeklyDays) && sched.weeklyDays.length === 7) {
-      return sched.weeklyDays.map((v: any) => v === true);
-    }
-    if (sched.scheduleType === 'eod') return fromList([0, 2, 4, 6]);
-  }
-
-  const perWeek = Math.max(1, Math.min(7, Number(training?.daysPerWeek) || 3));
-  const pattern: Record<number, number[]> = {
-    1: [2],
-    2: [0, 3],
-    3: [0, 2, 4],
-    4: [0, 1, 3, 4],
-    5: [0, 1, 2, 3, 4],
-    6: [0, 1, 2, 3, 4, 5],
-    7: [0, 1, 2, 3, 4, 5, 6],
-  };
-  return fromList(pattern[perWeek] || pattern[3]);
-}
-
-function rotationPlanIndex(planDays: number, iso: string): number {
-  const done = safe(() => getSessionsByWeek(getISOWeekNumber(iso)).length, 0);
-  return planDays > 0 ? done % planDays : 0;
-}
-
-function pickPlanDayIndex(iso: string, training: any, planDays: number): number {
-  if (planDays <= 0) return 0;
-  const sched = training?.schedule;
-  if (sched?.enabled && sched.scheduleType === 'pattern') {
-    // Цикл «работа/отдых» здесь только ротацией по числу сессий: в профиле нет якоря
-    // начала цикла (канон `isTrainingDayFor` отсчитывает offset от сегодня), а фаза от
-    // выдуманной даты-эпохи давала бы ложные дни отдыха. Ограничение — в
-    // docs/BB-AUTO-NEXT-PLAN-2026-11.md (P3-4).
-    return rotationPlanIndex(planDays, iso);
-  }
-  const weekly = trainingWeekdays(training);
-  const positions = weekly.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
-  if (positions.length === 0) return rotationPlanIndex(planDays, iso);
-  const dow = mondayIndex(iso);
-  const exact = positions.indexOf(dow);
-  if (exact >= 0) return exact % planDays;
-  // Сегодня отдых — показываем ближайшую тренировку вперёд (по кругу).
-  const next = positions.find((p) => p > dow) ?? positions[0];
-  return positions.indexOf(next) % planDays;
-}
+export const trainingWeekdays: (training: any) => boolean[] = weeklyTrainingDays;
 
 /** Строка плана для одного упражнения: «4×8 · 80 кг · RIR 2». */
 export function formatPlanLine(ex: PlanExercise): string {
@@ -1025,18 +985,29 @@ function planExerciseFromRuntime(raw: any): PlanExercise {
 
 /** Прочитать `he_pl_runtime` и разрешить план на дату. */
 export function resolveWorkoutPlan(dateIso = todayLocalISO()): ResolvedWorkoutPlan | null {
-  const runtime = safe<{ days?: any[]; focus?: string; week?: number } | null>(
+  const runtime = safe<{ days?: any[]; focus?: string; week?: number; startDate?: string } | null>(
     () => JSON.parse(localStorageRef()?.getItem('he_pl_runtime') ?? 'null'),
     null,
   );
-  const days = Array.isArray(runtime?.days)
-    ? runtime!.days.filter((d: any) => Array.isArray(d?.exercises) && d.exercises.length > 0)
-    : [];
+  // Слот плана = элемент массива, как у плеера, календаря и календаря виджета:
+  // пустой день (пик-неделя, «отдых») раньше выпадал из `days` только здесь, и
+  // индекс дня у виджета расходился с плеером на том же payload.
+  const days = Array.isArray(runtime?.days) ? runtime!.days.filter((d: any) => Array.isArray(d?.exercises)) : [];
   if (!days.length) return null;
 
   const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
-  const dayIndex = pickPlanDayIndex(dateIso, training, days.length);
-  const day = days[dayIndex % days.length];
+  // День плана — из единого движка: с якорем `startDate` это N-й тренировочный
+  // день плана (дни 4–5 при 3 тренировках в неделю больше не недостижимы),
+  // без якоря — прежняя позиция дня недели/ротация по сессиям недели.
+  const sessionsThisWeek = safe(() => getSessionsByWeek(getISOWeekNumber(dateIso)).length, 0);
+  const dayIndex = pickPlanDayIndex({
+    iso: dateIso,
+    training,
+    planDays: days.length,
+    startDate: runtime?.startDate,
+    sessionsThisWeek,
+  });
+  const day = planDayAt(days, dayIndex);
   const exercises: PlanExercise[] = (day.exercises as any[]).slice(0, 12).map(planExerciseFromRuntime);
   return {
     dayIndex,
