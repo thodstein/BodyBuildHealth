@@ -56,6 +56,11 @@ const build = (p: typeof PROFILES[number], mc: number, tr: boolean): any => buil
   allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
   variety: 'medium', goal: 'maintenance', quality: 'full',
   excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
+  // §8.122: чужой ход (финальный овощной добор) изолирован — замок мерит ТОЛЬКО свою
+  // стадию. Иначе добор выбирает другой приём/граммы в одном из плеч A/B, и проверка
+  // «меняется только овощ» / «граммы прочих позиций те же» ловит чужую работу. Сам добор
+  // держит свой замок `planner-veg-floor-8122` (160 дней) вместе с каноном и тарелками.
+  vegTopUp88: false,
 } as unknown as MealPlanInput);
 
 const tgtKcal = (m: any) => (m?.target ? 4 * (m.target.p || 0) + 9 * (m.target.f || 0) + 4 * (m.target.c || 0) : 0);

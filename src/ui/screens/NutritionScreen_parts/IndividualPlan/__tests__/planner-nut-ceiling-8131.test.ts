@@ -30,27 +30,47 @@ import { nutCatchupCap, quotaWeightScale, stapleFamilyOf } from '../food-availab
 
 const W = 55;
 
-const plan = (p: number, f: number, c: number, mc: number, tr: boolean, manual: boolean): any => buildDayPlan({
-  weightKg: W, lbmKg: Math.round(W * 0.82), bodyFatPct: 18, sex: 'male',
-  goalKcal: Math.round(4 * p + 9 * f + 4 * c), goalProteinG: p, goalFatG: f, goalCarbsG: c,
-  mealsCount: mc, isTrainingDay: tr, trainStartMin: tr ? 18 * 60 : undefined,
-  trainDurationMin: 75, allowIntraWorkout: true, budget: 'medium', dayOffset: 0,
-  cyclePhase: 'none', variety: 'medium', goal: 'maintenance', quality: 'full',
-  excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
-  ...(manual ? { kbjuMode: 'manual', manualTargetsLocked: true } : {}),
-} as unknown as MealPlanInput);
+const plan = (p: number, f: number, c: number, mc: number, tr: boolean, manual: boolean): any =>
+  buildDayPlan({
+    weightKg: W,
+    lbmKg: Math.round(W * 0.82),
+    bodyFatPct: 18,
+    sex: 'male',
+    goalKcal: Math.round(4 * p + 9 * f + 4 * c),
+    goalProteinG: p,
+    goalFatG: f,
+    goalCarbsG: c,
+    mealsCount: mc,
+    isTrainingDay: tr,
+    trainStartMin: tr ? 18 * 60 : undefined,
+    trainDurationMin: 75,
+    allowIntraWorkout: true,
+    budget: 'medium',
+    dayOffset: 0,
+    cyclePhase: 'none',
+    variety: 'medium',
+    goal: 'maintenance',
+    quality: 'full',
+    excludedIds: new Set<string>(),
+    allergenTags: new Set<string>(),
+    randomSalt: 0,
+    ...(manual ? { kbjuMode: 'manual', manualTargetsLocked: true } : {}),
+  } as unknown as MealPlanInput);
 
 const dev = (pl: any, p: number, f: number, c: number) => {
   const t = pl.totals || {};
   const rel = (v: number, g: number) => (g > 0 ? (Math.abs(v - g) / g) * 100 : 0);
   return {
-    p: rel(Number(t.p) || 0, p), f: rel(Number(t.f) || 0, f), c: rel(Number(t.c) || 0, c),
+    p: rel(Number(t.p) || 0, p),
+    f: rel(Number(t.f) || 0, f),
+    c: rel(Number(t.c) || 0, c),
     max: Math.max(rel(Number(t.p) || 0, p), rel(Number(t.f) || 0, f), rel(Number(t.c) || 0, c)),
   };
 };
 
 const seedsOf = (pl: any): { total: number; maxItem: number } => {
-  let total = 0; let maxItem = 0;
+  let total = 0;
+  let maxItem = 0;
   for (const m of pl.meals || []) {
     for (const it of m.items || []) {
       const fam = stapleFamilyOf(String(it.id || '')) || '';
@@ -84,7 +104,10 @@ describe('§8.131: кап орехов/семян не запирает жиро
   });
 
   it('авто-путь тех же дней не сломан', () => {
-    for (const [p, f, c] of [[132, 39, 110], [110, 39, 110]]) {
+    for (const [p, f, c] of [
+      [132, 39, 110],
+      [110, 39, 110],
+    ]) {
       const d = dev(plan(p, f, c, 4, false, false), p, f, c);
       expect(d.max, `авто ${p}/${f}/${c}: ${d.max.toFixed(2)}`).toBeLessThanOrEqual(3.001);
     }
@@ -97,24 +120,28 @@ describe('§8.131: кап орехов/семян не запирает жиро
     expect(s.total, `семена ${s.total} г при капе ${cap}`).toBeLessThanOrEqual(cap + 1e-9);
   });
 
-  it('полоса 24 ручных дня 55 кг: вне канона только день-долг по белку, ведра нет', () => {
+  it('полоса 24 ручных дня 55 кг: вне канона нет ни одного дня, ведра нет', () => {
     // §8.132 снял из этого списка день `p240-c2-5-T` (Б132/Ж39/У110, 5 приёмов, тренировка:
     // было Б +7.27 / Ж −7.95 / У +7.91, стало +1.89 / +1.79 / +1.00) — пол белка приёма
     // больше не запирает углеводную ось: срез риса в перекусе разблокирован.
-    const OUTSIDE = new Set(['p160-c4-4-T']);
+    // 2026-11 (§8.127/§8.130c): последний день-долг `p160-c4-4-T` (Б88 на 6 слотов = 15 г
+    // на слот) тоже сошёлся — замер Б 89 (+1.02 %), Ж 40 (+1.79 %), У 221 (+0.50 %).
+    // Полоса 24/24 в каноне, поэтому ожидание — 0 дней вне канона.
     const bad: string[] = [];
     let outside = 0;
     for (const pg of [1.6, 2.0, 2.4]) {
       for (const cg of [2.0, 4.0]) {
         for (const mc of [4, 5]) {
           for (const tr of [true, false]) {
-            const p = Math.round(W * pg), f = Math.round(W * 0.7), c = Math.round(W * cg);
+            const p = Math.round(W * pg),
+              f = Math.round(W * 0.7),
+              c = Math.round(W * cg);
             const pl = plan(p, f, c, mc, tr, true);
             const d = dev(pl, p, f, c);
             const key = `p${Math.round(pg * 100)}-c${Math.round(cg)}-${mc}-${tr ? 'T' : 'R'}`;
             if (d.max > 3.001) {
               outside++;
-              if (!OUTSIDE.has(key)) bad.push(`${key}: Б ${d.p.toFixed(2)} Ж ${d.f.toFixed(2)} У ${d.c.toFixed(2)}`);
+              bad.push(`${key}: Б ${d.p.toFixed(2)} Ж ${d.f.toFixed(2)} У ${d.c.toFixed(2)}`);
             }
             const s = seedsOf(pl);
             if (s.total > 100) bad.push(`${key}: семена ${s.total} г`);
@@ -123,10 +150,9 @@ describe('§8.131: кап орехов/семян не запирает жиро
         }
       }
     }
-    // Долг: белок 88 г на 6 слотов питания (4 приёма + пред/пост-тренировка) — это 15 г
-    // на слот при MPS-поле 25 г; день не сходится по Б никакими граммами, лечится
-    // распределением белка на сборке (не срезом).
-    expect(outside, 'дней вне канона').toBe(1);
+    // Долг закрыт: белок 88 г на 6 слотов (4 приёма + пред/пост-тренировка) — 15 г на слот
+    // при MPS-поле 25 г — день сходится за счёт распределения белка на сборке, а не среза.
+    expect(outside, 'дней вне канона').toBe(0);
     expect(bad.join(' | ')).toBe('');
   });
 });

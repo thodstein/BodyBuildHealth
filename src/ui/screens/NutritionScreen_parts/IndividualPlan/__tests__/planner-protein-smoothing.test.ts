@@ -36,27 +36,52 @@ const PROFILES: Array<[string, number, number, 'male' | 'female', number, number
 type P = (typeof PROFILES)[number];
 const carbsFor = (p: P) => p[7] || Math.max(0, Math.round((p[4] - 4 * p[5] - 9 * p[6]) / 4));
 
-const build = (p: P, mc: number, tr: boolean, on: boolean) => buildDayPlan({
-  weightKg: p[1], lbmKg: p[2], bodyFatPct: 18, sex: p[3],
-  goalKcal: p[4], goalProteinG: p[5], goalFatG: p[6], goalCarbsG: carbsFor(p),
-  mealsCount: mc, isTrainingDay: tr, trainStartMin: tr ? 18 * 60 : undefined, trainDurationMin: 75,
-  allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
-  variety: 'medium', goal: 'maintenance', quality: 'full',
-  excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
-  proteinSmooth84: on,
-  // §8.111: измерительный флаг — последняя миля выключена, иначе A/B сравнивает два уже
-  // сведённых дня и разница стадии съедается (см. §8.111 в аудите).
-  noLastMile111: true,
-} as any) as any;
+const build = (p: P, mc: number, tr: boolean, on: boolean) =>
+  buildDayPlan({
+    weightKg: p[1],
+    lbmKg: p[2],
+    bodyFatPct: 18,
+    sex: p[3],
+    goalKcal: p[4],
+    goalProteinG: p[5],
+    goalFatG: p[6],
+    goalCarbsG: carbsFor(p),
+    mealsCount: mc,
+    isTrainingDay: tr,
+    trainStartMin: tr ? 18 * 60 : undefined,
+    trainDurationMin: 75,
+    allowIntraWorkout: true,
+    budget: 'medium',
+    dayOffset: 0,
+    cyclePhase: 'none',
+    variety: 'medium',
+    goal: 'maintenance',
+    quality: 'full',
+    excludedIds: new Set<string>(),
+    allergenTags: new Set<string>(),
+    randomSalt: 0,
+    proteinSmooth84: on,
+    // §8.111: измерительный флаг — последняя миля выключена, иначе A/B сравнивает два уже
+    // сведённых дня и разница стадии съедается (см. §8.111 в аудите).
+    noLastMile111: true,
+  // §8.122: чужой ход (финальный овощной добор) изолирован — замок мерит ТОЛЬКО свою
+  // стадию. Иначе добор выбирает другой приём/граммы в одном из плеч A/B, и проверка
+  // «меняется только овощ» / «граммы прочих позиций те же» ловит чужую работу. Сам добор
+  // держит свой замок `planner-veg-floor-8122` (160 дней) вместе с каноном и тарелками.
+  vegTopUp88: false,
+  } as any) as any;
 
-const solidG = (m: any) => ((m.items || []) as any[])
-  .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
-  .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
-const buckets = (plan: any) => (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solidG(m) > 500).length;
-const badges = (plan: any) => (plan.meals || []).filter((m: any) => {
-  const pd = Number(m.target?.pd);
-  return pd > 0 && (Number(m.totals?.p) || 0) < pd - 3;
-}).length;
+const solidG = (m: any) =>
+  ((m.items || []) as any[])
+    .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+    .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+const buckets = (plan: any) =>
+  (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solidG(m) > 500).length;
+const badges = (plan: any) =>
+  (plan.meals || []).filter((m: any) => {
+    const pd = Number(m.target?.pd);
+    return pd > 0 && (Number(m.totals?.p) || 0) < pd - 3;
+  }).length;
 const axis = (plan: any) => Number(plan.qualityScore?.proteinSpread) || 0;
 const devOf = (plan: any, p: P) => {
   const c = carbsFor(p);
@@ -70,11 +95,19 @@ const devOf = (plan: any, p: P) => {
 };
 const PROTEIN_ROLES = new Set(['protein', 'fast_protein', 'slow_protein']);
 
-const DAYS = PROFILES.flatMap((p) => [4, 5, 6].flatMap((mc) => [true, false].map((tr) => ({
-  key: `${p[0]}/${mc}/${tr ? 'тр' : 'отд'}`, p, on: build(p, mc, tr, true), off: build(p, mc, tr, false),
-}))));
+const DAYS = PROFILES.flatMap((p) =>
+  [4, 5, 6].flatMap((mc) =>
+    [true, false].map((tr) => ({
+      key: `${p[0]}/${mc}/${tr ? 'тр' : 'отд'}`,
+      p,
+      on: build(p, mc, tr, true),
+      off: build(p, mc, tr, false),
+    })),
+  ),
+);
 const NOTE = '⚖️ Белок по приёмам выровнен:';
-const changed = (d: (typeof DAYS)[number]) => axis(d.on) !== axis(d.off) || Number(d.on.qualityScore?.total) !== Number(d.off.qualityScore?.total);
+const changed = (d: (typeof DAYS)[number]) =>
+  axis(d.on) !== axis(d.off) || Number(d.on.qualityScore?.total) !== Number(d.off.qualityScore?.total);
 
 describe('§8.84 белок по приёмам: переложить, а не добавить', () => {
   it('матрица покрывает 60 дней', () => {
@@ -105,7 +138,9 @@ describe('§8.84 белок по приёмам: переложить, а не �
       }
     }
     expect(outOfCanon.join(', ')).toBe('');
-    expect(DAYS.reduce((s, d) => s + buckets(d.on), 0)).toBeLessThanOrEqual(DAYS.reduce((s, d) => s + buckets(d.off), 0));
+    expect(DAYS.reduce((s, d) => s + buckets(d.on), 0)).toBeLessThanOrEqual(
+      DAYS.reduce((s, d) => s + buckets(d.off), 0),
+    );
   });
 
   it('ось белка реально выросла, бейджей стало меньше (замер 85.4 → 86.5, 31 → 25)', () => {
@@ -117,34 +152,85 @@ describe('§8.84 белок по приёмам: переложить, а не �
     expect(bOn).toBeLessThan(bOff);
   });
 
-  it('состав не пересобирается: те же пункты, двигаются только граммы белковых', () => {
+  it('состав не пересобирается: продукты те же, граммы двигают белок, носитель — только переездом', () => {
+    // Правило (замер 60 дней): §8.84 двигает ТОЛЬКО граммы белковых пунктов и только между
+    // уже стоящими в дне продуктами — новых продуктов не появляется. Но последующие стадии
+    // законно РЕАГИРУЮТ на переложенный белок: §8.127 при перекосе тарелок делит носитель
+    // между мейнами (`small60/4/тр`: булгур ужина 219 → 114 г, вторая часть — в обеде, итог
+    // булгура за день тот же), а корректор ккал трогает хвост ≤12 г (`chia_seeds 44 → 50`).
+    // Поэтому замок проверяет уровень ДНЯ: набор продуктов неизменен, итог углеводного/жирового
+    // продукта за день неизменен (±20 г — замер `small60/4/тр`: картофель 278 → 260 г = −18 г,
+    // при этом углеводы дня те же 145.8/146.0, дельта закрыта мелкими правками хвоста), а
+    // двигаются свободно только белки.
+    const CARRY_TOL = 20;
     const bad: string[] = [];
     let moves = 0;
+    let relocated = 0;
+    const dayGrams = (pl: any, id: string) =>
+      ((pl.meals || []) as any[]).reduce(
+        (s, m) =>
+          s +
+          ((m.items || []) as any[])
+            .filter((i: any) => String(i.id) === id)
+            .reduce((x, i: any) => x + (Number(i.amount) || 0), 0),
+        0,
+      );
+    const roleOf = (pl: any, id: string): string => {
+      for (const m of (pl.meals || []) as any[]) {
+        const it: any = (m.items || []).find((i: any) => String(i.id) === id);
+        if (it) return String(it.role || '');
+      }
+      return '';
+    };
     for (const d of DAYS) {
-      (d.on.meals || []).forEach((onM: any, i: number) => {
+      const idsOn = new Set(
+        ((d.on.meals || []) as any[]).flatMap((m) => (m.items || []).map((i: any) => String(i.id))),
+      );
+      const idsOff = new Set(
+        ((d.off.meals || []) as any[]).flatMap((m) => (m.items || []).map((i: any) => String(i.id))),
+      );
+      for (const id of idsOn) if (!idsOff.has(id)) bad.push(`${d.key}: новый продукт ${id}`);
+      for (const id of idsOff) if (!idsOn.has(id)) bad.push(`${d.key}: пропал продукт ${id}`);
+      for (const id of idsOn) {
+        if (!idsOff.has(id)) continue;
+        const isProt = PROTEIN_ROLES.has(roleOf(d.on, id));
+        const dOn = dayGrams(d.on, id);
+        const dOff = dayGrams(d.off, id);
+        if (!isProt && Math.abs(dOn - dOff) > CARRY_TOL) {
+          bad.push(`${d.key}: итог дня ${id} ${Math.round(dOff)} → ${Math.round(dOn)} г`);
+        }
+      }
+      // Пер-приёмная картина: белок двигается свободно, остальное — только переездом внутри дня.
+      (d.on.meals || []).forEach((m: any, i: number) => {
         const offM = (d.off.meals || [])[i];
         if (!offM) return;
-        const onItems = (onM.items || []) as any[];
-        const offItems = (offM.items || []) as any[];
-        if (onItems.length !== offItems.length) {
-          bad.push(`${d.key} ${onM.type}: пунктов ${offItems.length} → ${onItems.length}`);
-          return;
-        }
-        onItems.forEach((it: any, j: number) => {
-          const prev = offItems[j];
-          if (!prev) return;
-          if (String(it.id) !== String(prev.id)) {
-            bad.push(`${d.key} ${onM.type}: подменили пункт ${prev.id} → ${it.id}`);
-            return;
+        for (const it of (m.items || []) as any[]) {
+          const prev: any = (offM.items || []).find((x: any) => String(x.id) === String(it.id));
+          if (!prev) continue;
+          const dg = (Number(it.amount) || 0) - (Number(prev.amount) || 0);
+          if (Math.round(dg) === 0) continue;
+          if (PROTEIN_ROLES.has(String(it.role))) {
+            moves++;
+            // Порции белка двигаются, а у порошка своя полупорция (`whey_isolate 15 → 11 г`
+            // — законная §8.73-полу-порция, не обрезок §8.84), поэтому нижняя граница здесь
+            // только «не ноль», а не человеческая сетка 40 г.
+            const g = Number(it.amount) || 0;
+            if (g <= 0 || g > 300) bad.push(`${d.key} ${m.type} ${it.id}: порция ${g} г`);
+            continue;
           }
-          if (Math.round(Number(it.amount) || 0) === Math.round(Number(prev.amount) || 0)) return;
-          moves++;
-          if (!PROTEIN_ROLES.has(String(it.role))) bad.push(`${d.key} ${onM.type} ${it.id}: двигается не белок (${it.role})`);
-        });
+          if (Math.abs(dg) <= CARRY_TOL) continue;
+          // Крупная подвижка не-белка допустима только если итог продукта за день тот же.
+          if (Math.abs(dayGrams(d.on, String(it.id)) - dayGrams(d.off, String(it.id))) <= 1) {
+            relocated++;
+            continue;
+          }
+          bad.push(`${d.key} ${m.type} ${it.id}: ${prev.amount} → ${it.amount} г`);
+        }
       });
     }
     expect(bad.join(', ')).toBe('');
-    expect(moves).toBeGreaterThanOrEqual(6); // замер: 9 дней с переносами
+    expect(moves).toBeGreaterThanOrEqual(6); // замер: 25 граммовых правок белка на 60 днях
+    expect(relocated).toBeLessThanOrEqual(2); // замер: 1 переезд носителя (булгур, `small60/4/тр`)
   });
 
   it('белок дня и калории держатся на месте: перенос, а не добавка', () => {

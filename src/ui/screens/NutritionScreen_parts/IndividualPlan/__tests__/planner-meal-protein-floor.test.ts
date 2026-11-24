@@ -32,7 +32,17 @@ import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
  * а не последней милей.
  */
 
-const PROFILES: Array<{ id: string; w: number; lbm: number; bf: number; sex: 'male' | 'female'; k: number; p: number; f: number; c?: number }> = [
+const PROFILES: Array<{
+  id: string;
+  w: number;
+  lbm: number;
+  bf: number;
+  sex: 'male' | 'female';
+  k: number;
+  p: number;
+  f: number;
+  c?: number;
+}> = [
   { id: 'p500', w: 110, lbm: 90, bf: 18, sex: 'male', k: 4600, p: 500, f: 120 },
   { id: 'c1500', w: 110, lbm: 90, bf: 18, sex: 'male', k: 8370, p: 300, f: 130, c: 1500 },
   { id: 'hugeCarb', w: 100, lbm: 82, bf: 18, sex: 'male', k: 6700, p: 250, f: 100 },
@@ -45,52 +55,85 @@ const PROFILES: Array<{ id: string; w: number; lbm: number; bf: number; sex: 'ma
   { id: 'keto85', w: 85, lbm: 70, bf: 18, sex: 'male', k: 2400, p: 180, f: 150 },
 ];
 
-const carbsFor = (p: { k: number; p: number; f: number; c?: number }) => (
-  p.c && p.c > 0 ? p.c : Math.max(0, Math.round((p.k - 4 * p.p - 9 * p.f) / 4))
-);
+const carbsFor = (p: { k: number; p: number; f: number; c?: number }) =>
+  p.c && p.c > 0 ? p.c : Math.max(0, Math.round((p.k - 4 * p.p - 9 * p.f) / 4));
 
-const build = (p: typeof PROFILES[number], mc: number, tr: boolean, on: boolean): any => buildDayPlan({
-  weightKg: p.w, lbmKg: p.lbm, bodyFatPct: p.bf, sex: p.sex,
-  goalKcal: p.k, goalProteinG: p.p, goalFatG: p.f, goalCarbsG: carbsFor(p),
-  mealsCount: mc, isTrainingDay: tr, trainStartMin: tr ? 18 * 60 : undefined, trainDurationMin: 75,
-  allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
-  variety: 'medium', goal: 'maintenance', quality: 'full',
-  excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
-  // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
-  // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
-  vegDensity78: false,
-  // §8.84 (перенос белка между приёмами) изолирован: замок мерит только свою стадию.
-  proteinSmooth84: false,
-  breakfastProteinFloor: on,
-  // §8.111: измерительный флаг — последняя миля выключена, иначе A/B сравнивает два уже
-  // сведённых дня и разница стадии съедается (см. §8.111 в аудите).
-  noLastMile111: true,
-  // §8.75 (семя вместо масла) включается отдельно и имеет свой замок: её обмен меняет
-  // белок приёма и портил бы «без стадии» вариант этого A/B.
-  seedSwap75: false,
-} as unknown as MealPlanInput);
+const build = (p: (typeof PROFILES)[number], mc: number, tr: boolean, on: boolean): any =>
+  buildDayPlan({
+    weightKg: p.w,
+    lbmKg: p.lbm,
+    bodyFatPct: p.bf,
+    sex: p.sex,
+    goalKcal: p.k,
+    goalProteinG: p.p,
+    goalFatG: p.f,
+    goalCarbsG: carbsFor(p),
+    mealsCount: mc,
+    isTrainingDay: tr,
+    trainStartMin: tr ? 18 * 60 : undefined,
+    trainDurationMin: 75,
+    allowIntraWorkout: true,
+    budget: 'medium',
+    dayOffset: 0,
+    cyclePhase: 'none',
+    variety: 'medium',
+    goal: 'maintenance',
+    quality: 'full',
+    excludedIds: new Set<string>(),
+    allergenTags: new Set<string>(),
+    randomSalt: 0,
+    // §8.78 (плотный овощ вместо объёма) выключается в обоих вариантах: иначе A/B
+    // перестаёт быть сравнением одной стадии (микро меняются до её гейтов).
+    vegDensity78: false,
+    // §8.84 (перенос белка между приёмами) изолирован: замок мерит только свою стадию.
+    proteinSmooth84: false,
+    breakfastProteinFloor: on,
+    // §8.73 (порошок не мельче 20 г) изолирован в обоих вариантах: это НЕ стадия §8.63, но она
+    // срабатывает только в том дне, где §8.63 не тронул перекус, и замер 60 дней показывал из-за
+    // неё ложные срабатывания замка — `recomp80/6/тр` ΔP = 7.1 г (порог 4.8) и «whey_isolate 11 г»
+    // (порошок 11 → 20 г — законная полупорция §8.73, а не обрезок §8.63). С изоляцией §8.73
+    // перенос §8.63 точен: ΔP ≤ 1.0 г на всех 60 днях, оценка 5561 → 5586 (0 дней хуже,
+    // канон/вёдра не хуже), порции стадии — 40–200 г шагом 5 г (egg_whole 75 → 115, chicken 90 → 75).
+    powderMinPortion73: false,
+    // §8.111: измерительный флаг — последняя миля выключена, иначе A/B сравнивает два уже
+    // сведённых дня и разница стадии съедается (см. §8.111 в аудите).
+    noLastMile111: true,
+    // §8.75 (семя вместо масла) включается отдельно и имеет свой замок: её обмен меняет
+    // белок приёма и портил бы «без стадии» вариант этого A/B.
+    seedSwap75: false,
+  } as unknown as MealPlanInput);
 
-const cells = (on: boolean) => PROFILES.flatMap((p) => [4, 5, 6].flatMap((mc) => [true, false].map((tr) => ({
-  key: `${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
-  w: p.w,
-  plan: build(p, mc, tr, on),
-}))));
+const cells = (on: boolean) =>
+  PROFILES.flatMap((p) =>
+    [4, 5, 6].flatMap((mc) =>
+      [true, false].map((tr) => ({
+        key: `${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
+        w: p.w,
+        plan: build(p, mc, tr, on),
+      })),
+    ),
+  );
 
 /** Бейджи «Б факт / порог» ровно как их видит UI: порог `target.pd`, недобор > 3 г. */
-const badges = (rows: ReturnType<typeof cells>) => rows.flatMap((r) => ((r.plan.meals || []) as any[])
-  .filter((m: any) => Number(m.target?.pd) > 0 && (Number(m.totals?.p) || 0) < Number(m.target.pd) - 3)
-  .map((m: any) => `${r.key}:${m.type}`));
+const badges = (rows: ReturnType<typeof cells>) =>
+  rows.flatMap((r) =>
+    ((r.plan.meals || []) as any[])
+      .filter((m: any) => Number(m.target?.pd) > 0 && (Number(m.totals?.p) || 0) < Number(m.target.pd) - 3)
+      .map((m: any) => `${r.key}:${m.type}`),
+  );
 
-const solidG = (m: any) => (m.items || [])
-  .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
-  .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
+const solidG = (m: any) =>
+  (m.items || [])
+    .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+    .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
 
-const dayDev = (pl: any, p: typeof PROFILES[number]) => Math.max(
-  Math.abs(Number(pl.totals.kcal) - p.k) / p.k,
-  Math.abs(Number(pl.totals.p) - p.p) / p.p,
-  Math.abs(Number(pl.totals.f) - p.f) / p.f,
-  carbsFor(p) > 0 ? Math.abs(Number(pl.totals.c) - carbsFor(p)) / carbsFor(p) : 0,
-);
+const dayDev = (pl: any, p: (typeof PROFILES)[number]) =>
+  Math.max(
+    Math.abs(Number(pl.totals.kcal) - p.k) / p.k,
+    Math.abs(Number(pl.totals.p) - p.p) / p.p,
+    Math.abs(Number(pl.totals.f) - p.f) / p.f,
+    carbsFor(p) > 0 ? Math.abs(Number(pl.totals.c) - carbsFor(p)) / carbsFor(p) : 0,
+  );
 
 describe('§8.63 приём не голодает по белку (`breakfastProteinFloor`)', () => {
   it('бейджи ниже порога: 84 → ≤78 на 60 дней, и строго меньше, чем без стадии', () => {
@@ -141,7 +184,7 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
       const before = off.get(row.key)!;
       const dp = Math.abs(Number(row.plan.totals?.p) - Number(before.plan.totals?.p));
       const w = row.w;
-      if (dp > 0.20 * 0.3 * w) broken.push(`${row.key}: ΔP=${dp.toFixed(1)}`);
+      if (dp > 0.2 * 0.3 * w) broken.push(`${row.key}: ΔP=${dp.toFixed(1)}`);
       // Донор не проваливается ниже порога: каждый приём-«отдающий» остаётся ≥0.30 г/кг
       // либо таковым не был и не отдавал.
       for (const m of row.plan.meals || []) {
@@ -149,7 +192,8 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
         if (!was) continue;
         const nowPk = (Number(m.totals.p) || 0) / w;
         const wasPk = (Number(was.totals.p) || 0) / w;
-        if (wasPk >= 0.30 && nowPk < 0.295) broken.push(`${row.key}/${m.type}: ${wasPk.toFixed(2)}→${nowPk.toFixed(2)} г/кг`);
+        if (wasPk >= 0.3 && nowPk < 0.295)
+          broken.push(`${row.key}/${m.type}: ${wasPk.toFixed(2)}→${nowPk.toFixed(2)} г/кг`);
       }
     }
     expect(broken.join(', ')).toBe('');
@@ -170,9 +214,11 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
           // Правило QG19 действует на то, что стадия тронула сама: до неё в плане могли
           // стоять порции 300 г (p500) — их стадия не создавала и не «чинит».
           const g = Number(i.amount) || 0;
-          if (g < 40 || g > 200 || Math.round(g / 5) * 5 !== Math.round(g)) bad.push(`${row.key}/${m.type}:${i.id}=${g}`);
+          if (g < 40 || g > 200 || Math.round(g / 5) * 5 !== Math.round(g))
+            bad.push(`${row.key}/${m.type}:${i.id}=${g}`);
         }
-        if (solidG(m) > 500 && solidG(was) <= 500) bad.push(`${row.key}/${m.type}: тарелка ${Math.round(solidG(was))}→${Math.round(solidG(m))} г`);
+        if (solidG(m) > 500 && solidG(was) <= 500)
+          bad.push(`${row.key}/${m.type}: тарелка ${Math.round(solidG(was))}→${Math.round(solidG(m))} г`);
       }
     }
     expect(bad.join(', ')).toBe('');
@@ -196,7 +242,8 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
       const p = PROFILES.find((x) => x.id === row.key.split('/')[0])!;
       const devOn = dayDev(row.plan, p);
       const devOff = dayDev(before.plan, p);
-      if (devOn > 0.03 && devOn > devOff + 0.001) canonWorse.push(`${row.key}: ${(devOff * 100).toFixed(1)}%→${(devOn * 100).toFixed(1)}%`);
+      if (devOn > 0.03 && devOn > devOff + 0.001)
+        canonWorse.push(`${row.key}: ${(devOff * 100).toFixed(1)}%→${(devOn * 100).toFixed(1)}%`);
       const nOn = (row.plan.meals || []).filter((m: any) => solidG(m) > 500).length;
       const nOff = (before.plan.meals || []).filter((m: any) => solidG(m) > 500).length;
       if (nOn > nOff) buckets.push(`${row.key}: ${nOff}→${nOn}`);
@@ -220,7 +267,9 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
   });
 
   it('нота стадии появляется только там, где приём реально добит (префикс — не QG14)', () => {
-    const withNote = cells(true).filter((r) => ((r.plan.notes || []) as string[]).some((n) => /Белок приёма: \d+ приём/.test(n)));
+    const withNote = cells(true).filter((r) =>
+      ((r.plan.notes || []) as string[]).some((n) => /Белок приёма: \d+ приём/.test(n)),
+    );
     expect(withNote.length).toBeGreaterThan(0);
     for (const row of withNote) {
       const note = ((row.plan.notes || []) as string[]).find((n) => /Белок приёма: \d+ приём/.test(n))!;

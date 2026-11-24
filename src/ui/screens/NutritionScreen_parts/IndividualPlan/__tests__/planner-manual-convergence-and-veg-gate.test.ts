@@ -24,14 +24,28 @@ import { FOOD_DB } from '../../../../../core/nutrition-database';
 
 const FORBIDDEN_VEG = ['broccoli', 'cucumber', 'tomato'];
 
-const planInput = (over: any = {}) => ({
-  weightKg: 80, lbmKg: 65, bodyFatPct: 18, sex: 'male' as const,
-  goalKcal: 1600, goalProteinG: 150, goalFatG: 55, goalCarbsG: 150,
-  mealsCount: 3, isTrainingDay: false, trainStartMin: 17 * 60 + 30, trainDurationMin: 90,
-  allowIntraWorkout: false, budget: 'medium' as const, dayOffset: 0,
-  cyclePhase: 'none' as const, variety: 'medium' as const, eveningLowCarb: false,
-  ...over,
-} as any);
+const planInput = (over: any = {}) =>
+  ({
+    weightKg: 80,
+    lbmKg: 65,
+    bodyFatPct: 18,
+    sex: 'male' as const,
+    goalKcal: 1600,
+    goalProteinG: 150,
+    goalFatG: 55,
+    goalCarbsG: 150,
+    mealsCount: 3,
+    isTrainingDay: false,
+    trainStartMin: 17 * 60 + 30,
+    trainDurationMin: 90,
+    allowIntraWorkout: false,
+    budget: 'medium' as const,
+    dayOffset: 0,
+    cyclePhase: 'none' as const,
+    variety: 'medium' as const,
+    eveningLowCarb: false,
+    ...over,
+  }) as any;
 
 describe('B1: наполнитель тарелки уважает исключённые продукты', () => {
   // Инвариант: ни в одной конфигурации исключённый овощ не может оказаться в плане.
@@ -39,7 +53,7 @@ describe('B1: наполнитель тарелки уважает исключ�
     const excludedIds = new Set<string>(FORBIDDEN_VEG);
     for (let d = 0; d < 7; d++) {
       const plan = buildDayPlan(planInput({ dayOffset: d, excludedIds }));
-      const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
+      const allIds = plan.meals.flatMap((m) => m.items.map((it) => it.id));
       for (const bad of FORBIDDEN_VEG) {
         expect(allIds, `исключённый овощ «${bad}» попал в план (день ${d})`).not.toContain(bad);
       }
@@ -53,12 +67,20 @@ describe('B1: наполнитель тарелки уважает исключ�
       { goalKcal: 1300, goalProteinG: 130, goalFatG: 45, goalCarbsG: 110, mealsCount: 6 },
       { goalKcal: 1600, goalProteinG: 150, goalFatG: 55, goalCarbsG: 150, mealsCount: 6 },
       { goalKcal: 1800, goalProteinG: 150, goalFatG: 55, goalCarbsG: 190, mealsCount: 7 },
-      { goalKcal: 2200, goalProteinG: 170, goalFatG: 70, goalCarbsG: 230, mealsCount: 6, isTrainingDay: true, allowIntraWorkout: true },
+      {
+        goalKcal: 2200,
+        goalProteinG: 170,
+        goalFatG: 70,
+        goalCarbsG: 230,
+        mealsCount: 6,
+        isTrainingDay: true,
+        allowIntraWorkout: true,
+      },
     ];
     for (const cfg of matrix) {
       for (let d = 0; d < 7; d++) {
         const plan = buildDayPlan(planInput({ ...cfg, dayOffset: d, excludedIds }));
-        const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
+        const allIds = plan.meals.flatMap((m) => m.items.map((it) => it.id));
         for (const bad of FORBIDDEN_VEG) {
           expect(allIds, `«${bad}» просочился (${JSON.stringify(cfg)}, день ${d})`).not.toContain(bad);
         }
@@ -68,8 +90,9 @@ describe('B1: наполнитель тарелки уважает исключ�
 
   it('наполнитель не ломается: разрешённые овощи при этом доступны', () => {
     // контроль осмысленности: в пуле вообще есть овощи, кроме запрещённых
-    const allowedVeg = FOOD_DB.filter(f =>
-      (f.category === 'vegetable' || String(f.id).startsWith('veg_')) && !FORBIDDEN_VEG.includes(f.id));
+    const allowedVeg = FOOD_DB.filter(
+      (f) => (f.category === 'vegetable' || String(f.id).startsWith('veg_')) && !FORBIDDEN_VEG.includes(f.id),
+    );
     expect(allowedVeg.length).toBeGreaterThan(5);
   });
 });
@@ -87,49 +110,74 @@ describe('B19/B20: ручное КБЖУ — сходимость дня не х
   for (const c of cases) {
     it(c.name, () => {
       const t = buildDayTargets({
-        weightKg: c.weightKg, kbjuMode: 'manual', manual: c.manual,
-        presetGPerKg: 2.0, calcTargets: undefined as any, profileTargets: undefined as any,
+        weightKg: c.weightKg,
+        kbjuMode: 'manual',
+        manual: c.manual,
+        presetGPerKg: 2.0,
+        calcTargets: undefined as any,
+        profileTargets: undefined as any,
         goal: 'fat_loss',
       } as any);
 
       // 1) набор целей обязан быть внутренне согласован (иначе сходимость недостижима)
       const aw = t.protein * 4 + t.fats * 9 + t.carbs * 4;
-      expect(Math.abs(aw - t.kcal) / Math.max(1, t.kcal), `ккал ${t.kcal} vs БЖУ ${aw}`).toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT / 100);
+      expect(Math.abs(aw - t.kcal) / Math.max(1, t.kcal), `ккал ${t.kcal} vs БЖУ ${aw}`).toBeLessThanOrEqual(
+        PLANNER_CONVERGENCE_PCT / 100,
+      );
 
       // 2) день, собранный под эти цели, сходится не хуже канона
-      const plan = buildDayPlan(planInput({
-        weightKg: c.weightKg,
-        goalKcal: t.kcal, goalProteinG: t.protein, goalFatG: t.fats, goalCarbsG: t.carbs,
-        mealsCount: 5, isTrainingDay: true, trainStartMin: 17 * 60 + 30, allowIntraWorkout: true,
-      }));
-      const tot = plan.totals;
-      const dev = (got: number, goal: number) => goal > 0 ? Math.abs(got - goal) / goal * 100 : 0;
-      const maxDev = Math.max(
-        dev(tot.kcal, t.kcal), dev(tot.p, t.protein), dev(tot.f, t.fats), dev(tot.c, t.carbs),
+      const plan = buildDayPlan(
+        planInput({
+          weightKg: c.weightKg,
+          goalKcal: t.kcal,
+          goalProteinG: t.protein,
+          goalFatG: t.fats,
+          goalCarbsG: t.carbs,
+          mealsCount: 5,
+          isTrainingDay: true,
+          trainStartMin: 17 * 60 + 30,
+          allowIntraWorkout: true,
+        }),
       );
-      expect(maxDev, `ккал ${Math.round(tot.kcal)}/${t.kcal} · Б ${tot.p}/${t.protein} · Ж ${tot.f}/${t.fats} · У ${tot.c}/${t.carbs}`)
-        .toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT + 1e-6);
+      const tot = plan.totals;
+      const dev = (got: number, goal: number) => (goal > 0 ? (Math.abs(got - goal) / goal) * 100 : 0);
+      const maxDev = Math.max(dev(tot.kcal, t.kcal), dev(tot.p, t.protein), dev(tot.f, t.fats), dev(tot.c, t.carbs));
+      expect(
+        maxDev,
+        `ккал ${Math.round(tot.kcal)}/${t.kcal} · Б ${tot.p}/${t.protein} · Ж ${tot.f}/${t.fats} · У ${tot.c}/${t.carbs}`,
+      ).toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT + 1e-6);
     });
   }
 
   it('B19: ручной жир 40 г не превращается в 0.8 г/кг', () => {
     const t = buildDayTargets({
-      weightKg: 80, kbjuMode: 'manual', manual: { kcal: 1900, p: 150, f: 40, c: 215 },
-      presetGPerKg: 2.0, goal: 'fat_loss',
+      weightKg: 80,
+      kbjuMode: 'manual',
+      manual: { kcal: 1900, p: 150, f: 40, c: 215 },
+      presetGPerKg: 2.0,
+      goal: 'fat_loss',
     } as any);
     expect(t.fats).toBe(40); // 0.8 г/кг дало бы 64
   });
 
   it('B20: в плане нет «осиротевших» продуктов вне цели по калорийности', () => {
     const t = buildDayTargets({
-      weightKg: 80, kbjuMode: 'manual', manual: { kcal: 1900, p: 150, f: 40, c: 215 },
-      presetGPerKg: 2.0, goal: 'fat_loss',
+      weightKg: 80,
+      kbjuMode: 'manual',
+      manual: { kcal: 1900, p: 150, f: 40, c: 215 },
+      presetGPerKg: 2.0,
+      goal: 'fat_loss',
     } as any);
-    const plan = buildDayPlan(planInput({ goalKcal: t.kcal, goalProteinG: t.protein, goalFatG: t.fats, goalCarbsG: t.carbs }));
+    const plan = buildDayPlan(
+      planInput({ goalKcal: t.kcal, goalProteinG: t.protein, goalFatG: t.fats, goalCarbsG: t.carbs }),
+    );
     // каждый продукт плана существует в базе и имеет непустое имя
-    for (const it of plan.meals.flatMap(m => m.items)) {
+    for (const it of plan.meals.flatMap((m) => m.items)) {
       expect(it.name, `безымянный продукт ${it.id}`).toBeTruthy();
-      expect(FOOD_DB.some(f => f.id === it.id), `продукт ${it.id} отсутствует в FOOD_DB`).toBe(true);
+      expect(
+        FOOD_DB.some((f) => f.id === it.id),
+        `продукт ${it.id} отсутствует в FOOD_DB`,
+      ).toBe(true);
     }
   });
 });
@@ -141,7 +189,11 @@ describe('B19-доп: ручное КБЖУ не масштабируется в
   const ctxSrc = readFileSync(join(__dirname, '..', 'IndividualPlanContext.tsx'), 'utf8');
 
   it('в ручном режиме волна нейтрализуется (ккал/углеводы = 1, рефид снят)', () => {
-    expect(ctxSrc).toMatch(/if \(kbjuMode === 'manual'\) \{\s*\n\s*dayKcalMod = 1; dayCarbMod = 1; isRefeedDay = false;/);
+    // Prettier кладёт каждое присваивание на свою строку и убирает лишние скобки —
+    // замок проверяет состав блока, а не его форматирование.
+    expect(ctxSrc).toMatch(
+      /if \(kbjuMode === 'manual'\) \{\s*dayKcalMod = 1;\s*dayCarbMod = 1;\s*isRefeedDay = false;/,
+    );
   });
 
   it('заметки, обещающие ×2.2 / «углеводы выше», в ручном режиме убираются', () => {
@@ -159,17 +211,35 @@ describe('B19-доп: ручное КБЖУ не масштабируется в
   it('ручные цели доходят до движка без изменений и день сходится ≤3%', () => {
     // 90 кг, ручные 180Б/80Ж/310У = 2680 ккал по Атwater — «я сам знаю свои цифры».
     const t = buildDayTargets({
-      weightKg: 90, kbjuMode: 'manual', manual: { kcal: 2680, p: 180, f: 80, c: 310 },
-      presetGPerKg: 2.0, goal: 'maintenance',
+      weightKg: 90,
+      kbjuMode: 'manual',
+      manual: { kcal: 2680, p: 180, f: 80, c: 310 },
+      presetGPerKg: 2.0,
+      goal: 'maintenance',
     } as any);
     expect([t.kcal, t.protein, t.fats, t.carbs]).toEqual([2680, 180, 80, 310]);
-    const plan = buildDayPlan(planInput({
-      weightKg: 90, goalKcal: t.kcal, goalProteinG: t.protein, goalFatG: t.fats, goalCarbsG: t.carbs,
-      mealsCount: 5, isTrainingDay: true, manualTargetsLocked: true,
-    }));
-    const dev = (got: number, goal: number) => goal > 0 ? Math.abs(got - goal) / goal * 100 : 0;
-    const maxDev = Math.max(dev(plan.totals.kcal, t.kcal), dev(plan.totals.p, t.protein), dev(plan.totals.f, t.fats), dev(plan.totals.c, t.carbs));
-    expect(maxDev, `ккал ${Math.round(plan.totals.kcal)}/${t.kcal} · Ж ${plan.totals.f}/${t.fats}`).toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT + 1e-6);
+    const plan = buildDayPlan(
+      planInput({
+        weightKg: 90,
+        goalKcal: t.kcal,
+        goalProteinG: t.protein,
+        goalFatG: t.fats,
+        goalCarbsG: t.carbs,
+        mealsCount: 5,
+        isTrainingDay: true,
+        manualTargetsLocked: true,
+      }),
+    );
+    const dev = (got: number, goal: number) => (goal > 0 ? (Math.abs(got - goal) / goal) * 100 : 0);
+    const maxDev = Math.max(
+      dev(plan.totals.kcal, t.kcal),
+      dev(plan.totals.p, t.protein),
+      dev(plan.totals.f, t.fats),
+      dev(plan.totals.c, t.carbs),
+    );
+    expect(maxDev, `ккал ${Math.round(plan.totals.kcal)}/${t.kcal} · Ж ${plan.totals.f}/${t.fats}`).toBeLessThanOrEqual(
+      PLANNER_CONVERGENCE_PCT + 1e-6,
+    );
   });
 });
 
@@ -193,8 +263,11 @@ describe('B19-доп-2: частично заполненное ручное К�
   for (const c of cases) {
     it(c.name, () => {
       const t = buildDayTargets({
-        weightKg: 85, kbjuMode: 'manual', manual: c.manual,
-        presetGPerKg: 2.0, goal: 'fat_loss',
+        weightKg: 85,
+        kbjuMode: 'manual',
+        manual: c.manual,
+        presetGPerKg: 2.0,
+        goal: 'fat_loss',
         calcTargets: { bmr: 1750, tdee: 2750, kcal: 2300, protein: 160, fats: 75, carbs: 240, adjustment: 0 },
         profileTargets: { bmr: 1750, tdee: 2600, kcal: 2400, protein: 155, fats: 72, carbs: 250, adjustment: 0 },
         trainingVolumeMinPerWeek: 300,
@@ -205,17 +278,29 @@ describe('B19-доп-2: частично заполненное ручное К�
       expect(t.fats).toBeGreaterThan(0);
       expect(t.carbs).toBeGreaterThan(0);
 
-      const plan = buildDayPlan(planInput({
-        weightKg: 85, goalKcal: t.kcal, goalProteinG: t.protein, goalFatG: t.fats, goalCarbsG: t.carbs,
-        mealsCount: 5, isTrainingDay: true, manualTargetsLocked: true,
-      }));
-      const dev = (got: number, goal: number) => goal > 0 ? Math.abs(got - goal) / goal * 100 : 0;
-      const maxDev = Math.max(
-        dev(plan.totals.kcal, t.kcal), dev(plan.totals.p, t.protein),
-        dev(plan.totals.f, t.fats), dev(plan.totals.c, t.carbs),
+      const plan = buildDayPlan(
+        planInput({
+          weightKg: 85,
+          goalKcal: t.kcal,
+          goalProteinG: t.protein,
+          goalFatG: t.fats,
+          goalCarbsG: t.carbs,
+          mealsCount: 5,
+          isTrainingDay: true,
+          manualTargetsLocked: true,
+        }),
       );
-      expect(maxDev, `${c.name}: ккал ${Math.round(plan.totals.kcal)}/${t.kcal} · Б ${plan.totals.p}/${t.protein} · Ж ${plan.totals.f}/${t.fats} · У ${plan.totals.c}/${t.carbs}`)
-        .toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT + 1e-6);
+      const dev = (got: number, goal: number) => (goal > 0 ? (Math.abs(got - goal) / goal) * 100 : 0);
+      const maxDev = Math.max(
+        dev(plan.totals.kcal, t.kcal),
+        dev(plan.totals.p, t.protein),
+        dev(plan.totals.f, t.fats),
+        dev(plan.totals.c, t.carbs),
+      );
+      expect(
+        maxDev,
+        `${c.name}: ккал ${Math.round(plan.totals.kcal)}/${t.kcal} · Б ${plan.totals.p}/${t.protein} · Ж ${plan.totals.f}/${t.fats} · У ${plan.totals.c}/${t.carbs}`,
+      ).toBeLessThanOrEqual(PLANNER_CONVERGENCE_PCT + 1e-6);
     });
   }
 });

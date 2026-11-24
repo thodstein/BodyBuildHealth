@@ -21,7 +21,14 @@ import { join } from 'node:path';
 import { buildDayTargets } from '../planner-day-targets';
 
 const targets = (over: Partial<{ kcal: number; protein: number; fats: number; carbs: number }> = {}) => ({
-  bmr: 1800, tdee: 3000, kcal: 4000, protein: 160, fats: 80, carbs: 660, adjustment: 0, ...over,
+  bmr: 1800,
+  tdee: 3000,
+  kcal: 4000,
+  protein: 160,
+  fats: 80,
+  carbs: 660,
+  adjustment: 0,
+  ...over,
 });
 
 const baseInput = (over: any = {}) => ({
@@ -47,9 +54,11 @@ describe('B32: «до потолка» приходит из того же ра�
   });
 
   it('auto: без капа carbsBeforeCap равен итоговым углям', () => {
-    const r = buildDayTargets(baseInput({
-      calcTargets: targets({ kcal: 2600, protein: 160, fats: 70 }),
-    }));
+    const r = buildDayTargets(
+      baseInput({
+        calcTargets: targets({ kcal: 2600, protein: 160, fats: 70 }),
+      }),
+    );
     expect(r.carbCapClipped).toBe(false);
     expect(r.carbsBeforeCap).toBe(r.carbs);
   });
@@ -67,10 +76,12 @@ describe('B32: «до потолка» приходит из того же ра�
   });
 
   it('manual: пользовательские угли не капятся, «до» == итог', () => {
-    const r = buildDayTargets(baseInput({
-      kbjuMode: 'manual',
-      manual: { kcal: 3000, p: 180, f: 80, c: 500 },
-    }));
+    const r = buildDayTargets(
+      baseInput({
+        kbjuMode: 'manual',
+        manual: { kcal: 3000, p: 180, f: 80, c: 500 },
+      }),
+    );
     expect(r.carbs).toBe(500);
     expect(r.carbsBeforeCap).toBe(500);
     expect(r.carbCapClipped).toBeUndefined();
@@ -79,7 +90,9 @@ describe('B32: «до потолка» приходит из того же ра�
   it('UI: «до капа» берётся из dayTargets, а не из calcTargets/profileTargets', () => {
     const ctx = readFileSync(join(__dirname, '..', 'IndividualPlanContext.tsx'), 'utf8');
     expect(ctx).toMatch(/dayTargets\.carbsBeforeCap/);
-    expect(ctx).not.toMatch(/const _rawCForCap = kbjuMode === 'manual' \? dayTargets\.carbs : kbjuMode === 'profile' \? profileTargets\.carbs : calcTargets\.carbs/);
+    expect(ctx).not.toMatch(
+      /const _rawCForCap = kbjuMode === 'manual' \? dayTargets\.carbs : kbjuMode === 'profile' \? profileTargets\.carbs : calcTargets\.carbs/,
+    );
   });
 });
 
@@ -87,13 +100,15 @@ describe('B33: оверрайд потолка — состояние + подп
   const ctx = () => readFileSync(join(__dirname, '..', 'IndividualPlanContext.tsx'), 'utf8');
 
   it('нет синхронного чтения he_planner_cap_override в теле рендера', () => {
-    expect(ctx()).not.toMatch(/const _capOverride = \(\(\) => \{ try \{ return localStorage\.getItem\('he_planner_cap_override'\)/);
+    expect(ctx()).not.toMatch(
+      /const _capOverride = \(\(\) => \{ try \{ return localStorage\.getItem\('he_planner_cap_override'\)/,
+    );
   });
 
   it('оба потребителя флага используют состояние carbCapOverride', () => {
     const src = ctx();
     expect(src).toMatch(/if \(carbCapOverride \|\| kbjuMode === 'manual'\) return false;/);
-    expect(src).toMatch(/carbCapGPerKg: \(carbCapOverride \|\| kbjuMode === 'manual'\) \? 0 : undefined/);
+    expect(src).toMatch(/carbCapGPerKg:\s*\(?carbCapOverride \|\| kbjuMode === 'manual'\)?\s*\?\s*0\s*:\s*undefined/);
     expect(src).not.toMatch(/_capOverride/);
   });
 

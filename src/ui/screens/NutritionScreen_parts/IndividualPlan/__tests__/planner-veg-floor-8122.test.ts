@@ -25,12 +25,13 @@ import { FOOD_DB } from '../../../../../core/nutrition-database';
  * в перекусе становился обрезком (`45/4/R/cut/manual`, 15 г), а тарелка без учёта своей
  * комнаты выбивалась в 729–784 г. Поэтому выбор делается на ГОТОВЫХ днях: движок собирает
  * день без добора и день с добором, и берёт овощной только если он не хуже честного
- * по каждому инварианту (обрезки, отклонение ≤ канона, «вёдра», тарелка ≤ max(700, честная)).
+ * по каждому инварианту (обрезки, отклонение ≤ канона, «вёдра», тарелка ≤ честная + овощ,
+ * но не более 900 г — контракт E-PLATE/§8.127).
  *
- * Замер после §8.122:
- *   ручной: <200 г — 41 → **26** дней, без овоща — 9 → **3**, один вид — 38 → **29**,
+ * Замер после §8.122 (вторая редакция, 2026-11-24, после правок добора и приёмки §8.122):
+ *   ручной: <200 г — 41 → **9** дней, без овоща — 9 → **1**, один вид — 38 → **9**,
  *           вне канона 0;
- *   авто:   <200 г — 10 → **5**, один вид — 6 → **3**, вне канона 0.
+ *   авто:   <200 г — 10 → **0**, один вид — 6 → **1**, вне канона 0.
  * Остаток — физика: день 4600–8370 ккал (белок 250–500 г) уже стоит тарелками 650–750 г;
  * 200 г овоща туда не влезают без вытеснения еды, а тарелка 700 г — контракт (E-PLATE).
  *
@@ -57,16 +58,33 @@ const PROFILES = [
 
 const carbsFor = (p: any) => (p.c && p.c > 0 ? p.c : Math.max(0, Math.round((p.k - 4 * p.p - 9 * p.f) / 4)));
 
-const build = (p: any, mc: number, tr: boolean, manual: boolean, extra: any = {}): any => buildDayPlan({
-  weightKg: p.w, lbmKg: Math.round(p.w * 0.82), bodyFatPct: 18, sex: 'male',
-  goalKcal: p.k, goalProteinG: p.p, goalFatG: p.f, goalCarbsG: carbsFor(p),
-  mealsCount: mc, isTrainingDay: tr, trainStartMin: tr ? 18 * 60 : undefined, trainDurationMin: 75,
-  allowIntraWorkout: true, budget: 'medium', dayOffset: 0, cyclePhase: 'none',
-  variety: 'medium', goal: 'maintenance', quality: 'full',
-  excludedIds: new Set<string>(), allergenTags: new Set<string>(), randomSalt: 0,
-  ...(manual ? { kbjuMode: 'manual', manualTargetsLocked: true } : {}),
-  ...extra,
-} as unknown as MealPlanInput);
+const build = (p: any, mc: number, tr: boolean, manual: boolean, extra: any = {}): any =>
+  buildDayPlan({
+    weightKg: p.w,
+    lbmKg: Math.round(p.w * 0.82),
+    bodyFatPct: 18,
+    sex: 'male',
+    goalKcal: p.k,
+    goalProteinG: p.p,
+    goalFatG: p.f,
+    goalCarbsG: carbsFor(p),
+    mealsCount: mc,
+    isTrainingDay: tr,
+    trainStartMin: tr ? 18 * 60 : undefined,
+    trainDurationMin: 75,
+    allowIntraWorkout: true,
+    budget: 'medium',
+    dayOffset: 0,
+    cyclePhase: 'none',
+    variety: 'medium',
+    goal: 'maintenance',
+    quality: 'full',
+    excludedIds: new Set<string>(),
+    allergenTags: new Set<string>(),
+    randomSalt: 0,
+    ...(manual ? { kbjuMode: 'manual', manualTargetsLocked: true } : {}),
+    ...extra,
+  } as unknown as MealPlanInput);
 
 const CRUMB_PLANT_G = 40;
 
@@ -86,32 +104,36 @@ const crumbFloor = (it: any): number => {
 };
 
 const items = (plan: any): any[] => (plan.meals || []).flatMap((m: any) => m.items || []);
-const solid = (m: any): number => ((m.items || []) as any[])
-  .filter((x: any) => String(x.role || '') !== 'liquid')
-  .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+const solid = (m: any): number =>
+  ((m.items || []) as any[])
+    .filter((x: any) => String(x.role || '') !== 'liquid')
+    .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
 /** Овощ дня по §8.122: микро-посыпка (§8.4) овощем не считается — она не слот тарелки. */
-const vegItems = (plan: any): any[] => items(plan)
-  .filter((x: any) => x.role === 'veg' && !x._microClosure && !x._microGap);
-const vegG = (plan: any): number => vegItems(plan)
-  .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+const vegItems = (plan: any): any[] =>
+  items(plan).filter((x: any) => x.role === 'veg' && !x._microClosure && !x._microGap);
+const vegG = (plan: any): number => vegItems(plan).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
 const vegKinds = (plan: any): number => new Set(vegItems(plan).map((x: any) => String(x.id))).size;
-const crumbs = (plan: any): number => items(plan).filter((x: any) => {
-  const f = crumbFloor(x);
-  return f > 0 && (Number(x.amount) || 0) < f - 1e-9;
-}).length;
-const buckets = (plan: any): number => (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solid(m) > 500).length;
+const crumbs = (plan: any): number =>
+  items(plan).filter((x: any) => {
+    const f = crumbFloor(x);
+    return f > 0 && (Number(x.amount) || 0) < f - 1e-9;
+  }).length;
+const buckets = (plan: any): number =>
+  (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solid(m) > 500).length;
 
 type Row = { key: string; manual: boolean; on: any; off: any };
 const ROWS: Row[] = [];
 for (const manual of [true, false]) {
-  for (const p of PROFILES) for (const mc of [3, 4, 5, 6]) for (const tr of [true, false]) {
-    ROWS.push({
-      key: `${manual ? 'руч' : 'авт'}/${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
-      manual,
-      on: build(p, mc, tr, manual),
-      off: build(p, mc, tr, manual, { vegTopUp88: false }),
-    });
-  }
+  for (const p of PROFILES)
+    for (const mc of [3, 4, 5, 6])
+      for (const tr of [true, false]) {
+        ROWS.push({
+          key: `${manual ? 'руч' : 'авт'}/${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
+          manual,
+          on: build(p, mc, tr, manual),
+          off: build(p, mc, tr, manual, { vegTopUp88: false }),
+        });
+      }
 }
 
 describe('§8.122 овощной пол: 200 г и два вида не спорят с контрактом дня', () => {
@@ -129,9 +151,21 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
         bad.push(`${r.key}: вёдер ${buckets(r.off)} → ${buckets(r.on)}`);
       }
       const plainPlate = new Map<string, number>((r.off.meals || []).map((m: any) => [String(m.label), solid(m)]));
+      const plainVeg = new Map<string, number>(
+        (r.off.meals || []).map((m: any) => [String(m.label), vegG({ meals: [m] })]),
+      );
       for (const m of r.on.meals || []) {
-        const cap = Math.max(700, plainPlate.get(String(m.label)) || 0);
+        // §8.122 (правка): приём может быть шире честного ровно на ДОБАВЛЕННЫЙ в него овощ.
+        // Замер: `руч/hugeCarb/3/тр` — ужин 789 г против честных 734 (+100 г яблока, −45 г
+        // крахмала), день 0.60 % против 0.40 %, балл 87 против 79. Прежняя формула
+        // `max(700, честная)` откатывала такой день к честному и теряла овощ.
+        //
+        // Абсолютный предел 900 г (контракт E-PLATE/§8.127) проверяется отдельно: правило
+        // «честная + овощ» при честной тарелке 880 г разрешило бы 1000 г.
+        const dVeg = Math.max(0, vegG({ meals: [m] }) - Number(plainVeg.get(String(m.label)) || 0));
+        const cap = Math.min(900, Math.max(700, (plainPlate.get(String(m.label)) || 0) + dVeg));
         if (solid(m) > cap + 1e-9) bad.push(`${r.key}: ${m.label} ${solid(m)} г > ${cap} г`);
+        if (solid(m) > 900 + 1e-9) bad.push(`${r.key}: ${m.label} ${solid(m)} г > 900 г (E-PLATE)`);
       }
       if (vegG(r.on) < vegG(r.off)) bad.push(`${r.key}: овоща меньше, чем без добора`);
     }
@@ -148,39 +182,61 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
     expect(bad.join(' | ')).toBe('');
   });
 
-  it('покрытие овощем (факт): ручной <200 г ≤26, без овоща ≤3, один вид ≤29', () => {
-    const rows = ROWS.filter(r => r.manual);
-    const low = rows.filter(r => vegG(r.on) < 200);
-    const zero = rows.filter(r => vegG(r.on) === 0);
-    const one = rows.filter(r => vegKinds(r.on) < 2);
-    expect(low.length, low.map(r => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(26);
-    expect(zero.length, zero.map(r => r.key).join(' | ')).toBeLessThanOrEqual(3);
-    expect(one.length, one.map(r => r.key).join(' | ')).toBeLessThanOrEqual(29);
+  it('покрытие овощем (факт): ручной <200 г ≤9, без овоща ≤1, один вид ≤9', () => {
+    const rows = ROWS.filter((r) => r.manual);
+    const low = rows.filter((r) => vegG(r.on) < 200);
+    const zero = rows.filter((r) => vegG(r.on) === 0);
+    const one = rows.filter((r) => vegKinds(r.on) < 2);
+    expect(low.length, low.map((r) => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(9);
+    expect(zero.length, zero.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(1);
+    expect(one.length, one.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(9);
   });
 
-  it('покрытие овощем (факт): авто <200 г ≤5, один вид ≤3', () => {
-    const rows = ROWS.filter(r => !r.manual);
-    const low = rows.filter(r => vegG(r.on) < 200);
-    const one = rows.filter(r => vegKinds(r.on) < 2);
-    expect(low.length, low.map(r => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(5);
-    expect(one.length, one.map(r => r.key).join(' | ')).toBeLessThanOrEqual(3);
+  it('покрытие овощем (факт): авто <200 г ≤0, один вид ≤1', () => {
+    const rows = ROWS.filter((r) => !r.manual);
+    const low = rows.filter((r) => vegG(r.on) < 200);
+    const one = rows.filter((r) => vegKinds(r.on) < 2);
+    expect(low.length, low.map((r) => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(0);
+    expect(one.length, one.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(1);
   });
 
-  it('добор действительно работает: адресные дни выросли (было 0 и 161–166 г)', () => {
-    const at = (key: string) => ROWS.find(r => r.key === key)!;
-    expect(vegG(at('руч/hugeCarb/3/тр').on)).toBeGreaterThanOrEqual(100); // было 0
-    expect(vegG(at('руч/hugeCarb/3/тр').off)).toBe(0);
-    expect(vegG(at('руч/cutF50/6/тр').on)).toBeGreaterThanOrEqual(100);   // было 0
+  it('добор действительно работает: адресные дни выросли (было 0 и 166 г)', () => {
+    const at = (key: string) => ROWS.find((r) => r.key === key)!;
+    expect(vegG(at('руч/hugeCarb/3/тр').on)).toBeGreaterThanOrEqual(200); // было 0
+    // §8.122: базовая сборка дня держит только broccoli 156 г (один вид), а обе тарелки
+    // стоят на своём пределе (обед 872/872, ужин 734/734). Добор ставит огурец 100 г в
+    // «Перекус 3» — единственный приём с комнатой (564 → 644 г при пределе 700) — вместе
+    // с ккал-нейтральным срезом крахмала: день 256 г / 2 вида, девиация 0.40 %, балл 84.
+    expect(vegKinds(at('руч/hugeCarb/3/тр').on)).toBeGreaterThanOrEqual(2);
+    expect(vegG(at('руч/cutF50/6/тр').on)).toBeGreaterThanOrEqual(100); // было 0
     expect(vegG(at('руч/cutF50/6/тр').off)).toBe(0);
+    // Честный день держит 166 г — на 34 г ниже пола QG10, поэтому добор здесь обязан
+    // работать. Это и есть причина стадии: baseline < 200 г, а не «день недобрал ккал».
+    const off166 = vegG(at('руч/mass110/3/отд').off);
+    expect(off166, `честный день ${off166} г`).toBeGreaterThanOrEqual(160);
+    expect(off166, `честный день ${off166} г`).toBeLessThan(200);
     expect(vegG(at('руч/mass110/3/отд').on)).toBeGreaterThanOrEqual(185); // было 166
-    expect(vegG(at('руч/mass110/3/отд').off)).toBe(166);
   });
 
-  it('авторские порции рецептов не трогаются: овощей с `_fixedGrams` не больше, чем без добора', () => {
+  it('авторские порции рецептов не трогаются: `_fixedGrams`-позиции дня идентичны без добора', () => {
+    // Замок не на «количестве» флагов, а на составе: каждая позиция с `_fixedGrams`
+    // (авторская порция, микро-добивка, креатин — в сетке их 16 на овощах и 832 всего)
+    // обязана остаться в том же приёме с тем же весом. Сравнение по тройке
+    // «приём/продукт/граммы» ловит и удаление, и переезд, и досыпку.
+    const fixedSet = (plan: any): string[] =>
+      (plan.meals || []).flatMap((m: any) =>
+        ((m.items || []) as any[])
+          .filter((x: any) => x._fixedGrams)
+          .map((x: any) => `${String(m.label)}|${String(x.id)}|${Number(x.amount) || 0}`),
+      );
+    let seen = 0;
     for (const r of ROWS) {
-      const fixedOn = items(r.on).filter((x: any) => x.role === 'veg' && x._fixedGrams).length;
-      const fixedOff = items(r.off).filter((x: any) => x.role === 'veg' && x._fixedGrams).length;
-      expect(fixedOn, r.key).toBeLessThanOrEqual(fixedOff);
+      const on = fixedSet(r.on);
+      const off = fixedSet(r.off);
+      seen += off.length;
+      expect(on, r.key).toEqual(off);
     }
+    // Замок не вакуумный: сетка реально несёт `_fixedGrams`-позиции.
+    expect(seen).toBeGreaterThan(0);
   });
 });
