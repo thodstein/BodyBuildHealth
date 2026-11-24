@@ -3007,11 +3007,27 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                         {athleteName}
                       </span>
                     )}
-                    {n.dueAt && (
-                      <span data-notes="due" style={{ fontSize: 10.5, color: colors.textSubtle }}>
-                        До {fmtDate(n.dueAt)}
-                      </span>
-                    )}
+                    {n.dueAt &&
+                      (() => {
+                        // Срок — календарный день, поэтому сравниваем с сегодняшним днём в той же
+                        // локальной шкале (toISOString западнее UTC отдал бы вчера).
+                        const overdue = n.dueAt.slice(0, 10) < localDayISO();
+                        return (
+                          <span
+                            data-notes="due"
+                            data-overdue={overdue ? 'true' : undefined}
+                            style={{
+                              fontSize: 10.5,
+                              color: overdue ? colors.danger : colors.textSubtle,
+                              fontWeight: overdue ? 800 : 400,
+                            }}
+                            title={overdue ? 'Срок прошёл' : undefined}
+                          >
+                            До {fmtDate(n.dueAt)}
+                            {overdue ? ' · просрочено' : ''}
+                          </span>
+                        );
+                      })()}
                     {n.priority === 'high' && (
                       <span data-notes="star" style={{ fontSize: 13, color: colors.danger }} title="Высокий приоритет">
                         ★
