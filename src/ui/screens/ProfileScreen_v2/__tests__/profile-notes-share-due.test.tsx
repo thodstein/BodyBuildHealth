@@ -38,6 +38,17 @@ vi.mock('../../../../core/apk-share', () => ({
           : '⚠ Не удалось',
 }));
 
+/** Запись в localStorage «падает» (квота) — проверяем честный отказ. */
+const writeFails = vi.hoisted(() => ({ on: false }));
+vi.mock('../../../../engines/coach/coach-notes.engine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../engines/coach/coach-notes.engine')>();
+  return {
+    ...actual,
+    writeCoachNotesChecked: (storage: Storage, store: Parameters<typeof actual.writeCoachNotesChecked>[1]) =>
+      writeFails.on ? false : actual.writeCoachNotesChecked(storage, store),
+  };
+});
+
 const PHOTO = {
   id: 'a1',
   kind: 'photo',
@@ -121,6 +132,7 @@ beforeEach(() => {
   }
   __resetNoteMediaForTests();
   copyOrShareText.mockClear();
+  writeFails.on = false;
   saveBlobApk.mockClear();
 });
 afterEach(() => {
@@ -231,6 +243,20 @@ describe('быстрый срок в списке', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('если запись не удалась, срок не меняется и сказано про место', () => {
+    seed();
+    const before = note('n1')?.dueAt ?? null;
+    writeFails.on = true;
+    const { container } = render(<ProfileNotesTab />);
+    fireEvent.click(container.querySelector('[data-note-id="n1"] [data-notes="due-quick"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-notes="due-quick-today"]') as HTMLElement);
+    writeFails.on = false;
+
+    // Стор не тронут: обещание «изменение не сохранено» — правда, а не текст.
+    expect(note('n1')?.dueAt ?? null).toBe(before);
+    expect(container.querySelector('[data-notes="notice"]')?.textContent).toContain('Не хватило места');
   });
 });
 
