@@ -1,80 +1,127 @@
 ---
 name: Research & Evidence
-description: Find and grade sources — PubMed/Europe PMC for medicine and sports science, OpenAlex for citation graphs, web for the rest
+description: Найти и оценить источники по медицине, фармакологии, БАДам и тренировкам — evidence_literature/trials/drug_label/substance/citation, MCP pubmed/openalex, веб-поиск, уровни доказательности и проверка ссылок
 ---
 
 # Research and evidence
 
-## Which tool for which question
+Правило проекта: медицинский, фармакологический или нутриентный факт без источника не произносится. Сначала
+источник — потом утверждение. «Я помню, что...» источником не считается.
 
-| Question                                                                                | Tool                                                                                |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Medicine, physiology, sports science, supplements, training studies                     | `pubmed` MCP (PubMed + PMC full text + Europe PMC preprints + iCite metrics + MeSH) |
-| Broad literature, citation graph, field trends, non-biomedical venues, Russian journals | `openalex` MCP (270M+ works)                                                        |
-| General web, vendor pages, forums, news, prices                                         | built-in `websearch` + `webfetch`; `browse` for JS-heavy or logged-in pages         |
-| Library/API docs                                                                        | `context7`                                                                          |
-| Facts about this repo                                                                   | the code — never the internet                                                       |
+## 1. Какой инструмент для какого вопроса
 
-Both research servers are configured in `opencode.json` as remote MCP (hosted, keyless). Queries leave the machine
-through that host: never send personal data, tokens or user health records in a query.
+| Вопрос                                                              | Инструмент                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Эффективность, дозы, ПКТ, побочки, БАДы, тренировочные протоколы    | `evidence_literature` (PubMed + Europe PMC) или MCP `pubmed`  |
+| Есть ли исследования, что набирают, фазы                            | `evidence_trials` (ClinicalTrials.gov)                        |
+| Официальная инструкция: доза, противопоказания, взаимодействия      | `evidence_drug_label` (DailyMed SPL)                          |
+| Что это за вещество: CID, формула, CAS, синонимы                    | `evidence_substance` (PubChem)                                |
+| Ссылка настоящая и не отозвана                                      | `evidence_citation` (Crossref + OpenAlex `is_retracted`)      |
+| Что уже знает наше приложение                                       | `repo_pharma`, `repo_lab`, `repo_doc`                         |
+| Веб: цены, вендоры, форумы, новости, документация                   | `websearch` / `web_search` (DuckDuckGo), `webfetch`, `browse` |
+| Литература вне биомедицины, цитатные графы, тренды, русские журналы | MCP `openalex` (270M+ работ)                                  |
+| Документация библиотек/API                                          | MCP `context7`                                                |
+| Факты об этом репозитории                                           | код (`read`/`grep`), `repo_doc`, `repo_pharma`, `repo_lab`    |
 
-## PubMed workflow
+`evidence_*` и `web_search` — плагины `.opencode/plugins/evidence.ts`, без ключей и аккаунтов. Они же запасной
+маршрут, если MCP `pubmed` недоступен.
 
-1. Frame the question as population × intervention × outcome (or PICO) before searching.
-2. Build the query with field tags — free text alone is noisy:
-   - `creatine[tiab] AND hypertrophy[tiab] AND "Randomized Controlled Trial"[pt]`
-   - `"Resistance Training"[mh] AND "Muscle Hypertrophy"[mh] AND 2020:2026[dp]`
-   - `protein intake[tiab] AND "energy restriction"[tiab] AND athletes[mh]`
-   - `pubmed pmc[sb]` restricts to records with open full text; `<doi>[doi]`, `<orcid>[auid]`,
-     `"N Engl J Med"[ta]`, `2026/10/01:2026/10/31[edat]` work as expected.
-3. `pubmed_search_articles` (`maxResults`, `summaryCount`). **Read `notice`** — it flags unrecognised field tags and
-   clauses that matched nothing; a bad-tag count is meaningless, fix the query instead of reporting it.
-4. Screen titles/abstracts, then `pubmed_fetch_articles` (PMIDs only, up to 200; `includeMesh`) for the shortlist.
-5. `pubmed_fetch_fulltext` by PMID/PMCID/DOI — PMC → Europe PMC → Unpaywall. If it comes back `unavailable`, the
-   claim stays "abstract only".
-6. Strength of the evidence: `pubmed_fetch_citation_metrics` (RCR, NIH percentile), `pubmed_find_related`
-   (`similar` / `citing` / `references`) to check for independent replication.
-7. `pubmed_format_citations` (Vancouver) for the source list; retraction/correction notices arrive inline — quote them.
-8. Never type a PMID/DOI from memory: resolve with `pubmed_convert_ids`, verify with `pubmed_fetch_articles`.
+## 2. Порядок для медицинского утверждения
 
-Use `pubmed_europepmc_search` for preprints, patents and records PubMed lacks (its `epmcId` is the PMID when one exists).
+1. Сформулируй вопрос как PICO: популяция × вмешательство × сравнение × исход.
+2. `repo_pharma` / `repo_lab` — что приложение уже утверждает. Это проверяемая база, но не доказательство.
+3. `evidence_literature` (или `pubmed_search_articles`, если MCP жив): 2–3 запроса с разными формулировками,
+   фильтры по годам и типу публикации.
+4. Есть препарат с официальным лейблом — `evidence_drug_label` (доза/противопоказания/взаимодействия — оттуда,
+   не из блога).
+5. Сомневаешься в веществе — `evidence_substance`, затем повтори поиск по каноническому имени.
+6. Перед вставкой ссылки в отчёт — `evidence_citation` по DOI/PMID. Отозванную статью не цитировать.
+7. В отчёте у каждого утверждения: источник (PubMed URL или DOI), уровень доказательности, размер эффекта.
 
-## OpenAlex workflow
+## 3. PubMed
 
-- `openalex_resolve_name` first — names are ambiguous, IDs are not.
-- `openalex_search_entities` (`entity_type`, `filters`, `sort`, `per_page`); call `openalex_describe_fields` before
-  inventing a filter or `group_by` field.
-- `openalex_get_citation_graph` with `direction: cites | cited_by` walks one hop; `openalex_analyze_trends` with
-  `group_by: publication_year` gives volume/trend context.
-- Metadata only: no full text. Use it to map a field or find a key paper, then fetch the text via PubMed/DOI.
+- Строй запрос по полям, не свободным текстом:
+  - `creatine[tiab] AND hypertrophy[tiab] AND "Randomized Controlled Trial"[pt]`
+  - `"Resistance Training"[mh] AND "Muscle Hypertrophy"[mh] AND 2020:2026[dp]`
+  - `protein intake[tiab] AND "energy restriction"[tiab] AND athletes[mh]`
+  - `pubmed pmc[sb]` — только со свободным полным текстом; `<doi>[doi]`, `<orcid>[auid]`, `"N Engl J Med"[ta]`,
+    `2026/10/01:2026/10/31[edat]` работают.
+- `pubmed_search_articles` (MCP) или `evidence_literature` (плагин, `source: 'pubmed'`). **Читай `notice`**: он
+  показывает нераспознанные теги — иначе счётчик совпадений бессмысленный.
+- Скрининг заголовков/абстрактов → `pubmed_fetch_articles` (PMIDs, `includeMesh`) → `pubmed_fetch_fulltext`
+  (PMC → Europe PMC → Unpaywall). Нет полного текста — так и пиши: «абстракт».
+- Сила доказательства: `pubmed_fetch_citation_metrics` (RCR, NIH percentile), `pubmed_find_related`.
+- Цитаты: `pubmed_format_citations` (Vancouver) или строка из `evidence_citation`.
+- **Никогда не печатай PMID/DOI по памяти**: `pubmed_convert_ids` / `evidence_citation`.
 
-## Grading rules (apply in every report)
+## 4. Europe PMC и препринты
 
-- Hierarchy: SR/meta-analysis of RCTs > RCT > prospective cohort > cross-sectional/case series > mechanistic/animal >
-  expert opinion or anecdote. Say which one a claim rests on.
-- For each claim record: population, n, dose/intervention, duration, outcome measure, effect size with CI,
-  conflicts of interest, retraction/correction status.
-- Bodybuilding specifics: separate hypertrophy / strength / performance; trained vs untrained; volume-equated
-  comparisons; direct measures (MRI, CT, DXA) vs BIA; supplement form and dose. Do not generalise a 6-week study in
-  untrained males to advanced lifters.
-- Secondary sources (Examine, Stronger by Science, MASS, review blogs) are pointers: cite the primary paper they cite.
-- If sources disagree, say so and show both numbers — do not average them into one claim.
+- `evidence_literature` с `source: 'both'` даёт PubMed и Europe PMC за один вызов; EPMC-абстракты приходят
+  сразу (у PubMed-записей — только метаданные и ссылка на PMC).
+- Europe PMC не понимает PubMed-теги `[tiab]`/`[mh]` — инструмент их вычищает, но не смешивай синтаксисы в одном
+  запросе, если вызываешь EPMC напрямую.
+- Работают `PUB_YEAR:`, `FIRST_PDATE:[2019-01-01 TO 2026-12-31]`, `OPEN_ACCESS:y`, `DOI:`, `TITLE:`, `SRC:PPR`
+  (препринты). `pubmed_europepmc_search` — когда PubMed пуст (препринты, патенты, EPMC-only OA).
 
-## Output
+## 5. ClinicalTrials.gov
 
-- Answer in Russian; every factual claim gets a link (PubMed URL or DOI) and its evidence level in parentheses.
-- Research deliverables go to `docs/` per the `bb-audit` conventions: `<AREA>-<KIND>-<date>.md`, with `file:line`
-  references when a finding concerns the code (existing example: `docs/EXERCISE-CORRECTION-RESEARCH-REPORT.md`).
-- If research changes engine constants (protein ranges, volume landmarks, creatine dosing), put the source next to the
-  constant or in the plan doc and update the tests per the `bb-engine` skill.
+- `evidence_trials`: `query`, `intervention`, `status` (`recruiting`, `active`, `completed`…), `phase`, `nctId`.
+- Регистрация испытания ≠ доказательство эффекта: ищи публикацию результатов (`evidence_literature` по NCT-номеру
+  или названию) и проверяй, совпадает ли заявленный исход с измеренным.
 
-## Limits and fallbacks
+## 6. DailyMed (официальные лейблы)
 
-- NCBI allows ~3 requests/s without `NCBI_API_KEY`; batch PMIDs. Europe PMC/OpenAlex are similarly polite-pool.
-- The hosted OpenAlex endpoint reports a small metered free budget in every response (`budget.remainingUsd`) — keep
-  queries narrow, `per_page` modest, and avoid exploratory `sample` calls.
-- If the `pubmed` MCP is unreachable: run it locally over stdio
-  `npx -y @cyanheads/pubmed-mcp-server` (node ≥ 24; this machine has 24.16), or query E-utilities through `webfetch`.
-- ClinicalTrials.gov registrations surface as `dataBanks` accessions (NCT ids) on PubMed records; to search the registry
-  itself use `webfetch` on `https://clinicaltrials.gov/api/v2/studies?query.term=<term>`.
-- Do not use PubMed for non-biomedical questions (cars, software, law) — that is `websearch`/OpenAlex territory.
+- `evidence_drug_label` сначала ищет по имени (английское МНН), затем грузит первый лейбл; `setId` — точечно.
+- `sections`: `boxed`, `indications`, `dosage`, `contraindications`, `warnings`, `precautions`, `interactions`,
+  `adverse`, `populations`, `overdose`, `pharmacology`, `description`, `counseling`. Разделов может не быть —
+  взаимодействия часто лежат внутри `precautions`, о чём инструмент предупреждает.
+- У ААС и ПКТ-препаратов официальных американских лейблов обычно нет: доза/схема — PubMed + `repo_pharma`,
+  и обязательно пометка «вне инструкции / off-label».
+
+## 7. PubChem и идентичность вещества
+
+- `evidence_substance`: CID, формула, масса, SMILES, CAS, синонимы. Нужен, чтобы не спутать эфиры, соли и
+  «похожие» пептиды, и чтобы найти каноническое английское имя для PubMed.
+- PubChem не даёт доз, ПКТ и клинических рекомендаций — не приписывай ему это.
+
+## 8. Проверка ссылки
+
+`evidence_citation` (`doi`, `pmid` или `title`): Crossref даёт журнал/год/том/страницы/авторов, OpenAlex —
+цитируемость, тип и `is_retracted`. Флаг отзыва или `update-to` — стоп-сигнал: не цитировать, найти замену.
+
+## 9. Веб
+
+- `websearch` (встроенный, через провайдер DuckDuckGo) и `web_search` (тот же движок + `site`/`limit`) работают с
+  этой машины; `webfetch` — открыть страницу, `browse` — JS-страницы и логины.
+- С этой машины **403** отдают `api.fda.gov`, `ods.od.nih.gov`, USDA FDC (`api.nal.usda.gov`), DSLD
+  (`api.ods.od.nih.gov`). Не трать на них раунды: лейблы — DailyMed, вещество — PubChem, доказательства — PubMed.
+- Вторичные источники (Examine, Stronger by Science, MASS) — указатели: цитируй первоисточник, который они
+  называют.
+
+## 10. Уровни доказательности (в каждом отчёте)
+
+- Иерархия: SR/мета-анализ РКИ > РКИ > проспективная когорта > поперечное/серия случаев > механистика/животные >
+  мнение эксперта или анекдот. Указывай, на каком уровне стоит утверждение.
+- Для каждого утверждения: популяция, n, доза/вмешательство, длительность, измеряемый исход, размер эффекта с CI,
+  конфликт интересов, статус отзыва.
+- Бодибилдинг-специфика: отделяй гипертрофию / силу / работоспособность; тренированные vs нетренированные;
+  сравнения при уравненном объёме; прямые измерения (МРТ, КТ, DXA) vs биоимпеданс; форма и доза добавки.
+  Шестинедельное исследование на новичках не переносится на продвинутых.
+- Источники противоречат — покажи оба числа, не усредняй.
+
+## 11. Результат
+
+- Ответ по-русски; у каждого факта ссылка (PubMed URL или DOI) и уровень доказательности в скобках.
+- Исследовательские отчёты — в `docs/` по правилам `bb-audit`: `<AREA>-<KIND>-<date>.md`, с `file:line`, когда
+  вывод касается кода (пример: `docs/EXERCISE-CORRECTION-RESEARCH-REPORT.md`).
+- Если исследование меняет константы движка (белок, объём, креатин), источник кладётся рядом с константой или в
+  план-документ, тесты обновляются по скиллу `bb-engine`.
+
+## 12. Лимиты
+
+- NCBI: ~3 запроса/с без `NCBI_API_KEY`; батчь PMID. Europe PMC и OpenAlex — тоже polite pool.
+- Hosted OpenAlex показывает метрику бюджета (`budget.remainingUsd`) — узкие запросы, скромный `per_page`, без
+  исследовательских `sample`.
+- `pubmed` MCP недоступен → `evidence_literature` (тот же PubMed через E-utilities), локальный stdio-сервер
+  `npx -y @cyanheads/pubmed-mcp-server` (node ≥ 24) или `webfetch` на E-utilities.
+- Не использовать PubMed для небиомедицинских вопросов (софт, право, цены) — это `web_search`/OpenAlex.
