@@ -530,6 +530,12 @@ for (const hook of [
   'data-notes="row-select"',
   'data-notes="batch-bar"',
   'data-notes="note-duplicate"',
+  'data-notes="share-note"',
+  'data-notes="due-quick"',
+  'data-notes="due-menu"',
+  'data-notes="due-quick-clear"',
+  'data-notes="editor-due-presets"',
+  'data-notes="editor-due-clear"',
 ])
   mustContain(NOTES_UI, hook, `notes hook ${hook}`);
 

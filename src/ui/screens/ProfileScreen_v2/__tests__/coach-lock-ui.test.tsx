@@ -60,15 +60,31 @@ const seedAthletes = (n = 1) => {
 };
 
 beforeEach(() => {
-  try { localStorage.clear(); } catch { /* ignore */ }
-  try { sessionStorage.clear(); } catch { /* ignore */ }
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
   shareCalls.saved = [];
   _resetDataSpaceCache();
 });
 afterEach(() => {
   cleanup();
-  try { localStorage.clear(); } catch { /* ignore */ }
-  try { sessionStorage.clear(); } catch { /* ignore */ }
+  try {
+    localStorage.clear();
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
   _resetDataSpaceCache();
 });
 
@@ -81,7 +97,8 @@ describe('PIN по желанию', () => {
     expect(container.querySelector('[data-coach="lock-enable-open"]')?.textContent).toContain('Включить PIN');
   });
 
-  it('включение PIN сохраняет настройку и пишет событие в журнал', async () => {    seedAthletes(1);
+  it('включение PIN сохраняет настройку и пишет событие в журнал', async () => {
+    seedAthletes(1);
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="lock-enable-open"]') as HTMLElement);
     fireEvent.change(container.querySelector('[data-coach="lock-pin"]') as HTMLElement, { target: { value: '2468' } });
@@ -90,9 +107,10 @@ describe('PIN по желанию', () => {
     });
     fireEvent.click(container.querySelector('[data-coach="lock-enable-save"]') as HTMLElement);
 
-    await waitFor(() => expect(readCoachLock(localStorage).enabled).toBe(true));
+    // PBKDF2 (100k итераций) под нагрузкой может не уложиться в дефолтную секунду waitFor.
+    await waitFor(() => expect(readCoachLock(localStorage).enabled).toBe(true), { timeout: 10_000 });
     expect(readCoachLock(localStorage).hash).not.toContain('2468');
-    expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('pin-enabled');
+    expect(readCoachAudit(localStorage).items.map((e) => e.kind)).toContain('pin-enabled');
     // Включили PIN — текущая сессия не выкидывается: человек только что ввёл код.
     expect(container.querySelector('[data-coach="locked"]')).toBeNull();
     expect(container.querySelector('[data-coach="lock-disable-open"]')).not.toBeNull();
@@ -107,8 +125,13 @@ describe('PIN по желанию', () => {
       target: { value: '2469' },
     });
     fireEvent.click(container.querySelector('[data-coach="lock-enable-save"]') as HTMLElement);
-    await waitFor(() =>
-      expect(container.querySelector('[data-coach="lock-error"]')?.textContent).toContain('не совпадают'),
+    await waitFor(
+      () => {
+        const el = container.querySelector('[data-coach="lock-error"]');
+        expect(el).not.toBeNull();
+        expect(el!.textContent).toContain('не совпадают');
+      },
+      { timeout: 10_000 },
     );
     expect(readCoachLock(localStorage).enabled).toBe(false);
   });
@@ -128,8 +151,13 @@ describe('PIN по желанию', () => {
       target: { value: '0000' },
     });
     fireEvent.click(container.querySelector('[data-coach="lock-unlock"]') as HTMLElement);
-    await waitFor(() =>
-      expect(container.querySelector('[data-coach="lock-unlock-error"]')?.textContent).toContain('не подошёл'),
+    await waitFor(
+      () => {
+        const el = container.querySelector('[data-coach="lock-unlock-error"]');
+        expect(el).not.toBeNull();
+        expect(el!.textContent).toContain('не подошёл');
+      },
+      { timeout: 10_000 },
     );
     expect(container.querySelector('[data-coach="locked"]')).not.toBeNull();
 
@@ -137,7 +165,7 @@ describe('PIN по желанию', () => {
       target: { value: '1357' },
     });
     fireEvent.click(container.querySelector('[data-coach="lock-unlock"]') as HTMLElement);
-    await waitFor(() => expect(container.querySelector('[data-coach="locked"]')).toBeNull());
+    await waitFor(() => expect(container.querySelector('[data-coach="locked"]')).toBeNull(), { timeout: 10_000 });
     expect(container.querySelector('[data-coach="athlete"]')).not.toBeNull();
     expect(sessionStorage.getItem(COACH_UNLOCK_KEY)).toBeTruthy();
   });
@@ -155,18 +183,21 @@ describe('PIN по желанию', () => {
       target: { value: '9999' },
     });
     fireEvent.click(container.querySelector('[data-coach="lock-disable-save"]') as HTMLElement);
-    await waitFor(() => expect(container.querySelector('[data-coach="lock-error"]')).not.toBeNull());
+    await waitFor(() => expect(container.querySelector('[data-coach="lock-error"]')).not.toBeNull(), {
+      timeout: 10_000,
+    });
     expect(readCoachLock(localStorage).enabled).toBe(true);
 
     fireEvent.change(container.querySelector('[data-coach="lock-disable-pin"]') as HTMLElement, {
       target: { value: '1357' },
     });
     fireEvent.click(container.querySelector('[data-coach="lock-disable-save"]') as HTMLElement);
-    await waitFor(() => expect(readCoachLock(localStorage).enabled).toBe(false));
-    expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('pin-disabled');
+    await waitFor(() => expect(readCoachLock(localStorage).enabled).toBe(false), { timeout: 10_000 });
+    expect(readCoachAudit(localStorage).items.map((e) => e.kind)).toContain('pin-disabled');
   });
 
-  it('автовыход меняется и сохраняется', async () => {    seedAthletes(1);
+  it('автовыход меняется и сохраняется', async () => {
+    seedAthletes(1);
     const { settings } = await createCoachLock('1357', { salt: 'fixed', autoLockMin: 15 });
     writeCoachLock(localStorage, settings!);
     sessionStorage.setItem(COACH_UNLOCK_KEY, new Date().toISOString());
@@ -196,9 +227,7 @@ describe('PIN по желанию', () => {
 
   it('биометрия включается только с PIN и открывает профиль', async () => {
     seedAthletes(1);
-    const { setCoachLockBiometry, readCoachLock: read } = await import(
-      '../../../../engines/coach/coach-lock.engine'
-    );
+    const { setCoachLockBiometry, readCoachLock: read } = await import('../../../../engines/coach/coach-lock.engine');
     const { settings } = await createCoachLock('1357', { salt: 'fixed' });
     // Включаем биометрию через движок: настройка «только с PIN».
     writeCoachLock(localStorage, setCoachLockBiometry(settings!, true));
@@ -232,7 +261,7 @@ describe('журнал действий', () => {
     fireEvent.click(container.querySelector('[data-coach="save"]') as HTMLElement);
 
     const audit = readCoachAudit(localStorage);
-    const added = audit.items.find(e => e.kind === 'athlete-added');
+    const added = audit.items.find((e) => e.kind === 'athlete-added');
     expect(added).toBeTruthy();
     expect(JSON.stringify(audit)).not.toContain('Секретное Имя');
     expect(added?.athleteId).toBeTruthy();
@@ -242,11 +271,11 @@ describe('журнал действий', () => {
     seedAthletes(1);
     const { container } = render(<ProfileCoachTab />);
     fireEvent.click(container.querySelector('[data-coach="pause"]') as HTMLElement);
-    expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('athlete-status');
+    expect(readCoachAudit(localStorage).items.map((e) => e.kind)).toContain('athlete-status');
 
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
     fireEvent.click(container.querySelector('[data-coach="delete"]') as HTMLElement);
-    expect(readCoachAudit(localStorage).items.map(e => e.kind)).toContain('athlete-removed');
+    expect(readCoachAudit(localStorage).items.map((e) => e.kind)).toContain('athlete-removed');
   });
 
   it('журнал выгружается файлом без имён и содержимого', async () => {

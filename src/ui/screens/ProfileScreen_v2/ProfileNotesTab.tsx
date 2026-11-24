@@ -250,6 +250,18 @@ const fmtDate = (iso: string): string => {
 };
 
 /**
+ * Локальный календарный день со сдвигом — для «Сегодня»/«На неделю».
+ * `toISOString()` здесь нельзя: западнее UTC он отдал бы вчерашний день.
+ */
+const localDayISO = (offsetDays = 0): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+};
+
+/**
  * Длинный текст в списке не разворачиваем целиком: заметка до 8000 символов
  * иначе занимает несколько экранов и прячет остальные. Превью — 6 строк.
  */
@@ -390,6 +402,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   }, [selected]);
   /** Статус «поделиться/сохранить» для последнего вложения. */
   const [shareNote, setShareNote] = useState<string | null>(null);
+  /** Заметка, у которой открыт быстрый срок: «Сегодня» / «На неделю». */
+  const [dueMenuFor, setDueMenuFor] = useState<string | null>(null);
+  /** Пока файлы уходят, второй тап не должен запускать второй шаринг. */
+  const [sharingNote, setSharingNote] = useState(false);
+  // Меню срока принадлежит одному списку: при смене «Заметки/Корзина»,
+  // включении выбора, поиска/фильтров или сортировки оно закрывается, иначе
+  // висело бы над чужой (или уже скрытой) строкой.
+  useEffect(() => {
+    setDueMenuFor(null);
+  }, [viewMode, selectMode, query, athleteFilter, tagFilter, sortBy]);
   /** Сколько занимают файлы заметок — по нему видно, что квота не бесконечна. */
   const [mediaTotal, setMediaTotal] = useState(0);
   /** Второй тап по «удалить все вложения» — подтверждение (как у заметки). */
@@ -456,6 +478,18 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     setError((prev) => (prev === QUOTA_FAIL ? null : prev));
     setNotice((prev) => (prev === QUOTA_FAIL || prev === DAMAGED_NOTICE ? null : prev));
     return true;
+  };
+
+  /**
+   * Быстрый срок из списка: перенос заметки в «Сегодня»/«На неделю» без открытия
+   * редактора (как быстрая дата в TickTick). null — снять срок.
+   */
+  const setDueQuick = (note: CoachNote, dueAt: string | null) => {
+    setDueMenuFor(null);
+    const next = updateCoachNote(storeRef.current, note.id, { dueAt });
+    if (next === storeRef.current) return;
+    if (!apply(next)) return;
+    setNotice(dueAt ? `Срок: ${dueAt === localDayISO() ? 'сегодня' : `до ${fmtDate(dueAt)}`}` : 'Срок снят');
   };
 
   /** Переключить выделение строки в списке; пустой выбор снимает и подтверждение удаления. */
@@ -1420,6 +1454,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
   /** Поделиться/сохранить вложение: сохраняется в «Документы» и в шаринг. */
   const shareAttachment = (att: CoachNoteAttachment) => {
+    if (sharingNote) return;
     setVoiceError(null);
     setShareNote('Готовлю файл…');
     void (async () => {
@@ -1436,19 +1471,53 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     })();
   };
 
-  /** Поделиться всей заметкой (то, что видит список): текст, теги, срок, чек-лист.
-      На вебе — clipboard/Share, в АПК — системный шаринг. */
+  /**
+   * Поделиться заметкой целиком, одной кнопкой: текст (заголовок, текст, теги,
+   * срок, чек-лист), затем каждый файл вложения. Раньше кнопка отдавала только
+   * текст, и файлы приходилось сохранять по одному. Статус честный: сколько
+   * файлов реально ушло и сколько не нашлось в хранилище.
+   */
   const shareNoteText = async (n: CoachNote) => {
-    const parts = [n.title, n.body].filter(Boolean) as string[];
-    if (n.tags && n.tags.length) parts.push(`Теги: ${n.tags.map((t) => `#${t}`).join()}`);
-    if (n.dueAt) parts.push(`Срок: ${fmtDate(n.dueAt)}`);
-    if (n.checklist && n.checklist.length) {
-      const done = n.checklist.filter((c) => c.done).map((c) => c.text);
-      const todo = n.checklist.filter((c) => !c.done).map((c) => c.text);
-      parts.push(`Чек-лист (${done.length}/${n.checklist.length}): ${[...done, ...todo].join('; ') || '∅'}`);
+    if (sharingNote) return;
+    setSharingNote(true);
+    setShareNote('Готовлю…');
+    try {
+      const parts = [n.title, n.body].filter(Boolean) as string[];
+      if (n.tags && n.tags.length) parts.push(`Теги: ${n.tags.map((t) => `#${t}`).join()}`);
+      if (n.dueAt) parts.push(`Срок: ${fmtDate(n.dueAt)}`);
+      if (n.checklist && n.checklist.length) {
+        const done = n.checklist.filter((c) => c.done).map((c) => c.text);
+        const todo = n.checklist.filter((c) => !c.done).map((c) => c.text);
+        parts.push(`Чек-лист (${done.length}/${n.checklist.length}): ${[...done, ...todo].join('; ') || '∅'}`);
+      }
+      const outcome = await copyOrShareText(parts.join('\n').trim() || '(заметка пуста)', n.title || 'Заметка');
+      const atts = noteAttachments(n);
+      let saved = 0;
+      let failed = 0;
+      for (const att of atts) {
+        const blob = await noteMediaPayload(await getNoteMedia(att.id));
+        if (!blob) {
+          failed += 1;
+          continue;
+        }
+        const base = (att.name ?? `note-${att.id}`).replace(/\.[^.]+$/, '').slice(0, 60) || 'note-file';
+        const fileOutcome = await saveBlobApk(`${base}.${extensionForMime(att.mime)}`, blob);
+        if (fileOutcome === 'failed') failed += 1;
+        else saved += 1;
+      }
+      const textLabel = shareOutcomeLabel(outcome);
+      setShareNote(
+        atts.length === 0
+          ? textLabel
+          : `Текст: ${textLabel} · файлы ${saved}/${atts.length}${failed === 0 ? '' : ` (не удалось: ${failed})`}`,
+      );
+    } catch {
+      // Движки глушат свои ошибки, но новый мост может бросить: статус не
+      // должен навсегда застрять на «Готовлю…».
+      setShareNote('⚠ Не удалось');
+    } finally {
+      setSharingNote(false);
     }
-    const outcome = await copyOrShareText(parts.join('\n').trim() || '(заметка пуста)', 'Заметка');
-    setShareNote(shareOutcomeLabel(outcome));
   };
 
   // Поиск/фильтр — «честные»: видно, сколько скрыто, и есть чем вернуть всё.
@@ -1931,6 +2000,35 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   {v === 'low' ? '◇' : v === 'normal' ? '■' : '◆'}
                 </button>
               ))}
+            </div>
+            <div style={{ display: 'flex', gap: 4 }} data-notes="editor-due-presets">
+              {(
+                [
+                  ['today', 'Сегодня', 0],
+                  ['week', 'На неделю', 7],
+                ] as const
+              ).map(([key, label, offset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  data-notes={`editor-due-${key}`}
+                  onClick={() => setEditor((s) => (s ? { ...s, dueAt: localDayISO(offset) } : s))}
+                  style={{ ...btn('ghost'), minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
+                >
+                  {label}
+                </button>
+              ))}
+              {editor.dueAt && (
+                <button
+                  type="button"
+                  data-notes="editor-due-clear"
+                  aria-label="Снять срок"
+                  onClick={() => setEditor((s) => (s ? { ...s, dueAt: null } : s))}
+                  style={{ ...btn('ghost'), minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
           {editor.createdAt && (
@@ -2570,16 +2668,65 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                         {attachBytes > 0 ? ` · ${formatBytes(attachBytes)}` : ''}
                       </span>
                     )}
+                    {viewMode === 'active' && editor?.id !== n.id && (
+                      <button
+                        type="button"
+                        data-notes="due-quick"
+                        aria-label="Срок: сегодня или на неделю"
+                        aria-expanded={dueMenuFor === n.id}
+                        onClick={() => setDueMenuFor((cur) => (cur === n.id ? null : n.id))}
+                        style={{ ...btn('ghost'), minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
+                      >
+                        📅
+                      </button>
+                    )}
                     <button
                       type="button"
                       data-notes="share-note"
-                      aria-label="Поделиться заметкой"
+                      aria-label="Поделиться заметкой и её файлами"
                       onClick={() => void shareNoteText(n)}
-                      style={{ ...btn('ghost'), padding: '2px 10px', fontSize: 11.5 }}
+                      disabled={sharingNote}
+                      style={{
+                        ...btn('ghost'),
+                        minWidth: 44,
+                        padding: '2px 10px',
+                        fontSize: 11.5,
+                        opacity: sharingNote ? 0.5 : 1,
+                      }}
                     >
                       ⤓
                     </button>
                   </div>
+                  {viewMode === 'active' && editor?.id !== n.id && dueMenuFor === n.id && (
+                    <div data-notes="due-menu" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      {(
+                        [
+                          ['today', 'Сегодня', 0],
+                          ['week', 'На неделю', 7],
+                        ] as const
+                      ).map(([key, label, offset]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          data-notes={`due-quick-${key}`}
+                          onClick={() => setDueQuick(n, localDayISO(offset))}
+                          style={{ ...btn('ghost'), minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      {n.dueAt && (
+                        <button
+                          type="button"
+                          data-notes="due-quick-clear"
+                          onClick={() => setDueQuick(n, null)}
+                          style={{ ...btn('ghost'), minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
+                        >
+                          Снять срок
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {n.body &&
                     (n.title || n.body.length > 80) &&
                     (() => {
@@ -3066,7 +3213,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             data-notes="notice-dismiss"
             onClick={() => setNotice(null)}
             aria-label="Скрыть сообщение"
-            style={{ ...btn('ghost'), minHeight: 44, padding: '2px 10px', fontSize: 11.5 }}
+            style={{ ...btn('ghost'), minHeight: 44, minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
           >
             ✕
           </button>
@@ -3092,7 +3239,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             data-notes="share-dismiss"
             onClick={() => setShareNote(null)}
             aria-label="Скрыть статус сохранения"
-            style={{ ...btn('ghost'), minHeight: 44, padding: '2px 10px', fontSize: 11.5 }}
+            style={{ ...btn('ghost'), minHeight: 44, minWidth: 44, padding: '2px 10px', fontSize: 11.5 }}
           >
             ✕
           </button>
