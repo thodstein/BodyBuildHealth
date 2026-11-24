@@ -524,6 +524,12 @@ for (const hook of [
   'data-notes="restore"',
   'data-notes="purge-trash"',
   'data-notes="checklist-toggle"',
+  'data-notes="due"',
+  'data-notes="priority"',
+  'data-notes="select-mode"',
+  'data-notes="row-select"',
+  'data-notes="batch-bar"',
+  'data-notes="note-duplicate"',
 ])
   mustContain(NOTES_UI, hook, `notes hook ${hook}`);
 

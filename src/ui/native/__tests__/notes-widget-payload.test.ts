@@ -72,4 +72,15 @@ describe('строки заметок для виджета', () => {
     // Закреплённая в корзине не должна раздувать счётчик закреплённых.
     expect(payload.pinned).toBe(0);
   });
+  it('заметка со сроком идёт выше более свежей без срока', () => {
+    let store = emptyCoachNotes();
+    store = addCoachNote(store, { title: 'Без срока' }, { id: 'n1', now: '2026-11-18T12:00:00.000Z' }).store;
+    store = addCoachNote(
+      store,
+      { title: 'Со сроком', dueAt: '2026-11-30' },
+      { id: 'n2', now: '2026-11-18T09:00:00.000Z' },
+    ).store;
+    const snap = notesForWidget(store);
+    expect(snap.notes.map((n) => n.title)).toEqual(['Со сроком', 'Без срока']);
+  });
 });

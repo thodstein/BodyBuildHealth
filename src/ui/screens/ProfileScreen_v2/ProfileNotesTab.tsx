@@ -46,8 +46,10 @@ import {
   COACH_NOTES_DAMAGED_KEY,
   COACH_NOTES_MAX,
   addCoachNote,
+  CoachNotePriority,
   collectCoachNoteTags,
   countLiveCoachNotes,
+  duplicateCoachNote,
   filterCoachNotes,
   isCoachNoteDeleted,
   noteAttachmentIds,
@@ -59,9 +61,11 @@ import {
   purgeCoachTrash,
   readCoachNotesResult,
   restoreCoachNote,
+  restoreCoachNotes,
   toggleCoachNotePin,
   toggleNoteChecklistItem,
   trashCoachNote,
+  trashCoachNotes,
   updateCoachNote,
   writeCoachNotesChecked,
   type CoachNote,
@@ -107,7 +111,7 @@ import {
   saveNoteMediaMany,
   type NoteMediaRecord,
 } from '../../../engines/note-media-store';
-import { saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { copyOrShareText, saveBlobApk, shareOutcomeLabel } from '../../../core/apk-share';
 
 const AMBER = '#f59e0b';
 
@@ -171,6 +175,12 @@ interface EditorState {
   body: string;
   athleteId: string;
   pinned: boolean;
+  /** Срок (`YYYY-MM-DD`), либо null — заметка без дедлайна. */
+  dueAt: string | null;
+  /** Приоритет заметки — для сортировки и отображения. */
+  priority: CoachNotePriority;
+  /** createdAt заметки — только для уже существующих (показ в редакторе). */
+  createdAt?: string;
   tagsText: string;
   checklist: CoachNoteChecklistItem[];
   attachments: DraftAttachment[];
@@ -182,6 +192,8 @@ const EMPTY_EDITOR: EditorState = {
   body: '',
   athleteId: '',
   pinned: false,
+  dueAt: null,
+  priority: 'normal',
   tagsText: '',
   checklist: [],
   attachments: [],
@@ -229,7 +241,10 @@ const btn = (tone: 'primary' | 'ghost' | 'danger'): React.CSSProperties => ({
 });
 
 const fmtDate = (iso: string): string => {
-  const d = new Date(iso);
+  // `dueAt` — календарный день, а не момент времени: `new Date('2026-11-23')`
+  // даёт UTC-полночь и западнее UTC показывал бы 22.11. День собираем локально.
+  const dayOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const d = dayOnly ? new Date(Number(dayOnly[1]), Number(dayOnly[2]) - 1, Number(dayOnly[3])) : new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 };
@@ -363,6 +378,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const [confirmPurgeTrash, setConfirmPurgeTrash] = useState(false);
   /** Короткое подтверждение действия («в корзине», «восстановлено»). */
   const [notice, setNotice] = useState<string | null>(null);
+  /** Режим «выделить → групповое действие» (как в TickTick). */
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  /** Подтверждать «удалить навсегда» — как у одиночного удаления. */
+  const [batchPurge, setBatchPurge] = useState(false);
+  // Подтверждение необратимого удаления не должно пережить смену набора:
+  // иначе следующий тап по «Удалить навсегда» снесёт уже другую заметку.
+  useEffect(() => {
+    setBatchPurge(false);
+  }, [selected]);
   /** Статус «поделиться/сохранить» для последнего вложения. */
   const [shareNote, setShareNote] = useState<string | null>(null);
   /** Сколько занимают файлы заметок — по нему видно, что квота не бесконечна. */
@@ -431,6 +456,134 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
     setError((prev) => (prev === QUOTA_FAIL ? null : prev));
     setNotice((prev) => (prev === QUOTA_FAIL || prev === DAMAGED_NOTICE ? null : prev));
     return true;
+  };
+
+  /** Переключить выделение строки в списке; пустой выбор снимает и подтверждение удаления. */
+  const toggleSelected = (id: string) => {
+    const next = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+    setSelected(next);
+    if (next.length === 0) setBatchPurge(false);
+  };
+
+  /** «В корзину» по выделенным — то же, что одиночное действие. */
+  const batchTrash = () => {
+    if (selected.length === 0) return;
+    const prev = storeRef.current;
+    // Stale id (уже удалённые/чужие списку) не считаем: иначе врали бы счётчики.
+    const candidates = selected.filter((id) => {
+      const n = prev.items.find((x) => x.id === id);
+      return Boolean(n) && !isCoachNoteDeleted(n!);
+    });
+    const before = countLiveCoachNotes(prev);
+    const next = trashCoachNotes(prev, candidates);
+    const moved = next === prev ? 0 : before - countLiveCoachNotes(next);
+    const full = moved < candidates.length;
+    setSelected([]);
+    setSelectMode(false);
+    if (moved === 0) {
+      setNotice(full ? 'Корзина заполнена: очистите её, чтобы удалять заметки.' : 'Нечего переносить в корзину.');
+      return;
+    }
+    if (!apply(next)) return;
+    // Открытый редактор удалённой заметки писал бы в корзину (правка отклоняется).
+    if (editor && selected.includes(editor.id ?? '')) closeEditor();
+    const left = candidates.length - moved;
+    setNotice(left > 0 ? `В корзину: ${moved}. Корзина заполнена — остались: ${left}.` : `В корзину: ${moved}`);
+  };
+
+  /** «Восстановить» по выделенным из корзины (лимит живых держит движок). */
+  const batchRestore = () => {
+    if (selected.length === 0) return;
+    const prev = storeRef.current;
+    const candidates = selected.filter((id) => {
+      const n = prev.items.find((x) => x.id === id);
+      return Boolean(n) && isCoachNoteDeleted(n!);
+    });
+    const before = countLiveCoachNotes(prev);
+    const next = restoreCoachNotes(prev, candidates);
+    const restored = next === prev ? 0 : countLiveCoachNotes(next) - before;
+    setSelected([]);
+    setSelectMode(false);
+    setBatchPurge(false);
+    if (restored === 0) {
+      setNotice(
+        candidates.length === 0
+          ? 'В корзине этих заметок уже нет.'
+          : `Лимит ${COACH_NOTES_MAX} живых заметок: освободите место, чтобы вернуть.`,
+      );
+      return;
+    }
+    if (!apply(next)) return;
+    const left = candidates.length - restored;
+    setNotice(left > 0 ? `Восстановлено: ${restored}. Не поместились в лимит: ${left}.` : `Восстановлено: ${restored}`);
+  };
+
+  /** «Удалить навсегда» по выделенным — подтверждение отдельно. */
+  const batchPurgeNow = () => {
+    if (selected.length === 0) return;
+    const ids = [...selected];
+    const before = storeRef.current.items.length;
+    let s = storeRef.current;
+    for (const id of ids) s = purgeCoachNote(s, id);
+    const purged = before - s.items.length;
+    setSelected([]);
+    setSelectMode(false);
+    setBatchPurge(false);
+    if (purged === 0) return;
+    if (!apply(s)) return;
+    if (editor && ids.includes(editor.id ?? '')) closeEditor();
+    // Окончательное удаление — единственное место, где стираются байты файлов.
+    void Promise.all(ids.map((id) => deleteNoteMediaForNote(id))).then(refreshMediaTotal);
+    setNotice(`Удалено навсегда: ${purged}`);
+  };
+
+  /**
+   * Копия заметки: движок копирует поля и метаданные вложений, а байты файлов
+   * живут в IndexedDB и без явного копирования остались бы под id оригинала —
+   * в копии было бы «файл не найден». Поэтому сначала новый id, затем байты.
+   */
+  const duplicateNote = (id: string) => {
+    const prev = storeRef.current;
+    const next = duplicateCoachNote(prev, id);
+    if (next === prev) {
+      setNotice(`Лимит ${COACH_NOTES_MAX} живых заметок: копию не создать.`);
+      return;
+    }
+    const src = prev.items.find((n) => n.id === id);
+    const copy = next.items[0];
+    if (!apply(next)) return;
+    setNotice('Создана копия заметки.');
+    const sources = src ? noteAttachments(src) : [];
+    const pairs = noteAttachments(copy)
+      .map((to, i) => ({ from: sources[i], to }))
+      .filter((p): p is { from: CoachNoteAttachment; to: CoachNoteAttachment } => Boolean(p.from));
+    if (pairs.length === 0) return;
+    void (async () => {
+      const records: NoteMediaRecord[] = [];
+      for (const { from, to } of pairs) {
+        const payload = await noteMediaPayload(await getNoteMedia(from.id));
+        if (!payload) continue;
+        records.push({
+          id: to.id,
+          noteId: copy.id,
+          kind: to.kind,
+          mime: to.mime,
+          size: payload.size,
+          ...(to.durationMs ? { durationMs: to.durationMs } : {}),
+          ...(to.name ? { name: to.name } : {}),
+          createdAt: Date.now(),
+          blob: payload,
+        });
+      }
+      if (records.length === 0) return;
+      if (!(await saveNoteMediaMany(records))) {
+        // Копия без файлов честнее ссылок на байты, которых нет.
+        apply(updateCoachNote(storeRef.current, copy.id, { attachments: [] }));
+        setNotice('Копия создана без файлов: в хранилище нет места.');
+        return;
+      }
+      refreshMediaTotal();
+    })();
   };
 
   /** «Сколько занимают файлы» — считаем после каждой записи/удаления. */
@@ -629,6 +782,9 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       body: n.body,
       athleteId: n.athleteId ?? '',
       pinned: n.pinned,
+      dueAt: n.dueAt ?? null,
+      priority: n.priority ?? 'normal',
+      createdAt: n.createdAt,
       tagsText: noteTags(n).join(', '),
       checklist: (n.checklist ?? []).map((c) => ({ ...c })),
       attachments,
@@ -698,6 +854,20 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       return;
     }
     setEditor((s) => (s ? { ...s, attachments: [...s.attachments, draft] } : s));
+  };
+
+  /** Поменять вложение местами в редакторе (reorder): порядок сохранится на общем update. */
+  const moveAttachment = (index: number, delta: -1 | 1) => {
+    setEditor((s) => {
+      if (!s) return s;
+      const next = [...s.attachments];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return s;
+      const tmp = next[index];
+      next[index] = next[target];
+      next[target] = tmp;
+      return { ...s, attachments: next };
+    });
   };
 
   const addAudioBlob = async (blob: Blob, durationMs: number, name?: string) => {
@@ -1035,6 +1205,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       body: draft.body,
       athleteId: draft.athleteId || null,
       pinned: draft.pinned,
+      dueAt: draft.dueAt,
+      priority: draft.priority,
       checklist: trimmedChecklist(draft),
       attachments,
       // Теги разбираются тем же правилом, что и движок: `#`, дубли и хвосты
@@ -1168,7 +1340,12 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
   const askDelete = (id: string) => {
     if (confirmDeleteId === id) {
       setConfirmDeleteId(null);
-      if (!apply(trashCoachNote(storeRef.current, id))) return;
+      const next = trashCoachNote(storeRef.current, id);
+      if (next === storeRef.current) {
+        setNotice('Корзина заполнена: очистите её, чтобы удалять заметки.');
+        return;
+      }
+      if (!apply(next)) return;
       setNotice('Заметка в корзине — её можно вернуть.');
       if (editor?.id === id) closeEditor();
       return;
@@ -1257,6 +1434,21 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
       const outcome = await saveBlobApk(`${base}.${extensionForMime(att.mime)}`, blob);
       setShareNote(shareOutcomeLabel(outcome));
     })();
+  };
+
+  /** Поделиться всей заметкой (то, что видит список): текст, теги, срок, чек-лист.
+      На вебе — clipboard/Share, в АПК — системный шаринг. */
+  const shareNoteText = async (n: CoachNote) => {
+    const parts = [n.title, n.body].filter(Boolean) as string[];
+    if (n.tags && n.tags.length) parts.push(`Теги: ${n.tags.map((t) => `#${t}`).join()}`);
+    if (n.dueAt) parts.push(`Срок: ${fmtDate(n.dueAt)}`);
+    if (n.checklist && n.checklist.length) {
+      const done = n.checklist.filter((c) => c.done).map((c) => c.text);
+      const todo = n.checklist.filter((c) => !c.done).map((c) => c.text);
+      parts.push(`Чек-лист (${done.length}/${n.checklist.length}): ${[...done, ...todo].join('; ') || '∅'}`);
+    }
+    const outcome = await copyOrShareText(parts.join('\n').trim() || '(заметка пуста)', 'Заметка');
+    setShareNote(shareOutcomeLabel(outcome));
   };
 
   // Поиск/фильтр — «честные»: видно, сколько скрыто, и есть чем вернуть всё.
@@ -1377,11 +1569,32 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           </div>
         )}
 
+        {/* Групповые операции — «выделить → групповое действие», как в TickTick. */}
+        <button
+          type="button"
+          data-notes="select-mode"
+          aria-pressed={selectMode}
+          onClick={() => {
+            setSelectMode(!selectMode);
+            setSelected([]);
+            setBatchPurge(false);
+          }}
+          style={{ ...btn('ghost'), marginTop: 8, padding: '2px 10px', fontSize: 12 }}
+        >
+          {selectMode ? 'Отменить выбор' : 'Выбрать'}
+        </button>
+
         {/* Два списка, как в TickTick: живые заметки и корзина. */}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
             type="button"
-            onClick={() => setViewMode('active')}
+            onClick={() => {
+              // Выделение живёт в пределах своего списка: иначе «в корзину»
+              // прилетело бы заметкам из другого режима.
+              setViewMode('active');
+              setSelected([]);
+              setBatchPurge(false);
+            }}
             data-notes="view"
             data-view="active"
             aria-pressed={viewMode === 'active'}
@@ -1396,6 +1609,8 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               // выглядел бы пустым без видимой причины.
               setTagFilter('all');
               setViewMode('trash');
+              setSelected([]);
+              setBatchPurge(false);
             }}
             data-notes="view"
             data-view="trash"
@@ -1420,6 +1635,83 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
             <option value="title">По заголовку (А–Я)</option>
           </select>
         </div>
+
+        {/* Групповой бар: «В корзину» / «Восстановить» / «Удалить навсегда». */}
+        {selected.length > 0 && (
+          <div
+            data-notes="batch-bar"
+            style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}
+          >
+            {viewMode === 'trash' ? (
+              <>
+                <button
+                  type="button"
+                  data-notes="batch-restore"
+                  onClick={batchRestore}
+                  style={{ ...btn('primary'), padding: '2px 14px', fontSize: 12.5 }}
+                >
+                  Восстановить ({selected.length})
+                </button>
+                {batchPurge ? (
+                  <>
+                    <button
+                      type="button"
+                      data-notes="batch-purge-confirm"
+                      onClick={batchPurgeNow}
+                      style={{ ...btn('danger'), padding: '2px 14px', fontSize: 12.5 }}
+                    >
+                      Удалить навсегда ({selected.length})
+                    </button>
+                    <button
+                      type="button"
+                      data-notes="batch-purge-cancel"
+                      onClick={() => setBatchPurge(false)}
+                      style={{ ...btn('ghost'), padding: '2px 10px', fontSize: 12.5 }}
+                    >
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    data-notes="batch-purge"
+                    onClick={() => setBatchPurge(true)}
+                    style={{ ...btn('ghost'), padding: '2px 10px', fontSize: 12.5 }}
+                  >
+                    Удалить навсегда
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                data-notes="batch-delete"
+                onClick={batchTrash}
+                style={{
+                  ...btn('ghost'),
+                  color: AMBER,
+                  borderColor: withAlpha(AMBER, '45'),
+                  padding: '2px 14px',
+                  fontSize: 12.5,
+                }}
+              >
+                В корзину ({selected.length})
+              </button>
+            )}
+            <button
+              type="button"
+              data-notes="select-cancel"
+              onClick={() => {
+                setSelected([]);
+                setSelectMode(false);
+                setBatchPurge(false);
+              }}
+              style={{ ...btn('ghost'), padding: '2px 10px', fontSize: 12.5 }}
+            >
+              Отменить выбор
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           <input
@@ -1602,6 +1894,50 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
           >
             {editor.title.length}/{COACH_NOTE_TITLE_MAX}
           </div>
+          {/* Срок/приоритет — отдельная строка, как «звёздка/дата» в TickTick. */}
+          <div
+            style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}
+            data-notes="editor-due"
+          >
+            <input
+              id="note-due"
+              type="date"
+              data-notes="due"
+              aria-label="Дата завершения срока (если есть)"
+              value={editor.dueAt ?? ''}
+              onChange={(e) => setEditor((s) => (s ? { ...s, dueAt: e.target.value || null } : s))}
+              style={inputStyle}
+            />
+            <div style={{ display: 'flex', gap: 4 }} data-notes="priority-row">
+              {(['low', 'normal', 'high'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  data-notes="priority"
+                  data-priority={v}
+                  aria-pressed={editor.priority === v}
+                  title={v === 'low' ? 'Низкий приоритет' : v === 'normal' ? 'Обычный приоритет' : 'Высокий приоритет'}
+                  onClick={() => setEditor((s) => (s ? { ...s, priority: v } : s))}
+                  style={{
+                    ...btn('ghost'),
+                    minWidth: 42,
+                    padding: '2px 10px',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    opacity: editor.priority === v ? 1 : 0.35,
+                    color: v === 'high' ? colors.danger : undefined,
+                  }}
+                >
+                  {v === 'low' ? '◇' : v === 'normal' ? '■' : '◆'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {editor.createdAt && (
+            <div data-notes="editor-created" style={{ marginTop: 6, fontSize: 11, color: colors.textSubtle }}>
+              Создано {fmtDate(editor.createdAt)}
+            </div>
+          )}
           <label
             style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: colors.textMuted, margin: '10px 0 5px' }}
             htmlFor="note-body"
@@ -1823,7 +2159,7 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
 
           {editor.attachments.length > 0 && (
             <div data-notes="attach-list" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-              {editor.attachments.map((a) => (
+              {editor.attachments.map((a, aIndex) => (
                 <div
                   key={a.id}
                   data-notes="attach-item"
@@ -1872,6 +2208,30 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                   >
                     {a.name ?? (a.kind === 'photo' ? 'Фото' : 'Запись')} · {formatBytes(a.size)}
                   </div>
+                  {aIndex > 0 && (
+                    <button
+                      type="button"
+                      data-notes="attach-swap"
+                      data-dir="up"
+                      aria-label="Выше вложения"
+                      onClick={() => moveAttachment(aIndex, -1)}
+                      style={{ ...btn('ghost'), minWidth: 32, minHeight: 44, padding: '2px 6px' }}
+                    >
+                      ↑
+                    </button>
+                  )}
+                  {aIndex < editor.attachments.length - 1 && (
+                    <button
+                      type="button"
+                      data-notes="attach-swap"
+                      data-dir="down"
+                      aria-label="Ниже вложения"
+                      onClick={() => moveAttachment(aIndex, 1)}
+                      style={{ ...btn('ghost'), minWidth: 32, minHeight: 44, padding: '2px 6px' }}
+                    >
+                      ↓
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeDraftAttachment(a.id)}
@@ -2153,6 +2513,30 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
               }}
             >
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                {/* Чек выбора — ☑/☐. */}
+                {selectMode && (
+                  <button
+                    type="button"
+                    data-notes="row-select"
+                    aria-label={`Выбрать заметку: ${n.title || n.body.slice(0, 30) || 'Заметка'}`}
+                    aria-pressed={selected.includes(n.id)}
+                    data-checked={selected.includes(n.id)}
+                    onClick={() => toggleSelected(n.id)}
+                    style={{
+                      // Только minWidth: сканер тап-таргетов флагует width без height.
+                      minWidth: 44,
+                      minHeight: 44,
+                      padding: 0,
+                      color: selected.includes(n.id) ? AMBER : colors.textSubtle,
+                      fontSize: 20,
+                      lineHeight: '44px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {selected.includes(n.id) ? '☑' : '☐'}
+                  </button>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <div
@@ -2186,6 +2570,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                         {attachBytes > 0 ? ` · ${formatBytes(attachBytes)}` : ''}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      data-notes="share-note"
+                      aria-label="Поделиться заметкой"
+                      onClick={() => void shareNoteText(n)}
+                      style={{ ...btn('ghost'), padding: '2px 10px', fontSize: 11.5 }}
+                    >
+                      ⤓
+                    </button>
                   </div>
                   {n.body &&
                     (n.title || n.body.length > 80) &&
@@ -2467,6 +2860,16 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                         {athleteName}
                       </span>
                     )}
+                    {n.dueAt && (
+                      <span data-notes="due" style={{ fontSize: 10.5, color: colors.textSubtle }}>
+                        До {fmtDate(n.dueAt)}
+                      </span>
+                    )}
+                    {n.priority === 'high' && (
+                      <span data-notes="star" style={{ fontSize: 13, color: colors.danger }} title="Высокий приоритет">
+                        ★
+                      </span>
+                    )}
                     <span style={{ fontSize: 10.5, color: colors.textSubtle }}>{fmtDate(n.updatedAt)}</span>
                     {n.pinned && <span style={{ fontSize: 10.5, color: AMBER, fontWeight: 800 }}>закреплена</span>}
                     {n.deletedAt && (
@@ -2544,6 +2947,15 @@ export const ProfileNotesTab: React.FC<{ initialAthleteId?: string }> = ({ initi
                       style={{ ...btn('ghost'), fontSize: 12 }}
                     >
                       Изменить
+                    </button>
+                    <button
+                      type="button"
+                      data-notes="note-duplicate"
+                      aria-label="Дублировать заметку"
+                      onClick={() => duplicateNote(n.id)}
+                      style={{ ...btn('ghost'), fontSize: 12 }}
+                    >
+                      Дублировать
                     </button>
                     {speechOutputSupported && (n.title || n.body) && (
                       <button

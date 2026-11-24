@@ -74,6 +74,10 @@ export interface CoachNote {
    */
   week: string | null;
   pinned: boolean;
+  /** Срок заметки: календарный день `YYYY-MM-DD` либо null (срок не задан). */
+  dueAt: string | null;
+  /** Важность заметки: `high` выше `normal` выше `low`. */
+  priority: CoachNotePriority;
   createdAt: string;
   updatedAt: string;
   /** Чек-лист (TickTick-подобный): пункты с отметками. Опционален для старых заметок. */
@@ -92,6 +96,9 @@ export interface CoachNote {
 /** Порядок сортировки заметок внутри групп закреплённых/обычных. */
 export type CoachNoteSort = 'updated' | 'created' | 'title';
 
+/** Важность заметки: `high` выше `normal` выше `low` — влияет на сортировку. */
+export type CoachNotePriority = 'low' | 'normal' | 'high';
+
 export interface CoachNotesStore {
   version: 1;
   items: CoachNote[];
@@ -105,7 +112,10 @@ export function emptyCoachNotes(): CoachNotesStore {
 }
 
 const nowIso = (): string => new Date().toISOString();
-const text = (v: unknown, max: number): string => String(v ?? '').trim().slice(0, max);
+const text = (v: unknown, max: number): string =>
+  String(v ?? '')
+    .trim()
+    .slice(0, max);
 
 /** Неделя — только календарный день `YYYY-MM-DD`; всё остальное → null. */
 const weekDay = (v: unknown): string | null => {
@@ -168,6 +178,16 @@ export function normalizeChecklist(raw: unknown): CoachNoteChecklistItem[] {
   return out;
 }
 
+/** Срок заметки: календарный день `YYYY-MM-DD`; битые/чужие значения → null. */
+const parseDueAt = (v: unknown): string | null => {
+  if (typeof v !== 'string') return null;
+  const t = text(v, 40);
+  return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : null;
+};
+
+/** Приоритет заметки: только `low`/`high`; всё остальное → `normal`. */
+const parsePriority = (v: unknown): CoachNotePriority => (v === 'low' || v === 'high' ? v : 'normal');
+
 /**
  * Терпимый парсер вложений: id обязателен, mime — только image/* или audio/*,
  * размер больше потолка выбрасывается (иначе метаданные ссылались бы на файл,
@@ -226,7 +246,7 @@ export function noteAttachments(note: CoachNote): CoachNoteAttachment[] {
 
 /** id вложений заметки — нужно хранилищу, чтобы вычистить осиротевшие файлы. */
 export function noteAttachmentIds(note: CoachNote): string[] {
-  return noteAttachments(note).map(a => a.id);
+  return noteAttachments(note).map((a) => a.id);
 }
 
 function normalizeNote(raw: unknown): CoachNote | null {
@@ -238,6 +258,8 @@ function normalizeNote(raw: unknown): CoachNote | null {
   const checklist = normalizeChecklist(n.checklist);
   const attachments = normalizeAttachments(n.attachments);
   const tags = normalizeNoteTags(n.tags);
+  const dueAt = parseDueAt(n.dueAt);
+  const priority = parsePriority(n.priority);
   const deletedAt = typeof n.deletedAt === 'string' ? text(n.deletedAt, 40) : '';
   if (!id || (!title && !body && checklist.length === 0 && attachments.length === 0)) return null;
   const createdAt = text(n.createdAt, 40) || nowIso();
@@ -248,6 +270,8 @@ function normalizeNote(raw: unknown): CoachNote | null {
     athleteId: text(n.athleteId, 80) || null,
     week: weekDay(n.week),
     pinned: n.pinned === true,
+    dueAt,
+    priority,
     createdAt,
     updatedAt: text(n.updatedAt, 40) || createdAt,
     checklist,
@@ -419,6 +443,10 @@ export function addCoachNote(
     pinned?: boolean;
     /** Неделя `YYYY-MM-DD` (понедельник) — для «комментария к неделе». */
     week?: string | null;
+    /** Срок заметки: календарный день `YYYY-MM-DD` либо null. */
+    dueAt?: string | null;
+    /** Важность: `low`/`normal`/`high` (по умолчанию `normal`). */
+    priority?: CoachNotePriority;
     checklist?: CoachNoteChecklistItem[];
     attachments?: CoachNoteAttachment[];
     /** Теги заметки (без `#`; лимиты и дедуп — в `normalizeNoteTags`). */
@@ -444,6 +472,8 @@ export function addCoachNote(
     athleteId: text(input.athleteId, 80) || null,
     week: weekDay(input.week),
     pinned: input.pinned === true,
+    dueAt: parseDueAt(input.dueAt),
+    priority: parsePriority(input.priority),
     createdAt: now,
     updatedAt: now,
     checklist,
@@ -462,20 +492,25 @@ export function updateCoachNote(
     athleteId?: string | null;
     pinned?: boolean;
     week?: string | null;
+    /** Срок заметки: календарный день `YYYY-MM-DD` либо null (`undefined` — не менять). */
+    dueAt?: string | null;
+    /** Приоритет: `low`/`normal`/`high` (`undefined` — не менять). */
+    priority?: CoachNotePriority;
     checklist?: CoachNoteChecklistItem[];
     attachments?: CoachNoteAttachment[];
     tags?: string[];
   },
   opts: { now?: string } = {},
 ): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === id);
+  const idx = store.items.findIndex((n) => n.id === id);
   if (idx < 0) return store;
   const prev = store.items[idx];
   // Корзина read-only: правку принимаем только после восстановления.
   if (isCoachNoteDeleted(prev)) return store;
   const title = patch.title === undefined ? prev.title : text(patch.title, COACH_NOTE_TITLE_MAX);
   const body = patch.body === undefined ? prev.body : text(patch.body, COACH_NOTE_BODY_MAX);
-  const checklist = patch.checklist === undefined ? normalizeChecklist(prev.checklist) : normalizeChecklist(patch.checklist);
+  const checklist =
+    patch.checklist === undefined ? normalizeChecklist(prev.checklist) : normalizeChecklist(patch.checklist);
   const attachments =
     patch.attachments === undefined ? normalizeAttachments(prev.attachments) : normalizeAttachments(patch.attachments);
   const tags = patch.tags === undefined ? normalizeNoteTags(prev.tags) : normalizeNoteTags(patch.tags);
@@ -486,9 +521,11 @@ export function updateCoachNote(
     ...prev,
     title,
     body,
-    athleteId: patch.athleteId === undefined ? prev.athleteId : (text(patch.athleteId, 80) || null),
+    athleteId: patch.athleteId === undefined ? prev.athleteId : text(patch.athleteId, 80) || null,
     week: patch.week === undefined ? prev.week : weekDay(patch.week),
     pinned: patch.pinned === undefined ? prev.pinned : patch.pinned === true,
+    dueAt: patch.dueAt === undefined ? prev.dueAt : parseDueAt(patch.dueAt),
+    priority: patch.priority === undefined ? prev.priority : parsePriority(patch.priority),
     checklist,
     attachments,
     tags,
@@ -507,7 +544,7 @@ export function addNoteAttachment(
   attachment: CoachNoteAttachment,
   opts: { now?: string } = {},
 ): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === noteId);
+  const idx = store.items.findIndex((n) => n.id === noteId);
   if (idx < 0) return store;
   const note = store.items[idx];
   const current = normalizeAttachments(note.attachments);
@@ -528,11 +565,11 @@ export function removeNoteAttachment(
   attachmentId: string,
   opts: { now?: string } = {},
 ): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === noteId);
+  const idx = store.items.findIndex((n) => n.id === noteId);
   if (idx < 0) return store;
   const note = store.items[idx];
   const current = normalizeAttachments(note.attachments);
-  const next = current.filter(a => a.id !== attachmentId);
+  const next = current.filter((a) => a.id !== attachmentId);
   if (next.length === current.length) return store;
   const items = [...store.items];
   items[idx] = { ...note, attachments: next, updatedAt: opts.now ?? nowIso() };
@@ -546,12 +583,12 @@ export function toggleNoteChecklistItem(
   itemId: string,
   opts: { now?: string } = {},
 ): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === noteId);
+  const idx = store.items.findIndex((n) => n.id === noteId);
   if (idx < 0) return store;
   const note = store.items[idx];
   if (isCoachNoteDeleted(note)) return store; // корзина read-only
   const checklist = normalizeChecklist(note.checklist);
-  const itemIdx = checklist.findIndex(c => c.id === itemId);
+  const itemIdx = checklist.findIndex((c) => c.id === itemId);
   if (itemIdx < 0) return store;
   checklist[itemIdx] = { ...checklist[itemIdx], done: !checklist[itemIdx].done };
   const items = [...store.items];
@@ -562,11 +599,11 @@ export function toggleNoteChecklistItem(
 /** Сколько пунктов чек-листа выполнено: { done, total }. */
 export function noteChecklistProgress(note: CoachNote): { done: number; total: number } {
   const checklist = normalizeChecklist(note.checklist);
-  return { done: checklist.filter(c => c.done).length, total: checklist.length };
+  return { done: checklist.filter((c) => c.done).length, total: checklist.length };
 }
 
 export function removeCoachNote(store: CoachNotesStore, id: string): CoachNotesStore {
-  const items = store.items.filter(n => n.id !== id);
+  const items = store.items.filter((n) => n.id !== id);
   return items.length === store.items.length ? store : { version: 1, items };
 }
 
@@ -575,12 +612,12 @@ export function weekNoteFor(store: CoachNotesStore, athleteId: string, week: str
   const day = weekDay(week);
   if (!day) return null;
   return (
-    store.items.find(n => n.athleteId === athleteId && n.week === day && !n.pinned && !isCoachNoteDeleted(n)) ?? null
+    store.items.find((n) => n.athleteId === athleteId && n.week === day && !n.pinned && !isCoachNoteDeleted(n)) ?? null
   );
 }
 
 export function toggleCoachNotePin(store: CoachNotesStore, id: string): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === id);
+  const idx = store.items.findIndex((n) => n.id === id);
   if (idx < 0) return store;
   const items = [...store.items];
   items[idx] = { ...items[idx], pinned: !items[idx].pinned, updatedAt: nowIso() };
@@ -588,7 +625,8 @@ export function toggleCoachNotePin(store: CoachNotesStore, id: string): CoachNot
 }
 
 /**
- * Закреплённые всегда сверху, внутри — по выбранному порядку:
+ * Закреплённые всегда сверху; внутри — по сроку (возрастание, без срока — в конец),
+ * по приоритету (`high` первым, `low` последним), затем по выбранному порядку:
  * `updated` (по умолчанию) — свежие правки первыми, `created` — свежие созданные,
  * `title` — по алфавиту (русская локаль).
  */
@@ -599,8 +637,18 @@ export function sortCoachNotes(items: CoachNote[], sortBy: CoachNoteSort = 'upda
       : sortBy === 'created'
         ? (a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')
         : (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '');
+  // `high` выше `normal`, `low` последним.
+  const priorityRank = (p: CoachNotePriority): number => (p === 'high' ? 0 : p === 'low' ? 2 : 1);
   return [...items].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    // Срок: `YYYY-MM-DD` — лексикографически = хронологически, возрастание;
+    // без срока — в конец.
+    if (a.dueAt && b.dueAt) {
+      const byDue = a.dueAt.localeCompare(b.dueAt);
+      if (byDue !== 0) return byDue;
+    } else if (a.dueAt && !b.dueAt) return -1;
+    else if (!a.dueAt && b.dueAt) return 1;
+    if (a.priority !== b.priority) return priorityRank(a.priority) - priorityRank(b.priority);
     return compare(a, b);
   });
 }
@@ -627,19 +675,19 @@ export function filterCoachNotes(
   let items = store.items;
   if (!opts.includeDeleted) {
     const inTrash = opts.deleted === true;
-    items = items.filter(n => isCoachNoteDeleted(n) === inTrash);
+    items = items.filter((n) => isCoachNoteDeleted(n) === inTrash);
   }
-  if (opts.athleteId === 'none') items = items.filter(n => !n.athleteId);
-  else if (opts.athleteId) items = items.filter(n => n.athleteId === opts.athleteId);
-  if (tagKey) items = items.filter(n => noteTags(n).some(t => t.toLowerCase() === tagKey));
+  if (opts.athleteId === 'none') items = items.filter((n) => !n.athleteId);
+  else if (opts.athleteId) items = items.filter((n) => n.athleteId === opts.athleteId);
+  if (tagKey) items = items.filter((n) => noteTags(n).some((t) => t.toLowerCase() === tagKey));
   if (q) {
     const hay = (n: CoachNote): string => {
       const checkText = normalizeChecklist(n.checklist)
-        .map(c => c.text)
+        .map((c) => c.text)
         .join(' ');
       return `${n.title} ${n.body} ${checkText} ${noteTags(n).join(' ')}`.toLowerCase();
     };
-    items = items.filter(n => hay(n).includes(q));
+    items = items.filter((n) => hay(n).includes(q));
   }
   return sortCoachNotes(items, opts.sort);
 }
@@ -664,23 +712,47 @@ export function collectCoachNoteTags(
 
 /** Сколько живых заметок (корзина не считается) — для счётчика/лимита. */
 export function countLiveCoachNotes(store: CoachNotesStore): number {
-  return store.items.filter(n => !isCoachNoteDeleted(n)).length;
+  return store.items.filter((n) => !isCoachNoteDeleted(n)).length;
 }
 
 /** Отправить заметку в корзину: ставит `deletedAt`, остальные поля и вложения не трогает. */
 export function trashCoachNote(store: CoachNotesStore, id: string, opts: { now?: string } = {}): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === id);
+  const idx = store.items.findIndex((n) => n.id === id);
   if (idx < 0) return store;
   const note = store.items[idx];
   if (isCoachNoteDeleted(note)) return store; // повторное удаление — no-op
+  // Корзина сама ограничена COACH_NOTES_MAX (её лишние строки чтение пропускает):
+  // переполнение молча теряло бы старые удалённые заметки, поэтому отказываем.
+  if (store.items.length - countLiveCoachNotes(store) >= COACH_NOTES_MAX) return store;
   const items = [...store.items];
   items[idx] = { ...note, deletedAt: opts.now ?? nowIso() };
   return { version: 1, items };
 }
 
+/**
+ * Массовый `trashCoachNote`: ставит `deletedAt` на каждой живой заметке из `ids`
+ * (уже в корзине — оставляем как есть). Пустой список и отсутствие живых — тот же стор.
+ */
+export function trashCoachNotes(store: CoachNotesStore, ids: string[], opts: { now?: string } = {}): CoachNotesStore {
+  const idSet = new Set(ids);
+  const items = [...store.items];
+  let trash = store.items.length - countLiveCoachNotes(store);
+  let changed = false;
+  for (let i = 0; i < items.length; i++) {
+    const note = items[i];
+    if (!idSet.has(note.id) || isCoachNoteDeleted(note)) continue;
+    // Мест в корзине нет — остальные остаются живыми (UI скажет, сколько влезло).
+    if (trash >= COACH_NOTES_MAX) break;
+    items[i] = { ...note, deletedAt: opts.now ?? nowIso() };
+    trash += 1;
+    changed = true;
+  }
+  return changed ? { version: 1, items } : store;
+}
+
 /** Вернуть заметку из корзины (очищает `deletedAt`, остальные поля не трогает). */
 export function restoreCoachNote(store: CoachNotesStore, id: string, opts: { now?: string } = {}): CoachNotesStore {
-  const idx = store.items.findIndex(n => n.id === id);
+  const idx = store.items.findIndex((n) => n.id === id);
   if (idx < 0) return store;
   const note = store.items[idx];
   // opts.now не нужен: восстановление не должно переставлять заметку в списке
@@ -693,19 +765,85 @@ export function restoreCoachNote(store: CoachNotesStore, id: string, opts: { now
   return { version: 1, items };
 }
 
+/**
+ * Массовый `restoreCoachNote`: снимает `deletedAt` у заметок из `ids` (поле удаляется).
+ * Инвариант живых заметок держим и здесь: «лишние» остаются в корзине, чтобы
+ * следующее чтение не выбросило их молча — UI честно скажет, сколько не поместилось.
+ */
+export function restoreCoachNotes(store: CoachNotesStore, ids: string[]): CoachNotesStore {
+  const idSet = new Set(ids);
+  let live = countLiveCoachNotes(store);
+  const items = [...store.items];
+  let changed = false;
+  for (let i = 0; i < items.length; i++) {
+    const note = items[i];
+    if (!idSet.has(note.id) || !isCoachNoteDeleted(note)) continue;
+    if (live >= COACH_NOTES_MAX) continue;
+    items[i] = { ...note, deletedAt: null };
+    live += 1;
+    changed = true;
+  }
+  return changed ? { version: 1, items } : store;
+}
+
+/**
+ * Дублировать заметку: новая заметка в начале стора с копией полей —
+ * `title`/`body` (обрезки лимитами), `athleteId`, `week`, `priority`/`dueAt`
+ * (через `parsePriority`/`parseDueAt`), `tags` (через `normalizeNoteTags`, без поля,
+ * если пусто), `checklist` (глубокая копия через `normalizeChecklist`),
+ * `attachments` (через `normalizeAttachments` — свежие id, порядок сохранён).
+ * `pinned: false`, `createdAt`/`updatedAt` = now, без `deletedAt`.
+ * Лимит живых заметок (`countLiveCoachNotes >= COACH_NOTES_MAX`) и отсутствие
+ * исходника по `id` — тот же стор.
+ */
+export function duplicateCoachNote(store: CoachNotesStore, id: string, opts: { now?: string } = {}): CoachNotesStore {
+  if (countLiveCoachNotes(store) >= COACH_NOTES_MAX) return store;
+  const idx = store.items.findIndex((n) => n.id === id);
+  if (idx < 0) return store;
+  const n = store.items[idx];
+  const now = opts.now ?? nowIso();
+  const stamp = new Date(now).getTime().toString(36);
+  let dupId = `n_${stamp}_${store.items.length + 1}`;
+  // Коллизия id заставила бы чтение выбросить заметку и пометить стор повреждённым.
+  for (let k = 2; store.items.some((x) => x.id === dupId); k++) {
+    dupId = `n_${stamp}_${store.items.length + k}`;
+  }
+  const tags = normalizeNoteTags(n.tags);
+  const attachments = normalizeAttachments(n.attachments).map((a, i) => ({
+    ...a,
+    id: `a_${dupId}_${i + 1}`,
+  }));
+  const note: CoachNote = {
+    id: dupId,
+    title: text(n.title, COACH_NOTE_TITLE_MAX),
+    body: text(n.body, COACH_NOTE_BODY_MAX),
+    athleteId: text(n.athleteId, 80) || null,
+    week: n.week ?? null,
+    pinned: false,
+    dueAt: parseDueAt(n.dueAt),
+    priority: parsePriority(n.priority),
+    createdAt: now,
+    updatedAt: now,
+    checklist: normalizeChecklist(n.checklist),
+    attachments,
+    ...(tags.length ? { tags } : {}),
+  };
+  return { version: 1, items: [note, ...store.items] };
+}
+
 /** Физически удалить одну заметку (вложение из IndexedDB чистит UI). */
 export function purgeCoachNote(store: CoachNotesStore, id: string): CoachNotesStore {
-  const items = store.items.filter(n => n.id !== id);
+  const items = store.items.filter((n) => n.id !== id);
   return items.length === store.items.length ? store : { version: 1, items };
 }
 
 /** Очистить корзину целиком. */
 export function purgeCoachTrash(store: CoachNotesStore): CoachNotesStore {
-  const items = store.items.filter(n => !isCoachNoteDeleted(n));
+  const items = store.items.filter((n) => !isCoachNoteDeleted(n));
   return items.length === store.items.length ? store : { version: 1, items };
 }
 
 /** Сколько заметок привязано к атлету (для карточки атлета). Корзину не считаем. */
 export function countNotesForAthlete(store: CoachNotesStore, athleteId: string): number {
-  return store.items.filter(n => n.athleteId === athleteId && !isCoachNoteDeleted(n)).length;
+  return store.items.filter((n) => n.athleteId === athleteId && !isCoachNoteDeleted(n)).length;
 }
