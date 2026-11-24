@@ -203,12 +203,19 @@ export function getPerMuscleMrvFromLevel(level: string, muscle: string, onCourse
   return mrv;
 }
 
+/** Канонический статус объёма относительно ориентиров MEV/MAV/MRV.
+ *  Единственное место, где живут границы: 'below_mev' до MEV, 'optimal' до MAV
+ *  включительно, 'approaching_mrv' до MRV включительно, выше — 'exceeding_mrv'. */
+export function volumeStatusOf(sets: number, landmarks: Pick<MuscleVolumeLandmarks, 'mev' | 'mav' | 'mrv'>): VolumeStatus {
+  if (sets < landmarks.mev) return 'below_mev';
+  if (sets <= landmarks.mav) return 'optimal';
+  if (sets <= landmarks.mrv) return 'approaching_mrv';
+  return 'exceeding_mrv';
+}
+
 /** Статус фактического объёма относительно ориентиров. */
 export function checkVolumeStatus(currentSets: number, landmarks: MuscleVolumeLandmarks): VolumeStatus {
-  if (currentSets < landmarks.mev) return 'below_mev';
-  if (currentSets <= landmarks.mav) return 'optimal';
-  if (currentSets <= landmarks.mrv) return 'approaching_mrv';
-  return 'exceeding_mrv';
+  return volumeStatusOf(currentSets, landmarks);
 }
 
 /**

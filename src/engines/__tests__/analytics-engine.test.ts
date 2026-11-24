@@ -5,6 +5,7 @@ import {
   computeVolume,
   computeIntensity,
   computeAnalytics,
+  computeStrength,
   type SetLogEntry,
   type SessionLogEntry,
 } from '../analytics-engine';
@@ -144,6 +145,65 @@ describe('analytics-engine: RPE не фабрикуется', () => {
   });
 });
 
+describe('analytics-engine: интенсивность = измеренный RPE, зоны = повторы', () => {
+  it('avgIntensity — средний RPE × 10, а не «средняя зона по повторам»', () => {
+    const m = computeIntensity([
+      mkSession([mkSet('bench_bar', 100, 5, { rpe: 9 }), mkSet('squat', 100, 5, { rpe: 7 })]),
+    ]);
+    expect(m.avgIntensity).toBe(80);
+    expect(m.avgRPE).toBe(8);
+  });
+
+  it('без единого RPE avgIntensity = 0, зоны при этом считаются по повторам', () => {
+    const m = computeIntensity([mkSession([mkSet('bench_bar', 100, 5), mkSet('squat', 100, 20)])]);
+    expect(m.avgIntensity).toBe(0);
+    expect(m.intensityDistribution).toEqual({ strength: 50, hypertrophy: 0, endurance: 50 });
+  });
+
+  it('зона «сила» — по числу повторов, а не по RPE', () => {
+    // Раньше низкий RPE выкидывал подход 5×8 из зоны силы и занижал среднюю интенсивность.
+    const m = computeIntensity([mkSession([mkSet('bench_bar', 100, 5, { rpe: 5 })])]);
+    expect(m.intensityDistribution).toEqual({ strength: 100, hypertrophy: 0, endurance: 0 });
+  });
+});
+
+describe('analytics-engine: база для тренда объёма', () => {
+  it('без предыдущего окна hasPreviousPeriod=false и тренд 0', () => {
+    const v = computeVolume([mkSession([mkSet('squat', 100, 10, { date: day(-1) })], day(-1))], [], NOW);
+    expect(v.hasPreviousPeriod).toBe(false);
+    expect(v.volumeTrend).toBe(0);
+  });
+
+  it('с предыдущим окном hasPreviousPeriod=true', () => {
+    const current = mkSession([mkSet('squat', 100, 10, { date: day(-1) })], day(-1));
+    const prev = mkSession([mkSet('squat', 100, 5, { date: day(-10) })], day(-10));
+    const v = computeVolume([current], [prev], NOW);
+    expect(v.hasPreviousPeriod).toBe(true);
+    expect(v.volumeTrend).toBe(100);
+  });
+});
+
+describe('analytics-engine: окно недель считается по датам, а не по числу сессий', () => {
+  it('плотная история не растягивает «4 недели» до 9 недель', () => {
+    // 40 тренировок через день (80 дней). За последние 4 недели их 14, за
+    // предыдущие 4 недели — ещё 14. Прежний slice(-weeks*7) брал 28 ПОСЛЕДНИХ
+    // тренировок, то есть 8 недель, и сравнивал совсем другие периоды.
+    const sessions: SessionLogEntry[] = [];
+    for (let offset = 0; offset >= -78; offset -= 2) {
+      const weight = offset >= -26 ? 200 : 100; // текущие 4 недели тяжелее предыдущих в 2 раза
+      sessions.push(mkSession([mkSet('squat', weight, 10, { date: day(offset) })], day(offset)));
+    }
+    const snap = computeAnalytics({ sessions, weeks: 4, now: NOW });
+    expect(snap.volume.weeklyVolumeKg).toBe(8000); // 4 тренировки последних 7 дней × 2000 кг
+    expect(snap.volume.hasPreviousPeriod).toBe(true);
+    // Предыдущие 7 дней: 3 тренировки по 2000 кг → (8000 − 6000) / 6000 = +33%.
+    expect(snap.volume.volumeTrend).toBe(33);
+    // Средний объём за сессию считается по окну `current`: 14 тренировок × 2000 = 28000.
+    // Прежний slice(-weeks * 7) брал 28 тренировок и давал 1500.
+    expect(snap.volume.avgVolumePerSession).toBe(2000);
+  });
+});
+
 describe('analytics-engine: нет NaN/Infinity при пустых данных и duration=0', () => {
   it('пустая история не делит на ноль', () => {
     const v = computeVolume([], [], NOW);
@@ -181,5 +241,29 @@ describe('analytics-engine: нет NaN/Infinity при пустых данных
     ];
     for (const n of numbers) expect(Number.isFinite(n)).toBe(true);
     expect(JSON.stringify(snap)).not.toMatch(/NaN|Infinity/);
+  });
+});
+
+describe('analytics-engine: тренд 1RM без базы не выдаётся за «↑0%»', () => {
+  it('упражнение без прошлого окна не получает записи в strengthTrend', () => {
+    const s = computeStrength([mkSession([mkSet('squat', 100, 5)])], []);
+    expect(s.estimated1RM.squat).toBeGreaterThan(0);
+    expect(s.strengthTrend.squat).toBeUndefined();
+  });
+
+  it('с прошлым окном тренд считается, и рост положительный', () => {
+    const current = [mkSession([mkSet('squat', 110, 5, { date: day(-1) })], day(-1))];
+    const prev = [mkSession([mkSet('squat', 100, 5, { date: day(-9) })], day(-9))];
+    const s = computeStrength(current, prev);
+    expect(s.strengthTrend.squat).toBeGreaterThan(0);
+  });
+});
+
+describe('analytics-engine: будущая дата не раздувает текущее окно', () => {
+  it('сессия «из будущего» не попадает в объём/7 дн.', () => {
+    const now: SessionLogEntry[] = [mkSession([mkSet('squat', 100, 5, { date: day(-1) })], day(-1))];
+    const future = mkSession([mkSet('squat', 1000, 10, { date: day(30) })], day(30));
+    const snap = computeAnalytics({ sessions: [...now, future], weeks: 4, now: NOW });
+    expect(snap.volume.weeklyVolumeKg).toBe(500);
   });
 });

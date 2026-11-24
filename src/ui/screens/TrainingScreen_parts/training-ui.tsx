@@ -7,6 +7,7 @@
  * и современно (mobile-first, фрост-гласс).
  */
 import React from 'react';
+import { VOLUME_STATUS_META } from './volume-recommendation';
 
 export const ACCENT = '#00e68a';
 export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
@@ -117,18 +118,15 @@ export function panelStyle(color: string, bgAlpha = 0.06, borderAlpha = 0.22): R
   };
 }
 
-/** MRV-статус бейдж для таблицы объёмов. */
+/** MRV-статус бейдж для таблицы объёмов. Цвет — из канона volume-canonical (через
+ *  `VOLUME_STATUS_META`): раньше здесь были литералы, где «близко к MRV» было красным,
+ *  а «недотрен» — янтарным, и один и тот же статус в двух таблицах выглядел по-разному. */
 export function mrvBadge(status: 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv'): React.CSSProperties {
-  const colors = {
-    below_mev: { bg: '#f59e0b1a', bd: '#f59e0b44', text: '#f59e0b', label: '🟡 Недотрен' },
-    optimal:     { bg: '#22c55e1a', bd: '#22c55e44', text: '#22c55e', label: '🟢 Оптимум' },
-    approaching_mrv: { bg: '#ef44441a', bd: '#ef444444', text: '#ef4444', label: '🟠 Близко к MRV' },
-    exceeding_mrv:   { bg: '#ef44441a', bd: '#ef444444', text: '#ef4444', label: '🔴 > MRV' },
-  };
-  const c = colors[status];
+  const text = VOLUME_STATUS_META[status].color;
+  const hex = text.slice(1);
   return {
     padding: '3px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700,
-    background: c.bg, border: `1px solid ${c.bd}`, color: c.text,
+    background: `${hex}1a`, border: `1px solid ${hex}44`, color: text,
     whiteSpace: 'nowrap',
   };
 }

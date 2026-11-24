@@ -484,46 +484,51 @@ export function composeQualityScoreV2(input: V2ComposerInput): QualityScoreV2 {
     const mav = input.mav[muscle] ?? 0;
     const mrv = input.mrv[muscle] ?? 0;
     const freq = input.frequency[muscle] ?? 1;
-    const effective = eff[muscle] ?? sets;
+    // Статус и числа в сообщениях считаем по effective (как в calcBBPlanMetrics):
+    // мышца с малым числом прямых сетов, но тяжёлой косвенной нагрузкой не должна
+    // уходить в «недогруз». Округление до 0.1 убирает float-хвосты из сравнений
+    // и из текста (иначе «7.000000000000001 сета»).
+    const shown = Math.round((eff[muscle] ?? sets) * 10) / 10;
+    const toMev = Math.round((mev - shown) * 10) / 10;
     let status: QualityScoreV2['perMuscle'][number]['status'];
-    if (mrv > 0 && sets > mrv) {
+    if (mrv > 0 && shown > mrv) {
       status = 'exceeding_mrv';
       b.volume = Math.max(0, b.volume - 8);
       issues.push({
         id: `vol_over_${muscle}`, severity: 'critical', category: 'volume', muscle,
-        message: `${muscle}: ${sets} сетов/нед > MRV (${mrv}) — риск перетренированности`,
+        message: `${muscle}: ${shown} сетов/нед > MRV (${mrv}) — риск перетренированности`,
         fix: `Снизить до ${mav} сетов/нед (MAV)`,
       });
-    } else if (mav > 0 && sets > mav) {
+    } else if (mav > 0 && shown > mav) {
       status = 'approaching_mrv';
       b.volume = Math.max(0, b.volume - 2);
       issues.push({
         id: `vol_high_${muscle}`, severity: 'warning', category: 'volume', muscle,
-        message: `${muscle}: ${sets} сетов/нед > MAV (${mav}) — зона толерантности`,
+        message: `${muscle}: ${shown} сетов/нед > MAV (${mav}) — зона толерантности`,
         fix: `Оптимально ${mav} сетов/нед`,
       });
-    } else if (sets >= mev || mev <= 0) {
+    } else if (shown >= mev || mev <= 0) {
       status = 'in_mav';
-    } else if (isSpecMaintenance(muscle, sets, mev, input.specTargets, input.maintenanceMuscles)) {
+    } else if (isSpecMaintenance(muscle, shown, mev, input.specTargets, input.maintenanceMuscles)) {
       status = 'maintenance';
       issues.push({
         id: `vol_maint_${muscle}`, severity: 'info', category: 'volume', muscle,
-        message: `${muscle}: ${ruCount(sets, RU_SETS)} — поддержание (MV-режим спец-блока), не штрафуется`,
+        message: `${muscle}: ${ruCount(shown, RU_SETS)} — поддержание (MV-режим спец-блока), не штрафуется`,
       });
-    } else if (mvStatus(sets, mev) === 'maintenance' && !input.specTargets?.length && !input.maintenanceMuscles?.length) {
+    } else if (mvStatus(shown, mev) === 'maintenance' && !input.specTargets?.length && !input.maintenanceMuscles?.length) {
       status = 'maintenance';
       issues.push({
         id: `vol_maint_${muscle}`, severity: 'info', category: 'volume', muscle,
-        message: `${muscle}: ${ruCount(sets, RU_SETS)} — поддержание (между MV и MEV), для роста добавьте до ${mev}`,
-        fix: `Добавить ${ruCount(mev - sets, RU_SETS)}/нед (до MEV)`,
+        message: `${muscle}: ${ruCount(shown, RU_SETS)} — поддержание (между MV и MEV), для роста добавьте до ${mev}`,
+        fix: `Добавить ${ruCount(toMev, RU_SETS)}/нед (до MEV)`,
       });
     } else {
       status = 'below_mev';
       b.volume = Math.max(0, b.volume - 6);
       issues.push({
         id: `vol_low_${muscle}`, severity: 'warning', category: 'volume', muscle,
-        message: `${muscle}: ${ruCount(sets, RU_SETS)}/нед < MEV (${mev})`,
-        fix: `Добавить ${ruCount(mev - sets, RU_SETS)}/нед (до MEV)`,
+        message: `${muscle}: ${ruCount(shown, RU_SETS)}/нед < MEV (${mev})`,
+        fix: `Добавить ${ruCount(toMev, RU_SETS)}/нед (до MEV)`,
       });
     }
 
@@ -546,7 +551,7 @@ export function composeQualityScoreV2(input: V2ComposerInput): QualityScoreV2 {
     }
 
     perMuscle.push({
-      muscle, weeklySets: sets, effectiveSets: Math.round(effective * 10) / 10,
+      muscle, weeklySets: sets, effectiveSets: shown,
       frequency: freq, mev, mav, mrv, status,
     });
   }

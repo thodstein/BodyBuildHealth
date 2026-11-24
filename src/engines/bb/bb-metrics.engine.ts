@@ -5,7 +5,7 @@
  * проверка против MEV/MAV/MRV (volume-landmarks).
  */
 import type { BBPlan } from './bb-builder.engine';
-import { getVolumeLandmarks, normLevel } from '../volume-landmarks.engine';
+import { getVolumeLandmarks, normLevel, volumeStatusOf } from '../volume-landmarks.engine';
 import { aggregateBBVolume, normalizeBBMuscle } from './bb-volume.engine';
 
 export interface BBMuscleVolume {
@@ -106,10 +106,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
     const mev = finalLm?.mev ?? Math.round(lm.mev * mult);
     const mav = finalLm?.mav ?? Math.round(lm.mav * mult);
     const mrv = finalLm?.mrv ?? Math.round(lm.mrv * mult);
-    let status: BBMuscleVolume['status'] = 'below_mev';
-    if (effective > mrv) status = 'exceeding_mrv';
-    else if (effective > mav) status = 'approaching_mrv';
-    else if (effective >= mev) status = 'optimal';
+    const status = volumeStatusOf(effective, { mev, mav, mrv });
     return {
       muscle, totalSets: a.total,
       directSets: effectiveByMuscle[muscle]?.directSets ?? a.total,
@@ -150,7 +147,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
           hardSets: 0,
           avgRir: 0,
           frequencyPerRotation: Math.round(freq * 10) / 10,
-          mev, mav, mrv, status: 'below_mev',
+          mev, mav, mrv, status: volumeStatusOf(0, { mev, mav, mrv }),
         });
       }
     }
@@ -162,10 +159,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
         if ((freqMapAll['shoulders'] || 0) > 0) {
           m.frequencyPerRotation = Math.round(Math.max(m.frequencyPerRotation, (freqMapAll['shoulders'] || 0) / totalWeeks) * 10) / 10;
         }
-        if (m.effectiveSets > m.mrv) m.status = 'exceeding_mrv';
-        else if (m.effectiveSets > m.mav) m.status = 'approaching_mrv';
-        else if (m.effectiveSets >= m.mev) m.status = 'optimal';
-        else m.status = 'below_mev';
+        m.status = volumeStatusOf(m.effectiveSets, { mev: m.mev, mav: m.mav, mrv: m.mrv });
       }
     }
     perMuscle.splice(shouldersIdx, 1);
@@ -188,7 +182,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
         hardSets: 0,
         avgRir: 0,
         frequencyPerRotation: 0,
-        mev, mav, mrv, status: 'below_mev',
+        mev, mav, mrv, status: volumeStatusOf(0, { mev, mav, mrv }),
       });
     }
   }

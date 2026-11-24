@@ -12,6 +12,16 @@ import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
 const ARM_MUSCLES = ['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','grip_crush','thumb','side_pressure','back_pressure','shoulder_stab'] as const;
 
+/** Цвет ячейки: ровно MAV — ещё оптимум (канон volumeStatusOf), поэтому
+ *  амбер начинается только выше MAV, а не с MAV включительно. */
+export function colorFor(sets: number, lm: { mev: number; mav: number; mrv: number } | undefined): string {
+  if (!lm || sets === 0) return 'rgba(255,255,255,0.04)';
+  if (sets > lm.mrv) return 'rgba(239,68,68,0.7)';
+  if (sets > lm.mav) return 'rgba(245,158,11,0.7)';
+  if (sets >= lm.mev) return 'rgba(34,197,94,0.5)';
+  return 'rgba(96,165,250,0.4)';
+}
+
 export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => void }> = ({ plan, onToast }) => {
   const [hoverCell, setHoverCell] = useState<{ m: string; w: number } | null>(null);
 
@@ -48,14 +58,6 @@ export const ArmHeatmap: React.FC<{ plan: ArmPlan; onToast?: (msg: string) => vo
   const labelW = 124;
   const svgW = labelW + cellW * weeks + 4;
   const svgH = cellH * ARM_MUSCLES.length + 16;
-
-  const colorFor = (sets: number, lm: { mev: number; mav: number; mrv: number } | undefined) => {
-    if (!lm || sets === 0) return 'rgba(255,255,255,0.04)';
-    if (sets > lm.mrv) return 'rgba(239,68,68,0.7)';
-    if (sets >= lm.mav) return 'rgba(245,158,11,0.7)';
-    if (sets >= lm.mev) return 'rgba(34,197,94,0.5)';
-    return 'rgba(96,165,250,0.4)';
-  };
 
   return (
     <div className="train-armheatmap">

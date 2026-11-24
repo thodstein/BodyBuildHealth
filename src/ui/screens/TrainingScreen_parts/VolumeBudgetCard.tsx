@@ -15,24 +15,7 @@ import type { BBPlanMetrics, BBMuscleVolume } from '../../../engines/bb/bb-metri
 import { GROUP_RU } from './program-types';
 import { CARD } from './training-ui';
 import { ruCount, RU_APPROACHES } from '../../../engines/ru-plural';
-
-const STATUS_META: Record<BBMuscleVolume['status'], { label: string; color: string }> = {
-  below_mev: { label: 'недотрен', color: '#60a5fa' },
-  optimal: { label: 'оптимум', color: '#22c55e' },
-  approaching_mrv: { label: 'около MRV', color: '#f59e0b' },
-  exceeding_mrv: { label: 'перегруз', color: '#ef4444' },
-};
-
-function recommendation(m: BBMuscleVolume): string {
-  // Используем effectiveSets (прямой + косвенный) — иначе передняя дельта
-  // с косвенной от жимов показывала 0, хотя фактически получает 2-4 effective.
-  const eff = m.effectiveSets;
-  if (eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} effective до MEV ${m.mev} — иначе нет стимула`;
-  if (eff > m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} effective — выше MRV ${m.mrv}, риск недовосстановления`;
-  if (eff > m.mav) return `Выше оптимума: в зоне MAV–MRV (${m.mav}–${m.mrv}), можно держать или −${(eff - m.mav).toFixed(1)} до MAV`;
-  if (eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} effective до MAV ${m.mav}`;
-  return 'Оптимум — объём в точке MAV';
-}
+import { volumeRecommendation, VOLUME_STATUS_META } from './volume-recommendation';
 
 function ru(muscle: string): string { return GROUP_RU[muscle] || muscle; }
 
@@ -61,7 +44,7 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
       </div>
 
       {rows.map(m => {
-        const st = STATUS_META[m.status];
+        const st = VOLUME_STATUS_META[m.status];
         // Показываем effective (прямой + косвенный) — иначе передняя дельта
         // с жимов получала 0 effective, хотя status уже учитывает indirect.
         const displaySets = m.effectiveSets;
@@ -89,7 +72,7 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
               <span>Мин MEV {m.mev} · Опт MAV {m.mav} · Макс MRV {m.mrv}</span>
               <span>частота {m.frequencyPerRotation}×/нед · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
             </div>
-            <div style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{recommendation(m)}</div>
+            <div style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{volumeRecommendation(m, 'effective')}</div>
           </div>
         );
       })}

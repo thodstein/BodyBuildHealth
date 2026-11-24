@@ -5,7 +5,7 @@
  * Сухожильные группы (wrist, pronators) имеют более низкий MRV и tendonCap 1.2×.
  */
 import type { MuscleVolumeLandmarks, TrainingLevel } from '../volume-landmarks.engine';
-import { normLevel } from '../volume-landmarks.engine';
+import { normLevel, volumeStatusOf } from '../volume-landmarks.engine';
 import { ARM_TENDON_MUSCLES as CANONICAL_TENDON_MUSCLES, isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export type { MuscleVolumeLandmarks, TrainingLevel };
@@ -140,8 +140,6 @@ export function getArmLandmarksForRotation(muscle: string, level: string, daysPe
 }
 
 export function armLandmarkStatus(sets: number, lm: MuscleVolumeLandmarks): 'below_mev' | 'optimal' | 'approaching_mrv' | 'exceeding_mrv' {
-  if (sets < lm.mev) return 'below_mev';
-  if (sets <= lm.mav) return 'optimal';
-  if (sets <= lm.mrv) return 'approaching_mrv';
-  return 'exceeding_mrv';
+  // Границы MEV/MAV/MRV — один канон на bb и arm (checkVolumeStatus делегирует туда же).
+  return volumeStatusOf(sets, lm);
 }

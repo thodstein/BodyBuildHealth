@@ -10,19 +10,13 @@ import {
   type VolumeSnapshot,
   type VolumeHubRow,
 } from '../../../engines/volume-hub-conveyor.engine';
+import { VOLUME_STATUS_META } from './volume-recommendation';
 
 const ACCENT = '#00e68a';
 const DIM_ = '#fff';
 
 const GROUP_RU: Record<string, string> = {
   chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор', full: 'Общее',
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  below_mev: '#ef4444', optimal: '#22c55e', approaching_mrv: '#f59e0b', exceeding_mrv: '#ef4444',
-};
-const STATUS_LABEL: Record<string, string> = {
-  below_mev: 'Ниже MEV', optimal: 'Оптимально', approaching_mrv: 'Близко к MRV', exceeding_mrv: 'Превышен MRV',
 };
 
 /** Тонкий вид канонического quality-мемо таба (структурный, без импорта внутренностей таба). */
@@ -104,13 +98,13 @@ export const VolumeQualityCard: React.FC<{ quality: CanonicalQualityView; improv
 export const PerMuscleList: React.FC<{ items: MuscleVolumeProAnaly[] }> = ({ items }) => (
   <div data-v="per-muscle">
     {items.map(m => {
-      const color = STATUS_COLOR[m.status];
+      const color = VOLUME_STATUS_META[m.status].color;
       return (
         <div key={m.muscle} data-v="per-muscle-card" style={{ marginBottom: 10, padding: 10, background: 'rgba(255,255,255,0.02)', borderRadius: 8, borderLeft: '3px solid ' + color }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
             <div>
               <span style={{ fontSize: 12, fontWeight: 700 }}>{m.muscleRu}</span>
-              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, color: '#000', background: color, marginLeft: 6 }}>{STATUS_LABEL[m.status]}</span>
+              <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, color: '#000', background: color, marginLeft: 6 }}>{VOLUME_STATUS_META[m.status].label}</span>
             </div>
             <div style={{ fontSize: 10, color: DIM_, fontVariantNumeric: 'tabular-nums' }}>
               SFR ср. {m.avgSFR.toFixed(2)} · Эфф. {m.efficiencyScore}%

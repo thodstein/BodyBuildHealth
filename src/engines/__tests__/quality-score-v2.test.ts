@@ -227,4 +227,31 @@ describe('quality-score-v2: композитор', () => {
     expect(r.perMuscle.find(m => m.muscle === 'back')?.status).toBe('maintenance');
     expect(r.issues.some(i => i.id === 'vol_low_back')).toBe(false);
   });
+  it('статус и текст считаются по effective, а не по прямым сетам', () => {
+    // Прямых 6 (< MEV 8), но косвенная нагрузка доводит effective до 22 > MRV 20 —
+    // в calcBBPlanMetrics такая мышца «перегруз», значит и здесь должно быть так же.
+    const r = composeQualityScoreV2({
+      ...base,
+      weeklySets: { chest: 6 },
+      frequency: { chest: 2 },
+      effectiveSets: { chest: 22 },
+    });
+    const chest = r.perMuscle.find(m => m.muscle === 'chest')!;
+    expect(chest.status).toBe('exceeding_mrv');
+    expect(chest.effectiveSets).toBe(22);
+    const issue = r.issues.find(i => i.id === 'vol_over_chest')!;
+    expect(issue.message).toContain('22 сетов/нед');
+    expect(issue.message).not.toContain('6 сетов/нед');
+  });
+  it('прямые выше MAV, но effective внутри MAV — не approaching_mrv', () => {
+    const r = composeQualityScoreV2({
+      ...base,
+      weeklySets: { chest: 18 },
+      frequency: { chest: 2 },
+      effectiveSets: { chest: 13 },
+    });
+    const chest = r.perMuscle.find(m => m.muscle === 'chest')!;
+    expect(chest.status).toBe('in_mav');
+    expect(r.issues.some(i => i.id === 'vol_high_chest' || i.id === 'vol_over_chest')).toBe(false);
+  });
 });
