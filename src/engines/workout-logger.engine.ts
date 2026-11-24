@@ -183,9 +183,10 @@ export function loadSessions(): WorkoutSession[] {
   }
 }
 
-export function saveSessions(sessions: WorkoutSession[]) {
+export function saveSessions(sessions: WorkoutSession[]): boolean {
   try {
     localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
+    return true;
   } catch (e: any) {
     if (e?.name === 'QuotaExceededError' || String(e).includes('quota')) {
       const sorted = sessions.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -199,7 +200,7 @@ export function saveSessions(sessions: WorkoutSession[]) {
       };
       let kept: WorkoutSession[] | null = null;
       if (trySave(sorted, 'full')) {
-        /* ok */
+        return true;
       } else if (trySave(sorted.slice(-500), '500')) {
         kept = sorted.slice(-500);
       } else if (trySave(sorted.slice(-100), '100')) {
@@ -207,8 +208,13 @@ export function saveSessions(sessions: WorkoutSession[]) {
       } else if (trySave(sorted.slice(-50), '50')) {
         kept = sorted.slice(-50);
       }
-      if (kept) markTrimmed(kept.length);
+      if (kept) {
+        markTrimmed(kept.length);
+        return true;
+      }
     }
+    // Запись не легла: вызывающий обязан это знать — иначе архив «успешен», а данные потеряны.
+    return false;
   }
 }
 
@@ -382,7 +388,7 @@ export function logSet(
 /** Максимальная правдоподобная длительность сессии: страховка от «стенных» часов,
  *  когда тренировку начали вчера вечером, а завершили утром следующего дня (иначе
  *  в историю и в sRPE уезжает ~10 часов). */
-const MAX_SESSION_DURATION_MIN = 360;
+export const MAX_SESSION_DURATION_MIN = 360;
 
 /**
  * Удалить последний записанный подход упражнения (с максимальным setNumber) — «Отменить подход».
@@ -412,7 +418,7 @@ export function finishSession(
   notes: string = '',
   durationMinOverride?: number,
 ): WorkoutSession {
-  const endTime = new Date().toTimeString().slice(0, 5);
+  let endTime = new Date().toTimeString().slice(0, 5);
   // Битая/пустая startTime (старая запись в localStorage) не должна ронять завершение:
   // раньше `split(':')` давал NaN, и «✓ Завершить» из виджета молча не срабатывал.
   const startParts = String(session.startTime || '')
@@ -426,9 +432,21 @@ export function finishSession(
 
   // Плеер знает реальную длительность по таймеру сессии и передаёт её явно.
   // Без override (например, завершение из виджета) клампим «стенную» разницу.
+  // Явный 0 — «длительность неизвестна» (архив вчерашней сессии без валидного старта):
+  // не подменяем её «стенными» часами через полночь.
+  const hasOverride = durationMinOverride !== undefined;
   const override = Number(durationMinOverride);
-  if (Number.isFinite(override) && override > 0) durationMin = Math.round(override);
-  else durationMin = Math.min(durationMin, MAX_SESSION_DURATION_MIN);
+  if (hasOverride && Number.isFinite(override) && override >= 0) {
+    // Потолок действует и для явной длительности: продолжение вчерашней сессии на
+    // следующее утро давало «14 часов» в дневнике и в sRPE-нагрузке (ACWR).
+    durationMin = Math.min(Math.round(override), MAX_SESSION_DURATION_MIN);
+    // Конец = старт + длительность: архив прошлого дня не должен выглядеть как
+    // «18:30–09:05 (90 мин)» с сегодняшним временем.
+    if (validStart && durationMin > 0) {
+      const endTotal = startMin + durationMin;
+      endTime = `${String(Math.floor((endTotal % 1440) / 60)).padStart(2, '0')}:${String(endTotal % 60).padStart(2, '0')}`;
+    }
+  } else durationMin = Math.min(durationMin, MAX_SESSION_DURATION_MIN);
   durationMin = Math.max(0, durationMin);
 
   const finished = { ...session, endTime, durationMin, notes };
@@ -528,6 +546,46 @@ export function clearActiveSession(): void {
   } catch {
     /* ignore */
   }
+}
+
+/** Начало сессии в локальной зоне: date 'YYYY-MM-DD' + startTime 'HH:MM'. */
+function localSessionStartMs(date: string, startTime: string): number {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || '').slice(0, 10));
+  const tm = /^(\d{1,2}):(\d{2})/.exec(String(startTime || ''));
+  if (!dm || !tm) return NaN;
+  const t = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]), Number(tm[1]), Number(tm[2]), 0, 0).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
+
+/**
+ * Незавершённая живая сессия не должна исчезать молча: автосейв новой тренировки затирает
+ * её в localStorage. Архивируем в историю с реальной длительностью «старт → последний
+ * автосейв»; если старт битый, длительность честно 0 (finishSession не изобретает часы
+ * через полночь). Пустая сессия (без единого подхода) ничего не архивирует.
+ * Если историю записать не удалось (квота), живая сессия остаётся: терять её нельзя.
+ */
+export function archiveActiveSession(note = ''): WorkoutSession | null {
+  const active = loadActiveSession();
+  if (!active || !(active.exercises || []).some((ex) => (ex.sets || []).length > 0)) return null;
+  const startMs = localSessionStartMs(String(active.date || ''), String(active.startTime || ''));
+  const savedMs = Number(active.savedAt) || 0;
+  let durationMin = 0;
+  if (Number.isFinite(startMs) && savedMs > startMs) {
+    durationMin = Math.min(MAX_SESSION_DURATION_MIN, Math.round((savedMs - startMs) / 60000));
+  }
+  // Служебные поля живой сессии (когда автосейв, план дня) — не факты тренировки:
+  // в историю они не пишутся.
+  const { savedAt: _savedAt, plannedSetsTotal: _plannedTotal, ...cleanSession } = active;
+  const archived = finishSession(
+    cleanSession,
+    note || `Незавершённая тренировка ${active.date}: сохранена при старте новой`,
+    durationMin,
+  );
+  // Запись могла не лечь (квота/приватный режим): тогда живую сессию НЕ снимаем,
+  // иначе подходы исчезнут и из истории, и из автосейва.
+  if (!loadSessions().some((s) => s.sessionId === archived.sessionId)) return null;
+  clearActiveSession();
+  return archived;
 }
 
 /** Сводка живой сессии для пульта/виджетов: сеты, тоннаж, текущее упражнение. */

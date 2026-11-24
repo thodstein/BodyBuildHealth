@@ -1016,7 +1016,6 @@ describe('SessionPlayer: кнопки доводят от разминки до 
         ],
       },
     ];
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={3} focus="Грудь" />);
 
     // Продолжение — главное действие: иначе «Начать тренировку» перекрывала бы его.
@@ -1025,14 +1024,17 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     expect(cta!.textContent).toContain('2 подх. уже записано');
     expect(findBtn(container, 'Начать тренировку')).toBeFalsy();
 
-    // «Начать заново» спрашивает подтверждение и стартует пустую сессию.
+    // «Начать заново» спрашивает подтверждение своим диалогом (window.confirm в WebView
+    // может быть недоступен и молча гасил кнопку) и до подтверждения ничего не стирает.
     const restart = container.querySelector('[data-act="resume-restart"]') as HTMLElement;
     expect(restart).toBeTruthy();
     fireEvent.click(restart);
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(container.querySelector('[data-session="restart-confirm"]')).toBeTruthy();
+    expect(loadActiveSession()?.exercises?.[0]?.sets?.length ?? 0).toBe(2);
+
+    fireEvent.click(container.querySelector('[data-act="restart-confirm-go"]') as HTMLElement);
     expect(loadActiveSession()?.exercises?.[0]?.sets?.length ?? 0).toBe(0);
 
-    confirmSpy.mockRestore();
     unmount();
     cleanup();
     localStorage.clear();

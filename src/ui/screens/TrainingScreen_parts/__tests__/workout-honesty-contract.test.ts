@@ -14,6 +14,9 @@ const player = read('../../SRCBBScreen_parts/SessionPlayer.tsx');
 const widgetSync = read('../../../../ui/native/widget-sync.ts');
 const logger = read('../../../../engines/workout-logger.engine.ts');
 const analyticsView = read('../DiaryAnalyticsView.tsx');
+const analyticsTab = read('../AnalyticsTab.tsx');
+const progressTab = read('../ProgressTab.tsx');
+const executionZone = read('../ExecutionZone.tsx');
 const hub = read('../TrainingDiaryHub.tsx');
 const progression = read('../../../../engines/log-analytics-progression.engine.ts');
 
@@ -53,7 +56,9 @@ describe('SessionPlayer: быстрый ввод и пульт', () => {
   it('старт из виджета при открытом плеере идёт реле, а не записью', () => {
     expect(player).toContain("window.addEventListener('he-workout-widget-start'");
     // handled=true только если плеер реально стартовал — иначе виджет поднимет сессию сам.
-    expect(player).toContain('d.handled = startMainRef.current() === true;');
+    // Форма в две строки (result → handled) появилась ради возврата карточки после сброса,
+    // поэтому проверяем обе половины контракта, а не одну строку целиком.
+    expect(player).toMatch(/const started = startMainRef\.current\(\) === true;[\s\S]{0,600}?d\.handled = started;/);
     expect(player).toContain('const startMain = (): boolean => {');
     // Плеер не размонтируется после итога: старт из «заминки»/итога тоже обрабатываем.
     expect(player).toContain("if (phase === 'cooldown' || phase === 'done') {");
@@ -138,6 +143,45 @@ describe('аналитика: без выдуманных длительност
 
   it('средняя интенсивность недели — только по сетам с RPE', () => {
     expect(progression).toContain('const ratedLogs = weekLogs.filter(l => Number(l.rpe) > 0);');
+  });
+});
+
+describe('аналитика: подписи не выдают оценку за измерение', () => {
+  it('тренд объёма без предыдущего окна не показывается как «↑0%»', () => {
+    expect(analyticsView).toContain('analytics.volume.hasPreviousPeriod ?');
+    expect(analyticsView).toContain('нет базы для сравнения');
+    expect(analyticsTab).toContain('volume.hasPreviousPeriod ?');
+    expect(analyticsTab).toContain('нет базы для сравнения');
+  });
+
+  it('интенсивность подписана как RPE, а без оценок — прочерк', () => {
+    expect(analyticsView).toContain('Интенсивность (RPE)');
+    expect(analyticsView).toContain("'RPE не оценён'");
+    expect(analyticsTab).toContain("'RPE не оценён'");
+  });
+
+  it('зоны названы зонами по повторам, а не процентами 1RM', () => {
+    expect(analyticsView).toContain('зоны по числу повторов, не по %1RM');
+    expect(analyticsView).toContain('1–6 повт.');
+    expect(analyticsTab).toContain('зоны по числу повторов, не по %1RM');
+  });
+
+  it('TUT подписан как оценка, а «всего» называет фактическое окно, а не «8 недель»', () => {
+    expect(analyticsView).toContain('const nSessions = lastWorkouts.length;');
+    expect(analyticsView).toContain('Всего за ${nSessions} ${sessionsWord}');
+    expect(analyticsView).not.toContain('Всего (8 нед)');
+    expect(analyticsView).not.toContain('Всего за 8 тренировок');
+    expect(analyticsView).toContain('≈3 с/повтор — оценка');
+  });
+});
+
+describe('ProgressTab: реальные поля вместо подставных RPE 7 и 60 минут', () => {
+  it('RPE, вес и длительность берутся из записи', () => {
+    expect(progressTab).not.toContain('rpe: 7');
+    expect(progressTab).not.toContain('durationMin: 60');
+    expect(progressTab).toContain('weightKg: Number(s.weight) || 0');
+    expect(progressTab).toContain('rpe: Number(s.rpe) || 0');
+    expect(progressTab).toContain('durationMin: Number(w.duration) || 0');
   });
 });
 

@@ -967,22 +967,6 @@ export function trainingWeekdays(training: any): boolean[] {
   return fromList(pattern[perWeek] || pattern[3]);
 }
 
-/** Цикл «работа/отдых» (scheduleType='pattern'): сегодня тренировочный? */
-function patternTrainingToday(sched: any, iso: string): boolean {
-  const work = Math.max(1, Math.min(14, Number(sched?.pattern?.work) || 2));
-  const off = Math.max(0, Math.min(14, Number(sched?.pattern?.off) || 1));
-  if (off === 0) return true;
-  try {
-    const [y, m, d] = iso.split('-').map(Number);
-    const epoch = Date.UTC(2024, 0, 1);
-    const dayMs = Date.UTC(y, m - 1, d) - epoch;
-    const pos = ((Math.floor(dayMs / 86400000) % (work + off)) + (work + off)) % (work + off);
-    return pos < work;
-  } catch {
-    return true;
-  }
-}
-
 function rotationPlanIndex(planDays: number, iso: string): number {
   const done = safe(() => getSessionsByWeek(getISOWeekNumber(iso)).length, 0);
   return planDays > 0 ? done % planDays : 0;
@@ -992,6 +976,10 @@ function pickPlanDayIndex(iso: string, training: any, planDays: number): number 
   if (planDays <= 0) return 0;
   const sched = training?.schedule;
   if (sched?.enabled && sched.scheduleType === 'pattern') {
+    // Цикл «работа/отдых» здесь только ротацией по числу сессий: в профиле нет якоря
+    // начала цикла (канон `isTrainingDayFor` отсчитывает offset от сегодня), а фаза от
+    // выдуманной даты-эпохи давала бы ложные дни отдыха. Ограничение — в
+    // docs/BB-AUTO-NEXT-PLAN-2026-11.md (P3-4).
     return rotationPlanIndex(planDays, iso);
   }
   const weekly = trainingWeekdays(training);
@@ -1598,13 +1586,15 @@ export function applyWidgetQueue(items: QueuedItem[]): {
  * коалесцируются: в полёте следующий вызов возвращает обещание сразу, а
  * лишняя строка виджета не бежит.
  */
-let trainingPushInFlight = false;
+let trainingPushInFlight: Promise<boolean> | null = null;
 let trainingPushPending = false;
 
 export function pushTrainingWidget(): Promise<boolean> {
   trainingPushPending = true;
-  if (trainingPushInFlight) return Promise.resolve(true);
-  trainingPushInFlight = true;
+  // Коалесцирование: второй вызов в полёте ждёт тот же проход и получает его
+  // результат. Прежний `Promise.resolve(true)` сообщал «отправлено», когда отправки
+  // ещё не было — на этом нельзя строить решение «показать/не показать».
+  if (trainingPushInFlight) return trainingPushInFlight;
   const run = async (): Promise<boolean> => {
     let ok = true;
     try {
@@ -1615,10 +1605,20 @@ export function pushTrainingWidget(): Promise<boolean> {
     } catch {
       ok = false;
     }
-    trainingPushInFlight = false;
     return ok;
   };
-  return run();
+  // Флаг снимаем асинхронно: если `collectTraining()`/`syncTrainingWidget()` бросят
+  // синхронно, `run()` закончится до присваивания ниже, и виджет навсегда застрял бы
+  // на уже выполненном обещании (все следующие пуши возвращали бы старый результат).
+  const p = run().finally(() => {
+    trainingPushInFlight = null;
+    // Вызов, пришедший между выходом из цикла и снятием флага, пометил
+    // trainingPushPending, но его проход уже не запустится — его данные попали бы
+    // на виджет только со следующим пушем. Запускаем проход сразу.
+    if (trainingPushPending) void pushTrainingWidget();
+  });
+  trainingPushInFlight = p;
+  return p;
 }
 
 /**
@@ -1646,6 +1646,8 @@ function foodCatalog(): NutritionFoodItem[] {
 
 /** Синк в полёте — параллельный вызов не гоняет дрень отдельно. */
 let draining = false;
+/** Обещание текущего прохода: параллельный вызов ждёт его и видит тот же агрегат. */
+let drainingPromise: Promise<WidgetSyncResult> | null = null;
 /** Причина из параллельного вызова: после прохода синк перезапускается. */
 let pendingReasons = false;
 
@@ -1667,6 +1669,31 @@ function zeroWidgetSyncResult(): WidgetSyncResult {
     nutritionOk: false,
     calendarOk: false,
     notesOk: false,
+  };
+}
+
+/**
+ * Агрегат дрена за несколько проходов: числа суммируются, флаги «ок» — по «или».
+ * Так вызывающий видит весь объём снятой очереди, а не только последний проход.
+ */
+function mergeWidgetSyncResult(total: WidgetSyncResult, pass: WidgetSyncResult): WidgetSyncResult {
+  return {
+    drainedWaterMl: total.drainedWaterMl + pass.drainedWaterMl,
+    drainedWaterRemovedMl: total.drainedWaterRemovedMl + pass.drainedWaterRemovedMl,
+    drainedFoods: total.drainedFoods + pass.drainedFoods,
+    drainedFoodsRemoved: total.drainedFoodsRemoved + pass.drainedFoodsRemoved,
+    tasksToggled: total.tasksToggled + pass.tasksToggled,
+    tasksAdded: total.tasksAdded + pass.tasksAdded,
+    notesAdded: total.notesAdded + pass.notesAdded,
+    setsAdded: total.setsAdded + pass.setsAdded,
+    workoutsStarted: total.workoutsStarted + pass.workoutsStarted,
+    workoutsFinished: total.workoutsFinished + pass.workoutsFinished,
+    trainingOk: total.trainingOk || pass.trainingOk,
+    workoutOk: total.workoutOk || pass.workoutOk,
+    complianceOk: total.complianceOk || pass.complianceOk,
+    nutritionOk: total.nutritionOk || pass.nutritionOk,
+    calendarOk: total.calendarOk || pass.calendarOk,
+    notesOk: total.notesOk || pass.notesOk,
   };
 }
 
@@ -1733,11 +1760,9 @@ async function doSyncAllWidgets(): Promise<WidgetSyncResult> {
     syncNotesWidget(nt).catch(() => false),
   ]);
   // A2: дрень обновил хранилище — живые виджеты должны узнать об этом сразу
-  // (снапшот тренировки после дрена подходов, виджет «Проведение» после дрена
-  // тренировки). Пушим без ожидания: виджет необязательный слой.
-  if (setsAdded > 0) {
-    void pushTrainingWidget();
-  }
+  // (снапшот тренировки после дрена подходов уже улетел вызовом выше, виджет
+  // «Проведение» — после дрена тренировки). Пушим без ожидания: виджет
+  // необязательный слой.
   if (workoutsFinished > 0) {
     void pushWorkoutWidget();
   }
@@ -1768,29 +1793,35 @@ async function doSyncAllWidgets(): Promise<WidgetSyncResult> {
  * Полный цикл с сериалом: забрать очередь -> применить -> запушить свежие
  * снапшоты. Безопасен везде; вне native виджеты просто не обновятся.
  *
- * Гонка: пока один проход в полёте, второй синк не начинает дрень отдельно —
- * он помечает причину (`pendingReasons`), и завершившийся проход
- * перезапускает синк после себя, чтобы не потерять обновления.
+ * Гонка: пока проход в полёте, второй синк не начинает дрень отдельно — он
+ * помечает причину (`pendingReasons`) и получает ТО ЖЕ обещание, чтобы видеть
+ * настоящий результат дрена, а не нули. Завершившийся проход перезапускает
+ * синк после себя внутри того же обещания: то, что пришло во время дрена, не
+ * теряется, а суммы проходов складываются в общий агрегат для всех, кто ждал.
  */
-export async function syncAllWidgets(): Promise<WidgetSyncResult> {
-  if (draining) {
+export function syncAllWidgets(): Promise<WidgetSyncResult> {
+  if (draining && drainingPromise) {
     pendingReasons = true;
-    return zeroWidgetSyncResult();
+    return drainingPromise;
   }
   draining = true;
-  let result = zeroWidgetSyncResult();
-  try {
-    result = await doSyncAllWidgets();
-  } catch {
-    /* проход упал — replay ниже */
-  } finally {
+  drainingPromise = (async (): Promise<WidgetSyncResult> => {
+    let total = zeroWidgetSyncResult();
+    try {
+      do {
+        pendingReasons = false;
+        const pass = await doSyncAllWidgets();
+        total = mergeWidgetSyncResult(total, pass);
+      } while (pendingReasons);
+    } catch {
+      /* проход упал — отдаём уже собранный агрегат */
+    }
+    return total;
+  })().finally(() => {
     draining = false;
-  }
-  if (pendingReasons) {
-    pendingReasons = false;
-    await syncAllWidgets();
-  }
-  return result;
+    drainingPromise = null;
+  });
+  return drainingPromise;
 }
 
 /**

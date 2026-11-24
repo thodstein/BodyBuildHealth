@@ -7,7 +7,7 @@
  *  - пока плеер открыт, виджет не пишет в хранилище сам, а отдаёт подход плееру;
  *  - подход без RPE/RIR не получает выдуманный RPE 10.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyWidgetQueue, resolveWorkoutPlan, setWorkoutPlayerActive } from '../../ui/native/widget-sync';
 import { finishSession, loadActiveSession, loadSessions, saveActiveSession } from '../../engines/workout-logger.engine';
 
@@ -37,12 +37,18 @@ const setsOf = (name: string) => {
 };
 
 beforeEach(() => {
+  // День плана выбирается по дню недели (`pickPlanDayIndex`), поэтому «сегодня»
+  // фиксируем на понедельнике: иначе для 2-дневного плана в другие дни недели
+  // резолвится другой день и число упражнений в тесте зависит от даты прогона.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 10, 23, 10, 0, 0)); // Пн 2026-11-23, 10:00 локального времени
   localStorage.clear();
   localStorage.setItem('he_pl_runtime', JSON.stringify(PLAN));
   setWorkoutPlayerActive(false);
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   setWorkoutPlayerActive(false);
   localStorage.clear();
 });

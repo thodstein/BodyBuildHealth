@@ -11,7 +11,12 @@ import { TimersTab } from './TimersTab';
 import { SessionWidgetsDock } from './SessionWidgetsDock';
 import { selectSetScheme } from '../../../engines/set-scheme.engine';
 import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
-import { getCachedProgressForExercise, localIsoDate, loadActiveSession, summarizeActiveSession } from '../../../engines/workout-logger.engine';
+import {
+  getCachedProgressForExercise,
+  localIsoDate,
+  loadActiveSession,
+  summarizeActiveSession,
+} from '../../../engines/workout-logger.engine';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } from '../../../engines/warmup.engine';
@@ -21,6 +26,7 @@ import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import { NativeIcon } from '../../native/NativeIcons';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
+import { todayTrainingDayIndex } from './diary-shared';
 import { ruCount, RU_APPROACHES, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
 
 const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
@@ -45,9 +51,11 @@ const playerDayFromMicro = (day: any): PlayerDay => {
       muscleGroup: String(ex?.muscleGroup || ex?.group || 'other'),
       targetSets,
       isBodyweight: isBWExercise(ex),
-      restSec: Math.max(20, Math.round(Number(ex?.restSec)) || 90),
+      restSec: Number(ex?.restSec) > 0 ? Math.max(20, Math.round(Number(ex.restSec))) : undefined,
       // D-3: суперсет-пара из плана, если данные дошли до микроцикла.
-      ...(ex?.supersetGroup != null ? { supersetGroup: Number(ex.supersetGroup), supersetSlot: (Number(ex.supersetSlot) === 1 ? 1 : 0) as 0 | 1 } : {}),
+      ...(ex?.supersetGroup != null
+        ? { supersetGroup: Number(ex.supersetGroup), supersetSlot: (Number(ex.supersetSlot) === 1 ? 1 : 0) as 0 | 1 }
+        : {}),
     };
   });
   return { label: String(day?.day || day?.label || 'День'), exercises };
@@ -58,53 +66,109 @@ type PlRuntime = { days: PlayerDay[]; focus: string; week: number; track: string
 
 interface Props {
   tab: TrainingTab;
-  goal: string; level: string; recovery: number;
+  goal: string;
+  level: string;
+  recovery: number;
   trainingOutput: TrainingOutput | null;
   macrocycle: MacrocyclePlan | null;
   selectedWeek: number;
   currentMicrocycle: Microcycle | null;
-  runtimeDay: number; setRuntimeDay: React.Dispatch<React.SetStateAction<number>>;
-  runtimeExIdx: number; setRuntimeExIdx: React.Dispatch<React.SetStateAction<number>>;
-  runtimeLogs: Record<string, RuntimeLogEntry>; setRuntimeLogs: React.Dispatch<React.SetStateAction<Record<string, RuntimeLogEntry>>>;
-  runtimeStarted: boolean; setRuntimeStarted: React.Dispatch<React.SetStateAction<boolean>>;
-  plRuntime: PlRuntime | null; plRunOpen: boolean; setPlRunOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  runtimeSetW: number; setRuntimeSetW: React.Dispatch<React.SetStateAction<number>>;
-  runtimeSetR: number; setRuntimeSetR: React.Dispatch<React.SetStateAction<number>>;
-  runtimeSetRP: number; setRuntimeSetRP: React.Dispatch<React.SetStateAction<number>>;
-  runtimeSetRI: number; setRuntimeSetRI: React.Dispatch<React.SetStateAction<number>>;
+  runtimeDay: number;
+  setRuntimeDay: React.Dispatch<React.SetStateAction<number>>;
+  runtimeExIdx: number;
+  setRuntimeExIdx: React.Dispatch<React.SetStateAction<number>>;
+  runtimeLogs: Record<string, RuntimeLogEntry>;
+  setRuntimeLogs: React.Dispatch<React.SetStateAction<Record<string, RuntimeLogEntry>>>;
+  runtimeStarted: boolean;
+  setRuntimeStarted: React.Dispatch<React.SetStateAction<boolean>>;
+  plRuntime: PlRuntime | null;
+  plRunOpen: boolean;
+  setPlRunOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  runtimeSetW: number;
+  setRuntimeSetW: React.Dispatch<React.SetStateAction<number>>;
+  runtimeSetR: number;
+  setRuntimeSetR: React.Dispatch<React.SetStateAction<number>>;
+  runtimeSetRP: number;
+  setRuntimeSetRP: React.Dispatch<React.SetStateAction<number>>;
+  runtimeSetRI: number;
+  setRuntimeSetRI: React.Dispatch<React.SetStateAction<number>>;
   diary: StrengthDiary;
   onRefresh: () => void;
   onGoToTimers?: (settings?: { work: number; rest: number; rounds: number }) => void;
 }
 
 export const ExecutionZone: React.FC<Props> = (p) => {
-  const { tab, goal, level, recovery, trainingOutput, macrocycle, selectedWeek, currentMicrocycle,
-    runtimeDay, setRuntimeDay, runtimeExIdx, setRuntimeExIdx, runtimeLogs, setRuntimeLogs,
-    runtimeStarted, setRuntimeStarted, plRuntime: _plRuntime, plRunOpen, setPlRunOpen,
-    runtimeSetW, setRuntimeSetW, runtimeSetR, setRuntimeSetR, runtimeSetRP, setRuntimeSetRP, runtimeSetRI, setRuntimeSetRI,
-    diary, onRefresh: loadDiaryStats, onGoToTimers } = p;
-  const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
-  const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
+  const {
+    tab,
+    goal,
+    level,
+    recovery,
+    trainingOutput,
+    macrocycle,
+    selectedWeek,
+    currentMicrocycle,
+    runtimeDay,
+    setRuntimeDay,
+    runtimeExIdx,
+    setRuntimeExIdx,
+    runtimeLogs,
+    setRuntimeLogs,
+    runtimeStarted,
+    setRuntimeStarted,
+    plRuntime: _plRuntime,
+    plRunOpen,
+    setPlRunOpen,
+    runtimeSetW,
+    setRuntimeSetW,
+    runtimeSetR,
+    setRuntimeSetR,
+    runtimeSetRP,
+    setRuntimeSetRP,
+    runtimeSetRI,
+    setRuntimeSetRI,
+    diary,
+    onRefresh: loadDiaryStats,
+    onGoToTimers,
+  } = p;
+  const plRuntime =
+    _plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days) ? _plRuntime : null;
+  const [timerInitialSettings, setTimerInitialSettings] = React.useState<
+    { work: number; rest: number; rounds: number } | undefined
+  >(undefined);
   const [dayDetailsOpen, setDayDetailsOpen] = React.useState(false);
   // Прогресс по упражнениям дня — сетка карточек на 3–4 ряда: по умолчанию строка.
   const [progressOpen, setProgressOpen] = React.useState(false);
   const [warmupOpen, setWarmupOpen] = React.useState(false);
   const [execWarmupDone, setExecWarmupDone] = React.useState<Record<string, boolean>>({});
-  const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
-    try { const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
-  });
+  const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(
+    () => {
+      try {
+        const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null;
+        return v === 'quick' || v === 'full' ? v : 'standard';
+      } catch {
+        return 'standard';
+      }
+    },
+  );
   // Wake Lock — единый хук (только APK, web/TG no-op)
   useNativeWakeLock(runtimeStarted);
   // Безопасные производные: мемоизированы чтобы не пересчитывать и не фризить вкладку на каждом тике таймера
   const trainingDaysList: any[] = React.useMemo(() => {
-    try { return ((currentMicrocycle?.days || []) as any[]).filter((d: any) => d && d.isTraining); }
-    catch { return []; }
+    try {
+      return ((currentMicrocycle?.days || []) as any[]).filter((d: any) => d && d.isTraining);
+    } catch {
+      return [];
+    }
   }, [currentMicrocycle]);
-  const safeRuntimeDay = React.useMemo(() => trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1), [trainingDaysList.length, runtimeDay]);
+  const safeRuntimeDay = React.useMemo(
+    () => (trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1)),
+    [trainingDaysList.length, runtimeDay],
+  );
   // Мемоизация разминки — тяжёлый generateWarmup не гоняем на каждый ререндер таймера
   const warmupMemo = React.useMemo(() => {
     const dayExercises: any[] = (trainingDaysList[safeRuntimeDay] as any)?.exercises || [];
-    if (!dayExercises.length) return { dayExercises: [] as any[], groups: [] as string[], blocks: [] as any[], total: 0, mins: 0 };
+    if (!dayExercises.length)
+      return { dayExercises: [] as any[], groups: [] as string[], blocks: [] as any[], total: 0, mins: 0 };
     const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
     const blocks = generateWarmup({
       sessionFocus: 'fullbody',
@@ -118,7 +182,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       mode: execWarmupMode,
     });
     const total = blocks.reduce((s: number, b: any) => s + b.exercises.length, 0);
-    const mins = Math.round(blocks.reduce((s: number, b: any) => s + (b.durationSec || 0), 0) / 60 * 10) / 10;
+    const mins = Math.round((blocks.reduce((s: number, b: any) => s + (b.durationSec || 0), 0) / 60) * 10) / 10;
     return { dayExercises, groups, blocks, total, mins };
   }, [trainingDaysList, safeRuntimeDay, execWarmupMode]);
   const warmupBlocksExec = warmupMemo.blocks;
@@ -126,7 +190,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const warmupMins = warmupMemo.mins;
   const warmupGroups = warmupMemo.groups;
   const warmupDoneCount = React.useMemo(() => Object.values(execWarmupDone).filter(Boolean).length, [execWarmupDone]);
-  const warmupPct = React.useMemo(() => warmupTotal > 0 ? Math.round(warmupDoneCount / warmupTotal * 100) : 0, [warmupDoneCount, warmupTotal]);
+  const warmupPct = React.useMemo(
+    () => (warmupTotal > 0 ? Math.round((warmupDoneCount / warmupTotal) * 100) : 0),
+    [warmupDoneCount, warmupTotal],
+  );
   /**
    * Старт сессии — один обработчик на всю карточку. Раньше он жил в кнопке
    * «Старт» в самом низу: до неё надо было проскроллить план дня, разминку
@@ -139,17 +206,34 @@ export const ExecutionZone: React.FC<Props> = (p) => {
       const warmupBlocks = generateWarmup({
         sessionFocus: 'fullbody',
         primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
-        primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
+        primaryWeights: dayExercises
+          .slice(0, 3)
+          .map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
         targetGroups: groups.length > 0 ? groups : ['fullbody'],
-        riskFlags: {}, techniqueIssues: [], fatigueLevel: 0.2, equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
+        riskFlags: {},
+        techniqueIssues: [],
+        fatigueLevel: 0.2,
+        equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
         mode: execWarmupMode,
       });
       const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
       const done = Object.values(execWarmupDone).filter(Boolean).length;
+      // Форму вызова (одна строка) закрепляет source-contract тест workout-exec-pro, поэтому prettier её не переносит.
+      // prettier-ignore
       upsertWarmupLog({ date: localIsoDate(), done: done > 0, quality: done > 0 ? (done / total >= 0.8 ? 4 : done / total >= 0.5 ? 3 : 2) : null, totalItems: total, doneItems: done });
     } catch {}
-    setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
-  }, [trainingDaysList, safeRuntimeDay, execWarmupMode, execWarmupDone, setRuntimeStarted, setRuntimeLogs, setRuntimeExIdx]);
+    setRuntimeStarted(true);
+    setRuntimeLogs({});
+    setRuntimeExIdx(0);
+  }, [
+    trainingDaysList,
+    safeRuntimeDay,
+    execWarmupMode,
+    execWarmupDone,
+    setRuntimeStarted,
+    setRuntimeLogs,
+    setRuntimeExIdx,
+  ]);
   /** Открыть проведение, не стирая записанное: док не должен сбрасывать подходы. */
   const openSession = React.useCallback(() => {
     // Есть план ПЛ/ББ — проведение живёт в его карточке, а не в выборе дня.
@@ -160,7 +244,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   React.useEffect(() => {
     const onOpen = () => openSession();
     window.addEventListener('he-workout-open', onOpen);
-    const onClose = () => { setRuntimeStarted(false); setPlRunOpen(false); };
+    const onClose = () => {
+      setRuntimeStarted(false);
+      setPlRunOpen(false);
+    };
     window.addEventListener('he-workout-close', onClose);
     return () => {
       window.removeEventListener('he-workout-open', onOpen);
@@ -171,446 +258,1290 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     <>
       {tab === 'runtime' && (
         <InfoErrorBoundary label="Тренировка">
-        <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
+          <div className="hub-exec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Запуск построенного плана ПЛ/ББ — единая сворачиваемая карточка.
               SessionPlayer НЕ размонтируется при сворачивании: прогресс сессии сохраняется. */}
-          {plRuntime && plRuntime.days.length > 0 && (
-            <div className="card" style={{ padding: plRunOpen ? '10px 12px' : '6px', border: plRunOpen ? '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.25)' : '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.20)', background: plRunOpen ? 'rgba(var(--train-accent-rgb, 0,230,138),0.06)' : 'transparent' }}>
-              {plRunOpen ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <NativeIcon name="play" size={12} /> Проведение тренировки · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
-                    </h3>
-                    <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
-                      Неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)} · выполнение записывается в дневник
-                    </p>
+            {plRuntime && plRuntime.days.length > 0 && (
+              <div
+                className="card"
+                style={{
+                  padding: plRunOpen ? '10px 12px' : '6px',
+                  border: plRunOpen
+                    ? '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.25)'
+                    : '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.20)',
+                  background: plRunOpen ? 'rgba(var(--train-accent-rgb, 0,230,138),0.06)' : 'transparent',
+                }}
+              >
+                {plRunOpen ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: 'var(--accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <NativeIcon name="play" size={12} /> Проведение тренировки ·{' '}
+                        {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
+                      </h3>
+                      <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
+                        Неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)} · выполнение
+                        записывается в дневник
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPlRunOpen(false)}
+                      aria-label="Свернуть проведение"
+                      style={{
+                        padding: '8px 12px',
+                        minHeight: 44,
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <NativeIcon name="pause" size={10} /> Свернуть
+                    </button>
                   </div>
-                  <button onClick={() => setPlRunOpen(false)} aria-label="Свернуть проведение" style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                    <NativeIcon name="pause" size={10} /> Свернуть
-                  </button>
-                </div>
-              ) : (
-                /* Свёрнутая карточка раньше прятала старт за кнопкой 5px высотой
+                ) : (
+                  /* Свёрнутая карточка раньше прятала старт за кнопкой 5px высотой
                    «Возобновить» — именно её никто не находил. Теперь старт здесь. */
-                <button type="button" data-act="session-start" onClick={() => setPlRunOpen(true)}
-                  aria-label="Открыть проведение тренировки"
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer',
-                    padding: '12px 14px', minHeight: 60, borderRadius: 13, border: 'none',
-                    background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)',
-                    boxShadow: '0 6px 20px rgba(0,230,138,0.24)', fontWeight: 800,
-                  }}>
-                  <span style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <NativeIcon name="play" size={14} />
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontSize: 14 }}>Начать по плану {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'}</span>
-                    <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
-                      {plRuntime.focus} · неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)}
+                  <button
+                    type="button"
+                    data-act="session-start"
+                    onClick={() => setPlRunOpen(true)}
+                    aria-label="Открыть проведение тренировки"
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      padding: '12px 14px',
+                      minHeight: 60,
+                      borderRadius: 13,
+                      border: 'none',
+                      background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))',
+                      color: 'var(--accent-contrast, #000)',
+                      boxShadow: '0 6px 20px rgba(0,230,138,0.24)',
+                      fontWeight: 800,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        background: 'rgba(0,0,0,0.14)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <NativeIcon name="play" size={14} />
                     </span>
-                  </span>
-                  <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
-                </button>
-              )}
-              <div style={{ display: plRunOpen ? 'block' : 'none' }}>
-                <SessionPlayer days={plRuntime.days} weekNumber={plRuntime.week} focus={plRuntime.focus} onSaved={loadDiaryStats} />
+                    <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                      <span style={{ display: 'block', fontSize: 14 }}>
+                        Начать по плану {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'}
+                      </span>
+                      <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
+                        {plRuntime.focus} · неделя {plRuntime.week} · {ruCount(plRuntime.days.length, RU_TRAININGS)}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
+                  </button>
+                )}
+                <div style={{ display: plRunOpen ? 'block' : 'none' }}>
+                  <SessionPlayer
+                    days={plRuntime.days}
+                    weekNumber={plRuntime.week}
+                    focus={plRuntime.focus}
+                    onSaved={loadDiaryStats}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          {/* Универсальная запись из сгенерированного плана — показывается только если нет активного ПЛ/ББ плана */}
-          {plRuntime && plRuntime.days.length > 0 ? null : (
-            <>
-            {/* Плеер не размонтируется при «Свернуть»: display:none сохраняет
+            )}
+            {/* Универсальная запись из сгенерированного плана — показывается только если нет активного ПЛ/ББ плана */}
+            {plRuntime && plRuntime.days.length > 0 ? null : (
+              <>
+                {/* Плеер не размонтируется при «Свернуть»: display:none сохраняет
                 разминку, записанные подходы и таймер отдыха до открытия заново. */}
-            <div className="card" data-session="chooser" style={{ padding: '12px', display: runtimeStarted ? 'none' : 'block' }}>
-              <h3 style={{ margin: '0 0 8px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ display: 'inline-flex', color: 'var(--accent)' }}><NativeIcon name="play" size={13} /></span> Выберите день и начинайте</h3>
-              {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
-                <>
-                  {/* Неделя — одной строкой. Раньше здесь стоял градиентный блок
+                <div
+                  className="card"
+                  data-session="chooser"
+                  style={{ padding: '12px', display: runtimeStarted ? 'none' : 'block' }}
+                >
+                  <h3 style={{ margin: '0 0 8px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-flex', color: 'var(--accent)' }}>
+                      <NativeIcon name="play" size={13} />
+                    </span>{' '}
+                    Выберите день и начинайте
+                  </h3>
+                  {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
+                    <>
+                      {/* Неделя — одной строкой. Раньше здесь стоял градиентный блок
                       с сеткой 7 дней, которая никуда не ведёт: он съедал ~90px
                       и отодвигал «Начать тренировку» ниже первого экрана. */}
-                  {(() => {
-                    const totalSetsWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
-                    const totalVolWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (Number(e.reps) || 0) * (e.weight || 0), 0) || 0), 0);
-                    return (
-                      <div data-week-summary={selectedWeek} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', padding: '2px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.20)' }}>
-                          Неделя {selectedWeek}{currentMicrocycle.mesocycleType ? ` · ${currentMicrocycle.mesocycleType}` : ''}
-                        </span>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)' }}>
-                          {ruCount(trainingDaysList.length, RU_TRAININGS)} · {ruCount(totalSetsWeek, RU_SETS)} · {totalVolWeek.toLocaleString()} кг
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', marginBottom: 10 }}>
-                    {(() => { const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, trainingDaysList.length); const isToday = safeRuntimeDay === _todayIdx; return (
-                      <button onClick={() => setRuntimeDay(_todayIdx)} aria-label="Выбрать сегодняшний день" style={{
-                        minWidth: 92, flex: '0 0 auto', scrollSnapAlign: 'start', padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-                        background: isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)',
-                        color: isToday ? '#00e68a' : '#fff', border: `1px solid ${isToday ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'}`,
-                        fontSize: 10, fontWeight: 800,
-                      }}>📅 Сегодня</button>
-                    ); })()}
-                    {trainingDaysList.map((day: any, di: number) => {
-                      const active = safeRuntimeDay === di;
-                      const exCnt = day.exercises?.length ?? 0;
-                      const sets = day.exercises?.reduce((s: number, e: any) => s + (e.sets || 0), 0) ?? 0;
-                      return (
-                        <button key={di} onClick={() => setRuntimeDay(di)} aria-pressed={active} aria-label={`Выбрать ${day.day || `День ${di+1}`}`} style={{
-                          minWidth: 112, flex: '0 0 auto', scrollSnapAlign: 'start', textAlign: 'left', position: 'relative', overflow: 'hidden',
-                          padding: '9px 11px', borderRadius: 13, cursor: 'pointer',
-                          background: active ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.04)',
-                          border: active ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)',
-                          borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.10)'}`,
-                          boxShadow: active ? '0 4px 14px rgba(0,230,138,0.16)' : '0 1px 8px rgba(0,0,0,0.10)',
-                          transition: 'all 0.2s',
-                        }}>
-                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: active ? 'linear-gradient(90deg,#00e68a,#00c853)' : 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
-                          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: active ? '#00e68a' : 'rgba(255,255,255,0.50)', marginBottom: 3 }}>День {di + 1}{active ? ' •' : ''}</div>
-                          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{day.day || `День ${di + 1}`}</div>
-                          <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 5px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.13)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.07)'}` }}>{exCnt} упр.</span>
-                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.06)' }}>{sets} сет.</span>
+                      {(() => {
+                        const totalSetsWeek = trainingDaysList.reduce(
+                          (s: number, d: any) =>
+                            s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0),
+                          0,
+                        );
+                        const totalVolWeek = trainingDaysList.reduce(
+                          (s: number, d: any) =>
+                            s +
+                            (d.exercises?.reduce(
+                              (ss: number, e: any) => ss + (e.sets || 0) * (Number(e.reps) || 0) * (e.weight || 0),
+                              0,
+                            ) || 0),
+                          0,
+                        );
+                        return (
+                          <div
+                            data-week-summary={selectedWeek}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: '#00e68a',
+                                padding: '2px 7px',
+                                borderRadius: 20,
+                                background: 'rgba(0,230,138,0.10)',
+                                border: '1px solid rgba(0,230,138,0.20)',
+                              }}
+                            >
+                              Неделя {selectedWeek}
+                              {currentMicrocycle.mesocycleType ? ` · ${currentMicrocycle.mesocycleType}` : ''}
+                            </span>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)' }}>
+                              {ruCount(trainingDaysList.length, RU_TRAININGS)} · {ruCount(totalSetsWeek, RU_SETS)} ·{' '}
+                              {totalVolWeek.toLocaleString()} кг
+                            </span>
                           </div>
-                          {active && <span style={{ position: 'absolute', top: 6, right: 7, width: 16, height: 16, borderRadius: 16, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>✓</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-            {/* Главное действие — сразу под выбором дня, без прокрутки. */}
-            {(() => {
-              const day = trainingDaysList[safeRuntimeDay] || {};
-              const dayEx: any[] = day.exercises || [];
-              const setsCnt = dayEx.reduce((s: number, e: any) => s + (e.sets || 0), 0);
-              const estMin = Math.round((setsCnt * 60 + 300) / 60);
-              // Незавершённая сессия: «Продолжить» не должно стирать записанное,
-              // поэтому открываем плеер (openSession), а не стартуем заново.
-              const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession(), setsCnt); } catch { return null; } })();
-              return (
-                <button
-                  type="button"
-                  data-act="start-session"
-                  onClick={liveSum ? openSession : startSession}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                    padding: '13px 15px', minHeight: 62, marginBottom: 10, borderRadius: 14, border: 'none', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))', color: 'var(--accent-contrast, #000)',
-                    boxShadow: '0 6px 20px rgba(0,230,138,0.26)', fontWeight: 800,
-                  }}
-                >
-                  <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <NativeIcon name="play" size={15} />
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontSize: 14 }}>{liveSum ? 'Продолжить тренировку' : 'Начать тренировку'}</span>
-                    <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
-                      {liveSum
-                        ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
-                        : `${day.day || `День ${safeRuntimeDay + 1}`} · ${dayEx.length} упр. · ${ruCount(setsCnt, RU_APPROACHES)} · ~${estMin} мин`}
-                    </span>
-                  </span>
-                  <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
-                </button>
-              );
-            })()}
-            {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
-                  {(() => {
-                    const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                    if (!dayExercises.length) return null;
-                    const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
-                    const estMin = Math.round((totalSets * 60 + 300) / 60);
-                    const dayTonnage = dayExercises.reduce((sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0), 0);
-                    const intensity = trainingDaysList[safeRuntimeDay]?.intensity || 'средняя';
-                    return (
-                      <div style={{ marginBottom: 8, background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <div
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', userSelect: 'none' }}
-                          onClick={() => setDayDetailsOpen(v => !v)}
-                          role="button"
-                          aria-expanded={dayDetailsOpen}
-                          aria-label="Детали плана дня"
-                        >
-                          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                            📋 План дня — {dayExercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · ~{estMin} мин · интенсивность {intensity} · {dayTonnage.toLocaleString()} кг
-                          </span>
-                          <span style={{ fontSize: 10, color: '#fff' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
-                        </div>
-                        {dayDetailsOpen && (
-                          <div style={{ padding: '0 10px 8px' }}>
-                            {dayExercises.map((ex: any, i: number) => (
-                              <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10 }}>
-                                <span style={{ color: '#fff', minWidth: 16 }}>{i + 1}</span>
-                                <span style={{ flex: 1, minWidth: 0, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ex.name}{ex.isCompound ? ' 🔴' : ''}
+                        );
+                      })()}
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 8,
+                          overflowX: 'auto',
+                          paddingBottom: 4,
+                          WebkitOverflowScrolling: 'touch',
+                          scrollSnapType: 'x mandatory',
+                          scrollbarWidth: 'none',
+                          marginBottom: 10,
+                        }}
+                      >
+                        {(() => {
+                          // «Сегодня» — день недели ВНУТРИ списка дней микроцикла (метки
+                          // Пн…Вс), а не номер дня плана `he_pl_runtime` и не день недели по
+                          // модулю: план и микроцикл — разные источники, и зажатый в длину
+                          // микроцикла индекс открывал чужой день. Сегодня отдых — кнопка
+                          // неактивна и говорит об этом прямо.
+                          const _todayIdx = todayTrainingDayIndex(
+                            trainingDaysList.map((day: any) => day?.day),
+                            localIsoDate(),
+                          );
+                          const restToday = _todayIdx < 0;
+                          const isToday = !restToday && safeRuntimeDay === _todayIdx;
+                          return (
+                            <button
+                              onClick={() => {
+                                if (!restToday) setRuntimeDay(_todayIdx);
+                              }}
+                              disabled={restToday}
+                              aria-label={restToday ? 'Сегодня — день отдыха' : 'Выбрать сегодняшний день'}
+                              title={restToday ? 'В плане на сегодня тренировки нет' : undefined}
+                              style={{
+                                minWidth: 92,
+                                flex: '0 0 auto',
+                                scrollSnapAlign: 'start',
+                                padding: '8px 10px',
+                                borderRadius: 12,
+                                cursor: restToday ? 'default' : 'pointer',
+                                textAlign: 'center',
+                                background: isToday
+                                  ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))'
+                                  : 'rgba(255,255,255,0.04)',
+                                color: isToday ? '#00e68a' : restToday ? 'rgba(255,255,255,0.6)' : '#fff',
+                                border: `1px solid ${isToday ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'}`,
+                                fontSize: 10,
+                                fontWeight: 800,
+                              }}
+                            >
+                              {restToday ? '📅 Сегодня — отдых' : '📅 Сегодня'}
+                            </button>
+                          );
+                        })()}
+                        {trainingDaysList.map((day: any, di: number) => {
+                          const active = safeRuntimeDay === di;
+                          const exCnt = day.exercises?.length ?? 0;
+                          const sets = day.exercises?.reduce((s: number, e: any) => s + (e.sets || 0), 0) ?? 0;
+                          return (
+                            <button
+                              key={di}
+                              onClick={() => setRuntimeDay(di)}
+                              aria-pressed={active}
+                              aria-label={`Выбрать ${day.day || `День ${di + 1}`}`}
+                              style={{
+                                minWidth: 112,
+                                flex: '0 0 auto',
+                                scrollSnapAlign: 'start',
+                                textAlign: 'left',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                padding: '9px 11px',
+                                borderRadius: 13,
+                                cursor: 'pointer',
+                                background: active
+                                  ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.07))'
+                                  : 'rgba(255,255,255,0.04)',
+                                border: active ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)',
+                                borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.10)'}`,
+                                boxShadow: active ? '0 4px 14px rgba(0,230,138,0.16)' : '0 1px 8px rgba(0,0,0,0.10)',
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: 2,
+                                  background: active
+                                    ? 'linear-gradient(90deg,#00e68a,#00c853)'
+                                    : 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)',
+                                }}
+                              />
+                              <div
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  letterSpacing: 0.4,
+                                  textTransform: 'uppercase',
+                                  color: active ? '#00e68a' : 'rgba(255,255,255,0.50)',
+                                  marginBottom: 3,
+                                }}
+                              >
+                                День {di + 1}
+                                {active ? ' •' : ''}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: '#fff',
+                                  lineHeight: 1.1,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {day.day || `День ${di + 1}`}
+                              </div>
+                              <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: '1px 5px',
+                                    borderRadius: 20,
+                                    background: active ? 'rgba(0,230,138,0.13)' : 'rgba(255,255,255,0.06)',
+                                    color: active ? '#00e68a' : '#fff',
+                                    border: `1px solid ${active ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.07)'}`,
+                                  }}
+                                >
+                                  {exCnt} упр.
                                 </span>
-                                <span style={{ color: 'var(--accent)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ex.sets}×{ex.reps}</span>
-                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>{ex.weight ? `${ex.weight}кг` : 'в/т'}</span>
-                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>RIR {ex.rir ?? '—'}</span>
-                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>~{ex.restSec ?? 90}с</span>
-                                {ex.technique && (
-                                  <span style={{ color: '#fbbf24', whiteSpace: 'nowrap' }} title={ex.technique}>🎯</span>
-                                )}
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    padding: '1px 5px',
+                                    borderRadius: 20,
+                                    background: 'rgba(255,255,255,0.04)',
+                                    color: 'rgba(255,255,255,0.62)',
+                                    border: '1px solid rgba(255,255,255,0.06)',
+                                  }}
+                                >
+                                  {sets} сет.
+                                </span>
                               </div>
-                            ))}
-                          </div>
-                        )}
+                              {active && (
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    top: 6,
+                                    right: 7,
+                                    width: 16,
+                                    height: 16,
+                                    borderRadius: 16,
+                                    background: '#00e68a',
+                                    color: '#000',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  ✓
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
-                    );
-                  })()}
-                  {/* Session difficulty estimate */}
-                  {(() => {
-                    const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                    const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
-                    const avgIntensity = dayExercises.length > 0
-                      ? dayExercises.reduce((s: number, e: any) => s + (e.intensity || 70), 0) / dayExercises.length
-                      : 70;
-                    const difficulty = totalSets > 25 ? 'очень тяжёлая' : totalSets > 15 ? 'средняя' : 'лёгкая';
-                    const color = totalSets > 25 ? '#ef4444' : totalSets > 15 ? '#f59e0b' : '#22c55e';
-                    return (
-                      <div style={{ fontSize: 10, margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                        <span style={{ color: '#fff' }}>Сложность: </span>
-                        <span style={{ fontWeight: 600, color }}>{difficulty}</span>
-                        <span style={{ color: '#fff', marginLeft: 6 }}>· {ruCount(totalSets, RU_APPROACHES)} · ~{avgIntensity.toFixed(0)}% ср.</span>
-                        {totalSets > 25 && (
-                          <div style={{ color: '#f97316', marginTop: 2 }}>⚠ Высокий объём — отдых ≥ 3 мин между подходами</div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {/* ── Красивая разминка дня — по группам, суставы+активация+подводящие (мемоизировано, не пересоздаём на тиках) ── */}
-                  {warmupMemo.dayExercises.length > 0 && (() => {
-                    const dayExercises = warmupMemo.dayExercises;
-                    const groups = warmupMemo.groups;
-                    const warmupBlocksExec = warmupMemo.blocks;
-                    const total = warmupMemo.total;
-                    const done = warmupDoneCount;
-                    const pct = warmupPct;
-                    const mins = warmupMemo.mins;
-                    return (
-                      <div style={{
-                        margin: '8px 0', borderRadius: 14, overflow: 'hidden',
-                        background: 'linear-gradient(135deg, rgba(249,115,22,0.09), rgba(167,139,250,0.06))',
-                        border: '1px solid rgba(249,115,22,0.18)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
-                      }}>
-                        <div
-                          role="button" tabIndex={0}
-                          onClick={() => setWarmupOpen(v => !v)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWarmupOpen(v => !v); } }}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', userSelect: 'none' }}
-                          aria-expanded={warmupOpen} aria-label="Разминка дня"
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', flexShrink: 0 }}><NativeIcon name="zap" size={14} /></span>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка дня · персональная</div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {groups.length > 0 ? groups.join(', ') : 'общая'} · {warmupBlocksExec.length} блока · {total} пунктов · ~{mins} мин
+                      {/* Главное действие — сразу под выбором дня, без прокрутки. */}
+                      {(() => {
+                        const day = trainingDaysList[safeRuntimeDay] || {};
+                        const dayEx: any[] = day.exercises || [];
+                        const setsCnt = dayEx.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+                        const estMin = Math.round((setsCnt * 60 + 300) / 60);
+                        // Незавершённая сессия: «Продолжить» не должно стирать записанное,
+                        // поэтому открываем плеер (openSession), а не стартуем заново.
+                        const liveSum = (() => {
+                          try {
+                            return summarizeActiveSession(loadActiveSession(), setsCnt);
+                          } catch {
+                            return null;
+                          }
+                        })();
+                        return (
+                          <button
+                            type="button"
+                            data-act="start-session"
+                            onClick={liveSum ? openSession : startSession}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              textAlign: 'left',
+                              padding: '13px 15px',
+                              minHeight: 62,
+                              marginBottom: 10,
+                              borderRadius: 14,
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))',
+                              color: 'var(--accent-contrast, #000)',
+                              boxShadow: '0 6px 20px rgba(0,230,138,0.26)',
+                              fontWeight: 800,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 10,
+                                background: 'rgba(0,0,0,0.14)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <NativeIcon name="play" size={15} />
+                            </span>
+                            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                              <span style={{ display: 'block', fontSize: 14 }}>
+                                {liveSum ? 'Продолжить тренировку' : 'Начать тренировку'}
+                              </span>
+                              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
+                                {liveSum
+                                  ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
+                                  : `${day.day || `День ${safeRuntimeDay + 1}`} · ${dayEx.length} упр. · ${ruCount(setsCnt, RU_APPROACHES)} · ~${estMin} мин`}
+                              </span>
+                            </span>
+                            <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
+                          </button>
+                        );
+                      })()}
+                      {/* ── Детали дня: полный список упражнений (сеты/вес/RIR/отдых) ── */}
+                      {(() => {
+                        const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                        if (!dayExercises.length) return null;
+                        const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+                        const estMin = Math.round((totalSets * 60 + 300) / 60);
+                        const dayTonnage = dayExercises.reduce(
+                          (sum: number, ex: any) => sum + (ex.sets || 0) * (Number(ex.reps) || 0) * (ex.weight || 0),
+                          0,
+                        );
+                        const intensity = trainingDaysList[safeRuntimeDay]?.intensity || 'средняя';
+                        return (
+                          <div
+                            style={{
+                              marginBottom: 8,
+                              background: 'rgba(255,255,255,0.02)',
+                              borderRadius: 8,
+                              border: '1px solid rgba(255,255,255,0.06)',
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '8px 10px',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                              }}
+                              onClick={() => setDayDetailsOpen((v) => !v)}
+                              role="button"
+                              aria-expanded={dayDetailsOpen}
+                              aria-label="Детали плана дня"
+                            >
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                                📋 План дня — {dayExercises.length} упр. · {ruCount(totalSets, RU_APPROACHES)} · ~
+                                {estMin} мин · интенсивность {intensity} · {dayTonnage.toLocaleString()} кг
+                              </span>
+                              <span style={{ fontSize: 10, color: '#fff' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
+                            </div>
+                            {dayDetailsOpen && (
+                              <div style={{ padding: '0 10px 8px' }}>
+                                {dayExercises.map((ex: any, i: number) => (
+                                  <div
+                                    key={i}
+                                    style={{
+                                      display: 'flex',
+                                      gap: 6,
+                                      alignItems: 'center',
+                                      padding: '5px 0',
+                                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                      fontSize: 10,
+                                    }}
+                                  >
+                                    <span style={{ color: '#fff', minWidth: 16 }}>{i + 1}</span>
+                                    <span
+                                      style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        color: '#fff',
+                                        fontWeight: 600,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                    >
+                                      {ex.name}
+                                      {ex.isCompound ? ' 🔴' : ''}
+                                    </span>
+                                    <span style={{ color: 'var(--accent)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                      {ex.sets}×{ex.reps}
+                                    </span>
+                                    <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>
+                                      {ex.weight ? `${ex.weight}кг` : 'в/т'}
+                                    </span>
+                                    <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>RIR {ex.rir ?? '—'}</span>
+                                    <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>
+                                      {Number(ex.restSec) > 0 ? `~${ex.restSec}с` : 'отдых —'}
+                                    </span>
+                                    {ex.technique && (
+                                      <span style={{ color: '#fbbf24', whiteSpace: 'nowrap' }} title={ex.technique}>
+                                        🎯
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
-                            </div>
+                            )}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: pct === 100 ? '#22c55e' : 'rgba(255,255,255,0.07)', color: pct === 100 ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{done}/{total} · {pct}%</span>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{warmupOpen ? '▲' : '▼'}</span>
+                        );
+                      })()}
+                      {/* Session difficulty estimate */}
+                      {(() => {
+                        const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                        const totalSets = dayExercises.reduce((s: number, e: any) => s + (e.sets || 0), 0);
+                        const avgIntensity =
+                          dayExercises.length > 0
+                            ? dayExercises.reduce((s: number, e: any) => s + (e.intensity || 70), 0) /
+                              dayExercises.length
+                            : 70;
+                        const difficulty = totalSets > 25 ? 'очень тяжёлая' : totalSets > 15 ? 'средняя' : 'лёгкая';
+                        const color = totalSets > 25 ? '#ef4444' : totalSets > 15 ? '#f59e0b' : '#22c55e';
+                        return (
+                          <div
+                            style={{
+                              fontSize: 10,
+                              margin: '6px 0',
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              background: 'rgba(255,255,255,0.03)',
+                            }}
+                          >
+                            <span style={{ color: '#fff' }}>Сложность: </span>
+                            <span style={{ fontWeight: 600, color }}>{difficulty}</span>
+                            <span style={{ color: '#fff', marginLeft: 6 }}>
+                              · {ruCount(totalSets, RU_APPROACHES)} · ~{avgIntensity.toFixed(0)}% ср.
+                            </span>
+                            {totalSets > 25 && (
+                              <div style={{ color: '#f97316', marginTop: 2 }}>
+                                ⚠ Высокий объём — отдых ≥ 3 мин между подходами
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        {warmupOpen && (
-                          <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : 'linear-gradient(90deg,#f97316,#fb923c)', transition: 'width 0.3s ease' }} />
+                        );
+                      })()}
+                      {/* ── Красивая разминка дня — по группам, суставы+активация+подводящие (мемоизировано, не пересоздаём на тиках) ── */}
+                      {warmupMemo.dayExercises.length > 0 &&
+                        (() => {
+                          const dayExercises = warmupMemo.dayExercises;
+                          const groups = warmupMemo.groups;
+                          const warmupBlocksExec = warmupMemo.blocks;
+                          const total = warmupMemo.total;
+                          const done = warmupDoneCount;
+                          const pct = warmupPct;
+                          const mins = warmupMemo.mins;
+                          return (
+                            <div
+                              style={{
+                                margin: '8px 0',
+                                borderRadius: 14,
+                                overflow: 'hidden',
+                                background: 'linear-gradient(135deg, rgba(249,115,22,0.09), rgba(167,139,250,0.06))',
+                                border: '1px solid rgba(249,115,22,0.18)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                              }}
+                            >
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setWarmupOpen((v) => !v)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setWarmupOpen((v) => !v);
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '10px 12px',
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                }}
+                                aria-expanded={warmupOpen}
+                                aria-label="Разминка дня"
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                  <span
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 8,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: 'linear-gradient(135deg,#f97316,#ea580c)',
+                                      color: '#fff',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <NativeIcon name="zap" size={14} />
+                                  </span>
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>
+                                      Разминка дня · персональная
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 10,
+                                        color: 'rgba(255,255,255,0.62)',
+                                        lineHeight: 1.2,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }}
+                                    >
+                                      {groups.length > 0 ? groups.join(', ') : 'общая'} · {warmupBlocksExec.length}{' '}
+                                      блока · {total} пунктов · ~{mins} мин
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: '3px 7px',
+                                      borderRadius: 20,
+                                      background: pct === 100 ? '#22c55e' : 'rgba(255,255,255,0.07)',
+                                      color: pct === 100 ? '#000' : '#fff',
+                                      border: '1px solid rgba(255,255,255,0.08)',
+                                    }}
+                                  >
+                                    {done}/{total} · {pct}%
+                                  </span>
+                                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                                    {warmupOpen ? '▲' : '▼'}
+                                  </span>
+                                </div>
+                              </div>
+                              {warmupOpen && (
+                                <div
+                                  style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}
+                                >
+                                  <div
+                                    style={{
+                                      height: 4,
+                                      borderRadius: 2,
+                                      background: 'rgba(255,255,255,0.08)',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        height: '100%',
+                                        width: `${pct}%`,
+                                        borderRadius: 2,
+                                        background: pct === 100 ? '#22c55e' : 'linear-gradient(90deg,#f97316,#fb923c)',
+                                        transition: 'width 0.3s ease',
+                                      }}
+                                    />
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                                    {(['quick', 'standard', 'full'] as const).map((m) => {
+                                      const active = execWarmupMode === m;
+                                      const cfg =
+                                        m === 'quick'
+                                          ? {
+                                              label: 'Быстро',
+                                              sub: '5м',
+                                              color: '#f59e0b',
+                                              bg: 'rgba(245,158,11,0.12)',
+                                              border: 'rgba(245,158,11,0.28)',
+                                            }
+                                          : m === 'standard'
+                                            ? {
+                                                label: 'Стандарт',
+                                                sub: '9м',
+                                                color: '#22c55e',
+                                                bg: 'rgba(34,197,94,0.12)',
+                                                border: 'rgba(34,197,94,0.28)',
+                                              }
+                                            : {
+                                                label: 'Полная',
+                                                sub: '14м',
+                                                color: '#a78bfa',
+                                                bg: 'rgba(167,139,250,0.12)',
+                                                border: 'rgba(167,139,250,0.28)',
+                                              };
+                                      return (
+                                        <button
+                                          key={m}
+                                          onClick={() => {
+                                            setExecWarmupMode(m);
+                                            try {
+                                              localStorage.setItem('he_warmup_mode', m);
+                                            } catch {}
+                                            setExecWarmupDone({});
+                                          }}
+                                          style={{
+                                            flex: 1,
+                                            minWidth: 60,
+                                            padding: '4px 6px',
+                                            borderRadius: 8,
+                                            cursor: 'pointer',
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            background: active ? cfg.bg : 'rgba(255,255,255,0.04)',
+                                            color: active ? cfg.color : 'rgba(255,255,255,0.55)',
+                                            border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.07)'}`,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: 1,
+                                          }}
+                                        >
+                                          <span>{cfg.label}</span>
+                                          <span style={{ fontSize: 7, opacity: 0.85 }}>{cfg.sub}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {warmupBlocksExec.map((b, bi) => {
+                                    const meta =
+                                      b.type === 'general'
+                                        ? {
+                                            icon: 'activity' as const,
+                                            title: 'Общая',
+                                            color: '#06b6d4',
+                                            bg: 'rgba(6,182,214,0.08)',
+                                            border: 'rgba(6,182,214,0.22)',
+                                          }
+                                        : b.type === 'mobility'
+                                          ? {
+                                              icon: 'move' as const,
+                                              title: 'Суставы + зоны',
+                                              color: '#f59e0b',
+                                              bg: 'rgba(245,158,11,0.08)',
+                                              border: 'rgba(245,158,11,0.22)',
+                                            }
+                                          : b.type === 'activation'
+                                            ? {
+                                                icon: 'zap' as const,
+                                                title: 'Активация',
+                                                color: '#22c55e',
+                                                bg: 'rgba(34,197,94,0.08)',
+                                                border: 'rgba(34,197,94,0.22)',
+                                              }
+                                            : {
+                                                icon: 'dumbbell' as const,
+                                                title: 'Подводящие',
+                                                color: '#a78bfa',
+                                                bg: 'rgba(167,139,250,0.08)',
+                                                border: 'rgba(167,139,250,0.22)',
+                                              };
+                                    const bTotal = b.exercises.length;
+                                    const bDone = b.exercises.filter(
+                                      (_: any, j: number) => execWarmupDone[`ew_${bi}_${j}`],
+                                    ).length;
+                                    const bPct = bTotal > 0 ? Math.round((bDone / bTotal) * 100) : 0;
+                                    return (
+                                      <div
+                                        key={bi}
+                                        style={{
+                                          borderRadius: 10,
+                                          padding: '8px 8px 6px',
+                                          background:
+                                            bDone === bTotal && bTotal > 0
+                                              ? 'rgba(34,197,94,0.06)'
+                                              : 'rgba(255,255,255,0.03)',
+                                          border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`,
+                                          borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}`,
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            marginBottom: 4,
+                                          }}
+                                        >
+                                          <span
+                                            style={{
+                                              fontSize: 10,
+                                              fontWeight: 800,
+                                              color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color,
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 4,
+                                            }}
+                                          >
+                                            <NativeIcon name={meta.icon} size={11} /> {meta.title}
+                                          </span>
+                                          <span
+                                            style={{
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              padding: '2px 6px',
+                                              borderRadius: 20,
+                                              background: meta.bg,
+                                              color: meta.color,
+                                              border: `1px solid ${meta.border}`,
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 3,
+                                            }}
+                                          >
+                                            <NativeIcon name="clock" size={8} /> {b.durationSec}с · {bDone}/{bTotal}
+                                          </span>
+                                        </div>
+                                        {b.notes && (
+                                          <div
+                                            style={{
+                                              fontSize: 10,
+                                              color: 'rgba(255,255,255,0.62)',
+                                              marginBottom: 5,
+                                              lineHeight: 1.3,
+                                            }}
+                                          >
+                                            {b.notes}
+                                          </div>
+                                        )}
+                                        <div
+                                          style={{
+                                            height: 2,
+                                            borderRadius: 1,
+                                            background: 'rgba(255,255,255,0.06)',
+                                            overflow: 'hidden',
+                                            marginBottom: 6,
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              height: '100%',
+                                              width: `${bPct}%`,
+                                              background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color,
+                                              transition: 'width 0.3s ease',
+                                            }}
+                                          />
+                                        </div>
+                                        <ul
+                                          style={{
+                                            listStyle: 'none',
+                                            padding: 0,
+                                            margin: 0,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 6,
+                                          }}
+                                        >
+                                          {b.exercises.map((ex: any, j: number) => {
+                                            const isDone = !!execWarmupDone[`ew_${bi}_${j}`];
+                                            const isSpec = 'intensityPct' in ex && (ex as any).intensityPct;
+                                            const elabel = isSpec
+                                              ? warmupSpecificLabel(ex.exerciseId)
+                                              : warmupLabel(ex.exerciseId);
+                                            const edose = isSpec
+                                              ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}`
+                                              : `${ex.sets}×${ex.reps}`;
+                                            return (
+                                              <li key={j} style={{ listStyle: 'none' }}>
+                                                <button
+                                                  type="button"
+                                                  aria-pressed={isDone}
+                                                  aria-label={`${elabel} — ${isDone ? 'выполнено' : 'отметить'}`}
+                                                  onClick={() =>
+                                                    setExecWarmupDone((prev) => ({
+                                                      ...prev,
+                                                      [`ew_${bi}_${j}`]: !prev[`ew_${bi}_${j}`],
+                                                    }))
+                                                  }
+                                                  style={{
+                                                    width: '100%',
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: 9,
+                                                    padding: '8px 9px',
+                                                    borderRadius: 11,
+                                                    cursor: 'pointer',
+                                                    textAlign: 'left',
+                                                    minWidth: 0,
+                                                    background: isDone
+                                                      ? 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.07))'
+                                                      : 'rgba(255,255,255,0.035)',
+                                                    border: `1px solid ${isDone ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.06)'}`,
+                                                    borderLeft: `3px solid ${isDone ? '#22c55e' : meta.color}`,
+                                                    boxShadow: isDone
+                                                      ? '0 2px 10px rgba(34,197,94,0.14)'
+                                                      : '0 1px 6px rgba(0,0,0,0.08)',
+                                                    opacity: isDone ? 0.92 : 1,
+                                                    transition: 'all 0.2s',
+                                                  }}
+                                                >
+                                                  <span
+                                                    style={{
+                                                      width: 24,
+                                                      height: 24,
+                                                      borderRadius: 8,
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      flexShrink: 0,
+                                                      marginTop: 1,
+                                                      background: isDone
+                                                        ? 'linear-gradient(135deg,#22c55e,#16a34a)'
+                                                        : `linear-gradient(135deg, ${meta.color}, ${meta.color}CC)`,
+                                                      color: '#fff',
+                                                      fontSize: 11,
+                                                      fontWeight: 800,
+                                                      boxShadow: `0 2px 7px ${isDone ? 'rgba(34,197,94,0.26)' : meta.color + '33'}`,
+                                                    }}
+                                                  >
+                                                    {isDone ? '✓' : j + 1}
+                                                  </span>
+                                                  <span style={{ flex: 1, minWidth: 0 }}>
+                                                    <span
+                                                      style={{
+                                                        fontSize: 10.5,
+                                                        fontWeight: isDone ? 600 : 700,
+                                                        color: isDone ? 'rgba(255,255,255,0.74)' : '#fff',
+                                                        textDecoration: isDone ? 'line-through' : 'none',
+                                                        lineHeight: 1.3,
+                                                        display: 'block',
+                                                        wordBreak: 'break-word',
+                                                      }}
+                                                    >
+                                                      {elabel}
+                                                    </span>
+                                                    <span
+                                                      style={{
+                                                        display: 'flex',
+                                                        gap: 5,
+                                                        flexWrap: 'wrap',
+                                                        alignItems: 'center',
+                                                        marginTop: 3,
+                                                      }}
+                                                    >
+                                                      <span
+                                                        style={{
+                                                          fontSize: 10,
+                                                          fontWeight: 800,
+                                                          padding: '1px 6px',
+                                                          borderRadius: 20,
+                                                          background: isDone ? 'rgba(34,197,94,0.13)' : meta.bg,
+                                                          color: isDone ? '#86efac' : meta.color,
+                                                          border: `1px solid ${isDone ? 'rgba(34,197,94,0.20)' : meta.border}`,
+                                                        }}
+                                                      >
+                                                        {edose}
+                                                      </span>
+                                                      {'note' in ex && (ex as any).note && (
+                                                        <span
+                                                          style={{
+                                                            fontSize: 10,
+                                                            color: isDone
+                                                              ? 'rgba(255,255,255,0.40)'
+                                                              : 'rgba(255,255,255,0.58)',
+                                                            lineHeight: 1.3,
+                                                          }}
+                                                        >
+                                                          {(ex as any).note}
+                                                        </span>
+                                                      )}
+                                                    </span>
+                                                  </span>
+                                                  <span
+                                                    style={{
+                                                      width: 22,
+                                                      height: 22,
+                                                      borderRadius: 22,
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      flexShrink: 0,
+                                                      marginTop: 1,
+                                                      background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)',
+                                                      color: isDone ? '#000' : 'rgba(255,255,255,0.34)',
+                                                      border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`,
+                                                      fontSize: 10,
+                                                      fontWeight: 800,
+                                                    }}
+                                                  >
+                                                    {isDone ? '✓' : '○'}
+                                                  </span>
+                                                </button>
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      </div>
+                                    );
+                                  })}
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      color: 'rgba(255,255,255,0.38)',
+                                      textAlign: 'center',
+                                      lineHeight: 1.3,
+                                    }}
+                                  >
+                                    Отмечайте пункты — прогресс сохранится до старта · без ленты — bodyweight-замены уже
+                                    включены · подводящие — с % и кг в подсказке
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
-                              {(['quick','standard','full'] as const).map(m => {
-                                const active = execWarmupMode === m;
-                                const cfg = m === 'quick' ? { label: 'Быстро', sub: '5м', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)' } : m === 'standard' ? { label: 'Стандарт', sub: '9м', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.28)' } : { label: 'Полная', sub: '14м', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.28)' };
+                          );
+                        })()}
+                      {/* Старт теперь вверху карточки (data-act="start-session"):
+                      до кнопки не нужно было проскролливать план и разминку. */}
+                      {onGoToTimers &&
+                        (() => {
+                          const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                          const compoundCount = dayExercises.filter((e: any) =>
+                            ['squat', 'bench', 'deadlift', 'overhead', 'row', 'pull', 'lunge', 'hip', 'leg'].some((p) =>
+                              (e.name || '').toLowerCase().includes(p),
+                            ),
+                          ).length;
+                          const isolationCount = dayExercises.length - compoundCount;
+                          const rests = dayExercises
+                            .map((e: any) => Number(e.restSec))
+                            .filter((n: number) => Number.isFinite(n) && n > 0);
+                          const avgRest =
+                            rests.length > 0
+                              ? Math.round(rests.reduce((a: number, b: number) => a + b, 0) / rests.length)
+                              : undefined;
+                          const rounds = Math.max(3, dayExercises.length);
+                          // 60 с — нейтральный дефолт таймера, а не значение из плана.
+                          const work = Math.max(45, Math.min(180, avgRest ?? 60));
+                          return (
+                            <button
+                              onClick={() => {
+                                setTimerInitialSettings({ work, rest: avgRest ?? 60, rounds });
+                                onGoToTimers?.({ work, rest: avgRest ?? 60, rounds });
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: 10,
+                                borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                cursor: 'pointer',
+                                background: 'rgba(59,130,246,0.1)',
+                                color: '#60a5fa',
+                                fontWeight: 600,
+                                fontSize: 12,
+                                marginTop: 8,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                              }}
+                            >
+                              <NativeIcon name="clock" size={12} /> Таймер для этого дня ·{' '}
+                              {avgRest ? `отдых ~${avgRest}с` : 'отдых 60с по умолчанию'} · {rounds} раундов
+                            </button>
+                          );
+                        })()}
+
+                      {/* Прогресс по упражнениям дня из кэша */}
+                      {(() => {
+                        const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                        if (!dayExercises.length) return null;
+                        return (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              padding: 10,
+                              borderRadius: 10,
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.07)',
+                            }}
+                          >
+                            <button
+                              type="button"
+                              data-act="day-progress-toggle"
+                              aria-expanded={progressOpen}
+                              onClick={() => setProgressOpen((v) => !v)}
+                              style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 8,
+                                background: 'transparent',
+                                border: 'none',
+                                padding: 0,
+                                marginBottom: progressOpen ? 6 : 0,
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <span>📈 Прогресс по упражнениям дня · {dayExercises.length} упр.</span>
+                              <span style={{ fontSize: 10, opacity: 0.75 }}>{progressOpen ? '▲' : '▼'}</span>
+                            </button>
+                            <div
+                              data-pl="day-progress"
+                              style={{
+                                display: progressOpen ? 'grid' : 'none',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                                gap: 6,
+                              }}
+                            >
+                              {dayExercises.slice(0, 6).map((ex: any, i: number) => {
+                                const cached = getCachedProgressForExercise(ex.name || ex.id || '');
+                                if (!cached)
+                                  return (
+                                    <div
+                                      key={i}
+                                      style={{
+                                        padding: 8,
+                                        borderRadius: 8,
+                                        background: 'rgba(255,255,255,0.03)',
+                                        border: '1px solid rgba(255,255,255,0.06)',
+                                      }}
+                                    >
+                                      <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+                                        {ex.name || ex.id}
+                                      </div>
+                                      <div style={{ fontSize: 10, color: '#fff' }}>Нет данных</div>
+                                    </div>
+                                  );
+                                const trendIcon = cached.trend === 'up' ? '↑' : cached.trend === 'down' ? '↓' : '→';
+                                const trendColor =
+                                  cached.trend === 'up' ? '#22c55e' : cached.trend === 'down' ? '#ef4444' : '#fff';
                                 return (
-                                  <button key={m} onClick={() => {
-                                    setExecWarmupMode(m);
-                                    try { localStorage.setItem('he_warmup_mode', m); } catch {}
-                                    setExecWarmupDone({});
-                                  }} style={{ flex: 1, minWidth: 60, padding: '4px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, background: active ? cfg.bg : 'rgba(255,255,255,0.04)', color: active ? cfg.color : 'rgba(255,255,255,0.55)', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                    <span>{cfg.label}</span><span style={{ fontSize: 7, opacity: 0.85 }}>{cfg.sub}</span>
-                                  </button>
+                                  <div
+                                    key={i}
+                                    style={{
+                                      padding: 8,
+                                      borderRadius: 8,
+                                      background: 'rgba(0,230,138,0.04)',
+                                      border: '1px solid rgba(0,230,138,0.12)',
+                                    }}
+                                  >
+                                    <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 3 }}>
+                                      {cached.exerciseName}
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: 10,
+                                        color: '#fff',
+                                      }}
+                                    >
+                                      <span>1RM {cached.bestE1RM}кг</span>
+                                      <span style={{ color: trendColor }}>
+                                        {trendIcon} {cached.e1RMDelta > 0 ? '+' : ''}
+                                        {cached.e1RMDelta}
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: 10,
+                                        color: '#fff',
+                                        marginTop: 2,
+                                      }}
+                                    >
+                                      <span>Объём {cached.totalVolume.toLocaleString()}</span>
+                                      <span style={{ color: trendColor }}>
+                                        {trendIcon} {cached.weightDelta > 0 ? '+' : ''}
+                                        {cached.weightDelta}кг
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
+                                      {ruCount(cached.sessions, RU_SESSIONS)} · {cached.lastDate}
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
-                            {warmupBlocksExec.map((b, bi) => {
-                              const meta = b.type === 'general' ? { icon: 'activity' as const, title: 'Общая', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
-                                : b.type === 'mobility' ? { icon: 'move' as const, title: 'Суставы + зоны', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)' }
-                                : b.type === 'activation' ? { icon: 'zap' as const, title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' }
-                                : { icon: 'dumbbell' as const, title: 'Подводящие', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' };
-                              const bTotal = b.exercises.length;
-                              const bDone = b.exercises.filter((_: any, j: number) => execWarmupDone[`ew_${bi}_${j}`]).length;
-                              const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
-                              return (
-                                <div key={bi} style={{ borderRadius: 10, padding: '8px 8px 6px', background: bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`, borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}` }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                    <span style={{ fontSize: 10, fontWeight: 800, color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, display: 'inline-flex', alignItems: 'center', gap: 4 }}><NativeIcon name={meta.icon} size={11} /> {meta.title}</span>
-                                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}`, display: 'inline-flex', alignItems: 'center', gap: 3 }}><NativeIcon name="clock" size={8} /> {b.durationSec}с · {bDone}/{bTotal}</span>
-                                  </div>
-                                  {b.notes && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', marginBottom: 5, lineHeight: 1.3 }}>{b.notes}</div>}
-                                  <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
-                                    <div style={{ height: '100%', width: `${bPct}%`, background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
-                                  </div>
-                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    {b.exercises.map((ex: any, j: number) => {
-                                      const isDone = !!execWarmupDone[`ew_${bi}_${j}`];
-                                      const isSpec = 'intensityPct' in ex && (ex as any).intensityPct;
-                                      const elabel = isSpec ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId);
-                                      const edose = isSpec ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`;
-                                      return (
-                                        <li key={j} style={{ listStyle: 'none' }}>
-                                          <button type="button" aria-pressed={isDone} aria-label={`${elabel} — ${isDone ? 'выполнено' : 'отметить'}`}
-                                            onClick={() => setExecWarmupDone(prev => ({ ...prev, [`ew_${bi}_${j}`]: !prev[`ew_${bi}_${j}`] }))}
-                                            style={{
-                                              width: '100%', display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 9px', borderRadius: 11, cursor: 'pointer', textAlign: 'left', minWidth: 0,
-                                              background: isDone ? 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.035)',
-                                              border: `1px solid ${isDone ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.06)'}`,
-                                              borderLeft: `3px solid ${isDone ? '#22c55e' : meta.color}`,
-                                              boxShadow: isDone ? '0 2px 10px rgba(34,197,94,0.14)' : '0 1px 6px rgba(0,0,0,0.08)',
-                                              opacity: isDone ? 0.92 : 1, transition: 'all 0.2s',
-                                            }}>
-                                            <span style={{
-                                              width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
-                                              background: isDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${meta.color}, ${meta.color}CC)`,
-                                              color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: `0 2px 7px ${isDone ? 'rgba(34,197,94,0.26)' : meta.color + '33'}`,
-                                            }}>{isDone ? '✓' : (j + 1)}</span>
-                                            <span style={{ flex: 1, minWidth: 0 }}>
-                                              <span style={{ fontSize: 10.5, fontWeight: isDone ? 600 : 700, color: isDone ? 'rgba(255,255,255,0.74)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3, display: 'block', wordBreak: 'break-word' }}>{elabel}</span>
-                                              <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
-                                                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.13)' : meta.bg, color: isDone ? '#86efac' : meta.color, border: `1px solid ${isDone ? 'rgba(34,197,94,0.20)' : meta.border}` }}>{edose}</span>
-                                                {'note' in ex && (ex as any).note && <span style={{ fontSize: 10, color: isDone ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.58)', lineHeight: 1.3 }}>{(ex as any).note}</span>}
-                                              </span>
-                                            </span>
-                                            <span style={{
-                                              width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
-                                              background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.34)',
-                                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
-                                            }}>{isDone ? '✓' : '○'}</span>
-                                          </button>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                </div>
-                              );
-                            })}
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3 }}>
-                              Отмечайте пункты — прогресс сохранится до старта · без ленты — bodyweight-замены уже включены · подводящие — с % и кг в подсказке
-                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {/* Старт теперь вверху карточки (data-act="start-session"):
-                      до кнопки не нужно было проскролливать план и разминку. */}
-                    {onGoToTimers && (() => {
-                      const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                      const compoundCount = dayExercises.filter((e: any) => ['squat','bench','deadlift','overhead','row','pull','lunge','hip','leg'].some(p => (e.name || '').toLowerCase().includes(p))).length;
-                      const isolationCount = dayExercises.length - compoundCount;
-                      const avgRest = dayExercises.length > 0 ? Math.round(dayExercises.reduce((s: number, e: any) => s + (e.restSec || 90), 0) / dayExercises.length) : 90;
-                      const rounds = Math.max(3, dayExercises.length);
-                      const work = Math.max(45, Math.min(180, avgRest));
-                       return (
-                         <button onClick={() => { setTimerInitialSettings({ work, rest: avgRest, rounds }); onGoToTimers?.({ work, rest: avgRest, rounds }); }} style={{
-                          width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                          background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontWeight: 600, fontSize: 12, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        }}>
-                          <NativeIcon name="clock" size={12} /> Таймер для этого дня · отдых ~{avgRest}с · {rounds} раундов
-                        </button>
-                      );
-                    })()}
-                    
-                    {/* Прогресс по упражнениям дня из кэша */}
-                    {(() => {
-                      const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
-                      if (!dayExercises.length) return null;
-                      return (
-                        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                          <button
-                            type="button"
-                            data-act="day-progress-toggle"
-                            aria-expanded={progressOpen}
-                            onClick={() => setProgressOpen((v) => !v)}
-                            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: 'transparent', border: 'none', padding: 0, marginBottom: progressOpen ? 6 : 0, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            <span>📈 Прогресс по упражнениям дня · {dayExercises.length} упр.</span>
-                            <span style={{ fontSize: 10, opacity: 0.75 }}>{progressOpen ? '▲' : '▼'}</span>
-                          </button>
-                          <div data-pl="day-progress" style={{ display: progressOpen ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-                            {dayExercises.slice(0, 6).map((ex: any, i: number) => {
-                              const cached = getCachedProgressForExercise(ex.name || ex.id || '');
-                              if (!cached) return (
-                                <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{ex.name || ex.id}</div>
-                                  <div style={{ fontSize: 10, color: '#fff' }}>Нет данных</div>
-                                </div>
-                              );
-                              const trendIcon = cached.trend === 'up' ? '↑' : cached.trend === 'down' ? '↓' : '→';
-                              const trendColor = cached.trend === 'up' ? '#22c55e' : cached.trend === 'down' ? '#ef4444' : '#fff';
-                              return (
-                                <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
-                                  <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 3 }}>{cached.exerciseName}</div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff' }}>
-                                    <span>1RM {cached.bestE1RM}кг</span>
-                                    <span style={{ color: trendColor }}>{trendIcon} {cached.e1RMDelta > 0 ? '+' : ''}{cached.e1RMDelta}</span>
-                                  </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2 }}>
-                                    <span>Объём {cached.totalVolume.toLocaleString()}</span>
-                                    <span style={{ color: trendColor }}>{trendIcon} {cached.weightDelta > 0 ? '+' : ''}{cached.weightDelta}кг</span>
-                                  </div>
-                                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{ruCount(cached.sessions, RU_SESSIONS)} · {cached.lastDate}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', color: '#fff', fontSize: 11 }}>
-                  Сначала сгенерируйте план во вкладке 📋 План
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#fff', fontSize: 11 }}>
+                      Сначала сгенерируйте план во вкладке 📋 План
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            {/* Проведение: проф-плеер (разминка → подходы → заминка → итоги).
+                {/* Проведение: проф-плеер (разминка → подходы → заминка → итоги).
                 Логирование сетов, блины, VBT, RIR, сравнение с прошлой сессией,
                 таймер отдыха, автосейв живой сессии — всё в SessionPlayer. */}
-            <div className="card" data-session="player" style={{ padding: '10px 12px', display: runtimeStarted ? 'block' : 'none', border: '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.22)', background: 'rgba(var(--train-accent-rgb, 0,230,138),0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <NativeIcon name="play" size={12} /> Проведение тренировки
-                  </h3>
-                  <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
-                    {trainingDaysList[safeRuntimeDay]?.day || `День ${safeRuntimeDay + 1}`} · неделя {selectedWeek}
-                    {trainingDaysList[safeRuntimeDay]?.exercises?.length ? ` · ${trainingDaysList[safeRuntimeDay].exercises.length} упр.` : ''}
-                  </p>
+                <div
+                  className="card"
+                  data-session="player"
+                  style={{
+                    padding: '10px 12px',
+                    display: runtimeStarted ? 'block' : 'none',
+                    border: '1px solid rgba(var(--train-accent-rgb, 0,230,138),0.22)',
+                    background: 'rgba(var(--train-accent-rgb, 0,230,138),0.05)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: 'var(--accent)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <NativeIcon name="play" size={12} /> Проведение тренировки
+                      </h3>
+                      <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
+                        {trainingDaysList[safeRuntimeDay]?.day || `День ${safeRuntimeDay + 1}`} · неделя {selectedWeek}
+                        {trainingDaysList[safeRuntimeDay]?.exercises?.length
+                          ? ` · ${trainingDaysList[safeRuntimeDay].exercises.length} упр.`
+                          : ''}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setRuntimeStarted(false);
+                        setRuntimeExIdx(0);
+                      }}
+                      aria-label="Свернуть проведение"
+                      style={{
+                        padding: '8px 12px',
+                        minHeight: 44,
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <NativeIcon name="pause" size={10} /> Свернуть
+                    </button>
+                  </div>
+                  <SessionPlayer
+                    days={trainingDaysList.length > 0 ? [playerDayFromMicro(trainingDaysList[safeRuntimeDay])] : []}
+                    weekNumber={selectedWeek}
+                    focus={
+                      trainingOutput?.splitName ||
+                      currentMicrocycle?.mesocycleType ||
+                      trainingDaysList[safeRuntimeDay]?.day ||
+                      'Тренировка'
+                    }
+                    onSaved={loadDiaryStats}
+                  />
                 </div>
-                <button onClick={() => { setRuntimeStarted(false); setRuntimeExIdx(0); }} aria-label="Свернуть проведение" style={{ padding: '8px 12px', minHeight: 44, borderRadius: 10, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                  <NativeIcon name="pause" size={10} /> Свернуть
-                </button>
-              </div>
-              <SessionPlayer
-                days={trainingDaysList.length > 0 ? [playerDayFromMicro(trainingDaysList[safeRuntimeDay])] : []}
-                weekNumber={selectedWeek}
-                focus={trainingOutput?.splitName || currentMicrocycle?.mesocycleType || trainingDaysList[safeRuntimeDay]?.day || 'Тренировка'}
-                onSaved={loadDiaryStats}
-              />
-            </div>
-            </>
-          )}
-          {/* Док зала (пульт/таймеры/график) — НИЖЕ главного действия: сверху он
+              </>
+            )}
+            {/* Док зала (пульт/таймеры/график) — НИЖЕ главного действия: сверху он
               отодвигал «Начать тренировку» и предлагал свой старт вторым путём.
               Свёрнут по умолчанию, пульт живой во время сессии. */}
-          <SessionWidgetsDock onOpen={openSession} />
-        </div>
+            <SessionWidgetsDock onOpen={openSession} />
+          </div>
         </InfoErrorBoundary>
       )}
-      {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab initialSettings={timerInitialSettings} /></InfoErrorBoundary>}
+      {tab === 'timers' && (
+        <InfoErrorBoundary label="Таймеры">
+          <TimersTab initialSettings={timerInitialSettings} />
+        </InfoErrorBoundary>
+      )}
     </>
   );
 };

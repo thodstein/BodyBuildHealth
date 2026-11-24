@@ -1,8 +1,8 @@
 /**
  * widget-sync-serial.test.ts — контракт A1/A2/A4 «сериал синков с дожимом»:
  *
- *  - синки не гоняются параллельно: второй вызов на полёте — «занят», а
- *    причина перезапускает первый проход после него;
+ *  - синки не гоняются параллельно: второй вызов на полёте ждёт то же обещание
+ *    и видит агрегат прохода, а причина перезапускает проход после него;
  *  - подход с виджета: сессия получает дату из метки времени очереди (A1);
  *  - дрень подходов/тренировок из очереди обновляет виджеты сразу (A2);
  *  - pushTrainingWidget возвращает обещание и не гоняет параллельные вызовы (A4).
@@ -72,20 +72,39 @@ afterEach(() => {
 });
 
 describe('A1 сериал синков: параллельный вызов не гоняет дрень', () => {
-  it('второй вызов на полёте — нулевой результат, причина перезапускает после первого прохода', async () => {
+  it('второй вызов на полёте получает тот же результат дрена, а очередь дожимается', async () => {
     await queueWaterMl(250);
     const p1 = syncAllWidgets();
     const p2 = syncAllWidgets();
-    // Пока первый проход в полёте — «500» прилетает во время него.
-    await queueWaterMl(500);
     const [r1, r2] = await Promise.all([p1, p2]);
 
-    // Второй синк — «занят»: у него ничего не дренится.
-    expect(r2.drainedWaterMl).toBe(0);
-    // Первый проход взял свой подход и вернул его.
+    // Оба вызова ждали один проход: второй видит снятую воду, а не нули.
     expect(r1.drainedWaterMl).toBe(250);
-    // Реплей: «500» прилетело во время первого прохода — перезапуск подхватил его.
+    expect(r2.drainedWaterMl).toBe(250);
+
+    // «500» прилетает после прохода: следующий синк дожимает очередь.
+    await queueWaterMl(500);
+    const r3 = await syncAllWidgets();
+    expect(r3.drainedWaterMl).toBe(500);
     expect(todayRow()?.amountMl).toBe(750);
+    expect(await drainWidgetQueue()).toHaveLength(0);
+  });
+
+  it('второй вызов на полёте не теряет set_add, поставленный во время дрена', async () => {
+    seedQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 82.5, reps: 7, ts: Date.now() }]);
+    const p1 = syncAllWidgets();
+    const p2 = syncAllWidgets();
+    // Новый подход с виджета приходит, пока первый проход в полёте.
+    seedQueue([{ type: 'set_add', exerciseName: 'Тяга блока', weight: 60, reps: 12, ts: Date.now() }]);
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    // Подход, пришедший во время дрена, снят тем же общим проходом:
+    // оба вызывающих видят оба подхода, а не только первый (или нули).
+    expect(r1.setsAdded).toBe(2);
+    expect(r2.setsAdded).toBe(2);
+    // Обе записи легли в живую сессию, очередь пуста.
+    expect(collectWorkout().live).toBe(true);
+    expect(collectWorkout().setsDone).toBe(2);
     expect(await drainWidgetQueue()).toHaveLength(0);
   });
 });
@@ -152,9 +171,10 @@ describe('A4 pushTrainingWidget: коалесцирует, возвращает 
     const a = pushTrainingWidget();
     const b = pushTrainingWidget();
     const [ra, rb] = await Promise.all([a, b]);
-    // Фолбэк без native-плагина — false; в полёте — true, промис разрешается.
+    // Фолбэк без native-плагина — false. Второй вызов получает результат того же
+    // прохода, а не выдуманное «true» (иначе вызывающий считает отправку успешной).
     expect(ra).toBe(false);
-    expect(rb).toBe(true);
+    expect(rb).toBe(false);
   });
 
   it('снапшот тренировки в фолбэке получает текущий снапшот: живая сессия есть', async () => {

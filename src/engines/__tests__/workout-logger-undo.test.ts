@@ -2,14 +2,19 @@
  * workout-logger-undo.test.ts — отмена последнего подхода («Отменить подход»)
  * и честность PR относительно базиса (e1RM не ниже текущего максимума).
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addExerciseToSession,
+  archiveActiveSession,
+  finishSession,
+  loadActiveSession,
+  loadSessions,
+  localIsoDate,
   logSet,
+  MAX_SESSION_DURATION_MIN,
   removeLastSet,
   startSession,
   saveActiveSession,
-  loadActiveSession,
 } from '../workout-logger.engine';
 
 const mkSession = () => {
@@ -108,5 +113,97 @@ describe('saveActiveSession plannedTotalMax', () => {
     saveActiveSession(s, 10);
     saveActiveSession(s);
     expect(loadActiveSession()?.plannedSetsTotal).toBe(10);
+  });
+});
+
+describe('архив незавершённой живой сессии', () => {
+  const ACTIVE_KEY = 'he_workout_active_v1';
+
+  /** Живая сессия с одним подходом и заданными date/startTime/savedAt. */
+  const putActive = (startedMinutesAgo: number, extra: Record<string, unknown> = {}) => {
+    let s = mkSession();
+    s = logSet(s, 0, { setNumber: 1, weightKg: 85, reps: 6, rpe: 8, rir: 2 }).session;
+    const start = new Date();
+    start.setSeconds(0, 0);
+    start.setTime(start.getTime() - startedMinutesAgo * 60000);
+    const startTime = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+    localStorage.setItem(
+      ACTIVE_KEY,
+      JSON.stringify({ ...s, date: localIsoDate(start), startTime, savedAt: start.getTime() + 90 * 60000, ...extra }),
+    );
+    return s;
+  };
+
+  it('прошлый день уходит в историю с реальной длительностью «старт → автосейв»', () => {
+    // Старт 26 часов назад (вчера), автосейв через 90 минут — длительность берётся из них,
+    // а не из «стенных» часов до текущего момента.
+    putActive(26 * 60);
+    const archived = archiveActiveSession();
+    expect(archived).not.toBeNull();
+    const sessions = loadSessions();
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].durationMin).toBe(90);
+    expect(sessions[0].date).toBe(localIsoDate(new Date(Date.now() - 26 * 3600 * 1000)));
+    expect(sessions[0].exercises[0].sets[0].weightKg).toBe(85);
+    // Живая сессия снята, чтобы автосейв новой её не перезаписал.
+    expect(loadActiveSession()).toBeNull();
+  });
+
+  it('сессия другого плана сегодня архивируется, а не затирается', () => {
+    putActive(40);
+    const archived = archiveActiveSession();
+    expect(archived).not.toBeNull();
+    expect(loadSessions()).toHaveLength(1);
+    expect(loadActiveSession()).toBeNull();
+  });
+
+  it('битый startTime даёт длительность 0, а не «стенные» часы через полночь', () => {
+    putActive(90, { startTime: '' });
+    const archived = archiveActiveSession();
+    expect(archived?.durationMin).toBe(0);
+  });
+
+  it('пустая живая сессия (без подходов) не попадает в историю', () => {
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify({ ...mkSession(), savedAt: Date.now() }));
+    expect(archiveActiveSession()).toBeNull();
+    expect(loadSessions()).toHaveLength(0);
+  });
+
+  it('длительность архива сверх потолка сессии обрезается', () => {
+    // Старт 20 часов назад, автосейв только что: в дневник не должно уехать 1200 минут.
+    putActive(20 * 60, { savedAt: Date.now() });
+    const archived = archiveActiveSession();
+    expect(archived?.durationMin).toBe(MAX_SESSION_DURATION_MIN);
+  });
+
+  it('если историю записать не удалось, живая сессия остаётся', () => {
+    putActive(40);
+    // Квота: любая запись в storage падает, включая каскад обрезки истории.
+    const spy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    let archived: ReturnType<typeof archiveActiveSession> = null;
+    try {
+      archived = archiveActiveSession();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(archived).toBeNull();
+    // Подходы не исчезли вместе с «успешным» архивом.
+    expect(loadActiveSession()).not.toBeNull();
+  });
+});
+
+describe('finishSession: границы длительности', () => {
+  it('явная длительность сверх потолка обрезается, конец = старт + длительность', () => {
+    const fin = finishSession({ ...mkSession(), startTime: '18:30' }, '', 870);
+    expect(fin.durationMin).toBe(MAX_SESSION_DURATION_MIN);
+    // Продолжение вчерашней сессии не должно выглядеть как «18:30–09:05».
+    expect(fin.endTime).toBe('00:30');
+  });
+
+  it('явный 0 остаётся нулём, а не «стенными» часами', () => {
+    const fin = finishSession({ ...mkSession(), startTime: '18:30' }, '', 0);
+    expect(fin.durationMin).toBe(0);
   });
 });

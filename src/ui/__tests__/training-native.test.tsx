@@ -41,9 +41,7 @@ describe('TrainingScreen native hero', () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<TrainingScreen />);
-    const img = container.querySelector(
-      '.training-hero img',
-    ) as HTMLImageElement | null;
+    const img = container.querySelector('.training-hero img') as HTMLImageElement | null;
     expect(img?.getAttribute('src')).toContain('training-hero.jpg');
     expect(container.querySelector('.training-hero-stats')).not.toBeNull();
     expect(screen.getByText('на неделе')).not.toBeNull();
@@ -62,9 +60,7 @@ describe('TrainingScreen native hero', () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<TrainingScreen />);
-    const lib = container.querySelector(
-      '.training-hero-zone[data-zone="library"]',
-    ) as HTMLElement;
+    const lib = container.querySelector('.training-hero-zone[data-zone="library"]') as HTMLElement;
     expect(lib).not.toBeNull();
     fireEvent.click(lib);
     expect(screen.getAllByText('Библиотека').length).toBeGreaterThan(0);
@@ -75,9 +71,7 @@ describe('TrainingScreen native hero', () => {
   it('4. навигация зон работает в web (Планировщик → выбор конструктора)', async () => {
     await resetPlatform();
     const { container } = render(<TrainingScreen />);
-    const planner = container.querySelector(
-      '.training-hero-zone[data-zone="planner"]',
-    ) as HTMLElement;
+    const planner = container.querySelector('.training-hero-zone[data-zone="planner"]') as HTMLElement;
     fireEvent.click(planner);
     expect(screen.getAllByText(/конструкторов/).length).toBeGreaterThan(0);
   });
@@ -93,9 +87,7 @@ describe('TrainingScreen native hero', () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<TrainingScreen />);
-    const intel = container.querySelector(
-      '.training-hero-zone[data-zone="calculators"]',
-    ) as HTMLElement;
+    const intel = container.querySelector('.training-hero-zone[data-zone="calculators"]') as HTMLElement;
     expect(intel).not.toBeNull();
     fireEvent.click(intel);
     // Дашборд интеллекта рендерится (заголовок), runtime-зона не открыта.
@@ -117,19 +109,20 @@ describe('TrainingScreen native hero', () => {
     setCapacitorNative();
     await resetPlatform();
     const { container } = render(<TrainingScreen />);
-    const intel = container.querySelector(
-      '.training-hero-zone[data-zone="calculators"]',
-    ) as HTMLElement;
+    const intel = container.querySelector('.training-hero-zone[data-zone="calculators"]') as HTMLElement;
     fireEvent.click(intel);
     // Группы поднава на месте (5 категорий).
     expect(container.querySelectorAll('.training-subnav-card').length).toBeGreaterThanOrEqual(5);
     expect(screen.getAllByText('Показатели').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Качество и диагностика').length).toBeGreaterThanOrEqual(1);
     // Уход в инструмент и возврат назад. Инструменты грузятся отдельным чанком
-    // (React.lazy) — поэтому ждём появления кнопки возврата.
+    // (React.lazy) — поэтому ждём появления кнопки возврата. Таймаут задан явно:
+    // дефолтная секунда — это ровно время трансформации чанка StrengthAnalysisHub
+    // на свободной машине (замер: 0.72–0.82 с), в полном прогоне ui-сьюта под
+    // нагрузкой оно переваливает за 1 с и тест падал не по делу.
     const strengthBtn = screen.getAllByText(/Анализ силы/)[0] as HTMLElement;
     fireEvent.click(strengthBtn);
-    const back = (await screen.findAllByText(/К дашборду/))[0] as HTMLElement;
+    const back = (await screen.findAllByText(/К дашборду/, {}, { timeout: 5000 }))[0] as HTMLElement;
     expect(back).not.toBeNull();
     fireEvent.click(back);
     expect(container.querySelector('.train-inteldash')).not.toBeNull();

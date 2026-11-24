@@ -110,6 +110,42 @@ for (const f of [
   'android/app/src/main/res/xml/locales_config.xml',
 ]) mustExist(f, 'native res');
 
+// 6b. Виджет «Проведение тренировки»: 48dp на тап-таргетах (＋ и две нижние кнопки).
+// Элемент ищется по android:id и режется первым `/>`; высота берётся из minHeight
+// или layout_height (wrap_content цель не задаёт — в виджете это и был тихий откат).
+const WIDGET_WORKOUT = 'android/app/src/main/res/layout/widget_workout.xml';
+function mustTapTarget(file, id, label) {
+  const p = join(root, file);
+  if (!existsSync(p)) {
+    fails.push(`MISS file ${file} (${label})`);
+    return;
+  }
+  const text = readFileSync(p, 'utf-8');
+  const idAt = text.indexOf(`android:id="@+id/${id}"`);
+  if (idAt < 0) {
+    fails.push(`MISS tap target >= 48dp ${id} in ${file} (${label})`);
+    return;
+  }
+  const endAt = text.indexOf('/>', idAt);
+  const block = text.slice(idAt, endAt < 0 ? text.length : endAt);
+  const sizes = [
+    /android:minHeight="(\d+)dp"/.exec(block),
+    /android:layout_height="(\d+)dp"/.exec(block),
+  ].filter(Boolean).map((m) => Number(m[1]));
+  if (!sizes.some((n) => n >= 48)) {
+    fails.push(`MISS tap target >= 48dp ${id} in ${file} (${label})`);
+  }
+}
+for (const [id, label] of [
+  ['w_wo_add1', 'виджет: ＋ подход 1'],
+  ['w_wo_add2', 'виджет: ＋ подход 2'],
+  ['w_wo_add3', 'виджет: ＋ подход 3'],
+  ['w_wo_add4', 'виджет: ＋ подход 4'],
+  ['w_wo_add5', 'виджет: ＋ подход 5'],
+  ['w_wo_action', 'виджет: «Начать»'],
+  ['w_wo_open', 'виджет: «Открыть»'],
+]) mustTapTarget(WIDGET_WORKOUT, id, label);
+
 // 7. index.html: boot anti-flash + webp preload.
 mustContain('index.html', 'he_apk_theme_v1', 'boot theme key');
 mustContain('index.html', "html[data-boot-theme='light']", 'boot override');
