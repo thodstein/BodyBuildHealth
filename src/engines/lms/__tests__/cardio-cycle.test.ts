@@ -1286,7 +1286,7 @@ describe('аудит: ккал по оборудованию (MET)', () => {
     expect(kcalForCardio('zone2', 30, 80)).toBe(kcalForCardio('zone2', 30, 80, 'running'));
   });
 
-  it('цикл учитывает оборудован��е в ккал недели', () => {
+  it('цикл учитывает оборудование в ккал недели', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 4, equipment: ['walking'], lowImpact: true });
     expect(c.weeks[0].sessions.every(s => s.equipment === 'walking')).toBe(true);
   });

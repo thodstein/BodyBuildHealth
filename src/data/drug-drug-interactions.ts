@@ -147,7 +147,7 @@ export const DRUG_DRUG_INTERACTIONS: DrugDrugInteraction[] = [
   { drugA: 'atorvastatin', drugB: 'clarithromycin', severity: 'medium',
     mechanism: 'CYP3A4 ингибитор', clinicalEffect: 'Миопатия', management: 'Аторвастатин ≤20 мг/сут', alternatives: ['Розувастатин'] },
 
-  // Тримे� préparation + АКШ/Цикл = риск гиперкалиемии (уже покрыто выше)
+  // Калий: АКШ/Цикл — риск гиперкалиемии (уже покрыто выше)
 
   // Беременность/Лактация специфичные
   { drugA: 'finasteride', drugB: 'pregnancy', severity: 'block',

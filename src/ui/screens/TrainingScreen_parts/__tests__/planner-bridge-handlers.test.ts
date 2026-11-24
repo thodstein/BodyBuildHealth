@@ -545,7 +545,7 @@ describe('annual_block bridge (блок года → редактор → обр
   });
 });
 
-describe('planner bridge � cardio handler (���� ���� � �������)', () => {
+describe('planner bridge — cardio/design/limiter handlers', () => {
   const CYCLE_KEY = 'he_cardio_cycles';
   const ACTIVE_KEY = 'he_active_cardio_cycle';
 

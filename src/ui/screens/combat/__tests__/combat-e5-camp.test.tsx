@@ -22,7 +22,7 @@ const mkPlan = (over: any = {}) =>
   } as any));
 
 describe('E5.1 — неделя цикла навигируема', () => {
-  it('каждая нед��ля — кнопка с aria-label и кликом', () => {
+  it('каждая неделя — кнопка с aria-label и кликом', () => {
     const plan = mkPlan();
     const onPick = vi.fn();
     render(<CampStrip plan={plan} expandedWeek={null} onPickWeek={onPick} />);
