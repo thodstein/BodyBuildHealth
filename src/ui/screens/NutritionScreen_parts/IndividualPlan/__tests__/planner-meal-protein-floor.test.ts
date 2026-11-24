@@ -30,6 +30,16 @@ import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
  * покупается только перебором дня — гейт канона честно отказывает. Приоритет владельца —
  * «≤3 % всегда», поэтому завтрак здесь уступает; распределение белка лечится сборкой дня,
  * а не последней милей.
+ *
+ * P1-3 (§8.139, 2026-11-24): овощной добор §8.122 изолирован в A/B (как §8.78/§8.84/§8.73/
+ * §8.75/§8.111). После того как «ведро» перестало быть безусловным отказом, добор выбирал
+ * разные планы в двух сборках, и стадии приписывался его выбор: `small60/4/тр` при включённой
+ * стадии уходил с 5.10 % на 3.60 % и терял ведро, но платил 1 баллом (микро 74 → 56).
+ * Числа стадии от изоляции не изменились (бейджи 7 / ≤5), а суммарный балл на текущем дереве
+ * — 5518 → 5531 изолированно и 5612 → 5625 в сборке с овощным добором (замер 2026-11-24;
+ * строка «5561 → 5586» выше — история замера до §8.135–§8.139). Сборка с добором проверяется
+ * отдельным кейсом: единственная потеря балла — тот же `small60/4/тр` 87 → 86 при улучшении
+ * канона (5.10 % → 3.60 %; 3 % так и не достигнуты).
  */
 
 const PROFILES: Array<{
@@ -58,7 +68,13 @@ const PROFILES: Array<{
 const carbsFor = (p: { k: number; p: number; f: number; c?: number }) =>
   p.c && p.c > 0 ? p.c : Math.max(0, Math.round((p.k - 4 * p.p - 9 * p.f) / 4));
 
-const build = (p: (typeof PROFILES)[number], mc: number, tr: boolean, on: boolean): any =>
+const build = (
+  p: (typeof PROFILES)[number],
+  mc: number,
+  tr: boolean,
+  on: boolean,
+  extra: Record<string, unknown> = {},
+): any =>
   buildDayPlan({
     weightKg: p.w,
     lbmKg: p.lbm,
@@ -101,15 +117,23 @@ const build = (p: (typeof PROFILES)[number], mc: number, tr: boolean, on: boolea
     // §8.75 (семя вместо масла) включается отдельно и имеет свой замок: её обмен меняет
     // белок приёма и портил бы «без стадии» вариант этого A/B.
     seedSwap75: false,
+    // P1-3 (§8.139, 2026-11-24): овощной добор §8.122 изолирован в ОБОИХ вариантах, как и
+    // остальные соседние стадии выше. Причина: после P1-3 добор стал выбирать разные планы
+    // в двух сборках, и A/B перестал быть сравнением одной стадии — `small60/4/тр` при
+    // включённой стадии уходил с 5.10 % на 3.60 % и терял ведро, но платил 1 баллом
+    // композитной оценки (микро 74 → 56). Бейджи от изоляции не сдвинулись (7 / ≤5), сумма
+    // на текущем дереве: 5518 → 5531 изолированно против 5612 → 5625 с добором.
+    vegTopUp88: false,
+    ...extra,
   } as unknown as MealPlanInput);
 
-const cells = (on: boolean) =>
+const cells = (on: boolean, extra: Record<string, unknown> = {}) =>
   PROFILES.flatMap((p) =>
     [4, 5, 6].flatMap((mc) =>
       [true, false].map((tr) => ({
         key: `${p.id}/${mc}/${tr ? 'тр' : 'отд'}`,
         w: p.w,
-        plan: build(p, mc, tr, on),
+        plan: build(p, mc, tr, on, extra),
       })),
     ),
   );
@@ -122,18 +146,29 @@ const badges = (rows: ReturnType<typeof cells>) =>
       .map((m: any) => `${r.key}:${m.type}`),
   );
 
-const solidG = (m: any) =>
+/** Масса тарелки для метрики «вёдер» — ТЕМ ЖЕ определением, что `solidOf122` движка (исключён
+ *  только `liquid`): иначе добавка, переведшая приём через 500 г, прошла бы незамеченной. */
+const solidForBuckets = (m: any) =>
   (m.items || [])
-    .filter((i: any) => !['liquid', 'supplement'].includes(String(i.role || '')))
+    .filter((i: any) => String(i.role || '') !== 'liquid')
     .reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0);
 
-const dayDev = (pl: any, p: (typeof PROFILES)[number]) =>
-  Math.max(
-    Math.abs(Number(pl.totals.kcal) - p.k) / p.k,
-    Math.abs(Number(pl.totals.p) - p.p) / p.p,
-    Math.abs(Number(pl.totals.f) - p.f) / p.f,
-    carbsFor(p) > 0 ? Math.abs(Number(pl.totals.c) - carbsFor(p)) / carbsFor(p) : 0,
-  );
+/** НОВЫЕ «вёдра» дня — тем же правилом, что ветка §8.139 движка: приём >500 г, который в
+ *  сравниваемом плане ведром не был (или которого там нет). Разница счётчиков здесь не годится:
+ *  она пропускает «одно срезали, два создали» как «+1». */
+const countNewBuckets = (on: any, off: any): number =>
+  (on.meals || []).filter((m: any) => {
+    if (solidForBuckets(m) <= 500) return false;
+    const pm = (off.meals || []).find((x: any) => String(x.label) === String(m.label));
+    return !pm || solidForBuckets(pm) <= 500;
+  }).length;
+
+/** Канон дня — ТЕМ ЖЕ значением, что видит продукт и по которому гейтит движок: поле
+ *  `deviationPct` из `buildDayPlan` (`withinTolerance` = dev ≤ 3 % авто / 2 % ручной). Считать
+ *  девиацию в тесте заново из `totals` НЕЛЬЗЯ: на `small60/4/тр` такой пересчёт даёт 2.67 %,
+ *  а поле дня — 3.6 % (движок считает оси против собственных входных/целевых величин сборки),
+ *  то есть тест был бы слабее продукта и пропускал бы выход из канона. */
+const dayDev = (pl: any) => (Number(pl.deviationPct) || 0) / 100;
 
 describe('§8.63 приём не голодает по белку (`breakfastProteinFloor`)', () => {
   it('бейджи ниже порога: 84 → ≤78 на 60 дней, и строго меньше, чем без стадии', () => {
@@ -217,8 +252,10 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
           if (g < 40 || g > 200 || Math.round(g / 5) * 5 !== Math.round(g))
             bad.push(`${row.key}/${m.type}:${i.id}=${g}`);
         }
-        if (solidG(m) > 500 && solidG(was) <= 500)
-          bad.push(`${row.key}/${m.type}: тарелка ${Math.round(solidG(was))}→${Math.round(solidG(m))} г`);
+        if (solidForBuckets(m) > 500 && solidForBuckets(was) <= 500)
+          bad.push(
+            `${row.key}/${m.type}: тарелка ${Math.round(solidForBuckets(was))}→${Math.round(solidForBuckets(m))} г`,
+          );
       }
     }
     expect(bad.join(', ')).toBe('');
@@ -239,18 +276,62 @@ describe('§8.63 приём не голодает по белку (`breakfastPro
       scoreOn += b;
       scoreOff += a;
       if (b < a) lost.push(`${row.key}: ${a}→${b}`);
-      const p = PROFILES.find((x) => x.id === row.key.split('/')[0])!;
-      const devOn = dayDev(row.plan, p);
-      const devOff = dayDev(before.plan, p);
-      if (devOn > 0.03 && devOn > devOff + 0.001)
+      const devOn = dayDev(row.plan);
+      const devOff = dayDev(before.plan);
+      // Канон: день не имеет права стать хуже, чем max(до стадии, 3 %) — то есть не может выйти
+      // из канона, а день вне канона не может стать ещё хуже. Сравнение с `max(...)` не пустое
+      // (в отличие от «только переход внутрь → наружу»): оно ловит 1.4 % → 3.2 %.
+      if (devOn > Math.max(devOff, 0.03) + 1e-6)
         canonWorse.push(`${row.key}: ${(devOff * 100).toFixed(1)}%→${(devOn * 100).toFixed(1)}%`);
-      const nOn = (row.plan.meals || []).filter((m: any) => solidG(m) > 500).length;
-      const nOff = (before.plan.meals || []).filter((m: any) => solidG(m) > 500).length;
-      if (nOn > nOff) buckets.push(`${row.key}: ${nOff}→${nOn}`);
+      if (countNewBuckets(row.plan, before.plan) > 0)
+        buckets.push(`${row.key}: новых вёдер ${countNewBuckets(row.plan, before.plan)}`);
     }
     expect(lost.join(', ')).toBe('');
     expect(canonWorse.join(', ')).toBe('');
     expect(buckets.join(', ')).toBe('');
+    expect(scoreOn).toBeGreaterThan(scoreOff);
+  });
+
+  it('сборка с овощным добором: никто не выходит из 3 % и не добавляет вёдер, потеря балла — только у замеренного дня', () => {
+    // Это не «вся продуктовая сборка»: как и остальные A/B этого файла, §8.78/§8.84/§8.73/
+    // §8.75/§8.111 выключены — включён ровно тот овощной добор §8.122, который изолирует
+    // проверка выше. Замер 2026-11-24 (P1-3, §8.139): сумма баллов 5612 → 5625 на 60 днях,
+    // единственный день с потерей — `small60/4/тр` 87 → 86 при девиации 5.10 % → 3.60 % и ведре
+    // 1 → 0. Разрешение на потерю выдаётся ТОЛЬКО этому дню (иначе «купить» балл можно было бы
+    // косметическим улучшением на 0.1 п.п.); любой новый день с потерей — красный тест.
+    // Девиацию внутри дня стадия менять вправе, даже если день остаётся вне канона (замер:
+    // 5.1 % → 3.6 %); запрещён ВЫХОД из 3 % и ухудшение дня, который уже был вне канона.
+    // Балл — поле дня `qualityScore` (снимок сборки до §8.127–§8.134); приёмка §8.122 считает
+    // балл заново, но здесь меряется именно продуктовая метрика дня.
+    const PAYS = new Set(['small60/4/тр']);
+    const veg = { vegTopUp88: true };
+    const on = cells(true, veg);
+    const off = new Map(cells(false, veg).map((r) => [r.key, r]));
+    const bad: string[] = [];
+    const paid: string[] = [];
+    let scoreOn = 0;
+    let scoreOff = 0;
+    for (const row of on) {
+      const before = off.get(row.key)!;
+      // Канон — для КАЖДОГО дня, до всякой логики балла: `devOn ≤ max(devOff, 3 %)`, то есть
+      // день не вправе выйти из канона и день вне канона не вправе стать хуже (на замеренном
+      // `small60/4/тр` девиация улучшается 5.1 % → 3.6 %, так и не достигая 3 %).
+      const devOn = dayDev(row.plan);
+      const devOff = dayDev(before.plan);
+      if (devOn > Math.max(devOff, 0.03) + 1e-6)
+        bad.push(`${row.key}: канон ${(devOff * 100).toFixed(1)}% → ${(devOn * 100).toFixed(1)}%`);
+      const nb = countNewBuckets(row.plan, before.plan);
+      if (nb > 0) bad.push(`${row.key}: новых вёдер ${nb}`);
+      const a = Number(before.plan.qualityScore?.total) || 0;
+      const b = Number(row.plan.qualityScore?.total) || 0;
+      scoreOn += b;
+      scoreOff += a;
+      if (b < a && !(PAYS.has(row.key) && a - b <= 1 && devOn < devOff - 0.001))
+        bad.push(`${row.key}: балл ${a} → ${b}`);
+      else if (b < a) paid.push(`${row.key}: ${a}→${b}`);
+    }
+    expect(bad.join(', ')).toBe('');
+    expect(paid.length, paid.join(', ')).toBeLessThanOrEqual(1);
     expect(scoreOn).toBeGreaterThan(scoreOff);
   });
 

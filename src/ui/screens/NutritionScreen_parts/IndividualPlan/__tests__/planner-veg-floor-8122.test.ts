@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
-import { MIN_MEANINGFUL_G } from '../planner-quality-score';
+import { MIN_MEANINGFUL_G, isRealVegItem } from '../planner-quality-score';
 import { isHerbSpiceId, isProteinPowderId, isPureSupplementId, isSauceCondimentFood } from '../food-availability';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
@@ -41,6 +41,22 @@ import { FOOD_DB } from '../../../../../core/nutrition-database';
  * вписывается вместе с ккал-нейтральным срезом крахмала того же приёма (`_cutFit88`),
  * а день без добора и день с добором сравниваются по НАСТОЯЩЕМУ овощу (§8.88: белок
  * ≥12 г/100 г — не овощ), иначе шорткат «день уже держит QG10» видел рыбу как овощ.
+ *
+ * P1-3 (§8.139, 2026-11-24): «ведро» перестало быть безусловным отказом — овощному плечу
+ * разрешено ОДНО новое «ведро» (>500 г твёрдого), если оно куплено овощем: рост ≥150 г или
+ * новый вид, и новый приём пересёк 500 г именно из-за добавленного овоща (прирост овоща в
+ * самом ведре ≥40 г — пол «крошки» §8.112, чтобы 2 г огурца не «покупали» ведро). Замер:
+ * ручной `<200` 9 → 4, без овоща 1 → 0, один вид 9 → 4, вёдра 121 → 126 (mass110/3–6/тр
+ * 198→341 г, 1→2 вида, ведра 1→2; keto85/4/тр 0→250 г, 0→2 вида, ведра 0→1), средний балл
+ * ручных дней (`scoreDayQuality` без микро) 77.91 → 82.05, канон 0, обрезки 0, тарелки >700 —
+ * 49, >900 — 0; авто-сторона — вёдра 120 → 120, балл 89.96 → 90.41. Агрегатного потолка у замка нет: каждое новое ведро
+ * проверяется правилом по дням, а общее число таких дней (замер — 5) держится счётчиком.
+ *
+ * Предикат овоща у замка теперь ОДИН с движком — `isRealVegItem` (§8.124: роль `veg` +
+ * плотность белка < 12 г/100 г; `_microClosure`/`_microGap` не исключаются). Пересчёт сетки
+ * 2026-11-24 этим предикатом фактов не изменил: ручной `on` — `<200` 4, без овоща 0, один вид 4,
+ * вёдра 126 (off — 121); авто `on` — `<200` 0, один вид 1, вёдра 120 (off — 120). Агрегатной
+ * константы «вёдер» в замке нет: правило проверяется по дням (потолок обязаны двигать P1-2/P1-5).
  */
 
 const PROFILES = [
@@ -88,11 +104,12 @@ const build = (p: any, mc: number, tr: boolean, manual: boolean, extra: any = {}
 
 const CRUMB_PLANT_G = 40;
 
-/** Пол порции по роли — та же арифметика, что держит замок §8.112. */
+/** Пол порции по роли — та же арифметика, что держит замок §8.112, включая исключения движка
+ *  (`crumbFloor122`: `_fixedGrams`, `_microClosure`, `_microGap` — это не обрезки). */
 const crumbFloor = (it: any): number => {
   const role = String(it?.role || '');
   if (!role || role === 'supplement' || role === 'liquid' || role === 'other') return 0;
-  if (it && it._fixedGrams) return 0;
+  if (it && (it._fixedGrams || it._microClosure || it._microGap)) return 0;
   const id = String(it?.id || '');
   const fd: any = FOOD_DB.find((f: any) => String(f.id) === id);
   if (!fd) return 0;
@@ -108,9 +125,9 @@ const solid = (m: any): number =>
   ((m.items || []) as any[])
     .filter((x: any) => String(x.role || '') !== 'liquid')
     .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
-/** Овощ дня по §8.122: микро-посыпка (§8.4) овощем не считается — она не слот тарелки. */
-const vegItems = (plan: any): any[] =>
-  items(plan).filter((x: any) => x.role === 'veg' && !x._microClosure && !x._microGap);
+/** Овощ дня — ТЕМ ЖЕ предикатом, что движок (§8.124: роль `veg` + плотность белка < 12 г/100 г;
+ *  `_microClosure`/`_microGap` не исключаются — закрытие VitA морковью 80 г это настоящий овощ). */
+const vegItems = (plan: any): any[] => items(plan).filter((x: any) => isRealVegItem(x));
 const vegG = (plan: any): number => vegItems(plan).reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
 const vegKinds = (plan: any): number => new Set(vegItems(plan).map((x: any) => String(x.id))).size;
 const crumbs = (plan: any): number =>
@@ -120,6 +137,25 @@ const crumbs = (plan: any): number =>
   }).length;
 const buckets = (plan: any): number =>
   (plan.meals || []).filter((m: any) => (m.items || []).length > 0 && solid(m) > 500).length;
+/** Копия правила движка (`preferVegPlan122`): разрешено ровно ОДНО НОВОЕ «ведро» — приём >500 г,
+ *  который в честном дне ведром не был (или которого там нет). Считаются именно новые, а не
+ *  разница счётчиков: добор, срезавший одно ведро и создавший два, по разнице прошёл бы как «+1». */
+const newBucketsOf = (on: any, off: any): any[] =>
+  (on.meals || []).filter((m: any) => {
+    if (solid(m) <= 500) return false;
+    const pm = (off.meals || []).find((x: any) => String(x.label) === String(m.label));
+    return !pm || solid(pm) <= 500;
+  });
+/** Копия `driven` движка: новое ведро обязано быть вызвано добавленным овощем — прирост овоща в
+ *  самом ведре ≥40 г (пол «крошки» §8.112) и без него тарелка была бы ≤500 г. Иначе тест зелёный
+ *  при удалённом `driven`. */
+const newBucketDriven = (on: any, off: any): boolean =>
+  newBucketsOf(on, off).some((m: any) => {
+    const pm = (off.meals || []).find((x: any) => String(x.label) === String(m.label));
+    if (!pm) return false;
+    const dVeg = vegG({ meals: [m] }) - vegG({ meals: [pm] });
+    return dVeg >= 40 && solid(m) - dVeg <= 500;
+  });
 
 type Row = { key: string; manual: boolean; on: any; off: any };
 const ROWS: Row[] = [];
@@ -141,14 +177,46 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
     expect(ROWS).toHaveLength(160);
   });
 
-  it('добор никогда не создаёт обрезок, вёдер и переполненных тарелок', () => {
+  it('метки приёмов уникальны внутри дня — правило «вёдер» ищет пару по `label`', () => {
+    // `preferVegPlan122` и копии ниже сопоставляют приёмы по `label`; при двух одинаковых метках
+    // сравнение возьмёт первый приём, и метрика «вёдер» станет бессмысленной. Инвариант нигде
+    // не объявлен, поэтому проверяется здесь, а не подразумевается.
+    const bad: string[] = [];
+    for (const r of ROWS) {
+      for (const plan of [r.on, r.off]) {
+        const labels = (plan.meals || []).map((m: any) => String(m.label));
+        if (new Set(labels).size !== labels.length) bad.push(`${r.key}: ${labels.join(' / ')}`);
+      }
+    }
+    expect(bad.join(' | ')).toBe('');
+  });
+
+  it('добор не создаёт обрезок и переполненных тарелок; «вёдра» — только +1 по правилу', () => {
     const bad: string[] = [];
     for (const r of ROWS) {
       if (crumbs(r.on) > crumbs(r.off)) {
         bad.push(`${r.key}: обрезков ${crumbs(r.off)} → ${crumbs(r.on)}`);
       }
-      if (buckets(r.on) > buckets(r.off)) {
-        bad.push(`${r.key}: вёдер ${buckets(r.off)} → ${buckets(r.on)}`);
+      const bOn = buckets(r.on);
+      const bOff = buckets(r.off);
+      // Счётчик НОВЫХ вёдер — до гейта «вёдра выросли»: день «срезал два, создал два» по разнице
+      // счётчиков даёт ноль, а приёмов >500 г стало на два больше. Отказ по числу новых стоит
+      // вне ветки — тем же порядком, что в движке.
+      const nr = newBucketsOf(r.on, r.off);
+      if (nr.length > 1) {
+        bad.push(
+          `${r.key}: новых вёдер ${nr.length} (всего ${bOff} → ${bOn}) при овоще ${vegG(r.off)} → ${vegG(r.on)} г`,
+        );
+      }
+      if (bOn > bOff) {
+        // P1-3: одно НОВОЕ «ведро» разрешено, только если овоща стало больше (≥150 г или новый
+        // вид) И само ведро пересекло 500 г из-за добавленного овоща. Замер 2026-11-24: 5 таких
+        // дней на ручном (mass110/3–6/тр — 198 → 341 г, но второй вид; keto85/4/тр — 0 → 250 г).
+        const grew = vegG(r.on) - vegG(r.off);
+        const moreKinds = vegKinds(r.on) > vegKinds(r.off);
+        if (!(grew >= 150 || moreKinds) || !newBucketDriven(r.on, r.off)) {
+          bad.push(`${r.key}: новых вёдер ${nr.length} при овоще ${vegG(r.off)} → ${vegG(r.on)} г`);
+        }
       }
       const plainPlate = new Map<string, number>((r.off.meals || []).map((m: any) => [String(m.label), solid(m)]));
       const plainVeg = new Map<string, number>(
@@ -156,9 +224,11 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
       );
       for (const m of r.on.meals || []) {
         // §8.122 (правка): приём может быть шире честного ровно на ДОБАВЛЕННЫЙ в него овощ.
-        // Замер: `руч/hugeCarb/3/тр` — ужин 789 г против честных 734 (+100 г яблока, −45 г
-        // крахмала), день 0.60 % против 0.40 %, балл 87 против 79. Прежняя формула
-        // `max(700, честная)` откатывала такой день к честному и теряла овощ.
+        // Исторический замер (то дерево, на котором правило вводилось): `руч/hugeCarb/3/тр` —
+        // ужин 789 г против честных 734 (+100 г яблока, −45 г крахмала), день 0.60 % против
+        // 0.40 %, балл 87 против 79; прежняя формула `max(700, честная)` откатывала такой день
+        // к честному и теряла овощ. Числа этого дня на текущем дереве другие (см. ниже, кейс
+        // «добор действительно работает»), поэтому это обоснование формулы, а не факт сетки.
         //
         // Абсолютный предел 900 г (контракт E-PLATE/§8.127) проверяется отдельно: правило
         // «честная + овощ» при честной тарелке 880 г разрешило бы 1000 г.
@@ -169,6 +239,12 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
       }
       if (vegG(r.on) < vegG(r.off)) bad.push(`${r.key}: овоща меньше, чем без добора`);
     }
+    // P1-3: агрегатной константы «вёдер» здесь нет — её обязаны поднимать P1-2/P1-5, поэтому
+    // потолок держит правило по дням выше. Регрессионный сигнал (НЕ продуктовая константа):
+    // замер 2026-11-24 — 5 дней с новым «ведром» на ручной стороне (mass110/3–6/тр, keto85/4/тр),
+    // авто — 0. Рост этого числа значит, что вёдра появляются шире замысла правила.
+    const grewDays = ROWS.filter((r) => newBucketsOf(r.on, r.off).length > 0).length;
+    if (grewDays > 5) bad.push(`дней с новым «ведром»: ${grewDays} > 5 (замер 2026-11-24: 5)`);
     expect(bad.join(' | ')).toBe('');
   });
 
@@ -182,14 +258,14 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
     expect(bad.join(' | ')).toBe('');
   });
 
-  it('покрытие овощем (факт): ручной <200 г ≤9, без овоща ≤1, один вид ≤9', () => {
+  it('покрытие овощем (факт): ручной <200 г ≤4, без овоща ≤0, один вид ≤4', () => {
     const rows = ROWS.filter((r) => r.manual);
     const low = rows.filter((r) => vegG(r.on) < 200);
     const zero = rows.filter((r) => vegG(r.on) === 0);
     const one = rows.filter((r) => vegKinds(r.on) < 2);
-    expect(low.length, low.map((r) => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(9);
-    expect(zero.length, zero.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(1);
-    expect(one.length, one.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(9);
+    expect(low.length, low.map((r) => `${r.key}:${vegG(r.on)}`).join(' | ')).toBeLessThanOrEqual(4);
+    expect(zero.length, zero.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(0);
+    expect(one.length, one.map((r) => r.key).join(' | ')).toBeLessThanOrEqual(4);
   });
 
   it('покрытие овощем (факт): авто <200 г ≤0, один вид ≤1', () => {
@@ -209,13 +285,11 @@ describe('§8.122 овощной пол: 200 г и два вида не спор
     // с ккал-нейтральным срезом крахмала: день 256 г / 2 вида, девиация 0.40 %, балл 84.
     expect(vegKinds(at('руч/hugeCarb/3/тр').on)).toBeGreaterThanOrEqual(2);
     expect(vegG(at('руч/cutF50/6/тр').on)).toBeGreaterThanOrEqual(100); // было 0
-    expect(vegG(at('руч/cutF50/6/тр').off)).toBe(0);
-    // Честный день держит 166 г — на 34 г ниже пола QG10, поэтому добор здесь обязан
-    // работать. Это и есть причина стадии: baseline < 200 г, а не «день недобрал ккал».
-    const off166 = vegG(at('руч/mass110/3/отд').off);
-    expect(off166, `честный день ${off166} г`).toBeGreaterThanOrEqual(160);
-    expect(off166, `честный день ${off166} г`).toBeLessThan(200);
-    expect(vegG(at('руч/mass110/3/отд').on)).toBeGreaterThanOrEqual(185); // было 166
+    // Отношение, а не прибитый ноль: честный день вправе вырасти (P1-2 лечит именно это; было 0).
+    expect(vegG(at('руч/cutF50/6/тр').on)).toBeGreaterThanOrEqual(vegG(at('руч/cutF50/6/тр').off));
+    // Честный день держал 166 г — на 34 г ниже пола QG10. P1-2 вправе это вылечить, поэтому
+    // пол дня проверяем у овощного плеча, а не у честного (было 166 г).
+    expect(vegG(at('руч/mass110/3/отд').on)).toBeGreaterThanOrEqual(200);
   });
 
   it('авторские порции рецептов не трогаются: `_fixedGrams`-позиции дня идентичны без добора', () => {
