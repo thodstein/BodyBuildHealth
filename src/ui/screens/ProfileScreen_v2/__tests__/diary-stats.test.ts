@@ -177,20 +177,18 @@ describe('buildHourDistribution', () => {
 
 describe('compareWithLastWeek', () => {
   it('возвращает null для менее 2 записей', () => {
-    const r = compareWithLastWeek([{ date: new Date().toISOString().slice(0, 10), value: 5 }]);
+    const r = compareWithLastWeek([{ date: dayOffset(0), value: 5 }]);
     expect(r.thisWeek).toBeNull();
   });
 
   it('сравнивает эту и прошлую неделю', () => {
-    const today = new Date();
-    const thisWeek = new Date(today.getTime() - 3 * 86400000);
-    const lastWeek = new Date(today.getTime() - 10 * 86400000);
-    const twoWeeks = new Date(today.getTime() - 17 * 86400000);
+    // Локальные даты: ночью в положительных часовых поясах UTC-дата ещё
+    // вчерашняя, и «сегодня» не совпадало с todayIso().
     const r = compareWithLastWeek([
-      { date: today.toISOString().slice(0, 10), value: 8 },
-      { date: thisWeek.toISOString().slice(0, 10), value: 7 },
-      { date: lastWeek.toISOString().slice(0, 10), value: 6 },
-      { date: twoWeeks.toISOString().slice(0, 10), value: 5 },
+      { date: dayOffset(0), value: 8 },
+      { date: dayOffset(-3), value: 7 },
+      { date: dayOffset(-10), value: 6 },
+      { date: dayOffset(-17), value: 5 },
     ]);
     expect(r.thisWeek).not.toBeNull();
     expect(r.lastWeek).not.toBeNull();
@@ -201,21 +199,17 @@ describe('compareWithLastWeek', () => {
   });
 
   it('better=down при отрицательной дельте', () => {
-    const today = new Date();
-    const lastWeek = new Date(today.getTime() - 10 * 86400000);
     const r = compareWithLastWeek([
-      { date: today.toISOString().slice(0, 10), value: 5 },
-      { date: lastWeek.toISOString().slice(0, 10), value: 8 },
+      { date: dayOffset(0), value: 5 },
+      { date: dayOffset(-10), value: 8 },
     ]);
     expect(r.better).toBe('down');
   });
 
   it('better=same при нулевой дельте', () => {
-    const today = new Date();
-    const lastWeek = new Date(today.getTime() - 10 * 86400000);
     const r = compareWithLastWeek([
-      { date: today.toISOString().slice(0, 10), value: 7 },
-      { date: lastWeek.toISOString().slice(0, 10), value: 7 },
+      { date: dayOffset(0), value: 7 },
+      { date: dayOffset(-10), value: 7 },
     ]);
     expect(r.better).toBe('same');
   });
@@ -339,7 +333,7 @@ describe('laggedCorrelation', () => {
 
 describe('dailyCompletion', () => {
   it('считает заполненность за сегодня', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = dayOffset(0);
     const r = dailyCompletion([
       { key: 'sleep' as DiaryKey, hasEntry: true, lastDate: today },
       { key: 'bp' as DiaryKey, hasEntry: true, lastDate: today },
@@ -364,12 +358,7 @@ describe('computePace', () => {
     expect(r).toBeNull();
   });
   it('считает прогресс по окну (например, 5 из 7 дней)', () => {
-    const today = new Date();
-    const last7 = Array.from({ length: 5 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      return { date: d.toISOString().slice(0, 10) };
-    });
+    const last7 = Array.from({ length: 5 }, (_, i) => ({ date: dayOffset(-i) }));
     const r = computePace('sleep' as DiaryKey, last7);
     expect(r).not.toBeNull();
     expect(r!.achieved).toBe(5);
@@ -378,14 +367,12 @@ describe('computePace', () => {
     expect(r!.pct).toBe(100);
   });
   it('ok=false если недостаточно дней', () => {
-    const r = computePace('sleep' as DiaryKey, [{ date: new Date().toISOString().slice(0, 10) }]);
+    const r = computePace('sleep' as DiaryKey, [{ date: dayOffset(0) }]);
     expect(r!.achieved).toBe(1);
     expect(r!.ok).toBe(false);
   });
   it('игнорирует записи вне окна', () => {
-    const old = new Date();
-    old.setDate(old.getDate() - 30);
-    const r = computePace('sleep' as DiaryKey, [{ date: old.toISOString().slice(0, 10) }]);
+    const r = computePace('sleep' as DiaryKey, [{ date: dayOffset(-30) }]);
     expect(r!.achieved).toBe(0);
   });
   it('PACE_TARGETS содержит ожидаемые ключи', () => {
@@ -400,20 +387,11 @@ describe('currentStreak', () => {
     expect(currentStreak([])).toBe(0);
   });
   it('считает серию дней подряд', () => {
-    const today = new Date();
-    const dates = Array.from({ length: 4 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      return { date: d.toISOString().slice(0, 10) };
-    });
+    const dates = Array.from({ length: 4 }, (_, i) => ({ date: dayOffset(-i) }));
     expect(currentStreak(dates)).toBe(4);
   });
   it('серия обрывается при разрыве', () => {
-    const today = new Date();
-    const d1 = new Date(today); d1.setDate(d1.getDate() - 0);
-    const d2 = new Date(today); d2.setDate(d2.getDate() - 1);
-    const d4 = new Date(today); d4.setDate(d4.getDate() - 3);
-    const r = currentStreak([{ date: d1.toISOString().slice(0, 10) }, { date: d2.toISOString().slice(0, 10) }, { date: d4.toISOString().slice(0, 10) }]);
+    const r = currentStreak([{ date: dayOffset(0) }, { date: dayOffset(-1) }, { date: dayOffset(-3) }]);
     expect(r).toBe(2);
   });
 });
