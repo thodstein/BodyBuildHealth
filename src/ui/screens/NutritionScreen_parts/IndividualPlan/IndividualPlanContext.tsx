@@ -51,7 +51,7 @@ import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks
 import { applyMealTargetOverrides } from './planner-meal-targets';
 import { publishPlanTargets } from './plan-targets-bridge';
 import { readActivePlan, rotateActivePlan, publishPlanTargetsFor } from './planner-plan-archive';
-import { correctDayToTargets } from './day-target-corrector';
+import { correctDayToTargets, plannerCanonPct } from './day-target-corrector';
 import { safeWriteJSON, migratePlannerStorage } from './planner-storage';
 import { readPlannerPrefs, writePlannerPrefsPatch } from './planner-prefs';
 import {
@@ -6743,6 +6743,9 @@ export const IndividualPlanProvider: React.FC<{
                 isWorkDay: input.isWorkDay,
                 workStartMin: input.workStartMin,
                 workEndMin: input.workEndMin,
+                // §8.135: рецептурный контур судит день каноном ПУТИ, а не общим 3 %. Движок
+                // отдаёт его в поле `canonPct` дня (ручной день — 2 %); fallback — предикат входа.
+                canonPct: (v2 as any)?.canonPct ?? plannerCanonPct(input as any),
               });
               meals.splice(0, meals.length, ...(_asm.meals as any[]));
               // Честность вердикта: ноты продуктового контура («⚠ «Не сошлось» 3.7%»,
@@ -6859,6 +6862,9 @@ export const IndividualPlanProvider: React.FC<{
               ...(_asmVerdict
                 ? { deviationPct: _asmVerdict.deviationPct, withinTolerance: _asmVerdict.withinTolerance }
                 : {}),
+              // §8.135: канон дня едет вместе с днём — по нему карточка «почему день не сошёлся»
+              // и любые другие потребители судят точность ручного дня по 2 %, а не по 3 %.
+              canonPct: (v2 as any)?.canonPct ?? plannerCanonPct(input as any),
               isTrainingDay: v2.isTrainingDay,
               allergenWarnings: _allergenWarnings,
               supplementTimeline: buildSupplementTimeline(mealTimesPro, v2.isTrainingDay),

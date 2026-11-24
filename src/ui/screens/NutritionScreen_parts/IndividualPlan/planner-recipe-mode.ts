@@ -48,7 +48,7 @@ import {
   mergeDuplicateItems,
   RICE_BUCKET_IDS,
 } from './meal-plan-engine';
-import { correctDayToTargets } from './day-target-corrector';
+import { correctDayToTargets, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import { getMicroFromFood } from './planner-micro-reader';
 import { RDA_BASE } from './planner-micro-coverage';
@@ -1501,8 +1501,12 @@ export function rebalanceDayAfterRecipes(
     hvStyle?: string;
     weekIndex?: number;
     plantCorridorPct?: number;
+    /** §8.135: канон дня по пути (ручной 2 %, авто PLANNER_CONVERGENCE_PCT) —
+     *  флаг «в допуске» обязан судиться тем же каноном, под который день собирался. */
+    canonPct?: number;
   },
 ): RebalanceResult {
+  const _canonPct = opts?.canonPct ?? PLANNER_CONVERGENCE_PCT;
   const notes: string[] = [];
   // Экстрим углей (≥1300): больше итераций ребаланса (24 не хватает: 15 приёмов,
   // кулдауны съедают часть) — иначе день застревает на −33% с честным флагом.
@@ -2307,7 +2311,7 @@ export function rebalanceDayAfterRecipes(
 
   const totalsOut = sumDayTotals(work);
   const devOut = maxDeviationPct(totalsOut, validTargets);
-  return { meals: work, notes, deviationPct: Math.round(devOut * 10) / 10, withinTolerance: devOut <= 3 };
+  return { meals: work, notes, deviationPct: Math.round(devOut * 10) / 10, withinTolerance: devOut <= _canonPct };
 }
 
 /**
@@ -2803,6 +2807,12 @@ export interface AssembleRecipeDayArgs {
    * сходимость не добивается (напр. экстрим-полоса).
    */
   plantCorridorPct?: number;
+  /**
+   * §8.135: канон дня по пути — ручной день 2 %, авто PLANNER_CONVERGENCE_PCT;
+   * вызывающий передаёт канон, под который день собирался (движок отдаёт его в поле
+   * `canonPct` дня). Без поля — прежний общий канон 3 %.
+   */
+  canonPct?: number;
 }
 
 export interface AssembleRecipeDayResult {
@@ -2820,6 +2830,10 @@ export interface AssembleRecipeDayResult {
 /**
  * Собирает основные приёмы дня из рецептов: топ-3 варианта на приём, автовыбор
  * лучшего с авторскими порциями, ребаланс дня до ±3%. Перекусы не трогаются.
+ *
+ * `withinTolerance` считается по канону пути (`args.canonPct`, §8.135): ручной день 2 %,
+ * иначе `PLANNER_CONVERGENCE_PCT`; вызывающий передаёт канон, под который день собирался
+ * (движок отдаёт его в поле `canonPct` дня).
  *
  * Важно: финальное ранжирование кандидатов идёт по ФАКТИЧЕСКОЙ декомпозиции
  * (ingredientIds/portions → FOOD_DB), а не по авторским макросам карточки —
@@ -2890,6 +2904,9 @@ export function carbRoomScore(
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
   const { meals, pool: _poolRaw, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  // §8.135: канон дня по пути — флаг «в допуске» и предупреждение судятся тем каноном,
+  // под который день собирался (ручной день 2 %, авто PLANNER_CONVERGENCE_PCT).
+  const _canonPct = args.canonPct ?? PLANNER_CONVERGENCE_PCT;
   // §4.4: коридор «посадки» ядер рецептов. По умолчанию ±3% — требование владельца
   // («порции не больше 3%»): порции близки к авторским, продуктовый путь сходится в ≤3%.
   // Остаток сходимости добирают НЕ порции, а своп не-ядровых жировых сайдов на углеводные
@@ -3862,6 +3879,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     workStartMin: args.workStartMin,
     workEndMin: args.workEndMin,
     plantCorridorPct: _plantCorridorPct,
+    canonPct: _canonPct,
   });
   let notes = [...rb.notes];
   // Peri-капы сразу после ребаланса (до корректора): топ-апы/сайды могли залить окна.
@@ -3941,7 +3959,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       );
     }
   }
-  const needCorr0 = !rb.withinTolerance || rb.deviationPct > 3;
+  // §8.135: запуск корректора — по канону ПУТИ. Раньше триггер стоял на общем 3 %: ручной
+  // день 2.4 % до корректора не доходил вообще и получал в ленте «⚠ … (>2 %) — попробуйте
+  // другие рецепты» без единой попытки свести его (корректор штатно доходит до <1 %).
   // Честный замер ПОСЛЕ жирового добора (rb.deviationPct считается до него): и условие
   // запуска, и строка «Корректор: A% → B%» должны говорить о факте.
   const _preCorrDev =
@@ -3951,9 +3971,11 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         { kcal: targets.kcal, p: targets.p, f: targets.f, c: targets.c } as any,
       ) * 10,
     ) / 10;
-  const needCorr = needCorr0 || _preCorrDev > 3;
+  const needCorr = rb.withinTolerance === false || _preCorrDev > _canonPct;
   if (needCorr) {
     const corr = correctDayToTargets(rb.meals as any, targets as any, {
+      // §8.135: и остановка итераций, и флаг — тем же каноном, что судит день.
+      tolPct: _canonPct,
       excludedIds,
       allowCoreScale: true,
       maxIter: 80,
@@ -3989,8 +4011,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         ...notes,
         ..._trimNotes1,
         ..._trimPeri1,
-        _postDev <= 3
-          ? `✓ Корректор дневных целей: ${_preCorrDev}% → ${_postDev}% (≤3%)`
+        _postDev <= _canonPct
+          ? `✓ Корректор дневных целей: ${_preCorrDev}% → ${_postDev}% (≤${_canonPct}%)`
           : `✓ Корректор дневных целей: ${_preCorrDev}% → ${_postDev}%`,
       ];
     }
@@ -4357,7 +4379,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       );
       host.items = [...(host.items || []), item];
       host.totals = sumMealTotals(host.items as any);
-      if (devOf() > d0 + 0.0005) {
+      // §8.50 (правка 2026-11-24): приёмка строгая — шаг обязан СТРОГО снизить девиацию дня.
+      // Прежнее `> d0 + 0.0005` пропускало «равный» шаг: нота «3.4 % → 3.4 %» была возможна,
+      // хотя день не приближался к цели («докармливание» канонического дня).
+      if (devOf() >= d0 - 0.0005) {
         host.items = snap.items;
         host.totals = snap.totals;
         return false;
@@ -4371,11 +4396,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       // §8.94 (замер 120 кг mass/5 отдых): окно 5–14 г было узким — при разрыве 25 г жира
       // последняя миля молчала, и день уходил в корректор, где жир −26 % «лечился»
       // углеводами (CoR 150 → 310 г в обеде, ккал +12.6 %). Теперь жир добирается ЛЁГКИМ
-      // шагом масла: 3 раунда по 5–15 г, приёмка — только если max-девиация дня падает.
-      for (let _round = 0; _round < 3; _round++) {
+      // шагом масла: до 3 раундов, в каждом — лестница 5/10/15 г (не больше остатка),
+      // берётся шаг с минимальной односторонней девиацией дня.
+      // §8.50 (правка 2026-11-24): приёмка `_mlTryAdd` строгая — равный шаг больше не
+      // принимается, поэтому шаг ищется по лестнице (как в углеводном блоке ниже), а не
+      // одним ходом: стадия молчит только там, где ни один шаг не улучшает худшую ось дня.
+      // Один вызов `_mlFatTryOnce` = максимум один принятый шаг масла; проходы повторяются
+      // (и ещё раз — после углеводного добора ниже), чтобы остаток жира не остался за каноном.
+      const _mlFatTryOnce = (): boolean => {
         const _t = sumDayTotals(outMeals as any);
         const _fatGap = (targets.f || 0) - (_t.f || 0);
-        if (_fatGap < 2 || _fatGap > 45) break;
+        if (_fatGap < 2 || _fatGap > 45) return false;
         const _oil = FOOD_DB.find(
           (f: any) =>
             (f.id === 'oil_olive' || f.id === 'oil_sunflower_unrefined') && !(excludedIds && excludedIds.has(f.id)),
@@ -4383,12 +4414,49 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         const _hostF = [..._mlMains].sort((a: any, b: any) => (a.totals?.f || 0) - (b.totals?.f || 0))[0];
         // QG51-лок: добавленная позиция — «реальная порция», а не крошка. Окно 2–4 г закрывало
         // разрыв, но писало в ноту «масло 2 г» (замок `planner-recipe-last-mile` требует ≥5 г,
-        // контракт QG46 — масло 5–10 г). Берём 5 г как минимальный шаг: лишние 2–3 г жира
-        // двусторонняя приёмка отсечёт сама, если девиация дня не падает.
-        const _gF = Math.min(15, Math.max(5, Math.round(_fatGap)));
-        if (_gF < 5) break;
-        if (!_oil || !_mlTryAdd(_hostF, _oil, _gF, 'fat', 'Остаток жира дня', true)) break;
-      }
+        // контракт QG46 — масло 5–10 г). Лестница начинается с минимального шага 5 г: остаток
+        // меньше 5 г не запрещает шаг (прежнее поведение), просто он единственный в лестнице,
+        // а приёмку проходит только если девиация дня реально падает.
+        const _gCapF = Math.max(5, Math.min(15, Math.floor(_fatGap)));
+        if (!_oil || !_hostF) return false;
+        const _snapF = _mlSnapOf(_hostF);
+        const _baseF = _mlDevFloor();
+        let _bestGF = 0;
+        let _bestDevF = _baseF;
+        for (let _gF = 5; _gF <= _gCapF; _gF += 5) {
+          _hostF.items = [
+            ..._snapF.items,
+            scaleItem(
+              {
+                name: _oil.name,
+                id: _oil.id,
+                amount: 100,
+                kcal: Math.round(_oil.kcal || 0),
+                p: _oil.protein || 0,
+                f: _oil.fat || 0,
+                c: _oil.carbs || 0,
+                fiber: _oil.fiber || 0,
+                role: 'fat',
+              } as any,
+              _gF,
+            ),
+          ];
+          _hostF.totals = sumMealTotals(_hostF.items as any);
+          const _dvF = _mlDevFloor();
+          if (_dvF < _bestDevF - 0.0005) {
+            _bestDevF = _dvF;
+            _bestGF = _gF;
+          }
+        }
+        // Откат проб: шаг применяет только `_mlTryAdd` — он же и отклонит его, если девиация
+        // дня не упала строго ниже базы.
+        _hostF.items = _snapF.items;
+        _hostF.totals = _snapF.totals;
+        if (_bestGF < 5 || !_mlTryAdd(_hostF, _oil, _bestGF, 'fat', 'Остаток жира дня', true)) return false;
+        return true;
+      };
+      // §8.94: до трёх раундов, пока принятый шаг реально улучшает день.
+      for (let _round = 0; _round < 3 && _mlFatTryOnce(); _round++);
       // (окно 12–40 г удалено: его работу делает блок ниже — с односторонней приёмкой.)
       // §8.91/§8.94: углеводный остаток 12–140 г — плотным носителем в основной приём
       // с максимальной углеводной комнатой. Раньше такой остаток 40–140 не добирался при
@@ -4451,6 +4519,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           if (bestG >= 40) _mlTryAdd(_hostBig, _dense, bestG, 'carb_slow', 'Крупный остаток углеводов дня', true);
         }
       }
+      // §8.50 (правка 2026-11-24): углеводный добор сдвигает худшую ось дня — после него
+      // жировой остаток ещё раз проходит ту же лестницу. Шаг принимается только при строгом
+      // падении девиации дня (`_mlTryAdd`), поэтому «докармливания» канонического дня нет.
+      for (let _round = 0; _round < 3 && _mlFatTryOnce(); _round++);
     }
   }
 
@@ -4818,11 +4890,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // «упёрлись»; честнее сказать «не сведён».
   {
     const _fmt = `${Math.round(_finTot.kcal)}/${Math.round(_finTot.p)}/${Math.round(_finTot.f)}/${Math.round(_finTot.c)}`;
-    if (_finDevR <= 3) {
+    // §8.135: вердикт «сведён/не сведён» — по канону ПУТИ. Иначе ручной день на 2.3 % писал
+    // «✓ День сведён к цели» рядом с «⚠ … 2.3% (>2%)» — два противоположных вердикта в одной ленте.
+    if (_finDevR <= _canonPct) {
       notes = [...notes, `✓ День сведён к цели: ${_finDevR}% (${_fmt})`];
-    } else if (_closeDev <= 3) {
+    } else if (_closeDev <= _canonPct) {
       // Закрыватель дошёл до канона, но следующий шаг (справедливость/перенос тарелки/овощи)
-      // сдвинул день обратно за 3% — это ДЕФЕКТ раскладки, и он обязан быть видимым.
+      // сдвинул день обратно за канон — это ДЕФЕКТ раскладки, и он обязан быть видимым.
       notes = [
         ...notes,
         `⚠ День не сведён к цели: ${_finDevR}% (${_fmt}) — закрыватель дошёл до ${_closeDev}%, но последующая раскладка увела день обратно`,
@@ -4849,18 +4923,20 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       ];
     }
   }
-  // P2 (честность флага): квота/peri-тримы могли увести за ±3% ПОСЛЕ tolerance-проверки
+  // P2 (честность флага): квота/peri-тримы могли увести за канон ПОСЛЕ tolerance-проверки
   // ребаланса — предупреждение обязательно (иначе property-тест «нет предупреждения» падает).
-  if (_finDevR > 3) {
+  // §8.135: порог — канон пути (`_canonPct`), иначе ручной день на 2.5 % получал красный
+  // флаг БЕЗ объяснения в нотах.
+  if (_finDevR > _canonPct) {
     notes = [
       ...notes,
-      `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>3%) — попробуйте выбрать другие варианты рецептов.`,
+      `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>${_canonPct}%) — попробуйте выбрать другие варианты рецептов.`,
     ];
   }
   return {
     meals: outMeals,
     notes,
-    withinTolerance: _finDevR <= 3,
+    withinTolerance: _finDevR <= _canonPct,
     deviationPct: _finDevR,
     appliedCount,
     ...(_effTargets ? { effectiveProteinTargetG: _effTargets.effP, deviationToEffectivePct: _effTargets.effDevR } : {}),

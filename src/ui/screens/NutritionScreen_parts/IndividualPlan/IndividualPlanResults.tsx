@@ -1,55 +1,83 @@
-import React, { useState, useRef, useEffect } from "react";
-import { addToCart } from "../../../../core/nutrition-utils";
+import React, { useState, useRef, useEffect } from 'react';
+import { addToCart } from '../../../../core/nutrition-utils';
 import { FOOD_DB, findFoodByIdOrName } from '../../../../core/nutrition-database';
-import { pickReplaceIdxForIssue } from "./planner-issue-replace";
-import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
-import { filterRecipesByHardRestrictions } from "./recipe-engine";
-import { ALLERGEN_LIST, HEALTH_ISSUES } from "./types";
-import { resolveAllergenFoodIds, resolveAllExcludedFoodIds, selectedAllergenTags } from "./planner-restrictions";
-import { effectiveSpecialMealTarget } from "./planner-special-meal-state";
-import { sumMealTotals, sumDayTotals } from "./planner-recipe-mode";
-import { localIsoDate } from "./planner-date-utils";
-import { buildTrainSchedule, isTrainingDayFor } from "./planner-training-schedule";
-import { NutritionPeriodizationCard } from "./NutritionPeriodizationCard";
-import { SupplementTimingCard } from "./SupplementTimingCard";
-import { WeeklyReviewCard } from "./WeeklyReviewCard";
-import { RefeedCalendarCard } from "./RefeedCalendarCard";
-import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { getWeightLog } from "../../../../engines/profile-store";
-import { PopupSelect } from "../../../components/PopupXxx";
-import type { DrugInjection } from "./types";
-import { GlassCard, greenBtn, reportPillStyle } from "./ui";
-import { usePlanCtx } from "./IndividualPlanContext";
-import { carbPeriodizationLabel, expectedWeekKcal } from "./planner-carb-periodization";
-import { comfortSummaryForPlan } from "./planner-comfort";
-import { computeDayScoreTrend, loadDayScores, clearDayScores } from "../../../../engines/day-score-trend";
-import { DailyDietDashboard } from "../DailyDietDashboard";
+import { pickReplaceIdxForIssue } from './planner-issue-replace';
+import { getRecipesByMeal } from '../../../../engines/nutrition-periodization.engine';
+import { filterRecipesByHardRestrictions } from './recipe-engine';
+import { ALLERGEN_LIST, HEALTH_ISSUES } from './types';
+import { resolveAllergenFoodIds, resolveAllExcludedFoodIds, selectedAllergenTags } from './planner-restrictions';
+import { effectiveSpecialMealTarget } from './planner-special-meal-state';
+import { sumMealTotals, sumDayTotals } from './planner-recipe-mode';
+import { localIsoDate } from './planner-date-utils';
+import { buildTrainSchedule, isTrainingDayFor } from './planner-training-schedule';
+import { NutritionPeriodizationCard } from './NutritionPeriodizationCard';
+import { SupplementTimingCard } from './SupplementTimingCard';
+import { WeeklyReviewCard } from './WeeklyReviewCard';
+import { RefeedCalendarCard } from './RefeedCalendarCard';
+import { ALL_SUBSTANCES } from '../../../../data/support-substances';
+import { getWeightLog } from '../../../../engines/profile-store';
+import { PopupSelect } from '../../../components/PopupXxx';
+import type { DrugInjection } from './types';
+import { GlassCard, greenBtn, reportPillStyle } from './ui';
+import { usePlanCtx } from './IndividualPlanContext';
+import { carbPeriodizationLabel, expectedWeekKcal } from './planner-carb-periodization';
+import { comfortSummaryForPlan } from './planner-comfort';
+import { computeDayScoreTrend, loadDayScores, clearDayScores } from '../../../../engines/day-score-trend';
+import { DailyDietDashboard } from '../DailyDietDashboard';
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
-import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
-import { MealQuickControls } from "./MealQuickControls";
-import { readDiaryV2 } from "../diary-storage-v2";
-import { IngredientRowsEditor, rowsToComponents, sumIngredientComponents } from "../diary/IngredientRowsEditor";
-import { createUserRecipe, recipeKey } from "../diary/user-recipes";
-import { buildDayReportPrintHtml, buildMealTimelinePrintHtml, buildRecipePlanPrintHtml, buildCoachExportHtml, shareOrCopyText, printPlanHtml, downloadCoachFile } from "./planner-day-print";
-import { buildDayBriefing } from "./planner-briefing";
-import { avgKcalPerDay } from "./planner-average";
-import { explainDayPlan, axisMissPct } from "./planner-day-explain";
-import { scoreDayComposition } from "./planner-composition-quality";
 import {
-  loadAbSnapshots, saveAbSnapshot, removeAbSnapshot, snapshotFromDayPlan, diffAbSnapshots,
-  AB_SLOTS, type AbSlot, type AbPlanSnapshot, type AbDiffResult,
-} from "./planner-ab-compare";
+  calcMealScoreV2,
+  calcMealDIAAS,
+  analyzeDailyDiet,
+  getDefaultProfile,
+  type MealTiming,
+  type DailyDietReport,
+  type MealScoreV2,
+} from '../../../../engines/product-usefulness-v2.engine';
+import { MealQuickControls } from './MealQuickControls';
+import { readDiaryV2 } from '../diary-storage-v2';
+import { IngredientRowsEditor, rowsToComponents, sumIngredientComponents } from '../diary/IngredientRowsEditor';
+import { createUserRecipe, recipeKey } from '../diary/user-recipes';
 import {
-  readActivePlan, readPlanArchive, restorePlanFromArchive, removeArchivedPlan, archivePlan,
-  PLAN_ARCHIVE_EVENT, publishPlanTargetsFor,
-} from "./planner-plan-archive";
+  buildDayReportPrintHtml,
+  buildMealTimelinePrintHtml,
+  buildRecipePlanPrintHtml,
+  buildCoachExportHtml,
+  shareOrCopyText,
+  printPlanHtml,
+  downloadCoachFile,
+} from './planner-day-print';
+import { buildDayBriefing } from './planner-briefing';
+import { avgKcalPerDay } from './planner-average';
+import { explainDayPlan, axisMissPct } from './planner-day-explain';
+import { scoreDayComposition } from './planner-composition-quality';
+import {
+  loadAbSnapshots,
+  saveAbSnapshot,
+  removeAbSnapshot,
+  snapshotFromDayPlan,
+  diffAbSnapshots,
+  AB_SLOTS,
+  type AbSlot,
+  type AbPlanSnapshot,
+  type AbDiffResult,
+} from './planner-ab-compare';
+import {
+  readActivePlan,
+  readPlanArchive,
+  restorePlanFromArchive,
+  removeArchivedPlan,
+  archivePlan,
+  PLAN_ARCHIVE_EVENT,
+  publishPlanTargetsFor,
+} from './planner-plan-archive';
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
     const diary = readDiaryV2();
     if (Array.isArray(diary)) return diary.filter((d: any) => (d.date || d.createdAt || '').startsWith(date));
     const meals = diary?.[date]?.meals || {};
-    return Object.values(meals).flatMap((meal: any) => Array.isArray(meal) ? meal : []);
+    return Object.values(meals).flatMap((meal: any) => (Array.isArray(meal) ? meal : []));
   } catch {
     return [];
   }
@@ -63,9 +91,13 @@ const readScheduledSpecialMeals = (): { date: string; type: 'refeed' | 'cheat_me
     const raw = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
     if (!Array.isArray(raw)) return [];
     return raw
-      .filter((m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast', 'diet_break'].includes(m.type))
+      .filter(
+        (m: any) => m && typeof m.date === 'string' && ['refeed', 'cheat_meal', 'fast', 'diet_break'].includes(m.type),
+      )
       .map((m: any) => ({ date: m.date, type: m.type as 'refeed' | 'cheat_meal' | 'fast' | 'diet_break' }));
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 };
 
 const getDiaryLoggedDayCount = (): number => {
@@ -77,7 +109,6 @@ const getDiaryLoggedDayCount = (): number => {
     return 0;
   }
 };
-
 
 // E7: импорт плана — модалка вместо prompt() + ВАЛИДАЦИЯ формы (раньше вставка мусора
 // с полем meals давала кривой план без предупреждения).
@@ -139,9 +170,8 @@ export const buildPlanExportJson = (plan: any): string => {
   }
 };
 
-export type ImportPlanResult =
-  | { ok: true; plan: any; blocked: string[] }
-  | { ok: false; reason: string };export const importPlanFromText = (raw: string): ImportPlanResult => {
+export type ImportPlanResult = { ok: true; plan: any; blocked: string[] } | { ok: false; reason: string };
+export const importPlanFromText = (raw: string): ImportPlanResult => {
   const text = String(raw ?? '').trim();
   if (!text) return { ok: false, reason: 'пусто — вставьте JSON плана' };
   let parsed: any;
@@ -150,13 +180,15 @@ export type ImportPlanResult =
   } catch {
     return {
       ok: false,
-      reason: 'это не JSON. Скопируйте план кнопкой «⧉ JSON» и вставьте сюда — человекочитаемый текст для импорта не подходит',
+      reason:
+        'это не JSON. Скопируйте план кнопкой «⧉ JSON» и вставьте сюда — человекочитаемый текст для импорта не подходит',
     };
   }
   // Обёртка экспорта ({ schema, plan }) и частые варианты — разворачиваем.
-  const candidate = (parsed && typeof parsed === 'object' && !Array.isArray(parsed.meals))
-    ? (parsed.plan ?? parsed.dayPlan ?? parsed)
-    : parsed;
+  const candidate =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed.meals)
+      ? (parsed.plan ?? parsed.dayPlan ?? parsed)
+      : parsed;
   const check = _validateImportedPlan(candidate);
   if (!check.ok) return { ok: false, reason: `неверная структура плана: ${check.reason}` };
   return { ok: true, plan: _normalizeImportedPlan(candidate), blocked: check.blocked };
@@ -181,62 +213,177 @@ export function resolveVisibleDayPlan(args: {
   const { planDays, dayPlan, threeDayPlan, weekPlan } = args;
   const total = planDays === 3 ? 3 : planDays === 7 ? 7 : 1;
   const index = Math.max(0, Math.min(Number(args.selectedDayIndex) || 0, total - 1));
-  const fromMulti = planDays === 3
-    ? threeDayPlan?.days?.[index]
-    : planDays === 7
-      ? weekPlan?.days?.[index]
-      : undefined;
+  const fromMulti = planDays === 3 ? threeDayPlan?.days?.[index] : planDays === 7 ? weekPlan?.days?.[index] : undefined;
   // fallback на dayPlan — если мультидневный план ещё не собран
   return { day: fromMulti || dayPlan, index, total };
 }
 
 export const IndividualPlanResults: React.FC = () => {
   const {
-    generatePlan, planDays, setPlanDays, selectedDayIndex, setSelectedDayIndex,
-    weekEditDay, openWeekDayForEdit, switchPlanDays, loadMonthWeekIntoPlan,
-    DAY_LABELS, trainingDays, planView, setPlanView, weekPlan, setWeekPlan,
-    monthPlanMode, setMonthPlanMode, monthPlan, setMonthPlan,
-    selectedWeek, setSelectedWeek,
-    generated, setGenerated, dayPlan, threeDayPlan, resultsRef, planBusy,
+    generatePlan,
+    planDays,
+    setPlanDays,
+    selectedDayIndex,
+    setSelectedDayIndex,
+    weekEditDay,
+    openWeekDayForEdit,
+    switchPlanDays,
+    loadMonthWeekIntoPlan,
+    DAY_LABELS,
+    trainingDays,
+    planView,
+    setPlanView,
+    weekPlan,
+    setWeekPlan,
+    monthPlanMode,
+    setMonthPlanMode,
+    monthPlan,
+    setMonthPlan,
+    selectedWeek,
+    setSelectedWeek,
+    generated,
+    setGenerated,
+    dayPlan,
+    threeDayPlan,
+    resultsRef,
+    planBusy,
     mealsCount,
-    renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC, errorMsg,
-    dayPlanNotes, setDayPlanNotes,
-     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, excludedCategories, healthIssues, dietPrefs,
+    renderMealList,
+    effectiveKcal,
+    effectiveP,
+    effectiveF,
+    effectiveC,
+    errorMsg,
+    dayPlanNotes,
+    setDayPlanNotes,
+    autoCorrectPlan,
+    allergens,
+    allergenExcludedCount,
+    excludedFoods,
+    excludedCategories,
+    healthIssues,
+    dietPrefs,
 
-    carbPeriodization, waterCalc, setWaterCalc, heavyTrainDay,
-    showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
-    userRecipes, setUserRecipes,
-    shoppingList, setShoppingList, injections,
-    recipePickerMeal, setRecipePickerMeal,
-    replaceMealWithRecipe, addSecondRecipeToMeal, secondRecipeConflict, setSecondRecipeConflict, addSecondRecipeWithSnackRoom, undoStack, setUndoStack, undoLast,
-    saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
-    loadSavedPlan, weight, budget, age, sex, bodyFatPct, trainType,
-    generateCheatMeal, cheatMealPlan, setCheatMealPlan,
-    generateCarbload, carbloadPlan, setCarbloadPlan,
-    generateBUTCH, butchPlan, setButchPlan,
-    generateCravingPlan, cravingPlan, setCravingPlan,
-    generateLazyDayPlan, lazyDayPlan, setLazyDayPlan,
-    generateRecommendations, recommendations, setRecommendations,
-    specialMealMode, setSpecialMealMode, specialMealProteinG, specialMealFatG, specialMealCarbsG,
-    specialMealGoal, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget,
-    cravingMode, setCravingMode, lazyDayMode, setLazyDayMode, cravingDays, lazyDayDays,
-    generateMealPrep, mealPrepPlan, mealPrepDays, setMealPrepDays,
+    carbPeriodization,
+    waterCalc,
+    setWaterCalc,
+    heavyTrainDay,
+    showRecipeCreator,
+    setShowRecipeCreator,
+    newRecipe,
+    setNewRecipe,
+    userRecipes,
+    setUserRecipes,
+    shoppingList,
+    setShoppingList,
+    injections,
+    recipePickerMeal,
+    setRecipePickerMeal,
+    replaceMealWithRecipe,
+    addSecondRecipeToMeal,
+    secondRecipeConflict,
+    setSecondRecipeConflict,
+    addSecondRecipeWithSnackRoom,
+    undoStack,
+    setUndoStack,
+    undoLast,
+    saveCurrentPlan,
+    savedPlans,
+    setSavedPlans,
+    expandedSavedId,
+    setExpandedSavedId,
+    loadSavedPlan,
+    weight,
+    budget,
+    age,
+    sex,
+    bodyFatPct,
+    trainType,
+    generateCheatMeal,
+    cheatMealPlan,
+    setCheatMealPlan,
+    generateCarbload,
+    carbloadPlan,
+    setCarbloadPlan,
+    generateBUTCH,
+    butchPlan,
+    setButchPlan,
+    generateCravingPlan,
+    cravingPlan,
+    setCravingPlan,
+    generateLazyDayPlan,
+    lazyDayPlan,
+    setLazyDayPlan,
+    generateRecommendations,
+    recommendations,
+    setRecommendations,
+    specialMealMode,
+    setSpecialMealMode,
+    specialMealProteinG,
+    specialMealFatG,
+    specialMealCarbsG,
+    specialMealGoal,
+    specialMealTiming,
+    specialMealReplaceMode,
+    specialMealReplaceTarget,
+    cravingMode,
+    setCravingMode,
+    lazyDayMode,
+    setLazyDayMode,
+    cravingDays,
+    lazyDayDays,
+    generateMealPrep,
+    mealPrepPlan,
+    mealPrepDays,
+    setMealPrepDays,
     saveUndo,
-    generateAllergenReport, allergenReport,
-    generateNutrientReport, nutrientReport,
-    generateQualityReport, qualityReport,
-    generateRiskReport, riskReport,
-    generateDrugCompatReport, drugCompatReport,
-    generateFullNutritionReport, nutritionReport, activeReports,
-    editItem, setEditItem, editAmount, setEditAmount,
-    removeFoodItem, replaceFoodItem, findSimilarFoods, updateItemAmount,
-    setDayPlan, setThreeDayPlan, planTargets, planType, variety,
-    linkToTraining, trainStart,
+    generateAllergenReport,
+    allergenReport,
+    generateNutrientReport,
+    nutrientReport,
+    generateQualityReport,
+    qualityReport,
+    generateRiskReport,
+    riskReport,
+    generateDrugCompatReport,
+    drugCompatReport,
+    generateFullNutritionReport,
+    nutritionReport,
+    activeReports,
+    editItem,
+    setEditItem,
+    editAmount,
+    setEditAmount,
+    removeFoodItem,
+    replaceFoodItem,
+    findSimilarFoods,
+    updateItemAmount,
+    setDayPlan,
+    setThreeDayPlan,
+    planTargets,
+    planType,
+    variety,
+    linkToTraining,
+    trainStart,
     weightMode,
-    goal, bbPrepPlan, trainEnd, trainScheduleType, trainPattern, takenSupplements, applyKcalAdjust,
-    workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType,
-    v2Phase, v2Pharma, v2Labs, histamineSensitive,
-    combatNutrition, applyCombatNutrition,
+    goal,
+    bbPrepPlan,
+    trainEnd,
+    trainScheduleType,
+    trainPattern,
+    takenSupplements,
+    applyKcalAdjust,
+    workScheduleEnabled,
+    workStartTime,
+    workEndTime,
+    workDays,
+    workScheduleType,
+    v2Phase,
+    v2Pharma,
+    v2Labs,
+    histamineSensitive,
+    combatNutrition,
+    applyCombatNutrition,
     plannerMode,
     annualPhase,
     setErrorMsg,
@@ -252,18 +399,28 @@ export const IndividualPlanResults: React.FC = () => {
   const _monthRunningRef = useRef(false); // FIX button-audit: guard двойного клика «План на месяц»
   const [calcTab, setCalcTab] = useState<'day' | 'week'>('day');
   const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
-  const [calcResults, setCalcResults] = useState<{ id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null>(null);
+  const [calcResults, setCalcResults] = useState<
+    { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] | null
+  >(null);
   const [recipeDetail, setRecipeDetail] = useState<any | null>(null);
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
   // 🟠8 — Checked shopping items state (must be at top level — Rules of Hooks)
-  const [checked, setChecked] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_shopping_checked') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
+  const [checked, setChecked] = useState<Set<string>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_shopping_checked') || '[]');
+      return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
   // E7: чекбоксы закупок сбрасываются при НОВОМ плане (раньше галочки «переезжали» между
   // разными списками — «молоко уже отмечено» в чужом рационе).
   // P1-фикс: ключ включает SUM totals, поэтому любая правка порции сбрасывала галочки.
   // Теперь НОВЫЙ план = смена идентичности (число приёмов/дней/СОСТАВ id), а не суммы.
   const _planKeyRef = useRef<string>('');
   const _planKey = (() => {
-    const _ids = (d: any) => (d?.meals || []).map((m: any) => (m.items || []).map((it: any) => it.id || it.name).join(',')).join(';');
+    const _ids = (d: any) =>
+      (d?.meals || []).map((m: any) => (m.items || []).map((it: any) => it.id || it.name).join(',')).join(';');
     const _dayIds = dayPlan ? _ids(dayPlan) : '';
     const _weekIds = weekPlan ? (weekPlan.days || []).map(_ids).join('/') : '';
     const _threeIds = threeDayPlan ? (threeDayPlan.days || []).map(_ids).join('/') : '';
@@ -277,7 +434,19 @@ export const IndividualPlanResults: React.FC = () => {
   }, [_planKey]);
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
-  const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
+  const [correctIssues, setCorrectIssues] = useState<
+    | {
+        mealIdx: number;
+        mealName: string;
+        issues: {
+          type: string;
+          text: string;
+          severity: 'low' | 'medium' | 'high';
+          suggestion?: { foodId: string; name: string; reason: string }[];
+        }[];
+      }[]
+    | null
+  >(null);
   // Волна-3: A/B двух планов питания (снапшоты A/B в localStorage + diff) — состояние наверху
   // (Rules of Hooks: карточка рендерится условно, хуки — всегда).
   const [abSnaps, setAbSnaps] = useState<Partial<Record<AbSlot, AbPlanSnapshot>>>(() => loadAbSnapshots());
@@ -288,7 +457,10 @@ export const IndividualPlanResults: React.FC = () => {
   const [activePlan, setActivePlan] = useState(() => readActivePlan());
   const [planArchive, setPlanArchive] = useState(() => readPlanArchive());
   useEffect(() => {
-    const sync = () => { setActivePlan(readActivePlan()); setPlanArchive(readPlanArchive()); };
+    const sync = () => {
+      setActivePlan(readActivePlan());
+      setPlanArchive(readPlanArchive());
+    };
     sync();
     window.addEventListener(PLAN_ARCHIVE_EVENT, sync);
     return () => window.removeEventListener(PLAN_ARCHIVE_EVENT, sync);
@@ -299,18 +471,21 @@ export const IndividualPlanResults: React.FC = () => {
   const archivedPlanIds = new Set(planArchive.map((p: any) => p.id));
   const visibleSavedPlans = savedPlans.filter((p: any) => !archivedPlanIds.has(p.id));
 
-/**
- * B5: выбор «жертвы» для замены вынесен в отдельный модуль
- * `planner-issue-replace.ts` (там же объяснение, почему нельзя было искать
- * предложенный продукт внутри приёма — его там заведомо нет).
- */
+  /**
+   * B5: выбор «жертвы» для замены вынесен в отдельный модуль
+   * `planner-issue-replace.ts` (там же объяснение, почему нельзя было искать
+   * предложенный продукт внутри приёма — его там заведомо нет).
+   */
 
   const analyzePlanIssues = () => {
     // FIX button-audit: активный план по view + клэмп индекса (иначе после недельного вида
     // threeDayPlan.days[3..6] = undefined → попап зависал на «Анализ рациона...»)
     const _di = Math.max(0, Math.min(selectedDayIndex, planDays === 3 ? 2 : planDays === 7 ? 6 : 0));
     const activePlan = planDays === 1 ? dayPlan : planDays === 3 ? threeDayPlan?.days?.[_di] : weekPlan?.days?.[_di];
-    if (!activePlan || !Array.isArray(activePlan.meals)) { setCorrectIssues([]); return; }
+    if (!activePlan || !Array.isArray(activePlan.meals)) {
+      setCorrectIssues([]);
+      return;
+    }
     // FIX B6 (аудит 2026-10): здесь стоял `if (plannerMode !== 'pro') { ...; return; }`.
     // Кнопка «🔀 Корректировка рациона» рендерится по одному условию `generated`,
     // т.е. доступна и в simple/minimal — попап открывался, анализ молча не запускался,
@@ -340,16 +515,31 @@ export const IndividualPlanResults: React.FC = () => {
     const allergenSet = resolveAllergenFoodIds(FOOD_DB, allergens || []);
     const healthIssueFoodIds = new Set<string>();
     (healthIssues || []).forEach((hi: string) => {
-      const found = HEALTH_ISSUES.find(h => h.id === hi);
-      if (found?.foodIds) found.foodIds.forEach(fid => healthIssueFoodIds.add(fid));
+      const found = HEALTH_ISSUES.find((h) => h.id === hi);
+      if (found?.foodIds) found.foodIds.forEach((fid) => healthIssueFoodIds.add(fid));
     });
-    const isFoodBlocked = (foodId: string) => excludedSet.has(foodId) || healthIssueFoodIds.has(foodId) || allergenSet.has(foodId);
+    const isFoodBlocked = (foodId: string) =>
+      excludedSet.has(foodId) || healthIssueFoodIds.has(foodId) || allergenSet.has(foodId);
 
-    const result: { mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] = [];
+    const result: {
+      mealIdx: number;
+      mealName: string;
+      issues: {
+        type: string;
+        text: string;
+        severity: 'low' | 'medium' | 'high';
+        suggestion?: { foodId: string; name: string; reason: string }[];
+      }[];
+    }[] = [];
 
     activePlan.meals.forEach((m: any, mi: number) => {
       const currentFoodIds = new Set((m.items || []).map((it: any) => it.id).filter(Boolean));
-      const issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] = [];
+      const issues: {
+        type: string;
+        text: string;
+        severity: 'low' | 'medium' | 'high';
+        suggestion?: { foodId: string; name: string; reason: string }[];
+      }[] = [];
       const products = (m.items || []).map((it: any) => {
         const food = findFoodByIdOrName(it.id, it.name);
         return { ...it, food };
@@ -361,43 +551,108 @@ export const IndividualPlanResults: React.FC = () => {
 
       // Low protein
       if (totalP < 25) {
-        const highProteinFoods = FOOD_DB.filter(f => f.protein > 25 && f.category !== 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `${f.protein}г белка/100г` }));
-        if (highProteinFoods.length > 0) issues.push({ type: 'low_protein', text: `🥩 Мало белка (${totalP}г) — <25г за приём`, severity: 'high', suggestion: highProteinFoods });
+        const highProteinFoods = FOOD_DB.filter(
+          (f) => f.protein > 25 && f.category !== 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id),
+        )
+          .slice(0, 3)
+          .map((f) => ({ foodId: f.id, name: f.name, reason: `${f.protein}г белка/100г` }));
+        if (highProteinFoods.length > 0)
+          issues.push({
+            type: 'low_protein',
+            text: `🥩 Мало белка (${totalP}г) — <25г за приём`,
+            severity: 'high',
+            suggestion: highProteinFoods,
+          });
       }
       // High fat
       if (totalF > 30) {
-        const lowFatFoods = FOOD_DB.filter(f => f.fat < 5 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Жиры ${f.fat}г/100г, белок ${f.protein}г/100г` }));
-        if (lowFatFoods.length > 0) issues.push({ type: 'high_fat', text: `🧈 Много жиров (${totalF}г) — >30г за приём`, severity: 'medium', suggestion: lowFatFoods });
+        const lowFatFoods = FOOD_DB.filter(
+          (f) => f.fat < 5 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id),
+        )
+          .slice(0, 3)
+          .map((f) => ({ foodId: f.id, name: f.name, reason: `Жиры ${f.fat}г/100г, белок ${f.protein}г/100г` }));
+        if (lowFatFoods.length > 0)
+          issues.push({
+            type: 'high_fat',
+            text: `🧈 Много жиров (${totalF}г) — >30г за приём`,
+            severity: 'medium',
+            suggestion: lowFatFoods,
+          });
       }
       // High carb
       if (totalC > 100 && profile.phase === 'EXTREME_CUT') {
-        const lowCarbFoods = FOOD_DB.filter(f => f.carbs < 10 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
-        if (lowCarbFoods.length > 0) issues.push({ type: 'high_carb', text: `🍚 Много углеводов (${totalC}г) на сушке`, severity: 'high', suggestion: lowCarbFoods });
+        const lowCarbFoods = FOOD_DB.filter(
+          (f) => f.carbs < 10 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id),
+        )
+          .slice(0, 3)
+          .map((f) => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
+        if (lowCarbFoods.length > 0)
+          issues.push({
+            type: 'high_carb',
+            text: `🍚 Много углеводов (${totalC}г) на сушке`,
+            severity: 'high',
+            suggestion: lowCarbFoods,
+          });
       }
       // Missing mTOR trigger — per100 invariant: leucine_mg per100 via AA profile or 75*protein (научно 75-85, было 42 занижало на 44%)
       const totalLeucine = products.reduce((s: number, p: any) => {
         const leucineMg = p.food?.amino_acid_profile_100g?.leucine_mg ?? p.food?.micros?.Leucine;
         const fallbackLeucine = p.food?.protein ? Math.round(p.food.protein * 75) : 0;
-        return s + (leucineMg ?? fallbackLeucine) * (p.amount || 100) / 100;
+        return s + ((leucineMg ?? fallbackLeucine) * (p.amount || 100)) / 100;
       }, 0);
       if (totalLeucine < 3000 && totalLeucine > 0) {
-        const getLeucine = (f: any) => f.amino_acid_profile_100g?.leucine_mg ?? f.micros?.Leucine ?? (f.protein ? Math.round(f.protein * 75) : 0);
-        const leucineFoods = FOOD_DB.filter(f => getLeucine(f) > 250 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).sort((a, b) => getLeucine(b) - getLeucine(a)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
-        if (leucineFoods.length > 0) issues.push({ type: 'low_leucine', text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`, severity: 'high', suggestion: leucineFoods });
+        const getLeucine = (f: any) =>
+          f.amino_acid_profile_100g?.leucine_mg ?? f.micros?.Leucine ?? (f.protein ? Math.round(f.protein * 75) : 0);
+        const leucineFoods = FOOD_DB.filter(
+          (f) => getLeucine(f) > 250 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id),
+        )
+          .sort((a, b) => getLeucine(b) - getLeucine(a))
+          .slice(0, 3)
+          .map((f) => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
+        if (leucineFoods.length > 0)
+          issues.push({
+            type: 'low_leucine',
+            text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`,
+            severity: 'high',
+            suggestion: leucineFoods,
+          });
       }
       // Low fiber
-      const totalFiber = products.reduce((s: number, p: any) => s + (p.food?.fiber || 0) * (p.amount || 100) / 100, 0);
+      const totalFiber = products.reduce(
+        (s: number, p: any) => s + ((p.food?.fiber || 0) * (p.amount || 100)) / 100,
+        0,
+      );
       if (totalFiber < 3) {
-        const fiberFoods = FOOD_DB.filter(f => f.fiber > 4 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Клетчатка ${f.fiber}г/100г` }));
-        if (fiberFoods.length > 0) issues.push({ type: 'low_fiber', text: `🌾 Мало клетчатки (${totalFiber.toFixed(0)}г)`, severity: 'medium', suggestion: fiberFoods });
+        const fiberFoods = FOOD_DB.filter((f) => f.fiber > 4 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id))
+          .slice(0, 3)
+          .map((f) => ({ foodId: f.id, name: f.name, reason: `Клетчатка ${f.fiber}г/100г` }));
+        if (fiberFoods.length > 0)
+          issues.push({
+            type: 'low_fiber',
+            text: `🌾 Мало клетчатки (${totalFiber.toFixed(0)}г)`,
+            severity: 'medium',
+            suggestion: fiberFoods,
+          });
       }
       // DIAAS per meal
-      const v2Products = products.filter((p: any) => p.food).map((p: any) => ({ foodId: p.food.id, weightGrams: p.amount || 100 }));
+      const v2Products = products
+        .filter((p: any) => p.food)
+        .map((p: any) => ({ foodId: p.food.id, weightGrams: p.amount || 100 }));
       if (v2Products.length > 0) {
         const diaas = calcMealDIAAS(v2Products);
         if (diaas.diaas < 0.75 && diaas.diaas > 0) {
-          const aaFoods = FOOD_DB.filter(f => f.protein > 15 && f.category === 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Полноценный белок, ${f.protein}г/100г` }));
-          if (aaFoods.length > 0) issues.push({ type: 'low_diaas', text: `💪 Низкий DIAAS (${diaas.diaas.toFixed(2)}) — лимит: ${diaas.limitingAA}`, severity: 'high', suggestion: aaFoods });
+          const aaFoods = FOOD_DB.filter(
+            (f) => f.protein > 15 && f.category === 'protein' && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id),
+          )
+            .slice(0, 3)
+            .map((f) => ({ foodId: f.id, name: f.name, reason: `Полноценный белок, ${f.protein}г/100г` }));
+          if (aaFoods.length > 0)
+            issues.push({
+              type: 'low_diaas',
+              text: `💪 Низкий DIAAS (${diaas.diaas.toFixed(2)}) — лимит: ${diaas.limitingAA}`,
+              severity: 'high',
+              suggestion: aaFoods,
+            });
         }
       }
 
@@ -409,7 +664,8 @@ export const IndividualPlanResults: React.FC = () => {
 
   const toggleCalcSelection = (id: string) => {
     const next = new Set(calcSelections);
-    if (next.has(id)) next.delete(id); else next.add(id);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setCalcSelections(next);
   };
 
@@ -446,13 +702,15 @@ export const IndividualPlanResults: React.FC = () => {
     profile.labs.glucose_fasting = v2Labs.glucose ? parseFloat(v2Labs.glucose) : undefined;
     profile.labs.insulin_fasting = v2Labs.insulin ? parseFloat(v2Labs.insulin) : undefined;
     profile.weightKg = weight || 80;
-    profile.lbm = profile.weightKg * (100 - profile.bodyFatPct) / 100;
+    profile.lbm = (profile.weightKg * (100 - profile.bodyFatPct)) / 100;
 
     const allMeals: { timing?: MealTiming; products: { foodId: string; weightGrams: number }[] }[] = [];
-    const results: { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] = [];
+    const results: { id: string; name: string; score: MealScoreV2; diaas: { diaas: number; limitingAA: string } }[] =
+      [];
 
-    if (dayPlan && Array.isArray(dayPlan.meals)) { // FIX button-audit: guard на meals=null
-      calcSelections.forEach(id => {
+    if (dayPlan && Array.isArray(dayPlan.meals)) {
+      // FIX button-audit: guard на meals=null
+      calcSelections.forEach((id) => {
         if (id.startsWith('meal_')) {
           const idx = parseInt(id.replace('meal_', ''));
           const meal = dayPlan.meals[idx];
@@ -506,47 +764,48 @@ export const IndividualPlanResults: React.FC = () => {
       });
     }
 
-  const dailyReport = allMeals.length > 0 ? analyzeDailyDiet(allMeals, profile) : null;
-  setCalcResults(results);
-  setCalcDailyReport(dailyReport);
-};
+    const dailyReport = allMeals.length > 0 ? analyzeDailyDiet(allMeals, profile) : null;
+    setCalcResults(results);
+    setCalcDailyReport(dailyReport);
+  };
 
-// E7: импорт плана — doImportPlan использует state-сеттеры компонента, валидатор/нормализатор вынесены на модульный уровень выше.
-const doImportPlan = (raw: string): boolean => {
-  // FIX B23: разбор/валидация/нормализация — в одном месте (importPlanFromText),
-  // чтобы тест проверял ровно то, что делает кнопка.
-  const res = importPlanFromText(raw);
-  if (!res.ok) {
-    setErrorMsg(res.reason.endsWith('.') ? res.reason : `${res.reason}.`);
-    return false;
-  }
-  try {
-    setDayPlan(res.plan);
-    setGenerated(true);
-    setPlanDays(1); // FIX button-audit: импорт всегда показывает 1-дневный план
-    setErrorMsg(null);
-    // Честная честность: импорт — явное действие пользователя, поэтому план ставим как есть,
-    // но предупреждаем, если в нём есть продукты под текущими ограничениями.
-    const blockedSet = new Set<string>([
-      ...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []),
-      ...(excludedFoods || []),
-    ]);
-    (healthIssues || []).forEach((hi: string) => {
-      HEALTH_ISSUES.find(h => h.id === hi)?.foodIds?.forEach(fid => blockedSet.add(fid));
-    });
-    const blockedHere = Array.from(new Set(res.blocked.filter(id => blockedSet.has(id))));
-    if (blockedHere.length > 0) {
-      setErrorMsg(`План импортирован, но ${blockedHere.length} продукт(ов) не проходят ваши ограничения: ${blockedHere.slice(0, 5).join(', ')}${blockedHere.length > 5 ? '…' : ''}. Проверьте состав.`);
-    } else if (typeof (window as any).showToast === 'function') {
-      (window as any).showToast('📥 План импортирован', 'success');
+  // E7: импорт плана — doImportPlan использует state-сеттеры компонента, валидатор/нормализатор вынесены на модульный уровень выше.
+  const doImportPlan = (raw: string): boolean => {
+    // FIX B23: разбор/валидация/нормализация — в одном месте (importPlanFromText),
+    // чтобы тест проверял ровно то, что делает кнопка.
+    const res = importPlanFromText(raw);
+    if (!res.ok) {
+      setErrorMsg(res.reason.endsWith('.') ? res.reason : `${res.reason}.`);
+      return false;
     }
-    return true;
-  } catch {
-    setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».');
-    return false;
-  }
-};
-
+    try {
+      setDayPlan(res.plan);
+      setGenerated(true);
+      setPlanDays(1); // FIX button-audit: импорт всегда показывает 1-дневный план
+      setErrorMsg(null);
+      // Честная честность: импорт — явное действие пользователя, поэтому план ставим как есть,
+      // но предупреждаем, если в нём есть продукты под текущими ограничениями.
+      const blockedSet = new Set<string>([
+        ...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []),
+        ...(excludedFoods || []),
+      ]);
+      (healthIssues || []).forEach((hi: string) => {
+        HEALTH_ISSUES.find((h) => h.id === hi)?.foodIds?.forEach((fid) => blockedSet.add(fid));
+      });
+      const blockedHere = Array.from(new Set(res.blocked.filter((id) => blockedSet.has(id))));
+      if (blockedHere.length > 0) {
+        setErrorMsg(
+          `План импортирован, но ${blockedHere.length} продукт(ов) не проходят ваши ограничения: ${blockedHere.slice(0, 5).join(', ')}${blockedHere.length > 5 ? '…' : ''}. Проверьте состав.`,
+        );
+      } else if (typeof (window as any).showToast === 'function') {
+        (window as any).showToast('📥 План импортирован', 'success');
+      }
+      return true;
+    } catch {
+      setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».');
+      return false;
+    }
+  };
 
   // P0-3: Атомарная генерация месяца — явный async-цикл по 4 неделям с коротким yield для UI.
   // Раньше 5×setTimeout (120мс) расово перекрывали weekPlan — построенные недели терялись.
@@ -564,23 +823,29 @@ const doImportPlan = (raw: string): boolean => {
       setMonthPlan([]);
       for (let w = 0; w < 4; w++) {
         // короткий yield для UI-рендера между неделями (100мс), без расы перекрытия state.
-        await new Promise<void>(r => setTimeout(() => r(), 100));
+        await new Promise<void>((r) => setTimeout(() => r(), 100));
         // generatePlan стал async (неблокирующая генерация 3/7 дней) — ОБЯЗАТЕЛЬНО await:
         // иначе недели месяца генерируются конкурентно и расы на общих recentFoodIds/hardWindow
         // портят выбор продуктов и перекрывают weekPlan.
-        try { await generatePlan(7, w, undefined, { skipUndo: true, async: true }); } catch (e: any) {
+        try {
+          await generatePlan(7, w, undefined, { skipUndo: true, async: true });
+        } catch (e: any) {
           failed.push(w);
-          try { console.warn('[Planner] month week', w, 'failed:', e); } catch {}
+          try {
+            console.warn('[Planner] month week', w, 'failed:', e);
+          } catch {}
         }
       }
-      await new Promise<void>(r => setTimeout(() => r(), 100));
+      await new Promise<void>((r) => setTimeout(() => r(), 100));
       setSelectedWeek(0);
       // P0-fix: не перегенерируем неделю 0 (расхождение с monthPlan[0]), а берём СВЕЖУЮ
       // неделю из ref-зеркала monthPlan. Раньше читался monthPlan[0] из замыкания — это
       // массив ДО setMonthPlan([]), т.е. старая/чужая неделя (на экране пусто/не то).
       const loaded = loadMonthWeekIntoPlan(0);
       if (failed.length > 0) {
-        setErrorMsg(`Месяц собран частично: не удалось построить неделю ${failed.map(x => x + 1).join(', ')}. Остальные недели готовы.`);
+        setErrorMsg(
+          `Месяц собран частично: не удалось построить неделю ${failed.map((x) => x + 1).join(', ')}. Остальные недели готовы.`,
+        );
       } else if (!loaded) {
         setErrorMsg('Месяц не собрался: нет данных за первую неделю. Попробуйте «Сгенерировать заново».');
       }
@@ -590,17 +855,27 @@ const doImportPlan = (raw: string): boolean => {
   };
 
   const _pickerMealType = recipePickerMeal
-    ? recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack'
+    ? recipePickerMeal.label === 'Завтрак'
+      ? 'breakfast'
+      : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак'
+        ? 'lunch'
+        : recipePickerMeal.label === 'Ужин'
+          ? 'dinner'
+          : 'snack'
     : null;
-  const _pickerExcludedIds = recipePickerMeal ? resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || []) : new Set<string>();
+  const _pickerExcludedIds = recipePickerMeal
+    ? resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])
+    : new Set<string>();
   if (recipePickerMeal) {
     for (const id of excludedFoods || []) {
       if (!id.startsWith('__recipe__') && !id.startsWith('__user_recipe__')) _pickerExcludedIds.add(id);
     }
   }
-  const _pickerExcludedRecipeNames = new Set<string>((excludedFoods || [])
-    .filter(id => id.startsWith('__recipe__') || id.startsWith('__user_recipe__'))
-    .map(id => id.replace(/^__recipe__/, '').replace(/^__user_recipe__/, '')));
+  const _pickerExcludedRecipeNames = new Set<string>(
+    (excludedFoods || [])
+      .filter((id) => id.startsWith('__recipe__') || id.startsWith('__user_recipe__'))
+      .map((id) => id.replace(/^__recipe__/, '').replace(/^__user_recipe__/, '')),
+  );
   const _pickerRecipes = _pickerMealType
     ? filterRecipesByHardRestrictions(getRecipesByMeal(_pickerMealType), {
         excludedIds: _pickerExcludedIds,
@@ -622,527 +897,1603 @@ const doImportPlan = (raw: string): boolean => {
     <>
       <div ref={resultsRef as any} />
       {!generated && (
-        <div style={{
-          padding: '28px 18px 24px', textAlign: 'center', borderRadius: 20,
-          background: 'linear-gradient(180deg, rgba(24,24,28,0.96) 0%, rgba(18,18,20,0.98) 100%)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '0 12px 36px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
-          position:'relative', overflow:'hidden',
-        }}>
-          <div style={{position:'absolute', top:-24, left:'50%', transform:'translateX(-50%)', width:220, height:120, background:'radial-gradient(220px 120px at 50% 100%, rgba(0,230,138,0.18), transparent 72%)', pointerEvents:'none'}} />
-          <div style={{
-            width:64, height:64, borderRadius:18, margin:'0 auto 12px', display:'flex', alignItems:'center', justifyContent:'center',
-            background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.08))', border:'1px solid rgba(0,230,138,0.18)',
-            boxShadow:'0 6px 20px rgba(0,230,138,0.14)', fontSize:30,
-          }}>🥗</div>
-          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 5, letterSpacing:'-0.3px' }}>План ещё не создан</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', marginBottom: 16, lineHeight: 1.5, maxWidth: 320, marginLeft:'auto', marginRight:'auto' }}>
-            Задайте параметры во вкладке «Настройки» или сгенерируйте рацион в один клик — КБЖУ, время приёмов и закупки соберутся автоматически.
+        <div
+          style={{
+            padding: '28px 18px 24px',
+            textAlign: 'center',
+            borderRadius: 20,
+            background: 'linear-gradient(180deg, rgba(24,24,28,0.96) 0%, rgba(18,18,20,0.98) 100%)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            boxShadow: '0 12px 36px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: -24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 220,
+              height: 120,
+              background: 'radial-gradient(220px 120px at 50% 100%, rgba(0,230,138,0.18), transparent 72%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 18,
+              margin: '0 auto 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.08))',
+              border: '1px solid rgba(0,230,138,0.18)',
+              boxShadow: '0 6px 20px rgba(0,230,138,0.14)',
+              fontSize: 30,
+            }}
+          >
+            🥗
           </div>
-          <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
-            padding: '12px 22px', borderRadius: 999, cursor: 'pointer',
-            fontSize: 13, fontWeight: 800, letterSpacing:'-0.2px',
-            background: 'linear-gradient(135deg,#00e68a 0%, #00c8a0 48%, #00b894 100%)', border: '1px solid rgba(0,230,138,0.5)', color: '#0A0A0A',
-            boxShadow: '0 6px 22px rgba(0,230,138,0.28), inset 0 1px 0 rgba(255,255,255,0.22)',
-          }}>✨ Создать план за 2 сек</button>
-          <div style={{marginTop:10, fontSize:10, color:'rgba(255,255,255,0.32)'}}>Pro-движок · per100 · ±3% к цели</div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 5, letterSpacing: '-0.3px' }}>
+            План ещё не создан
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.62)',
+              marginBottom: 16,
+              lineHeight: 1.5,
+              maxWidth: 320,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}
+          >
+            Задайте параметры во вкладке «Настройки» или сгенерируйте рацион в один клик — КБЖУ, время приёмов и закупки
+            соберутся автоматически.
+          </div>
+          <button
+            onClick={() => {
+              setErrorMsg(null);
+              generatePlan(1);
+            }}
+            style={{
+              padding: '12px 22px',
+              borderRadius: 999,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 800,
+              letterSpacing: '-0.2px',
+              background: 'linear-gradient(135deg,#00e68a 0%, #00c8a0 48%, #00b894 100%)',
+              border: '1px solid rgba(0,230,138,0.5)',
+              color: '#0A0A0A',
+              boxShadow: '0 6px 22px rgba(0,230,138,0.28), inset 0 1px 0 rgba(255,255,255,0.22)',
+            }}
+          >
+            ✨ Создать план за 2 сек
+          </button>
+          <div style={{ marginTop: 10, fontSize: 10, color: 'rgba(255,255,255,0.32)' }}>
+            Pro-движок · per100 · ±3% к цели
+          </div>
         </div>
       )}
-      {generated && (<>
-        <MealQuickControls />
-        {generated && (() => {
-          // E5 (встройка): вкус/комфорт — адресные замечания по дню (advisory, не режет КБЖУ).
-          const _cf = comfortSummaryForPlan(dayPlan as any);
-          if (_cf.length === 0) return null;
-          return (
-            <div data-comfort="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.22)', fontSize: 9, color: '#fff', lineHeight: 1.45 }}>
-              <div style={{ fontWeight: 800, marginBottom: 2 }}>🍽 Комфорт дня</div>
-              {_cf.slice(0, 3).map((t, i) => <div key={i}>{t}</div>)}
-            </div>
-          );
-        })()}
-        {generated && dayPlan && Array.isArray(dayPlan.notes) && dayPlan.notes.some((n: string) => (n || '').includes('Перегрузка приёма')) && (
-          <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: '#fbbf24', lineHeight: 1.4, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12 }}>⚠️</span>
-            <span style={{ flex: 1, minWidth: 180 }}>Часть приёмов перегружена (каша/крупа упирается в лимит порции) — число приёмов подбирается автоматически; увеличьте объём дня или смените бюджет/разнообразие.</span>
-          </div>
-        )}
-        {generated && dayPlan && (() => {
-          // Волна-3: «почему день не сошёлся» — чистый разбор notes движка (движок не меняется):
-          // причины (⚠ «Не сошлось»/«Корректор…»/<60%…), компенсации (добор/дотяжка/ужатие) и
-          // точечные проверки (MPS-интервалы, натрий, клетчатка).
-          const ex = explainDayPlan(dayPlan as any, planTargets as any);
-          const comp = scoreDayComposition(dayPlan as any);
-          // Заголовок честный: «не сошёлся» — только про ИТОГ дня (оси вне канона или
-          // дневной вердикт). Перекос в одном приёме не делает несошедшимся весь день.
-          const dayVerdict = ex.devPct != null
-            ? ex.devPct > ex.tolerance
-            : ex.causes.some((c) => c.id === 'not-converged' || c.id === 'corrector-left');
-          const bad = dayVerdict || ex.causes.some((c) => c.id === 'not-converged');
-          const hasContent = ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad || ex.devPct != null;
-          if (!hasContent) return null;
-          const accent = bad ? '#f59e0b' : '#22c55e';
-          // Нота движка уже содержит конкретику («36У из цели 120У», «+270 ккал»). Показываем
-          // её, а общий совет — второй строкой: раньше карточка состояла из одних советов.
-          const cleanNote = (s: string) => String(s || '')
-            .replace(/^[\s⚠✓➕➖🍚⚖️🥦🥕🧂📐🛡🍎🍽💪☀️⏱🟡🧭🥛•]+/u, '')
-            .trim();
-          return (
-            <div data-bitexplain="1" role="status" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: bad ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${bad ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.25)'}` }}>
-              <div data-bitexplain-head style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{bad ? '🧭 Почему день не сошёлся' : '🧭 Разбор дня (сошёлся)'}</div>
-              {ex.devPct != null && (
-                <div data-precision-badge={ex.within === false ? 'false' : 'true'} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 7px', borderRadius: 999, marginBottom: 4, fontSize: 9, fontWeight: 800, color: '#fff', background: bad ? 'rgba(245,158,11,0.14)' : 'rgba(34,197,94,0.14)', border: `1px solid ${bad ? 'rgba(245,158,11,0.35)' : 'rgba(34,197,94,0.3)'}` }}>
-                  🎯 Точность {ex.within === false ? '>' : '≤'}{ex.tolerance}% · факт {ex.devPct}%
-                </div>
-              )}
-              {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
-              {/* Реальные числа дня: факт/цель/разница по каждой оси — то, что человек
-                  сверяет с «ИТОГО ЗА ДЕНЬ». Без этого карточка показывала «0.6%», пока
-                  белок был 141 из 112 г (сравнивалась одна ось — ккал). */}
-              {ex.axes.length > 0 && (
-                <div data-bitexplain-axes="1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 4, margin: '4px 0 6px' }}>
-                  {ex.axes.map((a) => {
-                    // §8.91: белок — пол: перебор не дефект оси (недобор — дефект).
-                    const ok = axisMissPct(a) <= ex.tolerance;
-                    const isFloorOver = a.floor && a.diff > 0;
-                    return (
-                      <div key={a.key} data-axis={a.key} data-axis-ok={ok ? '1' : '0'} data-axis-floor={a.floor ? '1' : '0'} title={`${a.label}: факт ${a.fact}${a.unit} из ${a.goal}${a.unit}${isFloorOver ? ' — белок: пол, перебор не дефект дня' : ''}`} style={{ padding: '4px 5px', borderRadius: 8, background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.12)', border: `1px solid ${ok ? 'rgba(34,197,94,0.22)' : 'rgba(245,158,11,0.32)'}` }}>
-                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', fontWeight: 700, letterSpacing: '0.3px' }}>{a.label}{a.floor ? ' · пол' : ''}</div>
-                        <div style={{ fontSize: 10, color: '#fff', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                          {a.fact}<span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>/{a.goal}</span>
-                        </div>
-                        <div style={{ fontSize: 9, color: ok ? '#86efac' : '#fbbf24', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                          {a.diff >= 0 ? '+' : ''}{a.diff}{a.unit} · {a.diff > 0 ? '+' : ''}{a.diffPct}%
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {ex.causes.map((r, i) => (
-                <div key={'bc' + i} data-bitexplain-cause={r.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 4 }}>
-                  <div><span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span> {r.raw ? cleanNote(r.raw) : r.hint}</div>
-                  {r.raw && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{r.hint}</div>}
-                </div>
-              ))}
-              {ex.fixes.length > 0 && (
-                <details data-bitexplain-fixes="1" style={{ marginTop: 2 }}>
-                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>🔧 Что движок сделал ({ex.fixes.length})</summary>
-                  {ex.fixes.map((r, i) => (
-                    <div key={'bf' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}</div>
-                  ))}
-                </details>
-              )}
-              {ex.checks.length > 0 && (
-                <details data-bitexplain-checks="1" style={{ marginTop: 2 }}>
-                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>☑ Проверить ({ex.checks.length})</summary>
-                  {ex.checks.map((r, i) => (
-                    <div key={'bk' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>• {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}</div>
-                  ))}
-                </details>
-              )}
-              {Array.isArray(ex.journal) && ex.journal.length > 1 && (
-                <details data-bitexplain-journal="1" style={{ marginTop: 2 }}>
-                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>📉 Журнал сведения дня ({ex.journal.length})</summary>
-                  {ex.journal.map((j, i) => (
-                    <div key={'bj' + i} data-bitexplain-pass={j.id} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>
-                      • {j.label}: {j.devBefore}% → {j.devAfter}% {j.devAfter <= j.devBefore ? '↓' : '↑'}
-                    </div>
-                  ))}
-                </details>
-              )}
-              {/* Композиция — справочно, свёрнуто: её «замечания» про повторы гарниров
-                  не объясняют, почему день не сошёлся. */}
-              <details data-composition={comp.grade} style={{ marginTop: 2 }}>
-                <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>
-                  🥗 Композиция: {comp.score}/100 ({comp.grade}){comp.issues.length === 0 ? ' · замечаний нет' : ` · ${comp.issues.length} замеч.`}
-                </summary>
-                <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>
-                  {comp.issues.map((i, k) => <div key={'ci' + k}>• {i.label} — {i.hint}</div>)}
-                  {comp.positives.length > 0 && <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.65)' }}>✓ {comp.positives.join(' · ')}</div>}
-                </div>
-              </details>
-            </div>
-          );
-        })()}
-        {generated && effectiveKcal > 0 && (
-          <div style={{ marginBottom: 8 }}>
-            <NutritionPeriodizationCard
-              prepPlan={bbPrepPlan}
-              base={{
-                kcal: effectiveKcal,
-                proteinG: effectiveP,
-                fatG: effectiveF,
-                carbsG: effectiveC,
-                waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 3000,
-                sodiumMg: waterCalc?.electrolytes?.sodiumMg || 3500,
-              }}
-              goal={goal}
-              carbPeriodization={carbPeriodization}
-              isTrainingDayForOffset={(offset) => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset)}
-              dayModsByOffset={dayModsByOffset}
-              heavyTrainDay={heavyTrainDay}
-              dayLabels={DAY_LABELS}
-              todayIso={localIsoDate(new Date())}
-              maintenanceKcal={(planTargets as any)?.tdee || undefined}
-              specialMeals={readScheduledSpecialMeals()}
-              weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
-              onOpenDay={(date) => {
-                try {
-                  const today = localIsoDate(new Date());
-                  const off = Math.round((new Date(date + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000);
-                  if (off >= 0 && off < planDays) {
-                    setSelectedDayIndex(off);
-                    try { resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
-                  } else {
-                    (window as any).showToast?.('Этот день не сгенерирован — соберите план на нужную дату (1/3/7 дней)', 'info');
-                  }
-                } catch { /* deep-link best-effort */ }
-              }}
-            />
-          </div>
-        )}
-        <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
-          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.14)', color:'rgba(255,255,255,0.68)', fontSize:10, margin:'0 auto 8px', fontWeight:600, textAlign:'center' }}>👆 Нажмите на день — откроется план на 1 день</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5, marginBottom:10 }}>
-            {DAY_LABELS.map((label, idx) => {
-              const isTrain = trainingDays[idx];
-              const isSelected = planDays === 1 && selectedDayIndex === idx;
-              // Эпик E3: клик по дню = ПРОСМОТР существующего дня (из недели — без регенерации,
-              // иначе правки недели уничтожались); генерируем только если дня ещё нет.
-              const openDay = () => {
-                setPlanDays(1); setSelectedDayIndex(idx);
-                const weekDay = weekPlan?.days?.[idx];
-                const threeDay = planDays === 3 ? threeDayPlan?.days?.[idx] : null;
-                if (weekDay) { openWeekDayForEdit(idx); }
-                else if (threeDay) {
-                  try { setDayPlan(JSON.parse(JSON.stringify(threeDay))); } catch { setDayPlan(threeDay); }
-                }
-                else { generatePlan(1, undefined, idx); }
-              };
+      {generated && (
+        <>
+          <MealQuickControls />
+          {generated &&
+            (() => {
+              // E5 (встройка): вкус/комфорт — адресные замечания по дню (advisory, не режет КБЖУ).
+              const _cf = comfortSummaryForPlan(dayPlan as any);
+              if (_cf.length === 0) return null;
               return (
-                <button key={idx} onClick={openDay} style={{
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:4,
-                  padding:'9px 4px 8px', borderRadius:14, cursor:'pointer', minHeight: 56, position:'relative', overflow:'hidden',
-                  background: isSelected ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 52%, #00b894 100%)' : isTrain ? 'linear-gradient(180deg, rgba(34,197,94,0.16), rgba(34,197,94,0.06))' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-                  border: isSelected ? '1px solid rgba(0,230,138,0.55)' : isTrain ? '1px solid rgba(34,197,94,0.22)' : '1px solid rgba(255,255,255,0.07)',
-                  color: isSelected ? '#0A0A0A' : isTrain ? '#86efac' : 'rgba(255,255,255,0.72)',
-                  fontWeight: isSelected ? 800 : isTrain ? 700 : 600,
-                  fontSize:11, transition:'all 0.2s cubic-bezier(0.16,1,0.3,1)',
-                  boxShadow: isSelected ? '0 6px 18px rgba(0,230,138,0.30), inset 0 1px 0 rgba(255,255,255,0.22)' : isTrain ? '0 2px 10px rgba(34,197,94,0.10)' : '0 1px 6px rgba(0,0,0,0.18)',
-                  transform: isSelected ? 'translateY(-1px)' : 'none',
-                }}>
-                  {isTrain && !isSelected && <span style={{position:'absolute', top:5, right:5, width:6, height:6, borderRadius:'50%', background:'#22c55e', boxShadow:'0 0 6px rgba(34,197,94,0.6)'}} />}
-                  {isSelected && <span style={{position:'absolute', top:0, left:0, right:0, height:2, background:'linear-gradient(90deg, #fff 0%, rgba(255,255,255,0) 100%)', opacity:0.45}} />}
-                  <span style={{ fontSize:10, opacity: isSelected ? 0.9 : 0.66, fontWeight:700, letterSpacing:'0.2px' }}>{label}</span>
-                  <span style={{ fontSize:15, lineHeight:1, filter: isSelected ? 'none' : isTrain ? 'none' : 'grayscale(0.25) saturate(0.85)' }}>{isTrain ? '🏋️' : '🛌'}</span>
-                  <span style={{ fontSize:8, fontWeight:700, color: isSelected ? 'rgba(0,0,0,0.55)' : isTrain ? 'rgba(34,197,94,0.9)' : 'rgba(255,255,255,0.36)', letterSpacing:'0.3px' }}>{isTrain ? 'ТРЕНЯ' : 'ОТДЫХ'}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6, padding:4, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <button onClick={() => { setPlanDays(1); generatePlan(1); }} style={{
-              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 1 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
-              border: planDays === 1 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
-              color: planDays === 1 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
-              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
-              boxShadow: planDays === 1 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
-            }}>📅 1 день</button>
-            <button onClick={() => { setPlanDays(3); generatePlan(3, undefined, undefined, { async: true }); }} style={{
-              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 3 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
-              border: planDays === 3 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
-              color: planDays === 3 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
-              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
-              boxShadow: planDays === 3 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
-            }}>{planBusy && planDays === 3 ? '⏳…' : '📅 3 дня'}</button>
-            <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7, undefined, undefined, { async: true }); }} style={{
-              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6 0%, #7c3aed 70%, #6d28d9 100%)' : 'transparent',
-              border: planDays === 7 && !monthPlanMode ? '1px solid rgba(139,92,246,0.42)' : '1px solid transparent',
-              color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.72)',
-              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
-              boxShadow: planDays === 7 && !monthPlanMode ? '0 4px 14px rgba(139,92,246,0.28)' : 'none',
-            }}>{planBusy && planDays === 7 ? '⏳…' : '📆 Неделя'}</button>
-          </div>
-          {planDays === 1 && generated && (
-            <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'11px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:4, marginBottom:6, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
-              🔄 Перегенерировать день
-            </button>
-          )}
-          {/* --- Month block --- */}
-          <div style={{ marginBottom:6 }}>
-            <button onClick={runMonthPlan} style={{
-              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', width:'100%', minHeight: 40,
-              background: monthPlanMode ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : 'rgba(139,92,246,0.08)',
-              border: monthPlanMode ? 'none' : '1px solid rgba(139,92,246,0.25)',
-              color: monthPlanMode ? '#fff' : '#a78bfa',
-              fontWeight:700, fontSize:11,
-            }}>
-              📅 План на месяц (4 недели)
-            </button>
-          </div>
-          {monthPlan.length > 0 && (
-            <button onClick={() => {
-              if (monthPlanMode) { setMonthPlanMode(false); switchPlanDays(7); }
-              else { setMonthPlanMode(true); switchPlanDays(7); setSelectedWeek(0); if (monthPlan[0]) setWeekPlan(monthPlan[0]); }
-            }} style={{
-              marginBottom:6, padding:'10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:600, width:'100%', minHeight: 36,
-              background: monthPlanMode ? 'rgba(139,92,246,0.15)' : '#202023',
-              border: monthPlanMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: monthPlanMode ? '#a78bfa' : 'rgba(255,255,255,0.85)',
-            }}>
-              {monthPlanMode ? '📋 Список недель (выйти из месяца)' : '📅 Месячное отображение'}
-            </button>
-          )}
-          {planDays === 7 && !monthPlanMode && (
-            <button onClick={() => setPlanView(planView === 'list' ? 'calendar' : 'list')} style={{
-              marginTop: 0, marginBottom:6, padding: '6px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%',
-              background: planView === 'calendar' ? 'rgba(139,92,246,0.15)' : '#202023',
-              border: planView === 'calendar' ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
-              color: planView === 'calendar' ? '#a78bfa' : 'rgba(255,255,255,0.85)',
-            }}>📅 {planView === 'calendar' ? 'Список' : 'Календарь'}</button>
-          )}
-          {planDays !== 1 && !monthPlanMode && (
-            <button onClick={() => generatePlan(planDays, undefined, undefined, { async: true })} className="plan-actbtn" style={{ marginTop: 0, marginBottom:6, padding: '10px 8px', minHeight:44, borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.06)', color: '#00e68a', cursor: 'pointer', fontSize: 11, fontWeight: 700, width: '100%' }}>
-              {planBusy ? '⏳ Генерация…' : `🔄 Перегенерировать ${planDays === 3 ? '3 дня' : 'неделю'}`}
-            </button>
-          )}
-          {monthPlanMode && monthPlan.length > 0 && (
-            <button onClick={runMonthPlan} className="plan-actbtn" style={{ marginTop: 0, marginBottom:6, padding: '10px 8px', minHeight:44, borderRadius: 10, border: '1px solid rgba(168,85,247,0.25)', background: 'rgba(168,85,247,0.06)', color: '#a78bfa', cursor: 'pointer', fontSize: 11, fontWeight: 700, width: '100%' }}>
-              🔄 Перегенерировать месяц (4 недели)
-            </button>
-          )}
-          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-            <button onClick={() => {
-              const txt = dayPlan ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
-              void shareOrCopyText('План питания', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать план.'); });
-            }} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>📤 Копировать</button>
-            <button onClick={() => setImportModalOpen(true)} className="plan-actbtn" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:11, fontWeight:700 }}>📥 Импорт</button>
-            {/* FIX B23: машинный формат для «Импорта» — отдельной кнопкой, чтобы
-                человекочитаемое «Копировать» не ломало восстановление плана. */}
-            <button onClick={() => {
-              const json = buildPlanExportJson(dayPlan);
-              if (!json) { setErrorMsg('Нет плана для экспорта.'); return; }
-              void shareOrCopyText('План питания (JSON)', json).then(ok => {
-                if (!ok) setErrorMsg('Не удалось скопировать JSON плана.');
-                else if (typeof (window as any).showToast === 'function') (window as any).showToast('⧉ JSON плана скопирован — вставьте его в «Импорт»', 'success');
-              });
-            }} className="plan-actbtn" title="Скопировать план в машинном формате (для «Импорта» на другом устройстве)" aria-label="Скопировать план как JSON" style={{ flex:1, padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(168,85,247,0.2)', background:'rgba(168,85,247,0.06)', color:'#a78bfa', fontSize:11, fontWeight:700 }}>⧉ JSON</button>
-          </div>
-        </GlassCard>
-      </>)}
-      {/* Health-score — улучшена читаемость */}
-      {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).healthScore && (() => {
-        const hs = (dayPlan as any).healthScore;
-        const col = hs.status === 'green' ? '#22c55e' : hs.status === 'yellow' ? '#f59e0b' : '#ef4444';
-        const bg = hs.status === 'green' ? 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.04))' : hs.status === 'yellow' ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))';
-        const bor = hs.status === 'green' ? '1px solid rgba(34,197,94,0.22)' : hs.status === 'yellow' ? '1px solid rgba(245,158,11,0.22)' : '1px solid rgba(239,68,68,0.22)';
-        const bars = [['Микро', hs.micro], ['Клетч', hs.fiber], ['MPS', hs.mps], ['EA', hs.ea], ['Диверс', hs.diversity]] as [string,number][];
-        // Эпик 9в: тренд качества 7/30 дней (движок day-score-trend)
-        let trend: { avg7: number; avg30: number; delta: number; direction: string; has30: boolean } | null = null;
-        try { trend = computeDayScoreTrend(loadDayScores()); } catch {}
-        return (
-          <div style={{ padding:'12px 14px', borderRadius:16, background:bg, border:bor, marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 16px rgba(0,0,0,0.12)' }}>
-            <div style={{ textAlign:'center', minWidth:56, padding:'6px 0', borderRadius:12, background:`${col}14`, border:`1px solid ${col}22` }}>
-              <div style={{ fontSize:22, fontWeight:900, color:col, lineHeight:1, letterSpacing:'-0.6px' }}>{hs.score}</div>
-              <div style={{ fontSize:9, color:col, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:1 }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
-            </div>
-            <div style={{ flex:1, display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6 }}>
-              {bars.map(([lab,val]) => (
-                <div key={lab} style={{ textAlign:'center', padding:'4px 2px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:600, letterSpacing:'0.2px' }}>{lab}</div>
-                  <div style={{ fontSize:12, fontWeight:800, color: val >= 75 ? '#4ade80' : val >= 50 ? '#fbbf24' : '#f87171', marginTop:1 }}>{val}</div>
-                  <div style={{ height:4, borderRadius:999, background:'rgba(255,255,255,0.07)', marginTop:3, overflow:'hidden' }}><div style={{ height:'100%', width:`${Math.min(100,val)}%`, borderRadius:999, background: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444', boxShadow: `0 0 6px ${val >= 75 ? 'rgba(34,197,94,0.4)' : val >= 50 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)'}` }} /></div>
+                <div
+                  data-comfort="1"
+                  role="status"
+                  style={{
+                    marginBottom: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(167,139,250,0.06)',
+                    border: '1px solid rgba(167,139,250,0.22)',
+                    fontSize: 9,
+                    color: '#fff',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: 2 }}>🍽 Комфорт дня</div>
+                  {_cf.slice(0, 3).map((t, i) => (
+                    <div key={i}>{t}</div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            {trend && trend.has30 && (
-              <div style={{ textAlign:'center', minWidth:64, padding:'6px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }} title={`Средний скор за 7 дней: ${trend.avg7}/10 · за 30 дней: ${trend.avg30}/10`}>
-                <div style={{ fontSize:13, fontWeight:900, color: trend.direction === 'up' ? '#4ade80' : trend.direction === 'down' ? '#f87171' : 'rgba(255,255,255,0.6)', lineHeight:1 }}>{trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '►'} {trend.delta > 0 ? '+' : ''}{trend.delta.toFixed(1)}</div>
-                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:600, marginTop:2 }}>7д / {trend.avg30.toFixed(1)} за 30д</div>
-                <button onClick={() => { try { clearDayScores(); (window as any).showToast?.('🗑 История качества дня сброшена', 'info'); } catch {} }} title="Сбросить историю качества дня" style={{ marginTop:2, fontSize:7, padding:'1px 6px', borderRadius:999, cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)' }}>🗑</button>
+              );
+            })()}
+          {generated &&
+            dayPlan &&
+            Array.isArray(dayPlan.notes) &&
+            dayPlan.notes.some((n: string) => (n || '').includes('Перегрузка приёма')) && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: 8,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 9,
+                  color: '#fbbf24',
+                  lineHeight: 1.4,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ fontSize: 12 }}>⚠️</span>
+                <span style={{ flex: 1, minWidth: 180 }}>
+                  Часть приёмов перегружена (каша/крупа упирается в лимит порции) — число приёмов подбирается
+                  автоматически; увеличьте объём дня или смените бюджет/разнообразие.
+                </span>
               </div>
             )}
-            {trend && !trend.has30 && (() => { const n = loadDayScores().length; return n > 0 ? (
-              <div style={{ textAlign:'center', minWidth:64, padding:'6px 8px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }} title="Тренд появится после 7 записей дневных скоров">
-                <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.5)' }}>📈</div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', fontWeight:600, marginTop:1 }}>тренд: {n} из 7 дн</div>
+          {generated &&
+            dayPlan &&
+            (() => {
+              // Волна-3: «почему день не сошёлся» — чистый разбор notes движка (движок не меняется):
+              // причины (⚠ «Не сошлось»/«Корректор…»/<60%…), компенсации (добор/дотяжка/ужатие) и
+              // точечные проверки (MPS-интервалы, натрий, клетчатка).
+              const ex = explainDayPlan(dayPlan as any, planTargets as any, {
+                // §8.135: канон пути дня (ручной — 2 %) — иначе карточка объявляла бы «вне канона»
+                // по общим 3 % при красном флаге дня и наоборот.
+                tolerance: Number((dayPlan as any)?.canonPct) || undefined,
+              });
+              const comp = scoreDayComposition(dayPlan as any);
+              // Заголовок честный: «не сошёлся» — только про ИТОГ дня (оси вне канона или
+              // дневной вердикт). Перекос в одном приёме не делает несошедшимся весь день.
+              const dayVerdict =
+                ex.devPct != null
+                  ? ex.devPct > ex.tolerance
+                  : ex.causes.some((c) => c.id === 'not-converged' || c.id === 'corrector-left');
+              const bad = dayVerdict || ex.causes.some((c) => c.id === 'not-converged');
+              const hasContent =
+                ex.causes.length > 0 || ex.fixes.length > 0 || ex.checks.length > 0 || bad || ex.devPct != null;
+              if (!hasContent) return null;
+              const accent = bad ? '#f59e0b' : '#22c55e';
+              // Нота движка уже содержит конкретику («36У из цели 120У», «+270 ккал»). Показываем
+              // её, а общий совет — второй строкой: раньше карточка состояла из одних советов.
+              const cleanNote = (s: string) =>
+                String(s || '')
+                  .replace(/^[\s⚠✓➕➖🍚⚖️🥦🥕🧂📐🛡🍎🍽💪☀️⏱🟡🧭🥛•]+/u, '')
+                  .trim();
+              return (
+                <div
+                  data-bitexplain="1"
+                  role="status"
+                  style={{
+                    marginBottom: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: bad ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)',
+                    border: `1px solid ${bad ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.25)'}`,
+                  }}
+                >
+                  <div data-bitexplain-head style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 3 }}>
+                    {bad ? '🧭 Почему день не сошёлся' : '🧭 Разбор дня (сошёлся)'}
+                  </div>
+                  {ex.devPct != null && (
+                    <div
+                      data-precision-badge={ex.within === false ? 'false' : 'true'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '2px 7px',
+                        borderRadius: 999,
+                        marginBottom: 4,
+                        fontSize: 9,
+                        fontWeight: 800,
+                        color: '#fff',
+                        background: bad ? 'rgba(245,158,11,0.14)' : 'rgba(34,197,94,0.14)',
+                        border: `1px solid ${bad ? 'rgba(245,158,11,0.35)' : 'rgba(34,197,94,0.3)'}`,
+                      }}
+                    >
+                      🎯 Точность {ex.within === false ? '>' : '≤'}
+                      {ex.tolerance}% · факт {ex.devPct}%
+                    </div>
+                  )}
+                  {ex.headline && <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>{ex.headline}</div>}
+                  {/* Реальные числа дня: факт/цель/разница по каждой оси — то, что человек
+                  сверяет с «ИТОГО ЗА ДЕНЬ». Без этого карточка показывала «0.6%», пока
+                  белок был 141 из 112 г (сравнивалась одна ось — ккал). */}
+                  {ex.axes.length > 0 && (
+                    <div
+                      data-bitexplain-axes="1"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                        gap: 4,
+                        margin: '4px 0 6px',
+                      }}
+                    >
+                      {ex.axes.map((a) => {
+                        // §8.91: белок — пол: перебор не дефект оси (недобор — дефект).
+                        const ok = axisMissPct(a) <= ex.tolerance;
+                        const isFloorOver = a.floor && a.diff > 0;
+                        return (
+                          <div
+                            key={a.key}
+                            data-axis={a.key}
+                            data-axis-ok={ok ? '1' : '0'}
+                            data-axis-floor={a.floor ? '1' : '0'}
+                            title={`${a.label}: факт ${a.fact}${a.unit} из ${a.goal}${a.unit}${isFloorOver ? ' — белок: пол, перебор не дефект дня' : ''}`}
+                            style={{
+                              padding: '4px 5px',
+                              borderRadius: 8,
+                              background: ok ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.12)',
+                              border: `1px solid ${ok ? 'rgba(34,197,94,0.22)' : 'rgba(245,158,11,0.32)'}`,
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 8,
+                                color: 'rgba(255,255,255,0.55)',
+                                fontWeight: 700,
+                                letterSpacing: '0.3px',
+                              }}
+                            >
+                              {a.label}
+                              {a.floor ? ' · пол' : ''}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#fff', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                              {a.fact}
+                              <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>/{a.goal}</span>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color: ok ? '#86efac' : '#fbbf24',
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {a.diff >= 0 ? '+' : ''}
+                              {a.diff}
+                              {a.unit} · {a.diff > 0 ? '+' : ''}
+                              {a.diffPct}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {ex.causes.map((r, i) => (
+                    <div
+                      key={'bc' + i}
+                      data-bitexplain-cause={r.id}
+                      style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginBottom: 4 }}
+                    >
+                      <div>
+                        <span style={{ color: accent, fontWeight: 700 }}>⚠ {r.title}.</span>{' '}
+                        {r.raw ? cleanNote(r.raw) : r.hint}
+                      </div>
+                      {r.raw && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{r.hint}</div>}
+                    </div>
+                  ))}
+                  {ex.fixes.length > 0 && (
+                    <details data-bitexplain-fixes="1" style={{ marginTop: 2 }}>
+                      <summary
+                        style={{
+                          fontSize: 9,
+                          color: '#fff',
+                          cursor: 'pointer',
+                          minHeight: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        🔧 Что движок сделал ({ex.fixes.length})
+                      </summary>
+                      {ex.fixes.map((r, i) => (
+                        <div key={'bf' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>
+                          • {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                  {ex.checks.length > 0 && (
+                    <details data-bitexplain-checks="1" style={{ marginTop: 2 }}>
+                      <summary
+                        style={{
+                          fontSize: 9,
+                          color: '#fff',
+                          cursor: 'pointer',
+                          minHeight: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        ☑ Проверить ({ex.checks.length})
+                      </summary>
+                      {ex.checks.map((r, i) => (
+                        <div key={'bk' + i} style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}>
+                          • {r.raw ? cleanNote(r.raw) : r.title + ': ' + r.hint}
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                  {Array.isArray(ex.journal) && ex.journal.length > 1 && (
+                    <details data-bitexplain-journal="1" style={{ marginTop: 2 }}>
+                      <summary
+                        style={{
+                          fontSize: 9,
+                          color: '#fff',
+                          cursor: 'pointer',
+                          minHeight: 28,
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                      >
+                        📉 Журнал сведения дня ({ex.journal.length})
+                      </summary>
+                      {ex.journal.map((j, i) => (
+                        <div
+                          key={'bj' + i}
+                          data-bitexplain-pass={j.id}
+                          style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, marginTop: 2 }}
+                        >
+                          • {j.label}: {j.devBefore}% → {j.devAfter}% {j.devAfter <= j.devBefore ? '↓' : '↑'}
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                  {/* Композиция — справочно, свёрнуто: её «замечания» про повторы гарниров
+                  не объясняют, почему день не сошёлся. */}
+                  <details data-composition={comp.grade} style={{ marginTop: 2 }}>
+                    <summary
+                      style={{
+                        fontSize: 9,
+                        color: '#fff',
+                        cursor: 'pointer',
+                        minHeight: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      🥗 Композиция: {comp.score}/100 ({comp.grade})
+                      {comp.issues.length === 0 ? ' · замечаний нет' : ` · ${comp.issues.length} замеч.`}
+                    </summary>
+                    <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>
+                      {comp.issues.map((i, k) => (
+                        <div key={'ci' + k}>
+                          • {i.label} — {i.hint}
+                        </div>
+                      ))}
+                      {comp.positives.length > 0 && (
+                        <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.65)' }}>
+                          ✓ {comp.positives.join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              );
+            })()}
+          {generated && effectiveKcal > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <NutritionPeriodizationCard
+                prepPlan={bbPrepPlan}
+                base={{
+                  kcal: effectiveKcal,
+                  proteinG: effectiveP,
+                  fatG: effectiveF,
+                  carbsG: effectiveC,
+                  waterMl: waterCalc?.total ? Math.round(waterCalc.total * 1000) : 3000,
+                  sodiumMg: waterCalc?.electrolytes?.sodiumMg || 3500,
+                }}
+                goal={goal}
+                carbPeriodization={carbPeriodization}
+                isTrainingDayForOffset={(offset) =>
+                  isTrainingDayFor(
+                    buildTrainSchedule(
+                      linkToTraining,
+                      trainStart,
+                      trainEnd,
+                      trainingDays,
+                      trainScheduleType,
+                      trainPattern,
+                    ),
+                    offset,
+                  )
+                }
+                dayModsByOffset={dayModsByOffset}
+                heavyTrainDay={heavyTrainDay}
+                dayLabels={DAY_LABELS}
+                todayIso={localIsoDate(new Date())}
+                maintenanceKcal={(planTargets as any)?.tdee || undefined}
+                specialMeals={readScheduledSpecialMeals()}
+                weightLog={(() => {
+                  try {
+                    return getWeightLog().map((e) => ({ date: e.date, weightKg: e.weight }));
+                  } catch {
+                    return [];
+                  }
+                })()}
+                onOpenDay={(date) => {
+                  try {
+                    const today = localIsoDate(new Date());
+                    const off = Math.round(
+                      (new Date(date + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000,
+                    );
+                    if (off >= 0 && off < planDays) {
+                      setSelectedDayIndex(off);
+                      try {
+                        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      } catch {}
+                    } else {
+                      (window as any).showToast?.(
+                        'Этот день не сгенерирован — соберите план на нужную дату (1/3/7 дней)',
+                        'info',
+                      );
+                    }
+                  } catch {
+                    /* deep-link best-effort */
+                  }
+                }}
+              />
+            </div>
+          )}
+          <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 8px',
+                borderRadius: 999,
+                background: 'rgba(0,230,138,0.08)',
+                border: '1px solid rgba(0,230,138,0.14)',
+                color: 'rgba(255,255,255,0.68)',
+                fontSize: 10,
+                margin: '0 auto 8px',
+                fontWeight: 600,
+                textAlign: 'center',
+              }}
+            >
+              👆 Нажмите на день — откроется план на 1 день
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 5, marginBottom: 10 }}>
+              {DAY_LABELS.map((label, idx) => {
+                const isTrain = trainingDays[idx];
+                const isSelected = planDays === 1 && selectedDayIndex === idx;
+                // Эпик E3: клик по дню = ПРОСМОТР существующего дня (из недели — без регенерации,
+                // иначе правки недели уничтожались); генерируем только если дня ещё нет.
+                const openDay = () => {
+                  setPlanDays(1);
+                  setSelectedDayIndex(idx);
+                  const weekDay = weekPlan?.days?.[idx];
+                  const threeDay = planDays === 3 ? threeDayPlan?.days?.[idx] : null;
+                  if (weekDay) {
+                    openWeekDayForEdit(idx);
+                  } else if (threeDay) {
+                    try {
+                      setDayPlan(JSON.parse(JSON.stringify(threeDay)));
+                    } catch {
+                      setDayPlan(threeDay);
+                    }
+                  } else {
+                    generatePlan(1, undefined, idx);
+                  }
+                };
+                return (
+                  <button
+                    key={idx}
+                    onClick={openDay}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '9px 4px 8px',
+                      borderRadius: 14,
+                      cursor: 'pointer',
+                      minHeight: 56,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      background: isSelected
+                        ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 52%, #00b894 100%)'
+                        : isTrain
+                          ? 'linear-gradient(180deg, rgba(34,197,94,0.16), rgba(34,197,94,0.06))'
+                          : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                      border: isSelected
+                        ? '1px solid rgba(0,230,138,0.55)'
+                        : isTrain
+                          ? '1px solid rgba(34,197,94,0.22)'
+                          : '1px solid rgba(255,255,255,0.07)',
+                      color: isSelected ? '#0A0A0A' : isTrain ? '#86efac' : 'rgba(255,255,255,0.72)',
+                      fontWeight: isSelected ? 800 : isTrain ? 700 : 600,
+                      fontSize: 11,
+                      transition: 'all 0.2s cubic-bezier(0.16,1,0.3,1)',
+                      boxShadow: isSelected
+                        ? '0 6px 18px rgba(0,230,138,0.30), inset 0 1px 0 rgba(255,255,255,0.22)'
+                        : isTrain
+                          ? '0 2px 10px rgba(34,197,94,0.10)'
+                          : '0 1px 6px rgba(0,0,0,0.18)',
+                      transform: isSelected ? 'translateY(-1px)' : 'none',
+                    }}
+                  >
+                    {isTrain && !isSelected && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 5,
+                          right: 5,
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: '#22c55e',
+                          boxShadow: '0 0 6px rgba(34,197,94,0.6)',
+                        }}
+                      />
+                    )}
+                    {isSelected && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 2,
+                          background: 'linear-gradient(90deg, #fff 0%, rgba(255,255,255,0) 100%)',
+                          opacity: 0.45,
+                        }}
+                      />
+                    )}
+                    <span
+                      style={{
+                        fontSize: 10,
+                        opacity: isSelected ? 0.9 : 0.66,
+                        fontWeight: 700,
+                        letterSpacing: '0.2px',
+                      }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 15,
+                        lineHeight: 1,
+                        filter: isSelected ? 'none' : isTrain ? 'none' : 'grayscale(0.25) saturate(0.85)',
+                      }}
+                    >
+                      {isTrain ? '🏋️' : '🛌'}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 8,
+                        fontWeight: 700,
+                        color: isSelected
+                          ? 'rgba(0,0,0,0.55)'
+                          : isTrain
+                            ? 'rgba(34,197,94,0.9)'
+                            : 'rgba(255,255,255,0.36)',
+                        letterSpacing: '0.3px',
+                      }}
+                    >
+                      {isTrain ? 'ТРЕНЯ' : 'ОТДЫХ'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr 1fr',
+                gap: 6,
+                marginBottom: 6,
+                padding: 4,
+                borderRadius: 14,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setPlanDays(1);
+                  generatePlan(1);
+                }}
+                style={{
+                  padding: '10px 6px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minHeight: 40,
+                  background:
+                    planDays === 1 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
+                  border: planDays === 1 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
+                  color: planDays === 1 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '-0.2px',
+                  boxShadow: planDays === 1 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
+                }}
+              >
+                📅 1 день
+              </button>
+              <button
+                onClick={() => {
+                  setPlanDays(3);
+                  generatePlan(3, undefined, undefined, { async: true });
+                }}
+                style={{
+                  padding: '10px 6px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minHeight: 40,
+                  background:
+                    planDays === 3 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
+                  border: planDays === 3 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
+                  color: planDays === 3 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '-0.2px',
+                  boxShadow: planDays === 3 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
+                }}
+              >
+                {planBusy && planDays === 3 ? '⏳…' : '📅 3 дня'}
+              </button>
+              <button
+                onClick={() => {
+                  setPlanDays(7);
+                  setPlanView('calendar');
+                  generatePlan(7, undefined, undefined, { async: true });
+                }}
+                style={{
+                  padding: '10px 6px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  minHeight: 40,
+                  background:
+                    planDays === 7 && !monthPlanMode
+                      ? 'linear-gradient(135deg,#8b5cf6 0%, #7c3aed 70%, #6d28d9 100%)'
+                      : 'transparent',
+                  border:
+                    planDays === 7 && !monthPlanMode ? '1px solid rgba(139,92,246,0.42)' : '1px solid transparent',
+                  color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.72)',
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '-0.2px',
+                  boxShadow: planDays === 7 && !monthPlanMode ? '0 4px 14px rgba(139,92,246,0.28)' : 'none',
+                }}
+              >
+                {planBusy && planDays === 7 ? '⏳…' : '📆 Неделя'}
+              </button>
+            </div>
+            {planDays === 1 && generated && (
+              <button
+                onClick={() => generatePlan(1, undefined, selectedDayIndex)}
+                style={{
+                  width: '100%',
+                  padding: '11px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  marginTop: 4,
+                  marginBottom: 6,
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                  color: '#000',
+                  boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
+                }}
+              >
+                🔄 Перегенерировать день
+              </button>
+            )}
+            {/* --- Month block --- */}
+            <div style={{ marginBottom: 6 }}>
+              <button
+                onClick={runMonthPlan}
+                style={{
+                  padding: '11px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  width: '100%',
+                  minHeight: 40,
+                  background: monthPlanMode ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : 'rgba(139,92,246,0.08)',
+                  border: monthPlanMode ? 'none' : '1px solid rgba(139,92,246,0.25)',
+                  color: monthPlanMode ? '#fff' : '#a78bfa',
+                  fontWeight: 700,
+                  fontSize: 11,
+                }}
+              >
+                📅 План на месяц (4 недели)
+              </button>
+            </div>
+            {monthPlan.length > 0 && (
+              <button
+                onClick={() => {
+                  if (monthPlanMode) {
+                    setMonthPlanMode(false);
+                    switchPlanDays(7);
+                  } else {
+                    setMonthPlanMode(true);
+                    switchPlanDays(7);
+                    setSelectedWeek(0);
+                    if (monthPlan[0]) setWeekPlan(monthPlan[0]);
+                  }
+                }}
+                style={{
+                  marginBottom: 6,
+                  padding: '10px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  width: '100%',
+                  minHeight: 36,
+                  background: monthPlanMode ? 'rgba(139,92,246,0.15)' : '#202023',
+                  border: monthPlanMode ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                  color: monthPlanMode ? '#a78bfa' : 'rgba(255,255,255,0.85)',
+                }}
+              >
+                {monthPlanMode ? '📋 Список недель (выйти из месяца)' : '📅 Месячное отображение'}
+              </button>
+            )}
+            {planDays === 7 && !monthPlanMode && (
+              <button
+                onClick={() => setPlanView(planView === 'list' ? 'calendar' : 'list')}
+                style={{
+                  marginTop: 0,
+                  marginBottom: 6,
+                  padding: '6px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 8,
+                  fontWeight: 600,
+                  width: '100%',
+                  background: planView === 'calendar' ? 'rgba(139,92,246,0.15)' : '#202023',
+                  border:
+                    planView === 'calendar' ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                  color: planView === 'calendar' ? '#a78bfa' : 'rgba(255,255,255,0.85)',
+                }}
+              >
+                📅 {planView === 'calendar' ? 'Список' : 'Календарь'}
+              </button>
+            )}
+            {planDays !== 1 && !monthPlanMode && (
+              <button
+                onClick={() => generatePlan(planDays, undefined, undefined, { async: true })}
+                className="plan-actbtn"
+                style={{
+                  marginTop: 0,
+                  marginBottom: 6,
+                  padding: '10px 8px',
+                  minHeight: 44,
+                  borderRadius: 10,
+                  border: '1px solid rgba(0,230,138,0.25)',
+                  background: 'rgba(0,230,138,0.06)',
+                  color: '#00e68a',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  width: '100%',
+                }}
+              >
+                {planBusy ? '⏳ Генерация…' : `🔄 Перегенерировать ${planDays === 3 ? '3 дня' : 'неделю'}`}
+              </button>
+            )}
+            {monthPlanMode && monthPlan.length > 0 && (
+              <button
+                onClick={runMonthPlan}
+                className="plan-actbtn"
+                style={{
+                  marginTop: 0,
+                  marginBottom: 6,
+                  padding: '10px 8px',
+                  minHeight: 44,
+                  borderRadius: 10,
+                  border: '1px solid rgba(168,85,247,0.25)',
+                  background: 'rgba(168,85,247,0.06)',
+                  color: '#a78bfa',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  width: '100%',
+                }}
+              >
+                🔄 Перегенерировать месяц (4 недели)
+              </button>
+            )}
+            <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+              <button
+                onClick={() => {
+                  const txt = dayPlan
+                    ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber || 0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}`
+                    : '';
+                  void shareOrCopyText('План питания', txt).then((ok) => {
+                    if (!ok) setErrorMsg('Не удалось скопировать план.');
+                  });
+                }}
+                className="plan-actbtn"
+                style={{
+                  flex: 1,
+                  padding: '10px 8px',
+                  minHeight: 44,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  border: '1px solid rgba(96,165,250,0.2)',
+                  background: 'rgba(96,165,250,0.06)',
+                  color: '#60a5fa',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                📤 Копировать
+              </button>
+              <button
+                onClick={() => setImportModalOpen(true)}
+                className="plan-actbtn"
+                style={{
+                  flex: 1,
+                  padding: '10px 8px',
+                  minHeight: 44,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  border: '1px solid rgba(249,115,22,0.2)',
+                  background: 'rgba(249,115,22,0.06)',
+                  color: '#f97316',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                📥 Импорт
+              </button>
+              {/* FIX B23: машинный формат для «Импорта» — отдельной кнопкой, чтобы
+                человекочитаемое «Копировать» не ломало восстановление плана. */}
+              <button
+                onClick={() => {
+                  const json = buildPlanExportJson(dayPlan);
+                  if (!json) {
+                    setErrorMsg('Нет плана для экспорта.');
+                    return;
+                  }
+                  void shareOrCopyText('План питания (JSON)', json).then((ok) => {
+                    if (!ok) setErrorMsg('Не удалось скопировать JSON плана.');
+                    else if (typeof (window as any).showToast === 'function')
+                      (window as any).showToast('⧉ JSON плана скопирован — вставьте его в «Импорт»', 'success');
+                  });
+                }}
+                className="plan-actbtn"
+                title="Скопировать план в машинном формате (для «Импорта» на другом устройстве)"
+                aria-label="Скопировать план как JSON"
+                style={{
+                  flex: 1,
+                  padding: '10px 8px',
+                  minHeight: 44,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  border: '1px solid rgba(168,85,247,0.2)',
+                  background: 'rgba(168,85,247,0.06)',
+                  color: '#a78bfa',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                ⧉ JSON
+              </button>
+            </div>
+          </GlassCard>
+        </>
+      )}
+      {/* Health-score — улучшена читаемость */}
+      {plannerMode === 'pro' &&
+        generated &&
+        dayPlan &&
+        (dayPlan as any).healthScore &&
+        (() => {
+          const hs = (dayPlan as any).healthScore;
+          const col = hs.status === 'green' ? '#22c55e' : hs.status === 'yellow' ? '#f59e0b' : '#ef4444';
+          const bg =
+            hs.status === 'green'
+              ? 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.04))'
+              : hs.status === 'yellow'
+                ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04))'
+                : 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))';
+          const bor =
+            hs.status === 'green'
+              ? '1px solid rgba(34,197,94,0.22)'
+              : hs.status === 'yellow'
+                ? '1px solid rgba(245,158,11,0.22)'
+                : '1px solid rgba(239,68,68,0.22)';
+          const bars = [
+            ['Микро', hs.micro],
+            ['Клетч', hs.fiber],
+            ['MPS', hs.mps],
+            ['EA', hs.ea],
+            ['Диверс', hs.diversity],
+          ] as [string, number][];
+          // Эпик 9в: тренд качества 7/30 дней (движок day-score-trend)
+          let trend: { avg7: number; avg30: number; delta: number; direction: string; has30: boolean } | null = null;
+          try {
+            trend = computeDayScoreTrend(loadDayScores());
+          } catch {}
+          return (
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 16,
+                background: bg,
+                border: bor,
+                marginBottom: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              }}
+            >
+              <div
+                style={{
+                  textAlign: 'center',
+                  minWidth: 56,
+                  padding: '6px 0',
+                  borderRadius: 12,
+                  background: `${col}14`,
+                  border: `1px solid ${col}22`,
+                }}
+              >
+                <div style={{ fontSize: 22, fontWeight: 900, color: col, lineHeight: 1, letterSpacing: '-0.6px' }}>
+                  {hs.score}
+                </div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: col,
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginTop: 1,
+                  }}
+                >
+                  {hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}
+                </div>
               </div>
-            ) : null; })()}
-            {hs.conflicts > 0 && <span style={{ fontSize:11, color:'#f87171', fontWeight:800, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⚠ {hs.conflicts}</span>}
-          </div>
-        );
-      })()}
+              <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 6 }}>
+                {bars.map(([lab, val]) => (
+                  <div
+                    key={lab}
+                    style={{
+                      textAlign: 'center',
+                      padding: '4px 2px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.04)',
+                    }}
+                  >
+                    <div
+                      style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', fontWeight: 600, letterSpacing: '0.2px' }}
+                    >
+                      {lab}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: val >= 75 ? '#4ade80' : val >= 50 ? '#fbbf24' : '#f87171',
+                        marginTop: 1,
+                      }}
+                    >
+                      {val}
+                    </div>
+                    <div
+                      style={{
+                        height: 4,
+                        borderRadius: 999,
+                        background: 'rgba(255,255,255,0.07)',
+                        marginTop: 3,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${Math.min(100, val)}%`,
+                          borderRadius: 999,
+                          background: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444',
+                          boxShadow: `0 0 6px ${val >= 75 ? 'rgba(34,197,94,0.4)' : val >= 50 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {trend && trend.has30 && (
+                <div
+                  style={{
+                    textAlign: 'center',
+                    minWidth: 64,
+                    padding: '6px 8px',
+                    borderRadius: 12,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                  }}
+                  title={`Средний скор за 7 дней: ${trend.avg7}/10 · за 30 дней: ${trend.avg30}/10`}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color:
+                        trend.direction === 'up'
+                          ? '#4ade80'
+                          : trend.direction === 'down'
+                            ? '#f87171'
+                            : 'rgba(255,255,255,0.6)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '►'}{' '}
+                    {trend.delta > 0 ? '+' : ''}
+                    {trend.delta.toFixed(1)}
+                  </div>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginTop: 2 }}>
+                    7д / {trend.avg30.toFixed(1)} за 30д
+                  </div>
+                  <button
+                    onClick={() => {
+                      try {
+                        clearDayScores();
+                        (window as any).showToast?.('🗑 История качества дня сброшена', 'info');
+                      } catch {}
+                    }}
+                    title="Сбросить историю качества дня"
+                    style={{
+                      marginTop: 2,
+                      fontSize: 7,
+                      padding: '1px 6px',
+                      borderRadius: 999,
+                      cursor: 'pointer',
+                      background: 'rgba(239,68,68,0.12)',
+                      color: '#f87171',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                    }}
+                  >
+                    🗑
+                  </button>
+                </div>
+              )}
+              {trend &&
+                !trend.has30 &&
+                (() => {
+                  const n = loadDayScores().length;
+                  return n > 0 ? (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        minWidth: 64,
+                        padding: '6px 8px',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                      }}
+                      title="Тренд появится после 7 записей дневных скоров"
+                    >
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>📈</div>
+                      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginTop: 1 }}>
+                        тренд: {n} из 7 дн
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              {hs.conflicts > 0 && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: '#f87171',
+                    fontWeight: 800,
+                    background: 'rgba(239,68,68,0.10)',
+                    border: '1px solid rgba(239,68,68,0.18)',
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  ⚠ {hs.conflicts}
+                </span>
+              )}
+            </div>
+          );
+        })()}
       {/* Pro Engine MPS-сводка */}
       {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).mpsSummary && (
-        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.2)', marginBottom:8 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:4 }}>🧬 Muscle Protein Synthesis</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{(dayPlan as any).mpsSummary.feedings}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>MPS feedings</div>
+        <div
+          style={{
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: 'rgba(0,230,138,0.06)',
+            border: '1px solid rgba(0,230,138,0.2)',
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 4 }}>
+            🧬 Muscle Protein Synthesis
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>
+                {(dayPlan as any).mpsSummary.feedings}
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>MPS feedings</div>
             </div>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#3b82f6' }}>{(dayPlan as any).mpsSummary.avg_protein_per_meal_g}г</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Белок/приём</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#3b82f6' }}>
+                {(dayPlan as any).mpsSummary.avg_protein_per_meal_g}г
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Белок/приём</div>
             </div>
-            <div style={{ textAlign:'center' }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{(dayPlan as any).mpsSummary.avg_leucine_g}г</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>Лейцин/приём</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>
+                {(dayPlan as any).mpsSummary.avg_leucine_g}г
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Лейцин/приём</div>
             </div>
           </div>
-          <div style={{ display:'flex', gap:4, marginTop:6, flexWrap:'wrap' }}>
-            {(dayPlan as any).mpsSummary.prePostWindow && <span style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(34,197,94,0.1)', color:'#22c55e', border:'1px solid rgba(34,197,94,0.2)' }}>✅ Pre/Post-W</span>}
-            {(dayPlan as any).mpsSummary.intra_workout && <span style={{ fontSize:10, padding:'2px 6px', borderRadius:4, background:'rgba(168,85,247,0.1)', color:'#a855f7', border:'1px solid rgba(168,85,247,0.2)' }}>✅ Intra-W</span>}
+          <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+            {(dayPlan as any).mpsSummary.prePostWindow && (
+              <span
+                style={{
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(34,197,94,0.1)',
+                  color: '#22c55e',
+                  border: '1px solid rgba(34,197,94,0.2)',
+                }}
+              >
+                ✅ Pre/Post-W
+              </span>
+            )}
+            {(dayPlan as any).mpsSummary.intra_workout && (
+              <span
+                style={{
+                  fontSize: 10,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  background: 'rgba(168,85,247,0.1)',
+                  color: '#a855f7',
+                  border: '1px solid rgba(168,85,247,0.2)',
+                }}
+              >
+                ✅ Intra-W
+              </span>
+            )}
           </div>
           {(dayPlan as any).proNotes && (dayPlan as any).proNotes.length > 0 && (
-            <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.5 }}>
-              {(dayPlan as any).proNotes.map((n: string, i: number) => <div key={i} style={{ marginBottom:1 }}>• {n}</div>)}
+            <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+              {(dayPlan as any).proNotes.map((n: string, i: number) => (
+                <div key={i} style={{ marginBottom: 1 }}>
+                  • {n}
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
       {/* Адаптация по дневнику: баннер компенсации вчерашнего отклонения */}
       {/* #1 Микронутриентный coverage — структура по 16 нутриентам */}
-      {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).microSummary && (dayPlan as any).microSummary.coverage && (() => {
-        const cov = (dayPlan as any).microSummary.coverage as any[];
-        const ordered = [...cov].sort((a,b) => a.pct - b.pct);
-        const colorFor = (s: string) => s === 'deficit' ? '#ef4444' : s === 'high' ? '#f97316' : s === 'low' ? '#f59e0b' : '#22c55e';
-        const labelMap: Record<string,string> = { Ca:'Кальций', Fe:'Железо', Mg:'Магний', Zn:'Цинк', Se:'Селен', K:'Калий', Na:'Натрий', VitC:'C', VitD:'D', VitB12:'B12', VitB6:'B6', VitB9:'Фолат', VitA:'A', VitE:'E', VitK:'K', Omega3:'Омега-3' };
-        return (
-          <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', marginBottom:8 }}>
-            <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🧪 Микронутриенты (RDA coverage)</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4 }}>
-              {ordered.slice(0, 16).map(c => (
-                <div key={c.nutrient} style={{ textAlign:'center', padding:'3px 2px', borderRadius:6, background:'rgba(255,255,255,0.03)' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>{labelMap[c.nutrient] || c.nutrient}</div>
-                  <div style={{ fontSize:11, fontWeight:800, color: colorFor(c.status) }}>{c.pct}%</div>
-                  <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.08)', marginTop:2, overflow:'hidden' }}>
-                    <div style={{ height:'100%', width:`${Math.min(100, c.pct)}%`, background: colorFor(c.status) }} />
+      {plannerMode === 'pro' &&
+        generated &&
+        dayPlan &&
+        (dayPlan as any).microSummary &&
+        (dayPlan as any).microSummary.coverage &&
+        (() => {
+          const cov = (dayPlan as any).microSummary.coverage as any[];
+          const ordered = [...cov].sort((a, b) => a.pct - b.pct);
+          const colorFor = (s: string) =>
+            s === 'deficit' ? '#ef4444' : s === 'high' ? '#f97316' : s === 'low' ? '#f59e0b' : '#22c55e';
+          const labelMap: Record<string, string> = {
+            Ca: 'Кальций',
+            Fe: 'Железо',
+            Mg: 'Магний',
+            Zn: 'Цинк',
+            Se: 'Селен',
+            K: 'Калий',
+            Na: 'Натрий',
+            VitC: 'C',
+            VitD: 'D',
+            VitB12: 'B12',
+            VitB6: 'B6',
+            VitB9: 'Фолат',
+            VitA: 'A',
+            VitE: 'E',
+            VitK: 'K',
+            Omega3: 'Омега-3',
+          };
+          return (
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: 'rgba(96,165,250,0.06)',
+                border: '1px solid rgba(96,165,250,0.2)',
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>
+                🧪 Микронутриенты (RDA coverage)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 4 }}>
+                {ordered.slice(0, 16).map((c) => (
+                  <div
+                    key={c.nutrient}
+                    style={{
+                      textAlign: 'center',
+                      padding: '3px 2px',
+                      borderRadius: 6,
+                      background: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                      {labelMap[c.nutrient] || c.nutrient}
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: colorFor(c.status) }}>{c.pct}%</div>
+                    <div
+                      style={{
+                        height: 3,
+                        borderRadius: 2,
+                        background: 'rgba(255,255,255,0.08)',
+                        marginTop: 2,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{ height: '100%', width: `${Math.min(100, c.pct)}%`, background: colorFor(c.status) }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        );
-      })()}
-      {generated && dayPlan && (dayPlan as any).diaryCompensation && (() => {
-        const dc = (dayPlan as any).diaryCompensation;
-        const sev = dc.severity || 'low';
-        const color = sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f59e0b' : '#10b981';
-        return (
-          <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:`rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.08)`, border:`1px solid rgba(${sev==='high'?'239,68,68':sev==='medium'?'245,158,11':'16,185,129'},0.25)` }}>
-            <div style={{ fontSize:9, fontWeight:700, color, marginBottom:2 }}>📊 Адаптация по дневнику</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{dc.note}</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:3 }}>Цели на сегодня скорректированы по факту вчерашнего дня.</div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      {generated &&
+        dayPlan &&
+        (dayPlan as any).diaryCompensation &&
+        (() => {
+          const dc = (dayPlan as any).diaryCompensation;
+          const sev = dc.severity || 'low';
+          const color = sev === 'high' ? '#ef4444' : sev === 'medium' ? '#f59e0b' : '#10b981';
+          return (
+            <div
+              style={{
+                marginBottom: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: `rgba(${sev === 'high' ? '239,68,68' : sev === 'medium' ? '245,158,11' : '16,185,129'},0.08)`,
+                border: `1px solid rgba(${sev === 'high' ? '239,68,68' : sev === 'medium' ? '245,158,11' : '16,185,129'},0.25)`,
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color, marginBottom: 2 }}>📊 Адаптация по дневнику</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>{dc.note}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>
+                Цели на сегодня скорректированы по факту вчерашнего дня.
+              </div>
+            </div>
+          );
+        })()}
       {/* #1 Женская фаза цикла */}
       {generated && dayPlan && (dayPlan as any).menstrualPhaseNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(236,72,153,0.08)', border:'1px solid rgba(236,72,153,0.25)' }}>
-          <div style={{ fontSize:9, fontWeight:700, color:'#ec4899', marginBottom:2 }}>🌈 Фаза цикла</div>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).menstrualPhaseNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(236,72,153,0.08)',
+            border: '1px solid rgba(236,72,153,0.25)',
+          }}
+        >
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#ec4899', marginBottom: 2 }}>🌈 Фаза цикла</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+            {(dayPlan as any).menstrualPhaseNote}
+          </div>
         </div>
       )}
       {/* #2 Кости/кальций (женское) */}
-      {generated && dayPlan && (dayPlan as any).boneNotes && ((dayPlan as any).boneNotes as string[]).map((n: string, i: number) => (
-        <div key={'bone'+i} style={{ marginBottom:4, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:9, color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>{n}</div>
-      ))}
+      {generated &&
+        dayPlan &&
+        (dayPlan as any).boneNotes &&
+        ((dayPlan as any).boneNotes as string[]).map((n: string, i: number) => (
+          <div
+            key={'bone' + i}
+            style={{
+              marginBottom: 4,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(96,165,250,0.06)',
+              border: '1px solid rgba(96,165,250,0.2)',
+              fontSize: 9,
+              color: 'rgba(255,255,255,0.8)',
+              lineHeight: 1.4,
+            }}
+          >
+            {n}
+          </div>
+        ))}
       {/* #7 Сон-питание */}
       {generated && dayPlan && (dayPlan as any).sleepNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).sleepNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.85)',
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).sleepNote}
+        </div>
       )}
       {/* #6 Diet-break диагностика */}
       {generated && dayPlan && (dayPlan as any).dietBreakNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).dietBreakNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.25)',
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.85)',
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).dietBreakNote}
+        </div>
       )}
       {/* Дневные заметки: рефид / волна / тяжёлый день / календарь цикла */}
-      {generated && dayPlan && (() => {
-        const notes = [
-          { v: (dayPlan as any).refeedNote, c: '#22c55e' },
-          { v: (dayPlan as any).periodizationWeekNote, c: '#8b5cf6' },
-          { v: (dayPlan as any).heavyDayNote, c: '#fb923c' },
-          { v: (dayPlan as any).cycleCalendarNote, c: '#ec4899' },
-        ].filter((n: any) => !!n.v);
-        if (notes.length === 0) return null;
-        return (
-          <div style={{ marginBottom:6, display:'flex', flexDirection:'column', gap:4 }}>
-            {notes.map((n: any, i: number) => (
-              <div key={i} style={{ padding:'6px 10px', borderRadius:10, background:`${n.c}0a`, border:`1px solid ${n.c}22`, fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{n.v}</div>
-            ))}
-          </div>
-        );
-      })()}
+      {generated &&
+        dayPlan &&
+        (() => {
+          const notes = [
+            { v: (dayPlan as any).refeedNote, c: '#22c55e' },
+            { v: (dayPlan as any).periodizationWeekNote, c: '#8b5cf6' },
+            { v: (dayPlan as any).heavyDayNote, c: '#fb923c' },
+            { v: (dayPlan as any).cycleCalendarNote, c: '#ec4899' },
+          ].filter((n: any) => !!n.v);
+          if (notes.length === 0) return null;
+          return (
+            <div style={{ marginBottom: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {notes.map((n: any, i: number) => (
+                <div
+                  key={i}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 10,
+                    background: `${n.c}0a`,
+                    border: `1px solid ${n.c}22`,
+                    fontSize: 9,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {n.v}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       {/* #5 Категория бодибилдинга */}
       {generated && dayPlan && (dayPlan as any).categoryNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(168,85,247,0.08)',
+            border: '1px solid rgba(168,85,247,0.25)',
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.85)',
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).categoryNote}
+        </div>
       )}
       {/* п.18: карточка «📍 Текущий блок года» — активный блок годового плана на сегодня */}
-      {generated && annualPhase && (() => {
-        const b = annualPhase.block;
-        const statusIcon = b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
-        const statusLabel = b.status === 'built' ? 'собран' : b.status === 'stale' ? 'устарел' : b.status === 'error' ? 'ошибка' : 'не собран';
-        const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
-        const prepNote = b.ref.kind === 'BB' && b.ref.phase === 'contest_prep'
-          ? ' · 🏁 contest prep — фаза сушки: питание по prep-плану' : '';
-        return (
-          <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.07)', border: '1px solid rgba(96,165,250,0.25)', fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}
-            title={`Блок ${b.ref.phase} (нед ${b.ref.startWeek}–${b.ref.startWeek + b.ref.weeks - 1})`}>
-            📍 Текущий блок года: нед {annualPhase.week} · {b.ref.phase} ({b.ref.startWeek}–{b.ref.startWeek + b.ref.weeks - 1}) · {kindLabel} {statusIcon} {statusLabel}{prepNote}
-          </div>
-        );
-      })()}
-      {generated && combatNutrition && (() => {
-        // Гигиена (волна-3): условный `usePlanCtx()` внутри JSX ломал порядок хуков
-        // (React-warning «change in the order of Hooks»). combatNutrition/applyCombatNutrition
-        // берутся из безусловной деструктуризации наверху компонента.
-        const cn = combatNutrition as any;
-        return (
-          <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, display:'flex', flexWrap:'wrap', gap:6, alignItems:'center' }}
-            title={cn.note || ''}>
-            <span>🥊 План единоборств: {cn.kcal ? `${cn.kcal} ккал` : ''} {cn.proteinG ? `· P${cn.proteinG}` : ''} {cn.carbsG ? `· C${cn.carbsG}` : ''} {cn.fatG ? `· F${cn.fatG}` : ''} {cn.fiberG ? `· клетч ${cn.fiberG}г` : ''} {cn.waterMl ? `· 💧${cn.waterMl}мл` : ''} {cn.sodiumMg ? `· Na${cn.sodiumMg}мг` : ''} {cn.orsMmol ? `· ORS ${cn.orsMmol}` : ''} {cn.weighInType ? `· ${cn.weighInType==='same_day_2h'?'same-day':'24ч'}` : ''} {cn.planId ? `· #${String(cn.planId).slice(0,6)}` : ''}</span>
-            <button onClick={() => applyCombatNutrition?.()} style={{ marginLeft:'auto', padding:'4px 8px', borderRadius:6, background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.28)', color:'#d8b4fe', fontSize:9, fontWeight:700, cursor:'pointer' }}>⚡ Применить к плану</button>
-            <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)' }} title={cn.note || ''}>{cn.note ? String(cn.note).slice(0,80) : ''}</span>
-          </div>
-        );
-      })()}
+      {generated &&
+        annualPhase &&
+        (() => {
+          const b = annualPhase.block;
+          const statusIcon =
+            b.status === 'built' ? '✅' : b.status === 'stale' ? '⚠' : b.status === 'error' ? '❌' : '·';
+          const statusLabel =
+            b.status === 'built'
+              ? 'собран'
+              : b.status === 'stale'
+                ? 'устарел'
+                : b.status === 'error'
+                  ? 'ошибка'
+                  : 'не собран';
+          const kindLabel = b.ref.kind === 'PL' ? 'ПЛ' : b.ref.kind === 'BB' ? 'ББ' : '✍ Ручной';
+          const prepNote =
+            b.ref.kind === 'BB' && b.ref.phase === 'contest_prep'
+              ? ' · 🏁 contest prep — фаза сушки: питание по prep-плану'
+              : '';
+          return (
+            <div
+              style={{
+                marginBottom: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: 'rgba(96,165,250,0.07)',
+                border: '1px solid rgba(96,165,250,0.25)',
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.85)',
+                lineHeight: 1.4,
+              }}
+              title={`Блок ${b.ref.phase} (нед ${b.ref.startWeek}–${b.ref.startWeek + b.ref.weeks - 1})`}
+            >
+              📍 Текущий блок года: нед {annualPhase.week} · {b.ref.phase} ({b.ref.startWeek}–
+              {b.ref.startWeek + b.ref.weeks - 1}) · {kindLabel} {statusIcon} {statusLabel}
+              {prepNote}
+            </div>
+          );
+        })()}
+      {generated &&
+        combatNutrition &&
+        (() => {
+          // Гигиена (волна-3): условный `usePlanCtx()` внутри JSX ломал порядок хуков
+          // (React-warning «change in the order of Hooks»). combatNutrition/applyCombatNutrition
+          // берутся из безусловной деструктуризации наверху компонента.
+          const cn = combatNutrition as any;
+          return (
+            <div
+              style={{
+                marginBottom: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: 'rgba(168,85,247,0.08)',
+                border: '1px solid rgba(168,85,247,0.25)',
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.85)',
+                lineHeight: 1.4,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                alignItems: 'center',
+              }}
+              title={cn.note || ''}
+            >
+              <span>
+                🥊 План единоборств: {cn.kcal ? `${cn.kcal} ккал` : ''} {cn.proteinG ? `· P${cn.proteinG}` : ''}{' '}
+                {cn.carbsG ? `· C${cn.carbsG}` : ''} {cn.fatG ? `· F${cn.fatG}` : ''}{' '}
+                {cn.fiberG ? `· клетч ${cn.fiberG}г` : ''} {cn.waterMl ? `· 💧${cn.waterMl}мл` : ''}{' '}
+                {cn.sodiumMg ? `· Na${cn.sodiumMg}мг` : ''} {cn.orsMmol ? `· ORS ${cn.orsMmol}` : ''}{' '}
+                {cn.weighInType ? `· ${cn.weighInType === 'same_day_2h' ? 'same-day' : '24ч'}` : ''}{' '}
+                {cn.planId ? `· #${String(cn.planId).slice(0, 6)}` : ''}
+              </span>
+              <button
+                onClick={() => applyCombatNutrition?.()}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(168,85,247,0.14)',
+                  border: '1px solid rgba(168,85,247,0.28)',
+                  color: '#d8b4fe',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ⚡ Применить к плану
+              </button>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)' }} title={cn.note || ''}>
+                {cn.note ? String(cn.note).slice(0, 80) : ''}
+              </span>
+            </div>
+          );
+        })()}
       {/* #4 Peak-week protocol */}
       {generated && dayPlan && (dayPlan as any).peakWeekNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:9, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.3)',
+            fontSize: 9,
+            color: '#fbbf24',
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).peakWeekNote}
+        </div>
       )}
       {/* #10 Жизненный этап */}
       {generated && dayPlan && (dayPlan as any).lifeStageNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).lifeStageNote}</div>
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(34,197,94,0.08)',
+            border: '1px solid rgba(34,197,94,0.25)',
+            fontSize: 9,
+            color: 'rgba(255,255,255,0.85)',
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).lifeStageNote}
+        </div>
       )}
       {/* #1 RED-S / Energy Availability */}
       {generated && dayPlan && (dayPlan as any).redSNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.35)', fontSize:9, color:'#fca5a5', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).redSNote}</div>
-      )}
-      {generated && dayPlan && (dayPlan as any).energyAvailability && (dayPlan as any).energyAvailability.status !== 'risk' && (
-        <div style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.2)', fontSize:10, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>
-          ⚡ Energy Availability: {(dayPlan as any).energyAvailability.ea} ккал/кг FFM ({(dayPlan as any).energyAvailability.status}) — трен. расход {(dayPlan as any).energyAvailability.exerciseKcal} ккал
+        <div
+          style={{
+            marginBottom: 6,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.35)',
+            fontSize: 9,
+            color: '#fca5a5',
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
+          {(dayPlan as any).redSNote}
         </div>
       )}
+      {generated &&
+        dayPlan &&
+        (dayPlan as any).energyAvailability &&
+        (dayPlan as any).energyAvailability.status !== 'risk' && (
+          <div
+            style={{
+              marginBottom: 6,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(96,165,250,0.06)',
+              border: '1px solid rgba(96,165,250,0.2)',
+              fontSize: 10,
+              color: 'rgba(255,255,255,0.7)',
+              lineHeight: 1.4,
+            }}
+          >
+            ⚡ Energy Availability: {(dayPlan as any).energyAvailability.ea} ккал/кг FFM (
+            {(dayPlan as any).energyAvailability.status}) — трен. расход{' '}
+            {(dayPlan as any).energyAvailability.exerciseKcal} ккал
+          </div>
+        )}
       {/* #2 Голод — hungerNote удалён из генерации (шумовый сигнал) */}
       {plannerMode === 'pro' && generated && dayPlan && <DailyDietDashboard />}
       {plannerMode === 'pro' && generated && dayPlan && (
         <NutritionQualityCard
-          meals={(dayPlan as any)?.meals?.map((m: any) => ({
-            foods: (m.items || []).map((it: any) => ({
-              id: it.id || it.name || 'unknown',
-              name: it.name || '',
-              grams: it.amount || 100,
-              protein: it.p || 0,
-              fat: it.f || 0,
-              carbs: it.c || 0,
-              kcal: it.kcal || 0,
-              fiber: 0,
-            })),
-          })) || []}
+          meals={
+            (dayPlan as any)?.meals?.map((m: any) => ({
+              foods: (m.items || []).map((it: any) => ({
+                id: it.id || it.name || 'unknown',
+                name: it.name || '',
+                grams: it.amount || 100,
+                protein: it.p || 0,
+                fat: it.f || 0,
+                carbs: it.c || 0,
+                kcal: it.kcal || 0,
+                fiber: 0,
+              })),
+            })) || []
+          }
           weight={weight}
           age={age}
           sex={sex}
@@ -1152,12 +2503,24 @@ const doImportPlan = (raw: string): boolean => {
         <GlassCard title="Аллергены" icon="⚠️" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
             {allergenExcludedCount > 0 ? (
-              <>🚫 Исключено <strong style={{ color: '#f97316' }}>{allergenExcludedCount}</strong> продуктов из {FOOD_DB.length} по вашим аллергенам: <span style={{ color: '#fb923c' }}>{allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}</span></>
+              <>
+                🚫 Исключено <strong style={{ color: '#f97316' }}>{allergenExcludedCount}</strong> продуктов из{' '}
+                {FOOD_DB.length} по вашим аллергенам:{' '}
+                <span style={{ color: '#fb923c' }}>
+                  {allergens.map((a) => ALLERGEN_LIST.find((al) => al.id === a)?.label || a).join(', ')}
+                </span>
+              </>
             ) : (
-              <>⚠️ Аллергены выбраны ({allergens.map(a => ALLERGEN_LIST.find(al => al.id === a)?.label || a).join(', ')}), но ни один продукт не был исключён — проверьте список продуктов в базе</>
+              <>
+                ⚠️ Аллергены выбраны (
+                {allergens.map((a) => ALLERGEN_LIST.find((al) => al.id === a)?.label || a).join(', ')}), но ни один
+                продукт не был исключён — проверьте список продуктов в базе
+              </>
             )}
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>Чтобы применить изменения аллергенов, нажмите «Перегенерировать»</div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+            Чтобы применить изменения аллергенов, нажмите «Перегенерировать»
+          </div>
         </GlassCard>
       )}
 
@@ -1165,142 +2528,376 @@ const doImportPlan = (raw: string): boolean => {
           рендерился только в Settings, а он размонтирован). Показываем на вкладке
           плана; автоскрытие — 8с, чтобы ошибка не залипала после починки. */}
       {errorMsg && (
-        <div role="alert" style={{ marginBottom:6, padding:'6px 10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', fontSize:10, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>
-          <span style={{ flex:1 }}>⚠️ {errorMsg}</span>
-          <span onClick={() => setErrorMsg(null)} role="button" aria-label="Закрыть ошибку" style={{ cursor:'pointer', minHeight:32, minWidth:32, display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:6, fontSize:11 }}>✕</span>
+        <div
+          role="alert"
+          style={{
+            marginBottom: 6,
+            padding: '6px 10px',
+            borderRadius: 8,
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.25)',
+            fontSize: 10,
+            color: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span style={{ flex: 1 }}>⚠️ {errorMsg}</span>
+          <span
+            onClick={() => setErrorMsg(null)}
+            role="button"
+            aria-label="Закрыть ошибку"
+            style={{
+              cursor: 'pointer',
+              minHeight: 32,
+              minWidth: 32,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 6,
+              fontSize: 11,
+            }}
+          >
+            ✕
+          </span>
         </div>
       )}
 
-      {generated && planDays === 1 && dayPlan && (<>
-        <GlassCard title={`План на день${carbPeriodization !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
-          {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{carbPeriodization !== 'none' && ` · циклирование: ${carbPeriodizationLabel(carbPeriodization)}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
-          {weekEditDay !== null && (
-            <div style={{ marginBottom: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 9, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>✏️ Редактируете {DAY_LABELS[weekEditDay]} из недельного плана — изменения сохранятся в неделе.</span>
-              <button onClick={() => switchPlanDays(7)} style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap' }}>↩ К неделе</button>
-            </div>
-          )}
-          {/* 🧭 Брифинг дня — помощник спортсмена */}
+      {generated && planDays === 1 && dayPlan && (
+        <>
+          <GlassCard
+            title={`План на день${carbPeriodization !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`}
+            icon="📋"
+            color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'}
+            style={{ border: '1px solid rgba(0,230,138,0.15)' }}
+          >
+            {dayPlan.isTrainingDay !== undefined && (
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                {dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}
+                {carbPeriodization !== 'none' && ` · циклирование: ${carbPeriodizationLabel(carbPeriodization)}`}
+                {workScheduleEnabled &&
+                  ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}
+              </div>
+            )}
+            {weekEditDay !== null && (
+              <div
+                style={{
+                  marginBottom: 6,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(139,92,246,0.08)',
+                  border: '1px solid rgba(139,92,246,0.2)',
+                  fontSize: 9,
+                  color: '#a78bfa',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span>
+                  ✏️ Редактируете {DAY_LABELS[weekEditDay]} из недельного плана — изменения сохранятся в неделе.
+                </span>
+                <button
+                  onClick={() => switchPlanDays(7)}
+                  style={{
+                    marginLeft: 'auto',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    border: '1px solid rgba(139,92,246,0.3)',
+                    background: 'rgba(139,92,246,0.15)',
+                    color: '#c4b5fd',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  ↩ К неделе
+                </button>
+              </div>
+            )}
+            {/* 🧭 Брифинг дня — помощник спортсмена */}
+            {(() => {
+              try {
+                const now = new Date();
+                // Факт из дневника питания за сегодня (что реально съедено)
+                let fact: { kcal: number; p: number } | null = null;
+                try {
+                  const dateIso = localIsoDate(now);
+                  const data = readDiaryV2();
+                  const dayEntries = data?.[dateIso]?.meals || {};
+                  let fk = 0,
+                    fp = 0;
+                  Object.values(dayEntries).forEach((arr: any) =>
+                    (Array.isArray(arr) ? arr : []).forEach((e: any) => {
+                      fk += e.kcal || 0;
+                      fp += e.p || 0;
+                    }),
+                  );
+                  if (fk > 0) fact = { kcal: Math.round(fk), p: Math.round(fp * 10) / 10 };
+                } catch {}
+                const b = buildDayBriefing({
+                  totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
+                  goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
+                  meals: dayPlan.meals || [],
+                  isTrainingDay: !!dayPlan.isTrainingDay,
+                  trainTime: linkToTraining ? trainStart : undefined,
+                  nowTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+                  waterL: waterCalc?.total,
+                  fact,
+                });
+                if (b.cookToday.length === 0 && !b.nextMeal && b.tips.length === 0 && b.factVsPlanPct === null)
+                  return null;
+                return (
+                  <div
+                    style={{
+                      margin: '4px 0 8px',
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))',
+                      border: '1px solid rgba(59,130,246,0.18)',
+                    }}
+                  >
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>
+                      🧭 {b.dayTypeLabel}
+                      {waterCalc?.total ? ` · 💧 ${waterCalc.total} л/день` : ''}
+                    </div>
+                    {b.cookToday.length > 0 && (
+                      <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 3 }}>
+                        👨‍🍳 Готовить сегодня: <b>{b.cookToday.join(' · ')}</b>
+                      </div>
+                    )}
+                    {b.nextMeal && (
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                        ⏰ Следующий приём: <b>{b.nextMeal.label}</b> в {b.nextMeal.time}
+                      </div>
+                    )}
+                    {fact && b.factVsPlanPct !== null && (
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                        🍽 Съедено: <b>{fact.kcal} ккал</b> ({b.factVsPlanPct}% плана)
+                        {b.remainingKcalToGoal !== null && (
+                          <>
+                            {' '}
+                            · осталось до цели ~<b>{Math.abs(b.remainingKcalToGoal)}</b> ккал
+                            {b.remainingKcalToGoal < 0 ? ' (перебор)' : ''}
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {b.proteinLeftG >= 10 && (
+                      <div style={{ fontSize: 9, color: '#60a5fa' }}>
+                        🎯 План: Б{Math.round(dayPlan.totals?.p || 0)}/{effectiveP} · К
+                        {Math.round(dayPlan.totals?.kcal || 0)} ({b.kcalDeltaPct > 0 ? '+' : ''}
+                        {b.kcalDeltaPct}%)
+                      </div>
+                    )}
+                    {b.tips.map((t: string, i: number) => (
+                      <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 3 }}>
+                        {t}
+                      </div>
+                    ))}
+                  </div>
+                );
+              } catch {
+                return null;
+              }
+            })()}
+            {renderMealList(dayPlan, false, 0)}
+            <textarea
+              value={dayPlanNotes}
+              onChange={(e) => setDayPlanNotes(e.target.value)}
+              onBlur={() => {
+                try {
+                  localStorage.setItem('he_day_notes', dayPlanNotes);
+                } catch {}
+              }}
+              maxLength={2000}
+              placeholder="Заметки на сегодня..."
+              style={{
+                width: '100%',
+                marginTop: 6,
+                padding: '6px 10px',
+                borderRadius: 8,
+                fontSize: 9,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.85)',
+                resize: 'vertical',
+                minHeight: 30,
+                boxSizing: 'border-box',
+              }}
+              rows={1}
+            />
+            <button
+              onClick={() => generatePlan(1, undefined, selectedDayIndex)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 700,
+                marginTop: 8,
+                marginBottom: 4,
+                border: 'none',
+                background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                color: '#000',
+                boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
+              }}
+            >
+              🔄 Перегенерировать день
+            </button>
+            {(() => {
+              const dayTotal = dayPlan.totals;
+              const devKcal = Math.round(dayTotal?.kcal - effectiveKcal);
+              const devP = Math.round(dayTotal?.p - effectiveP);
+              if (Math.abs(devKcal) < 50 && Math.abs(devP) < 5) return null;
+              return (
+                <button
+                  onClick={autoCorrectPlan}
+                  style={{
+                    marginTop: 6,
+                    padding: '5px 10px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 8,
+                    fontWeight: 600,
+                    width: '100%',
+                    background: 'rgba(59,130,246,0.08)',
+                    border: '1px solid rgba(59,130,246,0.15)',
+                    color: '#60a5fa',
+                  }}
+                >
+                  📊 Автокоррекция: откл. от цели {devKcal > 0 ? '+' : ''}
+                  {devKcal} ккал / {devP > 0 ? '+' : ''}
+                  {devP}г Б — подогнать оставшиеся приёмы
+                </button>
+              );
+            })()}
+          </GlassCard>
+
           {(() => {
             try {
-              const now = new Date();
-              // Факт из дневника питания за сегодня (что реально съедено)
-              let fact: { kcal: number; p: number } | null = null;
-              try {
-                const dateIso = localIsoDate(now);
-                const data = readDiaryV2();
-                const dayEntries = data?.[dateIso]?.meals || {};
-                let fk = 0, fp = 0;
-                Object.values(dayEntries).forEach((arr: any) => (Array.isArray(arr) ? arr : []).forEach((e: any) => { fk += e.kcal || 0; fp += e.p || 0; }));
-                if (fk > 0) fact = { kcal: Math.round(fk), p: Math.round(fp * 10) / 10 };
-              } catch {}
-              const b = buildDayBriefing({
-                totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
-                goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
-                meals: dayPlan.meals || [],
-                isTrainingDay: !!dayPlan.isTrainingDay,
-                trainTime: linkToTraining ? trainStart : undefined,
-                nowTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-                waterL: waterCalc?.total,
-                fact,
-              });
-              if (b.cookToday.length === 0 && !b.nextMeal && b.tips.length === 0 && b.factVsPlanPct === null) return null;
+              const today = localIsoDate(new Date());
+              const todayEntries = getDiaryEntriesForDate(today);
+              if (todayEntries.length === 0) return null;
+              const factKcal = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.kcal || 0), 0));
+              const factP = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.p || d.protein || 0), 0));
+              const factF = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.f || d.fat || 0), 0));
+              const factC = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.c || d.carbs || 0), 0));
+              const planKcal = dayPlan?.totals?.kcal || 0;
+              const planP = dayPlan?.totals?.p || 0;
+              if (factKcal === 0) return null;
+              const kcalPct = planKcal > 0 ? Math.round((factKcal / planKcal) * 100) : 0;
               return (
-                <div style={{ margin: '4px 0 8px', padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))', border: '1px solid rgba(59,130,246,0.18)' }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🧭 {b.dayTypeLabel}{waterCalc?.total ? ` · 💧 ${waterCalc.total} л/день` : ''}</div>
-                  {b.cookToday.length > 0 && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 3 }}>👨‍🍳 Готовить сегодня: <b>{b.cookToday.join(' · ')}</b></div>}
-                  {b.nextMeal && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>⏰ Следующий приём: <b>{b.nextMeal.label}</b> в {b.nextMeal.time}</div>}
-                  {fact && b.factVsPlanPct !== null && (
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
-                      🍽 Съедено: <b>{fact.kcal} ккал</b> ({b.factVsPlanPct}% плана){b.remainingKcalToGoal !== null && <> · осталось до цели ~<b>{Math.abs(b.remainingKcalToGoal)}</b> ккал{b.remainingKcalToGoal < 0 ? ' (перебор)' : ''}</>}
+                <GlassCard
+                  title="📊 План vs Факт"
+                  icon="⚖️"
+                  color={kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b'}
+                >
+                  <div style={{ fontSize: 9 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
+                      {[
+                        { label: 'Ккал', plan: planKcal, fact: factKcal, unit: '', color: '#00e68a' },
+                        { label: 'Белок', plan: planP, fact: factP, unit: 'г', color: '#3b82f6' },
+                        { label: 'Жиры', plan: dayPlan?.totals?.f || 0, fact: factF, unit: 'г', color: '#f59e0b' },
+                        { label: 'Угл.', plan: dayPlan?.totals?.c || 0, fact: factC, unit: 'г', color: '#f97316' },
+                      ].map((m) => (
+                        <div
+                          key={m.label}
+                          style={{
+                            textAlign: 'center',
+                            padding: '4px',
+                            borderRadius: 6,
+                            background: 'rgba(255,255,255,0.02)',
+                          }}
+                        >
+                          <div style={{ color: m.color, fontWeight: 700, fontSize: 10 }}>{m.fact}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>
+                            План: {m.plan}
+                            {m.unit}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  {b.proteinLeftG >= 10 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🎯 План: Б{Math.round(dayPlan.totals?.p || 0)}/{effectiveP} · К{Math.round(dayPlan.totals?.kcal || 0)} ({b.kcalDeltaPct > 0 ? '+' : ''}{b.kcalDeltaPct}%)</div>}
-                  {b.tips.map((t: string, i: number) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 3 }}>{t}</div>)}
-                </div>
+                    <div style={{ color: kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b', fontWeight: 600 }}>
+                      {kcalPct >= 90 && kcalPct <= 110
+                        ? '✅ В рамках плана'
+                        : kcalPct > 110
+                          ? `⚠️ Перебор на ${kcalPct - 100}%`
+                          : `⚠️ Недобор на ${100 - kcalPct}%`}
+                      <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>
+                        ({factKcal}/{planKcal} ккал)
+                      </span>
+                    </div>
+                  </div>
+                </GlassCard>
               );
-            } catch { return null; }
-          })()}
-          {renderMealList(dayPlan, false, 0)}
-          <textarea value={dayPlanNotes} onChange={e => setDayPlanNotes(e.target.value)} onBlur={() => { try { localStorage.setItem('he_day_notes', dayPlanNotes); } catch {} }} maxLength={2000} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
-          <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>
-            🔄 Перегенерировать день
-          </button>
-          {(() => {
-            const dayTotal = dayPlan.totals;
-            const devKcal = Math.round(dayTotal?.kcal - effectiveKcal);
-            const devP = Math.round(dayTotal?.p - effectiveP);
-            if (Math.abs(devKcal) < 50 && Math.abs(devP) < 5) return null;
-            return (
-              <button onClick={autoCorrectPlan} style={{ marginTop: 6, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, width: '100%', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', color: '#60a5fa' }}>
-                📊 Автокоррекция: откл. от цели {devKcal > 0 ? '+' : ''}{devKcal} ккал / {devP > 0 ? '+' : ''}{devP}г Б — подогнать оставшиеся приёмы
-              </button>
-            );
-          })()}
-        </GlassCard>
-
-        {(() => {
-          try {
-            const today = localIsoDate(new Date());
-            const todayEntries = getDiaryEntriesForDate(today);
-            if (todayEntries.length === 0) return null;
-            const factKcal = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.kcal || 0), 0));
-            const factP = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.p || d.protein || 0), 0));
-            const factF = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.f || d.fat || 0), 0));
-            const factC = Math.round(todayEntries.reduce((s: number, d: any) => s + (d.c || d.carbs || 0), 0));
-            const planKcal = dayPlan?.totals?.kcal || 0;
-            const planP = dayPlan?.totals?.p || 0;
-            if (factKcal === 0) return null;
-            const kcalPct = planKcal > 0 ? Math.round(factKcal / planKcal * 100) : 0;
-            return (
-              <GlassCard title="📊 План vs Факт" icon="⚖️" color={kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b'}>
-                <div style={{ fontSize:9 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:6 }}>
-                    {[{label:'Ккал', plan:planKcal, fact:factKcal, unit:'', color:'#00e68a'},{label:'Белок', plan:planP, fact:factP, unit:'г', color:'#3b82f6'},{label:'Жиры', plan:dayPlan?.totals?.f||0, fact:factF, unit:'г', color:'#f59e0b'},{label:'Угл.', plan:dayPlan?.totals?.c||0, fact:factC, unit:'г', color:'#f97316'}].map(m=>(<div key={m.label} style={{textAlign:'center',padding:'4px',borderRadius:6,background:'rgba(255,255,255,0.02)'}}><div style={{color:m.color,fontWeight:700,fontSize:10}}>{m.fact}</div><div style={{color:'rgba(255,255,255,0.5)',fontSize:10}}>План: {m.plan}{m.unit}</div></div>))}
-                  </div>
-                  <div style={{ color: kcalPct >= 90 && kcalPct <= 110 ? '#22c55e' : '#f59e0b', fontWeight:600 }}>
-                    {kcalPct >= 90 && kcalPct <= 110 ? '✅ В рамках плана' : kcalPct > 110 ? `⚠️ Перебор на ${kcalPct-100}%` : `⚠️ Недобор на ${100-kcalPct}%`}
-                    <span style={{fontWeight:400,color:'rgba(255,255,255,0.5)',marginLeft:4}}>({factKcal}/{planKcal} ккал)</span>
-                  </div>
-                </div>
-              </GlassCard>
-            );
-          } catch { return null; }
-        })()}
-
-        {(() => {
-          try {
-            const days: { date: string; kcal: number; proteinG: number }[] = [];
-            for (let i = 6; i >= 0; i--) {
-              const d = new Date(); d.setDate(d.getDate() - i);
-              const date = localIsoDate(d);
-              const entries = getDiaryEntriesForDate(date);
-              const kcal = Math.round(entries.reduce((s: number, x: any) => s + (x.kcal || 0), 0));
-              const p = Math.round(entries.reduce((s: number, x: any) => s + (x.p || x.protein || 0), 0));
-              if (kcal > 0) days.push({ date, kcal, proteinG: p });
+            } catch {
+              return null;
             }
-            if (days.length === 0) return null;
-            return (
-              <WeeklyReviewCard
-                days={days}
-                targetKcal={dayPlan?.totals?.kcal || effectiveKcal || 0}
-                targetProteinG={dayPlan?.totals?.p || effectiveP || 0}
-                weightLog={(() => { try { return getWeightLog().map(e => ({ date: e.date, weightKg: e.weight })); } catch { return []; } })()}
-                goal={goal}
-                onApplyKcalAdjust={applyKcalAdjust}
-              />
-            );
-          } catch { return null; }
-        })()}
+          })()}
 
-        <RefeedCalendarCard goal={goal} startDate={localIsoDate(new Date())} bodyFatPct={bodyFatPct} />
-      </>)}
+          {(() => {
+            try {
+              const days: { date: string; kcal: number; proteinG: number }[] = [];
+              for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const date = localIsoDate(d);
+                const entries = getDiaryEntriesForDate(date);
+                const kcal = Math.round(entries.reduce((s: number, x: any) => s + (x.kcal || 0), 0));
+                const p = Math.round(entries.reduce((s: number, x: any) => s + (x.p || x.protein || 0), 0));
+                if (kcal > 0) days.push({ date, kcal, proteinG: p });
+              }
+              if (days.length === 0) return null;
+              return (
+                <WeeklyReviewCard
+                  days={days}
+                  targetKcal={dayPlan?.totals?.kcal || effectiveKcal || 0}
+                  targetProteinG={dayPlan?.totals?.p || effectiveP || 0}
+                  weightLog={(() => {
+                    try {
+                      return getWeightLog().map((e) => ({ date: e.date, weightKg: e.weight }));
+                    } catch {
+                      return [];
+                    }
+                  })()}
+                  goal={goal}
+                  onApplyKcalAdjust={applyKcalAdjust}
+                />
+              );
+            } catch {
+              return null;
+            }
+          })()}
+
+          <RefeedCalendarCard goal={goal} startDate={localIsoDate(new Date())} bodyFatPct={bodyFatPct} />
+        </>
+      )}
 
       {generated && planDays === 3 && threeDayPlan && (
         <GlassCard title="План на 3 дня" icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
-            <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 Всего: {Math.round(threeDayPlan.totals?.kcal || 0)} ккал</span>
-            <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {avgKcalPerDay(threeDayPlan.totals?.kcal || 0, threeDayPlan.days?.length || 3)} ккал/день</span>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 10,
+              marginBottom: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(0,230,138,0.04)',
+              border: '1px solid rgba(0,230,138,0.1)',
+            }}
+          >
+            <span style={{ color: '#00e68a', fontWeight: 700 }}>
+              📊 Всего: {Math.round(threeDayPlan.totals?.kcal || 0)} ккал
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Среднее: {avgKcalPerDay(threeDayPlan.totals?.kcal || 0, threeDayPlan.days?.length || 3)} ккал/день
+            </span>
           </div>
           {threeDayPlan.days.map((d: any, di: number) => {
             const dKcal = Math.round(d.totals?.kcal || 0);
@@ -1308,109 +2905,252 @@ const doImportPlan = (raw: string): boolean => {
             const dF = Math.round(d.totals?.f || 0);
             const dC = Math.round(d.totals?.c || 0);
             const dIsTrain = d.isTrainingDay;
-            const kcalPct = effectiveKcal > 0 ? Math.round(dKcal / effectiveKcal * 100) : 0;
-            const kcalColor = Math.abs(dKcal - (effectiveKcal||0)) <= Math.max(50, (effectiveKcal||0)*0.08) ? '#00e68a' : '#f59e0b';
+            const kcalPct = effectiveKcal > 0 ? Math.round((dKcal / effectiveKcal) * 100) : 0;
+            const kcalColor =
+              Math.abs(dKcal - (effectiveKcal || 0)) <= Math.max(50, (effectiveKcal || 0) * 0.08)
+                ? '#00e68a'
+                : '#f59e0b';
             return (
-            <div key={di} style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: dIsTrain ? '#00e68a' : '#a78bfa', marginBottom: 6, padding: '4px 8px', borderRadius: 6, background: dIsTrain ? 'rgba(0,230,138,0.06)' : 'rgba(139,92,246,0.06)', border: dIsTrain ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12 }}>{dIsTrain ? '🏋️' : '😴'}</span>
-                <span>{DAY_LABELS[di]} · День {di + 1}</span>
-                <span style={{ color: kcalColor, fontWeight: 800, marginLeft: 'auto' }}>{dKcal} <span style={{ fontSize: 7, fontWeight: 400 }}>/{effectiveKcal || '---'} ({kcalPct}%)</span></span>
-                <span style={{ color: '#3b82f6', fontSize: 8 }}>{dP}г</span>
-                <span style={{ color: '#f59e0b', fontSize: 8 }}>{dF}г</span>
-                <span style={{ color: '#f97316', fontSize: 8 }}>{dC}г</span>
+              <div key={di} style={{ marginBottom: 10 }}>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: dIsTrain ? '#00e68a' : '#a78bfa',
+                    marginBottom: 6,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: dIsTrain ? 'rgba(0,230,138,0.06)' : 'rgba(139,92,246,0.06)',
+                    border: dIsTrain ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(139,92,246,0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>{dIsTrain ? '🏋️' : '😴'}</span>
+                  <span>
+                    {DAY_LABELS[di]} · День {di + 1}
+                  </span>
+                  <span style={{ color: kcalColor, fontWeight: 800, marginLeft: 'auto' }}>
+                    {dKcal}{' '}
+                    <span style={{ fontSize: 7, fontWeight: 400 }}>
+                      /{effectiveKcal || '---'} ({kcalPct}%)
+                    </span>
+                  </span>
+                  <span style={{ color: '#3b82f6', fontSize: 8 }}>{dP}г</span>
+                  <span style={{ color: '#f59e0b', fontSize: 8 }}>{dF}г</span>
+                  <span style={{ color: '#f97316', fontSize: 8 }}>{dC}г</span>
+                </div>
+                {renderMealList(d, true, di + 1)}
               </div>
-              {renderMealList(d, true, di + 1)}
-            </div>
             );
           })}
         </GlassCard>
       )}
 
       {generated && planDays === 7 && weekPlan && (
-        <GlassCard title={monthPlanMode ? `Месячный план — Неделя ${selectedWeek + 1} / 4` : 'Недельный план'} icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+        <GlassCard
+          title={monthPlanMode ? `Месячный план — Неделя ${selectedWeek + 1} / 4` : 'Недельный план'}
+          icon="📋"
+          color="#00e68a"
+          style={{ border: '1px solid rgba(0,230,138,0.15)' }}
+        >
           {monthPlanMode && monthPlan.length > 0 && (
-            <div style={{ display:'flex', gap:4, marginBottom:8, justifyContent:'center', flexWrap:'wrap' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
               {monthPlan.map((_, wi) => (
-                <div key={wi} style={{ display:'flex', alignItems:'center', gap:2, padding:'4px 6px 4px 10px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700,
-                  background: selectedWeek === wi ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#202023',
-                  color: selectedWeek === wi ? '#fff' : 'rgba(255,255,255,0.85)',
-                  border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                }} onClick={() => { setSelectedWeek(wi); if (monthPlan[wi]) setWeekPlan(monthPlan[wi]); }}>
-                  Н{wi + 1}{monthPlan[wi]?.totals?.kcal ? ` · ${avgKcalPerDay(monthPlan[wi].totals.kcal || 0, monthPlan[wi].days?.length || 7)}` : ''}
-                  <span title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`} onClick={async (e) => { e.stopPropagation(); setSelectedWeek(wi); loadMonthWeekIntoPlan(wi); const ok = await generatePlan(7, wi, undefined, { skipUndo: true, async: true }); if (ok !== false) loadMonthWeekIntoPlan(wi); }} style={{ cursor:'pointer', fontSize:10, padding:'1px 4px', borderRadius:5, color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa', background: 'rgba(255,255,255,0.1)' }}>🔄</span>
+                <div
+                  key={wi}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    padding: '4px 6px 4px 10px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    background: selectedWeek === wi ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#202023',
+                    color: selectedWeek === wi ? '#fff' : 'rgba(255,255,255,0.85)',
+                    border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                  }}
+                  onClick={() => {
+                    setSelectedWeek(wi);
+                    if (monthPlan[wi]) setWeekPlan(monthPlan[wi]);
+                  }}
+                >
+                  Н{wi + 1}
+                  {monthPlan[wi]?.totals?.kcal
+                    ? ` · ${avgKcalPerDay(monthPlan[wi].totals.kcal || 0, monthPlan[wi].days?.length || 7)}`
+                    : ''}
+                  <span
+                    title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setSelectedWeek(wi);
+                      loadMonthWeekIntoPlan(wi);
+                      const ok = await generatePlan(7, wi, undefined, { skipUndo: true, async: true });
+                      if (ok !== false) loadMonthWeekIntoPlan(wi);
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      fontSize: 10,
+                      padding: '1px 4px',
+                      borderRadius: 5,
+                      color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa',
+                      background: 'rgba(255,255,255,0.1)',
+                    }}
+                  >
+                    🔄
+                  </span>
                 </div>
               ))}
-              <button onClick={() => { setMonthPlanMode(false); }} style={{
-                padding:'5px 8px', borderRadius:8, fontSize:9, cursor:'pointer',
-                background:'transparent', color:'rgba(255,255,255,0.8)', border:'1px solid rgba(255,255,255,0.06)',
-              }}>✕</button>
+              <button
+                onClick={() => {
+                  setMonthPlanMode(false);
+                }}
+                style={{
+                  padding: '5px 8px',
+                  borderRadius: 8,
+                  fontSize: 9,
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.8)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                ✕
+              </button>
             </div>
           )}
-           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.1)' }}>
-             <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals?.kcal || 0)} ккал</span>
-             <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {avgKcalPerDay(weekPlan.totals?.kcal || 0, weekPlan.days?.length || 7)} ккал/день</span>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 10,
+              marginBottom: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(0,230,138,0.04)',
+              border: '1px solid rgba(0,230,138,0.1)',
+            }}
+          >
+            <span style={{ color: '#00e68a', fontWeight: 700 }}>
+              📊 За неделю: {Math.round(weekPlan.totals?.kcal || 0)} ккал
+            </span>
+            <span style={{ color: 'rgba(255,255,255,0.85)' }}>
+              Среднее: {avgKcalPerDay(weekPlan.totals?.kcal || 0, weekPlan.days?.length || 7)} ккал/день
+            </span>
           </div>
           {/* Эпик-хвост (9а): неделя vs план — ккал и Б/Ж/У против целей */}
           {(() => {
             // Хвост-4: «Неделя vs план» учитывает недельную периодизацию углеводов (волна 2+1 —
             // каждая 3-я неделя поддержание ×0.9; рефид/цикл/БУЧ меняют дневные цели). Раньше
             // сравнение шло против effectiveKcal × 7 → для недель месяца ложно «вне ±5%».
-            const weekIdx = monthPlanMode ? (selectedWeek || 0) : 0;
+            const weekIdx = monthPlanMode ? selectedWeek || 0 : 0;
             const isTrainArr = (Array.isArray(weekPlan?.days) ? weekPlan.days : []).map((d: any) => !!d?.isTrainingDay);
             const planK = monthPlanMode
-              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS, dayModsByOffset)
+              ? expectedWeekKcal(
+                  effectiveKcal,
+                  carbPeriodization,
+                  weekIdx,
+                  isTrainArr,
+                  heavyTrainDay,
+                  DAY_LABELS,
+                  dayModsByOffset,
+                )
               : Math.round((effectiveKcal || 0) * 7);
             const factK = Math.round(weekPlan.totals?.kcal || 0);
-            const devK = planK > 0 ? Math.round((factK - planK) / planK * 100) : 0;
+            const devK = planK > 0 ? Math.round(((factK - planK) / planK) * 100) : 0;
             const okK = Math.abs(devK) <= 5;
             const rows: [string, number, number, string][] = [
               ['Б', Math.round(weekPlan.totals?.p || 0), Math.round((effectiveP || 0) * 7), '#3b82f6'],
               ['Ж', Math.round(weekPlan.totals?.f || 0), Math.round((effectiveF || 0) * 7), '#f59e0b'],
               ['У', Math.round(weekPlan.totals?.c || 0), Math.round((effectiveC || 0) * 7), '#f97316'],
             ];
-            const waveNote = monthPlanMode && carbPeriodization === 'wave' && (weekIdx % 3 === 2)
-              ? ' · волна 2+1: неделя поддержания ×0.9'
-              : monthPlanMode && carbPeriodization !== 'none'
-                ? ` · ${carbPeriodizationLabel(carbPeriodization)}`
-                : '';
+            const waveNote =
+              monthPlanMode && carbPeriodization === 'wave' && weekIdx % 3 === 2
+                ? ' · волна 2+1: неделя поддержания ×0.9'
+                : monthPlanMode && carbPeriodization !== 'none'
+                  ? ` · ${carbPeriodizationLabel(carbPeriodization)}`
+                  : '';
             return (
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, color: okK ? '#22c55e' : '#fbbf24' }}>🎯 Неделя vs план: {factK} / {Math.round(planK)} ккал ({devK > 0 ? '+' : ''}{devK}%){waveNote}</span>
+              <div
+                style={{
+                  fontSize: 8,
+                  color: 'rgba(255,255,255,0.85)',
+                  marginBottom: 8,
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  background: 'rgba(96,165,250,0.04)',
+                  border: '1px solid rgba(96,165,250,0.1)',
+                }}
+              >
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}
+                >
+                  <span style={{ fontWeight: 700, color: okK ? '#22c55e' : '#fbbf24' }}>
+                    🎯 Неделя vs план: {factK} / {Math.round(planK)} ккал ({devK > 0 ? '+' : ''}
+                    {devK}%){waveNote}
+                  </span>
                   <span style={{ color: okK ? '#22c55e' : '#fbbf24' }}>{okK ? '✓ в коридоре ±5%' : 'вне ±5%'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
                   {rows.map(([lab, fact, plan, col]) => (
-                    <span key={lab} style={{ color: col }}>● {lab}: {fact}г / {Math.round(plan)}г</span>
+                    <span key={lab} style={{ color: col }}>
+                      ● {lab}: {fact}г / {Math.round(plan)}г
+                    </span>
                   ))}
                 </div>
               </div>
             );
           })()}
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, display: 'flex', gap: 6, justifyContent: 'center' }}>
-             <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals?.p || 0)}г</span>
-             <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals?.f || 0)}г</span>
-             <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals?.c || 0)}г</span>
+          <div
+            style={{
+              fontSize: 8,
+              color: 'rgba(255,255,255,0.85)',
+              marginBottom: 6,
+              display: 'flex',
+              gap: 6,
+              justifyContent: 'center',
+            }}
+          >
+            <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals?.p || 0)}г</span>
+            <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals?.f || 0)}г</span>
+            <span style={{ color: '#f97316' }}>● У: {Math.round(weekPlan.totals?.c || 0)}г</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-             {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
+            {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
               const wKcal = Math.round(d.totals?.kcal || 0);
               const wP = Math.round(d.totals?.p || 0);
               const wF = Math.round(d.totals?.f || 0);
               const wC = Math.round(d.totals?.c || 0);
               const wIsTraining = d.isTrainingDay;
               return (
-                <div key={di} onClick={() => openWeekDayForEdit(di)} style={{
-                  padding: 10, borderRadius: 12, cursor: 'pointer',
-                  background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
-                  border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
-                }} title='Нажмите, чтобы открыть день подробно'>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div
+                  key={di}
+                  onClick={() => openWeekDayForEdit(di)}
+                  style={{
+                    padding: 10,
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    background: wIsTraining ? 'rgba(0,230,138,0.03)' : '#202023',
+                    border: wIsTraining ? '1px solid rgba(0,230,138,0.15)' : '1px solid rgba(255,255,255,0.06)',
+                  }}
+                  title="Нажмите, чтобы открыть день подробно"
+                >
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 14 }}>{wIsTraining ? '🏋️' : '😴'}</span>
                       <div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: wIsTraining ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                          }}
+                        >
                           {DAY_LABELS[di]} · День {di + 1}
                         </span>
                         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', display: 'flex', gap: 4 }}>
@@ -1428,7 +3168,9 @@ const doImportPlan = (raw: string): boolean => {
                         <span style={{ color: '#00e68a', fontWeight: 600, minWidth: 50 }}>{m.time}</span>
                         <span style={{ color: '#00e68a', minWidth: 55 }}>{m.label}</span>
                         <span style={{ flex: 1 }}>{m.items?.map((it: any) => it.name)?.join(', ') || ''}</span>
-                        <span style={{ color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>{Math.round(m.totals?.kcal || 0)} ккал</span>
+                        <span style={{ color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>
+                          {Math.round(m.totals?.kcal || 0)} ккал
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -1442,90 +3184,287 @@ const doImportPlan = (raw: string): boolean => {
       {generated && planDays === 7 && weekPlan && planView === 'calendar' && (
         <GlassCard title="📅 Календарь питания на неделю" icon="📅" color="#a78bfa">
           {(() => {
-             const allMealLabels = Array.from(new Set((Array.isArray(weekPlan.days) ? weekPlan.days : []).flatMap((d: any) => (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => m.label))));
-            return <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 9 }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: '4px 6px', textAlign: 'center', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Приём</th>
-                    {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => (
-                      <th key={di} style={{ padding: '4px 6px', textAlign: 'center', background: d.isTrainingDay ? 'rgba(0,230,138,0.12)' : '#202023', borderRadius: 6, fontSize: 7, color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
-                        {DAY_LABELS[di]}
-                        <div style={{ fontWeight: 400, color: 'rgba(255,255,255,0.85)' }}>{Math.round(d.totals?.kcal || 0)} ккал</div>
+            const allMealLabels = Array.from(
+              new Set(
+                (Array.isArray(weekPlan.days) ? weekPlan.days : []).flatMap((d: any) =>
+                  (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => m.label),
+                ),
+              ),
+            );
+            return (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 3, fontSize: 9 }}>
+                  <thead>
+                    <tr>
+                      <th
+                        style={{
+                          padding: '4px 6px',
+                          textAlign: 'center',
+                          background: '#202023',
+                          borderRadius: 6,
+                          fontSize: 7,
+                          color: 'rgba(255,255,255,0.85)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Приём
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {allMealLabels.map((label: any) => (
-                    <tr key={label}>
-                      <td style={{ padding: '4px 6px', background: '#202023', borderRadius: 6, fontSize: 7, color: 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</td>
-                       {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
-                         const meal = (Array.isArray(d?.meals) ? d.meals : []).find((m: any) => m.label === label);
-                        if (!meal) return <td key={di} style={{ padding: '4px', textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 6 }}>—</td>;
-                        const kcal = Math.round(meal.totals?.kcal || 0);
-                        return (
-                          <td key={di} style={{ padding: '6px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: 9, verticalAlign: 'top', minWidth: 92, overflowWrap: 'break-word' }}>
-                            <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 9, marginBottom: 2 }}>{kcal} ккал</div>
-                            {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
-                              <div key={ii} style={{ color: '#fff', lineHeight: 1.4, fontSize: 9, overflowWrap: 'break-word' }}>{it.name} {it.amount}г</div>
-                            ))}
-                             {(Array.isArray(meal.items) ? meal.items.length : 0) > 2 && <div style={{ color: '#fff', fontSize: 9 }}>+{(meal.items?.length || 0) - 2} ещё</div>}
-                          </td>
-                        );
-                      })}
+                      {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => (
+                        <th
+                          key={di}
+                          style={{
+                            padding: '4px 6px',
+                            textAlign: 'center',
+                            background: d.isTrainingDay ? 'rgba(0,230,138,0.12)' : '#202023',
+                            borderRadius: 6,
+                            fontSize: 7,
+                            color: d.isTrainingDay ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {DAY_LABELS[di]}
+                          <div style={{ fontWeight: 400, color: 'rgba(255,255,255,0.85)' }}>
+                            {Math.round(d.totals?.kcal || 0)} ккал
+                          </div>
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>;
+                  </thead>
+                  <tbody>
+                    {allMealLabels.map((label: any) => (
+                      <tr key={label}>
+                        <td
+                          style={{
+                            padding: '4px 6px',
+                            background: '#202023',
+                            borderRadius: 6,
+                            fontSize: 7,
+                            color: 'rgba(255,255,255,0.85)',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {label}
+                        </td>
+                        {(Array.isArray(weekPlan.days) ? weekPlan.days : []).map((d: any, di: number) => {
+                          const meal = (Array.isArray(d?.meals) ? d.meals : []).find((m: any) => m.label === label);
+                          if (!meal)
+                            return (
+                              <td
+                                key={di}
+                                style={{
+                                  padding: '4px',
+                                  textAlign: 'center',
+                                  color: 'rgba(255,255,255,0.7)',
+                                  fontSize: 6,
+                                }}
+                              >
+                                —
+                              </td>
+                            );
+                          const kcal = Math.round(meal.totals?.kcal || 0);
+                          return (
+                            <td
+                              key={di}
+                              style={{
+                                padding: '6px',
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: 6,
+                                fontSize: 9,
+                                verticalAlign: 'top',
+                                minWidth: 92,
+                                overflowWrap: 'break-word',
+                              }}
+                            >
+                              <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 9, marginBottom: 2 }}>
+                                {kcal} ккал
+                              </div>
+                              {(meal.items || []).slice(0, 2).map((it: any, ii: number) => (
+                                <div
+                                  key={ii}
+                                  style={{ color: '#fff', lineHeight: 1.4, fontSize: 9, overflowWrap: 'break-word' }}
+                                >
+                                  {it.name} {it.amount}г
+                                </div>
+                              ))}
+                              {(Array.isArray(meal.items) ? meal.items.length : 0) > 2 && (
+                                <div style={{ color: '#fff', fontSize: 9 }}>+{(meal.items?.length || 0) - 2} ещё</div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
           })()}
         </GlassCard>
       )}
 
       {generated && planDays === 1 && dayPlan && weekPlan && (
-        <button onClick={() => switchPlanDays(7)} style={{ marginBottom:6, padding:'6px 12px', borderRadius:8, border:'1px solid rgba(139,92,246,0.25)', background:'rgba(139,92,246,0.06)', color:'#a78bfa', cursor:'pointer', fontSize:9, fontWeight:600 }}>← Назад к неделе</button>
+        <button
+          onClick={() => switchPlanDays(7)}
+          style={{
+            marginBottom: 6,
+            padding: '6px 12px',
+            borderRadius: 8,
+            border: '1px solid rgba(139,92,246,0.25)',
+            background: 'rgba(139,92,246,0.06)',
+            color: '#a78bfa',
+            cursor: 'pointer',
+            fontSize: 9,
+            fontWeight: 600,
+          }}
+        >
+          ← Назад к неделе
+        </button>
       )}
       {generated && planDays === 1 && dayPlan && (
         <GlassCard title="⏳ Таймлайн дня" icon="⏳" color="#06b6d4">
           <div style={{ position: 'relative', paddingLeft: 20 }}>
-            <div style={{ position: 'absolute', left: 8, top: 0, bottom: 0, width: 2, background: 'rgba(6,182,212,0.2)', borderRadius: 1 }} />
+            <div
+              style={{
+                position: 'absolute',
+                left: 8,
+                top: 0,
+                bottom: 0,
+                width: 2,
+                background: 'rgba(6,182,212,0.2)',
+                borderRadius: 1,
+              }}
+            />
             {(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any, mi: number) => {
               const k = Math.round(m.totals?.kcal || 0);
-              const w = Math.max(10, Math.round(k / Math.max(1, dayPlan.totals?.kcal) * 100));
+              const w = Math.max(10, Math.round((k / Math.max(1, dayPlan.totals?.kcal)) * 100));
               return (
                 <div key={mi} style={{ position: 'relative', marginBottom: 8, paddingLeft: 16 }}>
-                  <div style={{ position: 'absolute', left: -16, top: 4, width: 10, height: 10, borderRadius: '50%', background: '#06b6d4', border: '2px solid #18181b' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap', wordBreak: 'break-word' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: -16,
+                      top: 4,
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      background: '#06b6d4',
+                      border: '2px solid #18181b',
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginBottom: 2,
+                      flexWrap: 'wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
                     <span style={{ fontSize: 8, fontWeight: 600, color: '#06b6d4', minWidth: 40 }}>{m.time}</span>
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{m.label}</span>
-                    {m.mpsCheck && (m.mpsCheck.triggers_mTOR
-                      ? <span style={{ fontSize: 9, padding:'2px 6px', borderRadius:4, background:'rgba(0,230,138,0.1)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', marginLeft:4 }}>⚡ mTOR</span>
-                      : <span style={{ fontSize: 9, padding:'2px 6px', borderRadius:4, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', marginLeft:4 }}>⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц</span>)}
-                    {m.rationale && m.rationale.length > 0 && (() => {
-                      const _inter = (m.rationale as string[]).filter(r => r.startsWith('⚠') || r.includes('Синергия'));
-                      const _regular = (m.rationale as string[]).filter(r => !r.startsWith('⚠') && !r.includes('Синергия')).slice(0, 2);
-                      return (
-                        <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.5, fontStyle: 'italic', overflowWrap: 'break-word' }}>
-                          {_regular.map((r: string, i: number) => <div key={i}>• {r}</div>)}
-                          {_inter.map((r: string, i: number) => (
-                            <div key={'i'+i} style={{ marginTop: 2, padding: '1px 4px', borderRadius: 3, fontStyle: 'normal', fontWeight: 600,
-                              background: r.startsWith('⚠') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                              border: `1px solid ${r.startsWith('⚠') ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
-                              color: r.startsWith('⚠') ? '#ef4444' : '#22c55e' }}>{r}</div>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    {m.mpsCheck &&
+                      (m.mpsCheck.triggers_mTOR ? (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            background: 'rgba(0,230,138,0.1)',
+                            border: '1px solid rgba(0,230,138,0.2)',
+                            color: '#00e68a',
+                            marginLeft: 4,
+                          }}
+                        >
+                          ⚡ mTOR
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: 9,
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            background: 'rgba(245,158,11,0.1)',
+                            border: '1px solid rgba(245,158,11,0.2)',
+                            color: '#f59e0b',
+                            marginLeft: 4,
+                          }}
+                        >
+                          ⚠ {Math.round(m.mpsCheck.leucineG * 10) / 10}г лейц
+                        </span>
+                      ))}
+                    {m.rationale &&
+                      m.rationale.length > 0 &&
+                      (() => {
+                        const _inter = (m.rationale as string[]).filter(
+                          (r) => r.startsWith('⚠') || r.includes('Синергия'),
+                        );
+                        const _regular = (m.rationale as string[])
+                          .filter((r) => !r.startsWith('⚠') && !r.includes('Синергия'))
+                          .slice(0, 2);
+                        return (
+                          <div
+                            style={{
+                              fontSize: 9,
+                              color: '#fff',
+                              marginTop: 3,
+                              lineHeight: 1.5,
+                              fontStyle: 'italic',
+                              overflowWrap: 'break-word',
+                            }}
+                          >
+                            {_regular.map((r: string, i: number) => (
+                              <div key={i}>• {r}</div>
+                            ))}
+                            {_inter.map((r: string, i: number) => (
+                              <div
+                                key={'i' + i}
+                                style={{
+                                  marginTop: 2,
+                                  padding: '1px 4px',
+                                  borderRadius: 3,
+                                  fontStyle: 'normal',
+                                  fontWeight: 600,
+                                  background: r.startsWith('⚠') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                                  border: `1px solid ${r.startsWith('⚠') ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.25)'}`,
+                                  color: r.startsWith('⚠') ? '#ef4444' : '#22c55e',
+                                }}
+                              >
+                                {r}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700 }}>{k} ккал</span>
-                    <span style={{ fontSize: 9, color: '#fff' }}>Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}</span>
+                    <span style={{ fontSize: 9, color: '#fff' }}>
+                      Б {Math.round(m.totals?.p || 0)} Ж {Math.round(m.totals?.f || 0)} У {Math.round(m.totals?.c || 0)}
+                    </span>
                   </div>
                   <div style={{ height: 4, borderRadius: 2, background: '#202023', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${w}%`, background: 'linear-gradient(90deg, #06b6d4, #00e68a)', borderRadius: 2 }} />
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${w}%`,
+                        background: 'linear-gradient(90deg, #06b6d4, #00e68a)',
+                        borderRadius: 2,
+                      }}
+                    />
                   </div>
                   <div style={{ fontSize: 9, color: '#fff', marginTop: 2, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {(m.items || []).map((it: any, ii: number) => (
-                      <span key={ii} style={{ background: '#202023', padding: '2px 6px', borderRadius: 4, overflowWrap: 'break-word' }}>{it.name} {it.amount}г</span>
+                      <span
+                        key={ii}
+                        style={{
+                          background: '#202023',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          overflowWrap: 'break-word',
+                        }}
+                      >
+                        {it.name} {it.amount}г
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1536,62 +3475,332 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {recipePickerMeal && generated && dayPlan && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.7)', padding:'12px' }}
-          onClick={() => setRecipePickerMeal(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px', background:'#18181b', boxShadow:'0 18px 54px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
-            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-0.3px' }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied ? (_m?.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт') : '🍳 Заменить'; })()} «{recipePickerMeal.label}» рецептом</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied2 ? `Уже: «${_m.recipeApplied}» + «${_m.recipeApplied2}» — выберите на замену второго` : _m?.recipeApplied ? `Уже: «${_m.recipeApplied}» — выберите второй рецепт (совместимый)` : 'Подходящие рецепты'; })()}</div>
-            <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
-              {_pickerRecipes.length === 0 ? (
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
-              ) : _pickerRecipes.map((r, i) => (
-                <div key={i} style={{ display:'flex', gap:4, width:'100%' }}>
-                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; if (_m?.recipeApplied) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
-                    onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
-                    onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
-                    <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
-                    <div style={{ color:'rgba(255,255,255,0.85)', marginBottom:4 }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', display:'flex', gap:2, flexWrap:'wrap' }}>{(r.tags || []).map(t => <span key={t} style={{ padding:'1px 4px', borderRadius:3, background:'rgba(139,92,246,0.08)', color:'rgba(167,139,250,0.5)' }}>{t}</span>)}</div>
-                  </button>
-                  <button onClick={() => setRecipeDetail(r)} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>ℹ️</button>
-                  {(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied && !_m?.recipeApplied2 ? <button type="button" title="Ужать первый рецепт ×0.65 и добавить этот полноценно (опция B)" onClick={(e) => { e.preventDefault(); e.stopPropagation(); addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx, { shrinkFirst: true }); setRecipePickerMeal(null); }} style={{ width:36, height:36, borderRadius:10, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.12)', border:'1px dashed rgba(139,92,246,0.45)', color:'#c4b5fd', fontSize:14, flexShrink:0, alignSelf:'flex-start', marginTop:8 }}>⚖️</button> : null; })()}
-                </div>
-              ))}
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)',
+            padding: '12px',
+          }}
+          onClick={() => setRecipePickerMeal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              padding: '14px 20px 28px',
+              borderRadius: '20px',
+              background: '#18181b',
+              boxShadow: '0 18px 54px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: 'rgba(255,255,255,0.15)',
+                margin: '0 auto 16px',
+              }}
+            />
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4, letterSpacing: '-0.3px' }}>
+              {(function () {
+                const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx];
+                return _m?.recipeApplied
+                  ? _m?.recipeApplied2
+                    ? '🍳 Заменить второй рецепт'
+                    : '➕ Добавить второй рецепт'
+                  : '🍳 Заменить';
+              })()}{' '}
+              «{recipePickerMeal.label}» рецептом
             </div>
-            <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:9, fontWeight:600 }}>✕ Отмена</button>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 12 }}>
+              {(function () {
+                const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx];
+                return _m?.recipeApplied2
+                  ? `Уже: «${_m.recipeApplied}» + «${_m.recipeApplied2}» — выберите на замену второго`
+                  : _m?.recipeApplied
+                    ? `Уже: «${_m.recipeApplied}» — выберите второй рецепт (совместимый)`
+                    : 'Подходящие рецепты';
+              })()}
+            </div>
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {_pickerRecipes.length === 0 ? (
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'center', padding: 10 }}>
+                  Нет рецептов для этого приёма.
+                </div>
+              ) : (
+                _pickerRecipes.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 4, width: '100%' }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx];
+                        if (_m?.recipeApplied) {
+                          addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx);
+                        } else {
+                          replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx);
+                        }
+                        setRecipePickerMeal(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        background: '#202023',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        color: '#fff',
+                        fontSize: 9,
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => ((e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)')}
+                      onMouseLeave={(e) => ((e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)')}
+                    >
+                      <div style={{ fontWeight: 700, color: '#a78bfa', fontSize: 10, marginBottom: 2 }}>{r.name}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                        ⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.8)',
+                          display: 'flex',
+                          gap: 2,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {(r.tags || []).map((t) => (
+                          <span
+                            key={t}
+                            style={{
+                              padding: '1px 4px',
+                              borderRadius: 3,
+                              background: 'rgba(139,92,246,0.08)',
+                              color: 'rgba(167,139,250,0.5)',
+                            }}
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setRecipeDetail(r)}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#202023',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: 14,
+                        flexShrink: 0,
+                        alignSelf: 'flex-start',
+                        marginTop: 8,
+                      }}
+                    >
+                      ℹ️
+                    </button>
+                    {(function () {
+                      const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx];
+                      return _m?.recipeApplied && !_m?.recipeApplied2 ? (
+                        <button
+                          type="button"
+                          title="Ужать первый рецепт ×0.65 и добавить этот полноценно (опция B)"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx, {
+                              shrinkFirst: true,
+                            });
+                            setRecipePickerMeal(null);
+                          }}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: 'rgba(139,92,246,0.12)',
+                            border: '1px dashed rgba(139,92,246,0.45)',
+                            color: '#c4b5fd',
+                            fontSize: 14,
+                            flexShrink: 0,
+                            alignSelf: 'flex-start',
+                            marginTop: 8,
+                          }}
+                        >
+                          ⚖️
+                        </button>
+                      ) : null;
+                    })()}
+                  </div>
+                ))
+              )}
+            </div>
+            <button
+              onClick={() => setRecipePickerMeal(null)}
+              style={{
+                width: '100%',
+                marginTop: 8,
+                padding: '6px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.06)',
+                background: '#202023',
+                color: 'rgba(255,255,255,0.85)',
+                fontSize: 9,
+                fontWeight: 600,
+              }}
+            >
+              ✕ Отмена
+            </button>
           </div>
         </div>
       )}
 
       {/* P4a-диалог: второй рецепт не влез в закрытый приём — явный выбор */}
       {secondRecipeConflict && generated && dayPlan && (
-        <div style={{ position:'fixed', inset:0, zIndex:105, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.75)', padding:'12px' }}
-          onClick={() => setSecondRecipeConflict(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 22px', borderRadius:'20px', background:'#18181b', boxShadow:'0 18px 54px rgba(0,0,0,0.5)', border:'1px solid rgba(245,158,11,0.25)' }}>
-            <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
-            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>⚠️ Приём закрыт — куда деть «{secondRecipeConflict.recipe?.name}»?</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', marginBottom:12 }}>
-              Цель приёма ~{Math.round(secondRecipeConflict.targetKcal)} ккал, первый рецепт уже {Math.round(secondRecipeConflict.firstKcal)} ккал
-              {secondRecipeConflict.roomKcal > 0 ? ` (свободно ~${Math.round(secondRecipeConflict.roomKcal)} ккал)` : ' (места нет)'}. День не разъедется: ребаланс держит итоги.
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 105,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.75)',
+            padding: '12px',
+          }}
+          onClick={() => setSecondRecipeConflict(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              padding: '14px 20px 22px',
+              borderRadius: '20px',
+              background: '#18181b',
+              boxShadow: '0 18px 54px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(245,158,11,0.25)',
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: 'rgba(255,255,255,0.15)',
+                margin: '0 auto 16px',
+              }}
+            />
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+              ⚠️ Приём закрыт — куда деть «{secondRecipeConflict.recipe?.name}»?
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              <button type="button" onClick={() => { const c = secondRecipeConflict; setSecondRecipeConflict(null); addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { shrinkFirst: true }); }}
-                style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.45)', color:'#c4b5fd', fontSize:10, fontWeight:700 }}>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 12 }}>
+              Цель приёма ~{Math.round(secondRecipeConflict.targetKcal)} ккал, первый рецепт уже{' '}
+              {Math.round(secondRecipeConflict.firstKcal)} ккал
+              {secondRecipeConflict.roomKcal > 0
+                ? ` (свободно ~${Math.round(secondRecipeConflict.roomKcal)} ккал)`
+                : ' (места нет)'}
+              . День не разъедется: ребаланс держит итоги.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const c = secondRecipeConflict;
+                  setSecondRecipeConflict(null);
+                  addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { shrinkFirst: true });
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: 'rgba(139,92,246,0.12)',
+                  border: '1px solid rgba(139,92,246,0.45)',
+                  color: '#c4b5fd',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
                 ⚖️ Ужать первый ×0.65 — второй влезет полноценно
               </button>
-              <button type="button" onClick={() => { setSecondRecipeConflict(null); addSecondRecipeWithSnackRoom(); }}
-                style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'rgba(34,197,94,0.10)', border:'1px solid rgba(34,197,94,0.4)', color:'#86efac', fontSize:10, fontWeight:700 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSecondRecipeConflict(null);
+                  addSecondRecipeWithSnackRoom();
+                }}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  background: 'rgba(34,197,94,0.10)',
+                  border: '1px solid rgba(34,197,94,0.4)',
+                  color: '#86efac',
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
                 🥜 Забрать из перекусов — ужа́ть снеки, второй полностью
               </button>
               {secondRecipeConflict.miniKcal > 0 && (
-                <button type="button" onClick={() => { const c = secondRecipeConflict; setSecondRecipeConflict(null); addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { acceptedMini: true }); }}
-                  style={{ padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(245,158,11,0.4)', color:'#fbbf24', fontSize:10, fontWeight:700 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = secondRecipeConflict;
+                    setSecondRecipeConflict(null);
+                    addSecondRecipeToMeal(c.recipe, c.mealIdx, c.dayIdx, { acceptedMini: true });
+                  }}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    background: '#202023',
+                    border: '1px solid rgba(245,158,11,0.4)',
+                    color: '#fbbf24',
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
                   ➕ Всё равно мини-порцию (~{Math.round(secondRecipeConflict.miniKcal)} ккал)
                 </button>
               )}
-              <button type="button" onClick={() => setSecondRecipeConflict(null)}
-                style={{ padding:'8px 12px', borderRadius:12, cursor:'pointer', background:'transparent', border:'1px solid rgba(255,255,255,0.12)', color:'rgba(255,255,255,0.7)', fontSize:10, fontWeight:600 }}>
+              <button
+                type="button"
+                onClick={() => setSecondRecipeConflict(null)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              >
                 ✕ Отмена
               </button>
             </div>
@@ -1601,60 +3810,178 @@ const doImportPlan = (raw: string): boolean => {
 
       {/* Recipe detail popup */}
       {recipeDetail && (
-        <div style={{ position:'fixed', inset:0, zIndex:110, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => setRecipeDetail(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'90%', maxWidth:380, maxHeight:'80vh', padding:18, borderRadius:16, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)', overflowY:'auto' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 110,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)',
+          }}
+          onClick={() => setRecipeDetail(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '90%',
+              maxWidth: 380,
+              maxHeight: '80vh',
+              padding: 18,
+              borderRadius: 16,
+              background: '#18181b',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+              overflowY: 'auto',
+            }}
+          >
+            <div
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}
+            >
               <div>
-                <div style={{ fontSize:15, fontWeight:700, color:'#a78bfa', marginBottom:2 }}>{recipeDetail.name}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>⏱ {recipeDetail.prepTimeMin} мин · {recipeDetail.kcal} ккал</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>
+                  {recipeDetail.name}
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                  ⏱ {recipeDetail.prepTimeMin} мин · {recipeDetail.kcal} ккал
+                </div>
               </div>
-              <button onClick={() => setRecipeDetail(null)} style={{ width:28, height:28, borderRadius:'50%', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'none', color:'rgba(255,255,255,0.5)', fontSize:12 }}>✕</button>
+              <button
+                onClick={() => setRecipeDetail(null)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: 'none',
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: 12,
+                }}
+              >
+                ✕
+              </button>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:10 }}>
-              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)', textAlign:'center' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#22c55e' }}>{recipeDetail.protein}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Белки</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 10 }}>
+              <div
+                style={{
+                  padding: '6px 4px',
+                  borderRadius: 8,
+                  background: 'rgba(34,197,94,0.06)',
+                  border: '1px solid rgba(34,197,94,0.1)',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#22c55e' }}>{recipeDetail.protein}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Белки</div>
               </div>
-              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)', textAlign:'center' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#f59e0b' }}>{recipeDetail.fat}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Жиры</div>
+              <div
+                style={{
+                  padding: '6px 4px',
+                  borderRadius: 8,
+                  background: 'rgba(245,158,11,0.06)',
+                  border: '1px solid rgba(245,158,11,0.1)',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f59e0b' }}>{recipeDetail.fat}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Жиры</div>
               </div>
-              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(249,115,22,0.06)', border:'1px solid rgba(249,115,22,0.1)', textAlign:'center' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#f97316' }}>{recipeDetail.carbs}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>Угл</div>
+              <div
+                style={{
+                  padding: '6px 4px',
+                  borderRadius: 8,
+                  background: 'rgba(249,115,22,0.06)',
+                  border: '1px solid rgba(249,115,22,0.1)',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#f97316' }}>{recipeDetail.carbs}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Угл</div>
               </div>
-              <div style={{ padding:'6px 4px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.1)', textAlign:'center' }}>
-                <div style={{ fontSize:14, fontWeight:700, color:'#8b5cf6' }}>{(recipeDetail.kcal && recipeDetail.kcal > 0) ? Math.round(recipeDetail.protein*4/recipeDetail.kcal*100) : 0}%</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>% белка</div>
+              <div
+                style={{
+                  padding: '6px 4px',
+                  borderRadius: 8,
+                  background: 'rgba(139,92,246,0.06)',
+                  border: '1px solid rgba(139,92,246,0.1)',
+                  textAlign: 'center',
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#8b5cf6' }}>
+                  {recipeDetail.kcal && recipeDetail.kcal > 0
+                    ? Math.round(((recipeDetail.protein * 4) / recipeDetail.kcal) * 100)
+                    : 0}
+                  %
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>% белка</div>
               </div>
             </div>
             {recipeDetail.ingredients?.length > 0 && (
-              <div style={{ marginBottom:10 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:4 }}>🥕 Ингредиенты</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                  {recipeDetail.ingredients.map((ing:string, i:number) => (
-                    <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'2px 6px', background:'rgba(249,115,22,0.04)', borderRadius:4 }}>• {ing}</div>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>🥕 Ингредиенты</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {recipeDetail.ingredients.map((ing: string, i: number) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.85)',
+                        padding: '2px 6px',
+                        background: 'rgba(249,115,22,0.04)',
+                        borderRadius: 4,
+                      }}
+                    >
+                      • {ing}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
             {recipeDetail.instructions?.length > 0 && (
-              <div style={{ marginBottom:10 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>📝 Инструкция</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                  {recipeDetail.instructions.map((step:string, i:number) => (
-                    <div key={i} style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'4px 6px', background:'rgba(96,165,250,0.04)', borderRadius:4, lineHeight:1.4 }}>
-                      <span style={{ fontWeight:700, color:'#60a5fa', marginRight:4 }}>{i+1}.</span>{step}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>📝 Инструкция</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {recipeDetail.instructions.map((step: string, i: number) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.85)',
+                        padding: '4px 6px',
+                        background: 'rgba(96,165,250,0.04)',
+                        borderRadius: 4,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, color: '#60a5fa', marginRight: 4 }}>{i + 1}.</span>
+                      {step}
                     </div>
                   ))}
                 </div>
               </div>
             )}
             {recipeDetail.tags?.length > 0 && (
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                {recipeDetail.tags.map((t:string, i:number) => (
-                  <span key={i} style={{ padding:'2px 7px', borderRadius:5, background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.12)', color:'#a78bfa', fontSize:10, fontWeight:600 }}>{t}</span>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {recipeDetail.tags.map((t: string, i: number) => (
+                  <span
+                    key={i}
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: 5,
+                      background: 'rgba(139,92,246,0.08)',
+                      border: '1px solid rgba(139,92,246,0.12)',
+                      color: '#a78bfa',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {t}
+                  </span>
                 ))}
               </div>
             )}
@@ -1663,38 +3990,72 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {generated && undoStack.length > 0 && (
-        <button onClick={() => undoLast()} className="plan-actbtn" style={{ width:'100%', padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:11, fontWeight:700 }}>
+        <button
+          onClick={() => undoLast()}
+          className="plan-actbtn"
+          style={{
+            width: '100%',
+            padding: '10px 8px',
+            minHeight: 44,
+            borderRadius: 10,
+            cursor: 'pointer',
+            border: '1px solid rgba(96,165,250,0.2)',
+            background: 'rgba(96,165,250,0.06)',
+            color: '#60a5fa',
+            fontSize: 11,
+            fontWeight: 700,
+          }}
+        >
           ↩ Отменить ({undoStack.length})
         </button>
       )}
 
       {generated && (
-        <div style={{ display:'flex', gap:8 }}>
-          <button onClick={saveCurrentPlan} style={{
-            ...greenBtn, background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
-            fontSize: 13, padding: 12, flex:1,
-            boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
-          }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={saveCurrentPlan}
+            style={{
+              ...greenBtn,
+              background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)',
+              fontSize: 13,
+              padding: 12,
+              flex: 1,
+              boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
+            }}
+          >
             💾 Сохранить в мои планы
           </button>
-          <button onClick={() => {
-            const res = addPlanToDiary();
-            if (res.ok) {
-              const scope = planDays === 7 ? `Неделя (${weekPlan?.days?.length || 7} дн)` : planDays === 3 ? '3 дня' : 'День';
-              // FIX B3: честное сообщение — сколько записей реально добавлено и
-              // сколько уже было (раньше при повторном нажатии всё дублировалось молча).
-              const msg = res.added > 0
-                ? `📒 ${scope} → дневник${res.skipped > 0 ? ` (+${res.skipped} уже было)` : ''}`
-                : `📒 ${scope} уже в дневнике — дублей не создано`;
-              // @ts-ignore
-              if (typeof (window as any).showToast === 'function') (window as any).showToast(msg, res.added > 0 ? 'success' : 'info');
-              else alert(msg);
-            }
-          }} style={{
-            flex:1, padding:12, borderRadius:14, border:'none', cursor:'pointer',
-            background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000',
-            fontWeight:700, fontSize:13, boxShadow:'0 4px 16px rgba(0,230,138,0.2)',
-          }}>
+          <button
+            onClick={() => {
+              const res = addPlanToDiary();
+              if (res.ok) {
+                const scope =
+                  planDays === 7 ? `Неделя (${weekPlan?.days?.length || 7} дн)` : planDays === 3 ? '3 дня' : 'День';
+                // FIX B3: честное сообщение — сколько записей реально добавлено и
+                // сколько уже было (раньше при повторном нажатии всё дублировалось молча).
+                const msg =
+                  res.added > 0
+                    ? `📒 ${scope} → дневник${res.skipped > 0 ? ` (+${res.skipped} уже было)` : ''}`
+                    : `📒 ${scope} уже в дневнике — дублей не создано`;
+                // @ts-ignore
+                if (typeof (window as any).showToast === 'function')
+                  (window as any).showToast(msg, res.added > 0 ? 'success' : 'info');
+                else alert(msg);
+              }
+            }}
+            style={{
+              flex: 1,
+              padding: 12,
+              borderRadius: 14,
+              border: 'none',
+              cursor: 'pointer',
+              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: 13,
+              boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
+            }}
+          >
             {planDays === 7 ? '📒 В дневник (неделя)' : planDays === 3 ? '📒 В дневник (3 дня)' : '📒 В дневник'}
           </button>
         </div>
@@ -1713,185 +4074,718 @@ const doImportPlan = (raw: string): boolean => {
               const plans = plansRaw ? JSON.parse(plansRaw) : [];
               if (plans.length >= 1) ach.push({ label: 'Первый сохранённый план', earned: true, icon: '💾' });
               if (plans.length >= 5) ach.push({ label: '5 планов', earned: true, icon: '📚' });
-              if (localStorage.getItem('he_off_cache')) ach.push({ label: 'Сканировал штрих-код', earned: true, icon: '📷' });
+              if (localStorage.getItem('he_off_cache'))
+                ach.push({ label: 'Сканировал штрих-код', earned: true, icon: '📷' });
             } catch {}
             const month = new Date().getMonth();
             const seasonal = [
-              { months: [5,6,7,8], label: '🥒 Огурцы, помидоры, ягоды, зелень' },
-              { months: [9,10], label: '🍂 Тыква, кабачки, яблоки, виноград' },
-              { months: [11,12,1,2], label: '🥬 Цитрусовые, хурма, гранаты, свёкла' },
-              { months: [3,4], label: '🌱 Спаржа, редис, шпинат, первая зелень' },
-            ].find(s => s.months.includes(month));
-            return <>
-              {ach.length > 0 && <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>
-                {ach.map(a => <span key={a.label} style={{ padding:'3px 8px', borderRadius:6, fontSize:9, background:'rgba(244,114,182,0.08)', border:'1px solid rgba(244,114,182,0.15)', color:'#f472b6' }}>{a.icon} {a.label}</span>)}
-              </div>}
-              {seasonal && <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'4px 8px', borderRadius:6, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.1)' }}>🌿 Сезонные продукты: {seasonal.label}</div>}
-              {ach.length === 0 && <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)' }}>Начните вести дневник питания, чтобы получать достижения.</div>}
-            </>;
+              { months: [5, 6, 7, 8], label: '🥒 Огурцы, помидоры, ягоды, зелень' },
+              { months: [9, 10], label: '🍂 Тыква, кабачки, яблоки, виноград' },
+              { months: [11, 12, 1, 2], label: '🥬 Цитрусовые, хурма, гранаты, свёкла' },
+              { months: [3, 4], label: '🌱 Спаржа, редис, шпинат, первая зелень' },
+            ].find((s) => s.months.includes(month));
+            return (
+              <>
+                {ach.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                    {ach.map((a) => (
+                      <span
+                        key={a.label}
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          fontSize: 9,
+                          background: 'rgba(244,114,182,0.08)',
+                          border: '1px solid rgba(244,114,182,0.15)',
+                          color: '#f472b6',
+                        }}
+                      >
+                        {a.icon} {a.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {seasonal && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: 'rgba(255,255,255,0.85)',
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(34,197,94,0.06)',
+                      border: '1px solid rgba(34,197,94,0.1)',
+                    }}
+                  >
+                    🌿 Сезонные продукты: {seasonal.label}
+                  </div>
+                )}
+                {ach.length === 0 && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>
+                    Начните вести дневник питания, чтобы получать достижения.
+                  </div>
+                )}
+              </>
+            );
           })()}
         </GlassCard>
       )}
 
-      <button onClick={() => setShowRecipeCreator(true)} className="plan-actbtn" style={{ width:'100%', padding:'10px 8px', minHeight:44, borderRadius:10, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:11, fontWeight:700, marginTop:4 }}>
+      <button
+        onClick={() => setShowRecipeCreator(true)}
+        className="plan-actbtn"
+        style={{
+          width: '100%',
+          padding: '10px 8px',
+          minHeight: 44,
+          borderRadius: 10,
+          cursor: 'pointer',
+          border: '1px solid rgba(249,115,22,0.2)',
+          background: 'rgba(249,115,22,0.06)',
+          color: '#f97316',
+          fontSize: 11,
+          fontWeight: 700,
+          marginTop: 4,
+        }}
+      >
         🍳 Создать свой рецепт
       </button>
       {showRecipeCreator && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)' }}
-          onClick={() => setShowRecipeCreator(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'88%', maxWidth:380, maxHeight:'85vh', overflowY:'auto', padding:0, borderRadius:20, background:'#1c1c1e', boxShadow:'0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)' }}>
-            <div style={{ padding:'20px 20px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:17, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🍳 Создать рецепт</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginTop:2 }}>Заполните информацию о блюде</div>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+          }}
+          onClick={() => setShowRecipeCreator(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '88%',
+              maxWidth: 380,
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              padding: 0,
+              borderRadius: 20,
+              background: '#1c1c1e',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+            }}
+          >
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>🍳 Создать рецепт</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+                Заполните информацию о блюде
+              </div>
             </div>
-            <div style={{ padding:'12px 20px 20px', display:'flex', flexDirection:'column', gap:8 }}>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Название</div>
-              <input value={newRecipe.name} onChange={e => setNewRecipe({...newRecipe, name: e.target.value})} placeholder="Название рецепта" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', fontWeight:500 }} />
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Приём и время</div>
-              <div style={{ display:'flex', gap:6 }}>
+            <div style={{ padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>Название</div>
+              <input
+                value={newRecipe.name}
+                onChange={(e) => setNewRecipe({ ...newRecipe, name: e.target.value })}
+                placeholder="Название рецепта"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  fontSize: 15,
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  fontWeight: 500,
+                }}
+              />
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>Приём и время</div>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {/* P1-UX: попап-выбор вместо нативного select */}
-                <div style={{ flex:1 }}>
-                  <PopupSelect label="Приём" value={newRecipe.meal}
-                    options={[{ id:'breakfast', label:'Завтрак' },{ id:'lunch', label:'Обед' },{ id:'dinner', label:'Ужин' },{ id:'snack', label:'Перекус' }]}
-                    onChange={v => setNewRecipe({...newRecipe, meal: v})} />
+                <div style={{ flex: 1 }}>
+                  <PopupSelect
+                    label="Приём"
+                    value={newRecipe.meal}
+                    options={[
+                      { id: 'breakfast', label: 'Завтрак' },
+                      { id: 'lunch', label: 'Обед' },
+                      { id: 'dinner', label: 'Ужин' },
+                      { id: 'snack', label: 'Перекус' },
+                    ]}
+                    onChange={(v) => setNewRecipe({ ...newRecipe, meal: v })}
+                  />
                 </div>
-                <input type="number" min={0} value={newRecipe.prepTime} onChange={e => setNewRecipe({...newRecipe, prepTime: e.target.value === '' ? 10 : Math.max(0, +e.target.value)})} placeholder="Мин" style={{ width:80, padding:'12px 10px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:500 }} />
+                <input
+                  type="number"
+                  min={0}
+                  value={newRecipe.prepTime}
+                  onChange={(e) =>
+                    setNewRecipe({ ...newRecipe, prepTime: e.target.value === '' ? 10 : Math.max(0, +e.target.value) })
+                  }
+                  placeholder="Мин"
+                  style={{
+                    width: 80,
+                    padding: '12px 10px',
+                    borderRadius: 12,
+                    background: '#18181b',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    fontSize: 15,
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    textAlign: 'center',
+                    fontWeight: 500,
+                  }}
+                />
               </div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>КБЖУ (на порцию)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5 }}>
-                {[{k:'kcal',l:'Ккал',c:'#22c55e'},{k:'protein',l:'Белки',c:'#3b82f6'},{k:'fat',l:'Жиры',c:'#f59e0b'},{k:'carbs',l:'Угл',c:'#f97316'}].map(f => <div key={f.k}><input type="number" min={0} value={(newRecipe as Record<string,number|string>)[f.k] as number} onChange={e => setNewRecipe({...newRecipe, [f.k]: Math.max(0, +e.target.value || 0)})} placeholder={f.l} style={{ width:'100%', padding:'14px 6px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:f.c, fontSize:15, boxSizing:'border-box', outline:'none', textAlign:'center', fontWeight:700 }} /></div>)}
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>КБЖУ (на порцию)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5 }}>
+                {[
+                  { k: 'kcal', l: 'Ккал', c: '#22c55e' },
+                  { k: 'protein', l: 'Белки', c: '#3b82f6' },
+                  { k: 'fat', l: 'Жиры', c: '#f59e0b' },
+                  { k: 'carbs', l: 'Угл', c: '#f97316' },
+                ].map((f) => (
+                  <div key={f.k}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={(newRecipe as Record<string, number | string>)[f.k] as number}
+                      onChange={(e) => setNewRecipe({ ...newRecipe, [f.k]: Math.max(0, +e.target.value || 0) })}
+                      placeholder={f.l}
+                      style={{
+                        width: '100%',
+                        padding: '14px 6px',
+                        borderRadius: 12,
+                        background: '#18181b',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        color: f.c,
+                        fontSize: 15,
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        textAlign: 'center',
+                        fontWeight: 700,
+                      }}
+                    />
+                  </div>
+                ))}
               </div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Ингредиенты и их КБЖУ</div>
-              <IngredientRowsEditor compact
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>Ингредиенты и их КБЖУ</div>
+              <IngredientRowsEditor
+                compact
                 rows={newRecipe.ingredientRows || []}
-                onChange={rows => setNewRecipe({...newRecipe, ingredientRows: rows})}
-                onUseTotals={totals => setNewRecipe({...newRecipe,
-                  kcal: Math.round(totals.kcal),
-                  protein: Math.round(totals.p * 10) / 10,
-                  fat: Math.round(totals.f * 10) / 10,
-                  carbs: Math.round(totals.c * 10) / 10,
-                })} />
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Приготовление</div>
-              <textarea value={newRecipe.instructions} onChange={e => setNewRecipe({...newRecipe, instructions: e.target.value})} placeholder="Инструкция (каждый шаг с новой строки)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', minHeight:64, resize:'vertical', fontSize:13, lineHeight:1.4 }} rows={3} />
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:3 }}>Теги</div>
-              <input value={newRecipe.tags} onChange={e => setNewRecipe({...newRecipe, tags: e.target.value})} placeholder="Теги (через запятую)" style={{ width:'100%', padding:'12px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', boxSizing:'border-box', outline:'none', fontSize:13 }} />
-              <button onClick={() => {
-                if (!newRecipe.name.trim()) { setErrorMsg('Укажите название рецепта'); return; }
-                // Состав с КБЖУ главнее введённого итога: правка продукта сразу
-                // меняет калорийность рецепта, как и в Кухне.
-                const components = rowsToComponents(newRecipe.ingredientRows || []);
-                const totals = sumIngredientComponents(components);
-                const kcal = totals.kcal > 0 ? Math.round(totals.kcal) : Number(newRecipe.kcal);
-                // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
-                if (!Number.isFinite(kcal) || kcal <= 0) { setErrorMsg('Укажите калорийность рецепта больше 0'); return; }
-                // Общее хранилище: рецепт из планировщика сразу виден в Кухне,
-                // выборе рецепта для дневника и в «Избранном».
-                const saved = createUserRecipe({
-                  name: newRecipe.name,
-                  ingredients: newRecipe.ingredients,
-                  // Состав с КБЖУ по продуктам: попадёт в дневник построчно,
-                  // без пересборки из текста.
-                  ingredientRows: components,
-                  instructions: newRecipe.instructions,
-                  kcal,
-                  protein: totals.p > 0 ? Math.round(totals.p * 10) / 10 : Number(newRecipe.protein),
-                  fat: totals.f > 0 ? Math.round(totals.f * 10) / 10 : Number(newRecipe.fat),
-                  carbs: totals.c > 0 ? Math.round(totals.c * 10) / 10 : Number(newRecipe.carbs),
-                  meal: newRecipe.meal,
-                  prepTimeMin: Number(newRecipe.prepTime),
-                  tags: newRecipe.tags,
-                });
-                // Локальное состояние планировщика — в его формате (prepTime);
-                // одноимённый старый рецепт заменяем, как и в хранилище.
-                setUserRecipes([
-                  ...userRecipes.filter((r: any) => recipeKey(String(r?.name || '')) !== recipeKey(saved.name)),
-                  { ...saved, prepTime: saved.prepTimeMin ?? 10, userCreated: true },
-                ]);
-                setShowRecipeCreator(false);
-                setNewRecipe({ name: '', meal: 'lunch', prepTime: 10, kcal: 400, protein: 30, fat: 10, carbs: 40, ingredients: '', ingredientRows: [], instructions: '', tags: '' });
-              }} style={{ width:'100%', padding:'13px', borderRadius:14, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:15, fontWeight:700, letterSpacing:0.2 }}>✓ Сохранить рецепт</button>
+                onChange={(rows) => setNewRecipe({ ...newRecipe, ingredientRows: rows })}
+                onUseTotals={(totals) =>
+                  setNewRecipe({
+                    ...newRecipe,
+                    kcal: Math.round(totals.kcal),
+                    protein: Math.round(totals.p * 10) / 10,
+                    fat: Math.round(totals.f * 10) / 10,
+                    carbs: Math.round(totals.c * 10) / 10,
+                  })
+                }
+              />
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>Приготовление</div>
+              <textarea
+                value={newRecipe.instructions}
+                onChange={(e) => setNewRecipe({ ...newRecipe, instructions: e.target.value })}
+                placeholder="Инструкция (каждый шаг с новой строки)"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  minHeight: 64,
+                  resize: 'vertical',
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                }}
+                rows={3}
+              />
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 3 }}>Теги</div>
+              <input
+                value={newRecipe.tags}
+                onChange={(e) => setNewRecipe({ ...newRecipe, tags: e.target.value })}
+                placeholder="Теги (через запятую)"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#18181b',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                  fontSize: 13,
+                }}
+              />
+              <button
+                onClick={() => {
+                  if (!newRecipe.name.trim()) {
+                    setErrorMsg('Укажите название рецепта');
+                    return;
+                  }
+                  // Состав с КБЖУ главнее введённого итога: правка продукта сразу
+                  // меняет калорийность рецепта, как и в Кухне.
+                  const components = rowsToComponents(newRecipe.ingredientRows || []);
+                  const totals = sumIngredientComponents(components);
+                  const kcal = totals.kcal > 0 ? Math.round(totals.kcal) : Number(newRecipe.kcal);
+                  // FIX input-audit: рецепт с kcal<=0 ломал масштабирование граммовок при замене
+                  if (!Number.isFinite(kcal) || kcal <= 0) {
+                    setErrorMsg('Укажите калорийность рецепта больше 0');
+                    return;
+                  }
+                  // Общее хранилище: рецепт из планировщика сразу виден в Кухне,
+                  // выборе рецепта для дневника и в «Избранном».
+                  const saved = createUserRecipe({
+                    name: newRecipe.name,
+                    ingredients: newRecipe.ingredients,
+                    // Состав с КБЖУ по продуктам: попадёт в дневник построчно,
+                    // без пересборки из текста.
+                    ingredientRows: components,
+                    instructions: newRecipe.instructions,
+                    kcal,
+                    protein: totals.p > 0 ? Math.round(totals.p * 10) / 10 : Number(newRecipe.protein),
+                    fat: totals.f > 0 ? Math.round(totals.f * 10) / 10 : Number(newRecipe.fat),
+                    carbs: totals.c > 0 ? Math.round(totals.c * 10) / 10 : Number(newRecipe.carbs),
+                    meal: newRecipe.meal,
+                    prepTimeMin: Number(newRecipe.prepTime),
+                    tags: newRecipe.tags,
+                  });
+                  // Локальное состояние планировщика — в его формате (prepTime);
+                  // одноимённый старый рецепт заменяем, как и в хранилище.
+                  setUserRecipes([
+                    ...userRecipes.filter((r: any) => recipeKey(String(r?.name || '')) !== recipeKey(saved.name)),
+                    { ...saved, prepTime: saved.prepTimeMin ?? 10, userCreated: true },
+                  ]);
+                  setShowRecipeCreator(false);
+                  setNewRecipe({
+                    name: '',
+                    meal: 'lunch',
+                    prepTime: 10,
+                    kcal: 400,
+                    protein: 30,
+                    fat: 10,
+                    carbs: 40,
+                    ingredients: '',
+                    ingredientRows: [],
+                    instructions: '',
+                    tags: '',
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: 14,
+                  cursor: 'pointer',
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                  color: '#000',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  letterSpacing: 0.2,
+                }}
+              >
+                ✓ Сохранить рецепт
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {generated && shoppingList && (
-        <GlassCard title="Список покупок" icon="🛒" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
+        <GlassCard
+          title="Список покупок"
+          icon="🛒"
+          color="#f97316"
+          style={{ border: '1px solid rgba(249,115,22,0.15)' }}
+        >
           {(() => {
-            const CAT_RU: Record<string, string> = { protein:'🥩 Мясо/Рыба/Яйца', dairy:'🥛 Молочные продукты', grain:'🌾 Крупы/Хлеб', carb:'🥔 Овощи/Корнеплоды', veg_fruit:'🥦 Овощи/Фрукты', fat:'🥑 Жиры/Масла/Орехи', supplement:'💊 Спортпит', fast_food:'🍔 Фастфуд', other:'📦 Прочее' };
+            const CAT_RU: Record<string, string> = {
+              protein: '🥩 Мясо/Рыба/Яйца',
+              dairy: '🥛 Молочные продукты',
+              grain: '🌾 Крупы/Хлеб',
+              carb: '🥔 Овощи/Корнеплоды',
+              veg_fruit: '🥦 Овощи/Фрукты',
+              fat: '🥑 Жиры/Масла/Орехи',
+              supplement: '💊 Спортпит',
+              fast_food: '🍔 Фастфуд',
+              other: '📦 Прочее',
+            };
             const groups: Record<string, any[]> = {};
             shoppingList.forEach((item: any) => {
               const cat = CAT_RU[item.catLabel || item.category] || item.catLabel || item.category || '📦 Прочее';
               if (!groups[cat]) groups[cat] = [];
               const existing = groups[cat].find((g: any) => g.id === item.id);
-              if (existing) { existing.amount += item.amount || 0; existing.packs = (existing.packs || 1) + 1; }
-              else groups[cat].push({ ...item, packs: 1 });
+              if (existing) {
+                existing.amount += item.amount || 0;
+                existing.packs = (existing.packs || 1) + 1;
+              } else groups[cat].push({ ...item, packs: 1 });
             });
             const allItems = Object.values(groups).flat() as any[];
             const totalItems = allItems.length;
             const totalGrams = allItems.reduce((s: number, i: any) => s + (i.amount || 0), 0);
             const pricePerKg: Record<string, number> = { low: 4, medium: 7, max: 12, enhanced: 18 };
-            const estCost = Math.round(totalGrams / 1000 * (pricePerKg[budget] || 7));
-            const exportText = allItems.map((i: any) => `${i.name} — ${i.amount >= 1000 ? `${(i.amount/1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`).join('\n');
+            const estCost = Math.round((totalGrams / 1000) * (pricePerKg[budget] || 7));
+            const exportText = allItems
+              .map(
+                (i: any) =>
+                  `${i.name} — ${i.amount >= 1000 ? `${(i.amount / 1000).toFixed(1)} кг` : `${Math.round(i.amount)} г`}`,
+              )
+              .join('\n');
             // 🟠8 — Checked items state (already declared at top of component)
-            const toggleChecked = (id: string) => { setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); try { localStorage.setItem('he_shopping_checked', JSON.stringify([...n])); } catch {} return n; }); };
+            const toggleChecked = (id: string) => {
+              setChecked((prev) => {
+                const n = new Set(prev);
+                if (n.has(id)) n.delete(id);
+                else n.add(id);
+                try {
+                  localStorage.setItem('he_shopping_checked', JSON.stringify([...n]));
+                } catch {}
+                return n;
+              });
+            };
             const checkedCount = allItems.filter((i: any) => checked.has(i.id)).length;
             // 🟡13 — Pack estimates
-            const PACK_SIZES: Record<string, number> = { chicken_breast:500, turkey_breast:500, beef_steak:400, salmon:300, cod:400, tuna:200, egg_whole:600, egg_white:500, rice_white:900, buckwheat:800, pasta:500, oatmeal:500, potato:1000, broccoli:400, cauliflower:500, carrot:1000, tomato:500, cucumber:400, spinach:200, milk:1000, yogurt_greek:500, cottage_cheese_5:250, cheese:200, butter:200, olive_oil:500, avocado:200, nuts_almonds:200, banana:1000, apple:1000, berries:300, bread_white:500, whey_isolate:1000, casein:1000, creatine:500 };
+            const PACK_SIZES: Record<string, number> = {
+              chicken_breast: 500,
+              turkey_breast: 500,
+              beef_steak: 400,
+              salmon: 300,
+              cod: 400,
+              tuna: 200,
+              egg_whole: 600,
+              egg_white: 500,
+              rice_white: 900,
+              buckwheat: 800,
+              pasta: 500,
+              oatmeal: 500,
+              potato: 1000,
+              broccoli: 400,
+              cauliflower: 500,
+              carrot: 1000,
+              tomato: 500,
+              cucumber: 400,
+              spinach: 200,
+              milk: 1000,
+              yogurt_greek: 500,
+              cottage_cheese_5: 250,
+              cheese: 200,
+              butter: 200,
+              olive_oil: 500,
+              avocado: 200,
+              nuts_almonds: 200,
+              banana: 1000,
+              apple: 1000,
+              berries: 300,
+              bread_white: 500,
+              whey_isolate: 1000,
+              casein: 1000,
+              creatine: 500,
+            };
             return (
               <>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  <button onClick={() => { allItems.forEach((i: any) => addToCart({ name: i.name, kcal: i.kcal || 0, amount: i.amount, category: i.catLabel || i.category })); }} className="plan-actbtn" style={{ flex:1, padding: '10px', minHeight:44, borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                  <button
+                    onClick={() => {
+                      allItems.forEach((i: any) =>
+                        addToCart({
+                          name: i.name,
+                          kcal: i.kcal || 0,
+                          amount: i.amount,
+                          category: i.catLabel || i.category,
+                        }),
+                      );
+                    }}
+                    className="plan-actbtn"
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      minHeight: 44,
+                      borderRadius: 10,
+                      border: '1px solid rgba(249,115,22,0.2)',
+                      background: 'rgba(249,115,22,0.06)',
+                      color: '#f97316',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
                     🛒 В корзину ({totalItems})
                   </button>
-                  <div style={{ padding: '5px 8px', borderRadius: 8, background: checkedCount === totalItems && totalItems > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(0,230,138,0.06)', border: checkedCount === totalItems && totalItems > 0 ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(0,230,138,0.15)', color: checkedCount === totalItems && totalItems > 0 ? '#22c55e' : '#00e68a', fontSize: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div
+                    style={{
+                      padding: '5px 8px',
+                      borderRadius: 8,
+                      background:
+                        checkedCount === totalItems && totalItems > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(0,230,138,0.06)',
+                      border:
+                        checkedCount === totalItems && totalItems > 0
+                          ? '1px solid rgba(34,197,94,0.3)'
+                          : '1px solid rgba(0,230,138,0.15)',
+                      color: checkedCount === totalItems && totalItems > 0 ? '#22c55e' : '#00e68a',
+                      fontSize: 8,
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
                     💰 ~{estCost * 100}₽
                   </div>
-                  <button aria-label="Скопировать список покупок" onClick={() => { void shareOrCopyText('Список покупок', exportText).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать список покупок.'); }); }} className="plan-mini" style={{ padding: '10px 12px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(96,165,250,0.2)', background: 'rgba(96,165,250,0.06)', color: '#60a5fa', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>📋</button>
-                  {checkedCount > 0 && <button aria-label="Сбросить отметки" onClick={() => { try { localStorage.setItem('he_shopping_checked', '[]'); } catch {} setChecked(new Set()); }} className="plan-mini" style={{ padding: '10px 12px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>✕ Сброс</button>}
+                  <button
+                    aria-label="Скопировать список покупок"
+                    onClick={() => {
+                      void shareOrCopyText('Список покупок', exportText).then((ok) => {
+                        if (!ok) setErrorMsg('Не удалось скопировать список покупок.');
+                      });
+                    }}
+                    className="plan-mini"
+                    style={{
+                      padding: '10px 12px',
+                      minHeight: 44,
+                      minWidth: 44,
+                      borderRadius: 10,
+                      border: '1px solid rgba(96,165,250,0.2)',
+                      background: 'rgba(96,165,250,0.06)',
+                      color: '#60a5fa',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    📋
+                  </button>
+                  {checkedCount > 0 && (
+                    <button
+                      aria-label="Сбросить отметки"
+                      onClick={() => {
+                        try {
+                          localStorage.setItem('he_shopping_checked', '[]');
+                        } catch {}
+                        setChecked(new Set());
+                      }}
+                      className="plan-mini"
+                      style={{
+                        padding: '10px 12px',
+                        minHeight: 44,
+                        minWidth: 44,
+                        borderRadius: 10,
+                        border: '1px solid rgba(239,68,68,0.2)',
+                        background: 'rgba(239,68,68,0.04)',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✕ Сброс
+                    </button>
+                  )}
                 </div>
-                {checkedCount > 0 && <div style={{marginBottom:6,height:4,borderRadius:2,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}><div style={{height:'100%',width:`${Math.round(checkedCount/totalItems*100)}%`,borderRadius:2,background:'#22c55e',transition:'width 0.3s'}}/></div>}
-                {(shoppingList as any)._diversity && <div style={{marginBottom:6,fontSize:9,color:((shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b'),fontWeight:600}}>🌈 Разнообразие: {((shoppingList as any)._diversity.uniqueFoods)} видов продуктов · {((shoppingList as any)._diversity.note)}</div>}
+                {checkedCount > 0 && (
+                  <div
+                    style={{
+                      marginBottom: 6,
+                      height: 4,
+                      borderRadius: 2,
+                      background: 'rgba(255,255,255,0.06)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${Math.round((checkedCount / totalItems) * 100)}%`,
+                        borderRadius: 2,
+                        background: '#22c55e',
+                        transition: 'width 0.3s',
+                      }}
+                    />
+                  </div>
+                )}
+                {(shoppingList as any)._diversity && (
+                  <div
+                    style={{
+                      marginBottom: 6,
+                      fontSize: 9,
+                      color: (shoppingList as any)._diversity.score >= 7 ? '#22c55e' : '#f59e0b',
+                      fontWeight: 600,
+                    }}
+                  >
+                    🌈 Разнообразие: {(shoppingList as any)._diversity.uniqueFoods} видов продуктов ·{' '}
+                    {(shoppingList as any)._diversity.note}
+                  </div>
+                )}
                 {Object.entries(groups).map(([cat, items]) => (
                   <div key={cat} style={{ marginBottom: 6 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#f97316', marginBottom: 2, padding: '2px 0 2px 4px', borderLeft: '2px solid rgba(249,115,22,0.3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: '#f97316',
+                        marginBottom: 2,
+                        padding: '2px 0 2px 4px',
+                        borderLeft: '2px solid rgba(249,115,22,0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
                       {cat}
-                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }}>{items.length} шт</span>
+                      <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginLeft: 'auto' }}>
+                        {items.length} шт
+                      </span>
                     </div>
                     {items.map((data: any, i: number) => {
                       const isChecked = checked.has(data.id);
                       const packSize = PACK_SIZES[data.id];
                       const packEstimate = packSize ? `~${Math.max(1, Math.round(data.amount / packSize))} уп.` : '';
                       return (
-                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', flexDirection: 'column', gap: 1, color: isChecked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', textDecoration: isChecked ? 'line-through' : 'none', transition: 'all 0.2s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{display:'flex',alignItems:'center',gap:4}}>
-                            <span onClick={() => toggleChecked(data.id)} style={{cursor:'pointer',fontSize:11,color:isChecked?'#22c55e':'rgba(255,255,255,0.2)',userSelect:'none',width:16,textAlign:'center'}}>{isChecked ? '☑' : '☐'}</span>
-                            <span>{data.name}</span>
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
-                            {data.batchCook && <span title={data.batchCook} style={{ fontSize: 6, color: '#22c55e', fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>🍳{data.dayCount}д</span>}
-                            <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }} title={data.buyAmount && data.buyAmount !== Math.round(data.amount) ? `Купить сухим: ${data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}` : 'Вес как на тарелке'}>
-                              {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
-                              {data.buyAmount && data.buyAmount !== Math.round(data.amount) && <span style={{ color: '#60a5fa' }}> · купить {data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}</span>}
+                        <div
+                          key={data.name + i}
+                          style={{
+                            fontSize: 9,
+                            padding: '3px 0 3px 8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1,
+                            color: isChecked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)',
+                            textDecoration: isChecked ? 'line-through' : 'none',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span
+                                onClick={() => toggleChecked(data.id)}
+                                style={{
+                                  cursor: 'pointer',
+                                  fontSize: 11,
+                                  color: isChecked ? '#22c55e' : 'rgba(255,255,255,0.2)',
+                                  userSelect: 'none',
+                                  width: 16,
+                                  textAlign: 'center',
+                                }}
+                              >
+                                {isChecked ? '☑' : '☐'}
+                              </span>
+                              <span>{data.name}</span>
                             </span>
-                            <button aria-label="В корзину" onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, border: '1px solid rgba(249,115,22,0.2)', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 14 }}>🛒</button>
-                          </div>
-                        </div>
-                        {(() => {
-                          const per100 = data.amount > 0 ? { kcal: Math.round((data.kcal || 0) / data.amount * 100), p: Math.round((data.p || 0) / data.amount * 100 * 10) / 10, f: Math.round((data.f || 0) / data.amount * 100 * 10) / 10, c: Math.round((data.c || 0) / data.amount * 100 * 10) / 10 } : null;
-                          return (
-                            <div style={{ display: 'flex', gap: 6, paddingLeft: 20, fontSize: 7, fontWeight: 500, color: isChecked ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.55)', flexWrap: 'wrap' }}>
-                              <span style={{ color: '#22c55e' }}>К:{Math.round(data.kcal || 0)} ккал</span>
-                              <span style={{ color: '#3b82f6' }}>Б:{Math.round((data.p || 0) * 10) / 10}г</span>
-                              <span style={{ color: '#f59e0b' }}>Ж:{Math.round((data.f || 0) * 10) / 10}г</span>
-                              <span style={{ color: '#f97316' }}>У:{Math.round((data.c || 0) * 10) / 10}г</span>
-                              {per100 && <span style={{ color: 'rgba(255,255,255,0.35)' }}>· на 100г: {per100.kcal}ккал Б{per100.p} Ж{per100.f} У{per100.c}</span>}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {packEstimate && (
+                                <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                                  {packEstimate}
+                                </span>
+                              )}
+                              {data.batchCook && (
+                                <span
+                                  title={data.batchCook}
+                                  style={{
+                                    fontSize: 6,
+                                    color: '#22c55e',
+                                    fontWeight: 700,
+                                    padding: '1px 4px',
+                                    borderRadius: 4,
+                                    background: 'rgba(34,197,94,0.1)',
+                                    border: '1px solid rgba(34,197,94,0.2)',
+                                  }}
+                                >
+                                  🍳{data.dayCount}д
+                                </span>
+                              )}
+                              <span
+                                style={{
+                                  color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                }}
+                                title={
+                                  data.buyAmount && data.buyAmount !== Math.round(data.amount)
+                                    ? `Купить сухим: ${data.buyAmount >= 1000 ? `${(data.buyAmount / 1000).toFixed(1)} кг` : `${Math.round(data.buyAmount)} г`}`
+                                    : 'Вес как на тарелке'
+                                }
+                              >
+                                {data.amount >= 1000
+                                  ? `${(data.amount / 1000).toFixed(1)} кг`
+                                  : `${Math.round(data.amount)} г`}
+                                {data.buyAmount && data.buyAmount !== Math.round(data.amount) && (
+                                  <span style={{ color: '#60a5fa' }}>
+                                    {' '}
+                                    · купить{' '}
+                                    {data.buyAmount >= 1000
+                                      ? `${(data.buyAmount / 1000).toFixed(1)} кг`
+                                      : `${Math.round(data.buyAmount)} г`}
+                                  </span>
+                                )}
+                              </span>
+                              <button
+                                aria-label="В корзину"
+                                onClick={() =>
+                                  addToCart({
+                                    name: data.name,
+                                    kcal: data.kcal || 0,
+                                    amount: data.amount,
+                                    category: data.catLabel || data.category,
+                                  })
+                                }
+                                className="plan-mini"
+                                style={{
+                                  padding: '10px',
+                                  minHeight: 44,
+                                  minWidth: 44,
+                                  borderRadius: 10,
+                                  border: '1px solid rgba(249,115,22,0.2)',
+                                  background: 'rgba(249,115,22,0.12)',
+                                  color: '#f97316',
+                                  cursor: 'pointer',
+                                  fontSize: 14,
+                                }}
+                              >
+                                🛒
+                              </button>
                             </div>
-                          );
-                        })()}
-                      </div>
+                          </div>
+                          {(() => {
+                            const per100 =
+                              data.amount > 0
+                                ? {
+                                    kcal: Math.round(((data.kcal || 0) / data.amount) * 100),
+                                    p: Math.round(((data.p || 0) / data.amount) * 100 * 10) / 10,
+                                    f: Math.round(((data.f || 0) / data.amount) * 100 * 10) / 10,
+                                    c: Math.round(((data.c || 0) / data.amount) * 100 * 10) / 10,
+                                  }
+                                : null;
+                            return (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: 6,
+                                  paddingLeft: 20,
+                                  fontSize: 7,
+                                  fontWeight: 500,
+                                  color: isChecked ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.55)',
+                                  flexWrap: 'wrap',
+                                }}
+                              >
+                                <span style={{ color: '#22c55e' }}>К:{Math.round(data.kcal || 0)} ккал</span>
+                                <span style={{ color: '#3b82f6' }}>Б:{Math.round((data.p || 0) * 10) / 10}г</span>
+                                <span style={{ color: '#f59e0b' }}>Ж:{Math.round((data.f || 0) * 10) / 10}г</span>
+                                <span style={{ color: '#f97316' }}>У:{Math.round((data.c || 0) * 10) / 10}г</span>
+                                {per100 && (
+                                  <span style={{ color: 'rgba(255,255,255,0.35)' }}>
+                                    · на 100г: {per100.kcal}ккал Б{per100.p} Ж{per100.f} У{per100.c}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       );
                     })}
                   </div>
@@ -1899,12 +4793,33 @@ const doImportPlan = (raw: string): boolean => {
               </>
             );
           })()}
-          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(249,115,22,0.25)', background: 'rgba(249,115,22,0.06)', color: '#f97316', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
+          <button
+            onClick={saveCurrentPlan}
+            style={{
+              marginTop: 6,
+              padding: '8px',
+              borderRadius: 8,
+              border: '1px solid rgba(249,115,22,0.25)',
+              background: 'rgba(249,115,22,0.06)',
+              color: '#f97316',
+              cursor: 'pointer',
+              fontSize: 9,
+              fontWeight: 600,
+              width: '100%',
+            }}
+          >
+            💾 Сохранить план
+          </button>
         </GlassCard>
       )}
 
       {generated && (Array.isArray(injections) ? injections.length : 0) > 0 && (
-        <GlassCard title="Тайминг препаратов и приёмов пищи" icon="💊" color="#8b5cf6" style={{ border: '1px solid rgba(139,92,246,0.15)' }}>
+        <GlassCard
+          title="Тайминг препаратов и приёмов пищи"
+          icon="💊"
+          color="#8b5cf6"
+          style={{ border: '1px solid rgba(139,92,246,0.15)' }}
+        >
           {injections.map((inj: DrugInjection) => {
             const isInsulin = inj.type === 'инсулин';
             const isIGF = inj.type === 'IGF-1';
@@ -1912,81 +4827,145 @@ const doImportPlan = (raw: string): boolean => {
             const isPeptide = inj.type === 'пептид';
             const isAAS = inj.type === 'ААС';
             return (
-              <div key={inj.id} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div
+                key={inj.id}
+                style={{
+                  marginBottom: 6,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(139,92,246,0.06)',
+                  border: '1px solid rgba(139,92,246,0.12)',
+                }}
+              >
                 <div style={{ fontWeight: 700, fontSize: 10, color: '#a78bfa', marginBottom: 3 }}>
-                  💉 {inj.name} ({inj.dose}{inj.unit}) — {inj.time}
+                  💉 {inj.name} ({inj.dose}
+                  {inj.unit}) — {inj.time}
                   <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginLeft: 4 }}>
                     T½ {inj.halfLifeHours}ч
-                    {inj.trainLinked && <span style={{ color: '#00e68a', marginLeft: 4 }}>🏋️ {inj.trainTiming === 'before' ? 'До тренировки' : inj.trainTiming === 'after' ? 'После тренировки' : 'До+После'}</span>}
+                    {inj.trainLinked && (
+                      <span style={{ color: '#00e68a', marginLeft: 4 }}>
+                        🏋️{' '}
+                        {inj.trainTiming === 'before'
+                          ? 'До тренировки'
+                          : inj.trainTiming === 'after'
+                            ? 'После тренировки'
+                            : 'До+После'}
+                      </span>
+                    )}
                   </span>
                 </div>
                 {isInsulin && inj.esterType === 'rapid' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    ⚡ <strong>Быстрый инсулин (аналог)</strong> — пик 30-90 мин, длительность 3-4ч.<br />
-                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или после. <strong>ПРОПУСК ЕДЫ = ГИПОГЛИКЕМИЯ!</strong><br />
-                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят сывороточного белка + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
-                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы) каждые 20 мин!' : ''}
-                    {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}<br />
-                    🥑 <strong>Жиры МИНИМУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют опорожнение желудка и блокируют поступление глюкозы.<br />
-                    🩸 <strong>Глюкоза:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель не ниже 4.0 ммоль/л.<br />
-                    🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне {'<'}3.5 ммоль/л. 
+                    ⚡ <strong>Быстрый инсулин (аналог)</strong> — пик 30-90 мин, длительность 3-4ч.
+                    <br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Принять сразу перед едой или
+                    после. <strong>ПРОПУСК ЕДЫ = ГИПОГЛИКЕМИЯ!</strong>
+                    <br />
+                    {inj.trainLinked
+                      ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). В приёме: изолят сывороточного белка + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.`
+                      : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after'
+                      ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы (изотоник/гейнер/бананы) каждые 20 мин!'
+                      : ''}
+                    {!inj.trainLinked ? ' ⏰ Не ешь без углеводов — риск гипогликемии!' : ''}
+                    <br />
+                    🥑 <strong>Жиры МИНИМУМ</strong> в окне действия (первые 90 мин) — не более 3-5г. Жиры замедляют
+                    опорожнение желудка и блокируют поступление глюкозы.
+                    <br />
+                    🩸 <strong>Глюкоза:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель не ниже 4.0 ммоль/л.
+                    <br />
+                    🍬 <strong>Экстренно:</strong> 200мл сока + 4 таблетки глюкозы при уровне {'<'}3.5 ммоль/л.
                   </div>
                 )}
                 {isInsulin && inj.esterType === 'short' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    🕐 <strong>Короткий инсулин (человеческий)</strong> — пик 2-4ч, длительность 5-8ч.<br />
-                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды. <strong>ПРОПУСК ЕДЫ ОПАСЕН!</strong><br />
-                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до+после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.` : ''}
-                    {inj.trainLinked && inj.trainTiming !== 'after' ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы каждые 20 мин!' : ''}<br />
-                    🥑 <strong>Жиры {'<'}5г</strong> в окне 90 мин — иначе гипогликемия на фоне уже принятых углеводов.<br />
-                    🩸 <strong>Правило 4 часов:</strong> каждый час после укола — минимум 10-15г углеводов на подержание.
+                    🕐 <strong>Короткий инсулин (человеческий)</strong> — пик 2-4ч, длительность 5-8ч.
+                    <br />
+                    🍚 На <strong>{Math.round(inj.dose * 10)}г углеводов</strong> (10г/ед). Ввести за 20-30 мин до еды.{' '}
+                    <strong>ПРОПУСК ЕДЫ ОПАСЕН!</strong>
+                    <br />
+                    {inj.trainLinked
+                      ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до+после'}). В приёме: изолят + ${inj.trainTiming === 'before' ? 'амилопектин' : 'декстроза'}.`
+                      : ''}
+                    {inj.trainLinked && inj.trainTiming !== 'after'
+                      ? ' 🚨 На тренировке ОБЯЗАТЕЛЬНО углеводы каждые 20 мин!'
+                      : ''}
+                    <br />
+                    🥑 <strong>Жиры {'<'}5г</strong> в окне 90 мин — иначе гипогликемия на фоне уже принятых углеводов.
+                    <br />
+                    🩸 <strong>Правило 4 часов:</strong> каждый час после укола — минимум 10-15г углеводов на
+                    подержание.
                   </div>
                 )}
                 {isInsulin && inj.esterType === 'long' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    🌙 <strong>Длинный инсулин (базальный)</strong> — покрывает суточную потребность.<br />
-                    🍚 Привязка к еде <strong>не требуется</strong>. Принимай в одно и то же время ежедневно.<br />
-                    📊 Короткий инсулин считай отдельно от длинного (суточная норма + еда).<br />
+                    🌙 <strong>Длинный инсулин (базальный)</strong> — покрывает суточную потребность.
+                    <br />
+                    🍚 Привязка к еде <strong>не требуется</strong>. Принимай в одно и то же время ежедневно.
+                    <br />
+                    📊 Короткий инсулин считай отдельно от длинного (суточная норма + еда).
+                    <br />
                     📋 Контроль глюкозы натощак каждое утро — цель 4.0-6.0 ммоль/л.
                   </div>
                 )}
                 {isIGF && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    🧬 <strong>IGF-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.<br />
-                    {inj.trainLinked ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК за 30-45 мин до еды. Еда после — изолят + декстроза (МGF — натощак, локально в месте нагрузки).` : '⏰ Принимать натощак, за 30-45 мин до еды или согласно протоколу.'}<br />
-                    🥑 <strong>Жиры МИНИМУМ</strong> — в комбинации с инсулином жиры критически замедляют анаболический ответ.<br />
-                    🩸 <strong>Гипогликемия:</strong> IGF-1 + инсулин — риск гипо вдвойне. Глюкометр обязателен!<br />
-                    🔬 <strong>MGF:</strong> активирует сателлитные клетки локально (только нагружаемая мышца). В комбинации с IGF-1 — каскад гиперплазии. Питание: глюкоза + аминокислоты (BCAA/изолят) в окне 30 мин после.
+                    🧬 <strong>IGF-1/MGF</strong> — анаболический пептид, работает синергично с инсулином.
+                    <br />
+                    {inj.trainLinked
+                      ? `🏋️ Привязан к тренировке (${inj.trainTiming === 'before' ? 'до' : inj.trainTiming === 'after' ? 'после' : 'до и после'}). Принимать НАТОЩАК за 30-45 мин до еды. Еда после — изолят + декстроза (МGF — натощак, локально в месте нагрузки).`
+                      : '⏰ Принимать натощак, за 30-45 мин до еды или согласно протоколу.'}
+                    <br />
+                    🥑 <strong>Жиры МИНИМУМ</strong> — в комбинации с инсулином жиры критически замедляют анаболический
+                    ответ.
+                    <br />
+                    🩸 <strong>Гипогликемия:</strong> IGF-1 + инсулин — риск гипо вдвойне. Глюкометр обязателен!
+                    <br />
+                    🔬 <strong>MGF:</strong> активирует сателлитные клетки локально (только нагружаемая мышца). В
+                    комбинации с IGF-1 — каскад гиперплазии. Питание: глюкоза + аминокислоты (BCAA/изолят) в окне 30 мин
+                    после.
                   </div>
                 )}
                 {isGH && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    🧬 <strong>ГР/Пептиды</strong> — влияние на инсулин и глюкозу.<br />
-                    ⏰ Натощак, за 30-60 мин до еды. Не есть углеводы 30 мин после.<br />
+                    🧬 <strong>ГР/Пептиды</strong> — влияние на инсулин и глюкозу.
+                    <br />
+                    ⏰ Натощак, за 30-60 мин до еды. Не есть углеводы 30 мин после.
+                    <br />
                     📊 Контролируй глюкозу — ГР снижает чувствительность к инсулину.
                   </div>
                 )}
                 {isAAS && inj.esterType === 'short' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    💉 <strong>Короткий эфир</strong> — частая инъекция (EOD/ежедневно).<br />
-                    ⏰ Привязка к еде минимальна. Следи за уровнем воды: +0.5л к норме.
+                    💉 <strong>Короткий эфир</strong> — частая инъекция (EOD/ежедневно).
+                    <br />⏰ Привязка к еде минимальна. Следи за уровнем воды: +0.5л к норме.
                   </div>
                 )}
                 {isAAS && inj.esterType === 'long' && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    💉 <strong>Длинный эфир</strong> — редкая инъекция (1-2р/нед).<br />
-                    ⏰ Пей 40мл/кг воды. Контролируй АД и липиды.
+                    💉 <strong>Длинный эфир</strong> — редкая инъекция (1-2р/нед).
+                    <br />⏰ Пей 40мл/кг воды. Контролируй АД и липиды.
                   </div>
                 )}
                 {(inj.type === 'семаглутид' || inj.type === 'тирзепатид') && (
                   <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                    💊 <strong>GLP-1 агонист</strong> — замедляет опорожнение желудка, подавляет аппетит.<br />
-                    📏 <strong>Питание дробное:</strong> 5-6 раз/день по 100-200г. Не переедать — тошнота, рвота.<br />
-                    🥑 <strong>Жиры {'<'}5г/приём</strong> — жирная пища задерживается в желудке на 4-6ч, вызывая тошноту и риск панкреатита.<br />
-                    💧 <strong>Вода 30-40мл/кг</strong> — GLP-1 снижает моторику ЖКТ, риск запора. Клетчатка 25-30г/день.<br />
-                    ⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие приёмы, жиры {'<'}20г/день.<br />
-                    🩸 <strong>B12 и электролиты:</strong> добавки обязательны — GLP-1 снижает всасывание через IF-фактор.<br />
-                    🚫 <strong>Алкоголь</strong> — исключить полностью (панкреатит, гипогликемия).<br />
+                    💊 <strong>GLP-1 агонист</strong> — замедляет опорожнение желудка, подавляет аппетит.
+                    <br />
+                    📏 <strong>Питание дробное:</strong> 5-6 раз/день по 100-200г. Не переедать — тошнота, рвота.
+                    <br />
+                    🥑 <strong>Жиры {'<'}5г/приём</strong> — жирная пища задерживается в желудке на 4-6ч, вызывая
+                    тошноту и риск панкреатита.
+                    <br />
+                    💧 <strong>Вода 30-40мл/кг</strong> — GLP-1 снижает моторику ЖКТ, риск запора. Клетчатка
+                    25-30г/день.
+                    <br />⏰ <strong>Дни пик тошноты:</strong> первые 24-72ч после еженедельной инъекции — самые лёгкие
+                    приёмы, жиры {'<'}20г/день.
+                    <br />
+                    🩸 <strong>B12 и электролиты:</strong> добавки обязательны — GLP-1 снижает всасывание через
+                    IF-фактор.
+                    <br />
+                    🚫 <strong>Алкоголь</strong> — исключить полностью (панкреатит, гипогликемия).
+                    <br />
                     🚨 <strong>Боли в животе/подреберье:</strong> немедленно к врачу — исключить панкреатит.
                   </div>
                 )}
@@ -1999,41 +4978,94 @@ const doImportPlan = (raw: string): boolean => {
             );
           })}
           {injections.some((i: DrugInjection) => i.type === 'инсулин' && i.esterType !== 'long') && (
-            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>🚨 Чеклист гипогликемии (ОПАСНОСТЬ)</div>
+            <div
+              style={{
+                marginTop: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: 'rgba(239,68,68,0.06)',
+                border: '1px solid rgba(239,68,68,0.15)',
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>
+                🚨 Чеклист гипогликемии (ОПАСНОСТЬ)
+              </div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                🩸 <strong>Глюкометр обязателен!</strong> Замеры: до, через 15, 30, 60, 90, 120 мин<br />
-                🧃 <strong>Экстренный набор:</strong> 200мл сока + 3-4 таблетки глюкозы (15-20г) ВСЕГДА С СОБОЙ<br />
-                🛌 <strong>Не принимать короткий инсулин после 18:00</strong> — риск ночной гипогликемии<br />
-                ⏰ <strong>Каждый час после инъекции</strong> — минимум 10-15г углеводов (4-часовое окно действия)<br />
-                🏋️ <strong>На тренировке:</strong> изотоник 6-8% (500-1000мл) + банан каждые 20 мин<br />
-                🔴 <strong>Если глюкоза {'<'}3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15 мин<br />
-                🚑 <strong>Если {'<'}2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в глюкоза 40%<br />
-                📋 <strong>Симптомы:</strong> потливость, дрожь, голод → спутанность, агрессия → потеря сознания, судороги<br />
-                🥑 <strong>Жиры МИНИМУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют всасывание углеводов!)
+                🩸 <strong>Глюкометр обязателен!</strong> Замеры: до, через 15, 30, 60, 90, 120 мин
+                <br />
+                🧃 <strong>Экстренный набор:</strong> 200мл сока + 3-4 таблетки глюкозы (15-20г) ВСЕГДА С СОБОЙ
+                <br />
+                🛌 <strong>Не принимать короткий инсулин после 18:00</strong> — риск ночной гипогликемии
+                <br />⏰ <strong>Каждый час после инъекции</strong> — минимум 10-15г углеводов (4-часовое окно действия)
+                <br />
+                🏋️ <strong>На тренировке:</strong> изотоник 6-8% (500-1000мл) + банан каждые 20 мин
+                <br />
+                🔴 <strong>Если глюкоза {'<'}3.5 ммоль/л:</strong> немедленно 15-20г быстрых углеводов, замер через 15
+                мин
+                <br />
+                🚑 <strong>Если {'<'}2.5 ммоль/л или потеря сознания:</strong> ВЫЗОВ 103! Глюкагон 1мг в/м или в/в
+                глюкоза 40%
+                <br />
+                📋 <strong>Симптомы:</strong> потливость, дрожь, голод → спутанность, агрессия → потеря сознания,
+                судороги
+                <br />
+                🥑 <strong>Жиры МИНИМУМ:</strong> в окне действия инсулина — не более 5г жиров за приём (жиры замедляют
+                всасывание углеводов!)
               </div>
             </div>
           )}
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2, lineHeight: 1.5 }}>
-            💡 <strong>БАЗОВЫЕ ПРАВИЛА ИНСУЛИНА:</strong><br />
-            🧮 1 ЕД короткого/быстрого ≈ 10г углеводов (чувствительность индивидуальна — после курса ГР/ААС может требоваться на 20-30% больше).<br />
-            🥑 <strong>ЖИРЫ МИНИМАЛЬНЫ</strong> в окне действия инсулина (первые 2ч) — не более 5г. Жиры блокируют выход глюкозы из желудка в кровь, вызывая гипогликемию при уже принятых углеводах!<br />
-            🚫 <strong>НЕ ПРОПУСКАЙ ПРИЁМЫ ПИЩИ</strong> — гипогликемия развивается за 15-30 минут!<br />
-            🩸 <strong>Глюкометр — твой лучший друг.</strong> Цель: 4.0-6.0 ммоль/л через 2ч после инъекции. Не выше 7.8, не ниже 3.9.<br />
-            🧬 MGF активирует сателлитные клетки локально (место инъекции/тренировки). IGF-1 — системно. Оба требуют глюкозу и аминокислоты. Без еды в окне — нулевой эффект. 
+            💡 <strong>БАЗОВЫЕ ПРАВИЛА ИНСУЛИНА:</strong>
+            <br />
+            🧮 1 ЕД короткого/быстрого ≈ 10г углеводов (чувствительность индивидуальна — после курса ГР/ААС может
+            требоваться на 20-30% больше).
+            <br />
+            🥑 <strong>ЖИРЫ МИНИМАЛЬНЫ</strong> в окне действия инсулина (первые 2ч) — не более 5г. Жиры блокируют выход
+            глюкозы из желудка в кровь, вызывая гипогликемию при уже принятых углеводах!
+            <br />
+            🚫 <strong>НЕ ПРОПУСКАЙ ПРИЁМЫ ПИЩИ</strong> — гипогликемия развивается за 15-30 минут!
+            <br />
+            🩸 <strong>Глюкометр — твой лучший друг.</strong> Цель: 4.0-6.0 ммоль/л через 2ч после инъекции. Не выше
+            7.8, не ниже 3.9.
+            <br />
+            🧬 MGF активирует сателлитные клетки локально (место инъекции/тренировки). IGF-1 — системно. Оба требуют
+            глюкозу и аминокислоты. Без еды в окне — нулевой эффект.
           </div>
           {injections.some((i: DrugInjection) => i.type === 'семаглутид' || i.type === 'тирзепатид') && (
-            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>💊 GLP-1 — справочник питания</div>
+            <div
+              style={{
+                marginTop: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: 'rgba(251,191,36,0.06)',
+                border: '1px solid rgba(251,191,36,0.15)',
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>
+                💊 GLP-1 — справочник питания
+              </div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6 }}>
-                📏 <strong>Дробное питание:</strong> 5-6 раз/день по 100-200г за приём. Не переполнять желудок — риск рвоты.<br />
-                🥑 <strong>Жиры {'<'}5г/приём:</strong> GLP-1 замедляет опорожнение желудка — жиры задерживаются и вызывают тошноту, изжогу, риск панкреатита.<br />
-                💧 <strong>Вода 30-40 мл/кг:</strong> GLP-1 снижает моторику ЖКТ — риск запоров. Клетчатка 25-30г/день дополнительно.<br />
-                ⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые лёгкие приёмы на эти дни. Жиры в эти дни {'<'}20г/день.<br />
-                🩸 <strong>Контроль B12 и электролитов:</strong> GLP-1 снижает всасывание B12 (через IF-фактор) и калия/магния — добавки обязательны.<br />
-                🚨 <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый панкреатит.<br />
-                🚫 <strong>Алкоголь:</strong> исключить полностью — усиливает тошноту, риск гипогликемии, панкреатит.<br />
-                🍬 <strong>Гипогликемия:</strong> в комбинации с инсулином — риск возрастает вдвое. Глюкометр обязателен!
+                📏 <strong>Дробное питание:</strong> 5-6 раз/день по 100-200г за приём. Не переполнять желудок — риск
+                рвоты.
+                <br />
+                🥑 <strong>Жиры {'<'}5г/приём:</strong> GLP-1 замедляет опорожнение желудка — жиры задерживаются и
+                вызывают тошноту, изжогу, риск панкреатита.
+                <br />
+                💧 <strong>Вода 30-40 мл/кг:</strong> GLP-1 снижает моторику ЖКТ — риск запоров. Клетчатка 25-30г/день
+                дополнительно.
+                <br />⏰ <strong>График инъекций:</strong> пик тошноты — первые 24-72ч после инъекции. Планируй самые
+                лёгкие приёмы на эти дни. Жиры в эти дни {'<'}20г/день.
+                <br />
+                🩸 <strong>Контроль B12 и электролитов:</strong> GLP-1 снижает всасывание B12 (через IF-фактор) и
+                калия/магния — добавки обязательны.
+                <br />
+                🚨 <strong>Боли в левом подреберье/животе:</strong> прекратить приём, срочно к врачу — исключить острый
+                панкреатит.
+                <br />
+                🚫 <strong>Алкоголь:</strong> исключить полностью — усиливает тошноту, риск гипогликемии, панкреатит.
+                <br />
+                🍬 <strong>Гипогликемия:</strong> в комбинации с инсулином — риск возрастает вдвое. Глюкометр
+                обязателен!
               </div>
             </div>
           )}
@@ -2041,25 +5073,96 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {injections.some((i: DrugInjection) => i.type === 'инсулин') && (
-        <GlassCard title="📖 Справочник: Инсулин" icon="📖" color="#ef4444" style={{ border: '1px solid rgba(239,68,68,0.15)' }}>
-          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🧮 Правило 10г/1ЕД:</strong> 1 единица короткого/быстрого инсулина покрывает ~10г углеводов. Доза × 10 = необходимые углеводы.
+        <GlassCard
+          title="📖 Справочник: Инсулин"
+          icon="📖"
+          color="#ef4444"
+          style={{ border: '1px solid rgba(239,68,68,0.15)' }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🧮 Правило 10г/1ЕД:</strong> 1 единица короткого/быстрого инсулина
+              покрывает ~10г углеводов. Доза × 10 = необходимые углеводы.
             </div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🥑 Жиры МИНИМУМ:</strong> в окне 90 минут после инъекции — не более 5г жиров. Жиры замедляют опорожнение желудка, вызывая гипогликемию при уже принятых углеводах.
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🥑 Жиры МИНИМУМ:</strong> в окне 90 минут после инъекции — не более
+              5г жиров. Жиры замедляют опорожнение желудка, вызывая гипогликемию при уже принятых углеводах.
             </div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🚫 ПРОПУСК ЕДЫ КРИТИЧЕН:</strong> гипогликемия развивается за 15-30 минут. Каждый час после укола — минимум 10-15г углеводов.
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🚫 ПРОПУСК ЕДЫ КРИТИЧЕН:</strong> гипогликемия развивается за 15-30
+              минут. Каждый час после укола — минимум 10-15г углеводов.
             </div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель — не ниже 4.0 ммоль/л. При {'<'}3.5 — 15-20г быстрых углеводов.
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🩸 Глюкометр:</strong> замеры через 15, 30, 60, 90, 120 мин. Цель —
+              не ниже 4.0 ммоль/л. При {'<'}3.5 — 15-20г быстрых углеводов.
             </div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🏋️ Тренировка + инсулин:</strong> предтрен — изолят (40-50г) + амилопектин (80-100г). Пост-трен — изолят + декстроза (10г/1ЕД). На тренировке изотоник каждые 20 мин.
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🏋️ Тренировка + инсулин:</strong> предтрен — изолят (40-50г) +
+              амилопектин (80-100г). Пост-трен — изолят + декстроза (10г/1ЕД). На тренировке изотоник каждые 20 мин.
             </div>
-            <div style={{ fontSize:9, color:'#fff', lineHeight:1.5, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)' }}>
-              <strong style={{ color:'#ef4444' }}>🛑 Не на ночь:</strong> короткий инсулин после 18:00 — риск ночной гипогликемии. Длинный (Лантус/Левемир) — базальный, можно.
+            <div
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                lineHeight: 1.5,
+                padding: '6px 8px',
+                borderRadius: 8,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.08)',
+              }}
+            >
+              <strong style={{ color: '#ef4444' }}>🛑 Не на ночь:</strong> короткий инсулин после 18:00 — риск ночной
+              гипогликемии. Длинный (Лантус/Левемир) — базальный, можно.
             </div>
           </div>
         </GlassCard>
@@ -2067,24 +5170,59 @@ const doImportPlan = (raw: string): boolean => {
 
       {generated && waterCalc && (
         <GlassCard title="Водный баланс" icon="💧" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
-          <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(6,182,212,0.04)', border: '1px solid rgba(6,182,212,0.08)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
-              <span>База: {waterCalc.hasPharma ? (waterCalc.pharmaBaseMl || 40) : '30'} мл × {weight} кг</span>
+          <div
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              background: 'rgba(6,182,212,0.04)',
+              border: '1px solid rgba(6,182,212,0.08)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9,
+                color: 'rgba(255,255,255,0.85)',
+                marginBottom: 2,
+              }}
+            >
+              <span>
+                База: {waterCalc.hasPharma ? waterCalc.pharmaBaseMl || 40 : '30'} мл × {weight} кг
+              </span>
               <span>{waterCalc.baseWater} л</span>
             </div>
             {waterCalc.hasPharma && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.85)',
+                  marginBottom: 2,
+                }}
+              >
                 <span>+ Фармакология (повышенный метаболизм)</span>
                 <span>+{waterCalc.pharmaBonus.toFixed(1)} л</span>
               </div>
             )}
             {waterCalc.trainBonus > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 9,
+                  color: 'rgba(255,255,255,0.85)',
+                  marginBottom: 2,
+                }}
+              >
                 <span>+ Тренировка</span>
                 <span>+{waterCalc.trainBonus} л</span>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+            <div
+              style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}
+            >
               <span>+ Клетчатка</span>
               <span>+{waterCalc.fiberFactor} л</span>
             </div>
@@ -2097,23 +5235,31 @@ const doImportPlan = (raw: string): boolean => {
 
       {generated && dayPlan && takenSupplements.length > 0 && (
         <SupplementTimingCard
-          supplements={takenSupplements.map(id => {
-            const s = ALL_SUBSTANCES.find(a => a.id === id);
+          supplements={takenSupplements.map((id) => {
+            const s = ALL_SUBSTANCES.find((a) => a.id === id);
             return s ? { id: s.id, name: s.name, nameRu: s.nameRu, dosage: s.dosage, timing: s.timing } : { id };
           })}
           meals={(dayPlan.meals || []).map((m: any) => ({
-            type: String(m.type || ''), label: String(m.label || ''), time: String(m.time || ''),
+            type: String(m.type || ''),
+            label: String(m.label || ''),
+            time: String(m.time || ''),
             items: (m.items || []).map((it: any) => ({ id: it.id, name: it.name, f: it.f })),
           }))}
-          trainStartMin={(() => { const mm = /^(\d{1,2}):(\d{2})$/.exec(String(trainStart || '')); return mm ? Number(mm[1]) * 60 + Number(mm[2]) : undefined; })()}
+          trainStartMin={(() => {
+            const mm = /^(\d{1,2}):(\d{2})$/.exec(String(trainStart || ''));
+            return mm ? Number(mm[1]) * 60 + Number(mm[2]) : undefined;
+          })()}
           trainDurationMin={(() => {
             const a = /^(\d{1,2}):(\d{2})$/.exec(String(trainStart || ''));
             const b = /^(\d{1,2}):(\d{2})$/.exec(String(trainEnd || ''));
             if (!a || !b) return undefined;
-            const d = (Number(b[1]) * 60 + Number(b[2])) - (Number(a[1]) * 60 + Number(a[2]));
+            const d = Number(b[1]) * 60 + Number(b[2]) - (Number(a[1]) * 60 + Number(a[2]));
             return d > 0 ? d : undefined;
           })()}
-          isTrainingDay={isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), selectedDayIndex)}
+          isTrainingDay={isTrainingDayFor(
+            buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern),
+            selectedDayIndex,
+          )}
           weightKg={weight || 80}
           sex={sex}
           goal={goal}
@@ -2121,43 +5267,144 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {generated && healthIssues.length > 0 && (
-        <GlassCard title="🩺 Здоровье — активные ограничения" icon="" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
-          {HEALTH_ISSUES.filter(h => healthIssues.includes(h.id)).map(h => (
-            <div key={h.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 8px', marginBottom:4, borderRadius:10, background:'rgba(6,182,212,0.06)', border:'1px solid rgba(6,182,212,0.1)' }}>
-              <div style={{ fontSize:16, width:28, textAlign:'center' }}>{h.icon}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#06b6d4' }}>{h.label}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', lineHeight:1.4 }}>{h.desc} — Исключено {h.foodIds.length} продуктов</div>
+        <GlassCard
+          title="🩺 Здоровье — активные ограничения"
+          icon=""
+          color="#06b6d4"
+          style={{ border: '1px solid rgba(6,182,212,0.15)' }}
+        >
+          {HEALTH_ISSUES.filter((h) => healthIssues.includes(h.id)).map((h) => (
+            <div
+              key={h.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 8px',
+                marginBottom: 4,
+                borderRadius: 10,
+                background: 'rgba(6,182,212,0.06)',
+                border: '1px solid rgba(6,182,212,0.1)',
+              }}
+            >
+              <div style={{ fontSize: 16, width: 28, textAlign: 'center' }}>{h.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>{h.label}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+                  {h.desc} — Исключено {h.foodIds.length} продуктов
+                </div>
               </div>
-              <div style={{ fontSize:9, color:'rgba(6,182,212,0.6)', background:'rgba(6,182,212,0.1)', padding:'2px 6px', borderRadius:6 }}>{h.foodIds.length}</div>
+              <div
+                style={{
+                  fontSize: 9,
+                  color: 'rgba(6,182,212,0.6)',
+                  background: 'rgba(6,182,212,0.1)',
+                  padding: '2px 6px',
+                  borderRadius: 6,
+                }}
+              >
+                {h.foodIds.length}
+              </div>
             </div>
           ))}
         </GlassCard>
       )}
 
       {generated && (
-        <GlassCard title="Отчёты по рациону" icon="📊" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
+        <GlassCard
+          title="Отчёты по рациону"
+          icon="📊"
+          color="#3b82f6"
+          style={{ border: '1px solid rgba(59,130,246,0.15)' }}
+        >
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
-            <button onClick={generateAllergenReport} style={reportPillStyle('#ef4444', activeReports.includes('allergen') && !!allergenReport)}>⚠️ Аллергены</button>
-            <button onClick={generateNutrientReport} style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}>🧬 Нутриенты</button>
-            {plannerMode === 'pro' && <button onClick={generateQualityReport} style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}>⭐ Качество</button>}
-            <button onClick={generateRiskReport} style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}>🩺 Риски здоровья</button>
-              {(Array.isArray(injections) ? injections.length : 0) > 0 && <button onClick={generateDrugCompatReport} style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}>💉 Совместимость</button>}
-            <button onClick={generateFullNutritionReport} style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}>📋 Полный отчёт</button>
-            <button onClick={() => {
-              // P2-fix: проверка dayPlan перед массовой генерацией отчётов
-              if (!dayPlan) { setErrorMsg('Сначала создайте план питания.'); return; }
-              generateAllergenReport();
-              generateNutrientReport();
-              if (plannerMode === 'pro') generateQualityReport();
-              generateRiskReport();
-              if ((Array.isArray(injections) ? injections.length : 0) > 0) generateDrugCompatReport();
-              generateRecommendations();
-            }} style={reportPillStyle('#3b82f6', activeReports.length >= 3)}>📋 Общий отчёт</button>
+            <button
+              onClick={generateAllergenReport}
+              style={reportPillStyle('#ef4444', activeReports.includes('allergen') && !!allergenReport)}
+            >
+              ⚠️ Аллергены
+            </button>
+            <button
+              onClick={generateNutrientReport}
+              style={reportPillStyle('#22c55e', activeReports.includes('nutrient') && !!nutrientReport)}
+            >
+              🧬 Нутриенты
+            </button>
+            {plannerMode === 'pro' && (
+              <button
+                onClick={generateQualityReport}
+                style={reportPillStyle('#f59e0b', activeReports.includes('quality') && !!qualityReport)}
+              >
+                ⭐ Качество
+              </button>
+            )}
+            <button
+              onClick={generateRiskReport}
+              style={reportPillStyle('#ef4444', activeReports.includes('risk') && !!riskReport)}
+            >
+              🩺 Риски здоровья
+            </button>
+            {(Array.isArray(injections) ? injections.length : 0) > 0 && (
+              <button
+                onClick={generateDrugCompatReport}
+                style={reportPillStyle('#8b5cf6', activeReports.includes('drug') && !!drugCompatReport)}
+              >
+                💉 Совместимость
+              </button>
+            )}
+            <button
+              onClick={generateFullNutritionReport}
+              style={reportPillStyle('#3b82f6', activeReports.includes('nutrition') && !!nutritionReport)}
+            >
+              📋 Полный отчёт
+            </button>
+            <button
+              onClick={() => {
+                // P2-fix: проверка dayPlan перед массовой генерацией отчётов
+                if (!dayPlan) {
+                  setErrorMsg('Сначала создайте план питания.');
+                  return;
+                }
+                generateAllergenReport();
+                generateNutrientReport();
+                if (plannerMode === 'pro') generateQualityReport();
+                generateRiskReport();
+                if ((Array.isArray(injections) ? injections.length : 0) > 0) generateDrugCompatReport();
+                generateRecommendations();
+              }}
+              style={reportPillStyle('#3b82f6', activeReports.length >= 3)}
+            >
+              📋 Общий отчёт
+            </button>
           </div>
           {allergenReport && activeReports.includes('allergen') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: allergenReport.riskLevel === 'high' ? 'rgba(239,68,68,0.06)' : allergenReport.riskLevel === 'medium' ? 'rgba(245,158,11,0.06)' : 'rgba(34,197,94,0.06)', border: `1px solid ${allergenReport.riskLevel === 'high' ? '#ef4444' : allergenReport.riskLevel === 'medium' ? '#f59e0b' : '#22c55e'}20` }}>
-              <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 3, color: allergenReport.riskLevel === 'high' ? '#ef4444' : allergenReport.riskLevel === 'medium' ? '#f59e0b' : '#22c55e' }}>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background:
+                  allergenReport.riskLevel === 'high'
+                    ? 'rgba(239,68,68,0.06)'
+                    : allergenReport.riskLevel === 'medium'
+                      ? 'rgba(245,158,11,0.06)'
+                      : 'rgba(34,197,94,0.06)',
+                border: `1px solid ${allergenReport.riskLevel === 'high' ? '#ef4444' : allergenReport.riskLevel === 'medium' ? '#f59e0b' : '#22c55e'}20`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  marginBottom: 3,
+                  color:
+                    allergenReport.riskLevel === 'high'
+                      ? '#ef4444'
+                      : allergenReport.riskLevel === 'medium'
+                        ? '#f59e0b'
+                        : '#22c55e',
+                }}
+              >
                 {allergenReport.summary}
               </div>
               {allergenReport.conflicts.map((c: any, i: number) => (
@@ -2168,56 +5415,173 @@ const doImportPlan = (raw: string): boolean => {
             </div>
           )}
           {nutrientReport && activeReports.includes('nutrient') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)' }}>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(34,197,94,0.04)',
+                border: '1px solid rgba(34,197,94,0.12)',
+              }}
+            >
               <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>🧬 Микронутриенты</div>
-              {Object.entries(nutrientReport.micros).slice(0, 10).map(([k, v]: [string, any]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, padding: '1px 0', color: 'rgba(255,255,255,0.85)' }}>
-                  <span>{k}</span>
-                  <span style={{ color: v.status === 'ok' ? '#22c55e' : v.status === 'low' ? '#f59e0b' : '#ef4444' }}>
-                    {v.actual} / {v.target} ({v.pct}%)
-                  </span>
-                </div>
-              ))}
+              {Object.entries(nutrientReport.micros)
+                .slice(0, 10)
+                .map(([k, v]: [string, any]) => (
+                  <div
+                    key={k}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 8,
+                      padding: '1px 0',
+                      color: 'rgba(255,255,255,0.85)',
+                    }}
+                  >
+                    <span>{k}</span>
+                    <span style={{ color: v.status === 'ok' ? '#22c55e' : v.status === 'low' ? '#f59e0b' : '#ef4444' }}>
+                      {v.actual} / {v.target} ({v.pct}%)
+                    </span>
+                  </div>
+                ))}
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
                 {nutrientReport.gaps.join('; ')}
               </div>
             </div>
           )}
           {plannerMode === 'pro' && qualityReport && activeReports.includes('quality') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3, flexWrap:'wrap', gap:4 }}>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(245,158,11,0.04)',
+                border: '1px solid rgba(245,158,11,0.12)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 3,
+                  flexWrap: 'wrap',
+                  gap: 4,
+                }}
+              >
                 <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
                   ⭐ Скор продуктов (bb_quality): {qualityReport.avgScore}/10
                 </div>
-                <div style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 5px',
+                    borderRadius: 4,
+                    background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                    color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b',
+                  }}
+                >
                   {qualityReport.budgetRange} · bb_quality {qualityReport.bbsAvg}
                 </div>
               </div>
               {/* Эпик 4а: ЕДИНЫЙ скор дня — тот же, что в карточке «Качество дня» выше */}
               {typeof qualityReport.dayScore === 'number' && (
-                <div style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:999, marginBottom:3,
-                  background: (qualityReport.dayStatus === 'green' ? 'rgba(34,197,94,0.10)' : qualityReport.dayStatus === 'yellow' ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.10)'),
-                  border: `1px solid ${qualityReport.dayStatus === 'green' ? 'rgba(34,197,94,0.2)' : qualityReport.dayStatus === 'yellow' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                  color: qualityReport.dayStatus === 'green' ? '#86efac' : qualityReport.dayStatus === 'yellow' ? '#fbbf24' : '#fca5a5' }}>
-                  🩺 Скор дня: {qualityReport.dayScore}/100 ({qualityReport.dayStatus === 'green' ? 'отлично' : qualityReport.dayStatus === 'yellow' ? 'норма' : 'внимание'})
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    marginBottom: 3,
+                    background:
+                      qualityReport.dayStatus === 'green'
+                        ? 'rgba(34,197,94,0.10)'
+                        : qualityReport.dayStatus === 'yellow'
+                          ? 'rgba(245,158,11,0.10)'
+                          : 'rgba(239,68,68,0.10)',
+                    border: `1px solid ${qualityReport.dayStatus === 'green' ? 'rgba(34,197,94,0.2)' : qualityReport.dayStatus === 'yellow' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                    color:
+                      qualityReport.dayStatus === 'green'
+                        ? '#86efac'
+                        : qualityReport.dayStatus === 'yellow'
+                          ? '#fbbf24'
+                          : '#fca5a5',
+                  }}
+                >
+                  🩺 Скор дня: {qualityReport.dayScore}/100 (
+                  {qualityReport.dayStatus === 'green'
+                    ? 'отлично'
+                    : qualityReport.dayStatus === 'yellow'
+                      ? 'норма'
+                      : 'внимание'}
+                  )
                 </div>
               )}
-              {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
-              {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
-              {qualityReport.recommendations.map((r: string, i: number) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>• {r}</div>)}
+              {qualityReport.bestItems.length > 0 && (
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
+                  Лучшие: {qualityReport.bestItems.join(', ')}
+                </div>
+              )}
+              {qualityReport.weakItems.length > 0 && (
+                <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>
+              )}
+              {qualityReport.recommendations.map((r: string, i: number) => (
+                <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>
+                  • {r}
+                </div>
+              ))}
             </div>
           )}
           {riskReport && activeReports.includes('risk') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, marginBottom: 3, color: riskReport.totalRisk === 'Низкий' ? '#22c55e' : riskReport.totalRisk === 'Средний' ? '#f59e0b' : '#ef4444' }}>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.12)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  marginBottom: 3,
+                  color:
+                    riskReport.totalRisk === 'Низкий'
+                      ? '#22c55e'
+                      : riskReport.totalRisk === 'Средний'
+                        ? '#f59e0b'
+                        : '#ef4444',
+                }}
+              >
                 🩺 Общий риск: {riskReport.totalRisk}
               </div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{riskReport.summary}</div>
               {Object.entries(riskReport.systems).map(([sys, data]: [string, any]) => (
-                <div key={sys} style={{ fontSize: 8, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <div
+                  key={sys}
+                  style={{ fontSize: 8, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 600, color: data.score >= 5 ? '#ef4444' : data.score >= 3 ? '#f59e0b' : '#22c55e' }}>
-                      {sys === 'hepatic' ? 'Печень' : sys === 'renal' ? 'Почки' : sys === 'inflammatory' ? 'Воспаление' : sys === 'insulin' ? 'Инсулин' : 'Электролиты'}
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: data.score >= 5 ? '#ef4444' : data.score >= 3 ? '#f59e0b' : '#22c55e',
+                      }}
+                    >
+                      {sys === 'hepatic'
+                        ? 'Печень'
+                        : sys === 'renal'
+                          ? 'Почки'
+                          : sys === 'inflammatory'
+                            ? 'Воспаление'
+                            : sys === 'insulin'
+                              ? 'Инсулин'
+                              : 'Электролиты'}
                     </span>
                     <span style={{ color: 'rgba(255,255,255,0.85)' }}>⚠ {data.score}/7</span>
                   </div>
@@ -2228,50 +5592,95 @@ const doImportPlan = (raw: string): boolean => {
             </div>
           )}
           {dayPlan && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>🍬 Гликемическая нагрузка</div>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(59,130,246,0.04)',
+                border: '1px solid rgba(59,130,246,0.12)',
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 3 }}>
+                🍬 Гликемическая нагрузка
+              </div>
               {(() => {
                 // P1-fix: null guard на dayPlan.meals — был crash при meals=null
                 const items = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).flatMap((m: any) => m.items || []);
-                const gl = Math.round(items.reduce((sum: number, it: any) => {
-                  const food = findFoodByIdOrName(it.id, it.name);
-                  if (!food?.gi) return sum;
-                  const amountRatio = (it.amount || 100) / 100;
-                  const availableCarbs = Math.max(0, (food.carbs || 0) - (food.fiber || 0)) * amountRatio;
-                  return sum + availableCarbs * food.gi / 100;
-                }, 0));
+                const gl = Math.round(
+                  items.reduce((sum: number, it: any) => {
+                    const food = findFoodByIdOrName(it.id, it.name);
+                    if (!food?.gi) return sum;
+                    const amountRatio = (it.amount || 100) / 100;
+                    const availableCarbs = Math.max(0, (food.carbs || 0) - (food.fiber || 0)) * amountRatio;
+                    return sum + (availableCarbs * food.gi) / 100;
+                  }, 0),
+                );
                 const carbItems = items.filter((it: any) => {
                   const food = findFoodByIdOrName(it.id, it.name);
                   return food?.gi && (food.carbs || 0) > 0;
                 });
-                const avgGI = carbItems.length > 0 ? Math.round(carbItems.reduce((sum: number, it: any) => {
-                  const food = findFoodByIdOrName(it.id, it.name);
-                  return sum + (food?.gi || 0);
-                }, 0) / carbItems.length) : 0;
+                const avgGI =
+                  carbItems.length > 0
+                    ? Math.round(
+                        carbItems.reduce((sum: number, it: any) => {
+                          const food = findFoodByIdOrName(it.id, it.name);
+                          return sum + (food?.gi || 0);
+                        }, 0) / carbItems.length,
+                      )
+                    : 0;
                 const totalCarbs = dayPlan.totals?.c || 0;
                 const glPerMeal = dayPlan.meals?.length > 0 ? Math.round(gl / dayPlan.meals.length) : 0;
                 const glLabel = gl <= 80 ? 'Низкая' : gl <= 120 ? 'Средняя' : 'Высокая';
                 const glColor = gl <= 80 ? '#22c55e' : gl <= 120 ? '#f59e0b' : '#ef4444';
                 return (
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 2,
+                      }}
+                    >
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Общий ГН (расчётный):</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>{gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>({glLabel})</span></span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: glColor }}>
+                        {gl} <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>({glLabel})</span>
+                      </span>
                     </div>
                     <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.9)' }}>
-                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы: {Math.round(dayPlan.totals?.c || 0)}г
+                      Средний ГИ рациона: ~{avgGI} · ГН на приём: ~{glPerMeal} · Углеводы:{' '}
+                      {Math.round(dayPlan.totals?.c || 0)}г
                     </div>
-                    {gl > 120 && <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>💡 Высокая нагрузка — рекомендуется увеличить долю низко-ГИ продуктов (бобовые, цельнозерновые, овощи)</div>}
+                    {gl > 120 && (
+                      <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 2 }}>
+                        💡 Высокая нагрузка — рекомендуется увеличить долю низко-ГИ продуктов (бобовые, цельнозерновые,
+                        овощи)
+                      </div>
+                    )}
                   </div>
                 );
               })()}
             </div>
           )}
           {drugCompatReport && activeReports.includes('drug') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>💉 Совместимость с препаратами</div>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(139,92,246,0.04)',
+                border: '1px solid rgba(139,92,246,0.12)',
+              }}
+            >
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 4 }}>
+                💉 Совместимость с препаратами
+              </div>
               {drugCompatReport.interactions.map((int: any, i: number) => (
-                <div key={i} style={{ fontSize: 8, padding: '2px 0', color: int.severity === 'high' ? '#ef4444' : '#f59e0b' }}>
+                <div
+                  key={i}
+                  style={{ fontSize: 8, padding: '2px 0', color: int.severity === 'high' ? '#ef4444' : '#f59e0b' }}
+                >
                   • {int.drug} + {int.food}: {int.effect}
                 </div>
               ))}
@@ -2281,290 +5690,926 @@ const doImportPlan = (raw: string): boolean => {
             </div>
           )}
           {nutritionReport && activeReports.includes('nutrition') && (
-            <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)' }}>
+            <div
+              style={{
+                padding: '6px 8px',
+                borderRadius: 8,
+                marginBottom: 4,
+                background: 'rgba(59,130,246,0.04)',
+                border: '1px solid rgba(59,130,246,0.12)',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6' }}>📋 Полный отчёт о питании</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: nutritionReport.overallGrade === 'A' ? '#22c55e' : nutritionReport.overallGrade === 'B' ? '#8b5cf6' : nutritionReport.overallGrade === 'C' ? '#f59e0b' : '#ef4444' }}>{nutritionReport.overallGrade}</span>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color:
+                      nutritionReport.overallGrade === 'A'
+                        ? '#22c55e'
+                        : nutritionReport.overallGrade === 'B'
+                          ? '#8b5cf6'
+                          : nutritionReport.overallGrade === 'C'
+                            ? '#f59e0b'
+                            : '#ef4444',
+                  }}
+                >
+                  {nutritionReport.overallGrade}
+                </span>
               </div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>{nutritionReport.overallGradeLabel}</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                {nutritionReport.overallGradeLabel}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 4 }}>
-                {[{l:'Ккал',v:nutritionReport.kbjuPct.kcal},{l:'Белки',v:nutritionReport.kbjuPct.p},{l:'Жиры',v:nutritionReport.kbjuPct.f},{l:'Угл.',v:nutritionReport.kbjuPct.c}].map((s: any) => (
-                  <div key={s.l} style={{ background:'rgba(0,0,0,0.2)', borderRadius:4, padding:'3px', textAlign:'center' }}>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>{s.l}</div>
-                    <div style={{ fontSize:11, fontWeight:700, color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444' }}>{s.v}%</div>
+                {[
+                  { l: 'Ккал', v: nutritionReport.kbjuPct.kcal },
+                  { l: 'Белки', v: nutritionReport.kbjuPct.p },
+                  { l: 'Жиры', v: nutritionReport.kbjuPct.f },
+                  { l: 'Угл.', v: nutritionReport.kbjuPct.c },
+                ].map((s: any) => (
+                  <div
+                    key={s.l}
+                    style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 4, padding: '3px', textAlign: 'center' }}
+                  >
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{s.l}</div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: s.v >= 85 && s.v <= 115 ? '#22c55e' : s.v >= 70 ? '#f59e0b' : '#ef4444',
+                      }}
+                    >
+                      {s.v}%
+                    </div>
                   </div>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
                 <div style={{ flex: 1, background: 'rgba(59,130,246,0.06)', borderRadius: 4, padding: '3px 5px' }}>
                   <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>Вес/нед</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: nutritionReport.weightDynamicsBasic.direction === 'loss' ? '#22c55e' : nutritionReport.weightDynamicsBasic.direction === 'gain' ? '#f59e0b' : '#fff' }}>
-                    {nutritionReport.weightDynamicsBasic.direction === 'loss' ? '−' : nutritionReport.weightDynamicsBasic.direction === 'gain' ? '+' : '∼'}{nutritionReport.weightDynamicsBasic.weeklyKg} кг
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color:
+                        nutritionReport.weightDynamicsBasic.direction === 'loss'
+                          ? '#22c55e'
+                          : nutritionReport.weightDynamicsBasic.direction === 'gain'
+                            ? '#f59e0b'
+                            : '#fff',
+                    }}
+                  >
+                    {nutritionReport.weightDynamicsBasic.direction === 'loss'
+                      ? '−'
+                      : nutritionReport.weightDynamicsBasic.direction === 'gain'
+                        ? '+'
+                        : '∼'}
+                    {nutritionReport.weightDynamicsBasic.weeklyKg} кг
                   </div>
                 </div>
                 <div style={{ flex: 1, background: 'rgba(139,92,246,0.06)', borderRadius: 4, padding: '3px 5px' }}>
                   <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>Качество</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: nutritionReport.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b' }}>{nutritionReport.foodQualityScore}/10</div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: nutritionReport.foodQualityScore >= 7 ? '#22c55e' : '#f59e0b',
+                    }}
+                  >
+                    {nutritionReport.foodQualityScore}/10
+                  </div>
                 </div>
               </div>
-              {nutritionReport.microDeficiencies.length > 0 && <div style={{ fontSize: 7, color: '#f59e0b', marginBottom: 2 }}>⚠ {nutritionReport.microDeficiencies.length} дефицитов: {nutritionReport.microDeficiencies.slice(0, 3).join('; ')}</div>}
-              {nutritionReport.recommendations.length > 0 && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>💡 {nutritionReport.recommendations.slice(0, 2).join(' • ')}</div>}
+              {nutritionReport.microDeficiencies.length > 0 && (
+                <div style={{ fontSize: 7, color: '#f59e0b', marginBottom: 2 }}>
+                  ⚠ {nutritionReport.microDeficiencies.length} дефицитов:{' '}
+                  {nutritionReport.microDeficiencies.slice(0, 3).join('; ')}
+                </div>
+              )}
+              {nutritionReport.recommendations.length > 0 && (
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+                  💡 {nutritionReport.recommendations.slice(0, 2).join(' • ')}
+                </div>
+              )}
             </div>
           )}
         </GlassCard>
       )}
 
-      <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:6 }}>
-        <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>⚡ Специальные режимы</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => generateCheatMeal()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)', color:'#f59e0b', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 2,
+          }}
+        >
+          ⚡ Специальные режимы
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => generateCheatMeal()}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: 'rgba(245,158,11,0.08)',
+                border: '1px solid rgba(245,158,11,0.2)',
+                color: '#f59e0b',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               🍔 Читмил
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Один приём пищи с повышенной калорийностью</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Один приём пищи с повышенной калорийностью
+            </div>
           </div>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => generateCarbload()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.2)', color:'#f97316', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => generateCarbload()}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: 'rgba(249,115,22,0.08)',
+                border: '1px solid rgba(249,115,22,0.2)',
+                color: '#f97316',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               🍚 Углев. загрузка
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Повышение углеводов на 1-2 дня</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Повышение углеводов на 1-2 дня
+            </div>
           </div>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => generateBUTCH()} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.2)', color:'#3b82f6', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => generateBUTCH()}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                color: '#3b82f6',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               ⤴️⤵️ БУЧ
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Белково-углеводное чередование</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Белково-углеводное чередование
+            </div>
           </div>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => { if (!cravingMode) setCravingMode(true); generateCravingPlan(); }} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: cravingMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)', border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)', color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => {
+                if (!cravingMode) setCravingMode(true);
+                generateCravingPlan();
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: cravingMode ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)',
+                border: cravingMode ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: cravingMode ? '#ef4444' : 'rgba(255,255,255,0.8)',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               🍬 Хочу сладкое
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Отдельный план: {cravingDays} {cravingDays === 1 ? 'день' : 'дня'} с десертом (основной рацион не меняется)</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Отдельный план: {cravingDays} {cravingDays === 1 ? 'день' : 'дня'} с десертом (основной рацион не
+              меняется)
+            </div>
           </div>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => { if (!lazyDayMode) setLazyDayMode(true); generateLazyDayPlan(); }} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)', color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => {
+                if (!lazyDayMode) setLazyDayMode(true);
+                generateLazyDayPlan();
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: lazyDayMode ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)',
+                border: lazyDayMode ? '1px solid rgba(245,158,11,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: lazyDayMode ? '#f59e0b' : 'rgba(255,255,255,0.8)',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               🛋 Ленивый день
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Отдельный план готовки: {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} (основной рацион не меняется)</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Отдельный план готовки: {lazyDayDays} {lazyDayDays === 1 ? 'день' : 'дней'} (основной рацион не меняется)
+            </div>
           </div>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={() => setSpecialMealMode(!specialMealMode)} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background: specialMealMode ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.02)', border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)', color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.8)', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={() => setSpecialMealMode(!specialMealMode)}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: specialMealMode ? 'rgba(249,115,22,0.08)' : 'rgba(255,255,255,0.02)',
+                border: specialMealMode ? '1px solid rgba(249,115,22,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                color: specialMealMode ? '#f97316' : 'rgba(255,255,255,0.8)',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               🍽️ Спецприём
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Приём с заданными макросами</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Приём с заданными макросами
+            </div>
           </div>
         </div>
       </div>
 
       {cravingPlan && (
         <GlassCard title="Хочу сладкое" icon="🍬" color="#ef4444" style={{ border: '1px solid rgba(239,68,68,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>~{cravingPlan.kcal} ккал ({cravingPlan.days} {cravingPlan.days === 1 ? 'день' : 'дня'})</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>
+            ~{cravingPlan.kcal} ккал ({cravingPlan.days} {cravingPlan.days === 1 ? 'день' : 'дня'})
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(59,130,246,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{cravingPlan.bju.p}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(245,158,11,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{cravingPlan.bju.f}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(239,68,68,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(239,68,68,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Углеводы</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444' }}>{cravingPlan.bju.c}г</div>
             </div>
           </div>
           {(Array.isArray(cravingPlan.items) ? cravingPlan.items : []).map((it: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9,
+                padding: '4px 0',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
+              }}
+            >
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span
+                onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })}
+                style={{ cursor: 'pointer', fontSize: 9, color: '#00e68a', opacity: 0.5, padding: '2px 4px' }}
+                title="В корзину"
+              >
+                🛒
+              </span>
             </div>
           ))}
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
-            {cravingPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#ef4444', marginTop: 6, marginBottom: 4 }}>
+            📋 Основные принципы:
           </div>
-          <div style={{ fontSize: 8, color: '#ef4444', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)' }}>{cravingPlan.recommendation}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.06)' }}>{cravingPlan.note}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+            {cravingPlan.principles.map((p: string, i: number) => (
+              <div key={i}>{p}</div>
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: '#ef4444',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(239,68,68,0.06)',
+            }}
+          >
+            {cravingPlan.recommendation}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: 'rgba(255,255,255,0.85)',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(239,68,68,0.06)',
+            }}
+          >
+            {cravingPlan.note}
+          </div>
         </GlassCard>
       )}
 
       {lazyDayPlan && (
         <GlassCard title="Ленивый день" icon="🛋️" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{lazyDayPlan.kcal} ккал (85% от нормы, {lazyDayPlan.days} {lazyDayPlan.days === 1 ? 'день' : 'дней'})</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>
+            ~{lazyDayPlan.kcal} ккал (85% от нормы, {lazyDayPlan.days} {lazyDayPlan.days === 1 ? 'день' : 'дней'})
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(59,130,246,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{lazyDayPlan.bju.p}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(245,158,11,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{lazyDayPlan.bju.f}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(59,130,246,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Углеводы</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{lazyDayPlan.bju.c}г</div>
             </div>
           </div>
           {(Array.isArray(lazyDayPlan.items) ? lazyDayPlan.items : []).map((it: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9,
+                padding: '4px 0',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
+              }}
+            >
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span
+                onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || 100, amount: 100 })}
+                style={{ cursor: 'pointer', fontSize: 9, color: '#00e68a', opacity: 0.5, padding: '2px 4px' }}
+                title="В корзину"
+              >
+                🛒
+              </span>
             </div>
           ))}
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
-            {lazyDayPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>
+            📋 Основные принципы:
           </div>
-          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{lazyDayPlan.recommendation}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{lazyDayPlan.note}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+            {lazyDayPlan.principles.map((p: string, i: number) => (
+              <div key={i}>{p}</div>
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: '#f59e0b',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(245,158,11,0.06)',
+            }}
+          >
+            {lazyDayPlan.recommendation}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: 'rgba(255,255,255,0.85)',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(245,158,11,0.06)',
+            }}
+          >
+            {lazyDayPlan.note}
+          </div>
         </GlassCard>
       )}
 
       {cheatMealPlan && (
         <GlassCard title="Читмил" icon="🍔" color="#f59e0b" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>~{cheatMealPlan.cals} ккал (35% от нормы)</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 6 }}>
+            ~{cheatMealPlan.cals} ккал (35% от нормы)
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(245,158,11,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{cheatMealPlan.bju.p}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(245,158,11,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{cheatMealPlan.bju.f}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(245,158,11,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Углеводы</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>{cheatMealPlan.bju.c}г</div>
             </div>
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>{cheatMealPlan.bjuBreakdown}</div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>
+            {cheatMealPlan.bjuBreakdown}
+          </div>
           {(Array.isArray(cheatMealPlan.items) ? cheatMealPlan.items : []).map((it: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9,
+                padding: '4px 0',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
+              }}
+            >
               <span style={{ color: '#fff' }}>• {it.name || it}</span>
-              <span onClick={() => addToCart({ name: it.name || it, kcal: it.kcal || (cheatMealPlan.cals / cheatMealPlan.items.length), amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span
+                onClick={() =>
+                  addToCart({
+                    name: it.name || it,
+                    kcal: it.kcal || cheatMealPlan.cals / cheatMealPlan.items.length,
+                    amount: 100,
+                  })
+                }
+                style={{ cursor: 'pointer', fontSize: 9, color: '#00e68a', opacity: 0.5, padding: '2px 4px' }}
+                title="В корзину"
+              >
+                🛒
+              </span>
             </div>
           ))}
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
-            {cheatMealPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#f59e0b', marginTop: 6, marginBottom: 4 }}>
+            📋 Основные принципы:
           </div>
-          <div style={{ fontSize: 8, color: '#f59e0b', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.recommendation}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.06)' }}>{cheatMealPlan.note}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+            {cheatMealPlan.principles.map((p: string, i: number) => (
+              <div key={i}>{p}</div>
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: '#f59e0b',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(245,158,11,0.06)',
+            }}
+          >
+            {cheatMealPlan.recommendation}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: 'rgba(255,255,255,0.85)',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(245,158,11,0.06)',
+            }}
+          >
+            {cheatMealPlan.note}
+          </div>
         </GlassCard>
       )}
 
       {carbloadPlan && (
-        <GlassCard title="Углеводная загрузка" icon="🍚" color="#f97316" style={{ border: '1px solid rgba(249,115,22,0.15)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / Math.max(1, weight || 80))} г/кг)</div>
+        <GlassCard
+          title="Углеводная загрузка"
+          icon="🍚"
+          color="#f97316"
+          style={{ border: '1px solid rgba(249,115,22,0.15)' }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316', marginBottom: 4 }}>
+            Всего: {carbloadPlan.totalCarbs} г ({Math.round(carbloadPlan.totalCarbs / Math.max(1, weight || 80))} г/кг)
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(249,115,22,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Белки</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#3b82f6' }}>{carbloadPlan.bju.p}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(249,115,22,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Жиры</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{carbloadPlan.bju.f}г</div>
             </div>
-            <div style={{ flex: 1, padding: '4px 6px', borderRadius: 6, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
+            <div
+              style={{
+                flex: 1,
+                padding: '4px 6px',
+                borderRadius: 6,
+                background: 'rgba(249,115,22,0.06)',
+                textAlign: 'center',
+              }}
+            >
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>Углеводы</div>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>{carbloadPlan.bju.c}г</div>
             </div>
           </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>~{carbloadPlan.bju.kcal} ккал всего</div>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textAlign: 'center' }}>
+            ~{carbloadPlan.bju.kcal} ккал всего
+          </div>
           {(Array.isArray(carbloadPlan.foods) ? carbloadPlan.foods : []).map((f: any, i: number) => (
-            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize: 9, padding: '4px 0', alignItems:'center', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+            <div
+              key={i}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: 9,
+                padding: '4px 0',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
+              }}
+            >
               <span style={{ color: '#fff' }}>• {f.name || f}</span>
-              <span onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })} style={{ cursor:'pointer', fontSize:9, color:'#00e68a', opacity:0.5, padding:'2px 4px' }} title="В корзину">🛒</span>
+              <span
+                onClick={() => addToCart({ name: f.name || f, kcal: f.kcal || 100, amount: 100 })}
+                style={{ cursor: 'pointer', fontSize: 9, color: '#00e68a', opacity: 0.5, padding: '2px 4px' }}
+                title="В корзину"
+              >
+                🛒
+              </span>
             </div>
           ))}
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#f97316', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
-            {carbloadPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+          <div style={{ fontSize: 9, fontWeight: 600, color: '#f97316', marginTop: 6, marginBottom: 4 }}>
+            📋 Основные принципы:
           </div>
-          <div style={{ fontSize: 8, color: '#f97316', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(249,115,22,0.06)' }}>{carbloadPlan.note}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+            {carbloadPlan.principles.map((p: string, i: number) => (
+              <div key={i}>{p}</div>
+            ))}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: '#f97316',
+              marginTop: 4,
+              padding: '4px 8px',
+              borderRadius: 6,
+              background: 'rgba(249,115,22,0.06)',
+            }}
+          >
+            {carbloadPlan.note}
+          </div>
         </GlassCard>
       )}
 
-      {specialMealMode && (() => {
-        const p = specialMealProteinG; const f = specialMealFatG; const c = specialMealCarbsG;
-        const kcal = p * 4 + f * 9 + c * 4;
-        const suggestFoods = (): { id: string; name: string; amount: string }[] => {
-          const picks: { id: string; g: number }[] = [];
-          if (p > 20) picks.push({ id: 'chicken_breast', g: Math.round(p / 31 * 100) });
-          else picks.push({ id: 'egg_whole', g: Math.round(p / 13 * 60) });
-          if (f > 10) picks.push({ id: 'salmon', g: Math.round(f / 13 * 100) });
-          if (c > 30) picks.push({ id: 'rice_white', g: Math.round(c / 28 * 100) });
-          else if (c > 10) picks.push({ id: 'buckwheat', g: Math.round(c / 30 * 100) });
-          if (specialMealGoal === 'pre_workout' || specialMealGoal === 'post_workout') picks.push({ id: 'whey', g: 30 });
-          if (specialMealGoal === 'before_bed') picks.push({ id: 'cottage_cheese', g: Math.round(p / 18 * 100) });
-          if (specialMealGoal === 'keto' && f > 20) picks.push({ id: 'avocado', g: Math.round(f / 15 * 100) });
-          return picks.map(pk => {
-            const food = findFoodByIdOrName(pk.id);
-            return { id: pk.id, name: food?.name || pk.id, amount: pk.g + 'г' };
-          });
-        };
-        const suggested = suggestFoods();
-        return (
-        <div style={{ borderRadius: 12, padding: 12, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.15)', marginTop: 4 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>🍽️ Спецприём{specialMealReplaceMode ? ` (замена: ${effectiveSpecialMealTarget(specialMealReplaceTarget, specialMealTiming)})` : ' (дополнительно)'}</span>
-            <span onClick={() => setSpecialMealMode(false)} style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}>✕</span>
-          </div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
-            {specialMealGoal === 'pre_workout' ? '🏋️ Предтренировочный приём' :
-             specialMealGoal === 'post_workout' ? '💪 Послетренировочный приём' :
-             specialMealGoal === 'before_bed' ? '🌙 Приём на ночь (медленный белок)' :
-             specialMealGoal === 'high_protein' ? '🥩 Высокобелковый приём' :
-             specialMealGoal === 'keto' ? '🥑 Кето-приём' :
-             specialMealGoal === 'low_cal_day' ? '📉 Низкокалорийный приём' : '⚙️ Свой приём'}
-            · {specialMealTiming === 'breakfast' ? '🌅 Завтрак' : specialMealTiming === 'lunch' ? '🍽️ Обед' : specialMealTiming === 'dinner' ? '🌆 Ужин' : specialMealTiming === 'snack' ? '🍪 Перекус' : '🌙 Перед сном'}
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🥩 Белок</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>{p}г</div>
-            </div>
-            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🧈 Жиры</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>{f}г</div>
-            </div>
-            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🍚 Углеводы</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6' }}>{c}г</div>
-            </div>
-            <div style={{ flex: 1, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.06)', textAlign: 'center' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🔥 Ккал</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>{kcal}</div>
-            </div>
-          </div>
-          {suggested.length > 0 && (
-            <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(249,115,22,0.04)', border: '1px solid rgba(249,115,22,0.1)' }}>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>🍽️ Рекомендуемые продукты:</div>
-              {suggested.map(s => (
-                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(255,255,255,0.7)', padding: '2px 0' }}>
-                  <span>{s.name}</span>
-                  <span style={{ color: '#f97316', fontWeight: 600 }}>{s.amount}</span>
+      {specialMealMode &&
+        (() => {
+          const p = specialMealProteinG;
+          const f = specialMealFatG;
+          const c = specialMealCarbsG;
+          const kcal = p * 4 + f * 9 + c * 4;
+          const suggestFoods = (): { id: string; name: string; amount: string }[] => {
+            const picks: { id: string; g: number }[] = [];
+            if (p > 20) picks.push({ id: 'chicken_breast', g: Math.round((p / 31) * 100) });
+            else picks.push({ id: 'egg_whole', g: Math.round((p / 13) * 60) });
+            if (f > 10) picks.push({ id: 'salmon', g: Math.round((f / 13) * 100) });
+            if (c > 30) picks.push({ id: 'rice_white', g: Math.round((c / 28) * 100) });
+            else if (c > 10) picks.push({ id: 'buckwheat', g: Math.round((c / 30) * 100) });
+            if (specialMealGoal === 'pre_workout' || specialMealGoal === 'post_workout')
+              picks.push({ id: 'whey', g: 30 });
+            if (specialMealGoal === 'before_bed') picks.push({ id: 'cottage_cheese', g: Math.round((p / 18) * 100) });
+            if (specialMealGoal === 'keto' && f > 20) picks.push({ id: 'avocado', g: Math.round((f / 15) * 100) });
+            return picks.map((pk) => {
+              const food = findFoodByIdOrName(pk.id);
+              return { id: pk.id, name: food?.name || pk.id, amount: pk.g + 'г' };
+            });
+          };
+          const suggested = suggestFoods();
+          return (
+            <div
+              style={{
+                borderRadius: 12,
+                padding: 12,
+                background: 'rgba(249,115,22,0.04)',
+                border: '1px solid rgba(249,115,22,0.15)',
+                marginTop: 4,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>
+                  🍽️ Спецприём
+                  {specialMealReplaceMode
+                    ? ` (замена: ${effectiveSpecialMealTarget(specialMealReplaceTarget, specialMealTiming)})`
+                    : ' (дополнительно)'}
+                </span>
+                <span
+                  onClick={() => setSpecialMealMode(false)}
+                  style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)' }}
+                >
+                  ✕
+                </span>
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+                {specialMealGoal === 'pre_workout'
+                  ? '🏋️ Предтренировочный приём'
+                  : specialMealGoal === 'post_workout'
+                    ? '💪 Послетренировочный приём'
+                    : specialMealGoal === 'before_bed'
+                      ? '🌙 Приём на ночь (медленный белок)'
+                      : specialMealGoal === 'high_protein'
+                        ? '🥩 Высокобелковый приём'
+                        : specialMealGoal === 'keto'
+                          ? '🥑 Кето-приём'
+                          : specialMealGoal === 'low_cal_day'
+                            ? '📉 Низкокалорийный приём'
+                            : '⚙️ Свой приём'}
+                ·{' '}
+                {specialMealTiming === 'breakfast'
+                  ? '🌅 Завтрак'
+                  : specialMealTiming === 'lunch'
+                    ? '🍽️ Обед'
+                    : specialMealTiming === 'dinner'
+                      ? '🌆 Ужин'
+                      : specialMealTiming === 'snack'
+                        ? '🍪 Перекус'
+                        : '🌙 Перед сном'}
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(34,197,94,0.06)',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🥩 Белок</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>{p}г</div>
                 </div>
-              ))}
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(245,158,11,0.06)',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🧈 Жиры</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b' }}>{f}г</div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(59,130,246,0.06)',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🍚 Углеводы</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6' }}>{c}г</div>
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    borderRadius: 8,
+                    background: 'rgba(249,115,22,0.06)',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>🔥 Ккал</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#f97316' }}>{kcal}</div>
+                </div>
+              </div>
+              {suggested.length > 0 && (
+                <div
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    background: 'rgba(249,115,22,0.04)',
+                    border: '1px solid rgba(249,115,22,0.1)',
+                  }}
+                >
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+                    🍽️ Рекомендуемые продукты:
+                  </div>
+                  {suggested.map((s) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 8,
+                        color: 'rgba(255,255,255,0.7)',
+                        padding: '2px 0',
+                      }}
+                    >
+                      <span>{s.name}</span>
+                      <span style={{ color: '#f97316', fontWeight: 600 }}>{s.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        );
-      })()}
+          );
+        })()}
 
       {butchPlan && (
-        <GlassCard title="БУЧ (белково-углеводное чередование)" icon="⤴️⤵️" color="#3b82f6" style={{ border: '1px solid rgba(59,130,246,0.15)' }}>
-          <div style={{ padding: '10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <GlassCard
+          title="БУЧ (белково-углеводное чередование)"
+          icon="⤴️⤵️"
+          color="#3b82f6"
+          style={{ border: '1px solid rgba(59,130,246,0.15)' }}
+        >
+          <div
+            style={{
+              padding: '10px',
+              borderRadius: 10,
+              background: '#202023',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>📋 {butchPlan.pattern}</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', textAlign: 'center' }}>
+              <div
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: 8,
+                  background: 'rgba(34,197,94,0.08)',
+                  border: '1px solid rgba(34,197,94,0.2)',
+                  textAlign: 'center',
+                }}
+              >
                 <div style={{ fontSize: 7, color: '#22c55e', fontWeight: 600 }}>ВУ (тренировка)</div>
                 <div style={{ fontSize: 14, fontWeight: 900, color: '#22c55e' }}>{butchPlan.highCarb}</div>
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>г углеводов</div>
                 <div style={{ fontSize: 7, color: '#3b82f6', marginTop: 2 }}>↑ белок {butchPlan.protein}г</div>
                 <div style={{ fontSize: 7, color: '#f59e0b' }}>↓ жиры {butchPlan.fatHigh}г</div>
               </div>
-              <div style={{ flex: 1, padding: '8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', textAlign: 'center' }}>
+              <div
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  borderRadius: 8,
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  textAlign: 'center',
+                }}
+              >
                 <div style={{ fontSize: 7, color: '#ef4444', fontWeight: 600 }}>НУ (отдых)</div>
                 <div style={{ fontSize: 14, fontWeight: 900, color: '#ef4444' }}>{butchPlan.lowCarb}</div>
                 <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>г углеводов</div>
@@ -2575,43 +6620,128 @@ const doImportPlan = (raw: string): boolean => {
             <div style={{ fontSize: 8, color: '#22c55e', textAlign: 'center', marginBottom: 4 }}>
               ВУ: {butchPlan.bjuHigh.kcal} ккал · НУ: {butchPlan.bjuLow.kcal} ккал
             </div>
-            <div style={{ fontSize: 9, fontWeight: 600, color: '#3b82f6', marginTop: 6, marginBottom: 4 }}>📋 Основные принципы:</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
-              {butchPlan.principles.map((p: string, i: number) => <div key={i}>{p}</div>)}
+            <div style={{ fontSize: 9, fontWeight: 600, color: '#3b82f6', marginTop: 6, marginBottom: 4 }}>
+              📋 Основные принципы:
             </div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.06)' }}>{butchPlan.note}</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 4 }}>
+              {butchPlan.principles.map((p: string, i: number) => (
+                <div key={i}>{p}</div>
+              ))}
+            </div>
+            <div
+              style={{
+                fontSize: 8,
+                color: 'rgba(255,255,255,0.85)',
+                marginTop: 4,
+                padding: '4px 8px',
+                borderRadius: 6,
+                background: 'rgba(59,130,246,0.06)',
+              }}
+            >
+              {butchPlan.note}
+            </div>
           </div>
         </GlassCard>
       )}
 
-      <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:6 }}>
-        <div style={{ fontSize:9, fontWeight:700, color:'var(--text-dim)', textTransform:'uppercase', letterSpacing:0.5, marginBottom:2 }}>🎯 Расширенные инструменты</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-          <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-            <button onClick={generateRecommendations} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.2)', color:'#a855f7', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+      <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div
+          style={{
+            fontSize: 9,
+            fontWeight: 700,
+            color: 'var(--text-dim)',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 2,
+          }}
+        >
+          🎯 Расширенные инструменты
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+          <div
+            style={{
+              background: 'rgba(24,24,27,0.5)',
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.04)',
+              padding: '8px 6px',
+              textAlign: 'center',
+            }}
+          >
+            <button
+              onClick={generateRecommendations}
+              style={{
+                width: '100%',
+                padding: '10px 6px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                textAlign: 'center',
+                background: 'rgba(168,85,247,0.08)',
+                border: '1px solid rgba(168,85,247,0.2)',
+                color: '#a855f7',
+                fontWeight: 700,
+                fontSize: 10,
+                transition: 'all 0.15s',
+              }}
+            >
               💡 Выдать рекомендации
             </button>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Персональные советы по питанию</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+              Персональные советы по питанию
+            </div>
           </div>
           {generated && dayPlan && (
-            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', padding:'8px 6px', textAlign:'center' }}>
-              <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-                {([1, 3, 7] as const).map(n => (
-                  <button key={n} onClick={() => setMealPrepDays(n)} style={{
-                    flex:1, padding:'5px', borderRadius:6, cursor:'pointer', textAlign:'center',
-                    background: mealPrepDays === n ? 'rgba(6,182,212,0.15)' : 'transparent',
-                    border: mealPrepDays === n ? '1px solid rgba(6,182,212,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                    color: mealPrepDays === n ? '#06b6d4' : 'rgba(255,255,255,0.6)',
-                    fontWeight:600, fontSize:9,
-                  }}>
+            <div
+              style={{
+                background: 'rgba(24,24,27,0.5)',
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.04)',
+                padding: '8px 6px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                {([1, 3, 7] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setMealPrepDays(n)}
+                    style={{
+                      flex: 1,
+                      padding: '5px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      background: mealPrepDays === n ? 'rgba(6,182,212,0.15)' : 'transparent',
+                      border: mealPrepDays === n ? '1px solid rgba(6,182,212,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      color: mealPrepDays === n ? '#06b6d4' : 'rgba(255,255,255,0.6)',
+                      fontWeight: 600,
+                      fontSize: 9,
+                    }}
+                  >
                     {n === 1 ? '1 день' : n === 3 ? '3 дня' : 'Неделя'}
                   </button>
                 ))}
               </div>
-              <button onClick={generateMealPrep} style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(6,182,212,0.08)', border:'1px solid rgba(6,182,212,0.2)', color:'#06b6d4', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+              <button
+                onClick={generateMealPrep}
+                style={{
+                  width: '100%',
+                  padding: '10px 6px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  background: 'rgba(6,182,212,0.08)',
+                  border: '1px solid rgba(6,182,212,0.2)',
+                  color: '#06b6d4',
+                  fontWeight: 700,
+                  fontSize: 10,
+                  transition: 'all 0.15s',
+                }}
+              >
                 👨‍🍳 Meal Prep
               </button>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+                План приготовления на несколько дней
+              </div>
             </div>
           )}
           {/* FIX B25 (аудит 2026-10): блок был заперт за `recipeApplied` — у большинства
@@ -2619,60 +6749,195 @@ const doImportPlan = (raw: string): boolean => {
               Теперь доступен всегда при наличии плана; печать корректно работает и без рецептов
               (перечисляет продукты), а экспорт берёт ВИДИМЫЙ день, а не первый. */}
           {generated && visibleDayPlan?.meals?.length > 0 && (
-            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
-              <div style={{ display:'flex', gap:4 }}>
-                <button onClick={() => { void printPlanHtml('Меню дня', buildRecipePlanPrintHtml(visibleDayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any)).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} title="Меню дня: продукты, а для выбранных рецептов — ингредиенты и шаги" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
+            <div
+              style={{
+                background: 'rgba(24,24,27,0.5)',
+                borderRadius: 12,
+                border: '1px solid rgba(249,115,22,0.06)',
+                padding: '8px 6px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => {
+                    void printPlanHtml(
+                      'Меню дня',
+                      buildRecipePlanPrintHtml(visibleDayPlan, (weightMode === 'raw' ? 'raw' : 'cooked') as any),
+                    ).then((ok: boolean) => {
+                      if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна');
+                    });
+                  }}
+                  title="Меню дня: продукты, а для выбранных рецептов — ингредиенты и шаги"
+                  className="plan-actbtn"
+                  style={{
+                    flex: 1,
+                    padding: '10px 6px',
+                    minHeight: 44,
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    background: 'rgba(249,115,22,0.1)',
+                    border: '1px solid rgba(249,115,22,0.3)',
+                    color: '#fb923c',
+                    fontWeight: 700,
+                    fontSize: 11,
+                    transition: 'all 0.15s',
+                  }}
+                >
                   🖨 Печать меню
                 </button>
-                <button onClick={() => {
-                  try {
-                    const html = buildCoachExportHtml({
-                      dateIso: localIsoDate(new Date()),
-                      totals: visibleDayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
-                      goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
-                      isTrainingDay: !!visibleDayPlan.isTrainingDay,
-                      meals: visibleDayPlan.meals || [],
-                      shopping: (shoppingList as any[])?.filter((s: any) => s.id !== 'unknown_x') || [],
-                      notes: [...(visibleDayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
-                      weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
-                    });
-                    void downloadCoachFile(html, `plan-coach-${localIsoDate(new Date())}.html`).then(ok => {
-                      if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера готов' : 'Не удалось создать файл', ok ? 'success' : 'warning');
-                    });
-                  } catch { setErrorMsg('Не удалось собрать файл для тренера.'); }
-                }} title="План выбранного дня + рецепты + закупки одним HTML-файлом" className="plan-actbtn" style={{ flex:1, padding:'10px 6px', minHeight:44, borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:11, transition:'all 0.15s' }}>
+                <button
+                  onClick={() => {
+                    try {
+                      const html = buildCoachExportHtml({
+                        dateIso: localIsoDate(new Date()),
+                        totals: visibleDayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
+                        goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
+                        isTrainingDay: !!visibleDayPlan.isTrainingDay,
+                        meals: visibleDayPlan.meals || [],
+                        shopping: (shoppingList as any[])?.filter((s: any) => s.id !== 'unknown_x') || [],
+                        notes: [...(visibleDayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
+                        weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
+                      });
+                      void downloadCoachFile(html, `plan-coach-${localIsoDate(new Date())}.html`).then((ok) => {
+                        if (typeof (window as any).showToast === 'function')
+                          (window as any).showToast(
+                            ok ? '📤 Файл для тренера готов' : 'Не удалось создать файл',
+                            ok ? 'success' : 'warning',
+                          );
+                      });
+                    } catch {
+                      setErrorMsg('Не удалось собрать файл для тренера.');
+                    }
+                  }}
+                  title="План выбранного дня + рецепты + закупки одним HTML-файлом"
+                  className="plan-actbtn"
+                  style={{
+                    flex: 1,
+                    padding: '10px 6px',
+                    minHeight: 44,
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    background: 'rgba(59,130,246,0.1)',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    color: '#60a5fa',
+                    fontWeight: 700,
+                    fontSize: 11,
+                    transition: 'all 0.15s',
+                  }}
+                >
                   📤 Файл тренеру
                 </button>
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>
-                {planDays === 1 ? 'День' : planDays === 3 ? `День ${_visibleDayIdx + 1} из 3` : `День ${_visibleDayIdx + 1} из 7`} · печать и файл тренеру
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+                {planDays === 1
+                  ? 'День'
+                  : planDays === 3
+                    ? `День ${_visibleDayIdx + 1} из 3`
+                    : `День ${_visibleDayIdx + 1} из 7`}{' '}
+                · печать и файл тренеру
               </div>
             </div>
           )}
           {generated && plannerMode === 'pro' && (
             <>
-            <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:10, padding:'8px 10px', border:'1px solid rgba(139,92,246,0.08)', marginBottom:6 }}>
-              <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:3 }}>🧬 v2 Скоринг — что это?</div>
-              <div style={{ fontSize:10, color:'var(--text-dim)', lineHeight:1.4 }}>
-                <b>BB Quality Score (1-10)</b> — статический рейтинг качества продукта для бодибилдинга на основе макронутриентов, аминокислот и клетчатки.<br/>
-                <b>Overall Dietary Score</b> — динамический рейтинг с учётом фазы (набор/сушка/ПКТ), фармакологии (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP) и тайминга приёма.<br/>
-                <b>Почему дублируются кнопки?</b> Скоринг анализирует рацион в целом, а не отдельные приёмы. Кнопка «Рассчитать полезность» запускает общий анализ. Кнопка DIAAS на карточке приёма — показывает усвояемость белка конкретного приёма.
+              <div
+                style={{
+                  background: 'rgba(139,92,246,0.04)',
+                  borderRadius: 10,
+                  padding: '8px 10px',
+                  border: '1px solid rgba(139,92,246,0.08)',
+                  marginBottom: 6,
+                }}
+              >
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', marginBottom: 3 }}>
+                  🧬 v2 Скоринг — что это?
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                  <b>BB Quality Score (1-10)</b> — статический рейтинг качества продукта для бодибилдинга на основе
+                  макронутриентов, аминокислот и клетчатки.
+                  <br />
+                  <b>Overall Dietary Score</b> — динамический рейтинг с учётом фазы (набор/сушка/ПКТ), фармакологии
+                  (ААС, инсулин, HGH, диуретики), анализов крови (гематокрит, липиды, печень, CRP) и тайминга приёма.
+                  <br />
+                  <b>Почему дублируются кнопки?</b> Скоринг анализирует рацион в целом, а не отдельные приёмы. Кнопка
+                  «Рассчитать полезность» запускает общий анализ. Кнопка DIAAS на карточке приёма — показывает
+                  усвояемость белка конкретного приёма.
+                </div>
               </div>
-            </div>
-            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(0,230,138,0.05)', padding:'8px 6px', textAlign:'center' }}>
-              <button onClick={() => { setShowCalcPopup(true); setCalcResults(null); setCalcDailyReport(null); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.12))', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
-                🧬 Рассчитать полезность
-              </button>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>v2 скоринг выбранных приёмов + спецприёмов</div>
-            </div>
+              <div
+                style={{
+                  background: 'rgba(24,24,27,0.5)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(0,230,138,0.05)',
+                  padding: '8px 6px',
+                  textAlign: 'center',
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setShowCalcPopup(true);
+                    setCalcResults(null);
+                    setCalcDailyReport(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 6px',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(0,200,160,0.12))',
+                    border: '1px solid rgba(0,230,138,0.3)',
+                    color: '#00e68a',
+                    fontWeight: 800,
+                    fontSize: 11,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  🧬 Рассчитать полезность
+                </button>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+                  v2 скоринг выбранных приёмов + спецприёмов
+                </div>
+              </div>
             </>
           )}
           {generated && (
-            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.05)', padding:'8px 6px', textAlign:'center' }}>
-              <button onClick={() => { setShowCorrectPopup(true); analyzePlanIssues(); }} style={{ width:'100%', padding:'12px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'linear-gradient(135deg,rgba(249,115,22,0.12),rgba(245,158,11,0.12))', border:'1px solid rgba(249,115,22,0.3)', color:'#f97316', fontWeight:800, fontSize:11, transition:'all 0.15s' }}>
+            <div
+              style={{
+                background: 'rgba(24,24,27,0.5)',
+                borderRadius: 12,
+                border: '1px solid rgba(249,115,22,0.05)',
+                padding: '8px 6px',
+                textAlign: 'center',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowCorrectPopup(true);
+                  analyzePlanIssues();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px 6px',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  background: 'linear-gradient(135deg,rgba(249,115,22,0.12),rgba(245,158,11,0.12))',
+                  border: '1px solid rgba(249,115,22,0.3)',
+                  color: '#f97316',
+                  fontWeight: 800,
+                  fontSize: 11,
+                  transition: 'all 0.15s',
+                }}
+              >
                 🔀 Корректировка рациона
               </button>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Анализ недочётов + замена продуктов + перегенерация</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 4, lineHeight: 1.2 }}>
+                Анализ недочётов + замена продуктов + перегенерация
+              </div>
             </div>
           )}
         </div>
@@ -2681,7 +6946,16 @@ const doImportPlan = (raw: string): boolean => {
       {recommendations.length > 0 && (
         <GlassCard title="Рекомендации" icon="💡" color="#a855f7" style={{ border: '1px solid rgba(168,85,247,0.15)' }}>
           {recommendations.map((r: string, i: number) => (
-            <div key={i} style={{ fontSize: 9, color: '#fff', padding: '4px 0', borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', lineHeight: 1.4 }}>
+            <div
+              key={i}
+              style={{
+                fontSize: 9,
+                color: '#fff',
+                padding: '4px 0',
+                borderBottom: i < recommendations.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                lineHeight: 1.4,
+              }}
+            >
               • {r}
             </div>
           ))}
@@ -2690,23 +6964,77 @@ const doImportPlan = (raw: string): boolean => {
 
       {mealPrepPlan && (
         <GlassCard title="План готовки" icon="👨‍🍳" color="#06b6d4" style={{ border: '1px solid rgba(6,182,212,0.15)' }}>
-          {(mealPrepPlan as any)._stale && <div style={{ fontSize: 8, color: '#fbbf24', marginBottom: 6 }}>↻ План изменился — готовка устарела, нажмите «🍳 Готовка» для пересборки</div>}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: '#06b6d4', marginBottom: 6 }}>
+          {(mealPrepPlan as any)._stale && (
+            <div style={{ fontSize: 8, color: '#fbbf24', marginBottom: 6 }}>
+              ↻ План изменился — готовка устарела, нажмите «🍳 Готовка» для пересборки
+            </div>
+          )}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#06b6d4',
+              marginBottom: 6,
+            }}
+          >
             <span>⏱ {mealPrepPlan.totalTime} мин</span>
             <span>📦 {mealPrepPlan.containers} контейнеров</span>
           </div>
           {mealPrepPlan.steps.map((st: any, i: number) => (
-            <div key={i} style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              key={i}
+              style={{
+                marginBottom: 6,
+                padding: '8px 10px',
+                borderRadius: 10,
+                background: '#202023',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>Шаг {st.step}: {st.action}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#06b6d4' }}>
+                  Шаг {st.step}: {st.action}
+                </span>
                 <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{st.duration} мин</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                {st.items.map((item: string, j: number) => <span key={j} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.1)', color: 'rgba(255,255,255,0.85)' }}>{item}</span>)}
+                {st.items.map((item: string, j: number) => (
+                  <span
+                    key={j}
+                    style={{
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      fontSize: 8,
+                      background: 'rgba(6,182,212,0.06)',
+                      border: '1px solid rgba(6,182,212,0.1)',
+                      color: 'rgba(255,255,255,0.85)',
+                    }}
+                  >
+                    {item}
+                  </span>
+                ))}
               </div>
             </div>
           ))}
-          <button onClick={saveCurrentPlan} style={{ marginTop: 6, padding: '8px', borderRadius: 8, border: '1px solid rgba(6,182,212,0.25)', background: 'rgba(6,182,212,0.06)', color: '#06b6d4', cursor: 'pointer', fontSize: 9, fontWeight: 600, width: '100%' }}>💾 Сохранить план</button>
+          <button
+            onClick={saveCurrentPlan}
+            style={{
+              marginTop: 6,
+              padding: '8px',
+              borderRadius: 8,
+              border: '1px solid rgba(6,182,212,0.25)',
+              background: 'rgba(6,182,212,0.06)',
+              color: '#06b6d4',
+              cursor: 'pointer',
+              fontSize: 9,
+              fontWeight: 600,
+              width: '100%',
+            }}
+          >
+            💾 Сохранить план
+          </button>
         </GlassCard>
       )}
 
@@ -2715,25 +7043,138 @@ const doImportPlan = (raw: string): boolean => {
           {visibleSavedPlans.slice(0, 10).map((p: any) => {
             const isExpanded = p.id === (expandedSavedId as any);
             return (
-              <div key={p.id} style={{ marginBottom: 6, borderRadius: 10, overflow: 'hidden', border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 6, padding: '8px 10px', cursor: 'pointer', background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023' }}
-                  onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}>
+              <div
+                key={p.id}
+                style={{
+                  marginBottom: 6,
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  border: isExpanded ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    background: isExpanded ? 'rgba(139,92,246,0.04)' : '#202023',
+                  }}
+                  onClick={() => setExpandedSavedId(isExpanded ? null : p.id)}
+                >
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{p.name || p.date}</span>
                   {activePlan?.id === p.id && (
-                    <span aria-label="Активный план" style={{ fontSize: 8, fontWeight: 800, color: '#00e68a', padding: '2px 7px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.28)', whiteSpace: 'nowrap' }}>● активный</span>
+                    <span
+                      aria-label="Активный план"
+                      style={{
+                        fontSize: 8,
+                        fontWeight: 800,
+                        color: '#00e68a',
+                        padding: '2px 7px',
+                        borderRadius: 999,
+                        background: 'rgba(0,230,138,0.12)',
+                        border: '1px solid rgba(0,230,138,0.28)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      ● активный
+                    </span>
                   )}
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 'auto' }}>
-                     <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>{p.dayPlan ? `${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}</span>
-                     <button aria-label="Загрузить сохранённый план" onClick={(e) => { e.stopPropagation(); loadSavedPlan(p); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 600 }}>📋</button>
-                     <button aria-label="Поделиться сохранённым планом" onClick={(e) => { e.stopPropagation(); const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`; void shareOrCopyText('Сохранённый план', txt).then(ok => { if (!ok) setErrorMsg('Не удалось скопировать сохранённый план.'); }); }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa', fontWeight: 600 }}>📤</button>
-                     <button aria-label="Удалить сохранённый план" onClick={(e) => { e.stopPropagation(); const updated = savedPlans.filter((x: any) => x.id !== p.id); setSavedPlans(updated); try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {} }} className="plan-mini" style={{ padding: '10px', minHeight:44, minWidth:44, borderRadius: 10, fontSize: 13, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 600 }}>✕</button>
+                    <span style={{ fontSize: 8, color: '#00e68a', fontWeight: 600 }}>
+                      {p.dayPlan ? `${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}
+                    </span>
+                    <button
+                      aria-label="Загрузить сохранённый план"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        loadSavedPlan(p);
+                      }}
+                      className="plan-mini"
+                      style={{
+                        padding: '10px',
+                        minHeight: 44,
+                        minWidth: 44,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        background: 'rgba(0,230,138,0.1)',
+                        border: '1px solid rgba(0,230,138,0.2)',
+                        color: '#00e68a',
+                        fontWeight: 600,
+                      }}
+                    >
+                      📋
+                    </button>
+                    <button
+                      aria-label="Поделиться сохранённым планом"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const txt = `🍽 План питания ${p.name || p.date}\n${p.dayPlan?.meals?.map((m: any) => `${m.time} ${m.label}: ${m.items?.map((it: any) => `${it.name} ${it.amount}г`).join(', ')}`).join('\n') || ''}`;
+                        void shareOrCopyText('Сохранённый план', txt).then((ok) => {
+                          if (!ok) setErrorMsg('Не удалось скопировать сохранённый план.');
+                        });
+                      }}
+                      className="plan-mini"
+                      style={{
+                        padding: '10px',
+                        minHeight: 44,
+                        minWidth: 44,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        background: 'rgba(96,165,250,0.1)',
+                        border: '1px solid rgba(96,165,250,0.2)',
+                        color: '#60a5fa',
+                        fontWeight: 600,
+                      }}
+                    >
+                      📤
+                    </button>
+                    <button
+                      aria-label="Удалить сохранённый план"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updated = savedPlans.filter((x: any) => x.id !== p.id);
+                        setSavedPlans(updated);
+                        try {
+                          localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated));
+                        } catch {}
+                      }}
+                      className="plan-mini"
+                      style={{
+                        padding: '10px',
+                        minHeight: 44,
+                        minWidth: 44,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        background: 'rgba(239,68,68,0.1)',
+                        border: '1px solid rgba(239,68,68,0.2)',
+                        color: '#ef4444',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
                 {isExpanded && (
-                  <div style={{ padding: '6px 10px 8px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
+                  <div
+                    style={{
+                      padding: '6px 10px 8px',
+                      borderTop: '1px solid rgba(255,255,255,0.04)',
+                      fontSize: 8,
+                      color: 'rgba(255,255,255,0.85)',
+                    }}
+                  >
                     {p.dayPlan && (
                       <div>
-                         <div style={{ fontWeight: 700, color: '#00e68a', marginBottom: 4, fontSize: 9 }}>🍽 План на день: {Math.round(p.dayPlan.totals?.kcal || 0)} ккал</div>
+                        <div style={{ fontWeight: 700, color: '#00e68a', marginBottom: 4, fontSize: 9 }}>
+                          🍽 План на день: {Math.round(p.dayPlan.totals?.kcal || 0)} ккал
+                        </div>
                         {p.dayPlan.meals?.map((m: any, mi: number) => (
                           <div key={mi} style={{ padding: '2px 0', display: 'flex', gap: 4 }}>
                             <span style={{ color: 'rgba(255,255,255,0.85)' }}>{m.time}</span>
@@ -2748,7 +7189,11 @@ const doImportPlan = (raw: string): boolean => {
                         <span style={{ color: '#f97316', fontWeight: 600 }}>🛒 {p.shoppingList.length} продуктов</span>
                       </div>
                     )}
-                    {p.waterCalc && <div style={{ marginTop: 2, color: '#06b6d4', fontWeight: 600 }}>💧 {p.waterCalc.total} л/день</div>}
+                    {p.waterCalc && (
+                      <div style={{ marginTop: 2, color: '#06b6d4', fontWeight: 600 }}>
+                        💧 {p.waterCalc.total} л/день
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2760,7 +7205,11 @@ const doImportPlan = (raw: string): boolean => {
       {/* Архив планов: сюда уезжает предыдущий активный план при сохранении
           нового. Карточка видна ВСЕГДА: пустой архив раньше не рендерился вовсе,
           и выглядело так, будто функции нет. */}
-      <GlassCard title={planArchive.length > 0 ? `Архив планов · ${planArchive.length}` : 'Архив планов'} icon="🗄" color="#94a3b8">
+      <GlassCard
+        title={planArchive.length > 0 ? `Архив планов · ${planArchive.length}` : 'Архив планов'}
+        icon="🗄"
+        color="#94a3b8"
+      >
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>
           {planArchive.length > 0
             ? 'Здесь лежат предыдущие планы. При сохранении нового активный план автоматически уходит сюда — его можно вернуть в работу или удалить.'
@@ -2771,48 +7220,109 @@ const doImportPlan = (raw: string): boolean => {
             aria-label="Убрать прошлые планы в архив"
             onClick={() => {
               const activeId = activePlan?.id ?? visibleSavedPlans[0]?.id;
-              visibleSavedPlans.filter((p: any) => p.id !== activeId).forEach((p: any) => {
-                try { archivePlan(p); } catch { /* квота — архив не критичен */ }
-              });
+              visibleSavedPlans
+                .filter((p: any) => p.id !== activeId)
+                .forEach((p: any) => {
+                  try {
+                    archivePlan(p);
+                  } catch {
+                    /* квота — архив не критичен */
+                  }
+                });
             }}
-            style={{ width: '100%', padding: '12px 14px', minHeight: 48, borderRadius: 12, cursor: 'pointer', marginBottom: 8,
-              background: 'rgba(148,163,184,0.10)', border: '1px dashed rgba(148,163,184,0.35)', color: '#cbd5e1', fontSize: 11, fontWeight: 700 }}>
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              minHeight: 48,
+              borderRadius: 12,
+              cursor: 'pointer',
+              marginBottom: 8,
+              background: 'rgba(148,163,184,0.10)',
+              border: '1px dashed rgba(148,163,184,0.35)',
+              color: '#cbd5e1',
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
             🗄 Убрать прошлые планы в архив
           </button>
         )}
         {planArchive.slice(0, 12).map((p: any) => (
-            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', marginBottom: 6, borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{p.name || p.date}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
-                  {p.date}{p.dayPlan ? ` · ${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}
-                </div>
+          <div
+            key={p.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 10px',
+              marginBottom: 6,
+              borderRadius: 10,
+              background: '#202023',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>
+                {p.name || p.date}
               </div>
-              <button
-                aria-label="Вернуть план из архива"
-                title="Вернуть план в работу"
-                onClick={() => {
-                  const restored = restorePlanFromArchive(p.id);
-                  if (!restored) return;
-                  publishPlanTargetsFor(restored);
-                  loadSavedPlan(restored);
-                  const updated = [restored, ...savedPlans.filter((x: any) => x.id !== restored.id)].slice(0, 10);
-                  setSavedPlans(updated);
-                  try { localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated)); } catch {}
-                }}
-                className="plan-mini"
-                style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'rgba(0,230,138,0.1)', border: '1px solid rgba(0,230,138,0.2)', color: '#00e68a', fontWeight: 700 }}>
-                ↩
-              </button>
-              <button
-                aria-label="Удалить план из архива"
-                title="Удалить из архива"
-                onClick={() => { removeArchivedPlan(p.id); }}
-                className="plan-mini"
-                style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 10, fontSize: 12, cursor: 'pointer', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontWeight: 700 }}>
-                ✕
-              </button>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
+                {p.date}
+                {p.dayPlan ? ` · ${Math.round(p.dayPlan.totals?.kcal || 0)} ккал` : ''}
+              </div>
             </div>
+            <button
+              aria-label="Вернуть план из архива"
+              title="Вернуть план в работу"
+              onClick={() => {
+                const restored = restorePlanFromArchive(p.id);
+                if (!restored) return;
+                publishPlanTargetsFor(restored);
+                loadSavedPlan(restored);
+                const updated = [restored, ...savedPlans.filter((x: any) => x.id !== restored.id)].slice(0, 10);
+                setSavedPlans(updated);
+                try {
+                  localStorage.setItem('he_saved_nutrition_plans', JSON.stringify(updated));
+                } catch {}
+              }}
+              className="plan-mini"
+              style={{
+                padding: '10px',
+                minHeight: 44,
+                minWidth: 44,
+                borderRadius: 10,
+                fontSize: 12,
+                cursor: 'pointer',
+                background: 'rgba(0,230,138,0.1)',
+                border: '1px solid rgba(0,230,138,0.2)',
+                color: '#00e68a',
+                fontWeight: 700,
+              }}
+            >
+              ↩
+            </button>
+            <button
+              aria-label="Удалить план из архива"
+              title="Удалить из архива"
+              onClick={() => {
+                removeArchivedPlan(p.id);
+              }}
+              className="plan-mini"
+              style={{
+                padding: '10px',
+                minHeight: 44,
+                minWidth: 44,
+                borderRadius: 10,
+                fontSize: 12,
+                cursor: 'pointer',
+                background: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.2)',
+                color: '#ef4444',
+                fontWeight: 700,
+              }}
+            >
+              ✕
+            </button>
+          </div>
         ))}
       </GlassCard>
 
@@ -2820,17 +7330,31 @@ const doImportPlan = (raw: string): boolean => {
       {generated && dayPlan && (
         <GlassCard title="A/B планов" icon="⚖️" color="#22d3ee" style={{ border: '1px solid rgba(34,211,238,0.15)' }}>
           <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>
-            Снимите текущий день в слот A (например, «до»), перегенерируйте/смените настройки и снимите в B — сравните КБЖУ, приёмы и состав.
+            Снимите текущий день в слот A (например, «до»), перегенерируйте/смените настройки и снимите в B — сравните
+            КБЖУ, приёмы и состав.
           </div>
           <div data-ab="card" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-            {AB_SLOTS.map(slot => {
+            {AB_SLOTS.map((slot) => {
               const snap = abSnaps[slot];
               return (
-                <div key={slot} style={{ flex: '1 1 140px', minWidth: 130, padding: '8px 10px', borderRadius: 10, background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.18)' }}>
-                  <div style={{ fontSize: 9, color: '#fff', fontWeight: 700, marginBottom: 2 }}>Слот {slot}: {snap ? snap.name : 'пусто'}</div>
+                <div
+                  key={slot}
+                  style={{
+                    flex: '1 1 140px',
+                    minWidth: 130,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: 'rgba(34,211,238,0.05)',
+                    border: '1px solid rgba(34,211,238,0.18)',
+                  }}
+                >
+                  <div style={{ fontSize: 9, color: '#fff', fontWeight: 700, marginBottom: 2 }}>
+                    Слот {slot}: {snap ? snap.name : 'пусто'}
+                  </div>
                   {snap && (
                     <div style={{ fontSize: 8, color: '#fff' }}>
-                      {Math.round(snap.totals.kcal)} ккал · {Math.round(snap.totals.p)}Б · {Math.round(snap.totals.f)}Ж · {Math.round(snap.totals.c)}У
+                      {Math.round(snap.totals.kcal)} ккал · {Math.round(snap.totals.p)}Б · {Math.round(snap.totals.f)}Ж
+                      · {Math.round(snap.totals.c)}У
                     </div>
                   )}
                   <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
@@ -2840,18 +7364,51 @@ const doImportPlan = (raw: string): boolean => {
                       onClick={() => {
                         const name = `${planDays === 1 ? DAY_LABELS[selectedDayIndex] : planDays === 3 ? '3 дня' : 'Неделя'} · ${Math.round((dayPlan as any)?.totals?.kcal || 0)} ккал`;
                         const made = snapshotFromDayPlan(slot, dayPlan as any, { name });
-                        if (made && saveAbSnapshot(made)) { setAbSnaps(loadAbSnapshots()); setAbDiff(null); setAbShowDiff(false); }
-                        else setErrorMsg('Не удалось сохранить снапшот — план пуст.');
+                        if (made && saveAbSnapshot(made)) {
+                          setAbSnaps(loadAbSnapshots());
+                          setAbDiff(null);
+                          setAbShowDiff(false);
+                        } else setErrorMsg('Не удалось сохранить снапшот — план пуст.');
                       }}
-                      style={{ flex: 1, padding: '10px 6px', minHeight: 44, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 800, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.3)', color: '#fff' }}
-                    >📸 В {slot}</button>
+                      style={{
+                        flex: 1,
+                        padding: '10px 6px',
+                        minHeight: 44,
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        background: 'rgba(34,211,238,0.12)',
+                        border: '1px solid rgba(34,211,238,0.3)',
+                        color: '#fff',
+                      }}
+                    >
+                      📸 В {slot}
+                    </button>
                     {snap && (
                       <button
                         data-ab={`clear-${slot}`}
                         aria-label={`Очистить слот ${slot}`}
-                        onClick={() => { removeAbSnapshot(slot); setAbSnaps(loadAbSnapshots()); setAbDiff(null); setAbShowDiff(false); }}
-                        style={{ padding: '10px', minHeight: 44, minWidth: 44, borderRadius: 8, cursor: 'pointer', fontSize: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}
-                      >✕</button>
+                        onClick={() => {
+                          removeAbSnapshot(slot);
+                          setAbSnaps(loadAbSnapshots());
+                          setAbDiff(null);
+                          setAbShowDiff(false);
+                        }}
+                        style={{
+                          padding: '10px',
+                          minHeight: 44,
+                          minWidth: 44,
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          background: 'rgba(239,68,68,0.1)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                          color: '#f87171',
+                        }}
+                      >
+                        ✕
+                      </button>
                     )}
                   </div>
                 </div>
@@ -2862,27 +7419,71 @@ const doImportPlan = (raw: string): boolean => {
             data-ab="compare"
             disabled={!abSnaps.A || !abSnaps.B}
             aria-label="Сравнить слот A и слот B"
-            onClick={() => { if (abSnaps.A && abSnaps.B) { setAbDiff(diffAbSnapshots(abSnaps.A, abSnaps.B)); setAbShowDiff(true); } }}
-            style={{ width: '100%', padding: '12px', minHeight: 44, borderRadius: 10, cursor: (!abSnaps.A || !abSnaps.B) ? 'default' : 'pointer', fontSize: 11, fontWeight: 800, background: (!abSnaps.A || !abSnaps.B) ? 'rgba(34,211,238,0.05)' : 'linear-gradient(135deg,#22d3ee,#0891b2)', border: '1px solid rgba(34,211,238,0.35)', color: (!abSnaps.A || !abSnaps.B) ? 'rgba(255,255,255,0.6)' : '#062a33' }}
-          >⇄ Сравнить A / B</button>
+            onClick={() => {
+              if (abSnaps.A && abSnaps.B) {
+                setAbDiff(diffAbSnapshots(abSnaps.A, abSnaps.B));
+                setAbShowDiff(true);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              minHeight: 44,
+              borderRadius: 10,
+              cursor: !abSnaps.A || !abSnaps.B ? 'default' : 'pointer',
+              fontSize: 11,
+              fontWeight: 800,
+              background:
+                !abSnaps.A || !abSnaps.B ? 'rgba(34,211,238,0.05)' : 'linear-gradient(135deg,#22d3ee,#0891b2)',
+              border: '1px solid rgba(34,211,238,0.35)',
+              color: !abSnaps.A || !abSnaps.B ? 'rgba(255,255,255,0.6)' : '#062a33',
+            }}
+          >
+            ⇄ Сравнить A / B
+          </button>
           {abShowDiff && abDiff && (
             <div data-ab="diff" style={{ marginTop: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{abDiff.summary}</div>
-              {abDiff.rows.map(r => (
-                <div key={r.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 9, color: '#fff' }}>
+              {abDiff.rows.map((r) => (
+                <div
+                  key={r.key}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 6,
+                    padding: '5px 0',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    fontSize: 9,
+                    color: '#fff',
+                  }}
+                >
                   <span style={{ flex: 1 }}>{r.label}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 72, textAlign: 'right' }}>A {r.a} · B {r.b}</span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 800, minWidth: 74, textAlign: 'right', color: r.delta === 0 ? '#fff' : (r.delta > 0 ? '#fbbf24' : '#60a5fa') }}>
-                    {r.delta > 0 ? `+${r.delta}` : `${r.delta}`}{r.deltaPct != null && r.delta !== 0 ? ` (${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%)` : ''}
+                  <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 72, textAlign: 'right' }}>
+                    A {r.a} · B {r.b}
+                  </span>
+                  <span
+                    style={{
+                      fontVariantNumeric: 'tabular-nums',
+                      fontWeight: 800,
+                      minWidth: 74,
+                      textAlign: 'right',
+                      color: r.delta === 0 ? '#fff' : r.delta > 0 ? '#fbbf24' : '#60a5fa',
+                    }}
+                  >
+                    {r.delta > 0 ? `+${r.delta}` : `${r.delta}`}
+                    {r.deltaPct != null && r.delta !== 0 ? ` (${r.deltaPct > 0 ? '+' : ''}${r.deltaPct}%)` : ''}
                   </span>
                 </div>
               ))}
               {abDiff.meals.length > 0 && (
                 <div style={{ marginTop: 6 }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 3 }}>Приёмы (Δ ккал · Δ белок)</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', marginBottom: 3 }}>
+                    Приёмы (Δ ккал · Δ белок)
+                  </div>
                   {abDiff.meals.map((m, i) => (
                     <div key={i} style={{ fontSize: 9, color: '#fff', padding: '3px 0', lineHeight: 1.4 }}>
-                      {m.label}: {m.aKcal} → {m.bKcal} ккал ({m.deltaKcal > 0 ? `+${m.deltaKcal}` : m.deltaKcal}) · Б {m.aP} → {m.bP} ({m.deltaP > 0 ? `+${m.deltaP}` : m.deltaP})
+                      {m.label}: {m.aKcal} → {m.bKcal} ккал ({m.deltaKcal > 0 ? `+${m.deltaKcal}` : m.deltaKcal}) · Б{' '}
+                      {m.aP} → {m.bP} ({m.deltaP > 0 ? `+${m.deltaP}` : m.deltaP})
                       {m.added.length > 0 && <span style={{ color: '#22c55e' }}> · +{m.added.join(', ')}</span>}
                       {m.removed.length > 0 && <span style={{ color: '#f87171' }}> · −{m.removed.join(', ')}</span>}
                     </div>
@@ -2891,15 +7492,38 @@ const doImportPlan = (raw: string): boolean => {
               )}
               {(abDiff.foodAdded.length > 0 || abDiff.foodRemoved.length > 0) && (
                 <div style={{ marginTop: 6, fontSize: 9, color: '#fff', lineHeight: 1.45 }}>
-                  {abDiff.foodAdded.length > 0 && <div style={{ color: '#22c55e' }}>Состав +: {abDiff.foodAdded.slice(0, 12).join(', ')}</div>}
-                  {abDiff.foodRemoved.length > 0 && <div style={{ color: '#f87171' }}>Состав −: {abDiff.foodRemoved.slice(0, 12).join(', ')}</div>}
+                  {abDiff.foodAdded.length > 0 && (
+                    <div style={{ color: '#22c55e' }}>Состав +: {abDiff.foodAdded.slice(0, 12).join(', ')}</div>
+                  )}
+                  {abDiff.foodRemoved.length > 0 && (
+                    <div style={{ color: '#f87171' }}>Состав −: {abDiff.foodRemoved.slice(0, 12).join(', ')}</div>
+                  )}
                 </div>
               )}
               {(abDiff.notesAdded.length > 0 || abDiff.notesRemoved.length > 0) && (
                 <details style={{ marginTop: 6 }}>
-                  <summary style={{ fontSize: 9, color: '#fff', cursor: 'pointer', minHeight: 28, display: 'flex', alignItems: 'center' }}>Заметки движка: +{abDiff.notesAdded.length} / −{abDiff.notesRemoved.length}</summary>
-                  {abDiff.notesAdded.map((n, i) => <div key={'na' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>+ {n}</div>)}
-                  {abDiff.notesRemoved.map((n, i) => <div key={'nr' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>− {n}</div>)}
+                  <summary
+                    style={{
+                      fontSize: 9,
+                      color: '#fff',
+                      cursor: 'pointer',
+                      minHeight: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    Заметки движка: +{abDiff.notesAdded.length} / −{abDiff.notesRemoved.length}
+                  </summary>
+                  {abDiff.notesAdded.map((n, i) => (
+                    <div key={'na' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>
+                      + {n}
+                    </div>
+                  ))}
+                  {abDiff.notesRemoved.map((n, i) => (
+                    <div key={'nr' + i} style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>
+                      − {n}
+                    </div>
+                  ))}
                 </details>
               )}
             </div>
@@ -2908,561 +7532,1426 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {importModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', padding: 16 }} onClick={() => setImportModalOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, background: 'linear-gradient(135deg,#1a1c26,#18181b)', border: '1px solid rgba(249,115,22,0.25)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 300,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)',
+            backdropFilter: 'blur(6px)',
+            padding: 16,
+          }}
+          onClick={() => setImportModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              padding: 18,
+              borderRadius: 16,
+              background: 'linear-gradient(135deg,#1a1c26,#18181b)',
+              border: '1px solid rgba(249,115,22,0.25)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+            }}
+          >
             <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316', marginBottom: 4 }}>📥 Импорт плана</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Вставьте JSON плана (кнопка «⧉ JSON» рядом с «Копировать»)</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+              Вставьте JSON плана (кнопка «⧉ JSON» рядом с «Копировать»)
+            </div>
             <textarea
               value={importText}
-              onChange={e => setImportText(e.target.value)}
+              onChange={(e) => setImportText(e.target.value)}
               autoFocus
               rows={6}
               placeholder='{"meals": [...]}'
-              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', resize: 'vertical' }}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: '#202023',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#fff',
+                fontSize: 11,
+                fontFamily: 'monospace',
+                outline: 'none',
+                resize: 'vertical',
+              }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button onClick={() => { setImportModalOpen(false); setImportText(''); }} className="plan-actbtn" style={{ flex: 1, padding: 12, minHeight:48, borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>Отмена</button>
-              <button onClick={() => { if (doImportPlan(importText)) { setImportModalOpen(false); setImportText(''); } }} className="plan-actbtn" style={{ flex: 1, padding: 12, minHeight:48, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>Импортировать</button>
+              <button
+                onClick={() => {
+                  setImportModalOpen(false);
+                  setImportText('');
+                }}
+                className="plan-actbtn"
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                onClick={() => {
+                  if (doImportPlan(importText)) {
+                    setImportModalOpen(false);
+                    setImportText('');
+                  }
+                }}
+                className="plan-actbtn"
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  minHeight: 48,
+                  borderRadius: 12,
+                  border: 'none',
+                  background: 'linear-gradient(135deg,#f97316,#fb923c)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                Импортировать
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {showCalcPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', background:'rgba(0,0,0,0.9)' }}
-          onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:480, margin:'0 auto', background:'#18181b', display:'flex', flexDirection:'column' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 12px 0' }}>
-              <div style={{ fontSize:15, fontWeight:800, color:'#00e68a' }}>🧬 Калькулятор полезности</div>
-              <span onClick={() => { setShowCalcPopup(false); setCalcResults(null); setCalcDailyReport(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>✕</span>
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', background: 'rgba(0,0,0,0.9)' }}
+          onClick={() => {
+            setShowCalcPopup(false);
+            setCalcResults(null);
+            setCalcDailyReport(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: 480,
+              margin: '0 auto',
+              background: '#18181b',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 12px 0' }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a' }}>🧬 Калькулятор полезности</div>
+              <span
+                onClick={() => {
+                  setShowCalcPopup(false);
+                  setCalcResults(null);
+                  setCalcDailyReport(null);
+                }}
+                style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)', padding: '2px 6px' }}
+              >
+                ✕
+              </span>
             </div>
-            <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'0 12px 80px' }}>
-
-            {/* Tabs */}
-            <div style={{ display:'flex', gap:4, marginBottom:10 }}>
-              {['day','week','month'].map(t => (
-                <button key={t} onClick={() => setCalcTab(t as any)} style={{
-                  flex:1, padding:'8px', borderRadius:10, cursor:'pointer', textAlign:'center', fontSize:9, fontWeight:700,
-                  background: calcTab === t ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
-                  border: calcTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                  color: calcTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)',
-                }}>{t === 'day' ? '📅 День' : t === 'week' ? '📆 Неделя' : '🗓 Месяц'}</button>
-              ))}
-            </div>
-
-            {/* Day view */}
-            {calcTab === 'day' && (
-              <>
-                {planDays !== 1 ? (
-                  <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.75)' }}>Выберите день (нажмите на день недели сверху) и сгенерируйте план на 1 день</div>
-                ) : dayPlan ? (
-                  <div style={{ marginBottom:10 }}>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:4, display:'flex', justifyContent:'space-between' }}>
-                      <span>🍽 Приёмы пищи</span>
-                      <span onClick={() => { const all: string[] = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((_: any, i: number) => `meal_${i}`); const next = new Set(calcSelections); all.forEach((id: string) => next.add(id)); setCalcSelections(next); }} style={{ cursor:'pointer', fontSize:10, color:'#00e68a', fontWeight:600 }}>Выбрать все</span>
-                    </div>
-                    {(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any, i: number) => {
-                      const id = `meal_${i}`;
-                      const sel = calcSelections.has(id);
-                      return (
-                        <div key={id} onClick={() => toggleCalcSelection(id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{m.label || `Приём ${i+1}`} {m.time && <span style={{ color:'rgba(255,255,255,0.9)', fontWeight:400, marginLeft:3 }}>{m.time}</span>}</div>
-                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>{Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p||0}/Ж{m.totals?.f||0}/У{m.totals?.c||0} · {m.items?.length || 0} продуктов</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.75)' }}>Сначала сгенерируйте план питания</div>
-                )}
-
-                {/* Special meals */}
-                {(cheatMealPlan || carbloadPlan || lazyDayPlan || cravingPlan) && (
-                  <div style={{ marginBottom:10 }}>
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:4 }}>⚡ Спецприёмы</div>
-                    {[
-                      { id:'special_cheatmeal', label:'🍔 Читмил', desc: cheatMealPlan ? `~${cheatMealPlan.cals} ккал` : '', plan: cheatMealPlan },
-                      { id:'special_carbload', label:'🍚 Углев. загрузка', desc: carbloadPlan ? `${carbloadPlan.totalCarbs}г углей` : '', plan: carbloadPlan },
-                      { id:'special_lazy', label:'🛋 Ленивый день', desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '', plan: lazyDayPlan },
-                      { id:'special_craving', label:'🍬 Хочу сладкое', desc: cravingPlan ? `~${cravingPlan.kcal} ккал` : '', plan: cravingPlan },
-                    ].filter(s => s.plan).map(s => {
-                      const sel = calcSelections.has(s.id);
-                      return (
-                        <div key={s.id} onClick={() => toggleCalcSelection(s.id)} style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 9px', borderRadius:8, marginBottom:3, background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)', cursor:'pointer' }}>
-                          <div style={{ width:20, height:20, borderRadius:5, display:'flex', alignItems:'center', justifyContent:'center', background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)', color: sel ? '#000' : 'transparent', fontSize:11, fontWeight:800, border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)' }}>{sel ? '✓' : ''}</div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{s.label}</div>
-                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>{s.desc}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Week/Month view */}
-            {calcTab !== 'day' && (
-              <div style={{ textAlign:'center', padding:16, fontSize:9, color:'rgba(255,255,255,0.75)' }}>
-                {calcTab === 'week' ? '📆 Выберите день на вкладке "День" для поимённого выбора приёмов' : '🗓 Выберите день на вкладке "День"'}
-                <div style={{ fontSize:10, marginTop:4, color:'rgba(255,255,255,0.2)' }}>Недельный/месячный расчёт доступен через выбор каждого дня отдельно</div>
+            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 12px 80px' }}>
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                {['day', 'week', 'month'].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setCalcTab(t as any)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      fontSize: 9,
+                      fontWeight: 700,
+                      background: calcTab === t ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: calcTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+                      color: calcTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                    }}
+                  >
+                    {t === 'day' ? '📅 День' : t === 'week' ? '📆 Неделя' : '🗓 Месяц'}
+                  </button>
+                ))}
               </div>
-            )}
 
-            {/* Calculate button */}
-            <button onClick={handleCalcUsefulness} disabled={calcSelections.size === 0} style={{
-              width:'100%', padding:'12px', borderRadius:12, cursor: calcSelections.size === 0 ? 'default' : 'pointer', textAlign:'center',
-              background: calcSelections.size === 0 ? 'rgba(0,230,138,0.05)' : 'linear-gradient(135deg,#00e68a,#00c8a0)',
-              border: calcSelections.size === 0 ? '1px solid rgba(0,230,138,0.1)' : 'none',
-              color: calcSelections.size === 0 ? 'rgba(0,230,138,0.4)' : '#000',
-              fontSize:11, fontWeight:800, opacity: calcSelections.size === 0 ? 0.4 : 1, transition:'all 0.15s',
-            }}>
-              🔬 Рассчитать выбранное ({calcSelections.size})
-            </button>
+              {/* Day view */}
+              {calcTab === 'day' && (
+                <>
+                  {planDays !== 1 ? (
+                    <div style={{ textAlign: 'center', padding: 16, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
+                      Выберите день (нажмите на день недели сверху) и сгенерируйте план на 1 день
+                    </div>
+                  ) : dayPlan ? (
+                    <div style={{ marginBottom: 10 }}>
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color: 'rgba(255,255,255,0.8)',
+                          marginBottom: 4,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>🍽 Приёмы пищи</span>
+                        <span
+                          onClick={() => {
+                            const all: string[] = (Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map(
+                              (_: any, i: number) => `meal_${i}`,
+                            );
+                            const next = new Set(calcSelections);
+                            all.forEach((id: string) => next.add(id));
+                            setCalcSelections(next);
+                          }}
+                          style={{ cursor: 'pointer', fontSize: 10, color: '#00e68a', fontWeight: 600 }}
+                        >
+                          Выбрать все
+                        </span>
+                      </div>
+                      {(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any, i: number) => {
+                        const id = `meal_${i}`;
+                        const sel = calcSelections.has(id);
+                        return (
+                          <div
+                            key={id}
+                            onClick={() => toggleCalcSelection(id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '7px 9px',
+                              borderRadius: 8,
+                              marginBottom: 3,
+                              background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                              border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 5,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)',
+                                color: sel ? '#000' : 'transparent',
+                                fontSize: 11,
+                                fontWeight: 800,
+                                border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                              }}
+                            >
+                              {sel ? '✓' : ''}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>
+                                {m.label || `Приём ${i + 1}`}{' '}
+                                {m.time && (
+                                  <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 400, marginLeft: 3 }}>
+                                    {m.time}
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>
+                                {Math.round(m.totals?.kcal || 0)} ккал · Б{m.totals?.p || 0}/Ж{m.totals?.f || 0}/У
+                                {m.totals?.c || 0} · {m.items?.length || 0} продуктов
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 16, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
+                      Сначала сгенерируйте план питания
+                    </div>
+                  )}
 
-            {/* Results */}
-            {calcResults && calcResults.length > 0 && (
-              <div style={{ marginTop:12, borderTop:'1px solid rgba(0,230,138,0.1)', paddingTop:10 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', marginBottom:6 }}>📊 Результаты</div>
-                {/* Summary row */}
-                <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(0,230,138,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Приёмов</div>
-                    <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{calcResults.length}</div>
-                  </div>
-                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(139,92,246,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Ср. скор</div>
-                    <div style={{ fontSize:14, fontWeight:800, color:'#8b5cf6' }}>{(calcResults.reduce((s, r) => s + r.score.compositeScore, 0) / calcResults.length).toFixed(1)}</div>
-                  </div>
-                  <div style={{ flex:1, padding:'8px', borderRadius:8, background:'rgba(245,158,11,0.06)', textAlign:'center' }}>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>Всего ккал</div>
-                    <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{calcResults.reduce((s, r) => s + r.score.macros.kcal, 0)}</div>
+                  {/* Special meals */}
+                  {(cheatMealPlan || carbloadPlan || lazyDayPlan || cravingPlan) && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>⚡ Спецприёмы</div>
+                      {[
+                        {
+                          id: 'special_cheatmeal',
+                          label: '🍔 Читмил',
+                          desc: cheatMealPlan ? `~${cheatMealPlan.cals} ккал` : '',
+                          plan: cheatMealPlan,
+                        },
+                        {
+                          id: 'special_carbload',
+                          label: '🍚 Углев. загрузка',
+                          desc: carbloadPlan ? `${carbloadPlan.totalCarbs}г углей` : '',
+                          plan: carbloadPlan,
+                        },
+                        {
+                          id: 'special_lazy',
+                          label: '🛋 Ленивый день',
+                          desc: lazyDayPlan ? `~${lazyDayPlan.kcal} ккал` : '',
+                          plan: lazyDayPlan,
+                        },
+                        {
+                          id: 'special_craving',
+                          label: '🍬 Хочу сладкое',
+                          desc: cravingPlan ? `~${cravingPlan.kcal} ккал` : '',
+                          plan: cravingPlan,
+                        },
+                      ]
+                        .filter((s) => s.plan)
+                        .map((s) => {
+                          const sel = calcSelections.has(s.id);
+                          return (
+                            <div
+                              key={s.id}
+                              onClick={() => toggleCalcSelection(s.id)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                padding: '7px 9px',
+                                borderRadius: 8,
+                                marginBottom: 3,
+                                background: sel ? 'rgba(0,230,138,0.06)' : 'rgba(255,255,255,0.02)',
+                                border: sel ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.04)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: sel ? '#00e68a' : 'rgba(255,255,255,0.06)',
+                                  color: sel ? '#000' : 'transparent',
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  border: sel ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                                }}
+                              >
+                                {sel ? '✓' : ''}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>{s.label}</div>
+                                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)' }}>{s.desc}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Week/Month view */}
+              {calcTab !== 'day' && (
+                <div style={{ textAlign: 'center', padding: 16, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
+                  {calcTab === 'week'
+                    ? '📆 Выберите день на вкладке "День" для поимённого выбора приёмов'
+                    : '🗓 Выберите день на вкладке "День"'}
+                  <div style={{ fontSize: 10, marginTop: 4, color: 'rgba(255,255,255,0.2)' }}>
+                    Недельный/месячный расчёт доступен через выбор каждого дня отдельно
                   </div>
                 </div>
+              )}
 
-                {/* Per-meal results */}
-                {calcResults.map((r, i) => {
-                  const sc = r.score;
-                  const grade = sc.compositeScore >= 8 ? 'A' : sc.compositeScore >= 6 ? 'B' : sc.compositeScore >= 4 ? 'C' : 'D';
-                  const gradeColor = grade === 'A' ? '#00e68a' : grade === 'B' ? '#8b5cf6' : grade === 'C' ? '#f59e0b' : '#ef4444';
-                  const color = gradeColor;
-                  const totalKcal = sc.macros.protein * 4 + sc.macros.fat * 9 + sc.macros.carbs * 4;
-                  const totalW = sc.productScores.reduce((s: number, p: any) => s + (p.weightG || 0), 0);
-                  const pctP = totalKcal > 0 ? Math.round(sc.macros.protein * 4 / totalKcal * 100) : 0;
-                  const pctF = totalKcal > 0 ? Math.round(sc.macros.fat * 9 / totalKcal * 100) : 0;
-                  const pctC = totalKcal > 0 ? Math.round(sc.macros.carbs * 4 / totalKcal * 100) : 0;
-                  const kcalPerG = totalW > 0 ? (totalKcal / totalW).toFixed(1) : '—';
-                  const bestItems = sc.productScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
-                  const weakItems = sc.productScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
-                  return (
-                    <div key={r.id} style={{ marginBottom:6, borderRadius:10, padding:10, background:'rgba(24,24,27,0.8)', border:`1px solid ${color}20` }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                        <span style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{r.name}</span>
-                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                            background:`${gradeColor}18`, border:`2px solid ${gradeColor}`, fontSize:12, fontWeight:800, color:gradeColor }}>{grade}</div>
-                          <span style={{ fontSize:11, fontWeight:800, color }}>{sc.compositeScore.toFixed(1)}</span>
-                          <span style={{ fontSize:6, color, opacity:0.6 }}>{sc.label}</span>
-                        </div>
+              {/* Calculate button */}
+              <button
+                onClick={handleCalcUsefulness}
+                disabled={calcSelections.size === 0}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: 12,
+                  cursor: calcSelections.size === 0 ? 'default' : 'pointer',
+                  textAlign: 'center',
+                  background:
+                    calcSelections.size === 0 ? 'rgba(0,230,138,0.05)' : 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                  border: calcSelections.size === 0 ? '1px solid rgba(0,230,138,0.1)' : 'none',
+                  color: calcSelections.size === 0 ? 'rgba(0,230,138,0.4)' : '#000',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  opacity: calcSelections.size === 0 ? 0.4 : 1,
+                  transition: 'all 0.15s',
+                }}
+              >
+                🔬 Рассчитать выбранное ({calcSelections.size})
+              </button>
+
+              {/* Results */}
+              {calcResults && calcResults.length > 0 && (
+                <div style={{ marginTop: 12, borderTop: '1px solid rgba(0,230,138,0.1)', paddingTop: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>📊 Результаты</div>
+                  {/* Summary row */}
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: 8,
+                        background: 'rgba(0,230,138,0.06)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>Приёмов</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{calcResults.length}</div>
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: 8,
+                        background: 'rgba(139,92,246,0.06)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>Ср. скор</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#8b5cf6' }}>
+                        {(calcResults.reduce((s, r) => s + r.score.compositeScore, 0) / calcResults.length).toFixed(1)}
                       </div>
-                      {/* Full macros grid */}
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, marginBottom:6 }}>
-                        {[
-                          ['🔥','Ккал',`${totalKcal} ккал`, '#fff'],
-                          ['🥩','Белок',`${sc.macros.protein}г`,'#22c55e'],
-                          ['🧈','Жиры',`${sc.macros.fat}г`,'#f59e0b'],
-                          ['🍚','Углеводы',`${sc.macros.carbs}г`,'#3b82f6'],
-                          ['🌾','Клетчатка',`${sc.macros.fiber}г`,'#22c55e'],
-                          ['⚖️','Вес',`${totalW}г`,'rgba(255,255,255,0.8)'],
-                          ['📊','Ккал/г',kcalPerG,'rgba(255,255,255,0.8)'],
-                          ['💪','DIAAS',`${r.diaas.diaas.toFixed(2)}`,'#8b5cf6'],
-                        ].map(([icon, label, val, c]) => (
-                          <div key={label} style={{ padding:'3px 5px', borderRadius:5, background:'rgba(255,255,255,0.02)' }}>
-                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.8)' }}>{icon} {label}</div>
-                            <div style={{ fontSize:9, fontWeight:700, color:c }}>{val}</div>
-                          </div>
-                        ))}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: 8,
+                        background: 'rgba(245,158,11,0.06)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>Всего ккал</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>
+                        {calcResults.reduce((s, r) => s + r.score.macros.kcal, 0)}
                       </div>
-                      {/* PFC ratio bar */}
-                      <div style={{ marginBottom:6 }}>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>БЖУ %</div>
-                        <div style={{ display:'flex', gap:3, height:5, borderRadius:3, overflow:'hidden' }}>
-                          <div style={{ flex:pctP, background:'#22c55e' }} />
-                          <div style={{ flex:pctF, background:'#f59e0b' }} />
-                          <div style={{ flex:pctC, background:'#3b82f6' }} />
-                        </div>
-                        <div style={{ display:'flex', gap:6, marginTop:1, fontSize:6, color:'rgba(255,255,255,0.8)' }}>
-                          <span>🥩 {pctP}%</span>
-                          <span>🧈 {pctF}%</span>
-                          <span>🍚 {pctC}%</span>
-                        </div>
-                      </div>
-                      {/* Quality breakdown */}
-                      <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:4 }}>
-                        {bestItems.length > 0 && <span style={{ fontSize:10, padding:'1px 5px', borderRadius:3, background:'rgba(0,230,138,0.08)', color:'#22c55e' }}>✅ {bestItems.join(', ')}</span>}
-                        {weakItems.length > 0 && <span style={{ fontSize:10, padding:'1px 5px', borderRadius:3, background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>⚠️ {weakItems.join(', ')}</span>}
-                      </div>
-                      {/* Modifiers */}
-                      {sc.modifiers.length > 0 && (
-                        <div style={{ marginBottom:4 }}>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🧬 Факторы:</div>
-                          {sc.modifiers.map((m: any, mi: number) => (
-                            <div key={mi} style={{ fontSize:10, padding:'2px 5px', marginBottom:1, borderRadius:4, background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)', color: m.value > 0 ? '#22c55e' : '#ef4444' }}>
-                              {m.name} <b>({m.value > 0 ? '+' : ''}{m.value.toFixed(1)})</b>
+                    </div>
+                  </div>
+
+                  {/* Per-meal results */}
+                  {calcResults.map((r, i) => {
+                    const sc = r.score;
+                    const grade =
+                      sc.compositeScore >= 8 ? 'A' : sc.compositeScore >= 6 ? 'B' : sc.compositeScore >= 4 ? 'C' : 'D';
+                    const gradeColor =
+                      grade === 'A' ? '#00e68a' : grade === 'B' ? '#8b5cf6' : grade === 'C' ? '#f59e0b' : '#ef4444';
+                    const color = gradeColor;
+                    const totalKcal = sc.macros.protein * 4 + sc.macros.fat * 9 + sc.macros.carbs * 4;
+                    const totalW = sc.productScores.reduce((s: number, p: any) => s + (p.weightG || 0), 0);
+                    const pctP = totalKcal > 0 ? Math.round(((sc.macros.protein * 4) / totalKcal) * 100) : 0;
+                    const pctF = totalKcal > 0 ? Math.round(((sc.macros.fat * 9) / totalKcal) * 100) : 0;
+                    const pctC = totalKcal > 0 ? Math.round(((sc.macros.carbs * 4) / totalKcal) * 100) : 0;
+                    const kcalPerG = totalW > 0 ? (totalKcal / totalW).toFixed(1) : '—';
+                    const bestItems = sc.productScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
+                    const weakItems = sc.productScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          marginBottom: 6,
+                          borderRadius: 10,
+                          padding: 10,
+                          background: 'rgba(24,24,27,0.8)',
+                          border: `1px solid ${color}20`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 6,
+                          }}
+                        >
+                          <span style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{r.name}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: `${gradeColor}18`,
+                                border: `2px solid ${gradeColor}`,
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: gradeColor,
+                              }}
+                            >
+                              {grade}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      {/* Weak links */}
-                      {sc.weakLinks.length > 0 && (
-                        <div style={{ marginBottom:4, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.1)' }}>
-                          <div style={{ fontSize:10, color:'#f59e0b', fontWeight:600 }}>⚠️ Слабые звенья: {sc.weakLinks.join(', ')}</div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:2 }}>Добавьте продукты с более высоким скором в эту категорию</div>
-                        </div>
-                      )}
-                      {/* Product details */}
-                      <div style={{ marginBottom:4 }}>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>📦 Продукты и скоры</div>
-                        {sc.productScores.map((p: any) => (
-                          <div key={p.foodId} style={{ display:'flex', alignItems:'center', gap:4, padding:'2px 0', fontSize:10 }}>
-                            <div style={{ width:18, height:18, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                              fontSize:6, fontWeight:800, border:`1.5px solid ${p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444'}`,
-                              color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444' }}>{p.score}</div>
-                            <span style={{ flex:1, color:'#fff' }}>{p.name}</span>
-                            <span style={{ color:'rgba(255,255,255,0.6)' }}>{p.weightG}г</span>
+                            <span style={{ fontSize: 11, fontWeight: 800, color }}>{sc.compositeScore.toFixed(1)}</span>
+                            <span style={{ fontSize: 6, color, opacity: 0.6 }}>{sc.label}</span>
                           </div>
-                        ))}
-                      </div>
-                      {/* Micro coverage */}
-                      {(sc as any).microCoverage && (sc as any).microCoverage.length > 0 && (
-                        <div style={{ marginTop:4 }}>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>💊 Микронутриенты (% от нормы)</div>
-                          {(sc as any).microCoverage.slice(0, 8).map((m: any) => (
-                            <div key={m.key} style={{ display:'flex', alignItems:'center', gap:4, marginBottom:1 }}>
-                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20 }}>{m.name}</span>
-                              <div style={{ flex:1, height:3, borderRadius:2, background:'rgba(255,255,255,0.06)', overflow:'hidden' }}>
-                                <div style={{ width:`${Math.min(100, m.percent)}%`, height:'100%', borderRadius:2,
-                                  background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444' }} />
+                        </div>
+                        {/* Full macros grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, marginBottom: 6 }}>
+                          {[
+                            ['🔥', 'Ккал', `${totalKcal} ккал`, '#fff'],
+                            ['🥩', 'Белок', `${sc.macros.protein}г`, '#22c55e'],
+                            ['🧈', 'Жиры', `${sc.macros.fat}г`, '#f59e0b'],
+                            ['🍚', 'Углеводы', `${sc.macros.carbs}г`, '#3b82f6'],
+                            ['🌾', 'Клетчатка', `${sc.macros.fiber}г`, '#22c55e'],
+                            ['⚖️', 'Вес', `${totalW}г`, 'rgba(255,255,255,0.8)'],
+                            ['📊', 'Ккал/г', kcalPerG, 'rgba(255,255,255,0.8)'],
+                            ['💪', 'DIAAS', `${r.diaas.diaas.toFixed(2)}`, '#8b5cf6'],
+                          ].map(([icon, label, val, c]) => (
+                            <div
+                              key={label}
+                              style={{ padding: '3px 5px', borderRadius: 5, background: 'rgba(255,255,255,0.02)' }}
+                            >
+                              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.8)' }}>
+                                {icon} {label}
                               </div>
-                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20, textAlign:'right' }}>{Math.min(500, m.percent)}%</span>
+                              <div style={{ fontSize: 9, fontWeight: 700, color: c }}>{val}</div>
                             </div>
                           ))}
-                          {(sc as any).microCoverage.length > 8 && (
-                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.2)', marginTop:1 }}>+ ещё {Math.min(8, (sc as any).microCoverage.length - 8)}</div>
-                          )}
                         </div>
-                      )}
-                      {/* Recommendations */}
-                      <div style={{ marginTop:4, fontSize:10, color:'#8b5cf6' }}>
-                        {grade === 'A' && '🏆 Отличный состав — идеально для вашей фазы'}
-                        {grade === 'B' && '👍 Хороший приём — добавьте зелени или клетчатки'}
-                        {grade === 'C' && '⚡ Улучшите: больше белка, овощей, замените переработанное'}
-                        {grade === 'D' && '⚠️ Слабый приём — замените низкокачественные продукты'}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Combined daily report */}
-                {calcDailyReport && calcResults.length > 1 && (
-                  <div style={{ marginTop:8, borderRadius:10, padding:10, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
-                    <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:4 }}>
-                      <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
-                      <span style={{ display:'flex', gap:4 }}>
-                        <button onClick={() => { void printPlanHtml('Дневной отчёт питания', buildDayReportPrintHtml(calcDailyReport, {
-                          dayScore: (dayPlan as any)?.healthScore?.score ?? null,
-                          dayStatus: (dayPlan as any)?.healthScore?.status ?? null,
-                          coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage) ? (dayPlan as any).microSummary.coverage : []).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
-                         })).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
-                        <button onClick={() => { void printPlanHtml('План на день — таймлайн', buildMealTimelinePrintHtml(
-                          (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount, id: it.id })), totals: m.totals || {} })),
-                          { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart, weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any }
-                        )).then((ok: boolean) => { if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна'); }); }} className="plan-actbtn" style={{ padding:'10px 12px', minHeight:44, borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, background:'rgba(6,182,212,0.1)', border:'1px solid rgba(6,182,212,0.3)', color:'#22d3ee' }}>⏳ Таймлайн (PDF)</button>
-                      </span>
-                    </div>
-                    {/* Overall grade */}
-                    {(() => {
-                      const avgScore = calcResults.reduce((s: number, r: any) => s + r.score.compositeScore, 0) / calcResults.length;
-                      const overallGrade = avgScore >= 8 ? 'A' : avgScore >= 6 ? 'B' : avgScore >= 4 ? 'C' : 'D';
-                      const overallColor = overallGrade === 'A' ? '#00e68a' : overallGrade === 'B' ? '#8b5cf6' : overallGrade === 'C' ? '#f59e0b' : '#ef4444';
-                      return (
-                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                          <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center',
-                            background:`${overallColor}18`, border:`2px solid ${overallColor}`, fontSize:14, fontWeight:800, color:overallColor }}>{overallGrade}</div>
-                          <span style={{ fontSize:10, color:overallColor, fontWeight:700 }}>Качество рациона: {avgScore.toFixed(1)}/10</span>
-                        </div>
-                      );
-                    })()}
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:4 }}>
-                      Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} | Лимит.АК: {calcDailyReport.diaasLimitingAA}
-                      {calcDailyReport.histamineSensitive ? ' | ⚠️ Чувствителен к гистамину' : ''}
-                    </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:3, fontSize:10, color:'rgba(255,255,255,0.85)' }}>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)', color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444' }}>
-                        🧬 mTOR: {calcDailyReport.mtorTriggered ? '✅ Запущен' : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.giLoadWarning ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.giLoadWarning ? '#ef4444' : '#22c55e' }}>
-                        🧬 GL: {calcDailyReport.giLoad.toFixed(0)} {calcDailyReport.giLoadWarning ? '⚠️' : '✅'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.pralWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.pralWarning ? '#f59e0b' : '#22c55e' }}>
-                        🧂 PRAL: {calcDailyReport.pralTotal.toFixed(0)} {calcDailyReport.pralWarning || '✅'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.ammoniaRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.ammoniaRisk ? '#ef4444' : '#22c55e' }}>
-                        💨 Аммиак: {calcDailyReport.ammoniaScore.toFixed(1)} {calcDailyReport.ammoniaRisk ? '⚠️' : '✅'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.omegaWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.omegaWarning ? '#f59e0b' : '#22c55e' }}>
-                        🐟 Омега: {calcDailyReport.omegaRatio.toFixed(1)}:1 {calcDailyReport.omegaWarning ? '⚠️' : '✅'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.electrolyteRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.electrolyteRisk ? '#ef4444' : '#22c55e' }}>
-                        💧 K/Mg: {calcDailyReport.potassiumMg}/{calcDailyReport.magnesiumMg}мг {calcDailyReport.electrolyteRisk ? '⚠️' : '✅'}
-                      </div>
-                      <div title="Мало быстрых углеводов в post-workout приёме (< 0.5 г/кг) — риск кортизола" style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.cortisolRisk ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.cortisolRisk ? '#f59e0b' : '#22c55e' }}>
-                        🧠 Кортизол: {calcDailyReport.cortisolRisk ? '⚠️ Риск (мало быстрых угл. post-WO)' : '✅ Норма'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: calcDailyReport.insulinRicohet ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: calcDailyReport.insulinRicohet ? '#ef4444' : '#22c55e' }}>
-                        💉 Инсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
-                      </div>
-                      <div style={{ padding:'3px 6px', borderRadius:4, background: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)', color: (calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '#ef4444' : '#22c55e' }}>
-                        🔬 HOMA-IR: {calcDailyReport.homaIr !== null ? calcDailyReport.homaIr.toFixed(1) : '—'} {(calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5) ? '🚨' : '✅'}
-                      </div>
-                      {calcDailyReport.overloadWarning && (
-                        <div style={{ padding:'3px 6px', borderRadius:4, background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
-                          ⚠ Перегрузка приёма: порция {calcDailyReport.maxSinglePortionG} г — число приёмов план подбирает сам; распределите нагрузку по дню или снизьте цель
-                        </div>
-                      )}
-                    </div>
-                    {calcDailyReport.diaasWarning && (
-                      <div style={{ marginTop:4, fontSize:10, padding:'4px 8px', borderRadius:6, background: 'rgba(139,92,246,0.06)', color: '#8b5cf6' }}>
-                        💪 DIAAS: {calcDailyReport.diaasWarning}
-                      </div>
-                    )}
-                    {calcDailyReport.antinutrientWarning && (
-                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
-                        {calcDailyReport.antinutrientWarning}
-                      </div>
-                    )}
-                    {calcDailyReport.glutathioneWarning && (
-                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(245,158,11,0.06)', color:'#f59e0b' }}>
-                        {calcDailyReport.glutathioneWarning}
-                      </div>
-                    )}
-                    {calcDailyReport.histamineWarning && (
-                      <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>
-                        {calcDailyReport.histamineWarning}
-                      </div>
-                    )}
-                    {/* Micro deficits */}
-                    {calcDailyReport.microDeficits.length > 0 && (
-                      <div style={{ marginTop:3 }}>
-                        <div style={{ fontSize:10, color:'#f59e0b', fontWeight:600, marginBottom:2 }}>⚠️ Дефициты микронутриентов ({calcDailyReport.microDeficits.length})</div>
-                        <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
-                          {calcDailyReport.microDeficits.map((def: string) => {
-                            const criticalDefs = ['Железо','B12','Витамин D','Кальций','B9','C','Фолат','B6'];
-                            const isCritical = criticalDefs.some(c => def.toLowerCase().includes(c.toLowerCase()));
-                            return (
-                              <span key={def} style={{ fontSize:6, padding:'1px 5px', borderRadius:3,
-                                background: isCritical ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)',
-                                color: isCritical ? '#ef4444' : '#f59e0b' }}>
-                                {isCritical ? '🔴' : '🟡'} {def}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Weight dynamics prediction */}
-                    {(() => {
-                      const tdeeEst = (weight || 80) * 35;
-                      const kcalDiff = calcDailyReport.totalKcal - tdeeEst;
-                      const weeklyKg = kcalDiff * 7 / 7700;
-                      const direction = weeklyKg > 0.2 ? 'gain' : weeklyKg < -0.2 ? 'loss' : 'maintenance';
-                      const arrow = direction === 'gain' ? '📈' : direction === 'loss' ? '📉' : '➡️';
-                      const color = direction === 'gain' ? '#22c55e' : direction === 'loss' ? '#ef4444' : '#8b5cf6';
-                      return (
-                        <div style={{ marginTop:3, padding:'4px 8px', borderRadius:6, background:'rgba(6,182,212,0.04)', border:'1px solid rgba(6,182,212,0.08)' }}>
-                          <div style={{ fontSize:10, color:'#06b6d4', fontWeight:600, marginBottom:2 }}>⚖️ Прогноз динамики веса</div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)' }}>
-                            Ккал: {Math.round(calcDailyReport.totalKcal)}/день · TDEE: ~{Math.round(tdeeEst)} · Баланс: {kcalDiff > 0 ? '+' : ''}{Math.round(kcalDiff)} ккал/день
+                        {/* PFC ratio bar */}
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>БЖУ %</div>
+                          <div style={{ display: 'flex', gap: 3, height: 5, borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ flex: pctP, background: '#22c55e' }} />
+                            <div style={{ flex: pctF, background: '#f59e0b' }} />
+                            <div style={{ flex: pctC, background: '#3b82f6' }} />
                           </div>
-                          <div style={{ fontSize:9, fontWeight:600, color, marginTop:1 }}>
-                            {arrow} ~{Math.abs(weeklyKg).toFixed(2)} кг/нед ({direction === 'gain' ? 'набор' : direction === 'loss' ? 'снижение' : 'поддержание'})
+                          <div
+                            style={{
+                              display: 'flex',
+                              gap: 6,
+                              marginTop: 1,
+                              fontSize: 6,
+                              color: 'rgba(255,255,255,0.8)',
+                            }}
+                          >
+                            <span>🥩 {pctP}%</span>
+                            <span>🧈 {pctF}%</span>
+                            <span>🍚 {pctC}%</span>
                           </div>
                         </div>
-                      );
-                    })()}
-                    {/* Food quality breakdown */}
-                    {(() => {
-                      const allProductScores = calcResults.flatMap((r: any) => r.score.productScores || []);
-                      const bestItems = allProductScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
-                      const weakItems = allProductScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
-                      return (
-                        <>
+                        {/* Quality breakdown */}
+                        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', marginBottom: 4 }}>
                           {bestItems.length > 0 && (
-                            <div style={{ marginTop:4, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(0,230,138,0.04)', color:'#22c55e' }}>
-                              ✅ Лучшие продукты: {bestItems.join(', ')}
-                            </div>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 5px',
+                                borderRadius: 3,
+                                background: 'rgba(0,230,138,0.08)',
+                                color: '#22c55e',
+                              }}
+                            >
+                              ✅ {bestItems.join(', ')}
+                            </span>
                           )}
                           {weakItems.length > 0 && (
-                            <div style={{ marginTop:3, fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.04)', color:'#ef4444' }}>
-                              ⚠️ Слабые продукты: {weakItems.join(', ')}
-                            </div>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: '1px 5px',
+                                borderRadius: 3,
+                                background: 'rgba(239,68,68,0.08)',
+                                color: '#ef4444',
+                              }}
+                            >
+                              ⚠️ {weakItems.join(', ')}
+                            </span>
                           )}
-                        </>
-                      );
-                    })()}
-                    {/* Recommendations */}
-                    {(() => {
-                      const recs: string[] = [];
-                      if (!calcDailyReport.mtorTriggered) recs.push('🥩 Увеличьте лейцин (красное мясо, яйца, сывороточный протеин)');
-                      if (calcDailyReport.giLoadWarning) recs.push('🍚 Снизьте гликемическую нагрузку: часть быстрых углеводов замените на овсянку, гречку, бобовые или овощи');
-                      if (calcDailyReport.omegaWarning) recs.push('🐟 Добавьте Омега-3 (лосось, скумбрия, льняное масло)');
-                      if (calcDailyReport.electrolyteRisk) recs.push('🥑 Увеличьте калий (авокадо, шпинат, бананы) и магний (орехи, семена)');
-                      if (calcDailyReport.microDeficits.length > 0) recs.push('💊 Обратите внимание на дефициты: ' + calcDailyReport.microDeficits.slice(0,3).join(', '));
-                      return recs.length > 0 ? (
-                        <div style={{ marginTop:4 }}>
-                          <div style={{ fontSize:10, color:'#8b5cf6', fontWeight:600, marginBottom:2 }}>📋 Рекомендации</div>
-                          {recs.map((rec, ri) => (
-                            <div key={ri} style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:1 }}>• {rec}</div>
+                        </div>
+                        {/* Modifiers */}
+                        {sc.modifiers.length > 0 && (
+                          <div style={{ marginBottom: 4 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>
+                              🧬 Факторы:
+                            </div>
+                            {sc.modifiers.map((m: any, mi: number) => (
+                              <div
+                                key={mi}
+                                style={{
+                                  fontSize: 10,
+                                  padding: '2px 5px',
+                                  marginBottom: 1,
+                                  borderRadius: 4,
+                                  background: m.value > 0 ? 'rgba(0,230,138,0.04)' : 'rgba(239,68,68,0.04)',
+                                  color: m.value > 0 ? '#22c55e' : '#ef4444',
+                                }}
+                              >
+                                {m.name}{' '}
+                                <b>
+                                  ({m.value > 0 ? '+' : ''}
+                                  {m.value.toFixed(1)})
+                                </b>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Weak links */}
+                        {sc.weakLinks.length > 0 && (
+                          <div
+                            style={{
+                              marginBottom: 4,
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              background: 'rgba(245,158,11,0.06)',
+                              border: '1px solid rgba(245,158,11,0.1)',
+                            }}
+                          >
+                            <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600 }}>
+                              ⚠️ Слабые звенья: {sc.weakLinks.join(', ')}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+                              Добавьте продукты с более высоким скором в эту категорию
+                            </div>
+                          </div>
+                        )}
+                        {/* Product details */}
+                        <div style={{ marginBottom: 4 }}>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>
+                            📦 Продукты и скоры
+                          </div>
+                          {sc.productScores.map((p: any) => (
+                            <div
+                              key={p.foodId}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 10 }}
+                            >
+                              <div
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 6,
+                                  fontWeight: 800,
+                                  border: `1.5px solid ${p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444'}`,
+                                  color: p.score >= 7 ? '#22c55e' : p.score >= 4 ? '#f59e0b' : '#ef4444',
+                                }}
+                              >
+                                {p.score}
+                              </div>
+                              <span style={{ flex: 1, color: '#fff' }}>{p.name}</span>
+                              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{p.weightG}г</span>
+                            </div>
                           ))}
                         </div>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
+                        {/* Micro coverage */}
+                        {(sc as any).microCoverage && (sc as any).microCoverage.length > 0 && (
+                          <div style={{ marginTop: 4 }}>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>
+                              💊 Микронутриенты (% от нормы)
+                            </div>
+                            {(sc as any).microCoverage.slice(0, 8).map((m: any) => (
+                              <div
+                                key={m.key}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 1 }}
+                              >
+                                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.8)', minWidth: 20 }}>
+                                  {m.name}
+                                </span>
+                                <div
+                                  style={{
+                                    flex: 1,
+                                    height: 3,
+                                    borderRadius: 2,
+                                    background: 'rgba(255,255,255,0.06)',
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: `${Math.min(100, m.percent)}%`,
+                                      height: '100%',
+                                      borderRadius: 2,
+                                      background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444',
+                                    }}
+                                  />
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 6,
+                                    color: 'rgba(255,255,255,0.8)',
+                                    minWidth: 20,
+                                    textAlign: 'right',
+                                  }}
+                                >
+                                  {Math.min(500, m.percent)}%
+                                </span>
+                              </div>
+                            ))}
+                            {(sc as any).microCoverage.length > 8 && (
+                              <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.2)', marginTop: 1 }}>
+                                + ещё {Math.min(8, (sc as any).microCoverage.length - 8)}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Recommendations */}
+                        <div style={{ marginTop: 4, fontSize: 10, color: '#8b5cf6' }}>
+                          {grade === 'A' && '🏆 Отличный состав — идеально для вашей фазы'}
+                          {grade === 'B' && '👍 Хороший приём — добавьте зелени или клетчатки'}
+                          {grade === 'C' && '⚡ Улучшите: больше белка, овощей, замените переработанное'}
+                          {grade === 'D' && '⚠️ Слабый приём — замените низкокачественные продукты'}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Combined daily report */}
+                  {calcDailyReport && calcResults.length > 1 && (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        borderRadius: 10,
+                        padding: 10,
+                        background: 'rgba(139,92,246,0.04)',
+                        border: '1px solid rgba(139,92,246,0.12)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: '#8b5cf6',
+                          marginBottom: 6,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 4,
+                        }}
+                      >
+                        <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
+                        <span style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            onClick={() => {
+                              void printPlanHtml(
+                                'Дневной отчёт питания',
+                                buildDayReportPrintHtml(calcDailyReport, {
+                                  dayScore: (dayPlan as any)?.healthScore?.score ?? null,
+                                  dayStatus: (dayPlan as any)?.healthScore?.status ?? null,
+                                  coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage)
+                                    ? (dayPlan as any).microSummary.coverage
+                                    : []
+                                  ).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
+                                }),
+                              ).then((ok: boolean) => {
+                                if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна');
+                              });
+                            }}
+                            className="plan-actbtn"
+                            style={{
+                              padding: '10px 12px',
+                              minHeight: 44,
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: 'rgba(139,92,246,0.1)',
+                              border: '1px solid rgba(139,92,246,0.3)',
+                              color: '#a78bfa',
+                            }}
+                          >
+                            🖨 Печать отчёта
+                          </button>
+                          <button
+                            onClick={() => {
+                              void printPlanHtml(
+                                'План на день — таймлайн',
+                                buildMealTimelinePrintHtml(
+                                  (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({
+                                    time: m.time,
+                                    label: m.label,
+                                    type: m.type,
+                                    items: (m.items || []).map((it: any) => ({
+                                      name: it.name,
+                                      amount: it.amount,
+                                      id: it.id,
+                                    })),
+                                    totals: m.totals || {},
+                                  })),
+                                  {
+                                    title: 'План на день',
+                                    kcal: dayPlan?.totals?.kcal,
+                                    trainStart,
+                                    weightMode: (weightMode === 'raw' ? 'raw' : 'cooked') as any,
+                                  },
+                                ),
+                              ).then((ok: boolean) => {
+                                if (!ok) setErrorMsg('Печать заблокирована браузером — разрешите всплывающие окна');
+                              });
+                            }}
+                            className="plan-actbtn"
+                            style={{
+                              padding: '10px 12px',
+                              minHeight: 44,
+                              borderRadius: 10,
+                              cursor: 'pointer',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              background: 'rgba(6,182,212,0.1)',
+                              border: '1px solid rgba(6,182,212,0.3)',
+                              color: '#22d3ee',
+                            }}
+                          >
+                            ⏳ Таймлайн (PDF)
+                          </button>
+                        </span>
+                      </div>
+                      {/* Overall grade */}
+                      {(() => {
+                        const avgScore =
+                          calcResults.reduce((s: number, r: any) => s + r.score.compositeScore, 0) / calcResults.length;
+                        const overallGrade = avgScore >= 8 ? 'A' : avgScore >= 6 ? 'B' : avgScore >= 4 ? 'C' : 'D';
+                        const overallColor =
+                          overallGrade === 'A'
+                            ? '#00e68a'
+                            : overallGrade === 'B'
+                              ? '#8b5cf6'
+                              : overallGrade === 'C'
+                                ? '#f59e0b'
+                                : '#ef4444';
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <div
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: `${overallColor}18`,
+                                border: `2px solid ${overallColor}`,
+                                fontSize: 14,
+                                fontWeight: 800,
+                                color: overallColor,
+                              }}
+                            >
+                              {overallGrade}
+                            </div>
+                            <span style={{ fontSize: 10, color: overallColor, fontWeight: 700 }}>
+                              Качество рациона: {avgScore.toFixed(1)}/10
+                            </span>
+                          </div>
+                        );
+                      })()}
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
+                        Ккал: {Math.round(calcDailyReport.totalKcal)} | DIAAS: {calcDailyReport.diaas.toFixed(2)} |
+                        Лимит.АК: {calcDailyReport.diaasLimitingAA}
+                        {calcDailyReport.histamineSensitive ? ' | ⚠️ Чувствителен к гистамину' : ''}
+                      </div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 3,
+                          fontSize: 10,
+                          color: 'rgba(255,255,255,0.85)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.mtorTriggered ? 'rgba(0,230,138,0.06)' : 'rgba(239,68,68,0.06)',
+                            color: calcDailyReport.mtorTriggered ? '#22c55e' : '#ef4444',
+                          }}
+                        >
+                          🧬 mTOR:{' '}
+                          {calcDailyReport.mtorTriggered
+                            ? '✅ Запущен'
+                            : `❌ Дефицит ${calcDailyReport.mtorDeficitMg}мг лейцина`}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.giLoadWarning ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.giLoadWarning ? '#ef4444' : '#22c55e',
+                          }}
+                        >
+                          🧬 GL: {calcDailyReport.giLoad.toFixed(0)} {calcDailyReport.giLoadWarning ? '⚠️' : '✅'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.pralWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.pralWarning ? '#f59e0b' : '#22c55e',
+                          }}
+                        >
+                          🧂 PRAL: {calcDailyReport.pralTotal.toFixed(0)} {calcDailyReport.pralWarning || '✅'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.ammoniaRisk ? 'rgba(239,68,68,0.06)' : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.ammoniaRisk ? '#ef4444' : '#22c55e',
+                          }}
+                        >
+                          💨 Аммиак: {calcDailyReport.ammoniaScore.toFixed(1)}{' '}
+                          {calcDailyReport.ammoniaRisk ? '⚠️' : '✅'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.omegaWarning ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.omegaWarning ? '#f59e0b' : '#22c55e',
+                          }}
+                        >
+                          🐟 Омега: {calcDailyReport.omegaRatio.toFixed(1)}:1{' '}
+                          {calcDailyReport.omegaWarning ? '⚠️' : '✅'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.electrolyteRisk
+                              ? 'rgba(239,68,68,0.06)'
+                              : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.electrolyteRisk ? '#ef4444' : '#22c55e',
+                          }}
+                        >
+                          💧 K/Mg: {calcDailyReport.potassiumMg}/{calcDailyReport.magnesiumMg}мг{' '}
+                          {calcDailyReport.electrolyteRisk ? '⚠️' : '✅'}
+                        </div>
+                        <div
+                          title="Мало быстрых углеводов в post-workout приёме (< 0.5 г/кг) — риск кортизола"
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.cortisolRisk ? 'rgba(245,158,11,0.06)' : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.cortisolRisk ? '#f59e0b' : '#22c55e',
+                          }}
+                        >
+                          🧠 Кортизол:{' '}
+                          {calcDailyReport.cortisolRisk ? '⚠️ Риск (мало быстрых угл. post-WO)' : '✅ Норма'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background: calcDailyReport.insulinRicohet
+                              ? 'rgba(239,68,68,0.06)'
+                              : 'rgba(0,230,138,0.06)',
+                            color: calcDailyReport.insulinRicohet ? '#ef4444' : '#22c55e',
+                          }}
+                        >
+                          💉 Инсулин: {calcDailyReport.insulinRicohet ? '🚨 Рикшет' : '✅ Норма'}
+                        </div>
+                        <div
+                          style={{
+                            padding: '3px 6px',
+                            borderRadius: 4,
+                            background:
+                              calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5
+                                ? 'rgba(239,68,68,0.06)'
+                                : 'rgba(0,230,138,0.06)',
+                            color:
+                              calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5 ? '#ef4444' : '#22c55e',
+                          }}
+                        >
+                          🔬 HOMA-IR: {calcDailyReport.homaIr !== null ? calcDailyReport.homaIr.toFixed(1) : '—'}{' '}
+                          {calcDailyReport.homaIr !== null && calcDailyReport.homaIr > 2.5 ? '🚨' : '✅'}
+                        </div>
+                        {calcDailyReport.overloadWarning && (
+                          <div
+                            style={{
+                              padding: '3px 6px',
+                              borderRadius: 4,
+                              background: 'rgba(245,158,11,0.08)',
+                              color: '#f59e0b',
+                              border: '1px solid rgba(245,158,11,0.25)',
+                            }}
+                          >
+                            ⚠ Перегрузка приёма: порция {calcDailyReport.maxSinglePortionG} г — число приёмов план
+                            подбирает сам; распределите нагрузку по дню или снизьте цель
+                          </div>
+                        )}
+                      </div>
+                      {calcDailyReport.diaasWarning && (
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 10,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(139,92,246,0.06)',
+                            color: '#8b5cf6',
+                          }}
+                        >
+                          💪 DIAAS: {calcDailyReport.diaasWarning}
+                        </div>
+                      )}
+                      {calcDailyReport.antinutrientWarning && (
+                        <div
+                          style={{
+                            marginTop: 3,
+                            fontSize: 10,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(245,158,11,0.06)',
+                            color: '#f59e0b',
+                          }}
+                        >
+                          {calcDailyReport.antinutrientWarning}
+                        </div>
+                      )}
+                      {calcDailyReport.glutathioneWarning && (
+                        <div
+                          style={{
+                            marginTop: 3,
+                            fontSize: 10,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(245,158,11,0.06)',
+                            color: '#f59e0b',
+                          }}
+                        >
+                          {calcDailyReport.glutathioneWarning}
+                        </div>
+                      )}
+                      {calcDailyReport.histamineWarning && (
+                        <div
+                          style={{
+                            marginTop: 3,
+                            fontSize: 10,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(239,68,68,0.06)',
+                            color: '#ef4444',
+                          }}
+                        >
+                          {calcDailyReport.histamineWarning}
+                        </div>
+                      )}
+                      {/* Micro deficits */}
+                      {calcDailyReport.microDeficits.length > 0 && (
+                        <div style={{ marginTop: 3 }}>
+                          <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>
+                            ⚠️ Дефициты микронутриентов ({calcDailyReport.microDeficits.length})
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            {calcDailyReport.microDeficits.map((def: string) => {
+                              const criticalDefs = ['Железо', 'B12', 'Витамин D', 'Кальций', 'B9', 'C', 'Фолат', 'B6'];
+                              const isCritical = criticalDefs.some((c) => def.toLowerCase().includes(c.toLowerCase()));
+                              return (
+                                <span
+                                  key={def}
+                                  style={{
+                                    fontSize: 6,
+                                    padding: '1px 5px',
+                                    borderRadius: 3,
+                                    background: isCritical ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.08)',
+                                    color: isCritical ? '#ef4444' : '#f59e0b',
+                                  }}
+                                >
+                                  {isCritical ? '🔴' : '🟡'} {def}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Weight dynamics prediction */}
+                      {(() => {
+                        const tdeeEst = (weight || 80) * 35;
+                        const kcalDiff = calcDailyReport.totalKcal - tdeeEst;
+                        const weeklyKg = (kcalDiff * 7) / 7700;
+                        const direction = weeklyKg > 0.2 ? 'gain' : weeklyKg < -0.2 ? 'loss' : 'maintenance';
+                        const arrow = direction === 'gain' ? '📈' : direction === 'loss' ? '📉' : '➡️';
+                        const color = direction === 'gain' ? '#22c55e' : direction === 'loss' ? '#ef4444' : '#8b5cf6';
+                        return (
+                          <div
+                            style={{
+                              marginTop: 3,
+                              padding: '4px 8px',
+                              borderRadius: 6,
+                              background: 'rgba(6,182,212,0.04)',
+                              border: '1px solid rgba(6,182,212,0.08)',
+                            }}
+                          >
+                            <div style={{ fontSize: 10, color: '#06b6d4', fontWeight: 600, marginBottom: 2 }}>
+                              ⚖️ Прогноз динамики веса
+                            </div>
+                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                              Ккал: {Math.round(calcDailyReport.totalKcal)}/день · TDEE: ~{Math.round(tdeeEst)} ·
+                              Баланс: {kcalDiff > 0 ? '+' : ''}
+                              {Math.round(kcalDiff)} ккал/день
+                            </div>
+                            <div style={{ fontSize: 9, fontWeight: 600, color, marginTop: 1 }}>
+                              {arrow} ~{Math.abs(weeklyKg).toFixed(2)} кг/нед (
+                              {direction === 'gain' ? 'набор' : direction === 'loss' ? 'снижение' : 'поддержание'})
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      {/* Food quality breakdown */}
+                      {(() => {
+                        const allProductScores = calcResults.flatMap((r: any) => r.score.productScores || []);
+                        const bestItems = allProductScores.filter((p: any) => p.score >= 7).map((p: any) => p.name);
+                        const weakItems = allProductScores.filter((p: any) => p.score < 4).map((p: any) => p.name);
+                        return (
+                          <>
+                            {bestItems.length > 0 && (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  fontSize: 10,
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(0,230,138,0.04)',
+                                  color: '#22c55e',
+                                }}
+                              >
+                                ✅ Лучшие продукты: {bestItems.join(', ')}
+                              </div>
+                            )}
+                            {weakItems.length > 0 && (
+                              <div
+                                style={{
+                                  marginTop: 3,
+                                  fontSize: 10,
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  background: 'rgba(239,68,68,0.04)',
+                                  color: '#ef4444',
+                                }}
+                              >
+                                ⚠️ Слабые продукты: {weakItems.join(', ')}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                      {/* Recommendations */}
+                      {(() => {
+                        const recs: string[] = [];
+                        if (!calcDailyReport.mtorTriggered)
+                          recs.push('🥩 Увеличьте лейцин (красное мясо, яйца, сывороточный протеин)');
+                        if (calcDailyReport.giLoadWarning)
+                          recs.push(
+                            '🍚 Снизьте гликемическую нагрузку: часть быстрых углеводов замените на овсянку, гречку, бобовые или овощи',
+                          );
+                        if (calcDailyReport.omegaWarning)
+                          recs.push('🐟 Добавьте Омега-3 (лосось, скумбрия, льняное масло)');
+                        if (calcDailyReport.electrolyteRisk)
+                          recs.push('🥑 Увеличьте калий (авокадо, шпинат, бананы) и магний (орехи, семена)');
+                        if (calcDailyReport.microDeficits.length > 0)
+                          recs.push(
+                            '💊 Обратите внимание на дефициты: ' + calcDailyReport.microDeficits.slice(0, 3).join(', '),
+                          );
+                        return recs.length > 0 ? (
+                          <div style={{ marginTop: 4 }}>
+                            <div style={{ fontSize: 10, color: '#8b5cf6', fontWeight: 600, marginBottom: 2 }}>
+                              📋 Рекомендации
+                            </div>
+                            {recs.map((rec, ri) => (
+                              <div key={ri} style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 1 }}>
+                                • {rec}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         </div>
       )}
 
       {showCorrectPopup && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.8)' }}
-          onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }}>
-          <div onClick={e => e.stopPropagation()} style={{ width:'96%', maxWidth:440, maxHeight:'92vh', overflowY:'auto', padding:16, borderRadius:16, background:'#18181b', border:'1px solid rgba(249,115,22,0.12)', boxShadow:'0 8px 40px rgba(0,0,0,0.4)' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <div style={{ fontSize:15, fontWeight:800, color:'#f97316' }}>🔀 Корректировка рациона</div>
-              <span onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ cursor:'pointer', fontSize:10, color:'rgba(255,255,255,0.9)', padding:'2px 6px' }}>✕</span>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.8)',
+          }}
+          onClick={() => {
+            setShowCorrectPopup(false);
+            setCorrectIssues(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '96%',
+              maxWidth: 440,
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              padding: 16,
+              borderRadius: 16,
+              background: '#18181b',
+              border: '1px solid rgba(249,115,22,0.12)',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#f97316' }}>🔀 Корректировка рациона</div>
+              <span
+                onClick={() => {
+                  setShowCorrectPopup(false);
+                  setCorrectIssues(null);
+                }}
+                style={{ cursor: 'pointer', fontSize: 10, color: 'rgba(255,255,255,0.9)', padding: '2px 6px' }}
+              >
+                ✕
+              </span>
             </div>
 
             {!correctIssues ? (
-              <div style={{ textAlign:'center', padding:20, fontSize:9, color:'rgba(255,255,255,0.75)' }}>Анализ рациона...</div>
+              <div style={{ textAlign: 'center', padding: 20, fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>
+                Анализ рациона...
+              </div>
             ) : correctIssues.length === 0 ? (
-              <div style={{ textAlign:'center', padding:20 }}>
-                <div style={{ fontSize:24, marginBottom:8 }}>✅</div>
-                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Рацион сбалансирован</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)' }}>Не найдено критических недочётов</div>
+              <div style={{ textAlign: 'center', padding: 20 }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>✅</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 4 }}>
+                  Рацион сбалансирован
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>Не найдено критических недочётов</div>
               </div>
             ) : (
               <>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.8)', marginBottom:8 }}>
-                  Найдено <strong style={{ color:'#f97316' }}>{correctIssues.reduce((s, m) => s + m.issues.length, 0)}</strong> недочёта(ов) в <strong style={{ color:'#f97316' }}>{correctIssues.length}</strong> приёмах
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }}>
+                  Найдено{' '}
+                  <strong style={{ color: '#f97316' }}>{correctIssues.reduce((s, m) => s + m.issues.length, 0)}</strong>{' '}
+                  недочёта(ов) в <strong style={{ color: '#f97316' }}>{correctIssues.length}</strong> приёмах
                 </div>
 
                 {correctIssues.map((meal, mi) => (
-                  <div key={mi} style={{ marginBottom:8, borderRadius:10, background:'rgba(24,24,27,0.8)', border:'1px solid rgba(249,115,22,0.1)', overflow:'hidden' }}>
-                    <div style={{ padding:'7px 10px', background:'rgba(249,115,22,0.06)', borderBottom:'1px solid rgba(249,115,22,0.08)' }}>
-                      <span style={{ fontSize:10, fontWeight:700, color:'#f97316' }}>{meal.mealName}</span>
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.75)', marginLeft:6 }}>({meal.issues.length})</span>
+                  <div
+                    key={mi}
+                    style={{
+                      marginBottom: 8,
+                      borderRadius: 10,
+                      background: 'rgba(24,24,27,0.8)',
+                      border: '1px solid rgba(249,115,22,0.1)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: '7px 10px',
+                        background: 'rgba(249,115,22,0.06)',
+                        borderBottom: '1px solid rgba(249,115,22,0.08)',
+                      }}
+                    >
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#f97316' }}>{meal.mealName}</span>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginLeft: 6 }}>
+                        ({meal.issues.length})
+                      </span>
                     </div>
-                    <div style={{ padding:'6px 10px' }}>
+                    <div style={{ padding: '6px 10px' }}>
                       {meal.issues.map((issue, ii) => (
-                        <div key={ii} style={{ marginBottom:6, padding:'6px 8px', borderRadius:8, background: issue.severity === 'high' ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.04)', border:`1px solid ${issue.severity === 'high' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}` }}>
-                          <div style={{ fontSize:9, fontWeight:600, color: issue.severity === 'high' ? '#ef4444' : '#f59e0b', marginBottom:3 }}>{issue.text}</div>
+                        <div
+                          key={ii}
+                          style={{
+                            marginBottom: 6,
+                            padding: '6px 8px',
+                            borderRadius: 8,
+                            background: issue.severity === 'high' ? 'rgba(239,68,68,0.04)' : 'rgba(245,158,11,0.04)',
+                            border: `1px solid ${issue.severity === 'high' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}`,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              color: issue.severity === 'high' ? '#ef4444' : '#f59e0b',
+                              marginBottom: 3,
+                            }}
+                          >
+                            {issue.text}
+                          </div>
                           {issue.suggestion && issue.suggestion.length > 0 && (
                             <div>
-                              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginBottom:2 }}>🔀 Заменить на:</div>
-                              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 2 }}>
+                                🔀 Заменить на:
+                              </div>
+                              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                                 {issue.suggestion.map((s, si) => {
                                   // FIX button-audit: dayIdx по единой конвенции (7+ = неделя), guard на foodId
-                                  const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
-                                  const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
+                                  const dayIdx =
+                                    planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
+                                  const activeMeal =
+                                    planDays === 1
+                                      ? dayPlan?.meals?.[meal.mealIdx]
+                                      : planDays === 3
+                                        ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]
+                                        : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx];
                                   return (
-                                  <button key={si} onClick={() => {
-                                    // FIX B5 (аудит 2026-10): раньше здесь искался предложенный
-                                    // продукт ВНУТРИ текущего приёма — а предложения формируются с
-                                    // явным `!currentFoodIds.has(f.id)`, т.е. его там заведомо нет.
-                                    // itemIdx всегда был −1 → replaceFoodItem не вызывался, кнопка
-                                    // была мёртвой. Теперь ищем «жертву» — позицию в приёме, из-за
-                                    // которой возникла проблема (см. pickReplaceIdxForIssue), и
-                                    // меняем ИМЕННО её на предложенный продукт.
-                                    const target = findFoodByIdOrName(s.foodId);
-                                    const items = activeMeal?.items || [];
-                                    const victimIdx = pickReplaceIdxForIssue(items, issue.type);
-                                    if (target && victimIdx >= 0 && items[victimIdx]) {
-                                      // replaceFoodItem сам вызывает saveUndo — дубль не нужен
-                                      replaceFoodItem(dayIdx, meal.mealIdx, victimIdx, target);
-                                      analyzePlanIssues();
-                                    }
-                                  }} title={`Заменить «${(activeMeal?.items?.[pickReplaceIdxForIssue(activeMeal?.items || [], issue.type)]?.name) || '—'}» на «${s.name}»`} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontWeight:600 }}>
-                                    {s.name} <span style={{ fontWeight:400, color:'rgba(255,255,255,0.75)' }}>({s.reason})</span>
-                                  </button>
+                                    <button
+                                      key={si}
+                                      onClick={() => {
+                                        // FIX B5 (аудит 2026-10): раньше здесь искался предложенный
+                                        // продукт ВНУТРИ текущего приёма — а предложения формируются с
+                                        // явным `!currentFoodIds.has(f.id)`, т.е. его там заведомо нет.
+                                        // itemIdx всегда был −1 → replaceFoodItem не вызывался, кнопка
+                                        // была мёртвой. Теперь ищем «жертву» — позицию в приёме, из-за
+                                        // которой возникла проблема (см. pickReplaceIdxForIssue), и
+                                        // меняем ИМЕННО её на предложенный продукт.
+                                        const target = findFoodByIdOrName(s.foodId);
+                                        const items = activeMeal?.items || [];
+                                        const victimIdx = pickReplaceIdxForIssue(items, issue.type);
+                                        if (target && victimIdx >= 0 && items[victimIdx]) {
+                                          // replaceFoodItem сам вызывает saveUndo — дубль не нужен
+                                          replaceFoodItem(dayIdx, meal.mealIdx, victimIdx, target);
+                                          analyzePlanIssues();
+                                        }
+                                      }}
+                                      title={`Заменить «${activeMeal?.items?.[pickReplaceIdxForIssue(activeMeal?.items || [], issue.type)]?.name || '—'}» на «${s.name}»`}
+                                      style={{
+                                        padding: '3px 8px',
+                                        borderRadius: 6,
+                                        fontSize: 10,
+                                        cursor: 'pointer',
+                                        background: 'rgba(0,230,138,0.08)',
+                                        border: '1px solid rgba(0,230,138,0.2)',
+                                        color: '#00e68a',
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      {s.name}{' '}
+                                      <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.75)' }}>
+                                        ({s.reason})
+                                      </span>
+                                    </button>
                                   );
                                 })}
-                                <button onClick={() => {
-                                  // E7-фикс: «🔄 Все» собирает ВСЕ замены в ОДИН saveUndo и один setDayPlan
-                                  // (раньше каждая позиция мутировала план отдельно, а replaceFoodItem
-                                  // внутри forEach терял актуальный state — часть замен могла не примениться)
-                                  //
-                                  // FIX B9 (аудит 2026-10): замена шла «вручную», поэтому
-                                  //   • у новых позиций не пересчитывались клетчатка и лейцин (в приёме
-                                  //     оставались значения СТАРОГО продукта → ложные «низкий лейцин /
-                                  //     низкая клетчатка» и неверные итоги дня);
-                                  //   • totals приёма/дня собирались без fiber/leucine;
-                                  //   • итоги weekPlan/threeDayPlan вообще не обновлялись (оставались
-                                  //     старые суммы недели, хотя дни изменились).
-                                  // Теперь всё считается едиными хелперами sumMealTotals/sumDayTotals.
-                                  const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
-                                  const activePlan = planDays === 1 ? dayPlan : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex] : weekPlan?.days?.[selectedDayIndex]);
-                                  if (!activePlan?.meals?.[meal.mealIdx]) return;
-                                  const mealItems = [...activePlan.meals[meal.mealIdx].items];
-                                  const suggestions = issue.suggestion || [];
-                                  let changed = false;
-                                  const leucinePer100 = (f: any): number =>
-                                    f?.amino_acid_profile_100g?.leucine_mg ?? f?.micros?.Leucine ?? (f?.protein ? Math.round(f.protein * 75) : 0);
-                                  mealItems.forEach((it: any, i: number) => {
-                                    const similar = findSimilarFoods(it);
-                                    if (similar.length === 0) return;
-                                    const targetFood = similar.find(f => suggestions.some(s => s.foodId === f.id));
-                                    if (!targetFood) return;
-                                    const ratio = (it.amount || 100) / 100;
-                                    mealItems[i] = {
-                                      ...it,
-                                      name: targetFood.name, id: targetFood.id,
-                                      amount: it.amount || 100,
-                                      kcal: Math.round((targetFood.kcal || 0) * ratio),
-                                      p: Math.round((targetFood.protein || 0) * ratio * 10) / 10,
-                                      f: Math.round((targetFood.fat || 0) * ratio * 10) / 10,
-                                      c: Math.round((targetFood.carbs || 0) * ratio * 10) / 10,
-                                      fiber: Math.round((targetFood.fiber || 0) * ratio * 10) / 10,
-                                      leucine_mg: Math.round(leucinePer100(targetFood) * ratio),
-                                    };
-                                    changed = true;
-                                  });
-                                  if (!changed) return; // нечего менять — не пишем «пустую» правку в undo
-                                  saveUndo();
-                                  const totals = sumMealTotals(mealItems);
-                                  const newMeals = activePlan.meals.map((m: any, mi2: number) => (mi2 === meal.mealIdx ? { ...m, items: mealItems, totals } : m));
-                                  const apply = (p: any) => ({ ...p, meals: newMeals, totals: sumDayTotals(newMeals) });
-                                  // Итоги мульти-плана по всем дням (с клетчаткой и лейцином).
-                                  const multiTotals = (days: any[]) => days.reduce((s: any, d: any) => ({
-                                    kcal: s.kcal + (d?.totals?.kcal || 0),
-                                    p: s.p + (d?.totals?.p || 0),
-                                    f: s.f + (d?.totals?.f || 0),
-                                    c: s.c + (d?.totals?.c || 0),
-                                    fiber: s.fiber + (d?.totals?.fiber || 0),
-                                    leucine_mg: s.leucine_mg + (d?.totals?.leucine_mg || 0),
-                                  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-                                  if (dayIdx === 0) setDayPlan((prev: any) => apply(prev));
-                                  else if (planDays === 3) setThreeDayPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days, totals: multiTotals(days) }; });
-                                  else setWeekPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days, totals: multiTotals(days) }; });
-                                  analyzePlanIssues();
-                                }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
+                                <button
+                                  onClick={() => {
+                                    // E7-фикс: «🔄 Все» собирает ВСЕ замены в ОДИН saveUndo и один setDayPlan
+                                    // (раньше каждая позиция мутировала план отдельно, а replaceFoodItem
+                                    // внутри forEach терял актуальный state — часть замен могла не примениться)
+                                    //
+                                    // FIX B9 (аудит 2026-10): замена шла «вручную», поэтому
+                                    //   • у новых позиций не пересчитывались клетчатка и лейцин (в приёме
+                                    //     оставались значения СТАРОГО продукта → ложные «низкий лейцин /
+                                    //     низкая клетчатка» и неверные итоги дня);
+                                    //   • totals приёма/дня собирались без fiber/leucine;
+                                    //   • итоги weekPlan/threeDayPlan вообще не обновлялись (оставались
+                                    //     старые суммы недели, хотя дни изменились).
+                                    // Теперь всё считается едиными хелперами sumMealTotals/sumDayTotals.
+                                    const dayIdx =
+                                      planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
+                                    const activePlan =
+                                      planDays === 1
+                                        ? dayPlan
+                                        : planDays === 3
+                                          ? threeDayPlan?.days?.[selectedDayIndex]
+                                          : weekPlan?.days?.[selectedDayIndex];
+                                    if (!activePlan?.meals?.[meal.mealIdx]) return;
+                                    const mealItems = [...activePlan.meals[meal.mealIdx].items];
+                                    const suggestions = issue.suggestion || [];
+                                    let changed = false;
+                                    const leucinePer100 = (f: any): number =>
+                                      f?.amino_acid_profile_100g?.leucine_mg ??
+                                      f?.micros?.Leucine ??
+                                      (f?.protein ? Math.round(f.protein * 75) : 0);
+                                    mealItems.forEach((it: any, i: number) => {
+                                      const similar = findSimilarFoods(it);
+                                      if (similar.length === 0) return;
+                                      const targetFood = similar.find((f) =>
+                                        suggestions.some((s) => s.foodId === f.id),
+                                      );
+                                      if (!targetFood) return;
+                                      const ratio = (it.amount || 100) / 100;
+                                      mealItems[i] = {
+                                        ...it,
+                                        name: targetFood.name,
+                                        id: targetFood.id,
+                                        amount: it.amount || 100,
+                                        kcal: Math.round((targetFood.kcal || 0) * ratio),
+                                        p: Math.round((targetFood.protein || 0) * ratio * 10) / 10,
+                                        f: Math.round((targetFood.fat || 0) * ratio * 10) / 10,
+                                        c: Math.round((targetFood.carbs || 0) * ratio * 10) / 10,
+                                        fiber: Math.round((targetFood.fiber || 0) * ratio * 10) / 10,
+                                        leucine_mg: Math.round(leucinePer100(targetFood) * ratio),
+                                      };
+                                      changed = true;
+                                    });
+                                    if (!changed) return; // нечего менять — не пишем «пустую» правку в undo
+                                    saveUndo();
+                                    const totals = sumMealTotals(mealItems);
+                                    const newMeals = activePlan.meals.map((m: any, mi2: number) =>
+                                      mi2 === meal.mealIdx ? { ...m, items: mealItems, totals } : m,
+                                    );
+                                    const apply = (p: any) => ({
+                                      ...p,
+                                      meals: newMeals,
+                                      totals: sumDayTotals(newMeals),
+                                    });
+                                    // Итоги мульти-плана по всем дням (с клетчаткой и лейцином).
+                                    const multiTotals = (days: any[]) =>
+                                      days.reduce(
+                                        (s: any, d: any) => ({
+                                          kcal: s.kcal + (d?.totals?.kcal || 0),
+                                          p: s.p + (d?.totals?.p || 0),
+                                          f: s.f + (d?.totals?.f || 0),
+                                          c: s.c + (d?.totals?.c || 0),
+                                          fiber: s.fiber + (d?.totals?.fiber || 0),
+                                          leucine_mg: s.leucine_mg + (d?.totals?.leucine_mg || 0),
+                                        }),
+                                        { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 },
+                                      );
+                                    if (dayIdx === 0) setDayPlan((prev: any) => apply(prev));
+                                    else if (planDays === 3)
+                                      setThreeDayPlan((prev: any) => {
+                                        const days = [...prev.days];
+                                        days[selectedDayIndex] = apply(prev.days[selectedDayIndex]);
+                                        return { ...prev, days, totals: multiTotals(days) };
+                                      });
+                                    else
+                                      setWeekPlan((prev: any) => {
+                                        const days = [...prev.days];
+                                        days[selectedDayIndex] = apply(prev.days[selectedDayIndex]);
+                                        return { ...prev, days, totals: multiTotals(days) };
+                                      });
+                                    analyzePlanIssues();
+                                  }}
+                                  style={{
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                    fontSize: 10,
+                                    cursor: 'pointer',
+                                    background: 'rgba(139,92,246,0.08)',
+                                    border: '1px solid rgba(139,92,246,0.2)',
+                                    color: '#a78bfa',
+                                    fontWeight: 600,
+                                  }}
+                                >
                                   🔄 Все
                                 </button>
                               </div>
@@ -3474,16 +8963,45 @@ const doImportPlan = (raw: string): boolean => {
                   </div>
                 ))}
 
-                <div style={{ display:'flex', gap:4, marginTop:8 }}>
-                  <button onClick={() => {
-                    setShowCorrectPopup(false);
-                    setCorrectIssues(null);
-                    // FIX button-audit: перегенерация в текущем виде (не сбрасывать на 1 день)
-                    generatePlan(planDays === 3 ? 3 : planDays === 7 ? 7 : 1, undefined, selectedDayIndex);
-                  }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'none', background:'linear-gradient(135deg,#f97316,#fb923c)', color:'#fff', fontSize:10, fontWeight:800 }}>
+                <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                  <button
+                    onClick={() => {
+                      setShowCorrectPopup(false);
+                      setCorrectIssues(null);
+                      // FIX button-audit: перегенерация в текущем виде (не сбрасывать на 1 день)
+                      generatePlan(planDays === 3 ? 3 : planDays === 7 ? 7 : 1, undefined, selectedDayIndex);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'linear-gradient(135deg,#f97316,#fb923c)',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 800,
+                    }}
+                  >
                     ♻️ Перегенерировать рацион
                   </button>
-                  <button onClick={() => { setShowCorrectPopup(false); setCorrectIssues(null); }} style={{ flex:1, padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'#202023', color:'#fff', fontSize:10, fontWeight:600 }}>
+                  <button
+                    onClick={() => {
+                      setShowCorrectPopup(false);
+                      setCorrectIssues(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: '#202023',
+                      color: '#fff',
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
                     ✕ Закрыть
                   </button>
                 </div>

@@ -101,6 +101,7 @@ import {
   correctDayToTargets as _correctDayToTargets,
   mealTargetsStale as _mealTargetsStale,
   PLANNER_CONVERGENCE_PCT,
+  plannerCanonPct,
   checkTargetsConsistency,
 } from './day-target-corrector';
 import type { PassJournalEntry } from './planner-day-explain';
@@ -255,8 +256,11 @@ export interface DayPlanV2 {
   notes: string[];
   /** E0/P4: честный флаг сходимости products-пути. Канон допуска —
     PLANNER_CONVERGENCE_PCT (3%): при >3% флаг false + явная причина в notes
-    (несогласованные цели / упор в капы-полы реализма). deviationPct — отклонение %. */
+    (несогласованные цели / упор в капы-полы реализма). deviationPct — отклонение %.
+    §8.135: флаг считается по канону ПУТИ (ручной день — 2 %), а не всегда по авто-3 %. */
   withinTolerance?: boolean;
+  /** §8.135: канон дня по пути (ручной — 2, авто — PLANNER_CONVERGENCE_PCT); рецептурный контур судит день по нему. */
+  canonPct?: number;
   deviationPct?: number;
   /** Шаг 7 рефактора: журнал проходов сведения дня (dev до/после) — для карточки
     «Почему день не сошёлся». Аддитивно; старые сохранённые планы без поля — ок. */
@@ -7828,7 +7832,7 @@ const vegKindsOf122 = (plan: DayPlanV2): number =>
   ).size;
 
 /** Овощной день принимается, только если он не хуже честного ни по одному инварианту. */
-const preferVegPlan122 = (veg: DayPlanV2, plain: DayPlanV2, input: MealPlanInput): boolean => {
+export const preferVegPlan122 = (veg: DayPlanV2, plain: DayPlanV2, input: MealPlanInput): boolean => {
   // QG10 — это И 200 г, И два вида. День, где граммы уже на полу (шпинат 200 г в одном
   // приёме), покупает второй вид почти без цены (100 г овоща с 3–6 г углеводов), и
   // откатывать его только из-за равенства граммов нельзя: `авт/cutF50/6/тр`,
@@ -7849,10 +7853,36 @@ const preferVegPlan122 = (veg: DayPlanV2, plain: DayPlanV2, input: MealPlanInput
   // конвейера. Поле `qualityScore` дня считается до §8.127/§8.128/§8.134, а они ещё двигают
   // приёмы: замер `авт/small60/4/тр` — §8.128 вылечила перекус-«гарнир» (белок 7 → 21 г, ось
   // «белок основного приёма» 36 → 100), но снимок остался от крахмальной тарелки (75), и
-  // овощной день (200 г / 2 вида) проигрывал честному (100 г / 1 вид, балл 76). Микро-ось
-  // здесь не передаётся: её нет в этой точке ни у одного из плеч — сравнение симметрично.
+  // овощной день (200 г / 2 вида) проигрывал честному (100 г / 1 вид, балл 76). §8.135:
+  // микро-ось теперь передаётся ОБОИМ плечам одинаково — замер с их ФИНАЛЬНЫХ позиций
+  // (`analyzeMicroCoverage(sumMicros(...))`), иначе овощной день, добитый низко-нутриентным
+  // наполнителем (меньше микро-покрытие), выигрывал у честного по баллу. Ручной замер на
+  // сетке 160 дней (10 профилей × приёмы × тр/отд × авто/руч, скрипт-харнесс, в дереве НЕ
+  // закодирован): выбор плеча не переворачивается ни на одном дне (0 флипов), балл сдвигается
+  // на 48 днях — микро-ось симметрична и на реальной сетке лишь сужает отрыв. Замок
+  // `planner-veg-micro-arm.test.ts` держит саму логику сравнения (unit), а не сетку.
   const _qFresh122 = (p: DayPlanV2): number => {
-    const _s = scoreDayQuality((p.meals || []) as any[], { weightKg: Number((input as any).weightKg) || 0 });
+    const _items = ((p.meals || []) as any[]).flatMap((m: any) =>
+      (m.items || []).map((it: any) => ({ id: it.id, amount: it.amount })),
+    );
+    // Гейт `_pickCtx.qualityMode` здесь снят: `preferVegPlan122` вызывается только из
+    // `buildDayPlan` ПОСЛЕ ядер, а те к этому моменту уже выставили `qualityMode = 'full'`
+    // (finally ядра). Условие было мёртвым и вводило в заблуждение («микро только при full»).
+    const _cov: any = analyzeMicroCoverage(
+      sumMicros(_items, FOOD_DB as any),
+      input.sex || 'male',
+      input.weightKg,
+      input.cyclePhase as any,
+      !!input.isTrainingDay,
+      input.calciumTargetOverride,
+      input.sodiumTargetOverride,
+    );
+    const _n = Array.isArray(_cov?.coverage) ? _cov.coverage.length : 0;
+    const _low = _n > 0 ? lowCountForScore(_cov.coverage as any) : 0;
+    const _s = scoreDayQuality((p.meals || []) as any[], {
+      weightKg: Number((input as any).weightKg) || 0,
+      microCoverage: _n > 0 ? { lowCount: _low, total: _n } : undefined,
+    });
     const _t = Number(_s?.total);
     return Number.isFinite(_t) ? _t : Number((p as any).qualityScore?.total);
   };
@@ -7868,10 +7898,10 @@ const preferVegPlan122 = (veg: DayPlanV2, plain: DayPlanV2, input: MealPlanInput
   if (deferred122(veg) && !deferred122(plain)) {
     return false;
   }
-  const canon =
-    String((input as any).kbjuMode || '') === 'manual' || !!(input as any).manualTargetsLocked
-      ? 2
-      : PLANNER_CONVERGENCE_PCT;
+  // §8.135: канон — тот, под который плечи СОБИРАЛИСЬ (ядро кладёт `canonPct` в день:
+  // ручной согласованный день — 2 %, иначе 3 %); вход — только запасной путь для
+  // вызывающих, которые передают дни без поля (unit-тесты, легаси).
+  const canon = Number((veg as any).canonPct) || Number((plain as any).canonPct) || plannerCanonPct(input);
   const dv = Number(veg.deviationPct) || 0;
   const dp = Number(plain.deviationPct) || 0;
   if (dv > Math.max(dp, canon) + 1e-9) {
@@ -23072,6 +23102,11 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       // того же входа даёт 0.7/−0.5/0.2 %).
       Math.abs(_kcalEntered - __awKcal) / __awKcal <= 0.03;
     const __manualDay = __manualDayRaw && __kcalOk;
+    // §8.135: канон дня, под который он СОБИРАЛСЯ (ручной согласованный — 2 %, иначе 3 %).
+    // Все внутренние гейты ниже читают его, а не голый вход: `plannerCanonPct(input)` дал бы
+    // 2 % противоречивому ручному входу, который честно ведётся по 3 % (§8.130b), и день
+    // судился бы каноном, под который не собирался.
+    const __canonDayPct = __manualDay ? 2 : PLANNER_CONVERGENCE_PCT;
     if (__manualDay) {
       const _finN = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _finTg = { kcal: _finN.kcal, p: _finN.p, f: _finN.f, c: _finN.c };
@@ -23319,7 +23354,10 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
           `⚖️ Ккал = 4Б + 9Ж + 4У: ваши Б ${Math.round(input.goalProteinG || 0)} / Ж ${Math.round(input.goalFatG || 0)} / У ${Math.round(input.goalCarbsG || 0)} г дают ${_consIn.atwaterKcal} ккал, а ккал-цель была ${Math.round(_kcalEntered)} (расхождение ${_consIn.devPct}%). План собран под ваши макросы (ккал ${_consIn.atwaterKcal}); ${_advice}.`,
         );
       }
-      if (_dayDevPctP4 > PLANNER_CONVERGENCE_PCT) {
+      // §8.135: нота вердикта называет ТОТ ЖЕ канон, по которому выставлен флаг дня
+      // (`withinTolerance`/`canonPct`): ручной день — 2 %, авто — PLANNER_CONVERGENCE_PCT.
+      const _canonEff = __canonDayPct;
+      if (_dayDevPctP4 > _canonEff) {
         if (!_consIn.consistent) {
           // Ккал-ось вердикта считается от ВВЕДЁННЫХ ккал, а день собран под 4Б+9Ж+4У:
           // для противоречивого входа «не сошлось» — это свойство входа, а не провал
@@ -23333,22 +23371,22 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
               (input.goalCarbsG || 0) > 0 ? Math.abs(totals.c - (input.goalCarbsG || 0)) / (input.goalCarbsG || 1) : 0,
             ) * 100;
           notes.push(
-            `⚠ «Не сошлось»: ккал-ось ${Math.round(totals.kcal)} против введённых ${Math.round(_kcalEntered)} (${_dayDevPctP4}%) — это следствие противоречия ккал↔макросы выше; по вашим макросам день в ${Math.round(_macroDev * 10) / 10}% (канон ${PLANNER_CONVERGENCE_PCT}%, эталон ${_consIn.atwaterKcal} ккал)`,
+            `⚠ «Не сошлось»: ккал-ось ${Math.round(totals.kcal)} против введённых ${Math.round(_kcalEntered)} (${_dayDevPctP4}%) — это следствие противоречия ккал↔макросы выше; по вашим макросам день в ${Math.round(_macroDev * 10) / 10}% (канон ${_canonEff}%, эталон ${_consIn.atwaterKcal} ккал)`,
           );
         } else {
           notes.push(
-            `⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${PLANNER_CONVERGENCE_PCT}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`,
+            `⚠ «Не сошлось»: отклонение дня от целей ${_dayDevPctP4}% (канон ${_canonEff}%) — пулы/капы/полы реализма не дали закрыть цель, итог честный best-effort`,
           );
         }
       }
       // B38: вердикт корректора печатается ЗДЕСЬ и по ФИНАЛЬНЫМ тоталам. Если финал
       // сошёлся — сообщаем «сведено» (с исходным отклонением), если нет — молчим:
       // честное «⚠ Не сошлось» выше уже назвало финальную цифру, второй число не нужно.
-      if (_corrVerdict && _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT) {
+      if (_corrVerdict && _dayDevPctP4 <= _canonEff) {
         const _beforePct = Math.round(_corrVerdict.before * 100);
-        if (_beforePct > PLANNER_CONVERGENCE_PCT) {
+        if (_beforePct > _canonEff) {
           notes.push(
-            `✓ Корректор дневных целей: сведено к ≤${PLANNER_CONVERGENCE_PCT}% (было ${_beforePct}% → финал ${_dayDevPctP4}%)`,
+            `✓ Корректор дневных целей: сведено к ≤${_canonEff}% (было ${_beforePct}% → финал ${_dayDevPctP4}%)`,
           );
         }
       }
@@ -24962,10 +25000,8 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         // срезом крахмала даёт 6.40 % — без допуска отвергались ВСЕ восемь кандидатов и
         // день оставался 156 г/1 вид). Допуск не заменяет внешний гейт: `preferVegPlan122`
         // судит по `deviationPct`, баллу, обрезкам, вёдрам и тарелкам уже на готовых днях.
-        const _canon88 =
-          String((input as any).kbjuMode || '') === 'manual' || !!(input as any).manualTargetsLocked
-            ? 2
-            : PLANNER_CONVERGENCE_PCT;
+        // §8.135: канон — фактический канон дня (`__canonDayPct`), а не голый вход.
+        const _canon88 = __canonDayPct;
         const _ok88 = () => {
           const _d = _dev88();
           const _b = _buckNow88();
@@ -26532,10 +26568,7 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       const _tgt115 = (m: any) =>
         m?.target ? 4 * (Number(m.target.p) || 0) + 9 * (Number(m.target.f) || 0) + 4 * (Number(m.target.c) || 0) : 0;
       const _rel115 = (v: number, t: number) => (t > 0 ? (Math.abs(v - t) / t) * 100 : 0);
-      const _tok115 =
-        String((input as any).kbjuMode || '') === 'manual' || (input as any).manualTargetsLocked
-          ? 2
-          : PLANNER_CONVERGENCE_PCT;
+      const _tok115 = __canonDayPct;
       const _dayTgt115 = { kcal: 0, p: 0, f: 0, c: 0 };
       for (const _mt of meals) {
         const _t: any = (_mt as any).target || {};
@@ -27371,10 +27404,7 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
           // падал на ось «протеин-спред» 77 → 36 (овощной день проигрывал честному).
           // Допуск — 0.35 п.п.: 0.1 г на самой узкой оси (жир 45 г) = 0.22 п.п.; канон дня
           // остаётся жёстким потолком (день вне канона не ухудшается вовсе).
-          const _canonPct128 =
-            String((input as any).kbjuMode || '') === 'manual' || !!(input as any).manualTargetsLocked
-              ? 2
-              : PLANNER_CONVERGENCE_PCT;
+          const _canonPct128 = __canonDayPct;
           const _roundNoise128 = Math.min(0.0035, Math.max(0, _canonPct128 / 100 - devB));
           const good =
             applied > 0 &&
@@ -27448,10 +27478,7 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
           _rel108(t.c, _g108.c),
         );
       };
-      const _tol108 =
-        String((input as any).kbjuMode || '') === 'manual' || (input as any).manualTargetsLocked
-          ? 2
-          : PLANNER_CONVERGENCE_PCT;
+      const _tol108 = __canonDayPct;
       const _smallBefore108 = starchDoubleStats(meals).small;
       const _badBefore108 = _smallBefore108 + _mainsDouble108();
       const _devBefore108 = _dev108();
@@ -28553,7 +28580,8 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
       diversity: { uniqueFoods: _finalFoodIds.size, categories: _finalCategories },
       microSummary: { coverage: _finalMicro.coverage, topDeficitNutrient: _finalMicro.topDeficitNutrient },
       notes,
-      withinTolerance: _dayDevPctP4 <= PLANNER_CONVERGENCE_PCT,
+      withinTolerance: _dayDevPctP4 <= (__manualDay ? 2 : PLANNER_CONVERGENCE_PCT),
+      canonPct: __manualDay ? 2 : PLANNER_CONVERGENCE_PCT,
       deviationPct: _dayDevPctP4,
       qualityScore: planQuality,
       passJournal: _passJournal,
