@@ -4,6 +4,29 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+
+/**
+ * `native-bridge` в jsdom: `window.Capacitor` подделан, но нативного плагина
+ * `Biometry` в jsdom нет — вызов моста рождает `unhandled rejection`, и прогон
+ * `test:ui` завершался кодом 1 при всех зелёных тестах. Мокаем мост так же, как
+ * в `profile-settings-apk.test.tsx`: тест проверяет разметку §4.4, а не APK-мост.
+ */
+vi.mock('../../core/native-bridge', () => ({
+  haptics: vi.fn(),
+  isBiometricAvailable: vi.fn(async () => true),
+  authenticateWithBiometrics: vi.fn(async () => true),
+  disableBiometrics: vi.fn(),
+  setupNativeBackButton: vi.fn(async () => () => {}),
+  initNativeChrome: vi.fn(async () => {}),
+  notifyLocal: vi.fn(async () => true),
+  pickPhoto: vi.fn(async () => null),
+  shareText: vi.fn(async () => true),
+  getDeviceInfo: vi.fn(async () => ({ appVersion: '3.0.4' })),
+  scheduleDailyReminders: vi.fn(async () => 0),
+  scheduleWeeklyReminders: vi.fn(async () => 0),
+  cancelScheduledReminders: vi.fn(async () => {}),
+}));
+
 import { ProfileSettingsTab } from '../screens/ProfileScreen_v2/ProfileSettingsTab';
 
 function setCapacitorNative() {
