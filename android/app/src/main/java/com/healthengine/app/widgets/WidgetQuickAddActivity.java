@@ -103,6 +103,11 @@ public class WidgetQuickAddActivity extends Activity {
     /** Оценка техники 3/4/5 (0 — не указана) и пауза на груди. */
     private int technique = 0;
     private boolean pause = false;
+    /**
+     * RIR в поле — подсказка из плана. Фактом считаем только правку пользователя:
+     * иначе «+» на свежем дне записывал предписание как измеренную нагрузку.
+     */
+    private boolean rirTouched = false;
 
     private EditText titleEt;
     private EditText timeEt;
@@ -303,9 +308,28 @@ public class WidgetQuickAddActivity extends Activity {
                 repsEt.setText(safeExtra(intent, EXTRA_REPS));
                 String rirText = safeExtra(intent, EXTRA_RIR);
                 rirEt.setText(rirText);
-                // RPE по умолчанию = 10 − RIR: в проведении тренировки он выводится так же.
-                int rir0 = (int) Math.max(0, Math.min(20, parseDecimal(rirEt)));
-                if (!rirText.isEmpty()) rpeEt.setText(String.valueOf(Math.max(0, 10 - rir0)));
+                // RPE из планового RIR НЕ подставляем: при RIR 0 это давало RPE 10,
+                // и «+» записывал предписание как измеренную нагрузку. Поле остаётся
+                // пустым, пока пользователь сам не введёт RPE или RIR.
+                rirTouched = false;
+                rirEt.addTextChangedListener(new TextWatcher() {
+                    @Override
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                        // не нужен
+                    }
+
+                    @Override
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {
+                        // Вызывается и на программный setText, но подписка добавлена ПОСЛЕ
+                        // него — сюда попадают только правки пользователя.
+                        rirTouched = true;
+                    }
+
+                    @Override
+                    public void afterTextChanged(Editable s) {
+                        // не нужен
+                    }
+                });
             }
             String head = "Подход";
             if (setNumber > 0) head = head + " #" + setNumber;
@@ -843,9 +867,15 @@ public class WidgetQuickAddActivity extends Activity {
             showError("Укажите число повторений");
             return false;
         }
+        String rirTxt = rirEt.getText() == null ? "" : rirEt.getText().toString().trim();
         int rir = parseQty(rirEt, 20);
         double rpeRaw = parseDecimal(rpeEt);
-        double rpe = rpeRaw > 0 ? Math.min(10, rpeRaw) : Math.max(0, 10 - rir);
+        // RIR из плана (подсказка) — не измерение: производный RPE считаем только из
+        // явно введённого/исправленного RIR. Пустое поле раньше давало RPE 10.
+        boolean rirEntered = rirTouched && !rirTxt.isEmpty();
+        double rpe = rpeRaw > 0
+                ? Math.min(10, rpeRaw)
+                : (rirEntered ? Math.max(0, 10 - rir) : 0);
 
         JSONObject item = new JSONObject();
         item.put("type", "set_add");
@@ -853,7 +883,7 @@ public class WidgetQuickAddActivity extends Activity {
         item.put("weight", weight);
         item.put("reps", reps);
         item.put("rpe", rpe);
-        item.put("rir", rir);
+        item.put("rir", rirEntered ? rir : 0);
         if (technique > 0) item.put("technique", technique);
         if (pause) item.put("pause", true);
         String note = setNoteEt.getText() == null ? "" : setNoteEt.getText().toString().trim();

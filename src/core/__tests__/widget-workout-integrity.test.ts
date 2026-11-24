@@ -8,7 +8,7 @@
  *  - подход без RPE/RIR не получает выдуманный RPE 10.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { applyWidgetQueue, setWorkoutPlayerActive } from '../../ui/native/widget-sync';
+import { applyWidgetQueue, resolveWorkoutPlan, setWorkoutPlayerActive } from '../../ui/native/widget-sync';
 import { finishSession, loadActiveSession, loadSessions, saveActiveSession } from '../../engines/workout-logger.engine';
 
 const PLAN = {
@@ -179,6 +179,55 @@ describe('виджет: подходы и завершение', () => {
     expect(loadActiveSession()).toBeNull();
 
     window.removeEventListener('he-workout-finish-request', onFinishRequest);
+  });
+
+  it('при открытом плеере старт отдаётся плееру и виджет не пишет сессию', () => {
+    setWorkoutPlayerActive(true);
+    let starts = 0;
+    const onStart = (ev: Event) => {
+      starts += 1;
+      ((ev as CustomEvent).detail as { handled: boolean }).handled = true;
+    };
+    window.addEventListener('he-workout-widget-start', onStart);
+
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    expect(starts).toBe(1);
+    expect(res.workoutsStarted).toBe(1);
+    expect(loadActiveSession()).toBeNull();
+
+    window.removeEventListener('he-workout-widget-start', onStart);
+  });
+
+  it('если плеер старт не обработал, виджет сам дополняет живую сессию планом', () => {
+    // Подход с виджета записан раньше; упражнения дня плана в сессии ещё нет.
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Тяга в наклоне', weight: 60, reps: 10, rir: 2, ts: Date.now() },
+    ]);
+    const before = loadActiveSession();
+    expect(before).not.toBeNull();
+    setWorkoutPlayerActive(true);
+    const onStart = () => {
+      /* handled остаётся false: плеер не в фазе ready */
+    };
+    window.addEventListener('he-workout-widget-start', onStart);
+    const plan = resolveWorkoutPlan();
+    expect(plan?.exercises.length).toBeGreaterThan(0);
+
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    const active = loadActiveSession();
+    // Живая сессия не перезапущена, записанный подход не потерян.
+    expect(active?.sessionId).toBe(before?.sessionId);
+    expect(active?.exercises.find((e) => e.exerciseName === 'Тяга в наклоне')?.sets).toHaveLength(1);
+    // Фолбэк дотянул упражнения дня плана в живую сессию — до фикса ветка молчала.
+    for (const ex of plan?.exercises ?? []) {
+      expect(active?.exercises.some((e) => e.exerciseName === ex.name)).toBe(true);
+    }
+    // Сессия уже шла — старт не считается вторым.
+    expect(res.workoutsStarted).toBe(0);
+
+    window.removeEventListener('he-workout-widget-start', onStart);
   });
 
   it('подход без RPE и RIR не получает выдуманный RPE 10', () => {

@@ -14,8 +14,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import {
-  saveActiveSession, loadActiveSession, clearActiveSession,
-  summarizeActiveSession, isActiveSessionWorthSaving,
+  saveActiveSession,
+  loadActiveSession,
+  clearActiveSession,
+  summarizeActiveSession,
+  isActiveSessionWorthSaving,
   type WorkoutSession,
 } from '../../../../engines/workout-logger.engine';
 import { WorkoutMiniPult, WorkoutDayCard, WorkoutBigMode, requestQuickSet } from '../WorkoutSessionWidgets';
@@ -31,19 +34,42 @@ function mkSession(sets: number, weight = 80): WorkoutSession {
     endTime: '',
     durationMin: 0,
     focus: 'День 1 · Грудь',
-    exercises: [{
-      exerciseId: 'bench', exerciseName: 'Жим лёжа', pattern: 'horizontal_push', muscleGroup: 'chest',
-      order: 1,
-      sets: Array.from({ length: sets }, (_, i) => ({ setNumber: i + 1, weightKg: weight, reps: 8, rpe: 8, rir: 2, isPR: false, notes: '' })),
-      totalVolume: sets * weight * 8, best1RM: 100, avgRPE: 8,
-    }],
-    totalVolume: sets * weight * 8, totalSets: sets, totalReps: sets * 8,
-    avgIntensity: 8, prCount: 0, notes: '', weekNumber: 3, mesocycleWeek: 3,
+    exercises: [
+      {
+        exerciseId: 'bench',
+        exerciseName: 'Жим лёжа',
+        pattern: 'horizontal_push',
+        muscleGroup: 'chest',
+        order: 1,
+        sets: Array.from({ length: sets }, (_, i) => ({
+          setNumber: i + 1,
+          weightKg: weight,
+          reps: 8,
+          rpe: 8,
+          rir: 2,
+          isPR: false,
+          notes: '',
+        })),
+        totalVolume: sets * weight * 8,
+        best1RM: 100,
+        avgRPE: 8,
+      },
+    ],
+    totalVolume: sets * weight * 8,
+    totalSets: sets,
+    totalReps: sets * 8,
+    avgIntensity: 8,
+    prCount: 0,
+    notes: '',
+    weekNumber: 3,
+    mesocycleWeek: 3,
   };
 }
 
 describe('движок: живая сессия', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
   it('пустая сессия не сохраняется как «живая»', () => {
     const s = mkSession(0);
@@ -129,7 +155,8 @@ describe('проведение: один источник (SessionPlayer), бе�
   });
 
   it('плеер: автосейв живой сессии (с планом дня) + продолжение + быстрый сет', () => {
-    expect(player).toContain('saveActiveSession(session, plannedSets)');
+    // План дня — с plannedTotalMax: смена дня посреди сессии не сжимает знаменатель.
+    expect(player).toContain('saveActiveSession(session, plannedSets, { plannedTotalMax: true })');
     expect(player).toContain('loadActiveSession()');
     expect(player).toContain('data-session="resume"');
     expect(player).toContain('he-workout-quick-set');
@@ -138,7 +165,7 @@ describe('проведение: один источник (SessionPlayer), бе�
   it('плеер: тач-нормы контролов набора подхода (44px)', () => {
     expect(player).toContain('minHeight: 44');
     // старый 36px на кнопке «OK» убран
-    expect(player).not.toContain('minHeight: 36, padding: \'8px 14px\'');
+    expect(player).not.toContain("minHeight: 36, padding: '8px 14px'");
   });
 });
 
@@ -171,16 +198,22 @@ describe('таймеры', () => {
 });
 
 describe('док/пульт: живая сессия', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
-  const DEMO = { dayLabel: 'День 1 · Грудь', exercises: [{ name: 'Жим', done: 2, total: 4, weight: 80 }, { name: 'Разводка', done: 0, total: 3 }] };
+  const DEMO = {
+    dayLabel: 'День 1 · Грудь',
+    exercises: [
+      { name: 'Жим', done: 2, total: 4, weight: 80 },
+      { name: 'Разводка', done: 0, total: 3 },
+    ],
+  };
 
   it('пульт с живой сессией: прогресс + «Идёт» + «+ Сет»', () => {
     saveActiveSession(mkSession(4, 100));
     const s = summarizeActiveSession(loadActiveSession(), 10)!;
-    const html = renderToStaticMarkup(
-      <WorkoutMiniPult state={{ ...DEMO, live: s }} />
-    );
+    const html = renderToStaticMarkup(<WorkoutMiniPult state={{ ...DEMO, live: s }} />);
     expect(html).toContain('data-widget="workout-pult"');
     expect(html).toContain('Идёт');
     expect(html).toContain('4/10');
@@ -203,7 +236,9 @@ describe('док/пульт: живая сессия', () => {
 
   it('requestQuickSet шлёт событие he-workout-quick-set', () => {
     let got: string | null = null;
-    const h = (e: Event) => { got = e.type; };
+    const h = (e: Event) => {
+      got = e.type;
+    };
     window.addEventListener('he-workout-quick-set', h);
     requestQuickSet();
     window.removeEventListener('he-workout-quick-set', h);
@@ -220,7 +255,10 @@ describe('homescreen-виджет «Тренировка» (Android + мост)'
   });
 
   it('провайдер читает прогресс/live/действие и вешает deep-link', () => {
-    const j = readFileSync('android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java', 'utf8');
+    const j = readFileSync(
+      'android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java',
+      'utf8',
+    );
     expect(j).toContain('optInt("progress"');
     expect(j).toContain('optBoolean("live"');
     expect(j).toContain('R.id.w_training_progress');
@@ -257,34 +295,49 @@ describe('homescreen-виджет «Тренировка» (Android + мост)'
 
 describe('Stage 2: Android widget builder (снапшот → RemoteViews)', () => {
   it('без данных виджет показывает стартовое состояние, а не пустоту', () => {
-    const j = readFileSync('android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java', 'utf8');
+    const j = readFileSync(
+      'android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java',
+      'utf8',
+    );
     expect(j).toContain('if (title.isEmpty())');
     expect(j).toContain('Откройте план недели');
     expect(j).toContain('setProgressBar(R.id.w_training_progress, 100, 0, false)');
   });
 
   it('живая сессия: подпись действия «+ Сет» и зелёная кромка', () => {
-    const j = readFileSync('android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java', 'utf8');
+    const j = readFileSync(
+      'android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java',
+      'utf8',
+    );
     expect(j).toContain('live ? "+ Сет" : "▶ Начать"');
   });
 });
 
 describe('доцикл: живое обновление + быстрый сет с рабочего стола', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
 
   it('хук useWorkoutLive перечитывает состояние по событию плеера', async () => {
     const { act } = await import('@testing-library/react');
     const { useWorkoutLive } = await import('../WorkoutSessionWidgets');
     let seen: { live?: { setsDone: number } } | null = null;
-    const Probe: React.FC = () => { seen = useWorkoutLive() as never; return null; };
+    const Probe: React.FC = () => {
+      seen = useWorkoutLive() as never;
+      return null;
+    };
     const { renderToStaticMarkup: _r } = await import('react-dom/server');
     void _r;
     const { render } = await import('@testing-library/react');
     render(<Probe />);
     saveActiveSession(mkSession(3, 90), 10);
-    act(() => { window.dispatchEvent(new Event('he-workout-live-update')); });
+    act(() => {
+      window.dispatchEvent(new Event('he-workout-live-update'));
+    });
     expect((seen as any)?.live?.setsDone).toBe(3);
-    act(() => { window.dispatchEvent(new Event('he-workout-live-update')); });
+    act(() => {
+      window.dispatchEvent(new Event('he-workout-live-update'));
+    });
   });
 
   it('плеер шлёт he-workout-live-update после автосейва', () => {
@@ -294,7 +347,10 @@ describe('доцикл: живое обновление + быстрый сет 
 
   it('deep-link training_quick: open + записать подход', () => {
     const java = readFileSync('android/app/src/main/java/com/healthengine/app/widgets/WidgetStore.java', 'utf8');
-    const prov = readFileSync('android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java', 'utf8');
+    const prov = readFileSync(
+      'android/app/src/main/java/com/healthengine/app/widgets/TrainingWidgetProvider.java',
+      'utf8',
+    );
     const dash = readFileSync('src/ui/screens/DashboardScreen.native.tsx', 'utf8');
     const sync = readFileSync('src/ui/native/widget-sync.ts', 'utf8');
     expect(java).toContain('TARGET_TRAINING_QUICK');
@@ -346,7 +402,11 @@ describe('ExecutionZone: главная кнопка старта', () => {
   const micro = {
     mesocycleType: 'accumulation',
     days: [
-      { day: 'День 1 · Грудь', isTraining: true, exercises: [{ name: 'Жим штанги лёжа', sets: 3, reps: 8, weight: 80, restSec: 90 }] },
+      {
+        day: 'День 1 · Грудь',
+        isTraining: true,
+        exercises: [{ name: 'Жим штанги лёжа', sets: 3, reps: 8, weight: 80, restSec: 90 }],
+      },
       { day: 'Отдых', isTraining: false, exercises: [] },
     ],
   } as any;
@@ -363,15 +423,37 @@ describe('ExecutionZone: главная кнопка старта', () => {
     const [rp, setRp] = React.useState(0);
     const [ri, setRi] = React.useState(0);
     return (
-      <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
-        macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
-        runtimeDay={d} setRuntimeDay={setD} runtimeExIdx={e} setRuntimeExIdx={setE}
-        runtimeLogs={l} setRuntimeLogs={setL}
-        runtimeStarted={started} setRuntimeStarted={setStarted}
-        plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
-        runtimeSetW={w} setRuntimeSetW={setW} runtimeSetR={r} setRuntimeSetR={setR}
-        runtimeSetRP={rp} setRuntimeSetRP={setRp} runtimeSetRI={ri} setRuntimeSetRI={setRi}
-        diary={{} as any} onRefresh={noop} />
+      <ExecutionZone
+        tab="runtime"
+        goal=""
+        level=""
+        recovery={3}
+        trainingOutput={null}
+        macrocycle={{ name: 'Микроцикл' } as any}
+        currentMicrocycle={micro}
+        selectedWeek={1}
+        runtimeDay={d}
+        setRuntimeDay={setD}
+        runtimeExIdx={e}
+        setRuntimeExIdx={setE}
+        runtimeLogs={l}
+        setRuntimeLogs={setL}
+        runtimeStarted={started}
+        setRuntimeStarted={setStarted}
+        plRuntime={null}
+        plRunOpen={o}
+        setPlRunOpen={setO}
+        runtimeSetW={w}
+        setRuntimeSetW={setW}
+        runtimeSetR={r}
+        setRuntimeSetR={setR}
+        runtimeSetRP={rp}
+        setRuntimeSetRP={setRp}
+        runtimeSetRI={ri}
+        setRuntimeSetRI={setRi}
+        diary={{} as any}
+        onRefresh={noop}
+      />
     );
   };
 
@@ -393,20 +475,44 @@ describe('ExecutionZone: главная кнопка старта', () => {
       const [started, setStarted] = React.useState(false);
       const [d, setD] = React.useState(0);
       const [e, setE] = React.useState(0);
-      const [l, setL] = React.useState<Record<string, any>>({ bench: { sets: [{ weight: 80, reps: 8, rpe: 8, rir: 2 }], completed: false } });
+      const [l, setL] = React.useState<Record<string, any>>({
+        bench: { sets: [{ weight: 80, reps: 8, rpe: 8, rir: 2 }], completed: false },
+      });
       const [o, setO] = React.useState(false);
       return (
         <>
           <span data-probe="logs">{Object.keys(l).length}</span>
-          <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
-            macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
-            runtimeDay={d} setRuntimeDay={setD} runtimeExIdx={e} setRuntimeExIdx={setE}
-            runtimeLogs={l} setRuntimeLogs={setL}
-            runtimeStarted={started} setRuntimeStarted={setStarted}
-            plRuntime={null} plRunOpen={o} setPlRunOpen={setO}
-            runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
-            runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
-            diary={{} as any} onRefresh={noop} />
+          <ExecutionZone
+            tab="runtime"
+            goal=""
+            level=""
+            recovery={3}
+            trainingOutput={null}
+            macrocycle={{ name: 'Микроцикл' } as any}
+            currentMicrocycle={micro}
+            selectedWeek={1}
+            runtimeDay={d}
+            setRuntimeDay={setD}
+            runtimeExIdx={e}
+            setRuntimeExIdx={setE}
+            runtimeLogs={l}
+            setRuntimeLogs={setL}
+            runtimeStarted={started}
+            setRuntimeStarted={setStarted}
+            plRuntime={null}
+            plRunOpen={o}
+            setPlRunOpen={setO}
+            runtimeSetW={0}
+            setRuntimeSetW={noop as any}
+            runtimeSetR={0}
+            setRuntimeSetR={noop as any}
+            runtimeSetRP={0}
+            setRuntimeSetRP={noop as any}
+            runtimeSetRI={0}
+            setRuntimeSetRI={noop as any}
+            diary={{} as any}
+            onRefresh={noop}
+          />
         </>
       );
     };
@@ -446,21 +552,50 @@ describe('ExecutionZone: главная кнопка старта', () => {
 
   it('с построенным планом (ПЛ/ББ) старт — большая кнопка вместо «Возобновить»', () => {
     const plRuntime = {
-      track: 'pl', focus: 'Жим', week: 1,
-      days: [{ label: 'День 1 · Грудь', exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }] }],
+      track: 'pl',
+      focus: 'Жим',
+      week: 1,
+      days: [
+        {
+          label: 'День 1 · Грудь',
+          exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }],
+        },
+      ],
     } as any;
     const PlanProbe: React.FC = () => {
       const [open, setOpen] = React.useState(false);
       return (
-        <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
-          macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
-          runtimeDay={0} setRuntimeDay={noop as any} runtimeExIdx={0} setRuntimeExIdx={noop as any}
-          runtimeLogs={{}} setRuntimeLogs={noop as any}
-          runtimeStarted={false} setRuntimeStarted={noop as any}
-          plRuntime={plRuntime} plRunOpen={open} setPlRunOpen={setOpen}
-          runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
-          runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
-          diary={{} as any} onRefresh={noop} />
+        <ExecutionZone
+          tab="runtime"
+          goal=""
+          level=""
+          recovery={3}
+          trainingOutput={null}
+          macrocycle={{ name: 'Микроцикл' } as any}
+          currentMicrocycle={micro}
+          selectedWeek={1}
+          runtimeDay={0}
+          setRuntimeDay={noop as any}
+          runtimeExIdx={0}
+          setRuntimeExIdx={noop as any}
+          runtimeLogs={{}}
+          setRuntimeLogs={noop as any}
+          runtimeStarted={false}
+          setRuntimeStarted={noop as any}
+          plRuntime={plRuntime}
+          plRunOpen={open}
+          setPlRunOpen={setOpen}
+          runtimeSetW={0}
+          setRuntimeSetW={noop as any}
+          runtimeSetR={0}
+          setRuntimeSetR={noop as any}
+          runtimeSetRP={0}
+          setRuntimeSetRP={noop as any}
+          runtimeSetRI={0}
+          setRuntimeSetRI={noop as any}
+          diary={{} as any}
+          onRefresh={noop}
+        />
       );
     };
     const html = renderToStaticMarkup(<PlanProbe />);
@@ -474,30 +609,63 @@ describe('ExecutionZone: главная кнопка старта', () => {
   it('старт из дневника/виджета при плане ПЛ/ББ открывает именно его проведение', async () => {
     const { render, cleanup, act } = await import('@testing-library/react');
     const plRuntime = {
-      track: 'pl', focus: 'Жим', week: 1,
-      days: [{ label: 'День 1 · Грудь', exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }] }],
+      track: 'pl',
+      focus: 'Жим',
+      week: 1,
+      days: [
+        {
+          label: 'День 1 · Грудь',
+          exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8 }] }],
+        },
+      ],
     } as any;
     const PlanProbe: React.FC = () => {
       const [open, setOpen] = React.useState(false);
       return (
-        <ExecutionZone tab="runtime" goal="" level="" recovery={3} trainingOutput={null}
-          macrocycle={{ name: 'Микроцикл' } as any} currentMicrocycle={micro} selectedWeek={1}
-          runtimeDay={0} setRuntimeDay={noop as any} runtimeExIdx={0} setRuntimeExIdx={noop as any}
-          runtimeLogs={{}} setRuntimeLogs={noop as any}
-          runtimeStarted={false} setRuntimeStarted={noop as any}
-          plRuntime={plRuntime} plRunOpen={open} setPlRunOpen={setOpen}
-          runtimeSetW={0} setRuntimeSetW={noop as any} runtimeSetR={0} setRuntimeSetR={noop as any}
-          runtimeSetRP={0} setRuntimeSetRP={noop as any} runtimeSetRI={0} setRuntimeSetRI={noop as any}
-          diary={{} as any} onRefresh={noop} />
+        <ExecutionZone
+          tab="runtime"
+          goal=""
+          level=""
+          recovery={3}
+          trainingOutput={null}
+          macrocycle={{ name: 'Микроцикл' } as any}
+          currentMicrocycle={micro}
+          selectedWeek={1}
+          runtimeDay={0}
+          setRuntimeDay={noop as any}
+          runtimeExIdx={0}
+          setRuntimeExIdx={noop as any}
+          runtimeLogs={{}}
+          setRuntimeLogs={noop as any}
+          runtimeStarted={false}
+          setRuntimeStarted={noop as any}
+          plRuntime={plRuntime}
+          plRunOpen={open}
+          setPlRunOpen={setOpen}
+          runtimeSetW={0}
+          setRuntimeSetW={noop as any}
+          runtimeSetR={0}
+          setRuntimeSetR={noop as any}
+          runtimeSetRP={0}
+          setRuntimeSetRP={noop as any}
+          runtimeSetRI={0}
+          setRuntimeSetRI={noop as any}
+          diary={{} as any}
+          onRefresh={noop}
+        />
       );
     };
     const { container, unmount } = render(<PlanProbe />);
     // Выбор дня при плане ПЛ/ББ не рендерится вовсе — раньше старт «в никуда».
     expect(container.querySelector('[data-session="chooser"]')).toBeNull();
-    act(() => { window.dispatchEvent(new Event('he-workout-open')); });
+    act(() => {
+      window.dispatchEvent(new Event('he-workout-open'));
+    });
     expect(container.textContent).toContain('Проведение тренировки · ПЛ');
     // «Готово» в итоге сворачивает именно карточку плана.
-    act(() => { window.dispatchEvent(new Event('he-workout-close')); });
+    act(() => {
+      window.dispatchEvent(new Event('he-workout-close'));
+    });
     expect(container.textContent).not.toContain('Проведение тренировки · ПЛ');
     unmount();
     cleanup();
@@ -506,21 +674,26 @@ describe('ExecutionZone: главная кнопка старта', () => {
 
 describe('SessionPlayer: кнопки доводят от разминки до итога', () => {
   const findBtn = (root: ParentNode, text: string) =>
-    Array.from(root.querySelectorAll('button')).find(b => (b.textContent || '').includes(text)) as HTMLElement | undefined;
+    Array.from(root.querySelectorAll('button')).find((b) => (b.textContent || '').includes(text)) as
+      HTMLElement | undefined;
 
   it('Начать → К основной части → OK (подход записан) → Итог', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь',
-      exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 }],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь',
+        exercises: [
+          { name: 'Жим штанги лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 },
+        ],
+      },
+    ];
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
     const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
 
     // До старта «Итог» гасим: иначе пустой экран «Тренировка завершена».
-    expect(tabs().find(t => (t.textContent || '').includes('Итог'))!.disabled).toBe(true);
+    expect(tabs().find((t) => (t.textContent || '').includes('Итог'))!.disabled).toBe(true);
 
     const start = findBtn(container, 'Начать тренировку');
     expect(start).toBeTruthy();
@@ -545,7 +718,7 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     expect(toMain).toBeTruthy();
     fireEvent.click(toMain!);
     // В основной части «Готов» уже никуда не ведёт (сессия не сбрасывается) — гасим.
-    expect(tabs().find(t => (t.textContent || '').includes('Готов'))!.disabled).toBe(true);
+    expect(tabs().find((t) => (t.textContent || '').includes('Готов'))!.disabled).toBe(true);
 
     // Время сессии и пауза — одна кнопка в строке прогресса (отдельного ряда больше нет).
     const timerBtn = container.querySelector('[data-act="session-timer"]') as HTMLElement;
@@ -558,13 +731,17 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     expect(volToggle.getAttribute('aria-expanded')).toBe('false');
     expect(container.textContent).not.toContain('прогноз по плану сессии');
     fireEvent.click(volToggle);
-    expect((container.querySelector('[data-act="volume-toggle"]') as HTMLElement).getAttribute('aria-expanded')).toBe('true');
+    expect((container.querySelector('[data-act="volume-toggle"]') as HTMLElement).getAttribute('aria-expanded')).toBe(
+      'true',
+    );
     expect(container.textContent).toContain('прогноз по плану сессии');
     fireEvent.click(container.querySelector('[data-act="volume-toggle"]') as HTMLElement);
     expect(container.textContent).not.toContain('прогноз по плану сессии');
 
     // sRPE ушёл под подходы: до первого подхода он только отодвигал работу.
-    const srpeLabel = Array.from(container.querySelectorAll('span')).find(s => (s.textContent || '').trim() === 'sRPE')!;
+    const srpeLabel = Array.from(container.querySelectorAll('span')).find(
+      (s) => (s.textContent || '').trim() === 'sRPE',
+    )!;
     expect(srpeLabel).toBeTruthy();
     const okBtnEl = findBtn(container, 'OK')!;
     expect(okBtnEl.compareDocumentPosition(srpeLabel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -596,15 +773,16 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const coolItems = Array.from(container.querySelectorAll('[data-cool-item]')) as HTMLElement[];
     expect(coolItems.length).toBeGreaterThan(0);
     const coolBefore = coolItems.length;
-    const firstCool = coolItems.filter(el => (el.getAttribute('data-cool-item') || '').startsWith('0_'));
-    (firstCool.length ? firstCool : coolItems).forEach(el => fireEvent.click(el));
+    const firstCool = coolItems.filter((el) => (el.getAttribute('data-cool-item') || '').startsWith('0_'));
+    (firstCool.length ? firstCool : coolItems).forEach((el) => fireEvent.click(el));
     const coolToggle = container.querySelector('[data-act="cool-toggle"]') as HTMLElement;
     expect(coolToggle).toBeTruthy();
     expect(container.querySelectorAll('[data-cool-item]').length).toBeLessThan(coolBefore);
     fireEvent.click(coolToggle);
     expect(container.querySelectorAll('[data-cool-item]').length).toBe(coolBefore);
-    const doneTab = Array.from(container.querySelectorAll('[role="tab"]'))
-      .find(t => (t.textContent || '').includes('Итог')) as HTMLElement | undefined;
+    const doneTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+      (t.textContent || '').includes('Итог'),
+    ) as HTMLElement | undefined;
     expect(doneTab).toBeTruthy();
     fireEvent.click(doneTab!);
     expect(container.textContent).toContain('Тренировка завершена');
@@ -637,17 +815,23 @@ describe('SessionPlayer: кнопки доводят от разминки до 
   it('основная часть: полный редактор только у текущего подхода, остальные — строкой очереди', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь',
-      exercises: [{
-        name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90,
-        targetSets: [
-          { weight: 80, reps: 8, rir: 2 },
-          { weight: 82.5, reps: 8, rir: 2 },
-          { weight: 85, reps: 6, rir: 1 },
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь',
+        exercises: [
+          {
+            name: 'Жим штанги лёжа',
+            muscleGroup: 'chest',
+            restSec: 90,
+            targetSets: [
+              { weight: 80, reps: 8, rir: 2 },
+              { weight: 82.5, reps: 8, rir: 2 },
+              { weight: 85, reps: 6, rir: 1 },
+            ],
+          },
         ],
-      }],
-    }];
+      },
+    ];
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
     fireEvent.click(findBtn(container, 'Начать тренировку')!);
     fireEvent.click(findBtn(container, 'К основной части')!);
@@ -668,13 +852,31 @@ describe('SessionPlayer: кнопки доводят от разминки до 
   it('основная часть: полный редактор только у текущего упражнения, остальные — шапкой', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь/спина',
-      exercises: [
-        { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }, { weight: 80, reps: 8, rir: 2 }] },
-        { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }, { weight: 60, reps: 10, rir: 2 }] },
-      ],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь/спина',
+        exercises: [
+          {
+            name: 'Жим штанги лёжа',
+            muscleGroup: 'chest',
+            restSec: 90,
+            targetSets: [
+              { weight: 80, reps: 8, rir: 2 },
+              { weight: 80, reps: 8, rir: 2 },
+            ],
+          },
+          {
+            name: 'Тяга штанги',
+            muscleGroup: 'back',
+            restSec: 90,
+            targetSets: [
+              { weight: 60, reps: 10, rir: 2 },
+              { weight: 60, reps: 10, rir: 2 },
+            ],
+          },
+        ],
+      },
+    ];
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь/спина" />);
     fireEvent.click(findBtn(container, 'Начать тренировку')!);
     fireEvent.click(findBtn(container, 'К основной части')!);
@@ -697,10 +899,19 @@ describe('SessionPlayer: кнопки доводят от разминки до 
   it('разминка: «К основной части» видна сразу, не в конце списка блоков', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Ноги',
-      exercises: [{ name: 'Приседания со штангой', muscleGroup: 'legs', restSec: 120, targetSets: [{ weight: 100, reps: 5, rir: 2 }] }],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Ноги',
+        exercises: [
+          {
+            name: 'Приседания со штангой',
+            muscleGroup: 'legs',
+            restSec: 120,
+            targetSets: [{ weight: 100, reps: 5, rir: 2 }],
+          },
+        ],
+      },
+    ];
     try {
       const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Ноги" />);
       fireEvent.click(findBtn(container, 'Начать тренировку')!);
@@ -724,13 +935,15 @@ describe('SessionPlayer: кнопки доводят от разминки до 
   it('основная часть: после последнего подхода экран сам едет к следующему упражнению', async () => {
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь/спина',
-      exercises: [
-        { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] },
-        { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }] },
-      ],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь/спина',
+        exercises: [
+          { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] },
+          { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }] },
+        ],
+      },
+    ];
     const scrollSpy = vi.fn();
     const proto = Element.prototype as any;
     const orig = proto.scrollIntoView;
@@ -741,7 +954,7 @@ describe('SessionPlayer: кнопки доводят от разминки до 
       fireEvent.click(findBtn(container, 'К основной части')!);
       // Вход в основную часть экран не дёргает.
       expect(scrollSpy).not.toHaveBeenCalled();
-      const ok = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'OK') as HTMLElement;
+      const ok = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'OK') as HTMLElement;
       expect(ok).toBeTruthy();
       fireEvent.click(ok);
       expect(scrollSpy).toHaveBeenCalled();
@@ -765,16 +978,20 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь',
-      exercises: [{ name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] }],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь',
+        exercises: [
+          { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 90, targetSets: [{ weight: 80, reps: 8, rir: 2 }] },
+        ],
+      },
+    ];
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={1} focus="Грудь" />);
     fireEvent.click(findBtn(container, 'Начать тренировку')!);
     fireEvent.click(findBtn(container, 'К основной части')!);
     // Пока подход не записан, шага к заминке нет.
     expect(container.querySelector('[data-act="all-sets-done"]')).toBeNull();
-    const ok = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'OK') as HTMLElement;
+    const ok = Array.from(container.querySelectorAll('button')).find((b) => b.textContent === 'OK') as HTMLElement;
     expect(ok).toBeTruthy();
     fireEvent.click(ok);
     const allDone = container.querySelector('[data-act="all-sets-done"]') as HTMLElement;
@@ -791,10 +1008,14 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const { render, fireEvent, cleanup } = await import('@testing-library/react');
     localStorage.clear();
     saveActiveSession(mkSession(2));
-    const days: PlayerDay[] = [{
-      label: 'День 1 · Грудь',
-      exercises: [{ name: 'Жим лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 }],
-    }];
+    const days: PlayerDay[] = [
+      {
+        label: 'День 1 · Грудь',
+        exercises: [
+          { name: 'Жим лёжа', muscleGroup: 'chest', targetSets: [{ weight: 80, reps: 8, rir: 2 }], restSec: 90 },
+        ],
+      },
+    ];
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const { container, unmount } = render(<SessionPlayer days={days} weekNumber={3} focus="Грудь" />);
 

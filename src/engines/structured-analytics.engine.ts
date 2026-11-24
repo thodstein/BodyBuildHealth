@@ -143,7 +143,11 @@ export function computeStructuredAnalytics(
   });
 
   // ── Level 4: Density ──
-  const avgDuration = sessions.reduce((s, sess) => s + sess.durationMin, 0) / sessions.length;
+  // Усредняем только сессии с измеренной длительностью: 0 — «неизвестно».
+  const timedSessions = sessions.filter(sess => (Number(sess.durationMin) || 0) > 0);
+  const avgDuration = timedSessions.length > 0
+    ? timedSessions.reduce((s, sess) => s + (Number(sess.durationMin) || 0), 0) / timedSessions.length
+    : 0;
   const density = avgDuration > 0 ? avgVolume / avgDuration : 0;
   levels.push({
     level: 4, name: 'Плотность тренировки',
@@ -315,7 +319,10 @@ export function computeStructuredAnalytics(
 
   levels.push({
     level: 18, name: 'Продолжительность сессий',
-    metrics: { avgMin: Math.round(avgDuration), maxMin: Math.max(...sessions.map(s => s.durationMin)) },
+    metrics: {
+      avgMin: Math.round(avgDuration),
+      maxMin: timedSessions.length > 0 ? Math.max(...timedSessions.map(s => Number(s.durationMin) || 0)) : 0,
+    },
     status: avgDuration > 120 ? 'warning' : avgDuration > 90 ? 'good' : 'optimal',
     insight: avgDuration > 120 ? 'Средняя длительность >2ч — кортизол ↑, тестостерон ↓' : 'Длительность оптимальна',
   });

@@ -30,9 +30,11 @@ const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
  *  «ручной» учёт сетов (были UTC-дата, RPE=7 и 1RM от последнего подхода). */
 const playerDayFromMicro = (day: any): PlayerDay => {
   const exercises = ((day?.exercises || []) as any[]).map((ex: any, i: number) => {
-    const sets = Math.max(1, Math.min(20, Math.round(Number(ex?.sets)) || 3));
+    // Честные значения: план 0 не превращаем в выдуманные 3/10/90 — упражнение без
+    // планового веса/повторов открывается с нулями, игрок тут же видит, что данных нет.
+    const sets = Math.min(20, Math.max(0, Math.round(Number(ex?.sets)) || 0));
     const weight = Math.max(0, Number(ex?.weight) || 0);
-    const reps = Math.max(1, Math.round(Number(ex?.reps)) || 10);
+    const reps = Math.max(0, Math.round(Number(ex?.reps)) || 0);
     const rir = ex?.rir == null ? 2 : Math.max(0, Math.min(6, Math.round(Number(ex.rir))));
     // Вес 0 сам по себе не делает упражнение «своим весом»: план, не знающий веса штанги,
     // не должен превращать жим в BW-подход с тоннажем 0.

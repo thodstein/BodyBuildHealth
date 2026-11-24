@@ -430,7 +430,12 @@ export function generateWeeklyReport(logs: WorkoutSetLog[], sessionData: { date:
   const weekSessions = sessionData.filter(s => s.date >= startStr && s.date <= endStr);
 
   const volume = weekLogs.reduce((s, l) => s + l.weightKg * l.reps, 0);
-  const avgIntensity = weekLogs.length > 0 ? Math.round(weekLogs.reduce((s, l) => s + l.rpe, 0) / weekLogs.length * 10) / 10 : 0;
+  // Средняя интенсивность — только по подходам с измеренным RPE (0 = «не задано»),
+  // иначе отсутствие оценки разбавляло среднюю и занижало её.
+  const ratedLogs = weekLogs.filter(l => Number(l.rpe) > 0);
+  const avgIntensity = ratedLogs.length > 0
+    ? Math.round(ratedLogs.reduce((s, l) => s + Number(l.rpe), 0) / ratedLogs.length * 10) / 10
+    : 0;
   const prs = weekLogs.filter(l => l.isPR).length;
 
   // Top exercise

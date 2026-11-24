@@ -845,9 +845,10 @@ export function collectCalendar(): {
 }
 
 /**
- * Строки заметок для виджета: закреплённые сверху, затем свежие. Отдельной
- * функцией — чтобы состав полей можно было проверить тестом: нативная часть
- * (`NotesWidgetProvider`) читает `files` и рисует «📎».
+ * Строки заметок для виджета: закреплённые сверху, дальше по сроку (ближайший
+ * первым, без срока — в конце), затем важность и свежесть — как в списке вкладки.
+ * Отдельной функцией — чтобы состав полей можно было проверить тестом: нативная
+ * часть (`NotesWidgetProvider`) читает `files` и рисует «📎».
  */
 export function notesForWidget(store: CoachNotesStore): NotesWidgetSnapshot {
   // Корзина — не «заметки на сегодня»: в виджете её быть не должно,
@@ -1425,11 +1426,30 @@ export function applyWidgetQueue(items: QueuedItem[]): {
       } else if (it.type === 'workout_start') {
         const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
         const current = loadActiveSession();
+        if (playerActive()) {
+          // Player open: relay the start to the player instead of writing — the
+          // player owns the true start time/duration/warmup while mounted.
+          const relayStart = { handled: false };
+          try {
+            window.dispatchEvent(new CustomEvent('he-workout-widget-start', { detail: relayStart }));
+          } catch {
+            /* noop */
+          }
+          if (relayStart.handled) {
+            workoutsStarted += 1;
+            continue;
+          }
+          // Не обработал (плеер не в фазе ready или день не резолвится) — стартуем
+          // сами: иначе тап «Начать тренировку» молча теряется.
+        }
         if (!current) {
           if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets)) workoutsStarted += 1;
+          void pushWorkoutWidget();
         } else {
           // Сессия уже идёт: ничего не начинаем, только дополняем планом дня.
-          saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets);
+          saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets, {
+            plannedTotalMax: true,
+          });
         }
       } else if (it.type === 'workout_finish') {
         // Плеер открыт — завершить сессию целиком умеет только он (длительность, sRPE,
@@ -1457,12 +1477,20 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           } catch {
             /* noop */
           }
+          // Подхватываем состояние «завершено» на виджете.
+          void pushWorkoutWidget();
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
         const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
         const base = loadActiveSession();
         let session = base ? ensurePlanExercises(base, plan) : sessionFromPlan(plan);
+        if (!base) {
+          // Подход с виджета несёт метку времени: сессия, созданная для первого
+          // подхода, получает дату по ней — подход после полуночи не приземляется
+          // в «вчера». Уже идущая сессия свою дату сохраняет.
+          session = { ...session, date: isoFromTs(it.ts || Date.now()) };
+        }
         let index = session.exercises.findIndex((e) => e.exerciseName === name);
         if (index < 0) {
           // Подход по упражнению не из плана дня (или вовсе без плана) раньше
@@ -1538,7 +1566,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             plannedWeight: Number(it.weight) || undefined,
           });
           if (res.success) {
-            saveActiveSession(res.session, plan?.plannedSets);
+            saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true });
             setsAdded += 1;
             // Первый подход с рабочего стола сам запускает сессию.
             if (!base) workoutsStarted += 1;
@@ -1564,13 +1592,33 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   };
 }
 
-/** Только виджет тренировки — живой прогресс во время проведения (APK). */
-export async function pushTrainingWidget(): Promise<boolean> {
-  try {
-    return await syncTrainingWidget(collectTraining());
-  } catch {
-    return false;
-  }
+/**
+ * Только виджет тренировки — живой прогресс во время проведения (APK).
+ * Параллельные вызовы (подход → автосейв → событие, плюс синк после дрена)
+ * коалесцируются: в полёте следующий вызов возвращает обещание сразу, а
+ * лишняя строка виджета не бежит.
+ */
+let trainingPushInFlight = false;
+let trainingPushPending = false;
+
+export function pushTrainingWidget(): Promise<boolean> {
+  trainingPushPending = true;
+  if (trainingPushInFlight) return Promise.resolve(true);
+  trainingPushInFlight = true;
+  const run = async (): Promise<boolean> => {
+    let ok = true;
+    try {
+      do {
+        trainingPushPending = false;
+        ok = await syncTrainingWidget(collectTraining());
+      } while (trainingPushPending);
+    } catch {
+      ok = false;
+    }
+    trainingPushInFlight = false;
+    return ok;
+  };
+  return run();
 }
 
 /**
@@ -1596,7 +1644,33 @@ function foodCatalog(): NutritionFoodItem[] {
   return foodCatalogCache;
 }
 
-export async function syncAllWidgets(): Promise<WidgetSyncResult> {
+/** Синк в полёте — параллельный вызов не гоняет дрень отдельно. */
+let draining = false;
+/** Причина из параллельного вызова: после прохода синк перезапускается. */
+let pendingReasons = false;
+
+function zeroWidgetSyncResult(): WidgetSyncResult {
+  return {
+    drainedWaterMl: 0,
+    drainedWaterRemovedMl: 0,
+    drainedFoods: 0,
+    drainedFoodsRemoved: 0,
+    tasksToggled: 0,
+    tasksAdded: 0,
+    notesAdded: 0,
+    setsAdded: 0,
+    workoutsStarted: 0,
+    workoutsFinished: 0,
+    trainingOk: false,
+    workoutOk: false,
+    complianceOk: false,
+    nutritionOk: false,
+    calendarOk: false,
+    notesOk: false,
+  };
+}
+
+async function doSyncAllWidgets(): Promise<WidgetSyncResult> {
   let drainedWaterMl = 0;
   let drainedWaterRemovedMl = 0;
   let drainedFoods = 0;
@@ -1625,6 +1699,9 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
   } catch {
     /* очередь недоступна */
   }
+  // A2: пушим без ожидания: виджет необязательный слой — подходы из очереди должны
+  // появляться на пульте сразу (срабатывает только если есть применённые подходы).
+  if (setsAdded > 0) void pushTrainingWidget();
   const t = collectTraining();
   const wo = collectWorkout();
   const c = collectCompliance();
@@ -1655,6 +1732,15 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     syncCalendarWidget(cal).catch(() => false),
     syncNotesWidget(nt).catch(() => false),
   ]);
+  // A2: дрень обновил хранилище — живые виджеты должны узнать об этом сразу
+  // (снапшот тренировки после дрена подходов, виджет «Проведение» после дрена
+  // тренировки). Пушим без ожидания: виджет необязательный слой.
+  if (setsAdded > 0) {
+    void pushTrainingWidget();
+  }
+  if (workoutsFinished > 0) {
+    void pushWorkoutWidget();
+  }
   // Каталог продуктов для поиска в нативном редакторе еды: уходит один раз на
   // версию FOOD_DB (иначе каждый синк гонял бы ~700 позиций через мост).
   void pushNutritionFoods(foodCatalog(), nutritionFoodsVersion(foodCatalog())).catch(() => false);
@@ -1676,6 +1762,35 @@ export async function syncAllWidgets(): Promise<WidgetSyncResult> {
     calendarOk,
     notesOk,
   };
+}
+
+/**
+ * Полный цикл с сериалом: забрать очередь -> применить -> запушить свежие
+ * снапшоты. Безопасен везде; вне native виджеты просто не обновятся.
+ *
+ * Гонка: пока один проход в полёте, второй синк не начинает дрень отдельно —
+ * он помечает причину (`pendingReasons`), и завершившийся проход
+ * перезапускает синк после себя, чтобы не потерять обновления.
+ */
+export async function syncAllWidgets(): Promise<WidgetSyncResult> {
+  if (draining) {
+    pendingReasons = true;
+    return zeroWidgetSyncResult();
+  }
+  draining = true;
+  let result = zeroWidgetSyncResult();
+  try {
+    result = await doSyncAllWidgets();
+  } catch {
+    /* проход упал — replay ниже */
+  } finally {
+    draining = false;
+  }
+  if (pendingReasons) {
+    pendingReasons = false;
+    await syncAllWidgets();
+  }
+  return result;
 }
 
 /**

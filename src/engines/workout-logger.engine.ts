@@ -65,6 +65,11 @@ export interface WorkoutExercise {
   totalVolume: number;
   best1RM: number;
   avgRPE: number;
+  /** Пересчёт при отмене подхода: счётчики опциональны, чтобы существующие
+   *  конструкторы упражнений (импорт CSV, сессии из плана) оставались валидными. */
+  totalSets?: number;
+  totalReps?: number;
+  prCount?: number;
 }
 
 export interface WorkoutSession {
@@ -113,7 +118,7 @@ export function getISOWeekNumber(dateStr: string): number {
   const day = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 /** ISO-год недели (отличается от календарного года у 1 января: 2021-01-01 → 2020-W53). */
@@ -139,7 +144,10 @@ const STATS_CACHE_KEY = 'he_workout_stats_cache';
 const TRIM_KEY = 'he_workout_log_trimmed';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 
-export interface StorageTrimWarning { kept: number; at: number; }
+export interface StorageTrimWarning {
+  kept: number;
+  at: number;
+}
 
 /** Запись о принудительном срезе истории (QuotaExceeded) — для уведомления в UI. */
 export function getStorageTrimWarning(): StorageTrimWarning | null {
@@ -148,15 +156,21 @@ export function getStorageTrimWarning(): StorageTrimWarning | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed.kept === 'number' && parsed.at ? parsed : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function clearStorageTrimWarning(): void {
-  try { localStorage.removeItem(TRIM_KEY); } catch {}
+  try {
+    localStorage.removeItem(TRIM_KEY);
+  } catch {}
 }
 
 function markTrimmed(kept: number): void {
-  try { localStorage.setItem(TRIM_KEY, JSON.stringify({ kept, at: Date.now() })); } catch {}
+  try {
+    localStorage.setItem(TRIM_KEY, JSON.stringify({ kept, at: Date.now() }));
+  } catch {}
 }
 
 export function loadSessions(): WorkoutSession[] {
@@ -164,7 +178,9 @@ export function loadSessions(): WorkoutSession[] {
     const raw = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
     return raw.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 2000);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export function saveSessions(sessions: WorkoutSession[]) {
@@ -182,10 +198,15 @@ export function saveSessions(sessions: WorkoutSession[]) {
         }
       };
       let kept: WorkoutSession[] | null = null;
-      if (trySave(sorted, 'full')) { /* ok */ }
-      else if (trySave(sorted.slice(-500), '500')) { kept = sorted.slice(-500); }
-      else if (trySave(sorted.slice(-100), '100')) { kept = sorted.slice(-100); }
-      else if (trySave(sorted.slice(-50), '50')) { kept = sorted.slice(-50); }
+      if (trySave(sorted, 'full')) {
+        /* ok */
+      } else if (trySave(sorted.slice(-500), '500')) {
+        kept = sorted.slice(-500);
+      } else if (trySave(sorted.slice(-100), '100')) {
+        kept = sorted.slice(-100);
+      } else if (trySave(sorted.slice(-50), '50')) {
+        kept = sorted.slice(-50);
+      }
       if (kept) markTrimmed(kept.length);
     }
   }
@@ -202,15 +223,20 @@ export function startSession(
 ): WorkoutSession {
   return {
     sessionId: 'sess_' + Date.now(),
-     date: localIsoDate(),
+    date: localIsoDate(),
     startTime: new Date().toTimeString().slice(0, 5),
     endTime: '',
     durationMin: 0,
     focus,
     exercises: [],
-    totalVolume: 0, totalSets: 0, totalReps: 0,
-    avgIntensity: 0, prCount: 0, notes: '',
-    weekNumber, mesocycleWeek: weekNumber % 4 || 4,
+    totalVolume: 0,
+    totalSets: 0,
+    totalReps: 0,
+    avgIntensity: 0,
+    prCount: 0,
+    notes: '',
+    weekNumber,
+    mesocycleWeek: weekNumber % 4 || 4,
     ...provenance,
   };
 }
@@ -226,9 +252,45 @@ export function addExerciseToSession(
     muscleGroup: exercise.muscleGroup,
     order: session.exercises.length + 1,
     sets: [],
-    totalVolume: 0, best1RM: 0, avgRPE: 0,
+    totalVolume: 0,
+    best1RM: 0,
+    avgRPE: 0,
   };
   return { ...session, exercises: [...session.exercises, ex] };
+}
+
+/**
+ * Агрегаты одного упражнения по его подходам — один путь для записи и отмены:
+ * иначе `totalSets`/`totalReps`/`prCount` появлялись только после «Отменить подход»
+ * (их заполнял лишь undo-путь), а обычная сессия несла `undefined` в этих полях.
+ */
+function recomputeExerciseTotals(e: WorkoutExercise): WorkoutExercise {
+  const sets = e.sets || [];
+  const totalVolume = sets.reduce((s, st) => s + (st.weightKg || 0) * (st.reps || 0), 0);
+  const best1RM = sets.length > 0 ? Math.max(...sets.map((s) => epley1RM(s.weightKg, s.reps))) : 0;
+  const totalSets = sets.length;
+  const totalReps = sets.reduce((s, st) => s + (st.reps || 0), 0);
+  const avgRPE = totalSets > 0 ? Math.round((sets.reduce((s, st) => s + (st.rpe || 0), 0) / totalSets) * 10) / 10 : 0;
+  const prCount = sets.filter((st) => st.isPR).length;
+  return { ...e, sets, totalVolume, best1RM, totalSets, totalReps, avgRPE, prCount };
+}
+
+/**
+ * Агрегаты сессии по упражнениям — тот же набор полей, что пишет `logSet` и
+ * `removeLastSet`. Без этого отмена подхода оставляла в сессии `prCount` и
+ * `avgIntensity` от удалённого сета: «PR за неделю» в хабе показывал рекорд,
+ * которого в подходах уже нет.
+ */
+function recomputeSessionTotals(session: WorkoutSession, exercises: WorkoutExercise[]): WorkoutSession {
+  const totalVolume = exercises.reduce((s, e) => s + (e.totalVolume || 0), 0);
+  const totalSets = exercises.reduce((s, e) => s + (e.sets || []).length, 0);
+  const totalReps = exercises.reduce((s, e) => s + (e.sets || []).reduce((ss, st) => ss + (st.reps || 0), 0), 0);
+  const avgIntensity =
+    totalSets > 0
+      ? Math.round((exercises.reduce((s, e) => s + (e.avgRPE || 0) * (e.sets || []).length, 0) / totalSets) * 10) / 10
+      : 0;
+  const prCount = exercises.reduce((s, e) => s + (e.sets || []).filter((st) => st.isPR).length, 0);
+  return { ...session, exercises, totalVolume, totalSets, totalReps, avgIntensity, prCount };
 }
 
 export function logSet(
@@ -238,7 +300,8 @@ export function logSet(
   previousBestWeight?: number,
 ): { session: WorkoutSession; success: boolean; reason?: string; discardReason?: string } {
   const exercises = [...session.exercises];
-  if (exerciseIndex < 0 || exerciseIndex >= exercises.length) return { session, success: false, reason: 'Упражнение не найдено', discardReason: 'Упражнение не найдено' };
+  if (exerciseIndex < 0 || exerciseIndex >= exercises.length)
+    return { session, success: false, reason: 'Упражнение не найдено', discardReason: 'Упражнение не найдено' };
   const ex = { ...exercises[exerciseIndex] };
 
   const weightKg = Math.max(0, Number(set.weightKg) || 0);
@@ -254,51 +317,66 @@ export function logSet(
   // отягощение: раньше любой BW-подход отклонялся и день с турником нельзя было
   // записать. Тоннаж такого подхода 0, e1RM/PR для него не считаем.
   const isBodyweight = set.bodyweight === true && weightKg <= 0 && reps > 0;
-  if ((weightKg <= 0 && !isBodyweight) || reps <= 0) return { session, success: false, reason: 'Вес и повторения должны быть больше 0', discardReason: 'Вес и повторения должны быть больше 0' };
-  if (weightKg > SET_LIMITS.maxWeightKg) return { session, success: false, reason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`, discardReason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг` };
-  if (reps > SET_LIMITS.maxReps) return { session, success: false, reason: `Повторения превышают лимит ${SET_LIMITS.maxReps}`, discardReason: `Повторения превышают лимит ${SET_LIMITS.maxReps}` };
+  if ((weightKg <= 0 && !isBodyweight) || reps <= 0)
+    return {
+      session,
+      success: false,
+      reason: 'Вес и повторения должны быть больше 0',
+      discardReason: 'Вес и повторения должны быть больше 0',
+    };
+  if (weightKg > SET_LIMITS.maxWeightKg)
+    return {
+      session,
+      success: false,
+      reason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`,
+      discardReason: `Вес превышает лимит ${SET_LIMITS.maxWeightKg} кг`,
+    };
+  if (reps > SET_LIMITS.maxReps)
+    return {
+      session,
+      success: false,
+      reason: `Повторения превышают лимит ${SET_LIMITS.maxReps}`,
+      discardReason: `Повторения превышают лимит ${SET_LIMITS.maxReps}`,
+    };
 
   const estimated1RM = epley1RM(weightKg, reps);
   // PR по расчётному 1RM (а не только по весу): 80кг×5 (e1RM 93) > 82кг×1 (e1RM 85).
-  const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map(s => epley1RM(s.weightKg, s.reps))) : 0;
+  const sessionBestE1RM = ex.sets.length > 0 ? Math.max(...ex.sets.map((s) => epley1RM(s.weightKg, s.reps))) : 0;
+  // PR по e1RM защищены от «удара вниз»: сет не может быть PR, если его e1RM ниже
+  // текущего максимального (иначе правдоподобная последовательность, но противоречит
+  // определению PR-базиса). Строго больше: повтор того же лучшего сета — не рекорд,
+  // иначе каждое повторение одного веса×повторов увеличивало prCount.
+  const e1rmPrOk = sessionBestE1RM === 0 ? false : estimated1RM > sessionBestE1RM;
   // PR считаем только против реального базиса: первый подход в истории не PR сам по себе,
   // иначе каждое первое упражнение каждой сессии «бьёт рекорд».
-  const isPR = !isBodyweight && (
-    (sessionBestE1RM > 0 && estimated1RM > sessionBestE1RM)
-    || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight)
-  );
+  const isPR =
+    !isBodyweight &&
+    (e1rmPrOk || (previousBestWeight != null && previousBestWeight > 0 && weightKg > previousBestWeight));
 
-  ex.sets = [...ex.sets, {
-    setNumber: set.setNumber,
-    weightKg,
-    reps,
-    rpe,
-    rir,
-    velocityMs,
-    isPR,
-    notes: set.notes || '',
-    techniqueScore: set.techniqueScore,
-    plannedWeight: set.plannedWeight,
-    plannedReps: set.plannedReps,
-    plannedRir: set.plannedRir,
-    plannedTempo: set.plannedTempo,
-    actualTempo: set.actualTempo,
-    pause: set.pause === true ? true : undefined,
-    bodyweight: isBodyweight ? true : undefined,
-  }];
-  ex.totalVolume = ex.sets.reduce((s, st) => s + st.weightKg * st.reps, 0);
-  ex.best1RM = Math.max(ex.best1RM, estimated1RM);
-  ex.avgRPE = Math.round(ex.sets.reduce((s, st) => s + st.rpe, 0) / ex.sets.length * 10) / 10;
+  ex.sets = [
+    ...ex.sets,
+    {
+      setNumber: set.setNumber,
+      weightKg,
+      reps,
+      rpe,
+      rir,
+      velocityMs,
+      isPR,
+      notes: set.notes || '',
+      techniqueScore: set.techniqueScore,
+      plannedWeight: set.plannedWeight,
+      plannedReps: set.plannedReps,
+      plannedRir: set.plannedRir,
+      plannedTempo: set.plannedTempo,
+      actualTempo: set.actualTempo,
+      pause: set.pause === true ? true : undefined,
+      bodyweight: isBodyweight ? true : undefined,
+    },
+  ];
+  exercises[exerciseIndex] = recomputeExerciseTotals(ex);
 
-  exercises[exerciseIndex] = ex;
-
-  const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
-  const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-  const totalReps = exercises.reduce((s, e) => s + e.sets.reduce((ss, st) => ss + st.reps, 0), 0);
-  const avgIntensity = totalSets > 0 ? exercises.reduce((s, e) => s + e.avgRPE * e.sets.length, 0) / totalSets : 0;
-  const prCount = exercises.reduce((s, e) => s + e.sets.filter(st => st.isPR).length, 0);
-
-  return { session: { ...session, exercises, totalVolume, totalSets, totalReps, avgIntensity: Math.round(avgIntensity * 10) / 10, prCount }, success: true };
+  return { session: recomputeSessionTotals(session, exercises), success: true };
 }
 
 /** Максимальная правдоподобная длительность сессии: страховка от «стенных» часов,
@@ -306,17 +384,45 @@ export function logSet(
  *  в историю и в sRPE уезжает ~10 часов). */
 const MAX_SESSION_DURATION_MIN = 360;
 
+/**
+ * Удалить последний записанный подход упражнения (с максимальным setNumber) — «Отменить подход».
+ * Агрегаты пересчитываются так же, как в logSet. Входная сессия не мутируется.
+ */
+export function removeLastSet(
+  session: WorkoutSession,
+  exerciseIndex: number,
+): { session: WorkoutSession; success: boolean; removed?: WorkoutSet } {
+  const exercises = (session.exercises || []).map((e) => ({ ...e, sets: [...(e.sets || [])] }));
+  if (exerciseIndex < 0 || exerciseIndex >= exercises.length) {
+    return { session, success: false };
+  }
+  const ex = exercises[exerciseIndex];
+  if (!ex.sets || ex.sets.length === 0) return { session, success: false };
+  const maxIdx = ex.sets.reduce((mi, s, i) => (Number(s.setNumber) >= Number(ex.sets[mi].setNumber) ? i : mi), 0);
+  const removed = ex.sets[maxIdx];
+  ex.sets = ex.sets.slice(0, maxIdx).concat(ex.sets.slice(maxIdx + 1));
+  exercises[exerciseIndex] = recomputeExerciseTotals(ex);
+  // Сессионные агрегаты пересчитываются полностью: раньше `prCount` и `avgIntensity`
+  // оставались от удалённого подхода (PR «за неделю» без самого рекорда).
+  return { session: recomputeSessionTotals(session, exercises), success: true, removed };
+}
+
 export function finishSession(
   session: WorkoutSession,
   notes: string = '',
   durationMinOverride?: number,
 ): WorkoutSession {
   const endTime = new Date().toTimeString().slice(0, 5);
-  const startParts = session.startTime.split(':').map(Number);
+  // Битая/пустая startTime (старая запись в localStorage) не должна ронять завершение:
+  // раньше `split(':')` давал NaN, и «✓ Завершить» из виджета молча не срабатывал.
+  const startParts = String(session.startTime || '')
+    .split(':')
+    .map(Number);
   const endParts = endTime.split(':').map(Number);
-  const startMin = startParts[0] * 60 + startParts[1];
+  const validStart = startParts.length >= 2 && Number.isFinite(startParts[0]) && Number.isFinite(startParts[1]);
+  const startMin = validStart ? startParts[0] * 60 + startParts[1] : 0;
   const endMin = endParts[0] * 60 + endParts[1];
-  let durationMin = endMin >= startMin ? endMin - startMin : (1440 - startMin) + endMin;
+  let durationMin = validStart ? (endMin >= startMin ? endMin - startMin : 1440 - startMin + endMin) : 0;
 
   // Плеер знает реальную длительность по таймеру сессии и передаёт её явно.
   // Без override (например, завершение из виджета) клампим «стенную» разницу.
@@ -329,7 +435,7 @@ export function finishSession(
   const sessions = loadSessions();
   // Идемпотентно: одну и ту же сессию могут завершить и виджет, и плеер. Повторная
   // запись того же sessionId не должна удваивать историю, объём, серии и PR-статистику.
-  const idx = sessions.findIndex(s => s.sessionId === finished.sessionId);
+  const idx = sessions.findIndex((s) => s.sessionId === finished.sessionId);
   if (idx >= 0) sessions[idx] = finished;
   else sessions.push(finished);
   saveSessions(sessions);
@@ -339,7 +445,7 @@ export function finishSession(
 /** Обновить существующую сессию в localStorage. Возвращает null, если сессия не найдена. */
 export function updateSession(sessionId: string, patch: Partial<WorkoutSession>): WorkoutSession | null {
   const sessions = loadSessions();
-  const idx = sessions.findIndex(s => s.sessionId === sessionId);
+  const idx = sessions.findIndex((s) => s.sessionId === sessionId);
   if (idx < 0) return null;
   const updated: WorkoutSession = { ...sessions[idx], ...patch };
   sessions[idx] = updated;
@@ -350,7 +456,7 @@ export function updateSession(sessionId: string, patch: Partial<WorkoutSession>)
 /** Удалить сессию из localStorage. */
 export function deleteSession(sessionId: string): boolean {
   const sessions = loadSessions();
-  const next = sessions.filter(s => s.sessionId !== sessionId);
+  const next = sessions.filter((s) => s.sessionId !== sessionId);
   if (next.length === sessions.length) return false;
   saveSessions(next);
   return true;
@@ -362,7 +468,7 @@ export function deleteSession(sessionId: string): boolean {
 
 /** Стоит ли хранить сессию как «живую»: без подходов хранить нечего. */
 export function isActiveSessionWorthSaving(session: WorkoutSession | null | undefined): boolean {
-  return !!session && (session.exercises || []).some(e => (e.sets || []).length > 0);
+  return !!session && (session.exercises || []).some((e) => (e.sets || []).length > 0);
 }
 
 /** Живая сессия + служебные поля (когда сохранена, сколько сетов в плане дня). */
@@ -371,15 +477,34 @@ export type ActiveSession = WorkoutSession & { savedAt?: number; plannedSetsTota
 /** Сохранить живую сессию (автосейв каждого подхода).
  *  plannedSets — плановое число подходов дня: без него прогресс живой сессии
  *  нечестен (2/2 = 100% при восьми запланированных). */
-export function saveActiveSession(session: WorkoutSession | null | undefined, plannedSets?: number): boolean {
+export function saveActiveSession(
+  session: WorkoutSession | null | undefined,
+  plannedSets?: number,
+  opts?: { plannedTotalMax?: boolean },
+): boolean {
   if (!isActiveSessionWorthSaving(session) || !session) return false;
   try {
-    const planned = Math.max(0, Math.round(Number(plannedSets) || 0));
+    let planned = Math.max(0, Math.round(Number(plannedSets) || 0));
+    // План дня — знаменатель прогресса: путь из виджета не должен его уменьшать
+    // (план дня, пересчитанный из другого источника, иначе «рисует» ложные 100%).
+    // Заодно сохраняем прежний план, если новый не передан вовсе.
+    try {
+      const prev = loadActiveSession();
+      if (prev && prev.sessionId === session.sessionId) {
+        const prevPlanned = Math.max(0, Number(prev.plannedSetsTotal) || 0);
+        if (opts?.plannedTotalMax) planned = Math.max(planned, prevPlanned);
+        else if (planned === 0) planned = prevPlanned;
+      }
+    } catch {
+      /* предыдущая сессия недоступна — не блокируем запись */
+    }
     const payload: ActiveSession = { ...session, savedAt: Date.now() };
     if (planned > 0) payload.plannedSetsTotal = planned;
     localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 /** Прочитать живую сессию (битые/пустые данные → null). */
@@ -391,12 +516,18 @@ export function loadActiveSession(): ActiveSession | null {
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.exercises)) return null;
     if (!isActiveSessionWorthSaving(parsed)) return null;
     return parsed as ActiveSession;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Сбросить живую сессию (после сохранения или отказа). */
 export function clearActiveSession(): void {
-  try { localStorage.removeItem(ACTIVE_SESSION_KEY); } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Сводка живой сессии для пульта/виджетов: сеты, тоннаж, текущее упражнение. */
@@ -410,11 +541,14 @@ export interface ActiveSessionSummary {
   currentExercise: string;
   progressPct: number;
 }
-export function summarizeActiveSession(session: WorkoutSession | null | undefined, plannedSets?: number): ActiveSessionSummary | null {
+export function summarizeActiveSession(
+  session: WorkoutSession | null | undefined,
+  plannedSets?: number,
+): ActiveSessionSummary | null {
   if (!session || !isActiveSessionWorthSaving(session)) return null;
   const setsDone = (session.exercises || []).reduce((s, e) => s + (e.sets || []).length, 0);
   const volumeKg = (session.exercises || []).reduce((s, e) => s + (e.totalVolume || 0), 0);
-  const lastWithSets = [...(session.exercises || [])].reverse().find(e => (e.sets || []).length > 0);
+  const lastWithSets = [...(session.exercises || [])].reverse().find((e) => (e.sets || []).length > 0);
   const planned = Math.max(
     Math.round(Number(plannedSets) || 0),
     Math.round(Number((session as ActiveSession).plannedSetsTotal) || 0),
@@ -445,7 +579,10 @@ export function cleanLegacyExerciseName(name: string): string {
  *  дата + отсортированные (упражнение, подходы: вес|повт|RIR|RPE). */
 export function workoutContentSignature(log: { date: string; exercises: WorkoutLog['exercises'] }): string {
   const exParts = (log.exercises || [])
-    .map(ex => `${ex.exerciseName}:${(ex.sets || []).map(s => `${s.weight}|${s.reps}|${s.rir ?? ''}|${s.rpe ?? ''}`).join(';')}`)
+    .map(
+      (ex) =>
+        `${ex.exerciseName}:${(ex.sets || []).map((s) => `${s.weight}|${s.reps}|${s.rir ?? ''}|${s.rpe ?? ''}`).join(';')}`,
+    )
     .sort();
   return `${log.date}|${exParts.join('~')}`;
 }
@@ -474,7 +611,7 @@ export function findDuplicateWorkouts(logs: WorkoutLog[]): { keep: WorkoutLog; d
 /** Обратный маппер WorkoutLog → WorkoutSession (для зеркалирования IDB → localStorage).
  *  Сохраняет id как sessionId, чтобы удаление/обновление работало в обоих слоях. */
 export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
-  const exercises: WorkoutExercise[] = (log.exercises || []).map(ex => {
+  const exercises: WorkoutExercise[] = (log.exercises || []).map((ex) => {
     const sets: WorkoutSet[] = (ex.sets || []).map((st, i) => ({
       setNumber: i + 1,
       weightKg: st.weight || 0,
@@ -500,7 +637,7 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
       order: 0,
       sets,
       totalVolume: ex.totalVolume || sets.reduce((s, x) => s + x.weightKg * x.reps, 0),
-      best1RM: ex.estimated1RM || Math.max(0, ...sets.map(x => epley1RM(x.weightKg, x.reps))),
+      best1RM: ex.estimated1RM || Math.max(0, ...sets.map((x) => epley1RM(x.weightKg, x.reps))),
       avgRPE: sets.length > 0 ? Math.round((sets.reduce((s, x) => s + x.rpe, 0) / sets.length) * 10) / 10 : 0,
     };
   });
@@ -569,12 +706,12 @@ export function getWorkoutStats(): WorkoutStats {
 
   // Streak
   let streak = 0;
-  const dates = [...new Set(sessions.map(s => s.date))].sort().reverse();
+  const dates = [...new Set(sessions.map((s) => s.date))].sort().reverse();
   const today = new Date();
   for (let i = 0; i < dates.length; i++) {
     const expected = new Date(today);
     expected.setDate(expected.getDate() - i);
-     if (dates[i] === localIsoDate(expected)) streak++;
+    if (dates[i] === localIsoDate(expected)) streak++;
     else break;
   }
 
@@ -586,7 +723,9 @@ export function getWorkoutStats(): WorkoutStats {
     bestLifts,
     prCount,
     streak,
-    weeklyVolume: [...weekMap.values()].sort((a, b) => a.year - b.year || a.week - b.week).map(({ year, week, volume, sessions }) => ({ week, year, volume, sessions })),
+    weeklyVolume: [...weekMap.values()]
+      .sort((a, b) => a.year - b.year || a.week - b.week)
+      .map(({ year, week, volume, sessions }) => ({ week, year, volume, sessions })),
     exerciseFrequency: exerciseFreq,
   };
 }
@@ -600,7 +739,8 @@ export function getRecentPRs(limit: number = 5): { exercise: string; weight: num
     for (const ex of sess.exercises) {
       if (!ex || !Array.isArray(ex.sets)) continue;
       for (const set of ex.sets) {
-        if (set && set.isPR) prs.push({ exercise: ex.exerciseName, weight: set.weightKg, reps: set.reps, date: sess.date });
+        if (set && set.isPR)
+          prs.push({ exercise: ex.exerciseName, weight: set.weightKg, reps: set.reps, date: sess.date });
       }
     }
   }
@@ -621,9 +761,16 @@ export function exportToCSV(): WorkoutCSV {
         if (!set) continue;
         const estRM = epley1RM(set.weightKg, set.reps);
         rows.push([
-          sess.date, ex.exerciseName, String(set.setNumber),
-          String(set.weightKg), String(set.reps), String(set.rpe), String(set.rir),
-          String(estRM), set.isPR ? 'Yes' : 'No', sess.focus,
+          sess.date,
+          ex.exerciseName,
+          String(set.setNumber),
+          String(set.weightKg),
+          String(set.reps),
+          String(set.rpe),
+          String(set.rir),
+          String(estRM),
+          set.isPR ? 'Yes' : 'No',
+          sess.focus,
         ]);
       }
     }
@@ -644,15 +791,19 @@ export function splitCSVRow(line: string): string[] {
     const ch = line[i];
     if (inQ) {
       if (ch === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; }
-        else inQ = false;
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else inQ = false;
       } else cur += ch;
     } else if (ch === '"') inQ = true;
-    else if (ch === sep) { out.push(cur); cur = ''; }
-    else cur += ch;
+    else if (ch === sep) {
+      out.push(cur);
+      cur = '';
+    } else cur += ch;
   }
   out.push(cur);
-  return out.map(s => s.trim());
+  return out.map((s) => s.trim());
 }
 
 /**
@@ -661,29 +812,54 @@ export function splitCSVRow(line: string): string[] {
  * Группирует по дате → сессии, по упражнению → упражнения, пересчитывает тоталы/1RM/avgRPE,
  * weekNumber = ISO-неделя даты, isPR — по росту e1RM внутри упражнения.
  * Добавляет в he_workout_log_v2 (зеркалируется в IndexedDB при следующем чтении). */
-export function importSessionsFromCSV(text: string): { importedSessions: number; importedSets: number; errors: string[] } {
+export function importSessionsFromCSV(text: string): {
+  importedSessions: number;
+  importedSets: number;
+  errors: string[];
+} {
   const errors: string[] = [];
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length === 0) return { importedSessions: 0, importedSets: 0, errors: ['Пустой ввод.'] };
 
   // пропустить заголовок
   let start = 0;
   if (/^date/i.test(lines[0]) || /^"date/i.test(lines[0])) start = 1;
 
-  const byDate: Record<string, { exName: string; setNumber: number; weight: number; reps: number; rpe: number; rir: number; notes: string }[]> = {};
+  const byDate: Record<
+    string,
+    { exName: string; setNumber: number; weight: number; reps: number; rpe: number; rir: number; notes: string }[]
+  > = {};
   let lineNo = 0;
   for (let i = start; i < lines.length; i++) {
     lineNo = i + 1;
     const cols = splitCSVRow(lines[i]);
-    if (cols.length < 5) { errors.push(`Строка ${lineNo}: мало колонок (нужно ≥5: date,exercise,set,weight,reps).`); continue; }
+    if (cols.length < 5) {
+      errors.push(`Строка ${lineNo}: мало колонок (нужно ≥5: date,exercise,set,weight,reps).`);
+      continue;
+    }
     const [date, exercise, setStr, weightStr, repsStr, rpeStr, rirStr, notesCol] = cols;
-    if (!/^\d{4}-\d{2}-\d{2}/.test(date)) { errors.push(`Строка ${lineNo}: дата не YYYY-MM-DD («${date}»).`); continue; }
+    if (!/^\d{4}-\d{2}-\d{2}/.test(date)) {
+      errors.push(`Строка ${lineNo}: дата не YYYY-MM-DD («${date}»).`);
+      continue;
+    }
     const set = parseInt(setStr) || 1;
     const weight = parseFloat(weightStr);
     const reps = parseInt(repsStr);
-    if (isNaN(weight) || isNaN(reps)) { errors.push(`Строка ${lineNo}: вес/повт не число.`); continue; }
-    if (weight > SET_LIMITS.maxWeightKg || weight <= 0) { errors.push(`Строка ${lineNo}: вес вне лимита (0..${SET_LIMITS.maxWeightKg}).`); continue; }
-    if (reps > SET_LIMITS.maxReps || reps <= 0) { errors.push(`Строка ${lineNo}: повторения вне лимита (1..${SET_LIMITS.maxReps}).`); continue; }
+    if (isNaN(weight) || isNaN(reps)) {
+      errors.push(`Строка ${lineNo}: вес/повт не число.`);
+      continue;
+    }
+    if (weight > SET_LIMITS.maxWeightKg || weight <= 0) {
+      errors.push(`Строка ${lineNo}: вес вне лимита (0..${SET_LIMITS.maxWeightKg}).`);
+      continue;
+    }
+    if (reps > SET_LIMITS.maxReps || reps <= 0) {
+      errors.push(`Строка ${lineNo}: повторения вне лимита (1..${SET_LIMITS.maxReps}).`);
+      continue;
+    }
     const rpe = rpeStr ? parseFloat(rpeStr) || 0 : 0;
     const rirRaw = rirStr !== undefined && rirStr !== '' ? parseFloat(rirStr) : 2;
     const rir = isNaN(rirRaw) ? 2 : rirRaw;
@@ -695,53 +871,89 @@ export function importSessionsFromCSV(text: string): { importedSessions: number;
 
   const newSessions: WorkoutSession[] = [];
   let importedSets = 0;
-  Object.keys(byDate).sort().forEach(date => {
-    const rows = byDate[date];
-    const byEx: Record<string, typeof rows> = {};
-    rows.forEach(r => { if (!byEx[r.exName]) byEx[r.exName] = []; byEx[r.exName].push(r); });
-    const exercises: WorkoutExercise[] = Object.keys(byEx).map((exName, oi) => {
-      const exRows = byEx[exName].sort((a, b) => a.setNumber - b.setNumber);
-      // PR пересчитывается по росту e1RM внутри упражнения
-      let maxE1RM = 0;
-      const sets: WorkoutSet[] = exRows.map((r, si) => {
-        const e1 = epley1RM(r.weight, r.reps);
-        const isPR = e1 > maxE1RM;
-        maxE1RM = Math.max(maxE1RM, e1);
+  Object.keys(byDate)
+    .sort()
+    .forEach((date) => {
+      const rows = byDate[date];
+      const byEx: Record<string, typeof rows> = {};
+      rows.forEach((r) => {
+        if (!byEx[r.exName]) byEx[r.exName] = [];
+        byEx[r.exName].push(r);
+      });
+      const exercises: WorkoutExercise[] = Object.keys(byEx).map((exName, oi) => {
+        const exRows = byEx[exName].sort((a, b) => a.setNumber - b.setNumber);
+        // PR пересчитывается по росту e1RM внутри упражнения
+        let maxE1RM = 0;
+        const sets: WorkoutSet[] = exRows.map((r, si) => {
+          const e1 = epley1RM(r.weight, r.reps);
+          const isPR = e1 > maxE1RM;
+          maxE1RM = Math.max(maxE1RM, e1);
+          return {
+            setNumber: si + 1,
+            weightKg: r.weight,
+            reps: r.reps,
+            rpe: r.rpe,
+            rir: r.rir,
+            isPR,
+            notes: r.notes || '',
+          };
+        });
+        const totalVolume = sets.reduce((s, x) => s + x.weightKg * x.reps, 0);
+        const best1RM = Math.max(0, ...sets.map((s) => epley1RM(s.weightKg, s.reps)));
+        const rpes = sets.map((s) => s.rpe).filter((r) => r > 0);
+        const avgRPE = rpes.length > 0 ? rpes.reduce((a: number, b: number) => a + b, 0) / rpes.length : 0;
         return {
-          setNumber: si + 1, weightKg: r.weight, reps: r.reps, rpe: r.rpe, rir: r.rir,
-          isPR, notes: r.notes || '',
+          exerciseId: exName,
+          exerciseName: exName,
+          pattern: '',
+          muscleGroup: '',
+          order: oi,
+          sets,
+          totalVolume,
+          best1RM,
+          avgRPE,
         };
       });
-      const totalVolume = sets.reduce((s, x) => s + x.weightKg * x.reps, 0);
-      const best1RM = Math.max(0, ...sets.map(s => epley1RM(s.weightKg, s.reps)));
-      const rpes = sets.map(s => s.rpe).filter(r => r > 0);
-      const avgRPE = rpes.length > 0 ? rpes.reduce((a: number, b: number) => a + b, 0) / rpes.length : 0;
-      return { exerciseId: exName, exerciseName: exName, pattern: '', muscleGroup: '', order: oi, sets, totalVolume, best1RM, avgRPE };
+      const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
+      const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
+      const totalReps = exercises.reduce((s, e) => s + e.sets.reduce((ss: number, x: WorkoutSet) => ss + x.reps, 0), 0);
+      importedSets += totalSets;
+      const weekNumber = getISOWeekNumber(date);
+      const prCount = exercises.reduce((s, e) => s + e.sets.filter((x) => x.isPR).length, 0);
+      newSessions.push({
+        sessionId: 'imp_' + date + '_' + Math.random().toString(36).slice(2, 8),
+        date,
+        startTime: '00:00',
+        endTime: '00:00',
+        durationMin: 0,
+        focus: 'Импорт CSV',
+        exercises,
+        totalVolume,
+        totalSets,
+        totalReps,
+        avgIntensity: 0,
+        prCount,
+        notes: 'Импортировано из CSV',
+        weekNumber,
+        mesocycleWeek: weekNumber % 4 || 4,
+      });
     });
-    const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
-    const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
-    const totalReps = exercises.reduce((s, e) => s + e.sets.reduce((ss: number, x: WorkoutSet) => ss + x.reps, 0), 0);
-    importedSets += totalSets;
-    const weekNumber = getISOWeekNumber(date);
-    const prCount = exercises.reduce((s, e) => s + e.sets.filter(x => x.isPR).length, 0);
-    newSessions.push({
-      sessionId: 'imp_' + date + '_' + Math.random().toString(36).slice(2, 8),
-      date, startTime: '00:00', endTime: '00:00', durationMin: 0,
-      focus: 'Импорт CSV', exercises, totalVolume, totalSets, totalReps,
-      avgIntensity: 0, prCount, notes: 'Импортировано из CSV', weekNumber, mesocycleWeek: weekNumber % 4 || 4,
-    });
-  });
 
   if (newSessions.length > 0) {
     const existing = loadSessions();
     // дедуп: проверяем date + exercise name + weight + reps
     const existingKeys = new Set(
-      existing.flatMap(s => (s.exercises || []).flatMap(ex => 
-        (ex.sets || []).map(st => `${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`)
-      ))
+      existing.flatMap((s) =>
+        (s.exercises || []).flatMap((ex) =>
+          (ex.sets || []).map((st) => `${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`),
+        ),
+      ),
     );
-    const toAdd = newSessions.filter(s => 
-      !s.exercises.some(ex => (ex.sets || []).some(st => existingKeys.has(`${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`)))
+    const toAdd = newSessions.filter(
+      (s) =>
+        !s.exercises.some((ex) =>
+          (ex.sets || []).some((st) => existingKeys.has(`${s.date}|${ex.exerciseName}|${st.weightKg}|${st.reps}`)),
+        ),
     );
     saveSessions([...toAdd, ...existing]);
     return { importedSessions: toAdd.length, importedSets, errors };
@@ -754,7 +966,7 @@ export function getLastSession(): WorkoutSession | null {
 }
 
 export function getSessionsByWeek(weekNumber: number): WorkoutSession[] {
-  return loadSessions().filter(s => s.weekNumber === weekNumber);
+  return loadSessions().filter((s) => s.weekNumber === weekNumber);
 }
 
 export interface CachedProgress {
@@ -828,9 +1040,13 @@ export function loadCachedSessionStats(): Omit<CachedStats, 'cachedAt'> | null {
 
 export function getCachedProgressForExercise(name: string): CachedProgress | null {
   const all = loadCachedExerciseProgress();
-  const exact = all.find(p => p.exerciseName.toLowerCase() === name.toLowerCase());
+  const exact = all.find((p) => p.exerciseName.toLowerCase() === name.toLowerCase());
   if (exact) return exact;
-  const partial = all.find(p => name.toLowerCase().includes(p.exerciseName.toLowerCase()) || p.exerciseName.toLowerCase().includes(name.toLowerCase()));
+  const partial = all.find(
+    (p) =>
+      name.toLowerCase().includes(p.exerciseName.toLowerCase()) ||
+      p.exerciseName.toLowerCase().includes(name.toLowerCase()),
+  );
   return partial ?? null;
 }
 
@@ -859,7 +1075,8 @@ export function getExerciseProgress(name: string, limit: number = 20): ExerciseP
     if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
       if (!ex || !ex.sets?.length) continue;
-      const matches = ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
+      const matches =
+        ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
         ex.exerciseId.toLowerCase().includes(name.toLowerCase());
       if (!matches) continue;
       firstDate = firstDate ? (sess.date < firstDate ? sess.date : firstDate) : sess.date;
@@ -870,10 +1087,10 @@ export function getExerciseProgress(name: string, limit: number = 20): ExerciseP
     }
   }
   if (!sets.length) return null;
-  const bestWeight = Math.max(...sets.map(s => s.weightKg));
-  const bestReps = Math.max(...sets.map(s => s.reps));
-  const bestE1RM = Math.max(...sets.map(s => epley1RM(s.weightKg, s.reps)));
-  const rpeSets = sets.filter(s => s.rpe > 0);
+  const bestWeight = Math.max(...sets.map((s) => s.weightKg));
+  const bestReps = Math.max(...sets.map((s) => s.reps));
+  const bestE1RM = Math.max(...sets.map((s) => epley1RM(s.weightKg, s.reps)));
+  const rpeSets = sets.filter((s) => s.rpe > 0);
   const avgRPE = rpeSets.length > 0 ? rpeSets.reduce((a, s) => a + s.rpe, 0) / rpeSets.length : 0;
   const half = Math.floor(sets.length / 2);
   const firstHalf = sets.slice(0, half);
@@ -887,9 +1104,18 @@ export function getExerciseProgress(name: string, limit: number = 20): ExerciseP
   const trend = e1RMDelta > 1 ? 'up' : e1RMDelta < -1 ? 'down' : 'stable';
   return {
     exerciseName: name,
-    firstDate, lastDate, sessions: new Set(sets.map(s => s.date)).size,
-    totalSets: sets.length, totalVolume: sets.reduce((a, s) => a + s.weightKg * s.reps, 0),
-    bestWeight, bestReps, bestE1RM, avgRPE: Number(avgRPE.toFixed(1)), trend, weightDelta, e1RMDelta,
+    firstDate,
+    lastDate,
+    sessions: new Set(sets.map((s) => s.date)).size,
+    totalSets: sets.length,
+    totalVolume: sets.reduce((a, s) => a + s.weightKg * s.reps, 0),
+    bestWeight,
+    bestReps,
+    bestE1RM,
+    avgRPE: Number(avgRPE.toFixed(1)),
+    trend,
+    weightDelta,
+    e1RMDelta,
   };
 }
 
@@ -905,7 +1131,7 @@ export function getVolumeTrend(days: number = 14): VolumeTrendDay[] {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = localIsoDate(cutoff);
-  const sessions = loadSessions().filter(s => s.date >= cutoffStr);
+  const sessions = loadSessions().filter((s) => s.date >= cutoffStr);
   const map = new Map<string, { volume: number; sets: number; sessions: number }>();
   for (const sess of sessions) {
     const cur = map.get(sess.date) || { volume: 0, sets: 0, sessions: 0 };
@@ -931,7 +1157,7 @@ export interface SessionComparison {
 
 export function compareWithPrevious(session: WorkoutSession): SessionComparison {
   const sessions = loadSessions();
-  const idx = sessions.findIndex(s => s.sessionId === session.sessionId);
+  const idx = sessions.findIndex((s) => s.sessionId === session.sessionId);
   const newer = session;
   const older = idx >= 0 && idx + 1 < sessions.length ? sessions[idx + 1] : null;
   if (!older) {
@@ -952,13 +1178,24 @@ export function compareWithPrevious(session: WorkoutSession): SessionComparison 
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BODYWEIGHT_EXERCISE_PATTERNS = [
-  /подтягиван/i, /отжиман/i, /планк/i, /скручиван/i, /подъём ног/i,
-  /dip/i, /push.?up/i, /pull.?up/i, /plank/i, /crunch/i, /leg.?raise/i,
-  /брусь/i, /колен/i, /ab/i,
+  /подтягиван/i,
+  /отжиман/i,
+  /планк/i,
+  /скручиван/i,
+  /подъём ног/i,
+  /dip/i,
+  /push.?up/i,
+  /pull.?up/i,
+  /plank/i,
+  /crunch/i,
+  /leg.?raise/i,
+  /брусь/i,
+  /колен/i,
+  /ab/i,
 ];
 
 export function isBodyweightExercise(exerciseName: string): boolean {
-  return BODYWEIGHT_EXERCISE_PATTERNS.some(p => p.test(exerciseName));
+  return BODYWEIGHT_EXERCISE_PATTERNS.some((p) => p.test(exerciseName));
 }
 
 export interface BodyweightProgress {
@@ -983,11 +1220,12 @@ export function getBodyweightProgress(name: string, limit: number = 30): Bodywei
     if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
       if (!ex || !ex.sets?.length) continue;
-      const matches = ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
+      const matches =
+        ex.exerciseName.toLowerCase().includes(name.toLowerCase()) ||
         ex.exerciseId.toLowerCase().includes(name.toLowerCase());
       if (!matches) continue;
 
-      const isBW = ex.sets.some(s => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
+      const isBW = ex.sets.some((s) => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
       if (!isBW) continue;
 
       lastDate = lastDate ? (sess.date > lastDate ? sess.date : lastDate) : sess.date;
@@ -1001,7 +1239,7 @@ export function getBodyweightProgress(name: string, limit: number = 30): Bodywei
 
   if (!repsData.length) return null;
 
-  const sessions2 = new Set(repsData.map(d => d.date)).size;
+  const sessions2 = new Set(repsData.map((d) => d.date)).size;
   const avgRepsPerSession = Math.round(totalReps / Math.max(1, sessions2));
 
   // Trend: compare first half vs second half avg reps
@@ -1032,9 +1270,9 @@ export function getRecentBodyweightPRs(limit: number = 5): { exercise: string; b
     if (!Array.isArray(sess.exercises)) continue;
     for (const ex of sess.exercises) {
       if (!ex || !Array.isArray(ex.sets)) continue;
-      const isBW = ex.sets.some(s => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
+      const isBW = ex.sets.some((s) => s.weightKg === 0 || isBodyweightExercise(ex.exerciseName));
       if (!isBW) continue;
-      const bestReps = Math.max(...ex.sets.map(s => s.reps), 0);
+      const bestReps = Math.max(...ex.sets.map((s) => s.reps), 0);
       if (bestReps > 0) {
         prs.push({ exercise: ex.exerciseName, bestReps, date: sess.date });
       }
@@ -1045,7 +1283,11 @@ export function getRecentBodyweightPRs(limit: number = 5): { exercise: string; b
   const byExercise = new Map<string, { bestReps: number; date: string }>();
   for (const pr of prs) {
     const existing = byExercise.get(pr.exercise);
-    if (!existing || pr.bestReps > existing.bestReps || (pr.bestReps === existing.bestReps && pr.date > existing.date)) {
+    if (
+      !existing ||
+      pr.bestReps > existing.bestReps ||
+      (pr.bestReps === existing.bestReps && pr.date > existing.date)
+    ) {
       byExercise.set(pr.exercise, { bestReps: pr.bestReps, date: pr.date });
     }
   }

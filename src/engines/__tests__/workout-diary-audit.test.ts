@@ -15,10 +15,29 @@ vi.mock('../../core/db', () => ({
 }));
 
 import {
-  splitCSVRow, importSessionsFromCSV, updateSession, deleteSession, workoutLogToSession,
-  logSet, startSession, addExerciseToSession, getVolumeTrend, getISOWeekNumber, getISOWeekYear,
-  getStorageTrimWarning, clearStorageTrimWarning, saveSessions, loadSessions, cleanLegacyExerciseName, SET_LIMITS,
-  findDuplicateWorkouts, workoutContentSignature, finishSession, getLastSession, compareWithPrevious, localIsoDate,
+  splitCSVRow,
+  importSessionsFromCSV,
+  updateSession,
+  deleteSession,
+  workoutLogToSession,
+  logSet,
+  startSession,
+  addExerciseToSession,
+  getVolumeTrend,
+  getISOWeekNumber,
+  getISOWeekYear,
+  getStorageTrimWarning,
+  clearStorageTrimWarning,
+  saveSessions,
+  loadSessions,
+  cleanLegacyExerciseName,
+  SET_LIMITS,
+  findDuplicateWorkouts,
+  workoutContentSignature,
+  finishSession,
+  getLastSession,
+  compareWithPrevious,
+  localIsoDate,
 } from '../workout-logger.engine';
 import { StrengthDiary, sessionToWorkoutLog } from '../strength-diary.engine';
 import { db } from '../../core/db';
@@ -28,20 +47,46 @@ function getMockDb() {
   return db as any;
 }
 
-const mkLog = (id: string, date: string, exName: string, sets: Array<{ weight: number; reps: number; rpe?: number; rir?: number }>): WorkoutLog => ({
-  id, date, duration: 60,
-  exercises: [{
-    id: `${id}_ex`, date, exerciseId: exName, exerciseName: exName, isCompound: true,
-    sets, totalVolume: sets.reduce((s, x) => s + x.weight * x.reps, 0),
-    estimated1RM: Math.max(0, ...sets.map(x => x.weight * (1 + x.reps / 30))),
-  }],
-  overallRPE: 7, recoveryBefore: 5, split: 'PPL', weekNumber: 1,
+const mkLog = (
+  id: string,
+  date: string,
+  exName: string,
+  sets: Array<{ weight: number; reps: number; rpe?: number; rir?: number }>,
+): WorkoutLog => ({
+  id,
+  date,
+  duration: 60,
+  exercises: [
+    {
+      id: `${id}_ex`,
+      date,
+      exerciseId: exName,
+      exerciseName: exName,
+      isCompound: true,
+      sets,
+      totalVolume: sets.reduce((s, x) => s + x.weight * x.reps, 0),
+      estimated1RM: Math.max(0, ...sets.map((x) => x.weight * (1 + x.reps / 30))),
+    },
+  ],
+  overallRPE: 7,
+  recoveryBefore: 5,
+  split: 'PPL',
+  weekNumber: 1,
 });
 
 describe('splitCSVRow', () => {
   it('парсит кавычки и запятые внутри полей', () => {
     const row = '2026-08-01,"Жим штанги лёжа, узкий",1,80,5,8,2,"заметка, с запятой"';
-    expect(splitCSVRow(row)).toEqual(['2026-08-01', 'Жим штанги лёжа, узкий', '1', '80', '5', '8', '2', 'заметка, с запятой']);
+    expect(splitCSVRow(row)).toEqual([
+      '2026-08-01',
+      'Жим штанги лёжа, узкий',
+      '1',
+      '80',
+      '5',
+      '8',
+      '2',
+      'заметка, с запятой',
+    ]);
   });
   it('поддерживает точку с запятой', () => {
     const row = '2026-08-01;Приседания;1;100;5;8;1';
@@ -53,7 +98,9 @@ describe('splitCSVRow', () => {
 });
 
 describe('importSessionsFromCSV', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('импортирует формат экспорта хаба (с заметками и кавычками)', () => {
     const csv = [
       'date,exercise,set,weight,reps,rpe,rir,notes',
@@ -106,7 +153,9 @@ describe('importSessionsFromCSV', () => {
 });
 
 describe('CRUD сессий (localStorage)', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('updateSession обновляет поля', () => {
     const s = startSession('PPL', 1);
     addExerciseToSession(s, { id: 'bench', name: 'Жим', pattern: 'horizontal_push', muscleGroup: 'chest' });
@@ -120,9 +169,12 @@ describe('CRUD сессий (localStorage)', () => {
     expect(updateSession('nope', { notes: 'x' })).toBeNull();
   });
   it('deleteSession удаляет сессию', () => {
-    saveSessions([{ ...startSession('PPL', 1), sessionId: 'a' }, { ...startSession('PPL', 1), sessionId: 'b' }]);
+    saveSessions([
+      { ...startSession('PPL', 1), sessionId: 'a' },
+      { ...startSession('PPL', 1), sessionId: 'b' },
+    ]);
     expect(deleteSession('a')).toBe(true);
-    expect(loadSessions().map(s => s.sessionId)).toEqual(['b']);
+    expect(loadSessions().map((s) => s.sessionId)).toEqual(['b']);
     expect(deleteSession('nope')).toBe(false);
   });
 });
@@ -144,23 +196,33 @@ describe('logSet PR по e1RM', () => {
   it('PR засчитывается по росту e1RM, а не только веса', () => {
     let s = startSession('PPL', 1);
     s = addExerciseToSession(s, { id: 'bench', name: 'Жим', pattern: 'horizontal_push', muscleGroup: 'chest' });
-    let r = logSet(s, 0, { setNumber: 1, weightKg: 82, reps: 1, rpe: 9, rir: 0 });
+    // Базис из прошлой тренировки (80 кг): первый сет не может быть PR «сам по себе».
+    let r = logSet(s, 0, { setNumber: 1, weightKg: 82, reps: 1, rpe: 9, rir: 0 }, 80);
     expect(r.success).toBe(true);
     expect(r.session.exercises[0].sets[0].isPR).toBe(true);
     // 80×5 (e1RM 93.3) > 82×1 (e1RM 84.7) → PR даже при меньшем весе
-    r = logSet(r.session, 0, { setNumber: 2, weightKg: 80, reps: 5, rpe: 8, rir: 2 });
+    r = logSet(r.session, 0, { setNumber: 2, weightKg: 80, reps: 5, rpe: 8, rir: 2 }, 80);
     expect(r.session.exercises[0].sets[1].isPR).toBe(true);
-    // Повторный 80×5 — уже не PR
-    r = logSet(r.session, 0, { setNumber: 3, weightKg: 80, reps: 5, rpe: 8, rir: 2 });
+    // Повторный 80×5 — уже не PR (равный e1RM рекордом не считается)
+    r = logSet(r.session, 0, { setNumber: 3, weightKg: 80, reps: 5, rpe: 8, rir: 2 }, 80);
     expect(r.session.exercises[0].sets[2].isPR).toBe(false);
   });
 });
 
 describe('getVolumeTrend — окно по датам', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('фильтрует сессии старше N дней', () => {
     const old = { ...startSession('PPL', 1), date: '2020-01-01', sessionId: 'old' };
-    const recent = { ...startSession('PPL', 1), date: localIsoDate(), sessionId: 'recent', totalVolume: 1000, totalSets: 3, exercises: [] };
+    const recent = {
+      ...startSession('PPL', 1),
+      date: localIsoDate(),
+      sessionId: 'recent',
+      totalVolume: 1000,
+      totalSets: 3,
+      exercises: [],
+    };
     saveSessions([old, recent]);
     const trend = getVolumeTrend(14);
     expect(trend.length).toBe(1);
@@ -179,7 +241,9 @@ describe('ISO год недели', () => {
 });
 
 describe('предупреждение о срезе хранилища', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('set/clear/get roundtrip', () => {
     saveSessions([{ ...startSession('PPL', 1), sessionId: 'a' }]);
     expect(getStorageTrimWarning()).toBeNull();
@@ -192,7 +256,9 @@ describe('предупреждение о срезе хранилища', () => 
 });
 
 describe('валидация лимитов и legacy-чистка имён', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('logSet отклоняет вес/повторы сверх лимитов', () => {
     let s = startSession('PPL', 1);
     s = addExerciseToSession(s, { id: 'bench', name: 'Жим', pattern: 'horizontal_push', muscleGroup: 'chest' });
@@ -225,7 +291,7 @@ describe('findDuplicateWorkouts', () => {
     const dupes = findDuplicateWorkouts([a, b]);
     expect(dupes.length).toBe(1);
     expect(dupes[0].keep.id).toBe('ls_copy'); // наибольший id — keep
-    expect(dupes[0].dupes.map(d => d.id)).toEqual(['idb_copy']);
+    expect(dupes[0].dupes.map((d) => d.id)).toEqual(['idb_copy']);
   });
   it('не считает дублями разные тренировки за один день', () => {
     const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
@@ -239,16 +305,26 @@ describe('findDuplicateWorkouts', () => {
   });
   it('workoutContentSignature игнорирует порядок упражнений', () => {
     const a = mkLog('a', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
-    const b = { ...mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]), exercises: [mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]).exercises[0]] };
+    const b = {
+      ...mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]),
+      exercises: [mkLog('b', '2026-08-11', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]).exercises[0]],
+    };
     expect(workoutContentSignature(a)).toBe(workoutContentSignature(b));
   });
 });
 
 describe('finishSession roundtrip (проведение тренировки → дневник)', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('завершённая сессия появляется в loadSessions и getLastSession', () => {
     let s = startSession('ББ', 1);
-    s = addExerciseToSession(s, { id: 'bench_press', name: 'Жим штанги лёжа', pattern: 'horizontal_push', muscleGroup: 'chest' });
+    s = addExerciseToSession(s, {
+      id: 'bench_press',
+      name: 'Жим штанги лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
     const r = logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 5, rpe: 8, rir: 2 });
     const finished = finishSession(r.session, 'тест');
     expect(finished.durationMin).toBeGreaterThanOrEqual(0);
@@ -273,28 +349,41 @@ describe('finishSession roundtrip (проведение тренировки →
     const w = mkLog('w_dup', '2026-08-13', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
     await diary.saveWorkoutLog(w);
     await diary.saveWorkoutLog(w);
-    expect(loadSessions().filter(s => s.sessionId === 'w_dup').length).toBe(1);
+    expect(loadSessions().filter((s) => s.sessionId === 'w_dup').length).toBe(1);
   });
 });
 
 describe('StrengthDiary — единый слой и дедуп', () => {
-  beforeEach(() => { localStorage.clear(); getMockDb().getAll.mockReset(); getMockDb().put.mockReset().mockResolvedValue(undefined); getMockDb().delete.mockReset().mockResolvedValue(undefined); });
+  beforeEach(() => {
+    localStorage.clear();
+    getMockDb().getAll.mockReset();
+    getMockDb().put.mockReset().mockResolvedValue(undefined);
+    getMockDb().delete.mockReset().mockResolvedValue(undefined);
+  });
   it('saveWorkoutLog зеркалит в localStorage', async () => {
     const diary = new StrengthDiary();
     await diary.saveWorkoutLog(mkLog('w1', '2026-08-06', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]));
-    expect(loadSessions().map(s => s.sessionId)).toContain('w1');
+    expect(loadSessions().map((s) => s.sessionId)).toContain('w1');
   });
   it('deleteWorkoutLog удаляет из IDB и localStorage + дочерние strength-логи', async () => {
     const mockDb = getMockDb();
     const diary = new StrengthDiary();
     await diary.saveWorkoutLog(mkLog('w2', '2026-08-07', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]));
     mockDb.getAll.mockResolvedValueOnce([
-      { id: 'w2_ex', exerciseId: 'Жим', sets: [], totalVolume: 0, estimated1RM: 0, isCompound: true, date: '2026-08-07' } as StrengthLogEntry,
+      {
+        id: 'w2_ex',
+        exerciseId: 'Жим',
+        sets: [],
+        totalVolume: 0,
+        estimated1RM: 0,
+        isCompound: true,
+        date: '2026-08-07',
+      } as StrengthLogEntry,
     ]);
     await diary.deleteWorkoutLog('w2');
     expect(mockDb.delete).toHaveBeenCalledWith('workout_log', 'w2');
     expect(mockDb.delete).toHaveBeenCalledWith('training_log', 'w2_ex');
-    expect(loadSessions().map(s => s.sessionId)).not.toContain('w2');
+    expect(loadSessions().map((s) => s.sessionId)).not.toContain('w2');
   });
   it('getWorkoutLogs: две сессии за день с разными весами сохраняются, идентичные — схлопываются', async () => {
     const mockDb = getMockDb();
@@ -305,7 +394,7 @@ describe('StrengthDiary — единый слой и дедуп', () => {
     ]);
     const diary = new StrengthDiary();
     const logs = await diary.getWorkoutLogs();
-    const жим = logs.flatMap(l => l.exercises).filter(e => e.exerciseName === 'Жим');
+    const жим = logs.flatMap((l) => l.exercises).filter((e) => e.exerciseName === 'Жим');
     expect(жим.reduce((s, e) => s + (e.sets || []).length, 0)).toBe(2); // оба подхода сохранены
 
     // Свежий экземпляр (кэш 5 мин не должен возвращать устаревшие данные)
@@ -317,13 +406,15 @@ describe('StrengthDiary — единый слой и дедуп', () => {
       { ...workoutLogToSession(mkLog('w_b', '2026-08-09', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }])) },
     ]);
     const logs2 = await new StrengthDiary().getWorkoutLogs();
-    const жим2 = logs2.flatMap(l => l.exercises).filter(e => e.exerciseName === 'Жим');
+    const жим2 = logs2.flatMap((l) => l.exercises).filter((e) => e.exerciseName === 'Жим');
     expect(жим2.reduce((s, e) => s + (e.sets || []).length, 0)).toBe(1); // дубликат схлопнут
   });
   it('getWorkoutLogs: write-back сессий из localStorage в IndexedDB', async () => {
     const mockDb = getMockDb();
     mockDb.getAll.mockResolvedValueOnce([]);
-    saveSessions([workoutLogToSession(mkLog('ls_only', '2026-08-10', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]))]);
+    saveSessions([
+      workoutLogToSession(mkLog('ls_only', '2026-08-10', 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }])),
+    ]);
     const diary = new StrengthDiary();
     await diary.getWorkoutLogs();
     expect(mockDb.put).toHaveBeenCalledWith('workout_log', expect.objectContaining({ id: 'ls_only' }));
@@ -342,9 +433,9 @@ describe('StrengthDiary — единый слой и дедуп', () => {
     const date = new Date().toISOString().slice(0, 10);
     const workout = mkLog('w_daily_dup', date, 'Жим', [{ weight: 80, reps: 5, rir: 2, rpe: 8 }]);
     const legacyEntry = { ...workout.exercises[0], id: 'legacy_daily_dup' };
-    mockDb.getAll.mockImplementation((store: string) => Promise.resolve(
-      store === 'training_log' ? [legacyEntry] : store === 'workout_log' ? [workout] : [],
-    ));
+    mockDb.getAll.mockImplementation((store: string) =>
+      Promise.resolve(store === 'training_log' ? [legacyEntry] : store === 'workout_log' ? [workout] : []),
+    );
     const diary = new StrengthDiary();
     const progress = await diary.getWeeklyProgress();
     expect(progress).toHaveLength(1);

@@ -128,8 +128,8 @@
 
         <TextView
             android:id="@+id/w_wo_add1"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/widget_chip"
             android:contentDescription="Записать подход"
             android:gravity="center"
@@ -199,8 +199,8 @@
 
         <TextView
             android:id="@+id/w_wo_add2"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/widget_chip"
             android:contentDescription="Записать подход"
             android:gravity="center"
@@ -270,8 +270,8 @@
 
         <TextView
             android:id="@+id/w_wo_add3"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/widget_chip"
             android:contentDescription="Записать подход"
             android:gravity="center"
@@ -341,8 +341,8 @@
 
         <TextView
             android:id="@+id/w_wo_add4"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/widget_chip"
             android:contentDescription="Записать подход"
             android:gravity="center"
@@ -412,8 +412,8 @@
 
         <TextView
             android:id="@+id/w_wo_add5"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="@drawable/widget_chip"
             android:contentDescription="Записать подход"
             android:gravity="center"
@@ -446,7 +446,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="@drawable/widget_action"
+            android:contentDescription="Начать тренировку"
             android:gravity="center"
+            android:minHeight="48dp"
             android:padding="9dp"
             android:text="▶ Начать"
             android:textColor="#C9F73A"
@@ -460,6 +462,7 @@
             android:layout_marginStart="8dp"
             android:background="@drawable/widget_action"
             android:gravity="center"
+            android:minHeight="48dp"
             android:paddingLeft="14dp"
             android:paddingTop="9dp"
             android:paddingRight="14dp"

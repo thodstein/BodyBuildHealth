@@ -20,6 +20,13 @@ import VolumeRecoveryCorrelationCard from './VolumeRecoveryCorrelationCard';
 import StickingPointAnalysisCard from './StickingPointAnalysisCard';
 import { ReadinessForecastCard } from './ReadinessForecastCard';
 import { TrainingScoreCard } from '../../components/TrainingScoreCard';
+
+/** Дата записи «YYYY-MM-DD» — локальная полночь, а не UTC (иначе день съезжает). */
+const localDay = (value: string | Date): Date => {
+  if (value instanceof Date) return value;
+  const s = String(value);
+  return new Date(s.length <= 10 ? s + 'T00:00:00' : s);
+};
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { WeeklyTargetsCard, SectionHeader, DiaryEmptyState } from './diary-cards';
 import { diaryStyles as style, GRP_RU, GROUP_COLORS, ACCENT } from './diary-tokens';
@@ -90,11 +97,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {/* Bodyweight overlay on volume trend */}
               <SectionHeader icon="📊" title="Объём и нагрузка" hint="тоннаж · группы · баланс" />
               {measurements.length >= 2 && historyWorkouts.length >= 4 && (() => {
-                const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                 const weeklyVol: { week: string; vol: number }[] = [];
                 const weekMap = new Map<string, number>();
                 sorted.forEach(w => {
-                  const d = new Date(w.date);
+                  const d = localDay(w.date);
                   const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
                   const key = localIsoDate(wkStart);
                   weekMap.set(key, (weekMap.get(key) || 0) + w.exercises.reduce((s: number, e: any) => s + e.totalVolume, 0));
@@ -125,12 +132,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               })()}
               {/* Неделя-over-week comparison */}
               {historyWorkouts.length >= 2 && (() => {
-                const sorted = [...historyWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const sorted = [...historyWorkouts].sort((a, b) => localDay(b.date).getTime() - localDay(a.date).getTime());
                 const now = new Date();
                 const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                 const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-                const thisWeek = sorted.filter(w => new Date(w.date) >= weekAgo);
-                const lastWeek = sorted.filter(w => { const d = new Date(w.date); return d >= twoWeeksAgo && d < weekAgo; });
+                const thisWeek = sorted.filter(w => localDay(w.date) >= weekAgo);
+                const lastWeek = sorted.filter(w => { const d = localDay(w.date); return d >= twoWeeksAgo && d < weekAgo; });
                 if (thisWeek.length === 0 || lastWeek.length === 0) return null;
                 const twVol = thisWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
                 const lwVol = lastWeek.reduce((s, w) => s + w.exercises.reduce((sum, e) => sum + e.totalVolume, 0), 0);
@@ -746,7 +753,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   const weekEnd = new Date(today);
                   weekEnd.setDate(weekEnd.getDate() - w * 7);
                   const count = historyWorkouts.filter(wo => {
-                    const d = new Date(wo.date);
+                    const d = localDay(wo.date);
                     return d > weekStart && d <= weekEnd;
                   }).length;
                   weekData.push({ label: `Н${weeks - w}`, count, target: 4 });
@@ -790,7 +797,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {historyWorkouts.length >= 1 && <WeeklyTargetsCard historyWorkouts={historyWorkouts} />}
               {/* Workout streaks */}
               {historyWorkouts.length >= 3 && (() => {
-                const sorted = [...historyWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const sorted = [...historyWorkouts].sort((a, b) => localDay(b.date).getTime() - localDay(a.date).getTime());
                 // Локальные границы суток: toISOString уводил «сегодня»/шаг на ±1 около полуночи.
                 const days = sorted.map(w => (w.date || '').slice(0, 10));
                 const uniqueDays = [...new Set(days)];
@@ -806,7 +813,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 let cur = 1;
                 for (let i = 1; i < uniqueDays.length; i++) {
                   const prev = new Date(uniqueDays[i - 1]);
-                  const curr = new Date(uniqueDays[i]);
+                  const curr = localDay(uniqueDays[i]);
                   const diffDays = Math.round((prev.getTime() - curr.getTime()) / (24 * 60 * 60 * 1000));
                   if (diffDays === 1) { cur++; } else { maxStreak = Math.max(maxStreak, cur); cur = 1; }
                 }
@@ -839,7 +846,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 for (let w = weeks - 1; w >= 0; w--) {
                   const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - (w + 1) * 7);
                   const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() - w * 7);
-                  const weekWorkouts = historyWorkouts.filter(wo => { const d = new Date(wo.date); return d > weekStart && d <= weekEnd; });
+                  const weekWorkouts = historyWorkouts.filter(wo => { const d = localDay(wo.date); return d > weekStart && d <= weekEnd; });
                   const groupSets: Record<string, number> = {};
                   weekWorkouts.forEach(wo => wo.exercises.forEach((e: any) => {
                     const cat = EXERCISE_CATALOG.find((c: any) => c.id === e.exerciseId);
@@ -968,10 +975,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   w.exercises.forEach((e: any) => {
                     const sets = e.sets || [];
                     sets.forEach((s: any) => {
-                      const reps = s.reps || 10;
-                      const rest = s.restSec || 90;
-                      const timePerSet = reps * 3 + rest;
-                      totalTUT += timePerSet;
+                      // Отдых — не время под нагрузкой. TUT = повторы x ~3 c (оценка
+                      // темпа); подход без повторов не вносит вклада.
+                      const reps = Number(s.reps) || 0;
+                      if (reps <= 0) return;
+                      totalTUT += reps * 3;
                     });
                   });
                   if (w.exercises.length > 0) totalSessions++;
@@ -1136,7 +1144,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {/* Weekly summary card */}
               {historyWorkouts.length > 0 && (() => {
                 const lastWeek = historyWorkouts.filter(w => {
-                  const d = new Date(w.date);
+                  const d = localDay(w.date);
                   const now = new Date();
                   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                   return d >= weekAgo;
@@ -1219,10 +1227,10 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <AllExercisesTrendCard sessions={historyWorkouts} />
                     {/* Weekly volume bar chart */}
                     {historyWorkouts.length >= 3 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const weekMap = new Map<string, { vol: number; sets: number; count: number }>();
                       sorted.forEach(w => {
-                        const d = new Date(w.date);
+                        const d = localDay(w.date);
                         const wkStart = new Date(d); wkStart.setDate(d.getDate() - d.getDay());
                         const key = localIsoDate(wkStart);
                         const prev = weekMap.get(key) || { vol: 0, sets: 0, count: 0 };
@@ -1259,7 +1267,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {historyWorkouts.length >= 4 && (() => {
                       const now = new Date();
                       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-                      const monthW = historyWorkouts.filter(w => new Date(w.date) >= monthStart);
+                      const monthW = historyWorkouts.filter(w => localDay(w.date) >= monthStart);
                       if (monthW.length === 0) return null;
                       const totalVol = monthW.reduce((s: number, w: any) => s + w.exercises.reduce((ss: number, e: any) => ss + e.totalVolume, 0), 0);
                       const totalSets = monthW.reduce((s: number, w: any) => s + w.exercises.reduce((ss: number, e: any) => ss + (e.sets || []).length, 0), 0);
@@ -1329,7 +1337,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <VolumeRecoveryCorrelationCard sessions={historyWorkouts} />
                     {/* Fatigue accumulation curve */}
                     {historyWorkouts.length >= 4 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const last12 = sorted.slice(-12);
                       const fatigueData: number[] = [];
                       const volumeData: number[] = [];
@@ -1365,7 +1373,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     })()}
                     {/* Training velocity per muscle */}
                     {historyWorkouts.length >= 6 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const MUSCLES = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'biceps', 'triceps'];
                       const velocities: { group: string; velocity: number; sessions: number; first: number; last: number }[] = [];
                       MUSCLES.forEach(m => {
@@ -1380,7 +1388,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           });
                         }));
                         if (exBest.size < 2) return;
-                        const vals = [...exBest.values()].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                        const vals = [...exBest.values()].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                         const first = vals[0].e1rm; const last = vals[vals.length - 1].e1rm;
                         const weeks = Math.max(1, (new Date(vals[vals.length - 1].date).getTime() - new Date(vals[0].date).getTime()) / (7 * 24 * 60 * 60 * 1000));
                         velocities.push({ group: m, velocity: +((last - first) / weeks).toFixed(1), sessions: vals.length, first, last });
@@ -1406,13 +1414,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <StickingPointAnalysisCard sessions={historyWorkouts} />
                     {/* Training density trend */}
                     {historyWorkouts.length >= 4 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const last12 = sorted.slice(-12);
-                      const densityData = last12.map(w => {
+                      const densityData = last12.filter(w => (Number(w.duration) || 0) > 0).map(w => {
                         const totalSets = w.exercises.reduce((s: number, e: any) => s + (e.sets || []).length, 0);
-                        const dur = w.duration || 60;
+                        // Длительность не выдумываем: без неё плотность не считается.
+                        const dur = Number(w.duration) || 0;
                         return { date: w.date.slice(5, 10), setsPerMin: +(totalSets / dur).toFixed(2), sets: totalSets, mins: dur };
                       });
+                      if (densityData.length < 2) return null;
                       const maxD = Math.max(...densityData.map(d => d.setsPerMin), 1);
                       const h = 40; const ww = 280;
                       return (
@@ -1446,11 +1456,16 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     })()}
                     {/* Session duration forecast */}
                     {historyWorkouts.length >= 3 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const last10 = sorted.slice(-10);
-                      const avgDuration = Math.round(last10.reduce((s: number, w: any) => s + (w.duration || 60), 0) / last10.length);
+                      const withDuration = last10.filter((w: any) => (Number(w.duration) || 0) > 0);
+                      const avgDuration = withDuration.length > 0
+                        ? Math.round(withDuration.reduce((s: number, w: any) => s + (Number(w.duration) || 0), 0) / withDuration.length)
+                        : 0;
                       const avgExercises = Math.round(last10.reduce((s: number, w: any) => s + w.exercises.length, 0) / last10.length * 10) / 10;
                       const avgSets = Math.round(last10.reduce((s: number, w: any) => s + w.exercises.reduce((ss: number, e: any) => ss + (e.sets || []).length, 0), 0) / last10.length);
+                      // Нет измеренных длительностей — прогноз не рисуем (0 мин = ложь).
+                      if (avgDuration <= 0 || avgExercises <= 0) return null;
                       const predictByExercises = (n: number) => Math.round(avgDuration * n / avgExercises);
                       return (
                         <div style={style.card}>
@@ -1470,18 +1485,22 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     })()}
                     {/* Session quality score trend */}
                     {historyWorkouts.length >= 4 && (() => {
-                      const sorted = [...historyWorkouts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const sorted = [...historyWorkouts].sort((a, b) => localDay(a.date).getTime() - localDay(b.date).getTime());
                       const last12 = sorted.slice(-12);
                       const scores = last12.map(w => {
                         const sets = w.exercises.reduce((s: number, e: any) => s + (e.sets || []).length, 0);
-                        const dur = w.duration || 60;
+                        const dur = Number(w.duration) || 0;
                         const rpeArr: number[] = [];
                         w.exercises.forEach((e: any) => e.sets.forEach((st: any) => { if (st.rpe) rpeArr.push(st.rpe); }));
-                        const avgRPE = rpeArr.length > 0 ? rpeArr.reduce((s, v) => s + v, 0) / rpeArr.length : 7;
-                        const completion = dur > 0 ? Math.min(1, sets / dur * 1.5) : 0.5;
+                        // Качество сессии без длительности и RPE не оцениваем: подставные
+                        // 60 мин / RPE 7 / 0.5 превращали оценку в шум.
+                        if (dur <= 0 || rpeArr.length === 0) return null;
+                        const avgRPE = rpeArr.reduce((s, v) => s + v, 0) / rpeArr.length;
+                        const completion = Math.min(1, sets / dur * 1.5);
                         const quality = Math.round((completion * 40 + Math.min(avgRPE / 10, 1) * 30 + Math.min(sets / 30, 1) * 30) * 10);
                         return { date: w.date.slice(5, 10), score: Math.min(100, quality) };
-                      });
+                      }).filter((x): x is { date: string; score: number } => !!x);
+                      if (scores.length < 2) return null;
                       const maxS = 100;
                       const h = 40; const ww = 280;
                       return (

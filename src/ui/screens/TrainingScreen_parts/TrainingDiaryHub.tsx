@@ -12,8 +12,20 @@ import { computeAnalytics } from '../../../engines/analytics-engine';
 import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import type { MacrocyclePlan } from '../../../engines/training-periodization.engine';
-import { generateWeeklyReport, analyzeMeasurements, loadMeasurements, saveMeasurement, type BodyMeasurement } from '../../../engines/log-analytics-progression.engine';
-import { buildVisualDashboard, computeWeeklyChart, computeMuscleVolume, computeProgression, type VizSessionData } from '../../../engines/training-visualization.engine';
+import {
+  generateWeeklyReport,
+  analyzeMeasurements,
+  loadMeasurements,
+  saveMeasurement,
+  type BodyMeasurement,
+} from '../../../engines/log-analytics-progression.engine';
+import {
+  buildVisualDashboard,
+  computeWeeklyChart,
+  computeMuscleVolume,
+  computeProgression,
+  type VizSessionData,
+} from '../../../engines/training-visualization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 import { loadReadinessHistory } from './readiness-history';
@@ -40,14 +52,39 @@ import MMCTrackingCard from './MMCTrackingCard';
 import { CheckinMetricsCard } from './CheckinMetricsCard';
 import { CsvImportTab } from './CsvImportTab';
 import { useIsMobile } from './useIsMobile';
-import { getStorageTrimWarning, clearStorageTrimWarning, getISOWeekNumber, getISOWeekYear, findDuplicateWorkouts } from '../../../engines/workout-logger.engine';
+import {
+  getStorageTrimWarning,
+  clearStorageTrimWarning,
+  getISOWeekNumber,
+  getISOWeekYear,
+  findDuplicateWorkouts,
+} from '../../../engines/workout-logger.engine';
 import { migrateWeightLogLegacy, getWeightLog, saveWeightLog } from '../../../engines/profile-store';
 import { PL_NORM_TABLES, classifyTotal, RANK_LABELS, type Discipline } from '../../../engines/pl-norms.engine';
 import type { ProgressionAlert } from '../../../engines/strength-diary.engine';
-import { ACCENT, DIM, GRP_RU, GROUP_COLORS, diaryCard, diaryLabel, diaryInput, diaryBtn, diaryStyles } from './diary-tokens';
+import {
+  ACCENT,
+  DIM,
+  GRP_RU,
+  GROUP_COLORS,
+  diaryCard,
+  diaryLabel,
+  diaryInput,
+  diaryBtn,
+  diaryStyles,
+} from './diary-tokens';
 import { MiniLineChart, MiniBarChart } from './DiaryChart';
 import { SessionEditorModal } from './SessionEditorModal';
-import { WorkoutWeekCard, ProgressChartsCard, WorkoutComparisonCard, ExerciseSubstitutionCard, WarmupRampCard, SectionHeader, DiaryEmptyState, HabitWeekCard } from './diary-cards';
+import {
+  WorkoutWeekCard,
+  ProgressChartsCard,
+  WorkoutComparisonCard,
+  ExerciseSubstitutionCard,
+  WarmupRampCard,
+  SectionHeader,
+  DiaryEmptyState,
+  HabitWeekCard,
+} from './diary-cards';
 import { DiaryAnalyticsView } from './DiaryAnalyticsView';
 import { DiaryProgressView } from './DiaryProgressView';
 import { DiaryHistoryView } from './DiaryHistoryView';
@@ -66,8 +103,19 @@ import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
 import { WarmupDiaryView } from './WarmupDiaryView';
 import { CooldownDiaryView } from './CooldownDiaryView';
-import { loadActiveProtocol, itemsForDay, loadDayProgress, loadCheckins, detectDayType } from '../../../engines/mindset-protocol.engine';
-import { loadActiveMobility, itemsForSlot, loadMobilityDayProgress, hasDailyRoutine } from '../../../engines/mobility-protocol.engine';
+import {
+  loadActiveProtocol,
+  itemsForDay,
+  loadDayProgress,
+  loadCheckins,
+  detectDayType,
+} from '../../../engines/mindset-protocol.engine';
+import {
+  loadActiveMobility,
+  itemsForSlot,
+  loadMobilityDayProgress,
+  hasDailyRoutine,
+} from '../../../engines/mobility-protocol.engine';
 import { loadWarmupLog, upsertWarmupLog, warmupLogForDate } from '../../../engines/warmup.engine';
 import { loadCooldownLog, upsertCooldownLog, cooldownLogForDate } from '../../../engines/cooldown.engine';
 import { InfoErrorBoundary } from '../../components/InfoErrorBoundary';
@@ -83,25 +131,70 @@ const RecordModeSelector: React.FC<{
   pendingTemplate?: any;
   templateKey?: number;
   onTemplateApplied?: () => void;
-}> = ({ diary, historyWorkouts, selectedWeek, onSave, sub, onSubChange, pendingTemplate, templateKey, onTemplateApplied }) => {
+}> = ({
+  diary,
+  historyWorkouts,
+  selectedWeek,
+  onSave,
+  sub,
+  onSubChange,
+  pendingTemplate,
+  templateKey,
+  onTemplateApplied,
+}) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="td-seg" style={{ display: 'flex', gap: 6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'6px' }}>
-        {([['quick', '⚡ Быстро'], ['full', '📝 Подробно']] as const).map(([k, l]) => (
-          <button key={k} onClick={() => onSubChange(k)} data-active={sub === k ? 'true' : 'false'} style={{
-            flex: 1, padding: '8px 12px', borderRadius: 10,
-            border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
-            background: sub === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
-            color: sub === k ? '#000' : '#fff',
-            fontWeight: 700, fontSize: 11, cursor: 'pointer', boxShadow: sub === k ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
-          }}>{l}</button>
+      <div
+        className="td-seg"
+        style={{
+          display: 'flex',
+          gap: 6,
+          background: 'rgba(24,24,27,0.42)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          backdropFilter: 'blur(12px)' as any,
+          borderRadius: 12,
+          padding: '6px',
+        }}
+      >
+        {(
+          [
+            ['quick', '⚡ Быстро'],
+            ['full', '📝 Подробно'],
+          ] as const
+        ).map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => onSubChange(k)}
+            data-active={sub === k ? 'true' : 'false'}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+              background: sub === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
+              color: sub === k ? '#000' : '#fff',
+              fontWeight: 700,
+              fontSize: 11,
+              cursor: 'pointer',
+              boxShadow: sub === k ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
+            }}
+          >
+            {l}
+          </button>
         ))}
       </div>
       {sub === 'quick' ? (
         <QuickEntry diary={diary} historyWorkouts={historyWorkouts} selectedWeek={selectedWeek} onSave={onSave} />
       ) : (
-        <DiaryRecordingForm diary={diary} selectedWeek={selectedWeek} onSave={onSave} historyWorkouts={historyWorkouts}
-          pendingTemplate={pendingTemplate} templateKey={templateKey} onTemplateApplied={onTemplateApplied} />
+        <DiaryRecordingForm
+          diary={diary}
+          selectedWeek={selectedWeek}
+          onSave={onSave}
+          historyWorkouts={historyWorkouts}
+          pendingTemplate={pendingTemplate}
+          templateKey={templateKey}
+          onTemplateApplied={onTemplateApplied}
+        />
       )}
     </div>
   );
@@ -122,17 +215,94 @@ interface DiaryNavItem {
 }
 
 const DIARY_NAV_ITEMS: DiaryNavItem[] = [
-  { mode: 'record', label: '📓 Запись', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'linear-gradient(135deg, var(--accent), #00c853)', activeColor: '#000' },
-  { mode: 'history', label: '📜 История', color: 'var(--accent)', bg: 'rgba(255,255,255,0.04)', activeBg: 'rgba(0,230,138,0.12)', activeColor: 'var(--accent)' },
-  { mode: 'summary', label: '📊 Отчёт', color: '#22d3ee', bg: 'rgba(34,211,238,0.06)', activeBg: 'rgba(34,211,238,0.14)', activeColor: '#22d3ee' },
-  { mode: 'progress', label: '📏 Прогресс', color: '#34d399', bg: 'rgba(52,211,153,0.06)', activeBg: 'rgba(52,211,153,0.14)', activeColor: '#34d399' },
-  { mode: 'analytics_lite', label: '📈 Анализ', color: '#60a5fa', bg: 'rgba(96,165,250,0.06)', activeBg: 'rgba(96,165,250,0.14)', activeColor: '#60a5fa' },
-  { mode: 'rituals', label: '🧘 Ритуалы', color: '#f472b6', bg: 'rgba(244,114,182,0.06)', activeBg: 'rgba(244,114,182,0.14)', activeColor: '#f472b6' },
-  { mode: 'feedback', label: '📊 Фидбек', color: '#a855f7', bg: 'rgba(168,85,247,0.06)', activeBg: 'rgba(168,85,247,0.14)', activeColor: '#a78bfa' },
-  { mode: 'mytraining', label: '⭐ Мои', color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', activeBg: 'rgba(245,158,11,0.14)', activeColor: '#fbbf24' },
-  { mode: 'competition', label: '🏁 Соревн.', color: '#eab308', bg: 'rgba(234,179,8,0.06)', activeBg: 'rgba(234,179,8,0.14)', activeColor: '#fde68a' },
-  { mode: 'recommendations', label: '💡 Рекоменд.', color: '#8b5cf6', bg: 'rgba(139,92,246,0.06)', activeBg: 'rgba(139,92,246,0.14)', activeColor: '#a78bfa' },
-  { mode: 'tools', label: '🛠 Инструменты', color: '#94a3b8', bg: 'rgba(148,163,184,0.06)', activeBg: 'rgba(148,163,184,0.14)', activeColor: '#cbd5e1' },
+  {
+    mode: 'record',
+    label: '📓 Запись',
+    color: 'var(--accent)',
+    bg: 'rgba(255,255,255,0.04)',
+    activeBg: 'linear-gradient(135deg, var(--accent), #00c853)',
+    activeColor: '#000',
+  },
+  {
+    mode: 'history',
+    label: '📜 История',
+    color: 'var(--accent)',
+    bg: 'rgba(255,255,255,0.04)',
+    activeBg: 'rgba(0,230,138,0.12)',
+    activeColor: 'var(--accent)',
+  },
+  {
+    mode: 'summary',
+    label: '📊 Отчёт',
+    color: '#22d3ee',
+    bg: 'rgba(34,211,238,0.06)',
+    activeBg: 'rgba(34,211,238,0.14)',
+    activeColor: '#22d3ee',
+  },
+  {
+    mode: 'progress',
+    label: '📏 Прогресс',
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    activeBg: 'rgba(52,211,153,0.14)',
+    activeColor: '#34d399',
+  },
+  {
+    mode: 'analytics_lite',
+    label: '📈 Анализ',
+    color: '#60a5fa',
+    bg: 'rgba(96,165,250,0.06)',
+    activeBg: 'rgba(96,165,250,0.14)',
+    activeColor: '#60a5fa',
+  },
+  {
+    mode: 'rituals',
+    label: '🧘 Ритуалы',
+    color: '#f472b6',
+    bg: 'rgba(244,114,182,0.06)',
+    activeBg: 'rgba(244,114,182,0.14)',
+    activeColor: '#f472b6',
+  },
+  {
+    mode: 'feedback',
+    label: '📊 Фидбек',
+    color: '#a855f7',
+    bg: 'rgba(168,85,247,0.06)',
+    activeBg: 'rgba(168,85,247,0.14)',
+    activeColor: '#a78bfa',
+  },
+  {
+    mode: 'mytraining',
+    label: '⭐ Мои',
+    color: '#f59e0b',
+    bg: 'rgba(245,158,11,0.06)',
+    activeBg: 'rgba(245,158,11,0.14)',
+    activeColor: '#fbbf24',
+  },
+  {
+    mode: 'competition',
+    label: '🏁 Соревн.',
+    color: '#eab308',
+    bg: 'rgba(234,179,8,0.06)',
+    activeBg: 'rgba(234,179,8,0.14)',
+    activeColor: '#fde68a',
+  },
+  {
+    mode: 'recommendations',
+    label: '💡 Рекоменд.',
+    color: '#8b5cf6',
+    bg: 'rgba(139,92,246,0.06)',
+    activeBg: 'rgba(139,92,246,0.14)',
+    activeColor: '#a78bfa',
+  },
+  {
+    mode: 'tools',
+    label: '🛠 Инструменты',
+    color: '#94a3b8',
+    bg: 'rgba(148,163,184,0.06)',
+    activeBg: 'rgba(148,163,184,0.14)',
+    activeColor: '#cbd5e1',
+  },
 ];
 
 const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ mode, onGo }) => {
@@ -143,29 +313,59 @@ const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ 
     try {
       const el = navRef.current?.querySelector('[data-active="true"]') as HTMLElement | null;
       (el as any)?.scrollIntoView?.({ block: 'nearest', inline: 'center', behavior: 'auto' as any });
-    } catch { /* ignore (jsdom/SSR) */ }
+    } catch {
+      /* ignore (jsdom/SSR) */
+    }
   }, [mode]);
   return (
-  <div ref={navRef} className="td-subnav" aria-label="Разделы дневника" style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' as any, background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any, borderRadius: 12, padding: '8px', marginBottom: 4 }}>
-    {DIARY_NAV_ITEMS.map(item => {
-      const active = mode === item.mode;
-      const idleColor = item.mode === 'record' ? '#fff' : item.color;
-      return (
-        <button key={item.mode} aria-pressed={active} onClick={() => onGo(item.mode)}
-          data-active={active ? 'true' : 'false'} className="td-subnav-btn"
-          style={{
-            flex: '0 0 auto', minWidth: 90, whiteSpace: 'nowrap', padding: '8px 12px', borderRadius: 10,
-            border: active ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.08)',
-            background: active ? item.activeBg : item.bg,
-            color: active ? item.activeColor : idleColor,
-            fontWeight: active ? 800 : 700, fontSize: 11, cursor: 'pointer',
-            boxShadow: active && item.mode === 'record' ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
-          }}>
-          {item.label}
-        </button>
-      );
-    })}
-  </div>
+    <div
+      ref={navRef}
+      className="td-subnav"
+      aria-label="Разделы дневника"
+      style={{
+        display: 'flex',
+        gap: 6,
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        scrollbarWidth: 'none' as any,
+        background: 'rgba(24,24,27,0.42)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        backdropFilter: 'blur(12px)' as any,
+        borderRadius: 12,
+        padding: '8px',
+        marginBottom: 4,
+      }}
+    >
+      {DIARY_NAV_ITEMS.map((item) => {
+        const active = mode === item.mode;
+        const idleColor = item.mode === 'record' ? '#fff' : item.color;
+        return (
+          <button
+            key={item.mode}
+            aria-pressed={active}
+            onClick={() => onGo(item.mode)}
+            data-active={active ? 'true' : 'false'}
+            className="td-subnav-btn"
+            style={{
+              flex: '0 0 auto',
+              minWidth: 90,
+              whiteSpace: 'nowrap',
+              padding: '8px 12px',
+              borderRadius: 10,
+              border: active ? `1px solid ${item.color}` : '1px solid rgba(255,255,255,0.08)',
+              background: active ? item.activeBg : item.bg,
+              color: active ? item.activeColor : idleColor,
+              fontWeight: active ? 800 : 700,
+              fontSize: 11,
+              cursor: 'pointer',
+              boxShadow: active && item.mode === 'record' ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
+            }}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 };
 
@@ -174,7 +374,25 @@ const DiarySubnav: React.FC<{ mode: HubMode; onGo: (m: HubMode) => void }> = ({ 
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'summary' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
+  initialMode?:
+    | 'record'
+    | 'tools'
+    | 'diary'
+    | 'reports'
+    | 'history'
+    | 'summary'
+    | 'analytics'
+    | 'analytics_lite'
+    | 'rituals'
+    | 'progress'
+    | 'calendar'
+    | 'checkin'
+    | 'mmc'
+    | 'mindset'
+    | 'mobility'
+    | 'warmup'
+    | 'cooldown'
+    | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -196,11 +414,47 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'summary' | 'analytics' | 'analytics_lite' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback' | 'rituals';
+type HubMode =
+  | 'record'
+  | 'history'
+  | 'summary'
+  | 'analytics'
+  | 'analytics_lite'
+  | 'progress'
+  | 'tools'
+  | 'calendar'
+  | 'checkin'
+  | 'mmc'
+  | 'mindset'
+  | 'mobility'
+  | 'warmup'
+  | 'cooldown'
+  | 'competition'
+  | 'recommendations'
+  | 'mytraining'
+  | 'feedback'
+  | 'rituals';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
-  initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord, onStartSession,
-  trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
+  initialMode,
+  diary,
+  diaryStats,
+  diaryProgress,
+  historyWorkouts,
+  macrocycle,
+  selectedWeek,
+  level,
+  onRefresh,
+  onGoRecord,
+  onStartSession,
+  trainingOutput,
+  goal,
+  daysPerWeek,
+  splitType,
+  periodizationType,
+  mesoLength,
+  tprofile,
+  linked,
 }) => {
   const normalizeMode = (m: string): HubMode => {
     if (m === 'diary') return 'record';
@@ -208,14 +462,17 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     if (m === 'import_data') return 'tools';
     if (m === 'analytics') return 'analytics_lite';
     if (m === 'calendar') return 'progress';
-    if (m === 'mindset' || m === 'mobility' || m === 'warmup' || m === 'cooldown' || m === 'mmc' || m === 'checkin') return 'rituals';
+    if (m === 'mindset' || m === 'mobility' || m === 'warmup' || m === 'cooldown' || m === 'mmc' || m === 'checkin')
+      return 'rituals';
     return (m as HubMode) || 'record';
   };
   const resolvedMode: HubMode = normalizeMode(initialMode as string);
   const [mode, setMode] = useState<HubMode>(resolvedMode);
   // The hub is reused while the parent tab changes. Keep the visible content
   // in sync instead of relying on a remount/key as an accidental reset.
-  useEffect(() => { setMode(resolvedMode); }, [resolvedMode]);
+  useEffect(() => {
+    setMode(resolvedMode);
+  }, [resolvedMode]);
   // Навигация как табы топ-приложения: переход — всегда наверх списка.
   useEffect(() => {
     try {
@@ -223,7 +480,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       if (el && typeof (el as HTMLElement).scrollTo === 'function') {
         (el as HTMLElement).scrollTo({ top: 0, behavior: 'auto' });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [mode]);
   const [search, setSearch] = useState('');
   const [filterGroup, setFilterGroup] = useState<string>('all');
@@ -241,14 +500,22 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const isMobile = useIsMobile();
   const [historyExpanded, setHistoryExpanded] = useState<string | null>(null);
   const [hubAnalyticsExpanded, setHubAnalyticsExpanded] = useState(false);
-  const [barTooltip, setBarTooltip] = useState<{ group: string; sets: number; week: number; x: number; y: number } | null>(null);
+  const [barTooltip, setBarTooltip] = useState<{
+    group: string;
+    sets: number;
+    week: number;
+    x: number;
+    y: number;
+  } | null>(null);
   // Режим записи (быстро/подробно) + предзаполнение из плана дня
   const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
   // «Контекст дня» (привычки, миксы, contest prep, фидбек, кардио) — это
   // справка, а не запись: пять карточек подряд растягивали вкладку «Запись».
   const [auxOpen, setAuxOpen] = useState(false);
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
-  const [ritualsSub, setRitualsSub] = useState<'mindset'|'mobility'|'warmup'|'cooldown'|'checkin'|'mmc'>('mindset');
+  const [ritualsSub, setRitualsSub] = useState<'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'checkin' | 'mmc'>(
+    'mindset',
+  );
   // Разделы практик живут одной вкладкой «Ритуалы». Баннеры и кольца «Сегодня»
   // раньше ставили mode='warmup'/'mindset'/… — такого режима в рендере нет, и
   // экран под шапкой оставался пустым. Теперь вход открывает rituals с подвкладкой.
@@ -256,7 +523,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     setRitualsSub(sub);
     setMode('rituals');
   };
-  const [progressSub, setProgressSub] = useState<'progress'|'calendar'>('progress');
+  const [progressSub, setProgressSub] = useState<'progress' | 'calendar'>('progress');
   // «Мои тренировки» (перенесено из Библиотеки): рабочий список упражнений
   const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
   // Принудительная перерисовка блока «Сегодня» (быстрые отметки рутин/протоколов)
@@ -264,11 +531,17 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const on = () => { setIsOnline(true); onRefresh(); };
+    const on = () => {
+      setIsOnline(true);
+      onRefresh();
+    };
     const off = () => setIsOnline(false);
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
   }, [onRefresh]);
 
   // План на сегодня (для предпросмотра разминки/заминки во вкладках)
@@ -297,7 +570,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // Reports state
   const [trainingReportGenerated, setTrainingReportGenerated] = useState(false);
   const [trainingArchive, setTrainingArchive] = useState<any[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_training_reports') || '[]'); } catch { return []; }
+    try {
+      return JSON.parse(localStorage.getItem('he_training_reports') || '[]');
+    } catch {
+      return [];
+    }
   });
 
   // Дубли хранилища (диагностика + очистка)
@@ -316,33 +593,51 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       const raw = JSON.parse(localStorage.getItem('he_diary_reminder') || 'null');
       if (raw && raw.date === localIsoDate()) return raw.time || null;
       return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   });
   const scheduleReminder = (time: string, plannedName: string, plannedExercises: string[]) => {
     if (typeof Notification === 'undefined') return;
     if (Notification.permission === 'default') {
-      void Notification.requestPermission().then(p => { if (p === 'granted') scheduleReminder(time, plannedName, plannedExercises); });
+      void Notification.requestPermission().then((p) => {
+        if (p === 'granted') scheduleReminder(time, plannedName, plannedExercises);
+      });
       return;
     }
     if (Notification.permission !== 'granted') return;
     const [h, m] = time.split(':').map(Number);
     const now = new Date();
-    const target = new Date(); target.setHours(h || 18, m || 0, 0, 0);
+    const target = new Date();
+    target.setHours(h || 18, m || 0, 0, 0);
     const delay = target.getTime() - now.getTime();
     if (delay <= 0) return;
     setTimeout(() => {
-      try { new Notification('🏋️ Тренировка по плану', { body: `${plannedName} — ${plannedExercises.length} упр.` }); } catch {}
+      try {
+        new Notification('🏋️ Тренировка по плану', { body: `${plannedName} — ${plannedExercises.length} упр.` });
+      } catch {}
     }, delay);
-    try { localStorage.setItem('he_diary_reminder', JSON.stringify({ date: localIsoDate(), time })); } catch {}
+    try {
+      localStorage.setItem('he_diary_reminder', JSON.stringify({ date: localIsoDate(), time }));
+    } catch {}
     setReminderTime(time);
   };
   useEffect(() => {
     let cancelled = false;
-    diary.checkProgressionAlerts().then(alerts => { if (!cancelled) setProgressionAlerts(alerts); }).catch(() => {});
-    return () => { cancelled = true; };
+    diary
+      .checkProgressionAlerts()
+      .then((alerts) => {
+        if (!cancelled) setProgressionAlerts(alerts);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [diary, historyWorkouts]);
 
-  const handleEditWorkout = (w: WorkoutLog) => { setEditingWorkout(w); };
+  const handleEditWorkout = (w: WorkoutLog) => {
+    setEditingWorkout(w);
+  };
   const handleDeleteWorkout = async (id: string) => {
     setConfirmDeleteId(null);
     await diary.deleteWorkoutLog(id);
@@ -358,26 +653,37 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // Санитизация на входе: legacy-записи без exercises или с exercises={} (не-массив)
   // приводим к [] — защищает ВСЕ подкомпоненты дневника (формы, историю, аналитику).
   const safeHistoryWorkouts = useMemo(
-    () => (Array.isArray(historyWorkouts) ? historyWorkouts : []).map(w => ({ ...w, exercises: Array.isArray(w.exercises) ? w.exercises : [] })),
+    () =>
+      (Array.isArray(historyWorkouts) ? historyWorkouts : []).map((w) => ({
+        ...w,
+        exercises: Array.isArray(w.exercises) ? w.exercises : [],
+      })),
     [historyWorkouts],
   );
   // deferred для тяжёлых аналитик — не блочит ввод/скролл на большой истории
   const deferredSafeHistory = useDeferredValue(safeHistoryWorkouts);
-  const mesoIds = useMemo(() => Array.from(new Set(safeHistoryWorkouts.map(w => (w as any).mesocycleId).filter((x): x is string => !!x))), [safeHistoryWorkouts]);
+  const mesoIds = useMemo(
+    () => Array.from(new Set(safeHistoryWorkouts.map((w) => (w as any).mesocycleId).filter((x): x is string => !!x))),
+    [safeHistoryWorkouts],
+  );
   const allExerciseNames = useMemo(() => {
     const names = new Set<string>();
-    safeHistoryWorkouts.forEach(w => (w.exercises ?? []).forEach((e: any) => names.add(e.exerciseName || e.exerciseId)));
+    safeHistoryWorkouts.forEach((w) =>
+      (w.exercises ?? []).forEach((e: any) => names.add(e.exerciseName || e.exerciseId)),
+    );
     return Array.from(names).sort();
   }, [safeHistoryWorkouts]);
   const filteredHistoryWorkouts = useMemo(() => {
     if (!deferredHistoryExerciseFilter) return safeHistoryWorkouts;
     const safeExercises = (w: any): any[] => (Array.isArray(w.exercises) ? w.exercises : []);
     const q = deferredHistoryExerciseFilter.toLowerCase();
-    return safeHistoryWorkouts.map(w => ({
-      ...w,
-      // legacy-записи без exercises или с exercises={} не должны ронять фильтр истории
-      exercises: safeExercises(w).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(q)),
-    })).filter(w => safeExercises(w).length > 0);
+    return safeHistoryWorkouts
+      .map((w) => ({
+        ...w,
+        // legacy-записи без exercises или с exercises={} не должны ронять фильтр истории
+        exercises: safeExercises(w).filter((e: any) => (e.exerciseName || e.exerciseId).toLowerCase().includes(q)),
+      }))
+      .filter((w) => safeExercises(w).length > 0);
   }, [safeHistoryWorkouts, deferredHistoryExerciseFilter]);
 
   useEffect(() => {
@@ -391,17 +697,46 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       setMArm(last.armLeftCm || last.armRightCm || 38);
       setMThigh(last.thighLeftCm || last.thighRightCm || 60);
     }
-    try { if (localStorage.getItem('he_training_report_current')) setTrainingReportGenerated(true); } catch {}
+    try {
+      if (localStorage.getItem('he_training_report_current')) setTrainingReportGenerated(true);
+    } catch {}
   }, []);
-  const measureAnalytics = useMemo(() => analyzeMeasurements(linked?.profile?.settings?.personal?.height || 175), [measurements.length]);
+  const measureAnalytics = useMemo(
+    () => analyzeMeasurements(linked?.profile?.settings?.personal?.height || 175),
+    [measurements.length],
+  );
 
   useEffect(() => {
     if (safeHistoryWorkouts.length > 0) {
       const logs: any[] = [];
-      safeHistoryWorkouts.forEach((w: any) => (w.exercises || []).forEach((e: any) => {
-        (e.sets || []).forEach((s: any) => logs.push({ date: w.date, exercise: e.exerciseName || e.exerciseId, weight: s.weight, reps: s.reps, rpe: 7 }));
-      }));
-      if (logs.length > 0) setRepData(generateWeeklyReport(logs, logs.map((l: any) => ({ date: l.date, durationMin: 60 }))));
+      safeHistoryWorkouts.forEach((w: any) =>
+        (w.exercises || []).forEach((e: any) => {
+          (e.sets || []).forEach((s: any) =>
+            logs.push({
+              date: w.date,
+              exercise: e.exerciseName || e.exerciseId,
+              weight: s.weight,
+              reps: s.reps,
+              // Подставной RPE 7 искажал среднюю интенсивность недели: пишем только факт.
+              rpe: typeof s.rpe === 'number' && s.rpe > 0 ? s.rpe : 0,
+              isPR: s.isPR === true,
+            }),
+          );
+        }),
+      );
+      if (logs.length > 0) {
+        // Сессии без дублей по дате; длительность — измеренная, 0 если не записана
+        // (раньше все сессии считались 60-минутными, и это шло в отчёт недели).
+        const seenDates: string[] = [];
+        safeHistoryWorkouts.forEach((w: any) => {
+          if (!seenDates.includes(w.date)) seenDates.push(w.date);
+        });
+        const sessionData = seenDates.map((date) => {
+          const w: any = safeHistoryWorkouts.find((x: any) => x.date === date);
+          return { date, durationMin: Math.max(0, Math.round(Number(w?.duration) || 0)) };
+        });
+        setRepData(generateWeeklyReport(logs, sessionData));
+      }
     }
   }, [safeHistoryWorkouts]);
 
@@ -433,28 +768,49 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   const analytics = useMemo(() => {
     if (deferredSafeHistory.length === 0) return null;
     try {
-      const mapped = deferredSafeHistory.map(w => ({
-        sessionId: w.id, date: w.date, focus: w.split || 'fullbody', durationMin: w.duration || 60,
-        sets: (w.exercises || []).flatMap((ex: any) => (ex.sets || []).map((s: any, i: number) => ({
-          // StrengthLogEntry не имеет поля `name`: реальное имя — exerciseName.
-          exerciseId: ex.exerciseId || ex.exerciseName || 'unknown',
-          exerciseName: ex.exerciseName || ex.exerciseId || 'Exercise',
-          muscleGroup: ex.muscleGroup,
-          // Нет RPE/RIR в записи — не фабрикуем: 0 = «не задано» для движка.
-          reps: s.reps || 0, weight: s.weight || 0,
-          rpe: typeof s.rpe === 'number' && s.rpe > 0 ? s.rpe : 0,
-          rir: typeof s.rir === 'number' ? s.rir : 0,
-          date: w.date, setIndex: i,
-        }))),
+      const mapped = deferredSafeHistory.map((w) => ({
+        // 0 = «длительность не записана»; движок усредняет только измеренные сессии.
+        sessionId: w.id,
+        date: w.date,
+        focus: w.split || 'fullbody',
+        durationMin: Math.max(0, Math.round(Number(w.duration) || 0)),
+        sets: (w.exercises || []).flatMap((ex: any) =>
+          (ex.sets || []).map((s: any, i: number) => ({
+            // StrengthLogEntry не имеет поля `name`: реальное имя — exerciseName.
+            exerciseId: ex.exerciseId || ex.exerciseName || 'unknown',
+            exerciseName: ex.exerciseName || ex.exerciseId || 'Exercise',
+            muscleGroup: ex.muscleGroup,
+            // Нет RPE/RIR в записи — не фабрикуем: 0 = «не задано» для движка.
+            reps: s.reps || 0,
+            weight: s.weight || 0,
+            rpe: typeof s.rpe === 'number' && s.rpe > 0 ? s.rpe : 0,
+            rir: typeof s.rir === 'number' ? s.rir : 0,
+            date: w.date,
+            setIndex: i,
+          })),
+        ),
       }));
-      if (!mapped.some(m => m.sets.length > 0)) return null;
+      if (!mapped.some((m) => m.sets.length > 0)) return null;
       return computeAnalytics({ sessions: mapped, weeks: 4 });
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [deferredSafeHistory]);
 
   const wsg = useMemo(() => weeklySetsByGroup(deferredSafeHistory, 8), [deferredSafeHistory]);
-  const groups = useMemo(() => Object.keys(wsg).sort((a, b) => (wsg[b]?.reduce((s: number, x: number) => s + x, 0) || 0) - (wsg[a]?.reduce((s: number, x: number) => s + x, 0) || 0)), [wsg]);
-  const totals = useMemo(() => Array.from({ length: 8 }, (_, i) => groups.reduce((s, g) => s + (wsg[g]?.[i] || 0), 0)), [wsg, groups]);
+  const groups = useMemo(
+    () =>
+      Object.keys(wsg).sort(
+        (a, b) =>
+          (wsg[b]?.reduce((s: number, x: number) => s + x, 0) || 0) -
+          (wsg[a]?.reduce((s: number, x: number) => s + x, 0) || 0),
+      ),
+    [wsg],
+  );
+  const totals = useMemo(
+    () => Array.from({ length: 8 }, (_, i) => groups.reduce((s, g) => s + (wsg[g]?.[i] || 0), 0)),
+    [wsg, groups],
+  );
 
   const groupedHistory = useMemo(() => {
     const map = new Map<string, WorkoutLog[]>();
@@ -466,40 +822,74 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [safeHistoryWorkouts]);
   const filteredHistory = useMemo(() => {
-    let result = deferredSearch ? groupedHistory.filter(([week]) => week.toLowerCase().includes(deferredSearch.toLowerCase())) : groupedHistory;
+    let result = deferredSearch
+      ? groupedHistory.filter(([week]) => week.toLowerCase().includes(deferredSearch.toLowerCase()))
+      : groupedHistory;
     if (deferredFilterGroup !== 'all') {
-      result = result.map(([week, workouts]) => [
-        week,
-        workouts.filter(w => (w.exercises || []).some((e: any) => {
-          const cat = EXERCISE_CATALOG.find((c: any) => c.id === e.exerciseId);
-          return cat?.group === deferredFilterGroup;
-        })),
-      ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
+      result = result
+        .map(
+          ([week, workouts]) =>
+            [
+              week,
+              workouts.filter((w) =>
+                (w.exercises || []).some((e: any) => {
+                  const cat = EXERCISE_CATALOG.find((c: any) => c.id === e.exerciseId);
+                  return cat?.group === deferredFilterGroup;
+                }),
+              ),
+            ] as [string, WorkoutLog[]],
+        )
+        .filter(([, ws]) => ws.length > 0);
     }
     if (deferredHistoryExerciseFilter) {
       const q = deferredHistoryExerciseFilter.toLowerCase();
-      result = result.map(([week, workouts]) => [
-        week,
-        workouts.filter(w => (w.exercises || []).some((e: any) => (e.exerciseName || e.exerciseId || '').toLowerCase().includes(q))),
-      ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
+      result = result
+        .map(
+          ([week, workouts]) =>
+            [
+              week,
+              workouts.filter((w) =>
+                (w.exercises || []).some((e: any) => (e.exerciseName || e.exerciseId || '').toLowerCase().includes(q)),
+              ),
+            ] as [string, WorkoutLog[]],
+        )
+        .filter(([, ws]) => ws.length > 0);
     }
     if (deferredNotesFilter) {
       const q = deferredNotesFilter.toLowerCase();
-      result = result.map(([week, workouts]) => [
-        week,
-        workouts.filter(w => (w.notes || '').toLowerCase().includes(q) || (w.split || '').toLowerCase().includes(q)),
-      ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
+      result = result
+        .map(
+          ([week, workouts]) =>
+            [
+              week,
+              workouts.filter(
+                (w) => (w.notes || '').toLowerCase().includes(q) || (w.split || '').toLowerCase().includes(q),
+              ),
+            ] as [string, WorkoutLog[]],
+        )
+        .filter(([, ws]) => ws.length > 0);
     }
     if (deferredMesoFilter !== 'all') {
-      result = result.map(([week, workouts]) => [
-        week,
-        workouts.filter(w => (w as any).mesocycleId === deferredMesoFilter),
-      ] as [string, WorkoutLog[]]).filter(([, ws]) => ws.length > 0);
+      result = result
+        .map(
+          ([week, workouts]) =>
+            [week, workouts.filter((w) => (w as any).mesocycleId === deferredMesoFilter)] as [string, WorkoutLog[]],
+        )
+        .filter(([, ws]) => ws.length > 0);
     }
     return result;
-  }, [groupedHistory, deferredSearch, deferredFilterGroup, deferredHistoryExerciseFilter, deferredNotesFilter, deferredMesoFilter]);
+  }, [
+    groupedHistory,
+    deferredSearch,
+    deferredFilterGroup,
+    deferredHistoryExerciseFilter,
+    deferredNotesFilter,
+    deferredMesoFilter,
+  ]);
   // Сброс пагинации при смене фильтров (не режет декор, только объём рендера)
-  useEffect(() => { setHistoryVisibleCount(10); }, [deferredSearch, deferredFilterGroup, deferredHistoryExerciseFilter, deferredNotesFilter, deferredMesoFilter]);
+  useEffect(() => {
+    setHistoryVisibleCount(10);
+  }, [deferredSearch, deferredFilterGroup, deferredHistoryExerciseFilter, deferredNotesFilter, deferredMesoFilter]);
 
   const curPhase = useMemo(() => {
     if (!macrocycle) return null;
@@ -508,27 +898,86 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     }
     return null;
   }, [macrocycle, selectedWeek]);
-  const PHASE_RU: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', peaking: 'Пик', deload: 'Разгрузка', recovery: 'Восстановление' };
+  const PHASE_RU: Record<string, string> = {
+    accumulation: 'Накопление',
+    intensification: 'Интенсификация',
+    peaking: 'Пик',
+    deload: 'Разгрузка',
+    recovery: 'Восстановление',
+  };
 
   // Visual analytics — на deferred чтобы не блочить переключение вкладок
-  const vizSessions: VizSessionData[] = useMemo(() => deferredSafeHistory.map((s: any) => ({
-    week: s.weekNumber || 1, date: s.date || '',
-    exercises: (s.exercises || []).map((e: any) => ({
-      name: e.exerciseName || e.name || '', sets: e.sets?.length || 0,
-      reps: Math.max(...(e.sets || [{ reps: 0 }]).map((st: any) => st.reps || 0), 0),
-      weight: Math.max(...(e.sets || [{ weight: 0 }]).map((st: any) => st.weight || 0), 0),
-      rpe: 7, volume: e.totalVolume || 0,
-    })),
-  })), [deferredSafeHistory]);
-  const visDashboard = useMemo(() => { try { return deferredSafeHistory.length > 2 ? buildVisualDashboard(vizSessions) : null; } catch { return null; } }, [vizSessions, deferredSafeHistory]);
-  const visWeekly = useMemo(() => { try { return computeWeeklyChart(vizSessions); } catch { return []; } }, [vizSessions]);
-  const visMuscleVol = useMemo(() => { try { return computeMuscleVolume(vizSessions); } catch { return []; } }, [vizSessions]);
-  const visProg = useMemo(() => { try { return computeProgression(vizSessions); } catch { return []; } }, [vizSessions]);
+  const vizSessions: VizSessionData[] = useMemo(
+    () =>
+      deferredSafeHistory.map((s: any) => ({
+        week: s.weekNumber || 1,
+        date: s.date || '',
+        exercises: (s.exercises || []).map((e: any) => ({
+          name: e.exerciseName || e.name || '',
+          sets: e.sets?.length || 0,
+          reps: Math.max(...(e.sets || [{ reps: 0 }]).map((st: any) => st.reps || 0), 0),
+          weight: Math.max(...(e.sets || [{ weight: 0 }]).map((st: any) => st.weight || 0), 0),
+          // Средний RPE по записанным сетам: подставная «семёрка» у всех упражнений
+          // искажала распределение интенсивности (0 = «не задано»).
+          rpe: (() => {
+            const rated = (e.sets || []).map((st: any) => Number(st.rpe) || 0).filter((v: number) => v > 0);
+            return rated.length > 0
+              ? Math.round((rated.reduce((a: number, b: number) => a + b, 0) / rated.length) * 10) / 10
+              : 0;
+          })(),
+          volume: e.totalVolume || 0,
+        })),
+      })),
+    [deferredSafeHistory],
+  );
+  const visDashboard = useMemo(() => {
+    try {
+      return deferredSafeHistory.length > 2 ? buildVisualDashboard(vizSessions) : null;
+    } catch {
+      return null;
+    }
+  }, [vizSessions, deferredSafeHistory]);
+  const visWeekly = useMemo(() => {
+    try {
+      return computeWeeklyChart(vizSessions);
+    } catch {
+      return [];
+    }
+  }, [vizSessions]);
+  const visMuscleVol = useMemo(() => {
+    try {
+      return computeMuscleVolume(vizSessions);
+    } catch {
+      return [];
+    }
+  }, [vizSessions]);
+  const visProg = useMemo(() => {
+    try {
+      return computeProgression(vizSessions);
+    } catch {
+      return [];
+    }
+  }, [vizSessions]);
 
   // Expert analytics data
-  const expertSrpe = useMemo(() => { try { return loadSRPESessions(); } catch { return []; } }, []);
-  const expertAcwr = useMemo(() => expertSrpe.length >= 2 ? acuteChronicRatio(toDailyLoads(expertSrpe)).ratio : 1.0, [expertSrpe]);
-  const expertMono = useMemo(() => { try { return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0; } catch { return 0; } }, [expertSrpe]);
+  const expertSrpe = useMemo(() => {
+    try {
+      return loadSRPESessions();
+    } catch {
+      return [];
+    }
+  }, []);
+  const expertAcwr = useMemo(
+    () => (expertSrpe.length >= 2 ? acuteChronicRatio(toDailyLoads(expertSrpe)).ratio : 1.0),
+    [expertSrpe],
+  );
+  const expertMono = useMemo(() => {
+    try {
+      return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0;
+    } catch {
+      return 0;
+    }
+  }, [expertSrpe]);
   const expertExercises = useMemo(() => {
     const exMap = new Map<string, { first: number; last: number; firstDate: string; lastDate: string }>();
     for (const w of deferredSafeHistory) {
@@ -536,547 +985,1403 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       for (const ex of exs) {
         const nm = ex.exerciseName || ex.exerciseId || '?';
         // Вес/повторы лежат в подходах: берём лучший e1RM по сетам упражнения.
-        const best = (ex.sets || []).reduce((m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)), 0);
+        const best = (ex.sets || []).reduce(
+          (m: number, s: any) => Math.max(m, epley1RM(s.weight || 0, s.reps || 0)),
+          0,
+        );
         if (best <= 0) continue;
         const date = ex.date || w.date || '';
         const cur = exMap.get(nm);
-        if (!cur) { exMap.set(nm, { first: best, last: best, firstDate: date, lastDate: date }); continue; }
-        if (!cur.firstDate || date < cur.firstDate) { cur.first = best; cur.firstDate = date; }
-        else if (date === cur.firstDate) cur.first = Math.max(cur.first, best);
-        if (!cur.lastDate || date > cur.lastDate) { cur.last = best; cur.lastDate = date; }
-        else if (date === cur.lastDate) cur.last = Math.max(cur.last, best);
+        if (!cur) {
+          exMap.set(nm, { first: best, last: best, firstDate: date, lastDate: date });
+          continue;
+        }
+        if (!cur.firstDate || date < cur.firstDate) {
+          cur.first = best;
+          cur.firstDate = date;
+        } else if (date === cur.firstDate) cur.first = Math.max(cur.first, best);
+        if (!cur.lastDate || date > cur.lastDate) {
+          cur.last = best;
+          cur.lastDate = date;
+        } else if (date === cur.lastDate) cur.last = Math.max(cur.last, best);
       }
     }
-    return Array.from(exMap.entries()).filter(([, v]) => v.first > 0 && v.last > 0).slice(0, 10)
+    return Array.from(exMap.entries())
+      .filter(([, v]) => v.first > 0 && v.last > 0)
+      .slice(0, 10)
       .map(([name, v]) => ({ name, e1rmBefore: Math.round(v.first), e1rmAfter: Math.round(v.last) }));
   }, [deferredSafeHistory]);
-  const expertRecentVol = useMemo(() => deferredSafeHistory.slice(-14).reduce((s: number, w: any) => s + ((w.exercises || []).length), 0), [deferredSafeHistory]);
-  const expertRirStats = useMemo(() => { try { return loadRirCalibrationStats(); } catch { return { bias: 0, stdDev: 1, sessions: 0 }; } }, []);
-  const clearTrimWarning = () => { clearStorageTrimWarning(); setTrimWarning(null); };
+  const expertRecentVol = useMemo(
+    () => deferredSafeHistory.slice(-14).reduce((s: number, w: any) => s + (w.exercises || []).length, 0),
+    [deferredSafeHistory],
+  );
+  const expertRirStats = useMemo(() => {
+    try {
+      return loadRirCalibrationStats();
+    } catch {
+      return { bias: 0, stdDev: 1, sessions: 0 };
+    }
+  }, []);
+  const clearTrimWarning = () => {
+    clearStorageTrimWarning();
+    setTrimWarning(null);
+  };
 
   const hub: DiaryHubCtx = {
-    mode, setMode, onGoRecord, onRefresh, diary,
-    historyWorkouts: safeHistoryWorkouts, diaryProgress, diaryStats, level, tprofile, linked,
-    trainingOutput, macrocycle, selectedWeek, mesoLength, curPhase,
-    goal, daysPerWeek, splitType, periodizationType,
-    trainingArchive, setTrainingArchive, trainingReportGenerated, setTrainingReportGenerated,
-    analytics, wsg, groups, totals,
-    visDashboard, visWeekly, visMuscleVol, visProg,
-    expertSrpe, expertAcwr, expertMono, expertExercises, expertRecentVol, expertRirStats,
-    measurements, setMeasurements,
-    mWeight, setMWeight, mWaist, setMWaist, mChest, setMChest, mArm, setMArm, mThigh, setMThigh, mDate, setMDate,
-    saveMeasurementHandler, measureAnalytics, repData,
-    hubAnalyticsExpanded, setHubAnalyticsExpanded, barTooltip, setBarTooltip,
-    progressionAlerts, trimWarning, setTrimWarning, clearTrimWarning,
-    mesoIds, mesoFilter, setMesoFilter, search, setSearch, filterGroup, setFilterGroup,
-    groupPickerOpen, setGroupPickerOpen, exPickerOpen, setExPickerOpen, exSearch, setExSearch, deferredExSearch,
-    notesPickerOpen, setNotesPickerOpen,
-    historyExerciseFilter, setHistoryExerciseFilter, notesFilter, setNotesFilter,
-    allExerciseNames, groupedHistory, filteredHistory, filteredHistoryWorkouts, historyExpanded, setHistoryExpanded,
-    handleEditWorkout, handleDeleteWorkout, confirmDeleteId, setConfirmDeleteId,
-    editingWorkout, setEditingWorkout,
-    recordSub, setRecordSub, planToRecord, setPlanToRecord,
-    reminderTime, scheduleReminder,
-    dupes, setDupes, dupesBusy, setDupesBusy,
-    isPending, historyVisibleCount, setHistoryVisibleCount,
+    mode,
+    setMode,
+    onGoRecord,
+    onRefresh,
+    diary,
+    historyWorkouts: safeHistoryWorkouts,
+    diaryProgress,
+    diaryStats,
+    level,
+    tprofile,
+    linked,
+    trainingOutput,
+    macrocycle,
+    selectedWeek,
+    mesoLength,
+    curPhase,
+    goal,
+    daysPerWeek,
+    splitType,
+    periodizationType,
+    trainingArchive,
+    setTrainingArchive,
+    trainingReportGenerated,
+    setTrainingReportGenerated,
+    analytics,
+    wsg,
+    groups,
+    totals,
+    visDashboard,
+    visWeekly,
+    visMuscleVol,
+    visProg,
+    expertSrpe,
+    expertAcwr,
+    expertMono,
+    expertExercises,
+    expertRecentVol,
+    expertRirStats,
+    measurements,
+    setMeasurements,
+    mWeight,
+    setMWeight,
+    mWaist,
+    setMWaist,
+    mChest,
+    setMChest,
+    mArm,
+    setMArm,
+    mThigh,
+    setMThigh,
+    mDate,
+    setMDate,
+    saveMeasurementHandler,
+    measureAnalytics,
+    repData,
+    hubAnalyticsExpanded,
+    setHubAnalyticsExpanded,
+    barTooltip,
+    setBarTooltip,
+    progressionAlerts,
+    trimWarning,
+    setTrimWarning,
+    clearTrimWarning,
+    mesoIds,
+    mesoFilter,
+    setMesoFilter,
+    search,
+    setSearch,
+    filterGroup,
+    setFilterGroup,
+    groupPickerOpen,
+    setGroupPickerOpen,
+    exPickerOpen,
+    setExPickerOpen,
+    exSearch,
+    setExSearch,
+    deferredExSearch,
+    notesPickerOpen,
+    setNotesPickerOpen,
+    historyExerciseFilter,
+    setHistoryExerciseFilter,
+    notesFilter,
+    setNotesFilter,
+    allExerciseNames,
+    groupedHistory,
+    filteredHistory,
+    filteredHistoryWorkouts,
+    historyExpanded,
+    setHistoryExpanded,
+    handleEditWorkout,
+    handleDeleteWorkout,
+    confirmDeleteId,
+    setConfirmDeleteId,
+    editingWorkout,
+    setEditingWorkout,
+    recordSub,
+    setRecordSub,
+    planToRecord,
+    setPlanToRecord,
+    reminderTime,
+    scheduleReminder,
+    dupes,
+    setDupes,
+    dupesBusy,
+    setDupesBusy,
+    isPending,
+    historyVisibleCount,
+    setHistoryVisibleCount,
   };
 
   return (
     <DiaryHubContext.Provider value={hub}>
-    {/* key — только на контенте: навигация/шапка не перемонтируются,
+      {/* key — только на контенте: навигация/шапка не перемонтируются,
         лента не сбрасывает скролл при переходе между разделами */}
-    <div className="hub-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div className="hub-head" style={{ background:'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(168,85,247,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.18)', border:'1px solid rgba(168,85,247,0.30)', fontSize:16 }}>📓</span>
-          <div>
-            <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Дневник тренировок</div>
-            <div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>Запись · история · аналитика · прогресс · календарь</div>
-          </div>
-        </div>
-        <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{mode}</span>
-      </div>
-      {/* Program context header */}
-      {macrocycle && curPhase && (
-        <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="hub-diary" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div
+          className="hub-head"
+          style={{
+            background: 'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))',
+            border: '1px solid rgba(168,85,247,0.18)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(168,85,247,0.18)',
+                border: '1px solid rgba(168,85,247,0.30)',
+                fontSize: 16,
+              }}
+            >
+              📓
+            </span>
             <div>
-              <div style={{ fontSize: 10, color: '#fff' }}>Текущая программа</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{macrocycle.totalWeeks}-нед макроцикл</div>
-              <div style={{ fontSize: 10, color: '#fff' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: '#fff' }}>Сплит</div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa' }}>{historyWorkouts[0]?.split || '—'}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Дневник тренировок</div>
+              <div style={{ fontSize: 10, color: '#fff', opacity: 0.9 }}>
+                Запись · история · аналитика · прогресс · календарь
+              </div>
             </div>
           </div>
+          <span
+            style={{
+              fontSize: 10,
+              padding: '4px 8px',
+              borderRadius: 20,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#fff',
+            }}
+          >
+            {mode}
+          </span>
         </div>
-      )}
-      {/* Сквозная навигация по всем разделам (над контентом любого режима) */}
-      <DiarySubnav mode={mode} onGo={setMode} />
-      {/* Контент режима: анимация появления — только здесь */}
-      <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-      {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
-      {mode === 'record' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Главное действие дневника. Раньше тут был только «Записать по плану»
+        {/* Program context header */}
+        {macrocycle && curPhase && (
+          <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Текущая программа</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+                  {macrocycle.totalWeeks}-нед макроцикл
+                </div>
+                <div style={{ fontSize: 10, color: '#fff' }}>
+                  Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: '#fff' }}>Сплит</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa' }}>
+                  {historyWorkouts[0]?.split || '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Сквозная навигация по всем разделам (над контентом любого режима) */}
+        <DiarySubnav mode={mode} onGo={setMode} />
+        {/* Контент режима: анимация появления — только здесь */}
+        <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
+          {mode === 'record' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Главное действие дневника. Раньше тут был только «Записать по плану»
               (форма), а проведение тренировки из дневника открыть было нечем.
               Стартовая кнопка стоит первой, до карточек-отчётов. */}
-          {onStartSession && (() => {
-            const todayIdx = (new Date().getDay() + 6) % 7;
-            const planned = trainingOutput?.plan?.[todayIdx];
-            const hasPlan = !!planned && Array.isArray(planned.exercises) && planned.exercises.length > 0;
-            const sets = hasPlan ? (planned!.exercises as any[]).reduce((s: number, e: any) => s + (Number(e.sets) || 0), 0) : 0;
-            const liveSum = (() => { try { return summarizeActiveSession(loadActiveSession(), sets); } catch { return null; } })();
-            const title = liveSum ? 'Продолжить тренировку' : 'Начать тренировку';
-            const subtitle = liveSum
-              ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
-              : hasPlan
-                ? `${planned!.name} · ${planned!.exercises.length} упр. · ${sets} подх.${planned!.duration ? ` · ~${planned!.duration} мин` : ''}`
-                : 'Разминка · подходы · таймер отдыха';
-            return (
-              <button type="button" data-act="diary-start" onClick={onStartSession}
-                aria-label={title}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', cursor: 'pointer',
-                  padding: '13px 15px', minHeight: 62, borderRadius: 14, border: 'none',
-                  background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))',
-                  color: 'var(--accent-contrast, #000)', fontWeight: 800, boxShadow: '0 6px 20px rgba(0,230,138,0.26)',
-                }}>
-                <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0,0,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>▶</span>
-                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-                  <span style={{ display: 'block', fontSize: 14 }}>{title}</span>
-                  <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.78, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{subtitle}</span>
-                </span>
-                <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
-              </button>
-            );
-          })()}
-          {!isOnline && (
-            <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', padding: '8px 12px', fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
-              Офлайн: данные сохраняются локально и синхронизируются при восстановлении сети
-            </div>
-          )}
-          <InfoErrorBoundary label="Сегодня"><>{(() => {
-            const todayIdx = (new Date().getDay() + 6) % 7;
-            const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
-            const last = safeHistoryWorkouts[0];
-            const weekVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
-            // Последний сон из дневника сна (синхронизация: дневник сна → готовность)
-            const sleepEntries = (() => { try { return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]') as Array<{ date: string; hours?: number }>; } catch { return []; } })();
-            const lastSleep = sleepEntries.length > 0 ? [...sleepEntries].sort((a, b) => b.date.localeCompare(a.date))[0] : null;
-            const sleepHours = typeof lastSleep?.hours === 'number' ? lastSleep.hours : null;
-            return (
-              <div className="td-today" style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.15)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ ...diaryLabel, color: ACCENT, marginBottom: 0 }}>📅 Сегодня</div>
-                  {sleepHours != null && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(167,139,250,0.12)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)' }}>
-                      💤 Сон: {sleepHours} ч
-                    </span>
-                  )}
+              {onStartSession &&
+                (() => {
+                  const todayIdx = (new Date().getDay() + 6) % 7;
+                  const planned = trainingOutput?.plan?.[todayIdx];
+                  const hasPlan = !!planned && Array.isArray(planned.exercises) && planned.exercises.length > 0;
+                  const sets = hasPlan
+                    ? (planned!.exercises as any[]).reduce((s: number, e: any) => s + (Number(e.sets) || 0), 0)
+                    : 0;
+                  const liveSum = (() => {
+                    try {
+                      return summarizeActiveSession(loadActiveSession(), sets);
+                    } catch {
+                      return null;
+                    }
+                  })();
+                  const title = liveSum ? 'Продолжить тренировку' : 'Начать тренировку';
+                  const subtitle = liveSum
+                    ? `● Идёт · ${liveSum.focus} · ${liveSum.setsDone} подх. · ${liveSum.progressPct}%`
+                    : hasPlan
+                      ? `${planned!.name} · ${planned!.exercises.length} упр. · ${sets} подх.${planned!.duration ? ` · ~${planned!.duration} мин` : ''}`
+                      : 'Разминка · подходы · таймер отдыха';
+                  return (
+                    <button
+                      type="button"
+                      data-act="diary-start"
+                      onClick={onStartSession}
+                      aria-label={title}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        padding: '13px 15px',
+                        minHeight: 62,
+                        borderRadius: 14,
+                        border: 'none',
+                        background: 'linear-gradient(135deg, var(--accent), var(--accent-2, #00c853))',
+                        color: 'var(--accent-contrast, #000)',
+                        fontWeight: 800,
+                        boxShadow: '0 6px 20px rgba(0,230,138,0.26)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          background: 'rgba(0,0,0,0.14)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          fontSize: 15,
+                        }}
+                      >
+                        ▶
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
+                        <span style={{ display: 'block', fontSize: 14 }}>{title}</span>
+                        <span
+                          style={{
+                            display: 'block',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            opacity: 0.78,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {subtitle}
+                        </span>
+                      </span>
+                      <span style={{ fontSize: 17, opacity: 0.65, flexShrink: 0 }}>→</span>
+                    </button>
+                  );
+                })()}
+              {!isOnline && (
+                <div
+                  style={{
+                    ...style.card,
+                    border: '1px solid rgba(245,158,11,0.35)',
+                    background: 'rgba(245,158,11,0.08)',
+                    padding: '8px 12px',
+                    fontSize: 11,
+                    color: '#f59e0b',
+                    fontWeight: 700,
+                  }}
+                >
+                  Офлайн: данные сохраняются локально и синхронизируются при восстановлении сети
                 </div>
-                {/* Компактная сводка дня: три показателя + прогресс-кольца протоколов */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 200 }}>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: '#fff' }}>Неделя объём</div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
-                    </div>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: '#fff' }}>Всего сессий</div>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
-                    </div>
-                  </div>
+              )}
+              <InfoErrorBoundary label="Сегодня">
+                <>
                   {(() => {
-                    // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности, разминка
-                    const today = localIsoDate();
-                    const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                    const mindProto = loadActiveProtocol();
-                    const mobProto = loadActiveMobility();
-                    const mindItems = mindProto ? itemsForDay(mindProto, 'all') : [];
-                    const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
-                    const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
-                    const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
-                    const mindPct = mindItems.length > 0 ? Math.round(mindItems.filter(i => mindDone.includes(i.id)).length / mindItems.length * 100) : null;
-                    const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
-                    const warmToday = warmupLogForDate(today);
-                    const warmPct = warmToday ? (warmToday.done ? 100 : 0) : (trainedToday ? 0 : null);
-                    const coolToday = cooldownLogForDate(today);
-                    const coolPct = coolToday ? (coolToday.done ? 100 : 0) : (trainedToday ? 0 : null);
-                    const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
-                      { label: 'Трен.', pct: trainedToday ? 100 : planned ? 0 : null, color: '#00e68a', onClick: trainedToday ? () => setMode('history') : (onStartSession ?? (() => setMode('history'))) },
-                      { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => goRitual('mindset') },
-                      { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => goRitual('mobility') },
-                      { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => goRitual('warmup') },
-                      { label: 'Заминка', pct: coolPct, color: '#38bdf8', onClick: () => goRitual('cooldown') },
-                    ];
-                    const hasAny = rings.some(r => r.pct !== null);
-                    if (!hasAny) return null;
-                    const Ring = ({ label, pct, color, onClick }: { label: string; pct: number | null; color: string; onClick: () => void }) => {
-                      const r = 13;
-                      const c = 2 * Math.PI * r;
-                      const v = pct === null ? 0 : Math.max(0, Math.min(100, pct));
-                      const d = v / 100 * c;
-                      return (
-                        <button type="button" onClick={onClick} title={`${label}: ${pct === null ? 'нет данных' : v + '%'}`}
-                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                          <svg width="34" height="34" viewBox="0 0 34 34">
-                            <circle cx="17" cy="17" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
-                            <circle cx="17" cy="17" r={r} fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round"
-                              strokeDasharray={`${d} ${c - d}`} transform="rotate(-90 17 17)" opacity={pct === null ? 0.25 : 1} />
-                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? '#fff' : color}>{pct === null ? '·' : v + '%'}</text>
-                          </svg>
-                          <span style={{ fontSize: 8, color: '#fff' }}>{label}</span>
-                        </button>
-                      );
-                    };
+                    const todayIdx = (new Date().getDay() + 6) % 7;
+                    const planned =
+                      trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0
+                        ? trainingOutput.plan[todayIdx]
+                        : null;
+                    const last = safeHistoryWorkouts[0];
+                    const weekVol = diaryProgress.length > 0 ? diaryProgress[diaryProgress.length - 1].totalVolume : 0;
+                    // Последний сон из дневника сна (синхронизация: дневник сна → готовность)
+                    const sleepEntries = (() => {
+                      try {
+                        return JSON.parse(localStorage.getItem('he_sleep_diary') || '[]') as Array<{
+                          date: string;
+                          hours?: number;
+                        }>;
+                      } catch {
+                        return [];
+                      }
+                    })();
+                    const lastSleep =
+                      sleepEntries.length > 0
+                        ? [...sleepEntries].sort((a, b) => b.date.localeCompare(a.date))[0]
+                        : null;
+                    const sleepHours = typeof lastSleep?.hours === 'number' ? lastSleep.hours : null;
                     return (
-                      <div className="td-rings" style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                        {rings.filter(r => r.pct !== null).map(r => <Ring key={r.label} {...r} />)}
+                      <div className="td-today" style={{ ...diaryCard, border: '1px solid rgba(0,230,138,0.15)' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 8,
+                          }}
+                        >
+                          <div style={{ ...diaryLabel, color: ACCENT, marginBottom: 0 }}>📅 Сегодня</div>
+                          {sleepHours != null && (
+                            <span
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: 9,
+                                padding: '2px 8px',
+                                borderRadius: 10,
+                                background: 'rgba(167,139,250,0.12)',
+                                color: '#a78bfa',
+                                border: '1px solid rgba(167,139,250,0.3)',
+                              }}
+                            >
+                              💤 Сон: {sleepHours} ч
+                            </span>
+                          )}
+                        </div>
+                        {/* Компактная сводка дня: три показателя + прогресс-кольца протоколов */}
+                        <div
+                          style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}
+                        >
+                          <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 200 }}>
+                            <div
+                              style={{
+                                flex: 1,
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: 8,
+                                padding: '6px 8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              <div style={{ fontSize: 9, color: '#fff' }}>Неделя объём</div>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>
+                                {(weekVol / 1000).toFixed(1)}т
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                flex: 1,
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: 8,
+                                padding: '6px 8px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              <div style={{ fontSize: 9, color: '#fff' }}>Всего сессий</div>
+                              <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>
+                                {historyWorkouts.length}
+                              </div>
+                            </div>
+                          </div>
+                          {(() => {
+                            // Прогресс-кольца: тренировка (есть план), психо-протокол, рутина мобильности, разминка
+                            const today = localIsoDate();
+                            const trainedToday = safeHistoryWorkouts.some((w) => (w.date || '').slice(0, 10) === today);
+                            const mindProto = loadActiveProtocol();
+                            const mobProto = loadActiveMobility();
+                            const mindItems = mindProto ? itemsForDay(mindProto, 'all') : [];
+                            const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
+                            const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
+                            const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
+                            const mindPct =
+                              mindItems.length > 0
+                                ? Math.round(
+                                    (mindItems.filter((i) => mindDone.includes(i.id)).length / mindItems.length) * 100,
+                                  )
+                                : null;
+                            const mobPct =
+                              mobDaily.length > 0
+                                ? Math.round(
+                                    (mobDaily.filter((i) => mobDone.includes(i.id)).length / mobDaily.length) * 100,
+                                  )
+                                : null;
+                            const warmToday = warmupLogForDate(today);
+                            const warmPct = warmToday ? (warmToday.done ? 100 : 0) : trainedToday ? 0 : null;
+                            const coolToday = cooldownLogForDate(today);
+                            const coolPct = coolToday ? (coolToday.done ? 100 : 0) : trainedToday ? 0 : null;
+                            const rings: { label: string; pct: number | null; color: string; onClick: () => void }[] = [
+                              {
+                                label: 'Трен.',
+                                pct: trainedToday ? 100 : planned ? 0 : null,
+                                color: '#00e68a',
+                                onClick: trainedToday
+                                  ? () => setMode('history')
+                                  : (onStartSession ?? (() => setMode('history'))),
+                              },
+                              { label: 'Психо', pct: mindPct, color: '#a78bfa', onClick: () => goRitual('mindset') },
+                              { label: 'Рутина', pct: mobPct, color: '#60a5fa', onClick: () => goRitual('mobility') },
+                              { label: 'Разминка', pct: warmPct, color: '#f97316', onClick: () => goRitual('warmup') },
+                              { label: 'Заминка', pct: coolPct, color: '#38bdf8', onClick: () => goRitual('cooldown') },
+                            ];
+                            const hasAny = rings.some((r) => r.pct !== null);
+                            if (!hasAny) return null;
+                            const Ring = ({
+                              label,
+                              pct,
+                              color,
+                              onClick,
+                            }: {
+                              label: string;
+                              pct: number | null;
+                              color: string;
+                              onClick: () => void;
+                            }) => {
+                              const r = 13;
+                              const c = 2 * Math.PI * r;
+                              const v = pct === null ? 0 : Math.max(0, Math.min(100, pct));
+                              const d = (v / 100) * c;
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={onClick}
+                                  title={`${label}: ${pct === null ? 'нет данных' : v + '%'}`}
+                                  style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                  }}
+                                >
+                                  <svg width="34" height="34" viewBox="0 0 34 34">
+                                    <circle
+                                      cx="17"
+                                      cy="17"
+                                      r={r}
+                                      fill="none"
+                                      stroke="rgba(255,255,255,0.08)"
+                                      strokeWidth="3.5"
+                                    />
+                                    <circle
+                                      cx="17"
+                                      cy="17"
+                                      r={r}
+                                      fill="none"
+                                      stroke={color}
+                                      strokeWidth="3.5"
+                                      strokeLinecap="round"
+                                      strokeDasharray={`${d} ${c - d}`}
+                                      transform="rotate(-90 17 17)"
+                                      opacity={pct === null ? 0.25 : 1}
+                                    />
+                                    <text
+                                      x="17"
+                                      y="20"
+                                      textAnchor="middle"
+                                      fontSize="9"
+                                      fontWeight="700"
+                                      fill={pct === null ? '#fff' : color}
+                                    >
+                                      {pct === null ? '·' : v + '%'}
+                                    </text>
+                                  </svg>
+                                  <span style={{ fontSize: 8, color: '#fff' }}>{label}</span>
+                                </button>
+                              );
+                            };
+                            return (
+                              <div
+                                className="td-rings"
+                                style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}
+                              >
+                                {rings
+                                  .filter((r) => r.pct !== null)
+                                  .map((r) => (
+                                    <Ring key={r.label} {...r} />
+                                  ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {planned && (
+                          <div
+                            className="td-plan"
+                            style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}
+                          >
+                            <div
+                              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}
+                            >
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                                🎯 По плану сегодня: {planned.name}
+                              </div>
+                              {reminderTime ? (
+                                <span
+                                  style={{
+                                    fontSize: 9,
+                                    padding: '3px 8px',
+                                    borderRadius: 10,
+                                    background: 'rgba(96,165,250,0.12)',
+                                    color: '#60a5fa',
+                                    border: '1px solid rgba(96,165,250,0.3)',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  🔔 Напоминание: {reminderTime}
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    scheduleReminder(
+                                      '18:00',
+                                      planned.name,
+                                      planned.exercises.map((e: any) => e.name),
+                                    )
+                                  }
+                                  style={{
+                                    fontSize: 9,
+                                    padding: '3px 8px',
+                                    borderRadius: 10,
+                                    background: 'rgba(255,255,255,0.05)',
+                                    color: '#fff',
+                                    border: '1px solid rgba(255,255,255,0.12)',
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  🔔 Напомнить в 18:00
+                                </button>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
+                              {planned.exercises
+                                .slice(0, 6)
+                                .map((e) => e.name)
+                                .join(' · ')}
+                              {planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginTop: 6,
+                              }}
+                            >
+                              <div style={{ fontSize: 9, color: '#fff' }}>~{planned.duration} мин</div>
+                              <button
+                                onClick={() => setPlanToRecord({ day: planned, nonce: Date.now() })}
+                                style={{
+                                  padding: '6px 14px',
+                                  borderRadius: 8,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  background: 'var(--accent)',
+                                  color: '#000',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                ✍️ Записать по плану
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {last && (
+                          <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
+                            {/* legacy-запись без exercises или с exercises={} не должна ронять «Сегодня» */}
+                            Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> ·{' '}
+                            {(Array.isArray(last.exercises) ? last.exercises : []).length} упр. ·{' '}
+                            {(
+                              (Array.isArray(last.exercises) ? last.exercises : []).reduce(
+                                (s, e) => s + e.totalVolume,
+                                0,
+                              ) / 1000
+                            ).toFixed(1)}
+                            т
+                          </div>
+                        )}
+                        {sleepHours != null && sleepHours < 6 && (
+                          <div
+                            style={{
+                              marginTop: 6,
+                              padding: '6px 10px',
+                              borderRadius: 8,
+                              fontSize: 10,
+                              background: 'rgba(239,68,68,0.08)',
+                              border: '1px solid rgba(239,68,68,0.25)',
+                              color: '#ef4444',
+                            }}
+                          >
+                            ⚠️ Менее 6 часов сна ({sleepHours} ч) — учтите в интенсивности сегодняшней тренировки
+                          </div>
+                        )}
+                        {(() => {
+                          // «Доделать сегодня»: четыре баннера → одна компактная карточка
+                          const today = localIsoDate();
+                          const trainedToday = safeHistoryWorkouts.some((w) => (w.date || '').slice(0, 10) === today);
+                          const rows: React.ReactNode[] = [];
+                          const chip = (color: string): React.CSSProperties => ({
+                            padding: '4px 10px',
+                            borderRadius: 10,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            background: 'rgba(255,255,255,0.05)',
+                            color,
+                            border: `1px solid ${color}`,
+                            whiteSpace: 'nowrap',
+                          });
+                          const rowStyle: React.CSSProperties = {
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            flexWrap: 'wrap',
+                          };
+                          const labelStyle = (color: string): React.CSSProperties => ({
+                            flex: '1 1 150px',
+                            minWidth: 0,
+                            fontSize: 10,
+                            color,
+                          });
+
+                          // Психо-чек-ин: тренировка была, чек-ин не заполнен
+                          if (trainedToday && !loadCheckins().some((c) => (c.date || '').slice(0, 10) === today)) {
+                            rows.push(
+                              <div key="checkin" data-todo="checkin" style={rowStyle}>
+                                <span style={labelStyle('#a78bfa')}>🧠 Сегодня тренировка без психо-чек-ина</span>
+                                <button
+                                  type="button"
+                                  data-act="todo-checkin"
+                                  onClick={() => goRitual('mindset')}
+                                  style={chip('#a78bfa')}
+                                >
+                                  Заполнить
+                                </button>
+                              </div>,
+                            );
+                          }
+
+                          // Ежедневная рутина мобильности
+                          const mobProtocol = loadActiveMobility();
+                          if (mobProtocol && hasDailyRoutine(mobProtocol)) {
+                            const dailyIds = itemsForSlot(mobProtocol, 'daily').map((it) => it.id);
+                            const progress = loadMobilityDayProgress(today);
+                            const doneToday =
+                              dailyIds.length > 0 && dailyIds.every((id) => progress.doneItems.includes(id));
+                            if (!doneToday) {
+                              const markDailyDone = () => {
+                                try {
+                                  localStorage.setItem(
+                                    'he_mobility_day_progress',
+                                    JSON.stringify({ date: today, doneItems: dailyIds }),
+                                  );
+                                } catch {
+                                  /* ignore */
+                                }
+                                forceHub((h) => h + 1);
+                              };
+                              rows.push(
+                                <div key="mobility" data-todo="mobility" style={rowStyle}>
+                                  <span style={labelStyle('#60a5fa')}>
+                                    🧘 Ежедневная рутина мобильности не выполнена
+                                  </span>
+                                  <button
+                                    type="button"
+                                    data-act="todo-mobility-done"
+                                    onClick={markDailyDone}
+                                    style={chip('#60a5fa')}
+                                  >
+                                    ✓ Рутина выполнена
+                                  </button>
+                                  <button
+                                    type="button"
+                                    data-act="todo-mobility-go"
+                                    onClick={() => goRitual('mobility')}
+                                    style={chip('#60a5fa')}
+                                  >
+                                    К рутине
+                                  </button>
+                                </div>,
+                              );
+                            }
+                          }
+
+                          // Разминка: тренировка была, разминка не отмечена
+                          if (trainedToday && !warmupLogForDate(today)) {
+                            const markWarmupDone = () => {
+                              upsertWarmupLog({ date: today, done: true, quality: 4 });
+                              forceHub((h) => h + 1);
+                            };
+                            rows.push(
+                              <div key="warmup" data-todo="warmup" style={rowStyle}>
+                                <span style={labelStyle('#f97316')}>🔥 Разминка сегодня не отмечена</span>
+                                <button
+                                  type="button"
+                                  data-act="todo-warmup-done"
+                                  onClick={markWarmupDone}
+                                  style={chip('#f97316')}
+                                >
+                                  ✓ Разминка выполнена
+                                </button>
+                                <button
+                                  type="button"
+                                  data-act="todo-warmup-go"
+                                  onClick={() => goRitual('warmup')}
+                                  style={chip('#f97316')}
+                                >
+                                  К разминке
+                                </button>
+                              </div>,
+                            );
+                          }
+
+                          // Заминка: тренировка была, заминка не отмечена
+                          if (trainedToday && !cooldownLogForDate(today)) {
+                            const markCooldownDone = () => {
+                              upsertCooldownLog({ date: today, done: true, quality: 4 });
+                              forceHub((h) => h + 1);
+                            };
+                            rows.push(
+                              <div key="cooldown" data-todo="cooldown" style={rowStyle}>
+                                <span style={labelStyle('#38bdf8')}>❄️ Заминка сегодня не отмечена</span>
+                                <button
+                                  type="button"
+                                  data-act="todo-cooldown-done"
+                                  onClick={markCooldownDone}
+                                  style={chip('#38bdf8')}
+                                >
+                                  ✓ Заминка выполнена
+                                </button>
+                                <button
+                                  type="button"
+                                  data-act="todo-cooldown-go"
+                                  onClick={() => goRitual('cooldown')}
+                                  style={chip('#38bdf8')}
+                                >
+                                  К заминке
+                                </button>
+                              </div>,
+                            );
+                          }
+
+                          if (rows.length === 0) return null;
+                          return (
+                            <div
+                              data-pl="todo-today"
+                              style={{
+                                marginTop: 6,
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                background: 'rgba(255,255,255,0.02)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 6,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 800,
+                                  letterSpacing: 0.4,
+                                  color: ACCENT,
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                Доделать сегодня
+                              </div>
+                              {rows}
+                            </div>
+                          );
+                        })()}
+                        {(() => {
+                          // Прогресс протоколов сегодня (чипы-ссылки на вкладки)
+                          const today = localIsoDate();
+                          const mindProto = loadActiveProtocol();
+                          const mobProto = loadActiveMobility();
+                          if (!mindProto && !mobProto) return null;
+                          // Тип дня из сегодняшнего плана (для точного % психо-протокола)
+                          const todayIdx = (new Date().getDay() + 6) % 7;
+                          const plannedToday = trainingOutput?.plan?.[todayIdx];
+                          let track: string | undefined;
+                          try {
+                            const raw = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
+                            track = raw && typeof raw.track === 'string' ? raw.track : undefined;
+                          } catch {
+                            /* ignore */
+                          }
+                          const dayType =
+                            plannedToday && plannedToday.exercises && plannedToday.exercises.length > 0
+                              ? detectDayType(plannedToday.name || '', track)
+                              : 'all';
+                          const mindItems = mindProto ? itemsForDay(mindProto, dayType) : [];
+                          const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
+                          const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
+                          const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
+                          const mindPct =
+                            mindItems.length > 0
+                              ? Math.round(
+                                  (mindItems.filter((i) => mindDone.includes(i.id)).length / mindItems.length) * 100,
+                                )
+                              : null;
+                          const mobPct =
+                            mobDaily.length > 0
+                              ? Math.round(
+                                  (mobDaily.filter((i) => mobDone.includes(i.id)).length / mobDaily.length) * 100,
+                                )
+                              : null;
+                          return (
+                            <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {mindPct !== null && (
+                                <button
+                                  onClick={() => goRitual('mindset')}
+                                  title={dayType === 'all' ? 'Все шаги протокола' : `Шаги для типа дня: ${dayType}`}
+                                  style={{
+                                    padding: '3px 10px',
+                                    borderRadius: 12,
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)',
+                                    color: mindPct === 100 ? '#22c55e' : '#a78bfa',
+                                    border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  🧠 Психо-протокол: {mindPct}%
+                                </button>
+                              )}
+                              {mobPct !== null && (
+                                <button
+                                  onClick={() => goRitual('mobility')}
+                                  style={{
+                                    padding: '3px 10px',
+                                    borderRadius: 12,
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    background: mobPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(96,165,250,0.12)',
+                                    color: mobPct === 100 ? '#22c55e' : '#60a5fa',
+                                    border: `1px solid ${mobPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(96,165,250,0.35)'}`,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  🧘 Рутина: {mobPct}%
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        {(() => {
+                          // День отдыха: сессия мобильности (rest_day-блоки)
+                          const today = localIsoDate();
+                          const trainedToday = safeHistoryWorkouts.some((w) => (w.date || '').slice(0, 10) === today);
+                          if (trainedToday) return null;
+                          const mobProtocol = loadActiveMobility();
+                          if (!mobProtocol || itemsForSlot(mobProtocol, 'rest_day').length === 0) return null;
+                          return (
+                            <div
+                              style={{
+                                marginTop: 6,
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                fontSize: 10,
+                                background: 'rgba(167,139,250,0.08)',
+                                border: '1px solid rgba(167,139,250,0.25)',
+                                color: '#a78bfa',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 8,
+                                flexWrap: 'wrap',
+                              }}
+                            >
+                              <span>🧘 Сегодня нет тренировки — день отдыха: выполните сессию мобильности</span>
+                              <button
+                                onClick={() => goRitual('mobility')}
+                                style={{
+                                  padding: '3px 10px',
+                                  borderRadius: 8,
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  background: 'rgba(167,139,250,0.2)',
+                                  color: '#a78bfa',
+                                  border: '1px solid rgba(167,139,250,0.4)',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                Сессия мобильности →
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
-                </div>
-                {planned && (
-                  <div className="td-plan" style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: '8px 10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🎯 По плану сегодня: {planned.name}</div>
-                      {reminderTime ? (
-                        <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)', whiteSpace: 'nowrap' }}>
-                          🔔 Напоминание: {reminderTime}
-                        </span>
-                      ) : (
-                        <button onClick={() => scheduleReminder('18:00', planned.name, planned.exercises.map((e: any) => e.name))}
-                          style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                          🔔 Напомнить в 18:00
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
-                      {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                      <div style={{ fontSize: 9, color: '#fff' }}>~{planned.duration} мин</div>
-                      <button onClick={() => setPlanToRecord({ day: planned, nonce: Date.now() })}
-                        style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
-                        ✍️ Записать по плану
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {last && (
-                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
-                    {/* legacy-запись без exercises или с exercises={} не должна ронять «Сегодня» */}
-                    Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(Array.isArray(last.exercises) ? last.exercises : []).length} упр. · {((Array.isArray(last.exercises) ? last.exercises : []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
-                  </div>
-                )}
-                {sleepHours != null && sleepHours < 6 && (
-                  <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' }}>
-                    ⚠️ Менее 6 часов сна ({sleepHours} ч) — учтите в интенсивности сегодняшней тренировки
-                  </div>
-                )}
-                {(() => {
-                  // «Доделать сегодня»: четыре баннера → одна компактная карточка
-                  const today = localIsoDate();
-                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                  const rows: React.ReactNode[] = [];
-                  const chip = (color: string): React.CSSProperties => ({
-                    padding: '4px 10px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.05)', color, border: `1px solid ${color}`, whiteSpace: 'nowrap',
-                  });
-                  const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
-                  const labelStyle = (color: string): React.CSSProperties => ({ flex: '1 1 150px', minWidth: 0, fontSize: 10, color });
+                </>
+              </InfoErrorBoundary>
+              <InfoErrorBoundary label="Форма записи">
+                <RecordModeSelector
+                  diary={diary}
+                  historyWorkouts={safeHistoryWorkouts}
+                  selectedWeek={selectedWeek}
+                  onSave={onRefresh}
+                  sub={recordSub}
+                  onSubChange={setRecordSub}
+                  pendingTemplate={planToRecord?.day}
+                  templateKey={planToRecord?.nonce}
+                  onTemplateApplied={() => setPlanToRecord(null)}
+                />
+              </InfoErrorBoundary>
 
-                  // Психо-чек-ин: тренировка была, чек-ин не заполнен
-                  if (trainedToday && !loadCheckins().some(c => (c.date || '').slice(0, 10) === today)) {
-                    rows.push(
-                      <div key="checkin" data-todo="checkin" style={rowStyle}>
-                        <span style={labelStyle('#a78bfa')}>🧠 Сегодня тренировка без психо-чек-ина</span>
-                        <button type="button" data-act="todo-checkin" onClick={() => goRitual('mindset')} style={chip('#a78bfa')}>Заполнить</button>
-                      </div>
-                    );
-                  }
-
-                  // Ежедневная рутина мобильности
-                  const mobProtocol = loadActiveMobility();
-                  if (mobProtocol && hasDailyRoutine(mobProtocol)) {
-                    const dailyIds = itemsForSlot(mobProtocol, 'daily').map(it => it.id);
-                    const progress = loadMobilityDayProgress(today);
-                    const doneToday = dailyIds.length > 0 && dailyIds.every(id => progress.doneItems.includes(id));
-                    if (!doneToday) {
-                      const markDailyDone = () => {
-                        try {
-                          localStorage.setItem('he_mobility_day_progress', JSON.stringify({ date: today, doneItems: dailyIds }));
-                        } catch { /* ignore */ }
-                        forceHub(h => h + 1);
-                      };
-                      rows.push(
-                        <div key="mobility" data-todo="mobility" style={rowStyle}>
-                          <span style={labelStyle('#60a5fa')}>🧘 Ежедневная рутина мобильности не выполнена</span>
-                          <button type="button" data-act="todo-mobility-done" onClick={markDailyDone} style={chip('#60a5fa')}>✓ Рутина выполнена</button>
-                          <button type="button" data-act="todo-mobility-go" onClick={() => goRitual('mobility')} style={chip('#60a5fa')}>К рутине</button>
-                        </div>
+              {/* Дополнительные карточки дня — ниже формы: сначала запись, потом контекст */}
+              <div data-pl="record-aux" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  type="button"
+                  data-act="record-aux-toggle"
+                  aria-expanded={auxOpen}
+                  onClick={() => setAuxOpen((v) => !v)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    padding: '9px 12px',
+                    minHeight: 40,
+                    borderRadius: 10,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.03)',
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    📎 Контекст дня: привычки, миксы, ББ, кардио
+                  </span>
+                  <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{auxOpen ? '▲' : '▼'}</span>
+                </button>
+                <div
+                  data-pl="record-aux-body"
+                  style={{ display: auxOpen ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}
+                >
+                  {/* Привычки недели и миксы — контекст, а не запись: не оттесняют форму */}
+                  <InfoErrorBoundary label="Привычки недели">
+                    <HabitWeekCard historyWorkouts={safeHistoryWorkouts} />
+                  </InfoErrorBoundary>
+                  <InfoErrorBoundary label="Тренировочные миксы">
+                    <MixDiarySection hasTrainingToday={safeHistoryWorkouts.some((w) => w.date === localIsoDate())} />
+                  </InfoErrorBoundary>
+                  {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
+                  <BBContestPrepActiveCard
+                    onOpen={() => {
+                      try {
+                        localStorage.setItem('he_training_planning_track', 'bb');
+                      } catch {
+                        /* ignore */
+                      }
+                      window.dispatchEvent(
+                        new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }),
                       );
-                    }
-                  }
-
-                  // Разминка: тренировка была, разминка не отмечена
-                  if (trainedToday && !warmupLogForDate(today)) {
-                    const markWarmupDone = () => {
-                      upsertWarmupLog({ date: today, done: true, quality: 4 });
-                      forceHub(h => h + 1);
-                    };
-                    rows.push(
-                      <div key="warmup" data-todo="warmup" style={rowStyle}>
-                        <span style={labelStyle('#f97316')}>🔥 Разминка сегодня не отмечена</span>
-                        <button type="button" data-act="todo-warmup-done" onClick={markWarmupDone} style={chip('#f97316')}>✓ Разминка выполнена</button>
-                        <button type="button" data-act="todo-warmup-go" onClick={() => goRitual('warmup')} style={chip('#f97316')}>К разминке</button>
-                      </div>
-                    );
-                  }
-
-                  // Заминка: тренировка была, заминка не отмечена
-                  if (trainedToday && !cooldownLogForDate(today)) {
-                    const markCooldownDone = () => {
-                      upsertCooldownLog({ date: today, done: true, quality: 4 });
-                      forceHub(h => h + 1);
-                    };
-                    rows.push(
-                      <div key="cooldown" data-todo="cooldown" style={rowStyle}>
-                        <span style={labelStyle('#38bdf8')}>❄️ Заминка сегодня не отмечена</span>
-                        <button type="button" data-act="todo-cooldown-done" onClick={markCooldownDone} style={chip('#38bdf8')}>✓ Заминка выполнена</button>
-                        <button type="button" data-act="todo-cooldown-go" onClick={() => goRitual('cooldown')} style={chip('#38bdf8')}>К заминке</button>
-                      </div>
-                    );
-                  }
-
-                  if (rows.length === 0) return null;
-                  return (
-                    <div data-pl="todo-today" style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.4, color: ACCENT, textTransform: 'uppercase' }}>Доделать сегодня</div>
-                      {rows}
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // Прогресс протоколов сегодня (чипы-ссылки на вкладки)
-                  const today = localIsoDate();
-                  const mindProto = loadActiveProtocol();
-                  const mobProto = loadActiveMobility();
-                  if (!mindProto && !mobProto) return null;
-                  // Тип дня из сегодняшнего плана (для точного % психо-протокола)
-                  const todayIdx = (new Date().getDay() + 6) % 7;
-                  const plannedToday = trainingOutput?.plan?.[todayIdx];
-                  let track: string | undefined;
-                  try {
-                    const raw = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
-                    track = raw && typeof raw.track === 'string' ? raw.track : undefined;
-                  } catch { /* ignore */ }
-                  const dayType = plannedToday && plannedToday.exercises && plannedToday.exercises.length > 0
-                    ? detectDayType(plannedToday.name || '', track)
-                    : 'all';
-                  const mindItems = mindProto ? itemsForDay(mindProto, dayType) : [];
-                  const mobDaily = mobProto ? itemsForSlot(mobProto, 'daily') : [];
-                  const mindDone = mindProto ? loadDayProgress(today).doneItems : [];
-                  const mobDone = mobProto ? loadMobilityDayProgress(today).doneItems : [];
-                  const mindPct = mindItems.length > 0 ? Math.round(mindItems.filter(i => mindDone.includes(i.id)).length / mindItems.length * 100) : null;
-                  const mobPct = mobDaily.length > 0 ? Math.round(mobDaily.filter(i => mobDone.includes(i.id)).length / mobDaily.length * 100) : null;
-                  return (
-                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {mindPct !== null && (
-                        <button onClick={() => goRitual('mindset')} title={dayType === 'all' ? 'Все шаги протокола' : `Шаги для типа дня: ${dayType}`} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mindPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(167,139,250,0.12)', color: mindPct === 100 ? '#22c55e' : '#a78bfa', border: `1px solid ${mindPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(167,139,250,0.35)'}`, whiteSpace: 'nowrap' }}>
-                          🧠 Психо-протокол: {mindPct}%
-                        </button>
-                      )}
-                      {mobPct !== null && (
-                        <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 12, fontSize: 9, fontWeight: 700, cursor: 'pointer', background: mobPct === 100 ? 'rgba(34,197,94,0.12)' : 'rgba(96,165,250,0.12)', color: mobPct === 100 ? '#22c55e' : '#60a5fa', border: `1px solid ${mobPct === 100 ? 'rgba(34,197,94,0.35)' : 'rgba(96,165,250,0.35)'}`, whiteSpace: 'nowrap' }}>
-                          🧘 Рутина: {mobPct}%
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // День отдыха: сессия мобильности (rest_day-блоки)
-                  const today = localIsoDate();
-                  const trainedToday = safeHistoryWorkouts.some(w => (w.date || '').slice(0, 10) === today);
-                  if (trainedToday) return null;
-                  const mobProtocol = loadActiveMobility();
-                  if (!mobProtocol || itemsForSlot(mobProtocol, 'rest_day').length === 0) return null;
-                  return (
-                    <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, fontSize: 10, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span>🧘 Сегодня нет тренировки — день отдыха: выполните сессию мобильности</span>
-                      <button onClick={() => goRitual('mobility')} style={{ padding: '3px 10px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(167,139,250,0.2)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.4)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        Сессия мобильности →
-                      </button>
-                    </div>
-                  );
-                })()}
+                    }}
+                  />
+                  {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
+                  <BBFeedbackCard />
+                  {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
+                  <CardioDiarySlot />
+                </div>
               </div>
-            );
-          })()}</>
-          </InfoErrorBoundary>
-          <InfoErrorBoundary label="Форма записи">
-          <RecordModeSelector diary={diary} historyWorkouts={safeHistoryWorkouts} selectedWeek={selectedWeek} onSave={onRefresh}
-            sub={recordSub} onSubChange={setRecordSub}
-            pendingTemplate={planToRecord?.day} templateKey={planToRecord?.nonce} onTemplateApplied={() => setPlanToRecord(null)} /></InfoErrorBoundary>
-
-          {/* Дополнительные карточки дня — ниже формы: сначала запись, потом контекст */}
-          <div data-pl="record-aux" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button type="button" data-act="record-aux-toggle" aria-expanded={auxOpen}
-              onClick={() => setAuxOpen(v => !v)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', minHeight: 40, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 Контекст дня: привычки, миксы, ББ, кардио</span>
-              <span style={{ fontSize: 10, opacity: 0.8, flexShrink: 0 }}>{auxOpen ? '▲' : '▼'}</span>
-            </button>
-            <div data-pl="record-aux-body" style={{ display: auxOpen ? 'flex' : 'none', flexDirection: 'column', gap: 8 }}>
-            {/* Привычки недели и миксы — контекст, а не запись: не оттесняют форму */}
-            <InfoErrorBoundary label="Привычки недели"><HabitWeekCard historyWorkouts={safeHistoryWorkouts} /></InfoErrorBoundary>
-            <InfoErrorBoundary label="Тренировочные миксы"><MixDiarySection hasTrainingToday={safeHistoryWorkouts.some(w => w.date === localIsoDate())} /></InfoErrorBoundary>
-            {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
-            <BBContestPrepActiveCard onOpen={() => {
-              try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
-              window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }));
-            }} />
-            {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
-            <BBFeedbackCard />
-            {/* 🏃 Кардио-слой дня (план/факт активного цикла; владелец — кардио-конструктор) */}
-            <CardioDiarySlot />
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ═══ MODE: HISTORY ═══ */}
-      {mode === 'history' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <DiaryHistoryView hub={hub} />
-        </div>
-      )}
-
-      {/* ═══ MODE: SUMMARY ═══ — сводный отчёт по тренировке / периоду */}
-      {mode === 'summary' && (
-        <InfoErrorBoundary label="Отчёт">
-          <DiaryReportView hub={hub} />
-        </InfoErrorBoundary>
-      )}
-
-      {/* ═══ MODE: COMPETITION ═══ — сохранённые соревновательные циклы */}
-      {mode === 'competition' && <CompetitionPlansView onBack={() => setMode('record')} />}
-
-      {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
-      {mode === 'recommendations' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <BBRecommendationsTab hub={hub} />
-        </div>
-      )}
-
-      {/* ═══ MODE: FEEDBACK ═══ — план vs факт (ББ фидбек из дневника) */}
-      {mode === 'feedback' && (
-        <InfoErrorBoundary label="Фидбек">
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <BBFeedbackCard />
-            <div style={{ display:'flex', gap:6 }}>
-              <button onClick={() => setMode('record')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', color:'#fff', fontSize:11, cursor:'pointer' }}>← К записи</button>
-              <button onClick={() => setMode('history')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer' }}>📜 История</button>
+          {/* ═══ MODE: HISTORY ═══ */}
+          {mode === 'history' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <DiaryHistoryView hub={hub} />
             </div>
-          </div>
-        </InfoErrorBoundary>
-      )}
+          )}
 
-      {/* ═══ MODE: MY TRAINING ═══ — пользовательские упражнения/планы/циклы (перенесено из Библиотеки) */}
-      {mode === 'mytraining' && (
-        <InfoErrorBoundary label="Мои тренировки">
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-            <MyTrainingTab customExercises={myTrainingExs} setCustomExercises={setMyTrainingExs} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
-          </div>
-        </InfoErrorBoundary>
-      )}
+          {/* ═══ MODE: SUMMARY ═══ — сводный отчёт по тренировке / периоду */}
+          {mode === 'summary' && (
+            <InfoErrorBoundary label="Отчёт">
+              <DiaryReportView hub={hub} />
+            </InfoErrorBoundary>
+          )}
 
-      {/* ═══ MODE: ANALYTICS (lite) ═══ — обезжирен: линки в хабы */}
-      {(mode === 'analytics' || mode === 'analytics_lite') && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <DiaryAnalyticsView hub={hub} />
-          <MixEffectivenessCard workouts={attachMixGoalsToWorkouts(historyWorkouts)} />
-          <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11, lineHeight:1.5, color:'#fff' }}>
-            <div style={{ fontWeight:800, color:'#3b82f6', marginBottom:4 }}>🔗 Глубже — в Интеллекте</div>
-            <div>ACWR/монотонность/напряжение → <b>⚡ Интеллект → Нагрузка</b> · MEV/MAV/MRV → <b>📐 Объём-хаб</b> · 1RM/VBT/DOTS → <b>🏋️ Анализ силы</b> · прогноз → <b>🔮 Прогноз</b></div>
-          </div>
+          {/* ═══ MODE: COMPETITION ═══ — сохранённые соревновательные циклы */}
+          {mode === 'competition' && <CompetitionPlansView onBack={() => setMode('record')} />}
+
+          {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
+          {mode === 'recommendations' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <BBRecommendationsTab hub={hub} />
+            </div>
+          )}
+
+          {/* ═══ MODE: FEEDBACK ═══ — план vs факт (ББ фидбек из дневника) */}
+          {mode === 'feedback' && (
+            <InfoErrorBoundary label="Фидбек">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <BBFeedbackCard />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setMode('record')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: 'rgba(255,255,255,0.02)',
+                      color: '#fff',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ← К записи
+                  </button>
+                  <button
+                    onClick={() => setMode('history')}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      border: '1px solid var(--accent)',
+                      background: 'rgba(0,230,138,0.12)',
+                      color: 'var(--accent)',
+                      fontWeight: 700,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    📜 История
+                  </button>
+                </div>
+              </div>
+            </InfoErrorBoundary>
+          )}
+
+          {/* ═══ MODE: MY TRAINING ═══ — пользовательские упражнения/планы/циклы (перенесено из Библиотеки) */}
+          {mode === 'mytraining' && (
+            <InfoErrorBoundary label="Мои тренировки">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={() => setMode('record')}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '6px 10px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← К записи
+                </button>
+                <MyTrainingTab
+                  customExercises={myTrainingExs}
+                  setCustomExercises={setMyTrainingExs}
+                  goal={goal}
+                  level={level}
+                  daysPerWeek={daysPerWeek}
+                  mesoLength={mesoLength}
+                />
+              </div>
+            </InfoErrorBoundary>
+          )}
+
+          {/* ═══ MODE: ANALYTICS (lite) ═══ — обезжирен: линки в хабы */}
+          {(mode === 'analytics' || mode === 'analytics_lite') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <DiaryAnalyticsView hub={hub} />
+              <MixEffectivenessCard workouts={attachMixGoalsToWorkouts(historyWorkouts)} />
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(59,130,246,0.08)',
+                  border: '1px solid rgba(59,130,246,0.18)',
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: '#fff',
+                }}
+              >
+                <div style={{ fontWeight: 800, color: '#3b82f6', marginBottom: 4 }}>🔗 Глубже — в Интеллекте</div>
+                <div>
+                  ACWR/монотонность/напряжение → <b>⚡ Интеллект → Нагрузка</b> · MEV/MAV/MRV → <b>📐 Объём-хаб</b> ·
+                  1RM/VBT/DOTS → <b>🏋️ Анализ силы</b> · прогноз → <b>🔮 Прогноз</b>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ MODE: PROGRESS (lite + календарь) ═══ */}
+          {mode === 'progress' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <div
+                className="td-seg"
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  background: 'rgba(24,24,27,0.42)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 12,
+                  padding: 6,
+                }}
+              >
+                {(
+                  [
+                    ['progress', '📏 Прогресс'],
+                    ['calendar', '📅 Календарь'],
+                  ] as const
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    onClick={() => setProgressSub(k)}
+                    data-active={progressSub === k ? 'true' : 'false'}
+                    style={{
+                      flex: 1,
+                      padding: '7px 10px',
+                      borderRadius: 10,
+                      border: progressSub === k ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)',
+                      background: progressSub === k ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
+                      color: progressSub === k ? '#22c55e' : '#fff',
+                      fontWeight: progressSub === k ? 800 : 600,
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {progressSub === 'progress' ? <DiaryProgressView hub={hub} /> : <TrainingCalendarTab />}
+            </div>
+          )}
+
+          {/* ═══ MODE: RITUALS ═══ — практики 6 в 1 (психика/мобильность/разминка/заминка/чек-ин/MMC) */}
+          {mode === 'rituals' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <div
+                className="td-seg"
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  background: 'rgba(24,24,27,0.42)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 12,
+                  padding: 6,
+                }}
+              >
+                {(
+                  [
+                    ['mindset', '🧠 Психология'],
+                    ['mobility', '🧘 Мобильность'],
+                    ['warmup', '🔥 Разминка'],
+                    ['cooldown', '❄️ Заминка'],
+                    ['checkin', '📋 Чек-ин'],
+                    ['mmc', '🔄 MMC'],
+                  ] as const
+                ).map(([k, l]) => (
+                  <button
+                    key={k}
+                    onClick={() => setRitualsSub(k)}
+                    data-active={ritualsSub === k ? 'true' : 'false'}
+                    style={{
+                      flex: '1 1 90px',
+                      padding: '7px 10px',
+                      borderRadius: 10,
+                      border: ritualsSub === k ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
+                      background: ritualsSub === k ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
+                      color: ritualsSub === k ? '#a855f7' : '#fff',
+                      fontWeight: ritualsSub === k ? 800 : 600,
+                      fontSize: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {ritualsSub === 'mindset' && (
+                <InfoErrorBoundary label="Психология">
+                  <MindsetTab hub={hub} />
+                </InfoErrorBoundary>
+              )}
+              {ritualsSub === 'mobility' && (
+                <InfoErrorBoundary label="Мобильность">
+                  <MobilityTab hub={hub} />
+                </InfoErrorBoundary>
+              )}
+              {ritualsSub === 'warmup' && (
+                <InfoErrorBoundary label="Разминка">
+                  <WarmupDiaryView historyWorkouts={historyWorkouts} planDay={planDayToday} />
+                </InfoErrorBoundary>
+              )}
+              {ritualsSub === 'cooldown' && (
+                <InfoErrorBoundary label="Заминка">
+                  <CooldownDiaryView planDay={planDayToday} />
+                </InfoErrorBoundary>
+              )}
+              {ritualsSub === 'checkin' && <CheckinMetricsCard />}
+              {ritualsSub === 'mmc' && <MMCTrackingCard />}
+            </div>
+          )}
+          {/* legacy direct modes → теперь через rituals/progress seg (оставлено для backward deep-link, без дубля) */}
+
+          {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
+          {mode === 'tools' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => setMode('record')}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ← К записи
+              </button>
+              <DiaryToolsView hub={hub} />
+            </div>
+          )}
         </div>
-      )}
+        {/* /контент режима */}
 
-      {/* ═══ MODE: PROGRESS (lite + календарь) ═══ */}
-      {mode === 'progress' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <div className="td-seg" style={{ display:'flex', gap:6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
-            {([['progress','📏 Прогресс'],['calendar','📅 Календарь']] as const).map(([k,l]) => (
-              <button key={k} onClick={()=> setProgressSub(k)} data-active={progressSub===k ? 'true' : 'false'} style={{
-                flex:1, padding:'7px 10px', borderRadius:10, border: progressSub===k ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)',
-                background: progressSub===k ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)', color: progressSub===k ? '#22c55e' : '#fff',
-                fontWeight: progressSub===k?800:600, fontSize:11, cursor:'pointer',
-              }}>{l}</button>
-            ))}
-          </div>
-          {progressSub==='progress' ? <DiaryProgressView hub={hub} /> : <TrainingCalendarTab />}
-        </div>
-      )}
-
-      {/* ═══ MODE: RITUALS ═══ — практики 6 в 1 (психика/мобильность/разминка/заминка/чек-ин/MMC) */}
-      {mode === 'rituals' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <div className="td-seg" style={{ display:'flex', gap:6, flexWrap:'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
-            {([
-              ['mindset','🧠 Психология'],['mobility','🧘 Мобильность'],['warmup','🔥 Разминка'],['cooldown','❄️ Заминка'],['checkin','📋 Чек-ин'],['mmc','🔄 MMC'],
-            ] as const).map(([k,l]) => (
-              <button key={k} onClick={()=> setRitualsSub(k)} data-active={ritualsSub===k ? 'true' : 'false'} style={{
-                flex:'1 1 90px', padding:'7px 10px', borderRadius:10, border: ritualsSub===k ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
-                background: ritualsSub===k ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)', color: ritualsSub===k ? '#a855f7' : '#fff',
-                fontWeight: ritualsSub===k?800:600, fontSize:10, cursor:'pointer',
-              }}>{l}</button>
-            ))}
-          </div>
-          {ritualsSub==='mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
-          {ritualsSub==='mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
-          {ritualsSub==='warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} planDay={planDayToday} /></InfoErrorBoundary>}
-          {ritualsSub==='cooldown' && <InfoErrorBoundary label="Заминка"><CooldownDiaryView planDay={planDayToday} /></InfoErrorBoundary>}
-          {ritualsSub==='checkin' && <CheckinMetricsCard />}
-          {ritualsSub==='mmc' && <MMCTrackingCard />}
-        </div>
-      )}
-      {/* legacy direct modes → теперь через rituals/progress seg (оставлено для backward deep-link, без дубля) */}
-
-      {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
-      {mode === 'tools' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
-          <DiaryToolsView hub={hub} />
-        </div>
-      )}
-
+        {/* Редактор сохранённой тренировки */}
+        {editingWorkout && (
+          <SessionEditorModal
+            workout={editingWorkout}
+            onClose={() => setEditingWorkout(null)}
+            onSave={async (log) => {
+              await diary.updateWorkoutLog(log);
+              setEditingWorkout(null);
+              onRefresh();
+            }}
+          />
+        )}
       </div>
-      {/* /контент режима */}
-
-      {/* Редактор сохранённой тренировки */}
-      {editingWorkout && (
-        <SessionEditorModal
-          workout={editingWorkout}
-          onClose={() => setEditingWorkout(null)}
-          onSave={async (log) => {
-            await diary.updateWorkoutLog(log);
-            setEditingWorkout(null);
-            onRefresh();
-          }}
-        />
-      )}
-    </div>
     </DiaryHubContext.Provider>
   );
 };

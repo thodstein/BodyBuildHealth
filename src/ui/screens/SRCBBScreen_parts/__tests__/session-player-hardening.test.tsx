@@ -281,6 +281,71 @@ describe('SessionPlayer — вес 0 и подходы из виджета', () 
     expect(new Set(sets.map((s) => s.setNumber)).size).toBe(sets.length);
     unmount();
   });
+
+  it('два подхода из виджета в одном дренаже очереди не теряются', () => {
+    const day = plannedDay();
+    const { container, unmount } = render(<SessionPlayer days={[day]} weekNumber={1} focus="PL" />);
+    startMain(container);
+
+    const make = () => ({
+      exerciseName: day.exercises[0].name,
+      weight: 85,
+      reps: 5,
+      rir: 1,
+      handled: false,
+    });
+    const first = make();
+    const second = make();
+    // Очередь виджета разбирается синхронно, без ре-рендера между элементами.
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: first }));
+      window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: second }));
+    });
+
+    expect(first.handled).toBe(true);
+    expect(second.handled).toBe(true);
+    const sets = loadActiveSession()?.exercises?.[0]?.sets || [];
+    expect(sets).toHaveLength(2);
+    expect(new Set(sets.map((s) => s.setNumber)).size).toBe(2);
+    unmount();
+  });
+
+  it('подсказка RIR прошлой сессии показывается, но RPE из неё не пишется', async () => {
+    vi.spyOn(StrengthDiary.prototype, 'getLastSession').mockResolvedValue({
+      sessionId: 'prev',
+      date: '2026-11-20',
+      startTime: '10:00',
+      endTime: '11:00',
+      durationMin: 60,
+      notes: '',
+      focus: 'PL',
+      weekNumber: 1,
+      exercises: [
+        {
+          exerciseName: 'Жим штанги лёжа',
+          sets: [{ setNumber: 1, weightKg: 90, reps: 8, rpe: 0, rir: 2 }],
+        },
+      ],
+    } as never);
+
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    // hydratePrevious — async (getLastSession), подсказка приходит после микротасков.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const rirInput = container.querySelector('input[aria-label="RIR факт"]') as HTMLInputElement | null;
+    expect(rirInput?.value).toBe('2');
+    fireEvent.click(btn(container, 'OK')!);
+
+    // Подтверждение подсказки — не измерение: RPE/RIR остаются пустыми.
+    const set = loadActiveSession()?.exercises?.[0]?.sets?.[0];
+    expect(set?.rpe).toBe(0);
+    expect(set?.rir).toBe(0);
+    unmount();
+  });
 });
 
 describe('SessionPlayer — флаг isBodyweight из плана', () => {
@@ -360,6 +425,23 @@ describe('SessionPlayer — завершение из виджета', () => {
     expect(saved).toHaveLength(1);
     const sets = saved[0].exercises?.[0]?.sets || [];
     expect(sets.some((s) => s.weightKg === 87.5 && s.reps === 4)).toBe(true);
+    unmount();
+  });
+
+  it('старт из виджета после завершения (итог/заминка) не теряется', () => {
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    fireEvent.click(btn(container, 'OK')!);
+    fireEvent.click(btn(container, '⏹ Завершить')!);
+    // Плеер остаётся смонтированным на заминке, но новую тренировку начать можно.
+    const detail: { handled?: boolean } = { handled: false };
+    act(() => {
+      window.dispatchEvent(new CustomEvent('he-workout-widget-start', { detail }));
+    });
+
+    expect(detail.handled).toBe(true);
+    // Сессия реально стартовала: видна основная часть, а не итог.
+    expect(container.textContent).toContain('⏹ Завершить');
     unmount();
   });
 

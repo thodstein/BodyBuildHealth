@@ -109,7 +109,10 @@ describe('P2-1: таймер отдыха читает сохранённые н
   it('he_timer_settings разбирается и инициализирует preset/customRestSec/autoStart', () => {
     expect(src).toContain("localStorage.getItem('he_timer_settings')");
     expect(src).toContain('useState<number>(timerSettingsSaved.customRest)');
-    expect(src).toMatch(/useState<'compound' \| 'isolation' \| 'pump' \| 'custom'>\(timerSettingsSaved\.preset\)/);
+    // Prettier может перенести generic-вызов на новую строку — не завязываемся на одну.
+    expect(src).toMatch(
+      /useState<'compound' \| 'isolation' \| 'pump' \| 'custom'>\(\s*timerSettingsSaved\.preset,?\s*\)/,
+    );
     expect(src).toContain('useState<boolean>(timerSettingsSaved.autoStart)');
   });
 
@@ -118,9 +121,13 @@ describe('P2-1: таймер отдыха читает сохранённые н
   });
 
   it('сохранение осталось согласованным с чтением', () => {
-    const fn = src.slice(src.indexOf("localStorage.setItem('he_timer_settings'"));
-    expect(fn.slice(0, 220)).toContain('customRest: customRestSec');
-    expect(fn.slice(0, 220)).toContain('autoStart: autoStartRest');
+    // Ищем по ключу, а не по однострочному `setItem('…'`: после форматирования
+    // аргументы переносятся, и прежний поиск давал пустую строку.
+    const idx = src.lastIndexOf("'he_timer_settings'");
+    expect(idx).toBeGreaterThan(-1);
+    const fn = src.slice(idx, idx + 600);
+    expect(fn).toContain('customRest: customRestSec');
+    expect(fn).toContain('autoStart: autoStartRest');
   });
 });
 

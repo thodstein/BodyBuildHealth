@@ -116,9 +116,10 @@ public class WorkoutWidgetProvider extends AppWidgetProvider {
         try {
             JSONObject d = WidgetStore.getJson(context, WidgetStore.KEY_WORKOUT);
             d.put("live", false);
-            d.put("progress", 100);
             d.put("title", "✓ " + d.optString("title", "").replace("● ", "").replace("✓ ", "").trim());
-            d.put("subtitle", "Тренировка сохранена");
+            // Не обещаем "сохранена": сессию закрывает и записывает плеер, до синка
+            // подписываем ожидание (иначе подходы окажутся на момент, когда их ещё нет).
+            d.put("subtitle", "Ждём синк с плеера…");
             WidgetStore.putJson(context, WidgetStore.KEY_WORKOUT, d);
         } catch (Exception ignored) {}
     }
