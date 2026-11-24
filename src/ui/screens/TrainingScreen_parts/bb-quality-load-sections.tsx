@@ -397,7 +397,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({ ctx, q
                                  <span>MEV {m.mev} · MAV {m.mav} · MRV {m.mrv}</span>
                                  <span style={{ opacity:0.85 }}>{m.frequencyPerRotation}×/нед · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
                                </div>
-                               <div style={{ fontSize:10, color: st.color, fontWeight:600, marginTop:4 }}>{(()=>{ const eff=m.effectiveSets; if(eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} эфф до MEV`; if(eff >= m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} эфф (выше MRV)`; if(eff > m.mav) return `Выше оптимума: ${m.mav}–${m.mrv}, можно держать или −${(eff - m.mav).toFixed(1)} до MAV`; if(eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} эфф до MAV`; return 'Оптимум — в точке MAV'; })()}</div>
+                               <div style={{ fontSize:10, color: st.color, fontWeight:600, marginTop:4 }}>{(()=>{ const eff=m.effectiveSets; if(eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} эфф до MEV`; if(eff > m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} эфф (выше MRV)`; if(eff > m.mav) return `Выше оптимума: ${m.mav}–${m.mrv}, можно держать или −${(eff - m.mav).toFixed(1)} до MAV`; if(eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} эфф до MAV`; return 'Оптимум — в точке MAV'; })()}</div>
                                {(() => {
                                  const proQ = (quality as any).proResult as any;
                                  if (!proQ) return null;

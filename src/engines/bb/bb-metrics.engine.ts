@@ -99,18 +99,21 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
     const a = agg[muscle] || { total: 0, тяж: 0, памп: 0, лёг: 0, hard: 0, rirSum: 0, rirN: 0, freq: 0 };
     const lm = getVolumeLandmarks(level, muscle) || { mev: 0, mav: 0, mrv: 0 };
     const finalLm = plan.volumeLandmarks?.find(row => row.group === muscle);
-    const effective = effectiveByMuscle[muscle]?.effectiveSets ?? a.total;
+    // Сравниваем ровно то значение, что показываем: сумма долей (0.2–0.6 на сет)
+    // даёт float-хвосты вида 12.000000000000002, и строгое `> mrv` дало бы «перегруз»
+    // на строке «12 эфф · MRV 12».
+    const effective = Math.round((effectiveByMuscle[muscle]?.effectiveSets ?? a.total) * 10) / 10;
     const mev = finalLm?.mev ?? Math.round(lm.mev * mult);
     const mav = finalLm?.mav ?? Math.round(lm.mav * mult);
     const mrv = finalLm?.mrv ?? Math.round(lm.mrv * mult);
     let status: BBMuscleVolume['status'] = 'below_mev';
-    if (effective >= mrv) status = 'exceeding_mrv';
+    if (effective > mrv) status = 'exceeding_mrv';
     else if (effective > mav) status = 'approaching_mrv';
     else if (effective >= mev) status = 'optimal';
     return {
       muscle, totalSets: a.total,
       directSets: effectiveByMuscle[muscle]?.directSets ?? a.total,
-      effectiveSets: Math.round(effective * 10) / 10,
+      effectiveSets: effective,
       fatigueWeightedSets: Math.round((effectiveByMuscle[muscle]?.fatigueWeightedSets ?? a.total) * 10) / 10,
       тяжSets: a.тяж, пампSets: a.памп, лёгSets: a.лёг,
       hardSets: a.hard,
@@ -159,7 +162,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
         if ((freqMapAll['shoulders'] || 0) > 0) {
           m.frequencyPerRotation = Math.round(Math.max(m.frequencyPerRotation, (freqMapAll['shoulders'] || 0) / totalWeeks) * 10) / 10;
         }
-        if (m.effectiveSets >= m.mrv) m.status = 'exceeding_mrv';
+        if (m.effectiveSets > m.mrv) m.status = 'exceeding_mrv';
         else if (m.effectiveSets > m.mav) m.status = 'approaching_mrv';
         else if (m.effectiveSets >= m.mev) m.status = 'optimal';
         else m.status = 'below_mev';

@@ -28,7 +28,7 @@ function recommendation(m: BBMuscleVolume): string {
   // с косвенной от жимов показывала 0, хотя фактически получает 2-4 effective.
   const eff = m.effectiveSets;
   if (eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} effective до MEV ${m.mev} — иначе нет стимула`;
-  if (eff >= m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} effective — выше MRV ${m.mrv}, риск недовосстановления`;
+  if (eff > m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} effective — выше MRV ${m.mrv}, риск недовосстановления`;
   if (eff > m.mav) return `Выше оптимума: в зоне MAV–MRV (${m.mav}–${m.mrv}), можно держать или −${(eff - m.mav).toFixed(1)} до MAV`;
   if (eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} effective до MAV ${m.mav}`;
   return 'Оптимум — объём в точке MAV';

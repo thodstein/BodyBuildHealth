@@ -19,4 +19,20 @@ describe('BB metrics final landmarks parity', () => {
     expect(chest?.mrv).toBe(9);
     expect(chest?.status).toBe('exceeding_mrv');
   });
+
+  it('treats effective volume exactly at MRV as approaching, not exceeding', () => {
+    const plan: any = {
+      level: 'intermediate',
+      pattern: { name: 'Test', sessionsPerRotation: 1 },
+      weeks: [{ week: 1, sessions: [{ day: 1, weekOffset: 1, character: 'тяж', exercises: [{
+        muscle: 'chest', name: 'Жим лёжа', role: 'primary', character: 'тяж', sets: 9,
+        repsRange: [6, 8], rir: 2,
+        workSets: Array.from({ length: 9 }, () => ({ reps: 8, rir: 2, weight: 80 })),
+      }] }] }],
+      volumeLandmarks: [{ group: 'chest', label: 'Грудь', sets: 9, mev: 5, mav: 7, mrv: 9, status: 'approaching_mrv' }],
+    };
+    const chest = calcBBPlanMetrics(plan, 1.5).perMuscle.find(item => item.muscle === 'chest');
+    expect(chest?.effectiveSets).toBe(9);
+    expect(chest?.status).toBe('approaching_mrv');
+  });
 });
