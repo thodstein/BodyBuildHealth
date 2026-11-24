@@ -11,9 +11,9 @@
 | `npm run type-check` | 0 ошибок |
 | `npx vitest run` по 10 файлам BB/виджетов | 10 файлов / 73 теста — зелёные |
 | `npm run verify:apk-design` | OK, все маркеры на месте |
-| статус объёма на границе MRV | `effective === mrv` → `approaching_mrv` (`bb-metrics.engine.ts:105-112` и `165-168`, канон `volume-landmarks.engine.ts:207-212`) |
+| статус объёма на границе MRV | `effective === mrv` → `approaching_mrv` (`bb-metrics.engine.ts:109` и `162`, канон `volumeStatusOf` — `volume-landmarks.engine.ts:209`) |
 | `src/data/usda-foods.ts` | 8742 записи, полных близнецов нет (12 удалено), ссылок на удалённые `id` нет; замок — `src/data/__tests__/usda-foods-integrity.test.ts` |
-| `npm run test:bb` | не запускается: полный прогон упирается в OOM даже при `--max-old-space-size=8192`, а пара `--poolOptions.forks.maxForks` + `minForks` даёт `RangeError: options.minThreads and options.maxThreads must not conflict` (оба уже стоят в `package.json:21`) |
+| `npm run test:bb` | флаги верные (`--pool=forks` + пара `maxForks=1`/`minForks=1`, `package.json:21`): `maxForks` **без** `minForks` даёт `RangeError: options.minThreads and options.maxThreads must not conflict`, а пара работает; полный прогон под параллельной нагрузкой падает `Fatal process out of memory` (exit `-1073740791`), поэтому гонять его можно только в одиночку (см. P1-3) |
 
 Состояние коммитов этой серии проверено отдельно — в чистом worktree от `82517e9a6`, куда положены
 только файлы пунктов, а не всё грязное дерево: `tsc --noEmit` → 0; `npx vitest run` по
@@ -30,6 +30,13 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P1-1. Старт тренировки из виджета не работает, когда плеер на «Итоге» (S)
 
+- **Сделано (2026-11-24):** слушатель `he-workout-widget-start` в `SessionPlayer.tsx` принимает и
+  `cooldown`, и `done` (сброс → `startMain()`, `handled` по фактическому возврату) — код в HEAD
+  (`f7873c605`). Замок: `session-player-hardening.test.tsx` — «старт из виджета с фазы «Итог» не
+  теряется и пустая сессия не пишется в историю» (доходит до реального `done-empty`).
+- **Открытый риск:** сброс идёт глобальным `he-workout-close`, а его слушают родители
+  (`TrainingScreen.tsx:480`, `ExecutionZone.tsx:164`) и сворачивают карточку плеера: после старта из
+  виджета сессия может идти в скрытой карточке. Правильнее локальный сброс + `he-workout-open`.
 - **Где:** `src/ui/screens/SRCBBScreen_parts/SessionPlayer.tsx` — слушатель `he-workout-widget-start`
   реагирует только при `phase === 'ready'`; `src/ui/native/widget-sync.ts` — ветка `workout_start`
   уходит в локальный путь (`saveActiveSession(sessionFromPlan(plan))`);
@@ -52,6 +59,11 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P1-2. Ветки моста и журнала живут в незакоммиченном виде (M)
 
+- **Сделано (2026-11-24):** владелец закоммитил ветку — `f7873c605` «честные RPE/план и надёжный
+  пульт в проведении тренировки» (19 файлов, включая `widget-sync.ts`,
+  `workout-logger.engine.ts`, `widget-bridge.test.ts`, `workout-logger-undo.test.ts`,
+  `widget-sync-serial.test.ts`). В рабочем дереве эти файлы больше не висят незакоммиченными;
+  `widget-bridge.test.ts` байт-в-байт равен HEAD.
 - **Где:** `src/ui/screens/SRCBBScreen_parts/SessionPlayer.tsx` (таймеры на завершении, `logOne(ov)`,
   восстановление таймера сессии, знаменатель — подходы дня), `src/ui/native/widget-sync.ts`
   (сериал синка, дата `set_add` из метки времени, коалесценция `pushTrainingWidget`),
@@ -72,19 +84,31 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 - **Где:** `package.json:21` → `test:bb`: уже стоит `--max-old-space-size=8192`, `--pool=forks` и
   `--poolOptions.forks.maxForks=1 --poolOptions.forks.minForks=1`; окружение Windows + vitest 1.6.1.
-- **Дефект:** скрипт падает до сбора тестов: полный прогон упирается в OOM, а пара
-  `maxForks`/`minForks` даёт `RangeError: options.minThreads and options.maxThreads must not conflict`
-  (по отдельности оба флага работают), поэтому «BB-движок зелёный» локально подтвердить штатным
-  способом нельзя — только точечно.
-- **Сделать:** убрать конфликтующую пару (оставить `--pool=forks` **без** `minForks/maxForks` либо
-  только `maxForks`) и проверить, что полный прогон `src/engines/bb/__tests__` доходит до конца;
-  если OOM остаётся — резать на два скрипта (`test:bb:core`, `test:bb:ui`) с честными именами.
+- **Дефект:** полный прогон упирается в OOM (`Fatal process out of memory`, exit `-1073740791`) —
+  но это нехватка памяти/конкуренция за CPU, а не флаги: `maxForks` **без** `minForks` даёт
+  `RangeError: options.minThreads and options.maxThreads must not conflict`, пара из `package.json:21`
+  работает (проверено A/B на одном файле). Флаги **не трогать.**
+- **Сделать:** гонять `test:bb` только в одиночку (без параллельных vitest); если OOM остаётся —
+  резать на два скрипта (`test:bb:core`, `test:bb:ui`) с честными именами, а не менять пул.
 - **Мерить:** `npm run test:bb` → `Test Files … passed`, exit 0.
+- **Результат (2026-11-24, 19:38–19:54):** прогон на свободной машине (без параллельных vitest/tsc) —
+  `Test Files 319 passed | 4 skipped (323)`, `Tests 3682 passed | 20 skipped (3702)`, падений 0,
+  `Duration 993.92s`. Тот же скрипт под параллельной нагрузкой падает
+  `FATAL ERROR: Zone Allocation failed - process out of memory` после ~42 файлов: причина — память
+  машины, а не флаги. Вывод — `%TEMP%\bb-full5.log`.
 - **Замок:** запись в `docs/AGENTS-MEMORY.md` обновить по факту (сейчас там зафиксировано падение).
 - **Риск:** перенос части сьютов в отдельный скрипт может скрыть регрессии, если CI зовёт только один.
 
 ### P2-1. Правило статуса объёма продублировано в шести местах (M)
 
+- **Сделано (2026-11-24):** канон `volumeStatusOf(sets, { mev, mav, mrv })` —
+  `volume-landmarks.engine.ts:209` (`checkVolumeStatus` делегирует), `armLandmarkStatus` —
+  `arm-volume-landmarks.engine.ts:142-145`, два прохода в `bb-metrics.engine.ts:109` и `:162`.
+  Замки: `bb-metrics-landmarks.test.ts` (4.9 / 5 / 6 / 7 / 7.1 / 9 / 9.1 — на `9` до правки был
+  `exceeding_mrv`) и новый `src/engines/arm/__tests__/arm-landmark-status.test.ts` (паритет с
+  `checkVolumeStatus`). Не унифицированы намеренно: `ArmHeatmap.tsx:54-56` (визуал),
+  `quality-score-v2.engine.ts:489-521` (считает по прямым семам), `plan-quality.engine.ts:231-235`
+  (своя зона `in_mev`).
 - **Где:** `src/engines/volume-landmarks.engine.ts:207-212` (канон `checkVolumeStatus`),
   `src/engines/arm/arm-volume-landmarks.engine.ts:142-147` (`armLandmarkStatus` — байт-в-байт копия),
   `src/engines/bb/bb-metrics.engine.ts:105-112` и `165-168` (два независимых прохода),
@@ -103,6 +127,14 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P2-2. Подпись карточки бюджета объёма противоречит бейджу (S)
 
+- **Сделано (2026-11-24):** одна функция подписи `volumeRecommendation(m, unit)` —
+  `src/ui/screens/TrainingScreen_parts/volume-recommendation.ts`; текст строится из `m.status`
+  (`switch`, ни одного повторного сравнения с `mev`/`mav`/`mrv`). Используется в
+  `VolumeBudgetCard.tsx` (локальная `recommendation()` удалена) и `bb-quality-load-sections.tsx`.
+  Замок: `__tests__/volume-recommendation.test.ts` — 16 тестов, значения 4.9/5/6/7/7.1/9/9.1, статус
+  берётся из канона `checkVolumeStatus`, отдельная проверка «нет `+0.0`/`−0.0`» и что `9` при MRV 9 —
+  не «Перегруз»; плюс нормализация `effectiveSets` до 0.1 и finite-гард — float-хвост и `NaN` не
+  печатают `+0.0`/`NaN`.
 - **Где:** `src/ui/screens/TrainingScreen_parts/VolumeBudgetCard.tsx:29-34`.
 - **Дефект:** при `eff === mev` статус — `optimal` (бейдж «оптимум»), но текст
   `if (eff < m.mav) return 'Ниже оптимума: +X до MAV'` пишет «Ниже оптимума».
@@ -145,6 +177,11 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P2-5. Форматирование смешано с семантикой (S)
 
+- **Сделано частично (2026-11-24):** правки этой серии в движке пересобраны как «HEAD + смысловые
+  замены» скриптом через `fs.writeFileSync` (хук format-on-save обойдён), поэтому диффы минимальны:
+  `volume-landmarks.engine.ts` 11/4, `arm-volume-landmarks.engine.ts` 3/5,
+  `bb-metrics.engine.ts` 3/9, `bb-metrics-landmarks.test.ts` 29/0 — `git diff -w` совпадает с полным.
+  Массовый `style: prettier` по `usda-foods.ts` / `SessionPlayer.tsx` не делался (чужая зона).
 - **Где:** `src/data/usda-foods.ts` (полный reformat, ~130 тыс. строк диффа против HEAD),
   `SessionPlayer.tsx` (~7 тыс.), 6 файлов `src/engines/bb/*` (переформатированы format-on-save хуком).
 - **Дефект:** ревью диффа невозможно: смысловая правка в 1–4 строки утопает в переформатировании.
@@ -157,6 +194,11 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P3-1. Остальные тесты, зависящие от дня недели (S)
 
+- **Сделано (2026-11-24):** `widget-bridge.test.ts` уже с фейковой датой (в HEAD);
+  `widget-workout-integrity.test.ts` получил `vi.useFakeTimers({ toFake: ['Date'] })` +
+  `vi.setSystemTime(new Date(2026, 10, 23, 10, 0, 0))` (понедельник) в `beforeEach` и
+  `vi.useRealTimers()` в `afterEach` — фейкуется только `Date`, реальные таймеры живы, остальные
+  тесты файла от часов не зависят.
 - **Где:** `src/core/__tests__/widget-bridge.test.ts` (исправлено: фейковая дата на понедельнике),
   `resolveWorkoutPlan`/`pickPlanDayIndex`/`trainingWeekdays` в `widget-sync.ts`.
 - **Дефект:** 5 тестов из 60 падали во вторник–воскресенье не из-за кода, а из-за даты прогона.
@@ -169,6 +211,8 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
 
 ### P3-2. Инлайновые подписи объёма в секции качества (S)
 
+- **Сделано (2026-11-24):** IIFE заменён на `{volumeRecommendation(m)}` (см. P2-2), сам inline-блок
+  удалён; секция и карточка теперь берут текст из одной функции.
 - **Где:** `src/ui/screens/TrainingScreen_parts/bb-quality-load-sections.tsx:400` — IIFE внутри JSX
   повторяет логику `recommendation()` из `VolumeBudgetCard`.
 - **Сделать:** вынести одну функцию подписи и использовать в обоих компонентах (см. P2-1/P2-2).
@@ -181,6 +225,100 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
   (OpenAlex `W4390013292`), который про внутреннюю нагрузку и MRV не исследует; код удалён до коммита.
 - **Замок:** любую новую константу-эффект заводить вместе с полем-источником (PMID/DOI) и тестом,
   который проверяет наличие источника.
+
+### P3-4. Мелкие расхождения с каноном объёма и «кракозябры» (S)
+
+- **Сделано (2026-11-24):**
+  - `bb-metrics.engine.ts` — засеянные головки дельт (`:150`, `:185`) больше не пишут
+    `status: 'below_mev'` литералом, а получают `volumeStatusOf(0, {mev,mav,mrv})`; при вырожденных
+    ориентирах `{0,0,0}` это `optimal`, как в каноне.
+  - `ArmHeatmap.tsx` — ровно MAV теперь зелёный (`sets > mav` для амбра): канон даёт на MAV
+    `optimal`, виджет красил его как «MAV→MRV». `colorFor` вынесен экспортом ради замка.
+  - `quality-score-v2.engine.ts` — статус и числа в сообщениях считаются по `effectiveSets`
+    (округление до 0.1), а не по прямым сетам: мышца с малым числом прямых сетов и тяжёлой
+    косвенной нагрузкой больше не уходит в «недогруз», а `effectiveSets` в объекте совпадает
+    с тем, по чему принято решение.
+  - Кракозябры (U+FFFD) в комментариях/названиях тестов: `DiaryProgressView.tsx:1`,
+    `planner-bridge-handlers.test.ts:548`, `cardio-cycle.test.ts:1289`, `pdf-parser.engine.ts:1131`,
+    `combat-e5-camp.test.tsx:25`, `UnifiedSynergyCalculator.tsx:1070`, `arm-rfd-honesty.test.ts:67`,
+    `drug-drug-interactions.ts:150`. В `ocr-engine.ts:405` U+FFFD остаётся намеренно — это часть
+    regex-детектора битого текста.
+- **Замки:** `bb-metrics-landmarks.test.ts` («seeded delt heads …»), `arm-heatmap.test.tsx`
+  (граница MAV/MAV+0.1/MRV/MRV+0.1), `quality-score-v2.test.ts` (effective > MRV при прямых 6;
+  прямые 18 при effective 13).
+- **Остаток:** два файла с кракозябрами в зоне питания (`NutritionScreen_parts/IndividualPlan/__tests__/planner-micro-pools.test.ts`,
+  `planner-nut-ceiling-8131.test.ts`) и `docs/NUTRITION-PLANNER-QUALITY-AUDIT-2026-10.md` —
+  их правит другой агент.
+- **Второй проход (2026-11-24, зоны виджетов/проведения/заметок/календаря):**
+  - `training-ui.tsx` — `mrvBadge` берёт цвет из `CANONICAL_STATUS_COLOR`: раньше «близко к MRV»
+    печаталось красным, а «недотрен» янтарным, и один статус в двух таблицах выглядел по-разному.
+    Замок — `__tests__/training-ui-status-colors.test.ts`.
+  - `ProfileNotesTab.tsx` — просроченный срок заметки виден: `data-overdue="true"`, цвет `danger`,
+    хвост «· просрочено»; срок «сегодня» просроченным не считается. Замок —
+    `__tests__/profile-notes-overdue.test.tsx`.
+  - `widget-sync.ts` — удалена мёртвая `patternTrainingToday` (цикл «работа/отдых» с выдуманной эпохой
+    2024-01-01 ни разу не вызывалась); для `scheduleType='pattern'` виджет по-прежнему берёт день
+    ротацией, потому что в профиле нет якоря начала цикла. Ограничение известно: в день отдыха
+    виджет может предложить тренировку.
+  - `widget-sync.ts` — `pushTrainingWidget` снимает флаг «в полёте» в `finally`: синхронный бросок в
+    `collectTraining()` оставлял флаг навсегда, и все следующие пуши возвращали старый результат,
+    хотя новой отправки не было.
+  - `TrainingCalendarTab.tsx` — календарь больше не выдумывает план: дата дня плана берётся из
+    явного `date` или `startDate + dayOfWeek`, иначе день не рисуется; `totalVolume`/`totalSets`
+    считаются из реальных `targetSets` (было `|| 3000` / `|| 15`); демо-план `generateSyntheticPlan`
+    (Push/Pull/Legs, 4 дня) удалён — без плана календарь пустой и без «Пропущено». Замки —
+    `training-runtime.test.ts` (явная дата / `startDate+dayOfWeek` / без даты — пропуск / реальные суммы)
+    и новый `training-calendar-planned.test.tsx` (факт 500 кг против плана 1460 не даёт `missed`;
+    пустой localStorage — ни одного `missed` и ни одного демо-лейбла).
+  - `ExecutionZone.tsx` — кнопка «📅 Сегодня» берёт день недели ВНУТРИ списка дней микроцикла
+    (`todayTrainingDayIndex` по меткам `Пн`…`Вс`), а не «день недели по модулю числа дней плана»
+    и не индекс дня из `he_pl_runtime` (план и микроцикл — разные источники: 4-дневный план при
+    3-дневном микроцикле открывал чужой день). День отдыха — `-1`: кнопка `disabled` и подпись
+    «Сегодня — отдых». Побочно `diary-shared.ts` перестал импортировать `widget-sync`.
+  - `VolumeBudgetCard`/`bb-quality-load-sections`/`volume-optimizer-parts`/`mrvBadge` — цвет статуса
+    объёма из одного `VOLUME_STATUS_META` (цвет = `CANONICAL_STATUS_COLOR`): до правки «недотрен»
+    был синим на двух экранах и красным в оптимизаторе, а синий в каноне — это `maintenance`.
+  - Календарь: плановый подход без RIR больше не пишется как «RIR 0 / RPE 10»; мёртвый
+    `generateSyntheticPlan` (демо-PPL на 1/2/3-е число) удалён из `training-calendar.engine.ts`.
+  - `pushTrainingWidget` перезапускает проход, если вызов пришёл в окно «цикл закончен, флаг ещё
+    в полёте»; раньше такой вызов помечал `trainingPushPending`, но проход уже не запускался.
+  - `ProgressTab.tsx` / `DiaryAnalyticsView.tsx` — недельные корзины по понедельнику
+    (`weekStartIsoMon`), без `new Date('YYYY-MM-DD')` (UTC-сдвиг) и без воскресного старта, который
+    раскладывал сб/вс по разным неделям, чем дневник. Замок — `week-buckets-and-today-index.test.ts`.
+  - `AnalyticsTab.tsx` — `durationMin` больше не подставляется как 60 минут (только факт из записи,
+    иначе 0); `catch (e)` без использования → `catch`.
+- **Известные ограничения (не чинились в этом проходе):**
+  - PR-детект (`workout-logger.engine.ts`) сравнивает `sessionBestE1RM` только внутри текущей
+    сессии и ищет историю по подстрочному совпадению имени — ложный PR на первом подходе нового
+    упражнения и на втором сете без рекорда. Код не менялся в этом проходе.
+  - `TrainingCalendarTab.tsx` считает `plannedData` по `monthKey`: план, перегенерированный в том
+    же месяце, увиден после смены месяца/перемонтирования (события изменения `he_pl_runtime` нет).
+  - `computeWeeklyBreakdown` (`analytics-engine.ts`) режет недели по `time / 7 суток`, а дневник — по
+    понедельнику; поле сейчас не рендерится, но при подключении подписи разойдутся.
+  - Плеер всегда открывает `days[0]`, а виджет вычисляет «сегодня» по графику профиля
+    (`widget-sync.ts`, `pickPlanDayIndex`): в среду на запястье «Нед1 Д2», в приложении «Нед1 Д1».
+    Корень тот же, что у `startDate`: у дней плана нет дат/меток недели. Следствие — подход из виджета
+    по упражнению, которого нет в плане дня плеера, уходит в ветку `ei < 0` без `handled`, виджет пишет
+    сессию сам, а следующий автосейв плеера её перезаписывает. Чинить вместе с якорем дня плана.
+  - `positions.indexOf(next) % planDays` в `widget-sync.ts` не покажет дни 4–5 при плане на 5 дней и
+    профиле на 3 — тот же якорь дня.
+  - Виджет при `scheduleType: 'pattern'` раскладывает дни по `daysPerWeek` (Пн/Ср/Пт): в цикле
+    «работа/отдых» объявляет тренировку в день отдыха и пропускает плановый. Канон `isTrainingDayFor`
+    в `coach-agenda.engine.ts` есть, но в профиле нет якоря цикла — решение продуктовое.
+  - Экспорт календаря (`TrainingCalendarTab.tsx`) — `<a download>` + `URL.createObjectURL`: в APK-WebView
+    файл не сохраняется. `check-apk-markers.mjs` этот файл пока не гейтит.
+  - `archiveActiveSession` (`workout-logger.engine.ts`) проверяет запись через `loadSessions()`, а тот
+    режет журнал до 2000 (при квоте — до 500) и сортирует по дате: при большом журнале вернёт `null`
+    при фактически записанных данных.
+  - `TrainingScreen.tsx:432`: `runtimeDay` по умолчанию `1` — свежий пользователь открывает «День 2».
+  - `data-act="finish-session"` в плеере зовёт `exitSession(false)` — завершение без подтверждения
+    (P0 из ревью, не менялся).
+- **Известный разрыв (нужно решение):** производители `he_pl_runtime`
+  (`BbAutoConstructor`, `ProgramEditorView`, `SRCBBScreen`) пишут `{ days, focus, week, track }` без
+  `startDate` и без дат у дней (дни — плоский список всех недель плана). После честной правки
+  календарь на таком payload не рисует плановых дней вообще (раньше рисовал их на 1/2/3-е число и
+  помечал «Пропущено»). Чтобы вернуть план в календарь, нужно писать дату/`startDate` при сохранении
+  плана — это меняет модель `he_pl_runtime`, поэтому отдельным пунктом, а не «тихой» догадкой в UI.
 
 ## 3. Порядок закрепления
 
