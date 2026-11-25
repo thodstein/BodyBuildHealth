@@ -571,6 +571,12 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   // анализ жил в двух единицах сразу, и строка ступеней 1.0–3.0 нмоль/л на числе
   // в пг/мл не срабатывала никогда.
   'DHT':  { prefUnit: 'pg/mL', coeff: 1, uln: 842, lln: 143, name: 'Дигидротестостерон' },
+  // Проход 209: верх прогестерона у мужчины МЕТОД-ЗАВИСИМ — АКСИС/ECLIA < 0.47 нмоль/л
+  // (≈0.15 нг/мл), ИНВИТРО < 1.9 нмоль/л, Roche/ECLIA 0.2–1.4 нг/мл = 0.64–4.45 нмоль/л
+  // (Krasowski 2014, табл. 4). 1.2 нг/мл здесь — верх набора Roche, а не универсальная
+  // норма: разброс почти в 10 раз, и выбор одного числа подменил бы вердикт. Поэтому
+  // при наличии бланка главный референс — бланк (поле «Границы нормы»), а ступени
+  // действия (`LAB_TIERS.PROG`) отвечают на другой вопрос и нормой не являются.
   'PROG': { prefUnit: 'ng/mL', coeff: 1, uln: 1.2, lln: 0.1, name: 'Прогестерон' },
   'ALB':  { prefUnit: 'g/L', coeff: 1, uln: 50, lln: 35, name: 'Альбумин' },
   'TP':   { ...RANGE_TP, name: 'Общий белок' },
@@ -580,6 +586,11 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'K':    { ...RANGE_K, name: 'Калий' },
   'NA':   { ...RANGE_NA, name: 'Натрий' },
   'CA':   { ...RANGE_CA, name: 'Кальций' },
+  // Проход 209: короткий код `P` НЕ выровнен с `PHOSPHORUS` (0.81–1.45, Хеликс
+  // 06-046) — это осознанное расхождение, а не забытая строка: 0.8–1.5 — округление
+  // широкой полосы ИНВИТРО (> 19 лет) 0.74–1.52, а выбор одного числа меняет вердикт
+  // на 1.47. Гард `core/__tests__/ucum-same-name-single-range` держит пару в DIVERGENT;
+  // спорящий случай решает бланк (поле «Границы нормы», проход 208).
   'P':    { prefUnit: 'mmol/L', coeff: 1, uln: 1.5, lln: 0.8, name: 'Фосфор' },
   'MG':   { ...RANGE_MG, name: 'Магний' },
   'B12':  { prefUnit: 'pg/mL', coeff: 1, uln: 900, lln: 200, name: 'Витамин B12' },
@@ -616,6 +627,8 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   // ── Extended markers: +50 для 80+ total ──
   'ANDROSTENEDIONE': { prefUnit: 'nmol/L', coeff: 1, uln: 6, lln: 1, name: 'Андростендион' },
   'ESTRADIOL_SENS': { prefUnit: 'pmol/L', coeff: 1, uln: 150, lln: 40, name: 'Эстрадиол чувств.' },
+  // Проход 209: тот же набор в молях (1.5 нмоль/л ≈ 0.47 нг/мл) — не «вторая норма»,
+  // а второй единичный вид одного числа; метод-зависимость — см. комментарий у `PROG`.
   'PROGESTERONE': { prefUnit: 'nmol/L', coeff: 1, uln: 1.5, lln: 0.3, name: 'Прогестерон' },
   'PREALBUMIN': { prefUnit: 'mg/L', coeff: 1, uln: 400, lln: 200, name: 'Преальбумин' },
   'CK': { prefUnit: 'U/L', coeff: 1, uln: 200, lln: 30, name: 'КФК' },
@@ -668,7 +681,9 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   'POTASSIUM': { ...RANGE_K, name: 'Калий' },
   'CHLORIDE': { prefUnit: 'mmol/L', coeff: 1, uln: 108, lln: 98, name: 'Хлор' },
   'CALCIUM': { ...RANGE_CA, name: 'Кальций' },
-  'PHOSPHORUS': { prefUnit: 'mmol/L', coeff: 1, uln: 1.45, lln: 0.8, name: 'Фосфор' },
+  // Проход 209: взрослая норма 0.81–1.45 ммоль/л — Хеликс 06-046 (18+). Прежние
+  // 0.8/1.45 держали нижнюю границу «круглым» числом без источника.
+  'PHOSPHORUS': { prefUnit: 'mmol/L', coeff: 1, uln: 1.45, lln: 0.81, name: 'Фосфор' },
   'MAGNESIUM': { ...RANGE_MG, name: 'Магний' },
   'COPPER': { prefUnit: 'umol/L', coeff: 1, uln: 30, lln: 10, name: 'Медь' },
   'ZINC': { prefUnit: 'umol/L', coeff: 1, uln: 20, lln: 11, name: 'Цинк' },

@@ -178,10 +178,23 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   MAGNESIUM:        { marker:'MAGNESIUM', normal:[0.85,1.1], borderline:[0.7,0.85], treatment:[0.5,0.7], emergencyLow:0.5, direction:'low', unit:'mmol/L', label:'Магний' },
   ZINC:             { marker:'ZINC', normal:[11,18], borderline:[9,11], treatment:[7,9], emergencyLow:7, direction:'low', unit:'mcmol/L', label:'Цинк' },
   SELENIUM:         { marker:'SELENIUM', normal:[80,190], borderline:[60,80], treatment:[40,60], emergencyLow:40, direction:'low', unit:'mcg/L', label:'Селен' },
-  POTASSIUM:        { marker:'POTASSIUM', normal:[3.5,5.0], borderline:[3.0,3.5,5.0,5.5], treatment:[2.5,3,5.5,6.5], emergencyHigh:6.5, emergencyLow:2.5, direction:'both', unit:'mmol/L', label:'Калий' },
+  // Проход 209: норма 3.5–5.1 — референс Хеликс 06-064 (взрослые), а не 5.0.
+  // Экстренная граница 2.5 / 6.5 — не «правдоподобное число»: тяжёлой дискалиемией
+  // считаются K < 2.5 или > 6.5 ммоль/л («Treating potassium disturbances: kill the
+  // killers but avoid overkill», PMID 30353786), а внутривенный кальций показан уже
+  // при K ≥ 6.5 (обзор неотложной гиперкалиемии, PMID 41506858). Граница включена
+  // сознательно: источник называет тяжёлым «< 2.5», а приложение считает 2.5 экстренным —
+  // округление бланка до десятых не повод откладывать помощь (осторожная сторона).
+  // Поэтому ступень 3 здесь означает неотложную помощь, а не «наблюдение».
+  POTASSIUM:        { marker:'POTASSIUM', normal:[3.5,5.1], borderline:[3.0,3.5,5.1,5.5], treatment:[2.5,3,5.5,6.5], emergencyHigh:6.5, emergencyLow:2.5, direction:'both', unit:'mmol/L', label:'Калий' },
   SODIUM:           { marker:'SODIUM', normal:[135,145], borderline:[130,135,145,150], treatment:[125,130,150,155], emergencyHigh:155, emergencyLow:125, direction:'both', unit:'mmol/L', label:'Натрий' },
   CALCIUM:          { marker:'CALCIUM', normal:[2.2,2.6], borderline:[2.0,2.2,2.6,2.8], treatment:[1.8,2.0,2.8,3.0], emergencyHigh:3.0, emergencyLow:1.8, direction:'both', unit:'mmol/L', label:'Кальций' },
-  PHOSPHORUS:       { marker:'PHOSPHORUS', normal:[0.8,1.5], borderline:[0.6,0.8,1.5,1.8], treatment:[0.4,0.6,1.8,2.5], emergencyHigh:2.5, emergencyLow:0.4, direction:'both', unit:'mmol/L', label:'Фосфор' },
+  // Проход 209: норма 0.81–1.45 — Хеликс 06-046 (18+), те же числа, что в каталоге.
+  // Экстренные 0.4 / 2.5 остаются ПОРОГОМ ПРИЛОЖЕНИЯ: первичного источника с таким
+  // числом нет — обзоры гипофосфатемии задают степень словами (лёгкая/умеренная/
+  // тяжёлая) и привязаны к методу, поэтому ступень 3 тут означает «край диапазона —
+  // к врачу», а не цитируемый клинический порог. Число не выдаётся за guideline.
+  PHOSPHORUS:       { marker:'PHOSPHORUS', normal:[0.81,1.45], borderline:[0.6,0.81,1.45,1.8], treatment:[0.4,0.6,1.8,2.5], emergencyHigh:2.5, emergencyLow:0.4, direction:'both', unit:'mmol/L', label:'Фосфор' },
   VITAMIN_B6:       { marker:'VITAMIN_B6', normal:[20,100], borderline:[10,20], treatment:[5,10], emergencyLow:5, direction:'low', unit:'nmol/L', label:'B6' },
 };
 
