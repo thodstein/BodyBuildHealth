@@ -81,7 +81,7 @@ describe('проход 208: пресеты референсов лаборато
     expect(labPreset('helix', 'PTH')?.uln).toBe(88);
     expect(labPreset('helix', 'PARATHYROID')?.uln).toBe(88);
     expect(labPreset('helix', 'АЛТ')).toBeNull();
-    expect(labPreset('invitro', 'POTASSIUM')).toBeNull();
+    expect(labPreset('cmd', 'HOMOCYSTEINE')).toBeNull();
     expect(labPreset(null, 'POTASSIUM')).toBeNull();
   });
 
@@ -96,9 +96,9 @@ describe('проход 208: пресеты референсов лаборато
   });
 
   it('нет пресета — названная причина, а не подмена нормой приложения', () => {
-    const none = presetForEntry('POTASSIUM', 'invitro', 'mmol/L');
+    const none = presetForEntry('HOMOCYSTEINE', 'cmd', 'umol/L');
     expect(none.ok).toBe(false);
-    if (!none.ok) expect(none.reason).toContain('ИНВИТРО');
+    if (!none.ok) expect(none.reason).toContain('CMD');
     const unknown = presetForEntry('POTASSIUM', 'helix', 'mmol/L');
     expect(unknown.ok).toBe(true);
   });
@@ -125,6 +125,7 @@ describe('проход 208: пресеты референсов лаборато
     expect(refSourceLabel('app', 'POTASSIUM')).toBe('норма приложения');
     expect(refSourceLabel('blank', 'POTASSIUM')).toBe('границы из бланка');
     expect(refSourceLabel('helix', 'POTASSIUM')).toContain('Хеликс 06-064');
-    expect(refSourceLabel('kdl', 'POTASSIUM')).toContain('пресета нет');
+    expect(refSourceLabel('kdl', 'POTASSIUM')).toContain('КДЛ');
+    expect(refSourceLabel('cmd', 'HOMOCYSTEINE')).toContain('пресета нет');
   });
 });

@@ -19,6 +19,13 @@
  *  - Трансферрин: «2 – 3,6 г/л» — helix.ru/kb/item/06-040
  *  - Калий: «3,5–5,1 ммоль/л» — helix.ru/kb/item/06-064
  *  - Кальций общий: «18–60 лет 2,15 – 2,5 ммоль/л» — helix.ru/kb/item/06-020
+ *
+ *  Пресеты КДЛ, CMD и ИНВИТРО добавлены с их собственных страниц тестов:
+ *  цитата и URL стоят в каждой строке. Страница теста ИНВИТРО рисуется на клиенте,
+ *  поэтому строки её таблицы референсов читаются из того же сайта запросом
+ *  `/golk/tests/api/v1/tests/<uuid>?cityID=<город>` — источник тот же, что видит
+ *  человек в браузере. Где лаборатория печатает одну границу («< 5 мг/л») или
+ *  режет норму по полу/фазе, пресета нет: одна граница — не интервал.
  */
 
 import { tierMarkerKey } from './lab-tier-ranges';
@@ -38,9 +45,9 @@ export interface LabSourceInfo {
 
 export const LAB_SOURCES: LabSourceInfo[] = [
   { id: 'helix', label: 'Хеликс', note: 'пресеты по страницам helix.ru' },
-  { id: 'invitro', label: 'ИНВИТРО', note: 'пресетов нет — введите границы из бланка' },
-  { id: 'kdl', label: 'КДЛ', note: 'пресетов нет — введите границы из бланка' },
-  { id: 'cmd', label: 'CMD', note: 'пресетов нет — введите границы из бланка' },
+  { id: 'invitro', label: 'ИНВИТРО', note: 'пресеты по страницам invitro.ru' },
+  { id: 'kdl', label: 'КДЛ', note: 'пресеты по страницам kdlmed.ru' },
+  { id: 'cmd', label: 'CMD', note: 'пресеты по страницам cmd-online.ru' },
 ];
 
 export interface LabPresetRow {
@@ -101,9 +108,335 @@ export const LAB_REFERENCE_PRESETS: Record<LabId, Record<string, LabPresetRow>> 
       note: '18–60 лет; 60–90 лет верх 2,55',
     },
   },
-  invitro: {},
-  kdl: {},
-  cmd: {},
+  invitro: {
+    POTASSIUM: {
+      lln: 3.5,
+      uln: 5.1,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2920 Калий · «> 14 лет 3,5 - 5,1»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/2571/2920/',
+      note: '> 14 лет',
+    },
+    MAGNESIUM: {
+      lln: 0.66,
+      uln: 1.07,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2921 Магний · «> 20 лет 0,66 - 1,07»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/2571/2921/',
+      note: '> 20 лет',
+    },
+    CALCIUM: {
+      lln: 2.1,
+      uln: 2.55,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2962 Кальций общий · «12–60 лет 2,10–2,55»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/2571/2962/',
+      note: '12–60 лет',
+    },
+    PHOSPHORUS: {
+      lln: 0.74,
+      uln: 1.52,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2922 Фосфор неорганический · «> 19 лет оба 0,74-1,52»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/2571/2922/',
+      note: '> 19 лет',
+    },
+    ALP: {
+      lln: 40,
+      uln: 150,
+      unit: 'U/L',
+      source: 'ИНВИТРО 2234 Фосфатаза щёлочная · «>19 лет 40-150»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/486/2234/',
+      note: '> 19 лет; женщины > 15 лет — те же 40-150',
+    },
+    BIL: {
+      lln: 3.4,
+      uln: 20.5,
+      unit: 'umol/L',
+      source: 'ИНВИТРО 2219 Билирубин общий · «Взрослые и дети (кроме периода новорожденности): 3,4-20,5 мкмоль/л»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/484/2219/',
+      note: 'вне периода новорождённости',
+    },
+    UREA: {
+      lln: 2.1,
+      uln: 7.1,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2210 Мочевина · «18 - 60 лет 2,1 – 7,1»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/2368/2210/',
+      note: '18–60 лет',
+    },
+    GLU: {
+      lln: 4.1,
+      uln: 6.0,
+      unit: 'mmol/L',
+      source: 'ИНВИТРО 2212 Глюкоза · «старше 14 лет 4,1 - 6,0»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/481/2212/',
+      note: 'старше 14 лет',
+    },
+    TSH: {
+      lln: 0.4,
+      uln: 4.0,
+      unit: 'mIU/L',
+      source: 'ИНВИТРО 2322 ТТГ · «> 19 лет 0,4 - 4,0»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/629/2322/',
+      note: '> 19 лет; в бланке ИНВИТРО — мМЕ/л',
+    },
+    FT4: {
+      lln: 9.0,
+      uln: 19.05,
+      unit: 'pmol/L',
+      source: 'ИНВИТРО 2324 Т4 свободный · «>19 лет 9.00 – 19.05»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/629/2324/',
+      note: '> 19 лет',
+    },
+    FT3: {
+      lln: 3.0,
+      uln: 5.6,
+      unit: 'pmol/L',
+      source: 'ИНВИТРО 2326 Т3 свободный · «оба старше 19 лет 3,0 – 5,6»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/629/2326/',
+      note: '> 19 лет',
+    },
+    B12: {
+      lln: 187,
+      uln: 883,
+      unit: 'pg/mL',
+      source: 'ИНВИТРО 2248 Витамин В12 · «Референсные значения: 187-883 пг/мл»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/5145/2248/',
+    },
+    FOL: {
+      lln: 3.0,
+      uln: 20.5,
+      unit: 'ng/mL',
+      source: 'ИНВИТРО 2249 Фолиевая кислота · «Референсные значения: 3,0-20,5 нг/мл»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/5145/2249/',
+    },
+    VITD: {
+      lln: 30,
+      uln: 100,
+      unit: 'ng/mL',
+      source: 'ИНВИТРО 2849 25-OH витамин D · «30-100 – адекватный уровень»',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/5146/2849/',
+      note: 'адекватный уровень (РАЭ); > 100 — возможен токсический эффект',
+    },
+    WBC: {
+      lln: 4.5,
+      uln: 11.0,
+      unit: '10^9/L',
+      source: 'ИНВИТРО 2852 Общий анализ крови · «16 лет – 120 лет 4,50 – 11,0» (тыс/мкл = 10^9/л)',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/156/2852/',
+      note: '16–120 лет',
+    },
+    PLT: {
+      lln: 150,
+      uln: 400,
+      unit: '10^9/L',
+      source: 'ИНВИТРО 2852 Общий анализ крови · «6 лет - 120 лет 150 - 400» (тыс/мкл = 10^9/л)',
+      sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/156/2852/',
+      note: '6–120 лет',
+    },
+  },
+  kdl: {
+    POTASSIUM: {
+      lln: 3.5,
+      uln: 5.1,
+      unit: 'mmol/L',
+      source: 'КДЛ Калий · «Референсная концентрация — 3,5–5,1 ммоль/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/makro-i-mikroelementy/kaliy-v-syivorotke',
+    },
+    MAGNESIUM: {
+      lln: 0.66,
+      uln: 1.07,
+      unit: 'mmol/L',
+      source: 'КДЛ Магний · «> 20 лет 0,66 - 1,07 ммоль/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/makro-i-mikroelementy/magniy-v-syivorotke',
+      note: '> 20 лет',
+    },
+    CALCIUM: {
+      lln: 2.15,
+      uln: 2.5,
+      unit: 'mmol/L',
+      source: 'КДЛ Кальций · «18 - 60 лет 2,15 - 2,5 ммоль/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/makro-i-mikroelementy/kaltsiy-v-syivorotke',
+      note: '18–60 лет',
+    },
+    PHOSPHORUS: {
+      lln: 0.81,
+      uln: 1.45,
+      unit: 'mmol/L',
+      source: 'КДЛ Фосфор · «> 12 лет 0,81 - 1,45 ммоль/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/makro-i-mikroelementy/fosfor-v-syivorotke',
+      note: '> 12 лет',
+    },
+    BIL: {
+      lln: 3.5,
+      uln: 21,
+      unit: 'umol/L',
+      source: 'КДЛ Билирубин общий · «Больше 6 дней 3,5 - 21 мкмоль/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/pigmentnyy-obmen/bilirubin-obshhiy',
+      note: 'старше 6 дней',
+    },
+    GLU: {
+      lln: 4.1,
+      uln: 5.9,
+      unit: 'mmol/L',
+      source: 'КДЛ Глюкоза в плазме · «Больше 14 лет 4,1 - 5,9 ммоль/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/uglevodnyy-obmen/glyukoza-v-plazme',
+      note: '> 14 лет',
+    },
+    HbA1c: {
+      lln: 4.8,
+      uln: 5.9,
+      unit: '%',
+      source: 'КДЛ Гликированный гемоглобин · «Референсный диапазон — 4,8–5,9 %»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/klinicheskie-issledovaniya/glikirovannyiy-gemoglobin-hba-1c',
+    },
+    FT4: {
+      lln: 12.0,
+      uln: 22.0,
+      unit: 'pmol/L',
+      source: 'КДЛ Т4 свободный · «> 20 лет 12,0 - 22,0 пмоль/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/gormony/tiroksin-svobodnyiy-t4-svobodnyiy',
+      note: '> 20 лет',
+    },
+    FT3: {
+      lln: 3.1,
+      uln: 6.8,
+      unit: 'pmol/L',
+      source: 'КДЛ Т3 свободный · «Референсная концентрация — 3,1–6,8 пмоль/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/gormony/triyodtironin-svobodnyiy-t3-svobodnyiy',
+    },
+    T4: {
+      lln: 66,
+      uln: 181,
+      unit: 'nmol/L',
+      source: 'КДЛ Т4 общий · «> 20 лет 66 - 181 нмоль/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/gormony/tiroksin-obshhiy-t4',
+      note: '> 20 лет',
+    },
+    TIBC: {
+      lln: 45.3,
+      uln: 77.1,
+      unit: 'umol/L',
+      source: 'КДЛ ОЖСС · «Референсная концентрация — 45,3–77,1 мкмоль/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/obmen-zheleza/zhelezosvyazyivayushhaya-sposobnost-syivor',
+    },
+    TRANSFERRIN: {
+      lln: 2,
+      uln: 3.6,
+      unit: 'g/L',
+      source: 'КДЛ Трансферрин · «Референсная концентрация — 2–3,6 г/л»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/obmen-zheleza/transferrin',
+    },
+    B12: {
+      lln: 191,
+      uln: 663,
+      unit: 'pg/mL',
+      source: 'КДЛ Витамин B12 · «Референсная концентрация — 191–663 пг/мл»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/vitaminy/vitamin-b12-tsianokobalamin',
+    },
+    VITD: {
+      lln: 30,
+      uln: 70,
+      unit: 'ng/mL',
+      source: 'КДЛ Витамин D 25-OH · «Референсная концентрация — 30–70 нг/мл»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/vitaminy/vitamin-d-25-gidroksi-kaltsiferol',
+    },
+    CRP: {
+      lln: 0,
+      uln: 5,
+      unit: 'mg/L',
+      source: 'КДЛ С-реактивный белок · «Референсная концентрация — 0–5 мг/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/spetsificheskie-belki-krovi/c-reaktivnyiy-belok-kolichestvenno-meto',
+    },
+    TROPONIN_I: {
+      lln: 0,
+      uln: 1,
+      unit: 'ng/mL',
+      source: 'КДЛ Тропонин I · «Референсная концентрация — 0–1 нг/мл»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/kardiomarkyery/troponin-i',
+    },
+    NT_PROBNP: {
+      lln: 0,
+      uln: 125,
+      unit: 'pg/mL',
+      source: 'КДЛ NT-proBNP · «0 - 75 лет 0 - 125 пг/мл»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/biokhimiya/kardiomarkyery/nt-probnp-kolichestvenno',
+      note: '0–75 лет; для > 75 лет верх 450',
+    },
+    PARATHYROID: {
+      lln: 9.5,
+      uln: 75,
+      unit: 'pg/mL',
+      source: 'КДЛ ПТГ интактный · «23-70 лет 9,5 - 75 пг/мл»',
+      sourceUrl: 'https://www.kdlmed.ru/analizy/issledovaniya-krovi/gormony/paratireoidnyiy-gormon-intaktnyiy',
+      note: '23–70 лет',
+    },
+    WBC: {
+      lln: 4,
+      uln: 10,
+      unit: '10^9/L',
+      source: 'КДЛ Общий анализ крови · «Больше 16 лет 4 - 10 *10^9/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/klinicheskie-issledovaniya/klinicheskiy-analiz-krovi-s-leykotsita',
+      note: '> 16 лет',
+    },
+    PLT: {
+      lln: 180,
+      uln: 320,
+      unit: '10^9/L',
+      source: 'КДЛ Общий анализ крови · «Больше 15 лет 180 - 320 *10^9/л»',
+      sourceUrl:
+        'https://www.kdlmed.ru/analizy/issledovaniya-krovi/klinicheskie-issledovaniya/klinicheskiy-analiz-krovi-s-leykotsita',
+      note: '> 15 лет',
+    },
+  },
+  cmd: {
+    POTASSIUM: {
+      lln: 3.5,
+      uln: 5.1,
+      unit: 'mmol/L',
+      source: 'CMD Калий · «Референтный интервал: 3,5 – 5,1 ммоль/л»',
+      sourceUrl: 'https://www.cmd-online.ru/vracham/spravochnik-vracha/kaliy/',
+    },
+    GLU: {
+      lln: 4.0,
+      uln: 6.1,
+      unit: 'mmol/L',
+      source: 'CMD Глюкоза в крови · «Норма Натощак … плазма венозная 4,0–6,1»',
+      sourceUrl: 'https://www.cmd-online.ru/vracham/spravochnik-vracha/glyukoza-v-krovi/',
+      note: 'натощак, плазма венозной крови',
+    },
+    WBC: {
+      lln: 4.5,
+      uln: 11.0,
+      unit: '10^9/L',
+      source: 'CMD Лейкоциты · «Референтный интервал: 4,5–11,0 109/л»',
+      sourceUrl: 'https://www.cmd-online.ru/vracham/spravochnik-vracha/leykotsity/',
+    },
+    PLT: {
+      lln: 150,
+      uln: 350,
+      unit: '10^9/L',
+      source: 'CMD Тромбоциты · «Референтный интервал 150–350*10 9 /л»',
+      sourceUrl: 'https://www.cmd-online.ru/vracham/spravochnik-vracha/kolichestvo-trombotsitov-plt/',
+    },
+    RETICULOCYTES: {
+      lln: 0.2,
+      uln: 1,
+      unit: '%',
+      source: 'CMD Ретикулоциты · «Референтный интервал: 0,2–1 %»',
+      sourceUrl: 'https://www.cmd-online.ru/vracham/spravochnik-vracha/retikulotsity/',
+    },
+  },
 };
 
 /**
