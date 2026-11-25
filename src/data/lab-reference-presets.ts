@@ -28,6 +28,7 @@
  *  режет норму по полу/фазе, пресета нет: одна граница — не интервал.
  */
 
+import { ucumKey } from '../core/constants';
 import { tierMarkerKey } from './lab-tier-ranges';
 
 /** Лаборатории, для которых заведён хотя бы один пресет. */
@@ -462,13 +463,14 @@ export function labPreset(lab: LabId | null | undefined, code: string): LabPrese
   if (!table) return null;
   // Человек вводит код так, как он напечатан в бланке: «K», «ОЖСС», «PTH».
   // Пресеты подписаны канонами каталога (`POTASSIUM`), поэтому написание
-  // приводится тем же правилом, что и шкалы ступеней, — иначе пресет молча
-  // «не находится» на самом частом написании.
-  const raw = String(code || '')
-    .trim()
-    .toUpperCase();
+  // приводится тем же правилом, что и каталог: `ucumKey` — точное совпадение,
+  // затем верхний регистр, затем регистронезависимый поиск. Свой перебор
+  // регистров здесь недопустим: ключ `HbA1c` смешанного написания против
+  // `HBA1C` не совпадал, и пресет КДЛ «молча не находился» на собственном коде
+  // бланка (нашло ревью прохода 209).
+  const raw = String(code || '').trim();
   if (!raw) return null;
-  const canon = PRESET_CODE_ALIAS[raw] ?? raw;
+  const canon = PRESET_CODE_ALIAS[raw.toUpperCase()] ?? ucumKey(raw) ?? raw.toUpperCase();
   return table[canon] ?? table[tierMarkerKey(canon)] ?? null;
 }
 

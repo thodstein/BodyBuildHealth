@@ -21,7 +21,7 @@ import { unusedLabFields, labUnreadNotes } from './Calc.lab-coverage';
 import { LAB_UNIT_CHOICES, LAB_READ_UNIT, readLabValue } from '../../../core/constants';
 import type { TzSpecResult } from '../../../engines/risk-engine-tz-spec';
 
-export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult, onResetEdits }) => {
+export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedded, courseWeek: propWeek, courseLinked, labsLinked, onOpenManualPicker, onOpenLabs, planResult, onResetEdits, onOptionsChange }) => {
   const [state, setState] = useState<CalculatorState>(() => {
     const h = hydrateState();
     return normalizeCalculatorState({ ...DEFAULT_STATE, ...h });
@@ -657,8 +657,8 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 return (
                   <div key={r.key} role="button" tabIndex={0} aria-pressed={active}
                     data-calc-option={r.key}
-                    onClick={() => update('options', { ...opts, [r.key]: !active })}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); update('options', { ...opts, [r.key]: !active }); } }}
+                    onClick={() => { update('options', { ...opts, [r.key]: !active }); onOptionsChange?.(); }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); update('options', { ...opts, [r.key]: !active }); onOptionsChange?.(); } }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minHeight: 44,
                       padding: '6px 10px', borderRadius: 10,
@@ -685,7 +685,7 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
                 {dietNotes.length > 0
                   ? dietNotes.map((n, i) => <div key={i}>{n}</div>)
                   : planResult
-                    ? '🥗 Дневник питания за сегодня пуст или клетчатка в нём не указана — покрытие не определено (не «покрыто» и не «нет»).'
+                    ? '🥗 Пометки появятся после пересчёта плана с этой опцией. Если после пересчёта их нет — клетчатки в дневнике за сегодня нет, и покрытие не определено (это не «покрыто» и не «нет»).'
                     : '🥗 План ещё не рассчитан — пометки появятся в результате.'}
               </div>
             )}

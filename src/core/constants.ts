@@ -627,8 +627,10 @@ export const UCUM_MAP: Record<string, { prefUnit: string; coeff: number; uln: nu
   // ── Extended markers: +50 для 80+ total ──
   'ANDROSTENEDIONE': { prefUnit: 'nmol/L', coeff: 1, uln: 6, lln: 1, name: 'Андростендион' },
   'ESTRADIOL_SENS': { prefUnit: 'pmol/L', coeff: 1, uln: 150, lln: 40, name: 'Эстрадиол чувств.' },
-  // Проход 209: тот же набор в молях (1.5 нмоль/л ≈ 0.47 нг/мл) — не «вторая норма»,
-  // а второй единичный вид одного числа; метод-зависимость — см. комментарий у `PROG`.
+  // Проход 209: это НЕ тот же набор, что у `PROG` (0.1–1.2 нг/мл): 0.3–1.5 нмоль/л
+  // = 0.09–0.47 нг/мл, верх в 2.5 раза ниже. Здесь записана другая полоса другого
+  // метода, и сводить её с `PROG` нельзя — метод-зависимость см. в комментарии у
+  // `PROG`; числа двух строк сознательно не сведены (§4 docs/LAB-NORMS-SINGLE-SOURCE).
   'PROGESTERONE': { prefUnit: 'nmol/L', coeff: 1, uln: 1.5, lln: 0.3, name: 'Прогестерон' },
   'PREALBUMIN': { prefUnit: 'mg/L', coeff: 1, uln: 400, lln: 200, name: 'Преальбумин' },
   'CK': { prefUnit: 'U/L', coeff: 1, uln: 200, lln: 30, name: 'КФК' },

@@ -129,3 +129,41 @@ describe('проход 208: пресеты референсов лаборато
     expect(refSourceLabel('cmd', 'HOMOCYSTEINE')).toContain('пресета нет');
   });
 });
+
+/**
+ * Проход 209 (по ревью): код обязан находиться в ЛЮБОМ написании.
+ *
+ * Ключи таблиц — каноны каталога, но часть из них смешанного регистра
+ * (`HbA1c`). Поиск делал `code.toUpperCase()` и сравнивал с ключом напрямую,
+ * поэтому пресет КДЛ `HbA1c` физически не применялся: интерфейс отвечал
+ * «пресета нет — введите границы из бланка», хотя строка 4.8–5.9 % лежала в
+ * таблице. Тот же класс промаха, который проход 174 закрыл для каталога
+ * (`ucumKey`), поэтому теперь поиск идёт тем же правилом.
+ */
+describe('labPreset: код находится в нативном, верхнем и нижнем написании', () => {
+  it('каждый ключ каждой таблицы резолвится во всех трёх написаниях', () => {
+    for (const lab of Object.keys(LAB_REFERENCE_PRESETS) as LabId[]) {
+      for (const key of Object.keys(LAB_REFERENCE_PRESETS[lab])) {
+        const row = LAB_REFERENCE_PRESETS[lab][key];
+        for (const spelling of [key, key.toUpperCase(), key.toLowerCase()]) {
+          expect(labPreset(lab, spelling), `${lab}/${key} в написании «${spelling}»`).toBe(row);
+        }
+      }
+    }
+  });
+
+  it('HbA1c КДЛ достижим и применим — это и был молчаливый промах', () => {
+    const row = LAB_REFERENCE_PRESETS.kdl.HbA1c;
+    expect(row, 'строка кода HbA1c в таблице КДЛ').toBeTruthy();
+    expect(labPreset('kdl', 'HbA1c')).toBe(row);
+    expect(labPreset('kdl', 'HbA1c'.toUpperCase())).toBe(row);
+    expect(labPreset('kdl', 'hba1c')).toBe(row);
+    expect(presetForEntry('HbA1c', 'kdl', '%')).toEqual({
+      ok: true,
+      lln: 4.8,
+      uln: 5.9,
+      unit: '%',
+      source: row.source,
+    });
+  });
+});

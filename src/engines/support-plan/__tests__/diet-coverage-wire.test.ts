@@ -109,3 +109,14 @@ describe('🍽 dietCoverage ВКЛ', () => {
     expect(on.substances.some((s) => (s as any).note?.includes('покрыто питанием'))).toBe(false);
   });
 });
+
+describe('🍽 dietCoverage на битом дневнике', () => {
+  it('битый nutrition_diary_v2 не роняет расчёт: покрытие unknown, позиции прежние', () => {
+    localStorage.setItem('nutrition_diary_v2', '{это не json');
+    const on = runSupportUnified(pctState({ dietCoverage: true }));
+    // Битый дневник — это «нет данных», а не повод упасть или подставить нули.
+    expect(on.error).toBeUndefined();
+    expect(on.dietCoverage.every((c) => c.state === 'unknown' && c.intake === null)).toBe(true);
+    expect(on.substances.some((s) => (s as any).note?.includes('покрыто питанием'))).toBe(false);
+  });
+});

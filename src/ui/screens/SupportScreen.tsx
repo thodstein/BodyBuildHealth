@@ -202,6 +202,11 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
   const [jointMode, setJointMode] = useState(false);
   const [reproMode, setReproMode] = useState(false);
   const [neuroMode, setNeuroMode] = useState(false);
+  // Опции подбора (diaryLabs/dietAware/geneticsOn/dietCoverage) пишутся в
+  // `he_autocalc_state` из AutoCalculator, а план считается здесь по
+  // `hydrateState()`. Тик — единственный сигнал memo пересчитать план после
+  // переключения тумблера (иначе пометки остаются от прежнего расчёта).
+  const [calcOptionsTick, setCalcOptionsTick] = useState(0);
   const stateRef = useRef<CalculatorState | null>(null);
   const [myPlansRefresh, setMyPlansRefresh] = useState(0);
   const [weekChangeMsg, setWeekChangeMsg] = useState('');
@@ -653,7 +658,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       }
     }
     return { subs, dosages, planRes };
-  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, excludedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode]);
+  }, [supportLevel, supportPhase, selectedAnalogs, enhancedSubs, excludedSubs, linked.course, linked.profile, courseWeekState, boostEnabled, jointMode, reproMode, neuroMode, calcOptionsTick]);
 
   // Побочные эффекты (setPlanResult, showToast, localStorage) — в useEffect, НЕ в useMemo
   useEffect(() => {
@@ -3638,6 +3643,7 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
           courseWeek={courseWeekState}
           courseLinked={linked.course as any}
           labsLinked={linked.labs as any}
+          onOptionsChange={() => setCalcOptionsTick((v) => v + 1)}
           onApply={(r) => {
             setAutoCalcResult(r);
             setCalcDone(true);
