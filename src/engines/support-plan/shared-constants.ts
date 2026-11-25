@@ -35,6 +35,10 @@ export const SUB_ALIAS: Record<string, string> = {
   pharma_cabergoline: 'cabergoline',
   pharma_clomiphene: 'clomi',
   pharma_enclomiphene: 'clomi',
+  // UI Калькулятора (Calc.mapper.tsx:252,285) зовёт SERM lowercase-именем, а
+  // каталог держит запись под `clomi` (CATALOG_EXTRAS: кломифен 50 мг) —
+  // без алиаса карточка пустая: ключа `CLOMIPHENE` в каталоге нет.
+  clomiphene: 'clomi',
   pharma_letrozole: 'letrozole',
   metformin_dup: 'metformin',
   levothyroxine_dup: 'levothyroxine',

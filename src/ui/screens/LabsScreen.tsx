@@ -46,6 +46,8 @@ import { computeMarkerDeviations, type MarkerRiskSummary } from './LabsScreen_pa
 import { getLabNorm } from '../../engines/lab-norms.engine';
 import { computeLabTrends, getTrendColor, getTrendIcon, getTrendInsights, exportTrendsToCSV, type LabTrend } from '../../engines/lab-trend.engine';
 import { getCorrectionIds, getMarkerMap } from '../../data/lab-marker-map';
+// Проход 208: границы нормы можно взять из пресета лаборатории или из бланка.
+import { LAB_SOURCES, labsWithPresets, presetForEntry, blankRange, refSourceLabel, type LabId } from '../../data/lab-reference-presets';
 import { SYSTEM_INFO_ALL } from '../../core/risk-info';
 import { isNativeApp } from '../../core/app-platform';
 import { ensureLabsApkStyles } from './LabsScreen_parts/labs-apk-loader';
@@ -221,6 +223,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const [inputValue, setInputValue] = useState('');
   const [inputUnit, setInputUnit] = useState('');
   const [inputDate, setInputDate] = useState(todayLabDate);
+  // Проход 208: источник границ на поле бланка. `app` — норма каталога (как было),
+  // `blank` — две границы, переписанные из распечатки, лаборатория — пресет.
+  const [inputRefSource, setInputRefSource] = useState<'app' | 'blank' | LabId>('app');
+  const [inputRefLo, setInputRefLo] = useState('');
+  const [inputRefHi, setInputRefHi] = useState('');
   const [tick, setTick] = useState(0);
   const [catalogView, setCatalogView] = useState<'catalog' | 'schedule' | 'problems'>('catalog');
   const [journalSubView, setJournalSubView] = useState<'diary' | 'reports' | 'archive'>('diary');
@@ -582,15 +589,40 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     if (!entry) { setAddError(`Значение не прочитано: ${labFieldUnreadReason(text)}`); return; }
     const val = entry.value;
     const info = ucumInfo(inputCode);
+    // Проход 208: границы — часть записи. Бланк главнее каталога: если человек
+    // выбрал пресет лаборатории или переписал границы, вердикт считается по ним
+    // (`refLow`/`refHigh`), а норма приложения остаётся фолбэком.
+    let refLow: number | undefined;
+    let refHigh: number | undefined;
+    let refSource: string | undefined;
+    let unit = inputUnit;
+    if (inputRefSource === 'blank') {
+      const range = blankRange(inputRefLo, inputRefHi);
+      if (!range.ok) { setAddError('Границы бланка: ' + range.reason); return; }
+      refLow = range.refLow;
+      refHigh = range.refHigh;
+      refSource = 'бланк';
+    } else if (inputRefSource !== 'app') {
+      const check = presetForEntry(inputCode, inputRefSource, inputUnit);
+      if (!check.ok) { setAddError(check.reason); return; }
+      refLow = check.lln;
+      refHigh = check.uln;
+      refSource = check.source;
+      // Единицы не было — пресет её и подставляет: число и границы тогда в одной
+      // единице, и пересчёт не нужен.
+      if (!unit.trim()) unit = check.unit;
+    }
     const lab: LabPoint = {
       id: uid(),
       code: inputCode.toUpperCase(),
       name: info?.name || inputCode,
       value: val,
-      unit: inputUnit || info?.prefUnit || '',
+      unit: unit || info?.prefUnit || '',
       date: inputDate,
       phase: selectedPhase,
       bound: entry.bound,
+      ...(refLow !== undefined && refHigh !== undefined ? { refLow, refHigh } : {}),
+      ...(refSource ? { source: refSource } : {}),
     };
     try {
       await db.init();
@@ -599,6 +631,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       setInputCode('');
       setInputValue('');
       setInputUnit('');
+      setInputRefSource('app');
+      setInputRefLo('');
+      setInputRefHi('');
       setShowLabInput(false);
       setAddError('');
       setTick(t => t + 1);
@@ -2548,7 +2583,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(var(--labs-accent-rgb, 0,230,138),0.14)', border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.22)', fontSize:17 }}>🧪</span>
                 <span style={{ fontWeight:800, fontSize:15, color:'#fff' }}>Ввести результат</span>
               </div>
-              <button onClick={() => setShowLabInput(false)} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
+              <button onClick={() => { setShowLabInput(false); setInputRefSource('app'); setInputRefLo(''); setInputRefHi(''); setAddError(''); }} aria-label="Закрыть" style={{ background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)', color:'#fff', borderRadius:999, minWidth:44, minHeight:44, padding:'10px 14px', fontSize:14, cursor:'pointer' }}>✕</button>
             </div>
             <div style={{ flex:1, overflowY:'auto', padding:'0 18px 12px', WebkitOverflowScrolling:'touch' as any, minHeight:0 }}>
             {(() => { const info = ucumInfo(inputCode); return info ? (
@@ -2574,6 +2609,49 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} onFocus={e => { try { e.currentTarget.scrollIntoView({ block:'center' }); } catch {} }} style={{ width:'100%', padding:'12px 12px', background:'rgba(0,0,0,0.30)', border:'1px solid rgba(140,190,255,0.16)', borderRadius:12, color:'#fff', fontSize:16, minHeight:48, boxSizing:'border-box' }} />
               </div>
             </div>
+            {(() => {
+              // Проход 208: выбор источника границ. Пресеты есть только у лабораторий,
+              // для которых число взято со страницы и записан источник; у остальных —
+              // честно «свои границы из бланка», а не норма приложения под чужим именем.
+              const code = inputCode.trim().toUpperCase();
+              const catalog = ucumInfo(code);
+              const presetLabs = labsWithPresets();
+              const check = code && inputRefSource !== 'app' && inputRefSource !== 'blank'
+                ? presetForEntry(code, inputRefSource, inputUnit)
+                : null;
+              const selectStyle = { width: '100%', padding: '12px 12px', background: 'rgba(0,0,0,0.30)', border: '1px solid rgba(140,190,255,0.16)', borderRadius: 12, color: '#fff', fontSize: 16, minHeight: 48, boxSizing: 'border-box' as const };
+              return (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, color: '#fff', fontWeight: 700 }}>Границы нормы</label>
+                  <select value={inputRefSource} onChange={e => setInputRefSource(e.target.value as 'app' | 'blank' | LabId)} style={selectStyle}>
+                    <option value="app">{catalog ? 'Норма приложения (' + catalog.lln + '–' + catalog.uln + ' ' + catalog.prefUnit + ')' : 'Норма приложения'}</option>
+                    {presetLabs.map(id => (
+                      <option key={id} value={id}>{refSourceLabel(id, code)}</option>
+                    ))}
+                    <option value="blank">Свои границы из бланка</option>
+                  </select>
+                  {inputRefSource === 'blank' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <input type="text" inputMode="decimal" value={inputRefLo} onChange={e => setInputRefLo(e.target.value)} placeholder="Нижняя, напр. 3.5" style={selectStyle} />
+                      <input type="text" inputMode="decimal" value={inputRefHi} onChange={e => setInputRefHi(e.target.value)} placeholder="Верхняя, напр. 5.1" style={selectStyle} />
+                    </div>
+                  )}
+                  {check && !check.ok && (
+                    <div style={{ fontSize: 11, color: '#fbbf24', lineHeight: 1.45 }}>{check.reason}</div>
+                  )}
+                  {check && check.ok && (
+                    <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.45 }}>
+                      Будет записано: {check.lln}–{check.uln} {check.unit} · {check.source}{check.note ? ' · ' + check.note : ''}
+                    </div>
+                  )}
+                  {inputRefSource === 'app' && (
+                    <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.45 }}>
+                      Пресеты заведены только там, где число взято со страницы лаборатории ({LAB_SOURCES.filter(s => presetLabs.includes(s.id)).map(s => s.label).join(', ')}); для остальных лабораторий выберите «Свои границы из бланка».
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {addError && <div style={{ fontSize:12, color:'#ef4444', textAlign:'center', marginTop:10, fontWeight:700 }}>{addError}</div>}
             </div>
             <div style={{ flexShrink:0, padding:'12px 18px calc(18px + env(safe-area-inset-bottom,0px))', borderTop:'1px solid rgba(140,190,255,0.12)', background:'linear-gradient(0deg, rgba(12,23,40,0.98), rgba(12,23,40,0.92))' }}>

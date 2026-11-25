@@ -1312,6 +1312,45 @@ const SUPPLEMENT: Record<string, any> = {
     dosage:{ mg:500, timing:'на ночь (с едой, ↑ постепенно)' }, bestForCourse:false,
   },
 
+  // ── UI Калькулятора зовёт SERM по id `enclomiphene` (Calc.mapper.tsx:252,256,284,285),
+  //    а запись базового каталога лежит только под ключом PHARMA_ENCLOMIPHENE →
+  //    пустая карточка. Поля оттуда (support-catalog-data.ts:10303-10325);
+  //    доза 25 мг/сут, не 50 как у кломифена.
+  enclomiphene: {
+    id:'enclomiphene', name:'Enclomiphene', nameRu:'Энкломифен',
+    tier:'specialty', category:['hormonal','pharma'],
+    forms:[{ id:'enclomiphene_25', name:'Enclomiphene', nameRu:'Энкломифен 25 мг', dose:'25 мг 1x/д', best:true }],
+    organs:['ENDOCRINE','PITUITARY','REPRODUCTIVE'], systems:['endocrine','reproductive','neuro'],
+    mechanisms:['SERM_ACTIVITY','LH_STIMULATION','FSH_STIMULATION','HPTA_RESTORATION','TESTOSTERONE_SYNTHESIS','GNRH_STIMULATION','SPERMATOGENESIS'],
+    description:'Чистый изомер кломифена (транс-изомер). Без цитратного компонента, меньше побочных эффектов. Высокая эффективность в ПКТ и восстановлении эндогенного тестостерона.',
+    synergies:[{ with:'zinc', effect:'Синергия для HPTA', mechanism:'Zn — кофактор + энкломифен — SERM без цитрата', severity:'MEDIUM' },{ with:'vitamin_d3', effect:'Общий анаболический фон', mechanism:'D3 ↑ AR-рецепторы, энкломифен ↑ эндогенный Т', severity:'LOW' },{ with:'boron', effect:'Снижение SHBG', mechanism:'Бор ↓ SHBG, энкломифен ↑ тестостерон — ↑ свободный Т', severity:'MEDIUM' }],
+    conflicts:[{ with:'tamoxifen', effect:'Конкуренция за ER', mechanism:'Оба SERM — конкуренция за сайты связывания', severity:'LOW' },{ with:'alcohol', effect:'Гепатотоксичность', mechanism:'Энкломифен метаболизируется в печени', severity:'MEDIUM' }],
+    monitoring:[{ what:'Тестостерон общий', when:'Каждые 4 нед', targetRange:'> 450 нг/дл' },{ what:'Эстрадиол', when:'Каждые 4 нед', targetRange:'♂ 20-40 пг/мл (♀ — по фазе, не подавлять)' }],
+    contraindications:['Тромбофилия','Опухоли гипофиза','Выраженная гиперпролактинемия'],
+    sideEffects:['Меньше побочных по сравнению с кломифеном','Редко: головная боль'],
+    dosage:{ mg:25, timing:'1x/д', form:'таб' }, bestForCourse:true,
+  },
+  // ── UI: пресет «Ургент (LV4, по назначению)» отдаёт enoxaparin (Calc.mapper.tsx:498),
+  //    а карточки в каталоге не было — только дозовая запись support-dosing.ts:396-407
+  //    и локальная доза HEMATO_CATALOG (Calc.mapper.tsx:489); 40 мг п/к 1×/д — оттуда.
+  //    Рецептурный антикоагулянт: в TZ_AUTO_BLACKLIST (shared-constants.ts:198), только вручную.
+  //    Противопоказания в репозитории не задокументированы — «нет данных», список пуст.
+  enoxaparin: {
+    id:'enoxaparin', name:'Enoxaparin', nameRu:'Эноксапарин (НМГ)',
+    tier:'specialty', category:['pharma','anticoagulant'],
+    forms:[{ id:'enoxaparin_40', name:'Enoxaparin', nameRu:'Эноксапарин 40 мг', dose:'40 мг п/к 1×/д', best:true }],
+    organs:['BLOOD'], systems:['hematologic'],
+    mechanisms:['ANTI_XA','ANTICOAGULATION','THROMBIN_INHIBITION'],
+    description:'Низкомолекулярный гепарин (ингибитор фактора Xa). Антикоагулянт при подтверждённом тромбозе (ТГВ/ТЭЛА) и высоком D-димере — только по назначению врача, автоматически не назначается.',
+    synergies:[{ with:'warfarin', effect:'Переход НМГ → варфарин', mechanism:'Мост-терапия: НМГ 5+ дней, затем варфарин (bridge therapy)', severity:'HIGH' }],
+    // Аддитивный риск кровотечения с фибринолитиками — то же правило, что поднимает
+    // предупреждение в tz-mapper-engine.ts:323 (антикоагулянт + фибринолитик).
+    conflicts:[{ with:'nattokinase', effect:'Аддитивный риск кровотечения', mechanism:'Антикоагулянт + фибринолитик', severity:'HIGH' },{ with:'serrapeptase', effect:'Аддитивный риск кровотечения', mechanism:'Антикоагулянт + протеолитик', severity:'HIGH' }],
+    monitoring:[{ what:'Тромбоциты, Hb, признаки кровотечения', when:'Под контролем врача', targetRange:'Без кровоточивости, тромбоциты в норме' }],
+    contraindications:[],
+    sideEffects:['Кровотечение','Гепарин-индуцированная тромбоцитопения','Коррекция дозы при почечной недостаточности'],
+    dosage:{ mg:40, timing:'п/к 1×/д', form:'раствор для инъекций' }, bestForCourse:false,
+  },
 };
 
 // Append to catalog
