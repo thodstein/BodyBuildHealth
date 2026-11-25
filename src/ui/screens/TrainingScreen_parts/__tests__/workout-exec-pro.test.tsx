@@ -767,6 +767,12 @@ describe('SessionPlayer: кнопки доводят от разминки до 
     const finishBtn = findBtn(container, 'Завершить тренировку');
     expect(finishBtn).toBeTruthy();
     fireEvent.click(finishBtn!);
+    // «✓ Завершить тренировку» спрашивает подтверждение, если подходы записаны и
+    // ещё не сохранены: без второго клика тренировка остаётся открытой.
+    const exitSave = container.querySelector(
+      '[data-session="exit-confirm"] [data-act="exit-save"]',
+    ) as HTMLElement | null;
+    if (exitSave) fireEvent.click(exitSave);
     expect(container.textContent).toContain('Заминка: День 1 · Грудь');
 
     // Заминка: отмеченный целиком блок сворачивается, «Развернуть» возвращает пункты.

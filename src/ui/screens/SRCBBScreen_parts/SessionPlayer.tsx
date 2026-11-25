@@ -8,7 +8,7 @@ import {
   startSession,
   addExerciseToSession,
   logSet,
-  finishSession,
+  finishSessionWithSave,
   getLastSession,
   getRecentPRs,
   type WorkoutSession,
@@ -345,6 +345,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   // Последняя ошибка логирования подхода (вес 0 / сверх лимита) — показываем,
   // когда движок отказал: раньше отказ проглатывался и подход «терялся» тихо.
   const [logError, setLogError] = useState<{ key: string; msg: string } | null>(null);
+  // Провал записи в дневник (квота/приватный режим): без баннера плеер выглядел бы
+  // сохранённым, хотя живая сессия — единственная копия тренировки.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // Фидбек кнопки «Копировать сводку» — на 1.8 с меняется на «✓ Скопировано».
   const [copyDone, setCopyDone] = useState(false);
@@ -1022,6 +1025,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
 
   const startMain = (): boolean => {
     if (!day || !Array.isArray(day.exercises)) return false;
+    setSaveError(null);
     // Фиксируем факт разминки в дневник (he_warmup_diary, одна запись на дату)
     try {
       const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
@@ -1064,10 +1068,22 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     // Живая сессия, которую не продолжаем: не затираем её автосейвом пустой новой, а
     // сохраняем в историю. Иначе подходы прошлого дня (или другого дня сегодня) исчезали
     // без следа в дневнике.
+    // Продолжать старт при провале архива нельзя: автосейв первого подхода новой сессии
+    // перезапишет `he_workout_active_v1`, и записанные подходы прошлой тренировки
+    // исчезнут и из истории, и из автосейва — без возможности восстановить.
+    const stale = loadActiveSession();
+    const hadSets = !!stale && (stale.exercises || []).some((ex) => (ex.sets || []).length > 0);
+    let archived: WorkoutSession | null = null;
     try {
-      archiveActiveSession();
+      archived = archiveActiveSession();
     } catch {
-      /* архив недоступен — новую тренировку всё равно стартуем */
+      /* архив бросил — трактуем как провал; ниже решаем по hadSets */
+    }
+    if (hadSets && !archived) {
+      setSaveError(
+        'Не удалось сохранить прошлую тренировку в дневник. Новая не начата, чтобы не потерять записанные подходы.',
+      );
+      return false;
     }
     setActual({});
     setPrefill({});
@@ -1173,11 +1189,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       setPhase('done');
       return false;
     }
-    if (timerSoundSettings.vibrate) hapticNotify('success');
     // Для сессии, начатой сегодня, «стенные» часы точны (и включают паузы). Если её начали
     // вчера и вернулись утром — доверяем таймеру плеера, иначе в историю уедет ~10 часов.
     const sameDayStart = sess.date === localIsoDate();
-    const finished = finishSession(sess, `${focus} — ${day?.label}`, sameDayStart ? undefined : sessionDur);
+    const { session: finished, saved } = finishSessionWithSave(
+      sess,
+      `${focus} — ${day?.label}`,
+      sameDayStart ? undefined : sessionDur,
+    );
+    if (!saved) {
+      // Запись не легла (квота/приватный режим): живая сессия остаётся единственной
+      // копией тренировки. Не выдаём «сохранено», не чистим автосейв и не уходим в
+      // «Итог» — иначе записанные подходы исчезнут без следа.
+      savedRef.current = false;
+      setSaveError('Не удалось сохранить тренировку в дневник. Освободите место на устройстве и попробуйте ещё раз.');
+      return false;
+    }
+    setSaveError(null);
+    if (timerSoundSettings.vibrate) hapticNotify('success');
     savedRef.current = true;
     try {
       onSaved?.();
@@ -1313,9 +1342,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   const exitSession = (confirmFirst = true) => {
     // Подтверждение, чтобы не потерять незаписанные подходы при случайном тапе.
     // Диалог рисуем сами: window.confirm блокирует WebView и не попадает в тему.
-    // Явные кнопки («✓ Завершить тренировку», «✓ Все подходы записаны») подтверждения
-    // не требуют — пользователь только что выразил намерение, — но сохраняют
-    // подходы так же, как подтверждённый выход.
+    // «✓ Все подходы записаны» — явное намерение: подтверждения не требует, но
+    // сохраняет подходы так же, как подтверждённый выход.
     const hasLiveSets = !!session && session.exercises.some((e) => (e.sets || []).length > 0);
     if (hasLiveSets && !savedRef.current) {
       if (confirmFirst) setExitConfirm(true);
@@ -1847,11 +1875,24 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       // Очередь виджета разбирается синхронно: два подхода в одном дренаже пришли бы
       // с одной и той же сессией из замыкания, и второй затёр бы первый. Живую версию
       // держит ref (обновляется прямо в обработчике).
-      const live = liveSessionRef.current ?? session;
-      const want = normalizeExerciseName(String(d.exerciseName));
-      const ei = day.exercises.findIndex((ex) => normalizeExerciseName(ex.name) === want);
-      if (ei < 0) return;
-      const ex = day.exercises[ei];
+      let live = liveSessionRef.current ?? session;
+      const rawName = String(d.exerciseName).slice(0, 60);
+      const want = normalizeExerciseName(rawName);
+      let ei = day.exercises.findIndex((ex) => normalizeExerciseName(ex.name) === want);
+      const planned = ei >= 0;
+      if (!planned) {
+        // Упражнения нет в плане дня: раньше обработчик молча выходил, `d.handled`
+        // оставался false, и подход писал сам виджет — гонка с автосейвом плеера
+        // теряла его. Открытый плеер — единственный писатель активной сессии:
+        // добавляем упражнение в живую сессию (или находим уже добавленное) и
+        // пишем подход тем же путём, что и для упражнений из плана.
+        ei = live.exercises.findIndex((e) => normalizeExerciseName(e.exerciseName) === want);
+        if (ei < 0) {
+          live = addExerciseToSession(live, { id: rawName, name: rawName, pattern: '', muscleGroup: '' });
+          ei = live.exercises.length - 1;
+        }
+      }
+      const ex = planned ? day.exercises[ei] : undefined;
       const prevSets = live.exercises[ei]?.sets || [];
       const nextNum = prevSets.reduce((m, s) => Math.max(m, Number(s.setNumber) || 0), 0) + 1;
       const weight = Math.max(0, Number(d.weight) || 0);
@@ -1862,11 +1903,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       const rpe = Number.isFinite(rpeRaw) && rpeRaw > 0 ? Math.min(10, rpeRaw) : rir > 0 ? Math.max(0, 10 - rir) : 0;
       const techRaw = Number(d.technique);
       const techniqueScore = Number.isFinite(techRaw) && techRaw >= 3 && techRaw <= 5 ? Math.round(techRaw) : undefined;
-      const planWeight = Number(ex.targetSets?.[0]?.weight) || 0;
+      const planWeight = planned && ex ? Number(ex.targetSets?.[0]?.weight) || 0 : 0;
       const res = logSet(live, ei, {
         setNumber: nextNum,
         weightKg: weight,
-        bodyweight: planIsBodyweight(ex, planWeight) && weight <= 0,
+        bodyweight: planned && ex ? planIsBodyweight(ex, planWeight) && weight <= 0 : false,
         reps,
         rpe,
         rir,
@@ -1898,18 +1939,21 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           msg: 'Не хватило места в хранилище: подход только в памяти — завершите тренировку, чтобы сохранить',
         });
       }
-      // Подход с пульта должен появиться в полях редактора: иначе повторный тап
-      // отправил бы план вместо фактически записанного сета.
-      setActual((prev) => ({
-        ...prev,
-        [keyFor(ei, nextNum - 1)]: { weight, reps, rpe, rir, tempo: undefined },
-      }));
+      if (planned && ex) {
+        // Подход с пульта должен появиться в полях редактора: иначе повторный тап
+        // отправил бы план вместо фактически записанного сета. У упражнения вне
+        // плана дня полей редактора нет — ему нужен только сам подход.
+        setActual((prev) => ({
+          ...prev,
+          [keyFor(ei, nextNum - 1)]: { weight, reps, rpe, rir, tempo: undefined },
+        }));
+        setExerciseProgress((prev) => {
+          const total = ex?.targetSets?.length || prevSets.length + 1;
+          const completed = Math.min(prevSets.length + 1, total);
+          return { ...prev, [String(ei)]: { completed, total } };
+        });
+      }
       setSession(res.session);
-      setExerciseProgress((prev) => {
-        const total = ex.targetSets?.length || prevSets.length + 1;
-        const completed = Math.min(prevSets.length + 1, total);
-        return { ...prev, [String(ei)]: { completed, total } };
-      });
       d.handled = persisted;
     };
     window.addEventListener('he-workout-widget-set', onWidgetSet as EventListener);
@@ -2241,6 +2285,46 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   return (
     <div className="session-player">
       <style>{timerAnimationStyle}</style>
+      {/* Провал записи/архива в дневник: единственная копия тренировки — живая сессия,
+          поэтому ошибка видна над шапкой, а не проглатывается тостом. */}
+      {saveError && (
+        <div
+          data-session="save-error"
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 8,
+            padding: 8,
+            borderRadius: 10,
+            background: 'rgba(255,80,80,0.12)',
+            border: '1px solid rgba(255,80,80,0.45)',
+            color: '#fff',
+            fontSize: 11,
+          }}
+        >
+          <span style={{ flex: 1, lineHeight: 1.4 }}>{saveError}</span>
+          <button
+            type="button"
+            data-act="save-error-dismiss"
+            onClick={() => setSaveError(null)}
+            style={{
+              flexShrink: 0,
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'transparent',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Понятно
+          </button>
+        </div>
+      )}
       {/* Шапка недели — одной строкой. Сетка 7 дней была декором (никуда не
           ведёт) и съедала ~80px перед кнопкой старта; при одном дне в плане
           строка «выбор дня» ниже тоже не нужна. */}
@@ -5871,12 +5955,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
             />
           </div>
 
-          {/* Раньше из тренировки можно было выйти только тапом по табу фаз
-              «Итог» — явной кнопки завершения на экране не было. */}
+          {/* Явная кнопка завершения. Спрашивает подтверждение, если есть записанные
+              и ещё не сохранённые подходы: случайный тап не должен отнимать
+              возможность дописать сет. */}
           <button
             type="button"
             data-act="finish-session"
-            onClick={() => exitSession(false)}
+            onClick={() => exitSession(true)}
             style={{ ...BTN_GHOST, width: '100%', minHeight: 48, marginTop: 12, fontSize: 12, fontWeight: 800 }}
           >
             ✓ Завершить тренировку
@@ -7116,7 +7201,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
-            padding: 12,
+            // Нижний inset — чтобы системная навигация/жест-бар не перекрывали
+            // кнопку «Остаться в тренировке».
+            padding: '12px 12px calc(12px + env(safe-area-inset-bottom))',
           }}
         >
           <div
