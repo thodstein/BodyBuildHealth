@@ -34,6 +34,7 @@ import {
   applyWidgetQueue,
   normalizeMealKey,
   collectWorkout,
+  collectCompliance,
   collectNutrition,
   addDaysIso,
   resolveWorkoutPlan,
@@ -43,6 +44,7 @@ import {
   watchNutritionForWidgets,
 } from '../../ui/native/widget-sync';
 import { localIsoDate } from '../local-date';
+import { saveSessions, startSession } from '../../engines/workout-logger.engine';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { MEAL_PRESETS } from '../../ui/screens/NutritionScreen_parts/diary/hooks/useDiaryMealTypes';
@@ -136,14 +138,30 @@ describe('фолбэк вне native', () => {
   it('6. снапшоты пишутся в фолбэк и читаются', async () => {
     expect(await syncTrainingWidget({ title: 'A', subtitle: 'B', meta: 'C' })).toBe(false);
     expect(await syncComplianceWidget({ pct: 142, label: 'L', detail: 'D' })).toBe(false);
-    expect(await syncNutritionWidget({
-      kcal: 1, targetKcal: 2, protein: 3, fat: 4, carbs: 5,
-      targetProtein: 6, targetFat: 7, targetCarbs: 8,
-      waterMl: 9, waterTargetMl: 10,
-    })).toBe(false);
+    expect(
+      await syncNutritionWidget({
+        kcal: 1,
+        targetKcal: 2,
+        protein: 3,
+        fat: 4,
+        carbs: 5,
+        targetProtein: 6,
+        targetFat: 7,
+        targetCarbs: 8,
+        waterMl: 9,
+        waterTargetMl: 10,
+      }),
+    ).toBe(false);
     const n = readFallbackSnapshot('nutrition') as {
-      kcal: number; protein: number; fat: number; carbs: number; waterMl: number;
-      targetProtein: number; targetFat: number; targetCarbs: number; waterTargetMl: number;
+      kcal: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+      waterMl: number;
+      targetProtein: number;
+      targetFat: number;
+      targetCarbs: number;
+      waterTargetMl: number;
     };
     expect(n.kcal).toBe(1);
     expect(n.fat).toBe(4);
@@ -239,17 +257,14 @@ describe('очередь -> дневники', () => {
   });
 
   it('12. задача из виджета отмечается в планшете', async () => {
-    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } = await import(
-      '../../engines/coach/coach-planner.engine'
-    );
+    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } =
+      await import('../../engines/coach/coach-planner.engine');
     const added = addCoachTask(emptyCoachPlanner(), { title: 'Сдать ферритин', date: localIsoDate() });
     writeCoachPlanner(localStorage, added.store);
-    const applied = applyWidgetQueue([
-      { type: 'task', id: added.task!.id, done: true, ts: Date.now() },
-    ]);
+    const applied = applyWidgetQueue([{ type: 'task', id: added.task!.id, done: true, ts: Date.now() }]);
     expect(applied.tasks).toBe(1);
     const stored = readCoachPlanner(localStorage);
-    expect(stored.items.find(t => t.id === added.task!.id)?.done).toBe(true);
+    expect(stored.items.find((t) => t.id === added.task!.id)?.done).toBe(true);
   });
 
   it('13. быстрая задача из виджета создаётся с нативным id', async () => {
@@ -267,7 +282,7 @@ describe('очередь -> дневники', () => {
     ]);
     expect(applied.tasksAdded).toBe(1);
     const stored = readCoachPlanner(localStorage);
-    const task = stored.items.find(t => t.id === 'w_task_1');
+    const task = stored.items.find((t) => t.id === 'w_task_1');
     expect(task?.title).toBe('Позвонить тренеру');
     expect(task?.time).toBe('18:00');
     expect(task?.priority).toBe('high');
@@ -288,7 +303,7 @@ describe('очередь -> дневники', () => {
       },
     ]);
     expect(applied.notesAdded).toBe(1);
-    const note = readCoachNotes(localStorage).items.find(n => n.id === 'w_note_1');
+    const note = readCoachNotes(localStorage).items.find((n) => n.id === 'w_note_1');
     expect(note?.title).toBe('После тренировки');
     expect(note?.checklist?.length).toBe(2);
   });
@@ -308,7 +323,7 @@ describe('очередь -> дневники', () => {
     ]);
     expect(applied.tasksAdded).toBe(1);
     const stored = readCoachPlanner(localStorage);
-    const task = stored.items.find(t => t.id === 'w_task_2');
+    const task = stored.items.find((t) => t.id === 'w_task_2');
     expect(task?.title).toBe('Выпить креатин');
     expect(task?.done).toBe(true);
   });
@@ -470,9 +485,7 @@ describe('виджет «Проведение тренировки»', () => {
 
   it('23. «Завершить» сохраняет сессию в журнал и очищает живую', () => {
     seedPlan();
-    applyWidgetQueue([
-      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
-    ]);
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() }]);
     const res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
     expect(res.workoutsFinished).toBe(1);
     expect(localStorage.getItem(ACTIVE_KEY)).toBeNull();
@@ -487,9 +500,7 @@ describe('виджет «Проведение тренировки»', () => {
 
   it('24. вес 0 отклоняется: ни подхода, ни сессии', () => {
     seedPlan();
-    const res = applyWidgetQueue([
-      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 0, reps: 8, ts: Date.now() },
-    ]);
+    const res = applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 0, reps: 8, ts: Date.now() }]);
     expect(res.setsAdded).toBe(0);
     expect(res.workoutsStarted).toBe(0);
     expect(localStorage.getItem(ACTIVE_KEY)).toBeNull();
@@ -502,13 +513,15 @@ describe('виджет «Проведение тренировки»', () => {
   });
 
   it('26. график тренировок дня: настройка профиля и раскладка daysPerWeek', () => {
-    expect(trainingWeekdays({ daysPerWeek: 3 })).toEqual([
-      true, false, true, false, true, false, false,
-    ]);
+    expect(trainingWeekdays({ daysPerWeek: 3 })).toEqual([true, false, true, false, true, false, false]);
     expect(
       trainingWeekdays({
         daysPerWeek: 3,
-        schedule: { enabled: true, scheduleType: 'weekly', weeklyDays: [true, false, false, true, false, false, false] },
+        schedule: {
+          enabled: true,
+          scheduleType: 'weekly',
+          weeklyDays: [true, false, false, true, false, false, false],
+        },
       }),
     ).toEqual([true, false, false, true, false, false, false]);
   });
@@ -517,10 +530,10 @@ describe('виджет «Проведение тренировки»', () => {
 describe('календарь: тренировки, БАДы, фарма и дела', () => {
   it('27. график тренировок попадает в события календаря', () => {
     const cal = collectCalendar();
-    const training = cal.items.filter(i => i.kind === 'training');
+    const training = cal.items.filter((i) => i.kind === 'training');
     expect(training.length).toBeGreaterThan(30);
     // Дни недели тренировок повторяются по графику, а не «каждый день».
-    const dows = new Set(training.map(t => new Date(`${t.date}T00:00:00`).getDay()));
+    const dows = new Set(training.map((t) => new Date(`${t.date}T00:00:00`).getDay()));
     expect(dows.size).toBeGreaterThan(0);
     expect(dows.size).toBeLessThan(7);
     expect(training[0].title).toContain('Тренировка');
@@ -546,26 +559,25 @@ describe('календарь: тренировки, БАДы, фарма и де
     );
 
     const cal = collectCalendar();
-    const supp = cal.items.find(i => i.kind === 'supp' && i.date === today);
+    const supp = cal.items.find((i) => i.kind === 'supp' && i.date === today);
     expect(supp).toBeTruthy();
     expect(supp!.done).toBe(true);
     expect(supp!.title).toContain('БАДы');
 
-    const pharma = cal.items.find(i => i.kind === 'pharma' && i.date === today);
+    const pharma = cal.items.find((i) => i.kind === 'pharma' && i.date === today);
     expect(pharma).toBeTruthy();
     expect(pharma!.done).toBe(true);
     expect(pharma!.title).toContain('Тестостерон');
   });
 
   it('29. личные дела остаются в календаре с kind=task', async () => {
-    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } = await import(
-      '../../engines/coach/coach-planner.engine'
-    );
+    const { addCoachTask, readCoachPlanner, writeCoachPlanner, emptyCoachPlanner } =
+      await import('../../engines/coach/coach-planner.engine');
     const added = addCoachTask(emptyCoachPlanner(), { title: 'Позвонить врачу', date: localIsoDate() });
     writeCoachPlanner(localStorage, added.store);
 
     const cal = collectCalendar();
-    const task = cal.items.find(i => i.id === added.task!.id);
+    const task = cal.items.find((i) => i.id === added.task!.id);
     expect(task).toBeTruthy();
     expect(task!.kind).toBe('task');
     expect(task!.title).toBe('Позвонить врачу');
@@ -660,9 +672,8 @@ describe('аналитика питания: день, неделя, месяц'
 
   it('33. collectNutrition: цели как на экране «Питание» — из плана, не из профиля', async () => {
     const { writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
-    const { publishPlanTargets, PLAN_TARGETS_KEY } = await import(
-      '../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge'
-    );
+    const { publishPlanTargets, PLAN_TARGETS_KEY } =
+      await import('../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge');
 
     const today = localIsoDate();
     writeDiaryV2({
@@ -686,18 +697,14 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('34. без плана цели виджета остаются профильными, мусорный план их не подменяет', async () => {
-    const { PLAN_TARGETS_KEY } = await import(
-      '../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge'
-    );
+    const { PLAN_TARGETS_KEY } =
+      await import('../../ui/screens/NutritionScreen_parts/IndividualPlan/plan-targets-bridge');
     const before = collectNutrition();
     expect(before.targetKcal).toBeGreaterThan(0);
     expect(before.targetProtein).toBeGreaterThan(0);
 
     // Полупустой/нулевой план — не цель: мост отбрасывает его (kcal <= 0).
-    localStorage.setItem(
-      PLAN_TARGETS_KEY,
-      JSON.stringify({ kcal: 0, protein: 999, fats: 1, carbs: 1 }),
-    );
+    localStorage.setItem(PLAN_TARGETS_KEY, JSON.stringify({ kcal: 0, protein: 999, fats: 1, carbs: 1 }));
     const after = collectNutrition();
     expect(after.targetKcal).toBe(before.targetKcal);
     expect(after.targetProtein).toBe(before.targetProtein);
@@ -739,8 +746,8 @@ describe('аналитика питания: день, неделя, месяц'
     const first = applyWidgetQueue([{ type: 'water_remove', ml: 250, ts: Date.now() }]);
     expect(first.waterRemovedMl).toBe(250);
     const today = localIsoDate();
-    const left = () => (loadWaterLog() as { date: string; amountMl: number }[])
-      .find((e) => e.date === today)?.amountMl ?? 0;
+    const left = () =>
+      (loadWaterLog() as { date: string; amountMl: number }[]).find((e) => e.date === today)?.amountMl ?? 0;
     expect(left()).toBe(150);
 
     // Порция-ошибка больше остатка: снимаем сколько есть и не уходим в минус.
@@ -750,15 +757,13 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('37. «↩» на виджете снимает последнюю запись еды дня', async () => {
-    const { writeDiaryV2, readDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { writeDiaryV2, readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
       [today]: {
         meals: {
-          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
-          'Обед': [
+          Завтрак: [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          Обед: [
             { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
             { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
           ],
@@ -781,7 +786,7 @@ describe('аналитика питания: день, неделя, месяц'
     const today = localIsoDate();
     writeDiaryV2({
       [today]: {
-        meals: { 'Ужин': [{ name: 'Лосось', kcal: 320, p: 34, f: 18, c: 0, qty: 180 }] },
+        meals: { Ужин: [{ name: 'Лосось', kcal: 320, p: 34, f: 18, c: 0, qty: 180 }] },
       },
     } as any);
 
@@ -812,11 +817,11 @@ describe('аналитика питания: день, неделя, месяц'
     const yesterday = addDaysIso(today, -1);
     writeDiaryV2({
       [today]: {
-        meals: { 'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
+        meals: { Завтрак: [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
       },
       [yesterday]: {
         meals: {
-          'Обед': [
+          Обед: [
             { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
             { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
           ],
@@ -840,18 +845,16 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('41. «✕» удаляет позицию по дате, приёму и индексу, а не последнюю вообще', async () => {
-    const { writeDiaryV2, readDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { writeDiaryV2, readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     const yesterday = addDaysIso(today, -1);
     writeDiaryV2({
       [today]: {
-        meals: { 'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
+        meals: { Завтрак: [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }] },
       },
       [yesterday]: {
         meals: {
-          'Обед': [
+          Обед: [
             { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
             { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
           ],
@@ -859,9 +862,7 @@ describe('аналитика питания: день, неделя, месяц'
       },
     } as any);
 
-    const res = applyWidgetQueue([
-      { type: 'food_remove', date: yesterday, meal: 'Обед', index: 0, ts: Date.now() },
-    ]);
+    const res = applyWidgetQueue([{ type: 'food_remove', date: yesterday, meal: 'Обед', index: 0, ts: Date.now() }]);
     expect(res.foodsRemoved).toBe(1);
     const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
     expect(diary[yesterday].meals['Обед'].map((f) => f.name)).toEqual(['Рис']);
@@ -875,11 +876,11 @@ describe('аналитика питания: день, неделя, месяц'
     const yesterday = addDaysIso(today, -1);
     writeDiaryV2({
       [today]: {
-        meals: { 'Завтрак': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }] },
+        meals: { Завтрак: [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }] },
       },
       [yesterday]: {
         meals: {
-          'Обед': [
+          Обед: [
             { name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 },
             { name: 'Рис', kcal: 200, p: 4, f: 1, c: 42, qty: 150 },
           ],
@@ -946,24 +947,20 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('44. «✕» с несходящимся адресом не сносит последнюю запись дня', async () => {
-    const { writeDiaryV2, readDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { writeDiaryV2, readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
       [today]: {
         meals: {
-          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
-          'Обед': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+          Завтрак: [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          Обед: [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
         },
       },
     } as any);
 
     // Дневник уже другой (позицию убрали в приложении): адрес не сошёлся,
     // и удалять «последнюю вообще» нельзя — иначе снесём чужую еду.
-    const res = applyWidgetQueue([
-      { type: 'food_remove', date: today, meal: 'Завтрак', index: 5, ts: Date.now() },
-    ]);
+    const res = applyWidgetQueue([{ type: 'food_remove', date: today, meal: 'Завтрак', index: 5, ts: Date.now() }]);
     expect(res.foodsRemoved).toBe(0);
     const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
     expect(diary[today].meals['Завтрак'].map((f) => f.name)).toEqual(['Овсянка']);
@@ -977,8 +974,8 @@ describe('аналитика питания: день, неделя, месяц'
     writeDiaryV2({
       [today]: {
         meals: {
-          'Ужин': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
-          'Завтрак': [
+          Ужин: [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+          Завтрак: [
             { name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 },
             { name: 'Яйца', kcal: 140, p: 12, f: 10, c: 1, qty: 100 },
           ],
@@ -987,34 +984,26 @@ describe('аналитика питания: день, неделя, месяц'
     } as any);
 
     const items = collectNutrition().days[today].items;
-    expect(items.map((i) => `${i.meal}:${i.name}`)).toEqual([
-      'Завтрак:Овсянка',
-      'Завтрак:Яйца',
-      'Ужин:Курица',
-    ]);
+    expect(items.map((i) => `${i.meal}:${i.name}`)).toEqual(['Завтрак:Овсянка', 'Завтрак:Яйца', 'Ужин:Курица']);
     // Адрес внутри приёма не зависит от позиции в плоском списке.
     expect(items.map((i) => i.index)).toEqual([0, 1, 0]);
   });
 
   it('46. «↩» по адресу из lastFood снимает именно её, а не последнюю в дне', async () => {
-    const { writeDiaryV2, readDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { writeDiaryV2, readDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
       [today]: {
         meals: {
-          'Завтрак': [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
-          'Ужин': [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
+          Завтрак: [{ name: 'Овсянка', kcal: 300, p: 10, f: 6, c: 50, qty: 200 }],
+          Ужин: [{ name: 'Курица', kcal: 250, p: 40, f: 8, c: 0, qty: 150 }],
         },
       },
     } as any);
 
     // Виджет показал «↩» для завтрака (его только что добавили из редактора),
     // хотя последняя запись дня — ужин. Очередь несёт адрес этой записи.
-    const res = applyWidgetQueue([
-      { type: 'food_remove', date: today, meal: 'Завтрак', index: 0, ts: Date.now() },
-    ]);
+    const res = applyWidgetQueue([{ type: 'food_remove', date: today, meal: 'Завтрак', index: 0, ts: Date.now() }]);
     expect(res.foodsRemoved).toBe(1);
     const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string }[]> }>;
     expect(diary[today].meals['Завтрак']).toBeUndefined();
@@ -1035,10 +1024,7 @@ describe('аналитика питания: день, неделя, месяц'
     ]);
     expect(res.foods).toBe(3);
 
-    const diary = readDiaryV2() as Record<
-      string,
-      { meals: Record<string, { name: string; qty: number }[]> }
-    >;
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string; qty: number }[]> }>;
     expect(diary[today].meals['Завтрак'][0]).toMatchObject({ name: 'Овсянка', qty: 100 });
     expect(diary[today].meals['Обед'][0]).toMatchObject({ name: 'Курица', qty: 200 });
     expect(diary[today].meals['Перекус'][0]).toMatchObject({ name: 'Арбуз', qty: 5000 });
@@ -1116,10 +1102,7 @@ describe('аналитика питания: день, неделя, месяц'
     ]);
     expect(res.foods).toBe(2);
 
-    const diary = readDiaryV2() as Record<
-      string,
-      { meals: Record<string, { name: string; foodId?: string }[]> }
-    >;
+    const diary = readDiaryV2() as Record<string, { meals: Record<string, { name: string; foodId?: string }[]> }>;
     expect(diary[today].meals['Обед'][0]).toMatchObject({ name: 'Курица', foodId: 'chicken_breast' });
     // Пустой foodId в дневник не пишем: «блюдо без продукта» — легальное состояние.
     expect(diary[today].meals['Ужин'][0]).not.toHaveProperty('foodId');
@@ -1136,7 +1119,7 @@ describe('аналитика питания: день, неделя, месяц'
     writeDiaryV2({
       [today]: {
         meals: {
-          'Обед': [
+          Обед: [
             { name: 'Курица', foodId: 'chicken_breast', kcal: 248, p: 47, f: 5, c: 0, qty: 150 },
             { name: 'Гречка', foodId: 'buckwheat', kcal: 150, p: 5, f: 1, c: 30, qty: 200 },
           ],
@@ -1162,10 +1145,7 @@ describe('аналитика питания: день, неделя, месяц'
 
   it('53. предел позиций дня в снапшоте совпадает с Java-мостом', () => {
     const src = readFileSync(
-      path.resolve(
-        process.cwd(),
-        'android/app/src/main/java/com/healthengine/app/widgets/WidgetBridgePlugin.java',
-      ),
+      path.resolve(process.cwd(), 'android/app/src/main/java/com/healthengine/app/widgets/WidgetBridgePlugin.java'),
       'utf8',
     );
     // Предел живёт в двух местах (JS и Java) — третий раз он уже расходился.
@@ -1181,7 +1161,7 @@ describe('аналитика питания: день, неделя, месяц'
     // терял порцию, которую дневник показывает в строке.
     writeDiaryV2({
       [today]: {
-        meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: '150 г' as any }] },
+        meals: { Обед: [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: '150 г' as any }] },
       },
     } as any);
 
@@ -1196,7 +1176,7 @@ describe('аналитика питания: день, неделя, месяц'
     writeDiaryV2({
       [today]: {
         meals: {
-          'Обед': Array.from({ length: 60 }, (_, i) => ({
+          Обед: Array.from({ length: 60 }, (_, i) => ({
             name: `Блюдо ${i}`,
             kcal: 100,
             p: 10,
@@ -1224,14 +1204,12 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('56. правка порции с виджета: пересчёт по адресу, как в дневнике', async () => {
-    const { readDiaryV2, writeDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { readDiaryV2, writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
       [today]: {
         meals: {
-          'Обед': [
+          Обед: [
             {
               name: 'Курица',
               foodId: 'chicken_breast',
@@ -1248,9 +1226,7 @@ describe('аналитика питания: день, неделя, месяц'
       },
     } as any);
 
-    const res = applyWidgetQueue([
-      { type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: 300, ts: Date.now() },
-    ]);
+    const res = applyWidgetQueue([{ type: 'food_qty', date: today, meal: 'Обед', index: 0, qty: 300, ts: Date.now() }]);
     expect(res.foodsEdited).toBe(1);
 
     const diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
@@ -1271,12 +1247,10 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('57. правка порции: адрес не сошёлся — запись не меняется', async () => {
-    const { readDiaryV2, writeDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { readDiaryV2, writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
-      [today]: { meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
+      [today]: { meals: { Обед: [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
     } as any);
 
     const res = applyWidgetQueue([
@@ -1295,12 +1269,10 @@ describe('аналитика питания: день, неделя, месяц'
   });
 
   it('58. правка порции: битая порция игнорируется, огромная обрезается', async () => {
-    const { readDiaryV2, writeDiaryV2 } = await import(
-      '../../ui/screens/NutritionScreen_parts/diary-storage-v2'
-    );
+    const { readDiaryV2, writeDiaryV2 } = await import('../../ui/screens/NutritionScreen_parts/diary-storage-v2');
     const today = localIsoDate();
     writeDiaryV2({
-      [today]: { meals: { 'Обед': [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
+      [today]: { meals: { Обед: [{ name: 'Курица', kcal: 248, p: 47, f: 5, c: 0, qty: 150 }] } },
     } as any);
 
     const res = applyWidgetQueue([
@@ -1315,5 +1287,151 @@ describe('аналитика питания: день, неделя, месяц'
     diary = readDiaryV2() as Record<string, { meals: Record<string, any[]> }>;
     // Потолок тот же, что у поля «Порция» в редакторе.
     expect(diary[today].meals['Обед'][0].qty).toBe(5000);
+  });
+});
+
+describe('виджет: недельная цель и честный RIR', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 23, 10, 0, 0)); // Пн 2026-11-23
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('59. цель недели — дни графика профиля, а не длина 48-дневного цикла', () => {
+    // Цикл 48 дней: длина массива `days` — это длина цикла, а не недели.
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: Array.from({ length: 48 }, (_, i) => ({
+          label: `Д${i + 1}`,
+          exercises: [{ name: 'Жим лёжа', targetSets: [{ weight: 80, reps: 8, rir: 2 }] }],
+        })),
+      }),
+    );
+    // График профиля — 4 тренировки в неделю (путь, которым профиль сидят в widget-workout-integrity).
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { training: { daysPerWeek: 4 } } }));
+
+    const compliance = collectCompliance();
+    // Раньше цель бралась из длины плана (48 → клампинг до 7) и печаталось «0 из 7».
+    expect(compliance.detail).toBe('0 из 4');
+    expect(compliance.pct).toBe(0);
+  });
+
+  it('60. RIR печатается только назначенный: без него — null и без «RIR» в строке', () => {
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          {
+            label: 'Верх A',
+            exercises: [
+              { name: 'Жим лёжа', targetSets: [{ weight: 80, reps: 8 }] },
+              { name: 'Тяга блока', targetSets: [{ weight: 60, reps: 12, rir: 3 }] },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const plan = resolveWorkoutPlan(localIsoDate());
+    expect(plan).not.toBeNull();
+    // План RIR не назначал — выдуманного «RIR 2» больше нет.
+    expect(plan!.exercises[0].sets[0].rir).toBeNull();
+    expect(formatPlanLine(plan!.exercises[0])).not.toContain('RIR');
+    // Назначенный RIR печатается как раньше.
+    expect(formatPlanLine(plan!.exercises[1])).toContain('· RIR 3');
+  });
+
+  it('61. счётчик недели считает по датам Пн–Вс, а не по номеру недели плана', () => {
+    localStorage.setItem('he_profile_v2', JSON.stringify({ settings: { training: { daysPerWeek: 4 } } }));
+    // Плеер и виджет пишут в сессию номер недели ПЛАНА (1..N), а не ISO-неделю года.
+    // Раньше кольцо искало сессии по ISO-номеру и показывало «0 из 4» весь год.
+    expect(saveSessions([startSession('День A', 3)])).toBe(true);
+
+    const compliance = collectCompliance();
+    expect(compliance.detail).toBe('1 из 4');
+    expect(compliance.pct).toBe(25);
+  });
+
+  it('62. RIR плана клампится в 0…10, как в календаре (rir: 15 → «RIR 10»)', () => {
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          {
+            label: 'День 1',
+            exercises: [{ name: 'Жим лёжа', targetSets: [{ weight: 80, reps: 8, rir: 15 }] }],
+          },
+        ],
+      }),
+    );
+
+    const plan = resolveWorkoutPlan(localIsoDate());
+    expect(plan).not.toBeNull();
+    // RIR — шкала 0…10 (RPE = 10 − RIR). Календарь клэмпит сам rir, виджет печатал 15.
+    expect(plan!.exercises[0].sets[0].rir).toBe(10);
+    expect(formatPlanLine(plan!.exercises[0])).toContain('· RIR 10');
+  });
+
+  // День плана: у первого упражнения RIR не назначен, у второго назначен (3).
+  const seedPlanRirMix = () =>
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          {
+            label: 'Верх A',
+            exercises: [
+              { name: 'Жим лёжа', targetSets: [{ weight: 80, reps: 8 }] },
+              { name: 'Тяга блока', targetSets: [{ weight: 60, reps: 12, rir: 3 }] },
+            ],
+          },
+        ],
+      }),
+    );
+
+  it('63. снапшот не выдумывает RIR: план без RIR → null, назначенный RIR → значение', () => {
+    seedPlanRirMix();
+
+    const planSnap = collectWorkout();
+    expect(planSnap.exercises[0].name).toBe('Жим лёжа');
+    // План RIR не назначал — в снапшоте null, а не выдуманный 0 («до отказа»).
+    expect(planSnap.exercises[0].rir).toBeNull();
+    expect(planSnap.exercises[1].rir).toBe(3);
+
+    // Записанный подход важнее плана: RIR 2 из подхода попадает в снапшот.
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() }]);
+    expect(collectWorkout().exercises[0].rir).toBe(2);
+  });
+
+  it('64. «Завершить» при провале записи не стирает живую сессию', () => {
+    seedPlanRirMix();
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() }]);
+    const before = JSON.parse(localStorage.getItem('he_workout_active_v1') || 'null');
+    expect(before).not.toBeNull();
+
+    // Квота: журнал не пишется, и живая сессия остаётся единственной копией тренировки.
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'he_workout_log_v2') throw new DOMException('quota', 'QuotaExceededError');
+      realSetItem(key, value);
+    });
+    let res: ReturnType<typeof applyWidgetQueue> | undefined;
+    try {
+      res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(res?.workoutsFinished).toBe(0);
+    const after = JSON.parse(localStorage.getItem('he_workout_active_v1') || 'null');
+    expect(after).not.toBeNull();
+    expect(after.sessionId).toBe(before.sessionId);
+    expect(after.exercises[0].sets.length).toBe(1);
+    expect(after.exercises[0].sets[0].rir).toBe(2);
+    // В журнал ничего не легло: «сохранено» не соврали.
+    expect(localStorage.getItem('he_workout_log_v2')).toBeNull();
   });
 });

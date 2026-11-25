@@ -17,7 +17,7 @@
 
 // Канон календарной даты живёт в core; здесь реэкспорт (исторический путь импорта
 // используют дневники, экспорты и планировщик стронгмена/ТА).
-import { localIsoDate as localIsoDateCanon } from '../core/local-date';
+import { localIsoDate as localIsoDateCanon, mondayOfIso } from '../core/local-date';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -49,7 +49,8 @@ export interface WorkoutSet {
 }
 
 /** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
-export const SET_LIMITS = { maxWeightKg: 500, maxReps: 100, maxRpe: 10, maxRir: 20 } as const;
+// maxRir = 10 — шкала RPE = 10 − RIR; logSet клампит RIR в те же границы.
+export const SET_LIMITS = { maxWeightKg: 500, maxReps: 100, maxRpe: 10, maxRir: 10 } as const;
 
 export function localIsoDate(value: Date = new Date()): string {
   return localIsoDateCanon(value);
@@ -144,17 +145,24 @@ const STATS_CACHE_KEY = 'he_workout_stats_cache';
 const TRIM_KEY = 'he_workout_log_trimmed';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 
+/** Потолок хранимой истории. Срез делается на записи (см. `saveSessions`), поэтому
+ *  отбрасывание старых сессий фиксируется через `markTrimmed`, а не происходит молча. */
+export const MAX_STORED_SESSIONS = 2000;
+
 export interface StorageTrimWarning {
   kept: number;
   at: number;
 }
 
-/** Запись о принудительном срезе истории (QuotaExceeded) — для уведомления в UI. */
+/** Запись о принудительном срезе истории (потолок MAX_STORED_SESSIONS или QuotaExceeded) — для уведомления в UI. */
 export function getStorageTrimWarning(): StorageTrimWarning | null {
   try {
     const raw = localStorage.getItem(TRIM_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    // Закрытое пользователем уведомление не возвращаем: при потолке срез
+    // повторяется на каждой записи, и баннер иначе всплывал после каждой тренировки.
+    if (parsed?.dismissed === true) return null;
     return parsed && typeof parsed.kept === 'number' && parsed.at ? parsed : null;
   } catch {
     return null;
@@ -162,13 +170,27 @@ export function getStorageTrimWarning(): StorageTrimWarning | null {
 }
 
 export function clearStorageTrimWarning(): void {
+  // Запись не удаляем, а помечаем закрытой: удаление позволяло markTrimmed'у
+  // воссоздать её на следующем сохранении, и баннер возвращался.
   try {
+    const parsed = JSON.parse(localStorage.getItem(TRIM_KEY) || 'null');
+    if (parsed && typeof parsed.kept === 'number') {
+      localStorage.setItem(TRIM_KEY, JSON.stringify({ ...parsed, dismissed: true }));
+      return;
+    }
     localStorage.removeItem(TRIM_KEY);
-  } catch {}
+  } catch {
+    try {
+      localStorage.removeItem(TRIM_KEY);
+    } catch {}
+  }
 }
 
 function markTrimmed(kept: number): void {
   try {
+    // Тот же потолок, что уже закрыли, — не новость; более глубокий срез — новость.
+    const prev = JSON.parse(localStorage.getItem(TRIM_KEY) || 'null');
+    if (prev?.dismissed === true && prev.kept === kept) return;
     localStorage.setItem(TRIM_KEY, JSON.stringify({ kept, at: Date.now() }));
   } catch {}
 }
@@ -177,19 +199,28 @@ export function loadSessions(): WorkoutSession[] {
   try {
     const raw = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    return raw.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 2000);
+    // Потолок нужен и на чтении — как защита от устаревшего blob'а, записанного до
+    // введения лимита (сам срез теперь на записи, в saveSessions).
+    return raw.sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, MAX_STORED_SESSIONS);
   } catch {
     return [];
   }
 }
 
 export function saveSessions(sessions: WorkoutSession[]): boolean {
+  // Потолок применяем на записи: оставляем MAX_STORED_SESSIONS самых новых по дате
+  // (та же сортировка, что в loadSessions). Раньше срез был только на чтении, и старые
+  // сессии молча исчезали из журнала, хотя в localStorage ещё лежали.
+  const sorted = sessions.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const toStore = sorted.slice(0, MAX_STORED_SESSIONS);
+  const trimmed = toStore.length < sorted.length;
   try {
-    localStorage.setItem(LOG_KEY, JSON.stringify(sessions));
+    localStorage.setItem(LOG_KEY, JSON.stringify(toStore));
+    if (trimmed) markTrimmed(toStore.length);
     return true;
   } catch (e: any) {
     if (e?.name === 'QuotaExceededError' || String(e).includes('quota')) {
-      const sorted = sessions.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      const sortedAsc = sessions.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
       const trySave = (arr: WorkoutSession[], label: string) => {
         try {
           localStorage.setItem(LOG_KEY, JSON.stringify(arr));
@@ -199,14 +230,19 @@ export function saveSessions(sessions: WorkoutSession[]): boolean {
         }
       };
       let kept: WorkoutSession[] | null = null;
-      if (trySave(sorted, 'full')) {
+      // Неограниченный массив в фолбэке писать нельзя: если квоту выбили другие ключи,
+      // эта запись пройдёт — и в blob'е окажется больше потолка, а срез снова станет
+      // молчаливым (loadSessions его спрячет). Потолок держим и здесь.
+      const cappedAsc = sortedAsc.slice(-MAX_STORED_SESSIONS);
+      if (trySave(cappedAsc, 'capped')) {
+        if (cappedAsc.length < sortedAsc.length) markTrimmed(cappedAsc.length);
         return true;
-      } else if (trySave(sorted.slice(-500), '500')) {
-        kept = sorted.slice(-500);
-      } else if (trySave(sorted.slice(-100), '100')) {
-        kept = sorted.slice(-100);
-      } else if (trySave(sorted.slice(-50), '50')) {
-        kept = sorted.slice(-50);
+      } else if (trySave(sortedAsc.slice(-500), '500')) {
+        kept = sortedAsc.slice(-500);
+      } else if (trySave(sortedAsc.slice(-100), '100')) {
+        kept = sortedAsc.slice(-100);
+      } else if (trySave(sortedAsc.slice(-50), '50')) {
+        kept = sortedAsc.slice(-50);
       }
       if (kept) {
         markTrimmed(kept.length);
@@ -313,7 +349,9 @@ export function logSet(
   const weightKg = Math.max(0, Number(set.weightKg) || 0);
   const reps = Math.max(0, Math.round(Number(set.reps) || 0));
   const rpe = Math.max(0, Math.min(10, Number(set.rpe) || 0));
-  const rir = Math.max(0, Math.min(20, Number(set.rir) || 0));
+  // RIR — шкала 0…10 (RPE = 10 − RIR). 20 допускалось исторически и давало
+  // «RIR 15 / RPE 0»: подход с несуществующей оценкой попадал в нагрузку.
+  const rir = Math.max(0, Math.min(10, Number(set.rir) || 0));
   // Скорость штанги (VBT): пишется только осмысленный диапазон (0..5 м/с —
   // выше — опечатка/не тот снаряд), иначе undefined.
   const rawVel = Number(set.velocityMs);
@@ -413,11 +451,24 @@ export function removeLastSet(
   return { session: recomputeSessionTotals(session, exercises), success: true, removed };
 }
 
-export function finishSession(
+export interface FinishSessionResult {
+  session: WorkoutSession;
+  /** Легла ли сессия в журнал. `false` — живая сессия осталась единственной копией. */
+  saved: boolean;
+}
+
+/**
+ * Завершить тренировку и СООБЩИТЬ, легла ли она в журнал.
+ *
+ * Нужен там, где после завершения удаляется живая сессия: плеер и виджет-фолбэк
+ * раньше не проверяли `saveSessions`, ставили «сохранено» и стирали
+ * `he_workout_active_v1` — при квоте единственная копия тренировки исчезала.
+ */
+export function finishSessionWithSave(
   session: WorkoutSession,
   notes: string = '',
   durationMinOverride?: number,
-): WorkoutSession {
+): FinishSessionResult {
   let endTime = new Date().toTimeString().slice(0, 5);
   // Битая/пустая startTime (старая запись в localStorage) не должна ронять завершение:
   // раньше `split(':')` давал NaN, и «✓ Завершить» из виджета молча не срабатывал.
@@ -456,8 +507,26 @@ export function finishSession(
   const idx = sessions.findIndex((s) => s.sessionId === finished.sessionId);
   if (idx >= 0) sessions[idx] = finished;
   else sessions.push(finished);
-  saveSessions(sessions);
-  return finished;
+  // Результат записи НЕ выбрасываем: он нужен вызывающему (см. FinishSessionResult).
+  const wrote = saveSessions(sessions);
+  // `wrote` — «запись легла», а не «сессия в журнале»: saveSessions режет журнал до
+  // MAX_STORED_SESSIONS по дате, и завершённая сессия может вылететь из среза (сбитые
+  // часы, импорт будущих дат). Вызывающий после `saved` удаляет живую сессию, поэтому
+  // проверяем членство — тот же второй шлюз, что в archiveActiveSession.
+  const saved = wrote && loadSessions().some((s) => s.sessionId === finished.sessionId);
+  return { session: finished, saved };
+}
+
+/**
+ * Прежний контракт: вернуть завершённую сессию, не сообщая, легла ли запись.
+ * Оставлен для вызывающих, которые живую сессию не удаляют (экспорт, тесты).
+ */
+export function finishSession(
+  session: WorkoutSession,
+  notes: string = '',
+  durationMinOverride?: number,
+): WorkoutSession {
+  return finishSessionWithSave(session, notes, durationMinOverride).session;
 }
 
 /** Обновить существующую сессию в localStorage. Возвращает null, если сессия не найдена. */
@@ -576,13 +645,16 @@ export function archiveActiveSession(note = ''): WorkoutSession | null {
   // Служебные поля живой сессии (когда автосейв, план дня) — не факты тренировки:
   // в историю они не пишутся.
   const { savedAt: _savedAt, plannedSetsTotal: _plannedTotal, ...cleanSession } = active;
-  const archived = finishSession(
+  const { session: archived, saved } = finishSessionWithSave(
     cleanSession,
     note || `Незавершённая тренировка ${active.date}: сохранена при старте новой`,
     durationMin,
   );
   // Запись могла не лечь (квота/приватный режим): тогда живую сессию НЕ снимаем,
   // иначе подходы исчезнут и из истории, и из автосейва.
+  if (!saved) return null;
+  // Второй шлюз: запись легла, но сессия могла не попасть в срез, если журнал полон
+  // более новыми датами (сбитые часы, импорт будущих дат).
   if (!loadSessions().some((s) => s.sessionId === archived.sessionId)) return null;
   clearActiveSession();
   return archived;
@@ -1023,8 +1095,28 @@ export function getLastSession(): WorkoutSession | null {
   return sessions.length > 0 ? sessions[0] : null;
 }
 
+/**
+ * Сессии с заданным `weekNumber`.
+ *
+ * ВНИМАНИЕ: у сессий плеера/виджета это номер недели ПЛАНА (1..N), а не ISO-неделя
+ * года; для «сколько тренировок на неделе» нужен `getSessionsInWeek(iso)`.
+ */
 export function getSessionsByWeek(weekNumber: number): WorkoutSession[] {
   return loadSessions().filter((s) => s.weekNumber === weekNumber);
+}
+
+/**
+ * Сессии локальной календарной недели (Пн–Вс), в которую попадает `iso`.
+ *
+ * Считать «тренировок на неделе» по `weekNumber` нельзя: в журнале две шкалы —
+ * номер недели ПЛАНА (его пишут плеер и виджет, 1..N) и ISO-неделя года (её пишет
+ * CSV-импорт). Кольцо виджета искало ISO-номер и на плановой сессии показывало
+ * «0 из 4». Неделя здесь — по дате сессии, как в `computeWeeklyBreakdown`.
+ */
+export function getSessionsInWeek(iso: string): WorkoutSession[] {
+  const start = mondayOfIso(iso);
+  if (!start) return [];
+  return loadSessions().filter((s) => mondayOfIso(s.date || '') === start);
 }
 
 export interface CachedProgress {

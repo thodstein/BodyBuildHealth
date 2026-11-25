@@ -223,7 +223,6 @@ public class WorkoutWidgetProvider extends AppWidgetProvider {
 
             int weight = Math.max(0, ex.optInt("weight", 0));
             int reps = Math.max(0, ex.optInt("reps", 0));
-            int rir = Math.max(0, ex.optInt("rir", 0));
             int restSec = Math.max(0, ex.optInt("restSec", 0));
             // «＋» в строке: нативный редактор подхода с подстановкой плана.
             Intent setIntent = new Intent(context, WidgetQuickAddActivity.class);
@@ -232,7 +231,12 @@ public class WorkoutWidgetProvider extends AppWidgetProvider {
             setIntent.putExtra(WidgetQuickAddActivity.EXTRA_EXERCISE, name);
             setIntent.putExtra(WidgetQuickAddActivity.EXTRA_WEIGHT, weight > 0 ? String.valueOf(weight) : "");
             setIntent.putExtra(WidgetQuickAddActivity.EXTRA_REPS, reps > 0 ? String.valueOf(reps) : "");
-            setIntent.putExtra(WidgetQuickAddActivity.EXTRA_RIR, String.valueOf(rir));
+            // RIR кладём только если он назначен (шкала 0…10): нет поля/оно null —
+            // extra не пишем, и WidgetQuickAddActivity.safeExtra вернёт "", а не «0».
+            if (ex.has("rir") && !ex.isNull("rir")) {
+                int rir = Math.max(0, Math.min(10, ex.optInt("rir", 0)));
+                setIntent.putExtra(WidgetQuickAddActivity.EXTRA_RIR, String.valueOf(rir));
+            }
             setIntent.putExtra(WidgetQuickAddActivity.EXTRA_SET_NUM, done + 1);
             setIntent.putExtra(WidgetQuickAddActivity.EXTRA_REST_SEC, restSec);
             setIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);

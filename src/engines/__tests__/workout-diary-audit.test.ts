@@ -266,6 +266,8 @@ describe('валидация лимитов и legacy-чистка имён', ()
     expect(logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 200, rpe: 8, rir: 2 }).success).toBe(false);
     expect(logSet(s, 0, { setNumber: 1, weightKg: 80, reps: 5, rpe: 8, rir: 2 }).success).toBe(true);
     expect(SET_LIMITS.maxWeightKg).toBe(500);
+    // RIR живёт в шкале 0…10 (RPE = 10 − RIR): лимит 20 противоречил клампу logSet.
+    expect(SET_LIMITS.maxRir).toBe(10);
   });
   it('cleanLegacyExerciseName убирает маркеры [superset:N] и [note:...]', () => {
     expect(cleanLegacyExerciseName('Жим штанги лёжа [superset:1] [note:тяжело]')).toBe('Жим штанги лёжа');

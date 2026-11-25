@@ -9,12 +9,22 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  addDaysIso,
   applyWidgetQueue,
   collectCalendar,
   resolveWorkoutPlan,
   setWorkoutPlayerActive,
 } from '../../ui/native/widget-sync';
-import { finishSession, loadActiveSession, loadSessions, saveActiveSession } from '../../engines/workout-logger.engine';
+import { localIsoDate } from '../../core/local-date';
+import {
+  addExerciseToSession,
+  finishSession,
+  loadActiveSession,
+  loadSessions,
+  logSet,
+  saveActiveSession,
+  startSession,
+} from '../../engines/workout-logger.engine';
 
 const PLAN = {
   days: [
@@ -239,6 +249,32 @@ describe('виджет: подходы и завершение', () => {
     expect(res.workoutsStarted).toBe(0);
 
     window.removeEventListener('he-workout-widget-start', onStart);
+  });
+
+  it('живую сессию прошлого дня не дополняют сегодняшним планом (путь без плеера)', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    // Сессия вчерашнего дня с подходом — единственная копия, в архив не попала.
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'row',
+      name: 'Тяга штанги',
+      pattern: 'horizontal_pull',
+      muscleGroup: 'back',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 60, reps: 10, rpe: 8, rir: 2 }).session;
+    expect(saveActiveSession({ ...withSet, date: yesterday })).toBe(true);
+    const before = loadActiveSession();
+    expect(before?.date).toBe(yesterday);
+
+    // Плеер не смонтирован — так дренится очередь виджета на главном экране.
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    const active = loadActiveSession();
+    expect(res.workoutsStarted).toBe(0);
+    expect(active?.sessionId).toBe(before?.sessionId);
+    expect(active?.date).toBe(yesterday);
+    // План сегодняшнего дня в чужую сессию не дописан: иначе подходы двух дней слиплись
+    // бы в одной записи с датой вчера, а отдельной записи за вчера не появилось бы.
+    expect(active?.exercises.map((e) => e.exerciseName)).toEqual(['Тяга штанги']);
   });
 
   it('подход без RPE и RIR не получает выдуманный RPE 10', () => {

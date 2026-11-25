@@ -11,7 +11,8 @@
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
-export type WidgetKind = 'training' | 'workout' | 'timer' | 'compliance' | 'nutrition' | 'nutrition_panel' | 'water' | 'calendar' | 'notes';
+export type WidgetKind =
+  'training' | 'workout' | 'timer' | 'compliance' | 'nutrition' | 'nutrition_panel' | 'water' | 'calendar' | 'notes';
 export type WidgetTarget =
   | 'training'
   | 'training_run'
@@ -307,7 +308,11 @@ export interface WorkoutWidgetExercise {
   /** Вес/повторы/RIR для подстановки в диалог (последний сет или план). */
   weight: number;
   reps: number;
-  rir: number;
+  /**
+   * RIR последнего подхода или плана. `null` — ни в последнем подходе, ни в плане
+   * RIR не назначен; подставлять 0 нельзя (0 значит «до отказа»).
+   */
+  rir: number | null;
   /** Отдых между подходами, сек. */
   restSec: number;
 }
@@ -335,8 +340,13 @@ export interface WorkoutWidgetSnapshot {
 
 interface WidgetBridgeNative {
   syncTraining(o: {
-    title: string; subtitle: string; meta: string;
-    progress?: number; live?: boolean; actionLabel?: string; actionTarget?: string;
+    title: string;
+    subtitle: string;
+    meta: string;
+    progress?: number;
+    live?: boolean;
+    actionLabel?: string;
+    actionTarget?: string;
   }): Promise<{ ok: boolean }>;
   syncCompliance(o: { pct: number; label: string; detail: string }): Promise<{ ok: boolean }>;
   syncNutrition(o: NutritionWidgetSnapshot): Promise<{ ok: boolean }>;
@@ -346,7 +356,15 @@ interface WidgetBridgeNative {
   syncNotes(o: NotesWidgetSnapshot): Promise<{ ok: boolean }>;
   syncWorkout(o: WorkoutWidgetSnapshot): Promise<{ ok: boolean }>;
   queueWater(o: { ml: number }): Promise<{ ok: boolean; queue: number }>;
-  queueNutrition(o: { name: string; kcal: number; p: number; f: number; c: number; meal: string; qty?: number }): Promise<{ ok: boolean; queue: number }>;
+  queueNutrition(o: {
+    name: string;
+    kcal: number;
+    p: number;
+    f: number;
+    c: number;
+    meal: string;
+    qty?: number;
+  }): Promise<{ ok: boolean; queue: number }>;
   queueTaskToggle(o: { id: string; done: boolean }): Promise<{ ok: boolean; queue: number }>;
   drainQueue(): Promise<{ items: string; count: number }>;
   queueSize(): Promise<{ queue: number }>;
@@ -539,11 +557,7 @@ export async function syncTrainingWidget(input: TrainingWidgetInput): Promise<bo
   return false;
 }
 
-export async function syncComplianceWidget(input: {
-  pct: number;
-  label: string;
-  detail: string;
-}): Promise<boolean> {
+export async function syncComplianceWidget(input: { pct: number; label: string; detail: string }): Promise<boolean> {
   const pct = clampPct(input.pct);
   const p = plugin();
   if (p) {
@@ -578,11 +592,8 @@ function clampLastFood(food?: NutritionLastFood): NutritionLastFood | undefined 
   const num = (value: unknown) => Math.max(0, Math.round(Number(value) || 0));
   const qty = num(food.qty);
   const rawIndex = Number(food.index);
-  const index = food.index !== undefined && Number.isFinite(rawIndex) && rawIndex >= 0
-    ? Math.round(rawIndex)
-    : -1;
-  const date =
-    typeof food.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(food.date) ? food.date : '';
+  const index = food.index !== undefined && Number.isFinite(rawIndex) && rawIndex >= 0 ? Math.round(rawIndex) : -1;
+  const date = typeof food.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(food.date) ? food.date : '';
   return {
     name: String(food.name).slice(0, 40),
     meal: String(food.meal || '').slice(0, 32),
@@ -678,7 +689,9 @@ function clampMealTypes(meals?: string[]): string[] | undefined {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const raw of meals) {
-    const name = String(raw ?? '').trim().slice(0, 32);
+    const name = String(raw ?? '')
+      .trim()
+      .slice(0, 32);
     const key = name.toLowerCase();
     if (!name || seen.has(key)) continue;
     seen.add(key);
@@ -736,10 +749,7 @@ const FB_FOODS_VERSION = 'he_widget_foods_ver';
  *
  * Возвращает true, если каталог реально ушёл в нативную часть.
  */
-export async function pushNutritionFoods(
-  items: NutritionFoodItem[],
-  version: string,
-): Promise<boolean> {
+export async function pushNutritionFoods(items: NutritionFoodItem[], version: string): Promise<boolean> {
   const p = plugin();
   if (!p) return false;
   if (storageGet(FB_FOODS_VERSION) === version) return false;
@@ -810,7 +820,9 @@ export async function syncWorkoutWidget(input: WorkoutWidgetSnapshot): Promise<b
       planned: Math.max(0, Math.round(ex.planned || 0)),
       weight: Math.max(0, Number(ex.weight) || 0),
       reps: Math.max(0, Math.round(ex.reps || 0)),
-      rir: Math.max(0, Math.round(ex.rir || 0)),
+      // null — RIR не назначен: нативная часть не подставляет его в диалог подхода,
+      // иначе «не назначали» превращается в «0» (отказ до отказа).
+      rir: ex.rir === null || ex.rir === undefined ? null : Math.max(0, Math.min(10, Math.round(ex.rir))),
       restSec: Math.max(0, Math.round(ex.restSec || 0)),
     })),
   };
@@ -942,10 +954,7 @@ export async function drainWidgetQueue(): Promise<QueuedItem[]> {
 
 /* ---------------- timer ---------------- */
 
-export async function widgetTimerCommand(
-  action: TimerAction,
-  seconds = 0,
-): Promise<TimerState> {
+export async function widgetTimerCommand(action: TimerAction, seconds = 0): Promise<TimerState> {
   const fallback: TimerState = {
     running: action === 'preset' || action === 'start',
     remainingSec: seconds > 0 ? Math.min(3600, seconds) : 90,
@@ -1019,9 +1028,7 @@ export async function consumeWidgetLaunchTarget(): Promise<WidgetTarget | null> 
  * Попросить лаунчер закрепить виджет (Android 8+, системный диалог).
  * Вне native всегда { requested: false }.
  */
-export async function requestPinWidget(
-  kind: WidgetKind,
-): Promise<{ requested: boolean; reason?: string }> {
+export async function requestPinWidget(kind: WidgetKind): Promise<{ requested: boolean; reason?: string }> {
   const p = plugin();
   if (!p) return { requested: false, reason: 'not-native' };
   try {

@@ -10,7 +10,7 @@ import { isIsoDate } from '../../core/local-date';
 import {
   getWorkoutStats,
   getLastSession,
-  getSessionsByWeek,
+  getSessionsInWeek,
   getISOWeekNumber,
   loadActiveSession,
   summarizeActiveSession,
@@ -19,7 +19,7 @@ import {
   addExerciseToSession,
   logSet,
   saveActiveSession,
-  finishSession,
+  finishSessionWithSave,
   clearActiveSession,
   type WorkoutSession,
 } from '../../engines/workout-logger.engine';
@@ -159,7 +159,9 @@ function collectTraining(): {
 } {
   const last = safe(() => getLastSession(), null);
   const today = todayLocalISO();
-  const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
+  // Неделю считаем по датам Пн–Вс: у сессий плеера/виджета `weekNumber` — номер
+  // недели ПЛАНА (1..N), а не ISO-неделя года, и кольцо показывало «0 из 4».
+  const week = safe(() => getSessionsInWeek(today).length, 0);
   const total = safe(() => getWorkoutStats().totalSessions ?? 0, 0);
   const targetDays = weeklyTargetDays();
   const weekProgress = Math.max(0, Math.min(100, Math.round((week / Math.max(1, targetDays)) * 100)));
@@ -217,7 +219,7 @@ function collectTraining(): {
   };
 }
 
-function collectCompliance(): { pct: number; label: string; detail: string } {
+export function collectCompliance(): { pct: number; label: string; detail: string } {
   const adherence = safe(() => getAdherenceStats(), null as never);
   if (adherence && adherence.activeCount > 0) {
     return {
@@ -228,7 +230,7 @@ function collectCompliance(): { pct: number; label: string; detail: string } {
   }
   const targetDays = weeklyTargetDays();
   const today = todayLocalISO();
-  const week = safe(() => getSessionsByWeek(getISOWeekNumber(today)).length, 0);
+  const week = safe(() => getSessionsInWeek(today).length, 0);
   return {
     pct: Math.max(0, Math.min(100, Math.round((week / Math.max(1, targetDays)) * 100))),
     label: 'Тренировки недели',
@@ -237,17 +239,19 @@ function collectCompliance(): { pct: number; label: string; detail: string } {
 }
 
 /**
- * Цель недели по тренировкам — один источник для всех виджетов: число дней
- * в разрешённом плане (`he_pl_runtime.days`), иначе профильный `daysPerWeek`,
- * иначе 4. Раньше «Тренировки недели» делились на 3, а прогресс тренировочного
- * виджета — на 4, поэтому один и тот же прогресс выглядел по-разному.
+ * Цель недели по тренировкам — один источник для всех виджетов: число
+ * тренировочных дней недели из графика профиля (`settings.training`: weeklyDays,
+ * daysPerWeek или eod — раскладку считает `training-day.engine`).
+ *
+ * Длину массива `days` (`he_pl_runtime.days`) брать нельзя: это длина всего
+ * ЦИКЛА, а не недели. У 48-дневного плана при 4 тренировках в неделю длина 48,
+ * клампинг до 7 давал цель 7 — кольцо «Тренировки недели» никогда не доходило
+ * до 100% («4 из 7»). Пустой график — прежний фолбэк 4; цель всегда в 1..7.
  */
 function weeklyTargetDays(): number {
-  const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
-  const fromPlan = Math.round(Number(plan?.planDays) || 0);
-  if (fromPlan > 0) return Math.max(1, Math.min(7, fromPlan));
-  const daysPerWeek = safe(() => Number((getProfile() as any)?.settings?.training?.daysPerWeek) || 0, 0);
-  return Math.max(1, Math.min(7, daysPerWeek || 4));
+  const training = safe(() => (getProfile() as any)?.settings?.training, null as any);
+  const fromSchedule = safe(() => weeklyTrainingDays(training).filter(Boolean).length, 0);
+  return Math.max(1, Math.min(7, fromSchedule || 4));
 }
 
 /**
@@ -917,7 +921,8 @@ function localStorageRef(): Storage | null {
 interface PlanSetTarget {
   weight: number;
   reps: number;
-  rir: number;
+  /** RIR, только если он назначен в плане: `null` — «не назначали», а не 0. */
+  rir: number | null;
 }
 
 interface PlanExercise {
@@ -943,7 +948,7 @@ export interface ResolvedWorkoutPlan {
   week: number;
   exercises: PlanExercise[];
   plannedSets: number;
-  /** Сколько дней в плане — цель недели для прогресса виджетов. */
+  /** Сколько дней в плане (длина всего цикла; недельную цель даёт график профиля). */
   planDays: number;
 }
 
@@ -958,11 +963,15 @@ export function formatPlanLine(ex: PlanExercise): string {
   if (!ex.sets.length) return 'по самочувствию';
   const reps = [...new Set(ex.sets.map((s) => s.reps))].filter((r) => r > 0);
   const weights = [...new Set(ex.sets.map((s) => s.weight))].filter((w) => w > 0);
-  const rirs = [...new Set(ex.sets.map((s) => s.rir))];
+  // RIR печатаем только когда он назначен и одинаков во всех подходах: набор,
+  // где RIR никто не задавал, — не повод выводить «RIR 2» (календарь тоже
+  // правило «без RIR нет RPE» соблюдает).
+  const rir = ex.sets[0].rir;
+  const sameRir = rir !== null && ex.sets.every((s) => s.rir === rir);
   const parts = [`${ex.sets.length}×${reps.length ? reps.join('/') : '—'}`];
   if (weights.length === 1) parts.push(`${weights[0]} кг`);
   else if (weights.length > 1) parts.push(`${Math.min(...weights)}–${Math.max(...weights)} кг`);
-  if (rirs.length === 1) parts.push(`RIR ${rirs[0]}`);
+  if (sameRir) parts.push(`RIR ${rir}`);
   return parts.join(' · ');
 }
 
@@ -973,10 +982,14 @@ function planExerciseFromRuntime(raw: any): PlanExercise {
     muscleGroup: String(raw?.muscleGroup ?? raw?.pattern ?? ''),
     sets: sets.slice(0, 12).map((s: any) => {
       const rirRaw = Number(s?.rir);
+      // Пустой/нечисловой RIR — null: план RIR не назначал, выдумывать 2 нельзя.
+      const rirGiven = s?.rir !== null && s?.rir !== undefined && s?.rir !== '' && Number.isFinite(rirRaw);
       return {
         weight: Math.max(0, Number(s?.weight) || 0),
         reps: Math.max(0, Math.min(100, Math.round(Number(s?.reps) || 0))),
-        rir: Number.isFinite(rirRaw) ? Math.max(0, Math.min(20, Math.round(rirRaw))) : 2,
+        // RIR — шкала 0…10 (RPE = 10 − RIR), как в календаре: `rir: 15` в плане
+        // не должен печататься в виджете как «RIR 15» при «RIR 10 / RPE 0» в календаре.
+        rir: rirGiven ? Math.max(0, Math.min(10, Math.round(rirRaw))) : null,
       };
     }),
     restSec: Math.max(0, Math.min(600, Math.round(Number(raw?.restSec ?? raw?.rest) || 0))) || 90,
@@ -999,7 +1012,10 @@ export function resolveWorkoutPlan(dateIso = todayLocalISO()): ResolvedWorkoutPl
   // День плана — из единого движка: с якорем `startDate` это N-й тренировочный
   // день плана (дни 4–5 при 3 тренировках в неделю больше не недостижимы),
   // без якоря — прежняя позиция дня недели/ротация по сессиям недели.
-  const sessionsThisWeek = safe(() => getSessionsByWeek(getISOWeekNumber(dateIso)).length, 0);
+  // Сессии недели — по датам Пн–Вс: у записей плеера/виджета `weekNumber` — номер
+  // недели ПЛАНА (1..N), поэтому поиск по ISO-номеру всегда давал 0 и ротация без
+  // якоря застревала на первом дне плана.
+  const sessionsThisWeek = safe(() => getSessionsInWeek(dateIso).length, 0);
   const dayIndex = pickPlanDayIndex({
     iso: dateIso,
     training,
@@ -1076,6 +1092,15 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
     const sets = sessionEx?.sets ?? [];
     const last = sets.length ? sets[sets.length - 1] : null;
     const firstTarget = planEx?.sets[0] ?? null;
+    // RIR — только назначенный (шкала 0…10, RPE = 10 − RIR): живой подход важнее
+    // плана, а «нигде не назначали» — null, не выдуманный 0 (0 значит «до отказа»).
+    let snapshotRir: number | null;
+    if (last) snapshotRir = Math.max(0, Math.min(10, Math.round(Number(last.rir) || 0)));
+    else {
+      const planRir = firstTarget?.rir;
+      snapshotRir =
+        typeof planRir === 'number' && Number.isFinite(planRir) ? Math.max(0, Math.min(10, Math.round(planRir))) : null;
+    }
     exercises.push({
       name,
       plan: planEx ? formatPlanLine(planEx) : 'вне плана',
@@ -1083,7 +1108,7 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
       planned: planEx?.sets.length ?? sets.length,
       weight: Math.max(0, Math.round(Number(last?.weightKg ?? firstTarget?.weight ?? 0))),
       reps: Math.max(0, Math.round(Number(last?.reps ?? firstTarget?.reps ?? 0))),
-      rir: Math.max(0, Math.round(Number(last?.rir ?? firstTarget?.rir ?? 0))),
+      rir: snapshotRir,
       restSec: planEx?.restSec ?? 90,
     });
   };
@@ -1404,6 +1429,11 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         if (!current) {
           if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets)) workoutsStarted += 1;
           void pushWorkoutWidget();
+        } else if (String(current.date || '') !== todayLocalISO()) {
+          // Живая сессия другого дня (осталась с прошлой тренировки): дописывать в неё
+          // план сегодняшнего нельзя — подходы двух дней слиплись бы в записи с датой
+          // прошлого, а отдельной записи за сегодня не появилось бы. Плеер при открытии
+          // сам предложит её продолжить или заархивировать; здесь только не портим копию.
         } else {
           // Сессия уже идёт: ничего не начинаем, только дополняем планом дня.
           saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets, {
@@ -1427,17 +1457,23 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         }
         const active = loadActiveSession();
         if (active) {
-          finishSession(active);
-          clearActiveSession();
-          workoutsFinished += 1;
-          // Плеер держит эту сессию в состоянии — сообщаем ему, чтобы он не завершил её повторно.
-          try {
-            window.dispatchEvent(new Event('he-workout-close'));
-          } catch {
-            /* noop */
+          const { saved } = finishSessionWithSave(active);
+          // Запись в журнал не легла (квота/приватный режим): живая сессия — единственная
+          // копия тренировки из-за переполненного хранилища. Тогда её не стираем, не считаем
+          // тренировку завершённой и не перерисовываем виджет как «готово» — иначе подходы
+          // пропадут молча, а следующий тап «Завершить» уже нечего будет завершать.
+          if (saved) {
+            clearActiveSession();
+            workoutsFinished += 1;
+            // Плеер держит эту сессию в состоянии — сообщаем ему, чтобы он не завершил её повторно.
+            try {
+              window.dispatchEvent(new Event('he-workout-close'));
+            } catch {
+              /* noop */
+            }
+            // Подхватываем состояние «завершено» на виджете.
+            void pushWorkoutWidget();
           }
-          // Подхватываем состояние «завершено» на виджете.
-          void pushWorkoutWidget();
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
@@ -1494,7 +1530,8 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           // RPE/RIR — только измеренное: отсутствующий RIR раньше превращался в 0, а из него
           // синтезировался RPE 10, и подход без оценки уезжал в нагрузку как максимальный.
           const rirRaw = Number(it.rir);
-          const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(20, Math.round(rirRaw)) : 0;
+          // RIR — шкала 0…10 (RPE = 10 − RIR): 20 «повторов в запасе» не бывает.
+          const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(10, Math.round(rirRaw)) : 0;
           const rpeRaw = Number(it.rpe);
           const rpe =
             Number.isFinite(rpeRaw) && rpeRaw > 0
@@ -1524,8 +1561,10 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             pause: it.pause === true,
             plannedWeight: Number(it.weight) || undefined,
           });
-          if (res.success) {
-            saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true });
+          // Подход записан, только если живая сессия действительно легла в storage:
+          // на квоте/в приватном режиме `saveActiveSession` вернёт false, и «+1 подход»
+          // был бы ложью (подхода нет ни в живой сессии, ни в журнале).
+          if (res.success && saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true })) {
             setsAdded += 1;
             // Первый подход с рабочего стола сам запускает сессию.
             if (!base) workoutsStarted += 1;
