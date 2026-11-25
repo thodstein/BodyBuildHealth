@@ -624,10 +624,12 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
       {/* ===== КАРТОЧКА ОПЦИЙ ПОДБОРА (opt-in, выбор пользователя) ===== */}
       {(() => {
         const opts = state.options || {};
-        const rows: { key: 'diaryLabs' | 'dietAware' | 'geneticsOn'; icon: string; label: string; desc: string; color: string }[] = [
+        const dietNotes = planResult?.dietCoverageNotes || [];
+        const rows: { key: 'diaryLabs' | 'dietAware' | 'geneticsOn' | 'dietCoverage'; icon: string; label: string; desc: string; color: string }[] = [
           { key: 'diaryLabs', icon: '📥', label: 'Анализы из дневника', desc: 'свежие анализы из Лаборатории подставляются автоматически', color: '#60a5fa' },
           { key: 'dietAware', icon: '🍽', label: 'Учёт принятых добавок', desc: 'уже принимаемые перекрывают позиции плана (по дозе)', color: '#00e68a' },
           { key: 'geneticsOn', icon: '🧬', label: 'Генетика (MTHFR/HFE)', desc: 'корректировка плана по маркерам профиля', color: '#a78bfa' },
+          { key: 'dietCoverage', icon: '🥗', label: 'Рацион покрывает вещество', desc: 'покрытое дневником питания помечается, но остаётся в плане', color: '#22d3ee' },
         ];
         const geneInfo = (() => {
           const g = state.genetics || {};
@@ -676,6 +678,15 @@ export const AutoCalculator: React.FC<AutoCalculatorProps> = ({ onApply, embedde
             {opts.geneticsOn && (
               <div data-calc-genetics-info style={{ marginTop: 6, padding: '5px 8px', borderRadius: 8, fontSize: 7.5, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
                 🧬 Маркеры: {geneInfo}. MTHFR → метилфолат/B2/гомоцистеин; HFE → железо исключено. Спросите анализ при сомнениях — не диагноз.
+              </div>
+            )}
+            {opts.dietCoverage && (
+              <div data-calc-dietcoverage-info style={{ marginTop: 6, padding: '5px 8px', borderRadius: 8, fontSize: 7.5, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.6)' }}>
+                {dietNotes.length > 0
+                  ? dietNotes.map((n, i) => <div key={i}>{n}</div>)
+                  : planResult
+                    ? '🥗 Дневник питания за сегодня пуст или клетчатка в нём не указана — покрытие не определено (не «покрыто» и не «нет»).'
+                    : '🥗 План ещё не рассчитан — пометки появятся в результате.'}
               </div>
             )}
           </div>

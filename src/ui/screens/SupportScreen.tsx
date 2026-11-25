@@ -619,7 +619,7 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
       planRes = runSupportUnified(normalizeCalculatorState(state));
     } catch (e) {
       console.error('runSupportUnified in useMemo threw:', e);
-      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], labFlagOverrides: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
+      planRes = { substances: [], dosages: {}, schedule: [], systems: {}, mechanisms: [], coveragePercent: 0, synergyComment: '', monitoring: [], specialInstructions: [], riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50, labFindings: [], labFlagOverrides: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1, stackRecommendations: [], conflicts: [], riskBreakdown: {}, dietCoverageNotes: [], dietCoverage: [], pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' }, error: 'Ошибка расчёта поддержки: ' + ((e as Error)?.message || 'неизвестная') } as PlanResult;
     }
     // subs + dosages из единого результата (с dedup)
     // Минус вещества, УДАЛЁННЫЕ пользователем в менеджере калькулятора:

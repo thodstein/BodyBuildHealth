@@ -1,6 +1,6 @@
 /**
  * calc-options-card.test.tsx — хвост опций подбора (по заказу «все выполнено полностью?»):
- *  1) карточка «⚙️ Опции подбора» рендерится с 3 тумблерами (SSR);
+ *  1) карточка «⚙️ Опции подбора» рендерится с 4 тумблерами (SSR);
  *  2) опция «📥 Анализы из дневника» реально подтягивает he_lab_diary новее fullPanel (RTL-монтаж);
  *  3) лок доз протоколов (аудит §9): исправленные дозы-хардкоды не могут незаметно регресснуть.
  */
@@ -25,17 +25,19 @@ const mount = () => render(
 describe('карточка «⚙️ Опции подбора» (SSR)', () => {
   beforeEach(() => { localStorage.clear(); });
 
-  it('рендерится с 3 тумблерами, по умолчанию выключены', () => {
+  it('рендерится с 4 тумблерами, по умолчанию выключены', () => {
     const html = renderToStaticMarkup(
       React.createElement(AutoCalculator, { embedded: true, courseWeek: 6, courseLinked: courseLinked as any, onApply: () => {} })
     );
     // срез только карточки опций (aria-pressed=true встречается и в других карточках)
     const i = html.indexOf('data-calc="options"');
     const card = html.slice(i, i + 5000);
-    for (const key of ['diaryLabs', 'dietAware', 'geneticsOn']) {
+    // Проход 209: четвёртый тумблер — «🥗 рацион покрывает вещество» (opt-in,
+    // по умолчанию выключен, как и остальные).
+    for (const key of ['diaryLabs', 'dietAware', 'geneticsOn', 'dietCoverage']) {
       expect(card).toContain(`data-calc-option="${key}"`);
     }
-    expect(card.match(/aria-pressed="false"/g)?.length).toBe(3);
+    expect(card.match(/aria-pressed="false"/g)?.length).toBe(4);
   });
 });
 

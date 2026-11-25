@@ -24,7 +24,7 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import { calculateSupportTZ, hydrateState } from './engine';
+import { calculateSupportTZ, hydrateState, nutritionDiaryTotalsToday } from './engine';
 import { mechanismCoverageOf } from '../risk-engine-tz-spec';
 import type { CalculatorState, CalculatorResult, PlanResult } from './types';
 import { clamp } from './types';
@@ -41,6 +41,8 @@ import {
 } from './display';
 import { recommendStacksLight } from './stacks';
 import { applyGeneticsToPlanSubs, applyDietAwareToPlanSubs } from '../support-genetics-diet.engine';
+import { dietCoverage, annotatePlanSubsByDiet } from '../support-diet-coverage.engine';
+import type { DietIntake, NutrientCoverage } from '../support-diet-coverage.engine';
 
 /**
  * ЕДИНЫЙ расчёт поддержки: вещества + риски + display-данные.
@@ -62,6 +64,7 @@ export function runSupportUnified(state: CalculatorState): PlanResult {
       riskDynamics: [], overallRiskBefore: 50, overallRiskAfter: 50,
       labFindings: [], labFlagOverrides: [], uncoveredMechanisms: [], coverageGaps: [], weekScale: 1,
       stackRecommendations: [], conflicts: [], riskBreakdown: {},
+      dietCoverageNotes: [], dietCoverage: [],
       pillBurden: { totalSubstances: 0, estimatedPillsPerDay: 0, morningPills: 0, afternoonPills: 0, eveningPills: 0, feasibility: 'unknown', message: 'Ошибка расчёта' },
       error: 'Ошибка расчёта поддержки: ' + (err?.message || 'неизвестная'),
     };
@@ -93,6 +96,21 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     const d = applyDietAwareToPlanSubs(substances, state.nutrition?.takenSupplements);
     substances = d.subs;
     optionNotes.push(...d.notes);
+  }
+
+  // ── 1b. Опция «🍽 рацион покрывает вещество» (opt-in): пометки, НЕ удаление ──
+  // intake — только уже существующий агрегат дневника из engine.ts (сегодня).
+  // Железо/кальций/D3/магний/калий/EPA+DHA дневник не хранит → оставляем
+  // undefined, движок честно вернёт 'unknown', а не выдуманные нули.
+  const dietCoverageNotes: string[] = [];
+  let dietCoverageRows: NutrientCoverage[] = [];
+  if (state.options?.dietCoverage) {
+    const totals = nutritionDiaryTotalsToday();
+    const intake: DietIntake = { fiberG: totals?.fiberG };
+    dietCoverageRows = dietCoverage(intake);
+    const annotated = annotatePlanSubsByDiet(substances, dietCoverageRows);
+    substances = annotated.subs;
+    dietCoverageNotes.push(...annotated.notes);
   }
 
   // ── 2. Dosages ──
@@ -204,6 +222,9 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
       ? [...(tzRes.protocolWarnings || []), ...optionNotes]
       : tzRes.protocolWarnings,
     optionNotes: optionNotes.length > 0 ? optionNotes : undefined,
+    // 🍽 опция «рацион покрывает вещество»: пустые массивы — опция выключена.
+    dietCoverageNotes,
+    dietCoverage: dietCoverageRows,
   };
 }
 

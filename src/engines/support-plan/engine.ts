@@ -849,6 +849,47 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
   }
 }
 
+/**
+ * Агрегат питания из дневника за сегодня (`nutrition_diary_v2`) — единственный
+ * существующий источник фактического рациона. Возвращает `undefined`, если
+ * записей за сегодня нет. Дневник хранит только ккал/БЖУ/клетчатку/воду:
+ * железо, кальций, D3, магний, калий и EPA+DHA в нём отсутствуют — вызывающий
+ * код обязан оставить их `undefined`, а не заполнять нулями.
+ *
+ * Используется и `hydrateState` (профиль), и фильтром «рацион покрывает
+ * вещество» (опция `dietCoverage`), чтобы не заводить второй источник данных.
+ */
+export function nutritionDiaryTotalsToday(): {
+  calories: number; proteinG: number; fatG: number; carbsG: number; fiberG: number; waterL: number;
+} | undefined {
+  try {
+    const raw = localStorage.getItem('nutrition_diary_v2');
+    if (!raw) return undefined;
+    const diary = JSON.parse(raw);
+    const today = localIsoDate();
+    const todayEntries = Object.values(diary?.[today]?.meals || {}).flatMap((items: any) => Array.isArray(items) ? items : []);
+    if (todayEntries.length === 0) return undefined;
+    const totals = todayEntries.reduce((acc: any, e: any) => ({
+      calories: (acc.calories || 0) + (e.kcal || 0),
+      proteinG: (acc.proteinG || 0) + (e.p || 0),
+      fatG: (acc.fatG || 0) + (e.f || 0),
+      carbsG: (acc.carbsG || 0) + (e.c || 0),
+      fiberG: (acc.fiberG || 0) + (e.fiber || 0),
+      waterL: (acc.waterL || 0) + (e.water || 0),
+    }), {});
+    return {
+      calories: Math.round(totals.calories || 0),
+      proteinG: Math.round(totals.proteinG || 0),
+      fatG: Math.round(totals.fatG || 0),
+      carbsG: Math.round(totals.carbsG || 0),
+      fiberG: Math.round(totals.fiberG || 0),
+      waterL: Math.round((totals.waterL || 0) * 10) / 10,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export function hydrateState(): Partial<CalculatorState> {
   const result: Partial<CalculatorState> = {};
   try {
@@ -1202,33 +1243,13 @@ export function hydrateState(): Partial<CalculatorState> {
 
   // ── Авто-вывод питания из единого дневника питания ──
   if (!result.nutrition) {
-    try {
-      const raw = localStorage.getItem('nutrition_diary_v2');
-      if (raw) {
-        const diary = JSON.parse(raw);
-        const today = localIsoDate();
-        const todayEntries = Object.values(diary?.[today]?.meals || {}).flatMap((items: any) => Array.isArray(items) ? items : []);
-        if (todayEntries.length > 0) {
-          const totals = todayEntries.reduce((acc: any, e: any) => ({
-            calories: (acc.calories || 0) + (e.kcal || 0),
-            proteinG: (acc.proteinG || 0) + (e.p || 0),
-            fatG: (acc.fatG || 0) + (e.f || 0),
-            carbsG: (acc.carbsG || 0) + (e.c || 0),
-            fiberG: (acc.fiberG || 0) + (e.fiber || 0),
-            waterL: (acc.waterL || 0) + (e.water || 0),
-          }), {});
-          result.nutrition = {
-            calories: Math.round(totals.calories || 0),
-            proteinG: Math.round(totals.proteinG || 0),
-            fatG: Math.round(totals.fatG || 0),
-            carbsG: Math.round(totals.carbsG || 0),
-            fiberG: Math.round(totals.fiberG || 0),
-            waterL: Math.round((totals.waterL || 0) * 10) / 10,
-            omega3: false, sodiumMg: 3500, potassiumMg: 4500, saltIntake: 'normal',
-          } as any;
-        }
-      }
-    } catch {}
+    const totals = nutritionDiaryTotalsToday();
+    if (totals) {
+      result.nutrition = {
+        ...totals,
+        omega3: false, sodiumMg: 3500, potassiumMg: 4500, saltIntake: 'normal',
+      } as any;
+    }
   }
 
   return result;
