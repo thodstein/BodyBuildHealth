@@ -315,43 +315,100 @@ BB-пункт ниже проверяется точечно (`npx vitest run <�
   - Следствия: 5-дневный план при 3 тренировках в неделю проходит дни 1…5 (раньше 4–5 были
     недостижимы); `daysPerWeek: 0` читается как «не задано» (3 дня, а не одна среда); фаза
     `pattern`-цикла считается от якоря, а не от 2024-01-01.
-  - Календарь: дата дня плана — явная `day.date` → `startDate + dayOfWeek` →
-    `planDatesForIndexes`; без якоря и без дат день пропускается (догадок нет), `plannedData`
-    пересчитывается по сигналу плана, а не по смене месяца.
+  - Календарь: дата дня плана — явная `day.date` → якорь (`planDatesForIndexes`, N-й
+    тренировочный день от `startDate`) → `startDate + dayOfWeek`; без якоря и без дат день
+    пропускается (догадок нет), `plannedData` пересчитывается по сигналу плана, а не по смене месяца.
   - Виджет и нативный календарь виджета согласованы с плеером на одном payload: слот плана — элемент
     массива `days` (пустой день пик-недели/«отдых» остаётся слотом; раньше `resolveWorkoutPlan`
     выбрасывал пустые дни, и индекс дня расходился с плеером), плановые дни до якоря не рисуются,
     сканирование начинается от `max(from, startDate)`, тренировочный день считается `isTrainingDayFor`
     с якорем. Замок — `src/core/__tests__/widget-workout-integrity.test.ts` (кейс пик-недели).
-- **Известные ограничения (не чинились в этом проходе):**
+- **Известные ограничения:**
   - PR-детект (`workout-logger.engine.ts`) сравнивает `sessionBestE1RM` только внутри текущей
     сессии и ищет историю по подстрочному совпадению имени — ложный PR на первом подходе нового
-    упражнения и на втором сете без рекорда. Код не менялся в этом проходе.
-  - `computeWeeklyBreakdown` (`analytics-engine.ts`) режет недели по `time / 7 суток`, а дневник — по
-    понедельнику; поле сейчас не рендерится, но при подключении подписи разойдутся.
-  - Подход из виджета по упражнению, которого нет в плане дня плеера, уходит в ветку `ei < 0` без
-    `d.handled = true`: виджет пишет сессию сам, а следующий автосейв плеера её перезаписывает.
-    День плана теперь совпадает (якорь), сама ветка `ei < 0` не закрыта.
-  - Экспорт календаря (`TrainingCalendarTab.tsx`) — `<a download>` + `URL.createObjectURL`: в APK-WebView
-    файл не сохраняется. `check-apk-markers.mjs` этот файл пока не гейтит.
-  - `archiveActiveSession` (`workout-logger.engine.ts`) проверяет запись через `loadSessions()`, а тот
-    режет журнал до 2000 (при квоте — до 500) и сортирует по дате: при большом журнале вернёт `null`
-    при фактически записанных данных.
-  - `data-act="finish-session"` в плеере зовёт `exitSession(false)` — завершение без подтверждения
-    (P0 из ревью, не менялся).
-  - `weeklyTargetDays` (`widget-sync.ts`) считает цель от длины всего цикла: 48-дневный план при 4
-    тренировках в неделю даёт цель 7, кольцо тренировок не доходит до 100% («4 из 7»). Расчёт цели —
-    отдельная правка, якорь его не касается.
-  - `resolveWorkoutPlan` подставляет `rir: 2`, если в плановом подходе RIR не задан, — календарь в этом
-    случае правило соблюдает («без RIR нет выдуманного RPE»). `TrainingCalendarTab` клэмпит производный
-    RPE, но не сам `rir` (`rir: 15` → `{ rir: 15, rpe: 0 }`).
-  - `plannedData` в `TrainingCalendarTab` не зависит от графика профиля: смена дней недели не двигает
-    плановый слой до записи плана или смены месяца. Если в профиле нет `settings.training`,
-    `planDatesForIndexes` возвращает `null`, и сохранённый план в календаре молчит без объяснения.
-  - У существующих установок `he_runtime_day` уже сохранён как `1`, поэтому новый дефолт `0` их не
-    меняет — нужна миграция или игнор унаследованной единицы.
-  - `resolvePlannedDate` предпочитает `startDate + dayOfWeek` якорной дате; сейчас `dayOfWeek` не пишет
-    ни один продюсер, но гибридный payload встанет по дню недели, а не по счёту тренировочных дней.
+    упражнения и на втором сете без рекорда. Код не менялся.
+- **Закрыто 25.11.2026 — 11 запаркованных дефектов** (у каждого свой тест):
+  - `computeWeeklyBreakdown` группирует по локальному понедельнику (`mondayOfIso`), в записи есть
+    `weekStart`, `week` = YYYYMMDD → `src/engines/__tests__/analytics-weekly-breakdown.test.ts`.
+  - Срез журнала перенесён на запись: `MAX_STORED_SESSIONS = 2000` + `markTrimmed`, поэтому
+    `archiveActiveSession` находит записанную сессию → `src/engines/__tests__/workout-history-cap.test.ts`.
+  - Ветка `ei < 0` в `he-workout-widget-set` создаёт упражнение в живой сессии и пишет подход тем же
+    путём (`d.handled = persisted`) → `session-player-widget-offplan.test.tsx`.
+  - `data-act="finish-session"` подтверждает выход при несохранённых подходах (`exit-confirm` /
+    `exit-save`) → тот же файл.
+  - Цель недели — дни графика профиля (`weeklyTrainingDays`), а не длина цикла; СЧЁТЧИК недели —
+    по датам Пн–Вс (`getSessionsInWeek`), а не по `weekNumber` (в журнале две шкалы: неделя плана 1..N
+    и ISO-неделя из CSV) → тесты 59–62 в `src/core/__tests__/widget-bridge.test.ts`.
+  - `PlanSetTarget.rir` стал `number | null`: план без RIR больше не получает выдуманный `rir: 2` → там же.
+  - Календарь клэмпит сам `rir` в 0…10 (пара RIR/RPE согласована) → `training-calendar-honesty.test.tsx`.
+  - `plannedData` подписан на правку профиля через `onAnyProfileChangeCrossTab` (шина окна + `storage`)
+    → тот же файл + `src/core/__tests__/profile-events-crosstab.test.ts`.
+  - Экспорт журнала через `core/apk-share` (`saveCsvApk`/`saveTextFileApk`), `<a download>` убран → там же.
+  - `he_runtime_day`: одноразовая миграция унаследованной `1` → `0` с флагом `he_runtime_day_migrated`
+    (`TrainingScreen_parts/runtime-day.ts`) → `training-runtime-day-default.test.ts`.
+  - Порядок дат дня плана: явная `day.date` → якорь (`planDatesForIndexes`) → `startDate + dayOfWeek`
+    → `training-calendar-honesty.test.tsx`.
+- **Закрыто 25.11.2026 (четвёртый проход) — 7 дефектов ревью** (у каждого свой замок):
+  - Запись тренировки больше не «успешна по умолчанию»: `finishSessionWithSave()` возвращает
+    `{ session, saved }`, прежний `finishSession()` оставлен для экспорта/тестов. Плеер и виджет-фолбэк
+    проверяют `saved` и только тогда вызывают `clearActiveSession()`; при провале живая сессия остаётся
+    единственной копией, а в плеере показывается `[data-session="save-error"]` →
+    `src/engines/__tests__/workout-logger-save-report.test.ts`, `session-player-save-honesty.test.tsx`,
+    тест 64 в `src/core/__tests__/widget-bridge.test.ts`.
+  - `SessionPlayer.startMain()` не стартует новую тренировку, если у живой сессии были подходы, а
+    `archiveActiveSession()` вернул `null` (квота/сессия не попала в срез): автосейв пустой новой сессии
+    больше не затирает единственную копию → `session-player-save-honesty.test.tsx`.
+  - Quota-фолбэк `saveSessions()` пишет не больше `MAX_STORED_SESSIONS` (раньше `trySave(sortedAsc,
+    'full')` проходил, если квоту выбили другие ключи) и зовёт `markTrimmed` →
+    `workout-logger-save-report.test.ts`.
+  - `logSet` держит RIR в шкале 0…10 (было 0…20: RPE = 10 − RIR уходил в 0) →
+    `workout-logger-save-report.test.ts`; виджет-путь `set_add` тоже клампит в 10.
+  - У `[data-session="exit-confirm"]` появился `padding-bottom: calc(12px + env(safe-area-inset-bottom))`
+    — кнопка «Остаться в тренировке» не упирается в системный жест.
+  - `runtimeDay` задокументирован как индекс списка тренировочных дней микроцикла, а не день недели;
+    клампинг вынесен в `resolveRuntimeDayIndex()` (`runtime-day.ts`), `ExecutionZone` берёт его по длине
+    отфильтрованного списка; цена миграции `1 → 0` описана честно (до флага осознанный выбор второго дня
+    не отличим от унаследованного дефолта) → `training-runtime-day-default.test.ts`.
+  - `WorkoutWidgetExercise.rir` стал `number | null`: план без RIR больше не превращается в `rir: 0`
+    в снапшоте; `syncWorkoutWidget` сохраняет `null`, `WorkoutWidgetProvider` не передаёт `EXTRA_RIR`
+    при `null`, и поле RIR в диалоге подхода остаётся пустым → тест 63 в `widget-bridge.test.ts`.
+  - Дополнительно закрыто по ревью этого же прохода (найдено уже после первого прогона проверок):
+    - `saved` в `finishSessionWithSave()` теперь «сессия реально в журнале»: `saveSessions` режет
+      историю до `MAX_STORED_SESSIONS` по дате, и завершённая сессия могла вылететь из среза при
+      `true` от записи — вызывающий стёр бы живую копию. Проверка членства —
+      `saved && loadSessions().some(s => s.sessionId === finished.sessionId)`; замок — кейс
+      «сессия вылетела из среза истории» в `workout-logger-save-report.test.ts`.
+    - `workout_start` из виджета не дописывает план дня в живую сессию ПРОШЛОГО дня (условие
+      по дате, а не «плеер отверг» — путь без смонтированного плеера так же склеивал подходы
+      двух дней в записи с датой вчера) → новый кейс в `widget-workout-integrity.test.ts`.
+    - `readRuntimeDay()` пишет мигрированное значение ПЕРЕД флагом и держит записи в разных
+      `try`: провал записи больше не возвращает 0 и не «съедает» миграцию навсегда →
+      два новых кейса в `training-runtime-day-default.test.ts`.
+    - `SET_LIMITS.maxRir` 20 → 10 (поле не участвовало в валидации, но противоречило клампу `logSet`);
+      `resolveWorkoutPlan` считает сессии недели через `getSessionsInWeek` — ротация дня плана без
+      якоря больше не застревает на первом дне.
+- **Найдено ревью 25.11.2026, запарковано (в этот проход не входит):**
+  - Путь записи RIR из виджета (`WidgetQuickAddActivity` → очередь `set_add`) по-прежнему пишет `0`,
+    когда RIR не вводили, и выводит из него `rpe = 0`; честный `null` сделан только на пути чтения
+    снапшота. Нужен признак «RIR не вводили» в `WorkoutSet`.
+  - `SessionPlayer` не проверяет результат автосейва живой сессии (`saveActiveSession`) — под квотой
+    подходы живут только в памяти.
+  - Провал `archiveActiveSession()` в диалогах «В дневник»/«Начать заново» закрывает диалог без
+    сообщения (в `startMain` баннер уже есть).
+  - Завершение пустой сессии стирает `he_workout_active_v1` по состоянию React, а не по identity
+    (`loadActiveSession()?.sessionId`).
+  - Тест quota-фолбэка покрывает одиночный сбой `setItem`, а не реальную лестницу `500/100/50`.
+  - Два source-regex замка в `training-runtime-day-default.test.ts` хрупки к форматированию.
+  - `runtimeDaysToBridgeSessions(runtime, year, month)` не использует `year`/`month`.
+  - `workout_start` без живой сессии ничего не создаёт: `sessionFromPlan()` даёт упражнения без
+    подходов, `saveActiveSession` отказывает, и тап «Начать тренировку» с виджета остаётся без
+    сигнала (ни сессии, ни ошибки).
+  - `archiveActiveSession()` после проверки членства в `finishSessionWithSave()` дублирует тот же
+    инвариант (лишний parse до 2000 записей), `getSessionsByWeek()` — мёртвый экспорт (фильтр по
+    номеру недели плана, не по календарной неделе).
+- **Предсуществующее падение (не от этого прохода):**
+  - `src/engines/__tests__/diary-mmc-checkin-integration.test.tsx` ждёт «2 сетов», а карточка после
+    8aeb72252 печатает «2 сета».
 - **Закрыто в третьем проходе:** производители `he_pl_runtime` пишут `startDate` (см. выше), поэтому
   календарь, виджет, плеер и планёр строят плановые дни от якоря. Дат у отдельных дней по-прежнему нет:
   `days` остаётся плоским списком, а дата дня = N-й тренировочный день от `startDate` по графику профиля.
