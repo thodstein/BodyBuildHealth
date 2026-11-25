@@ -136,3 +136,151 @@ describe('§8.122: нота овощного добора не врёт ни в 
     expect(closed + partial).toBeGreaterThanOrEqual(20);
   }, 600000);
 });
+
+/**
+ * §8.122 / P2-3 (`docs/NUTRITION-PLANNER-NEXT-PLAN-2026-11.md:84-89`): лестница повторов.
+ *
+ * Инвариант: «день не теряет крупу без овоща» — крахмал дня может упасть относительно
+ * дня БЕЗ овощного добора (`vegTopUp88: false`) только если овощ дня вырос; сильнее и
+ * точнее по месту правки — тарелка не теряет крахмал, если ЕЁ овощ не вырос.
+ *
+ * Замеры (2026-11-25, сетка считает каждый день через `buildDayPlan` дважды):
+ *  • 160 дней (10 профилей × 3–6 приёмов × трен/отдых × авто/ручной): овощ вырос в **47**
+ *    днях; дней «крахмал упал без роста овоща» — **0** (дневной уровень).
+ *  • ветка лестницы реально срабатывает: на расширенной сетке 960 дней (профили w70/w90 ×
+ *    kcal 1400–7000 × 2 белка × 2 жира × mc 2–4 × трен/отдых × авто/ручной) — **60**
+ *    входов в `if (!_grow88(want))`, **31** принятый второй шаг. Форма ниже
+ *    (`w70k3600p1.6f0.7/mc2/тр/руч/s1d1`) — один из этих дней (`_ok88` отверг `want`,
+ *    лестница приняла шаг; замер инструментированного движка: entry=1, ok=1).
+ *  • мутация `live → vIt` на ДНЕВНОМ уровне не наблюдаема: на 960 + 1728 + 2592 + 1152
+ *    днях (сетки с randomSalt/dayOffset/fiberCapG/goal/variety) принятых «сиротских» шагов
+ *    было 1 + 6 + 3 + 8 = 18, и все они либо полностью откачены финальным гейтом §8.122
+ *    (`_qA88.total < _qB88.total` — крахмал дня возвращается к дню без добора), либо живой
+ *    овощ догоняется следующей постановкой/стадией (40 → 265 г). Дней «день потерял
+ *    крахмал без овоща» под мутацией — **0**. Значит дневной замок зелёный и под мутацией,
+ *    и P2-3 им не закрывается: нужен внутренний self-check движка (assert, что `live`
+ *    после пере-разрешения лежит в `m.items`, или счётчик в `_grow88`), иначе гейт §8.122
+ *    маскирует сироту.
+ *  • наблюдаемый след той же мутации — тарелочная форма инварианта на этой же форме:
+ *    чистый движок держит срез только там, где овощ вырос (обед +55 г овоща, −15 г крахмала;
+ *    ужин −15 г овоща, +1 г крахмала), а под мутацией обед теряет 5 г крахмала и перекус 1 г
+ *    при НЕИЗМЕНЁННОМ овоще (0 → 0). Этот замок красный под мутацией и зелёный на текущем коде.
+ */
+const buildEx = (p: any, mc: number, tr: boolean, manual: boolean, extra: Record<string, any> = {}): any =>
+  buildDayPlan({
+    weightKg: p.w,
+    lbmKg: Math.round(p.w * 0.82),
+    bodyFatPct: 18,
+    sex: 'male',
+    goalKcal: p.k,
+    goalProteinG: p.p,
+    goalFatG: p.f,
+    goalCarbsG: carbsFor(p),
+    mealsCount: mc,
+    isTrainingDay: tr,
+    trainStartMin: tr ? 18 * 60 : undefined,
+    trainDurationMin: 75,
+    allowIntraWorkout: true,
+    budget: 'medium',
+    dayOffset: 0,
+    cyclePhase: 'none',
+    variety: 'medium',
+    goal: 'maintenance',
+    quality: 'full',
+    excludedIds: new Set<string>(),
+    allergenTags: new Set<string>(),
+    randomSalt: 0,
+    ...(manual ? { kbjuMode: 'manual', manualTargetsLocked: true } : {}),
+    ...extra,
+  } as unknown as MealPlanInput);
+
+const starchG = (plan: any): number =>
+  ((plan.meals || []) as any[])
+    .flatMap((m: any) => m.items || [])
+    .filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast')
+    .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+
+const mealStarchG = (m: any): number =>
+  ((m?.items || []) as any[])
+    .filter((x: any) => x.role === 'carb_slow' || x.role === 'carb_fast')
+    .reduce((s: number, x: any) => s + (Number(x.amount) || 0), 0);
+
+/** Приёмы по ключу `тип#вхождение`: план с добором и без него держат одни и те же слоты. */
+const mealsByKey = (plan: any): Map<string, any> => {
+  const out = new Map<string, any>();
+  const seen = new Map<string, number>();
+  for (const m of plan.meals || []) {
+    const t = String(m.type);
+    const i = seen.get(t) || 0;
+    seen.set(t, i + 1);
+    out.set(`${t}#${i}`, m);
+  }
+  return out;
+};
+
+describe('§8.122 P2-3: лестница повторов не теряет крупу без овоща', () => {
+  it('день: крахмал упал ⇒ овощ дня вырос (160 дней сетки)', () => {
+    let grew = 0;
+    const bad: string[] = [];
+    for (const p of PROFILES) {
+      for (const mc of [3, 4, 5, 6]) {
+        for (const tr of [false, true]) {
+          for (const manual of [false, true]) {
+            const on: any = buildEx(p, mc, tr, manual);
+            const off: any = buildEx(p, mc, tr, manual, { vegTopUp88: false });
+            const vOn = Math.round(vegG(on));
+            const vOff = Math.round(vegG(off));
+            const sOn = starchG(on);
+            const sOff = starchG(off);
+            if (vOn > vOff) grew += 1;
+            if (sOn < sOff && vOn <= vOff) {
+              bad.push(
+                `${p.id}/mc${mc}/${tr ? 'тр' : 'отд'}/${manual ? 'руч' : 'авто'}: крахмал ${sOff}→${sOn} г, овощ ${vOff}→${vOn} г`,
+              );
+            }
+          }
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    // Замок не проходит вхолостую: на сетке есть дни, где добор реально вырастил овощ.
+    expect(grew).toBeGreaterThanOrEqual(20);
+  }, 600000);
+
+  it('тарелка: форма с принятым вторым шагом роста не теряет крахмал без своего овоща', () => {
+    // Формы из замера: на обеих чистый движок входит в лестницу (entry=1, ok=1 при
+    // инструментированном `_grow88`); `mc` 2 и 3 дают тот же день, но фиксируют оба слота.
+    const p14 = { id: 'w70k3600p1.4f0.7', w: 70, k: 3600, p: 98, f: 49 };
+    const p16 = { id: 'w70k3600p1.6f0.7', w: 70, k: 3600, p: 112, f: 49 };
+    const forms: any[] = [
+      [p14, 2, { randomSalt: 4, dayOffset: 1 }],
+      [p14, 3, { randomSalt: 4, dayOffset: 1 }],
+      [p16, 2, { randomSalt: 1, dayOffset: 1 }],
+      [p16, 3, { randomSalt: 1, dayOffset: 1 }],
+    ];
+    const bad: string[] = [];
+    let accepted = 0;
+    for (const [p, mc, extra] of forms) {
+      const on: any = buildEx(p, mc, true, true, extra);
+      const off: any = buildEx(p, mc, true, true, { ...extra, vegTopUp88: false });
+      const tag = `${p.id}/mc${mc}`;
+      if (Math.round(vegG(on)) > Math.round(vegG(off))) accepted += 1;
+      const onMeals = mealsByKey(on);
+      const offMeals = mealsByKey(off);
+      for (const [key, mOn] of onMeals) {
+        const mOff = offMeals.get(key);
+        if (!mOff) continue;
+        const sOn = mealStarchG(mOn);
+        const sOff = mealStarchG(mOff);
+        const vOn = Math.round(vegG({ meals: [mOn] }));
+        const vOff = Math.round(vegG({ meals: [mOff] }));
+        if (sOn < sOff && vOn <= vOff) {
+          bad.push(`${tag} ${key}: крахмал ${sOff}→${sOn} г, овощ ${vOff}→${vOn} г`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+    // Лестница должна реально срабатывать: хотя бы на одной форме добор принят.
+    expect(accepted).toBeGreaterThanOrEqual(1);
+  }, 600000);
+});

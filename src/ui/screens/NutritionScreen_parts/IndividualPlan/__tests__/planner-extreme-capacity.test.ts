@@ -12,7 +12,7 @@ describe('§3A extreme capacity profile', () => {
     expect(p.active).toBe(false);
     expect(p.plateMult).toBe(1);
     expect(p.dryGrainCap).toBe(170);
-    expect(p.recipePlate).toBe(730);
+    expect(p.recipePlate).toBe(700);
   });
 
   it('HV без инсулина (800У/110кг = 7.3 г/кг) — калибровки не трогаем', () => {

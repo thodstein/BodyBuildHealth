@@ -121,12 +121,17 @@ export interface ExtremeCapacityProfile {
   itemCap: number;
   /** Множитель съедобных капов продуктов (EDIBILITY ×1.15/×1.3). */
   edibilityMult: number;
-  /** Потолок твёрдой тарелки рецептурного приёма (730 → 850/900). */
+  /**
+   * Потолок твёрдой тарелки рецептурного приёма — ТОТ ЖЕ контракт, что `plateCapG` (§8.112):
+   * 700 обычный день / 900 экстрим-У. Поле читает ровно одно место (`extremeCarbTopUp`), и оно
+   * гейтится `isExtremeCarbTopUpBand` (У ≥ 8 г/кг), поэтому прежние 730/850 были недостижимы,
+   * но формально разрешали тарелку, которую движок считает «ведром» (§8.140).
+   */
   recipePlate: number;
 }
 
 export const DEFAULT_EXTREME_CAPACITY: ExtremeCapacityProfile = {
-  active: false, plateMult: 1, snackCarbCap: 120, dryGrainCap: 170, itemCap: 600, edibilityMult: 1, recipePlate: 730,
+  active: false, plateMult: 1, snackCarbCap: 120, dryGrainCap: 170, itemCap: 600, edibilityMult: 1, recipePlate: 700,
 };
 
 export function extremeCapacityProfile(input: {
@@ -149,7 +154,7 @@ export function extremeCapacityProfile(input: {
     dryGrainCap: extreme ? 240 : 200,
     itemCap: extreme ? 800 : 700,
     edibilityMult: extreme ? 1.3 : 1.15,
-    recipePlate: extreme ? 900 : 850,
+    recipePlate: extreme ? 900 : 700,
   };
 }
 

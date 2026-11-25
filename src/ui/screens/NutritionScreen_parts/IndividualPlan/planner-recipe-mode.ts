@@ -1132,7 +1132,15 @@ export function closeRecipeDayToCanon(
 export function applyRecipeCoreSwap(
   meals: PlanMealLike[],
   targets: DayMacroTargets,
-  opts?: { weightKg?: number; reconverge?: () => string[]; maxSwaps?: number; usedNames?: Set<string> },
+  opts?: {
+    weightKg?: number;
+    reconverge?: () => string[];
+    maxSwaps?: number;
+    /** Живой набор имён (для мутации `add`): в нём есть и сегодняшние имена. */
+    usedNames?: Set<string>;
+    /** Имена ПРОШЛЫХ дней — жёсткий запрет на повтор (§8.140). */
+    prevUsedNames?: Set<string>;
+  },
 ): string[] {
   const notes: string[] = [];
   const mealAny = meals as any[];
@@ -1203,7 +1211,35 @@ export function applyRecipeCoreSwap(
   for (const m of mealAny) {
     if (swaps >= maxSwaps) break;
     if (isPeriMeal(m)) continue;
-    const optsOf = ((m.recipeOptions || []) as any[]).filter((o: any) => o && o.name && o.name !== m.recipeApplied);
+    // §8.140/§8.102 (P1-5): свап обязан уважать разнообразие, но НЕ ценой сходимости.
+    // Контракт «одно блюдо за 7 дней» держит `prevUsedNames` — имена ПРОШЛЫХ дней; такой вариант
+    // не берём вовсе. Дубль ВНУТРИ дня — мягкое предпочтение: варианты, чьё имя уже стоит в
+    // другом приёме сегодня, идут последними (берутся, только если ни один уникальный не принят).
+    // Замер 40 дней × канон 2/3: жёсткий фильтр по всему `usedNames` (в нём лежат и сегодняшние
+    // имена из посадки) стоил двух дней 3.2 % → 14.5 % и 16.5 % → 20.1 % — вариантов на приём
+    // всего 3, и запрет «уже занятых» оставлял приём без рычага.
+    const _dayNames = new Set<string>(
+      mealAny.flatMap((x: any) => [x?.recipeApplied, x?.recipeApplied2]).filter(Boolean) as string[],
+    );
+    const _prevNames = opts?.prevUsedNames;
+    const optsOf = ((m.recipeOptions || []) as any[])
+      .map((o: any, i: number) => ({
+        o,
+        i,
+        dup: !!(o?.name && _dayNames.has(o.name) && o.name !== m.recipeApplied),
+      }))
+      .filter(
+        ({ o }) =>
+          o &&
+          o.name &&
+          o.name !== m.recipeApplied &&
+          // Ревью 2026-11-25: второй рецепт приёма — тоже «своё» блюдо, ставить его же
+          // на место первого значит дублировать блюдо в одном приёме.
+          o.name !== (m as any).recipeApplied2 &&
+          !(_prevNames && _prevNames.has(o.name)),
+      )
+      .sort((a, b) => Number(a.dup) - Number(b.dup) || a.i - b.i)
+      .map(({ o }) => o);
     if (optsOf.length === 0) continue;
     const core = coreOf(m);
     const sides = ((m.items || []) as any[]).filter((it: any) => !core.has(String(it.id)));
@@ -2205,6 +2241,14 @@ export function rebalanceDayAfterRecipes(
   // §4.4: коридор был ±10% — порции рецептов уезжали от авторских на ~12%
   // (продуктовый путь сходится в ≤3% без дрейфа порций). Компенсация остатка —
   // поздними доборами (extremeCarbTopUp/снаки), а не распуханием порции.
+  //
+  // P1-5 (§8.140): базис шага снят ОДИН раз (`finalTotals`), а `devFinal` пересчитывается после
+  // каждого шага — итерации 2…8 судят `dv` по дню ДО первого шага. Это осознанный долг, а не
+  // недосмотр: правка «брать текущий день» (`_base = sumDayTotals(work)`) замерена и ОТКЛОНЕНА
+  // на сетке 40 дней × канон 2/3: дней вне канона 5→3 и 17→14, но средняя девиация 2.35→2.49 %
+  // (канон 3) и 2.29→2.42 % (канон 2), максимум 16.5→20.1 % и день 29 — 3.2→14.5 %: на дне,
+  // который приходит к посадке в ~50 % от цели, «прогулка» портит работу закрывателя.
+  // Пересматривать только вместе с пересборкой закрывателя на таких днях.
   if (devFinal > 3) {
     // G3: ключ — номер приёма (один рецепт) или `${mi}:1`/`${mi}:2` (два рецепта раздельно).
     const cumScale = new Map<number | string, number>();
@@ -2254,12 +2298,11 @@ export function rebalanceDayAfterRecipes(
           const _coreIdx = _core ? _allIdx.filter((ii) => _core.has(((m.items || [])[ii] as any)?.id)) : _allIdx;
           _groups.push({ key: mi, name: (m as any).recipeApplied, idx: _coreIdx.length > 0 ? _coreIdx : _allIdx });
         }
-        let bestG: (typeof _groups)[number] | null = null;
-        let bestS = 1;
-        let bestDev = devFinal;
+        type _Cand = { g: (typeof _groups)[number]; s: number; dv: number; fact: number };
+        const _cands: _Cand[] = [];
         for (const g of _groups) {
           const used = cumScale.get(g.key) ?? 1;
-          const gTotals = g.idx.reduce(
+          const _gTotals = g.idx.reduce(
             (acc: any, ii: number) => {
               const it = (m.items || [])[ii];
               return {
@@ -2276,28 +2319,75 @@ export function rebalanceDayAfterRecipes(
             if (s === 1) continue;
             const nextCum = used * s;
             if (nextCum < 1 - _plantCorridorPct / 100 || nextCum > 1 + _plantCorridorPct / 100) continue; // коридор посадки на рецепт (§4.4)
-            const ntDay = {
-              kcal: finalTotals.kcal - gTotals.kcal + gTotals.kcal * s,
-              p: finalTotals.p - gTotals.p + gTotals.p * s,
-              f: finalTotals.f - gTotals.f + gTotals.f * s,
-              c: finalTotals.c - gTotals.c + gTotals.c * s,
+            const _idealDay = {
+              kcal: finalTotals.kcal - _gTotals.kcal + _gTotals.kcal * s,
+              p: finalTotals.p - _gTotals.p + _gTotals.p * s,
+              f: finalTotals.f - _gTotals.f + _gTotals.f * s,
+              c: finalTotals.c - _gTotals.c + _gTotals.c * s,
             };
-            const dv = maxDeviationPct(ntDay as any, validTargets);
-            if (dv < bestDev - 0.0005) {
-              bestDev = dv;
-              bestS = s;
-              bestG = g;
-            }
+            const dv = maxDeviationPct(_idealDay as any, validTargets);
+            if (dv >= devFinal - 0.0005) continue;
+            // P1-5 (§8.140): шаг ранжируется расчётным `s`, но принимается только если ФАКТ
+            // (округлённые граммы + `scaleItem`, который пересчитывает ккал из формулы) тоже
+            // улучшает день. Раньше применялся лучший по аналитике шаг, и трасса «расчёт
+            // 2.94 % → факт 3.05 %» выводила день из канона тем шагом, который день
+            // «улучшал» только в аналитике. Порядок кандидатов прежний — при benign-округлении
+            // выбирается ровно тот же шаг, что и раньше.
+            const _sim = g.idx.reduce(
+              (acc: any, ii: number) => {
+                const it = (m.items || [])[ii];
+                if (!it) return acc;
+                const nx = scaleItem(it, Math.max(5, Math.round((it.amount || 0) * s)));
+                return {
+                  kcal: acc.kcal + (nx.kcal || 0) - (it.kcal || 0),
+                  p: acc.p + (nx.p || 0) - (it.p || 0),
+                  f: acc.f + (nx.f || 0) - (it.f || 0),
+                  c: acc.c + (nx.c || 0) - (it.c || 0),
+                };
+              },
+              { kcal: 0, p: 0, f: 0, c: 0 },
+            );
+            const fact = maxDeviationPct(
+              {
+                kcal: finalTotals.kcal + _sim.kcal,
+                p: finalTotals.p + _sim.p,
+                f: finalTotals.f + _sim.f,
+                c: finalTotals.c + _sim.c,
+              } as any,
+              validTargets,
+            );
+            _cands.push({ g, s, dv, fact });
           }
         }
-        if (bestG && bestS !== 1) {
-          const inSet = new Set(bestG.idx);
+        _cands.sort((a, b) => a.dv - b.dv);
+        // P1-5 (§8.140): шаг выбирается по ФАКТУ, а не по аналитике. Раньше применялся лучший
+        // по расчётному `s` шаг, и трасса «расчёт 2.94 % → факт 3.05 %» выводила день из канона
+        // ровно тем ходом, который день «улучшал» только в аналитике (округление граммов +
+        // пересчёт ккал из формулы в `scaleItem`).
+        //   1) лучший по расчёту кандидат, который улучшает день и по факту (порядок прежний,
+        //      поэтому при benign-округлении выбирается тот же шаг — траектория не меняется);
+        //   2) иначе — прежний лучший по расчёту, если его факт СТРОГО улучшает день
+        //      (`fact < devFinal`) и не выводит его за канон. Равенство `fact == devFinal` —
+        //      это шаг, который после округления не меняет ни одного грамма: он не двигает день,
+        //      но жжёт коридор `cumScale` и печатает ноту «для сходимости» там, где сходимости нет
+        //      (ревью 2026-11-25). Раньше проверялось только «расчёт в каноне, а факт — нет»,
+        //      поэтому на уже несведённом дне (`dv > canon`) принимался шаг, который по факту
+        //      делал день хуже; это противоречило и комментарию, и правилу 3;
+        //   3) иначе — хода нет: день честно останется «не сведён», а не станет хуже.
+        const _byCalc = _cands[0];
+        const _calcOk =
+          !!_byCalc &&
+          _byCalc.fact < devFinal - 1e-9 &&
+          !(_byCalc.dv <= _canonPct + 1e-9 && _byCalc.fact > _canonPct + 1e-9);
+        const best = _cands.find((c) => c.fact < devFinal - 0.0005) ?? (_calcOk ? _byCalc : null);
+        if (best) {
+          const inSet = new Set(best.g.idx);
           const scaledItems = (m.items || []).map((it: any, ii: number) =>
-            inSet.has(ii) ? scaleItem(it, Math.max(5, Math.round((it.amount || 0) * bestS))) : it,
+            inSet.has(ii) ? scaleItem(it, Math.max(5, Math.round((it.amount || 0) * best.s))) : it,
           );
           work[mi] = { ...m, items: scaledItems, totals: sumMealTotals(scaledItems) };
-          cumScale.set(bestG.key, (cumScale.get(bestG.key) ?? 1) * bestS);
-          notes.push(`⚖️ Порция «${bestG.name}» ×${Math.round(bestS * 100)}% для сходимости КБЖУ дня`);
+          cumScale.set(best.g.key, (cumScale.get(best.g.key) ?? 1) * best.s);
+          notes.push(`⚖️ Порция «${best.g.name}» ×${Math.round(best.s * 100)}% для сходимости КБЖУ дня`);
           improved = true;
           break; // пересчитать тоталы и попробовать ещё
         }
@@ -2306,7 +2396,6 @@ export function rebalanceDayAfterRecipes(
       const t2 = sumDayTotals(work);
       devFinal = maxDeviationPct(t2, validTargets);
     }
-    void finalTotals;
   }
 
   const totalsOut = sumDayTotals(work);
@@ -2372,7 +2461,8 @@ export function extremeCarbTopUp(
   const tP = targets?.p || 0;
   const tK = targets?.kcal || 0;
   if (!w || tC <= 0 || !Array.isArray(meals)) return notes;
-  // §3A EXTREME-SCALE: тарелка рецептурного приёма шире на экстреме (730 → 850/900).
+  // §3A EXTREME-SCALE: тарелка рецептурного приёма шире на экстреме (`recipePlate` — тот же
+  // контракт, что `plateCapG`: 700 обычный / 900 экстрим-У, §8.112/§8.140).
   const _capProf = extremeCapacityProfile({ carbsG: tC, weightKg: w, goalKcal: tK, highVolumeDay: true });
   // Полоса карб-добора: только по углеводам (см. isExtremeCarbTopUpBand) — догружаем даже
   // при среднем белке, иначе высокоуглеводный день молча недобирал.
@@ -2904,6 +2994,9 @@ export function carbRoomScore(
 
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
   const { meals, pool: _poolRaw, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  // §8.140: имена, занятые ПРОШЛЫМИ днями, — снимок ДО посадки сегодняшних. Свап ядра видит
+  // живой набор (в нём к концу дня лежат и сегодняшние имена) и не должен считать их «чужими».
+  const _prevUsedNames = new Set<string>(usedNamesAcrossDays || []);
   // §8.135: канон дня по пути — флаг «в допуске» и предупреждение судятся тем каноном,
   // под который день собирался (ручной день 2 %, авто PLANNER_CONVERGENCE_PCT).
   const _canonPct = args.canonPct ?? PLANNER_CONVERGENCE_PCT;
@@ -3019,6 +3112,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         }
       }
       out.push(`⚖️ Яйца: приведено к квоте ${eggCap} г/день`);
+    }
+    // P1-5 (§8.140): трим квот меняет ГРАММЫ, но тоталы приёма не обновлял — день продолжал
+    // показывать фантомные макросы. Дальше любая полная пересборка тоталов (перенос тарелки
+    // §8.98 зовёт `recalcMealTotals`) «теряла» 2–7 % дня: рецептурный замер — 9 дней из 50
+    // считались «в каноне 3 %» на фантоме, трейс «закрыватель 1.5 % → факт 7.1 %».
+    // Кто изменил граммы, тот и ставит честные тоталы — ровно как `trimPeriCarbs` (§8.97, ниже).
+    if (out.length > 0) {
+      for (const m of ms) {
+        if (!(m.items || []).length) continue;
+        const _t = sumMealTotals(m.items as any);
+        // Ревью 2026-11-25: `sumMealTotals` не знает натрия, а приёмы движка его ведут
+        // (`totals.na`, `planner-meal-sodium.ts`). Поле переносим только если оно было —
+        // форма тоталов у приёмов без натрия не меняется.
+        if (typeof (m.totals as any)?.na === 'number') {
+          (_t as any).na = Math.round((m.items as any[]).reduce((s, it) => s + (Number(it?.na) || 0), 0));
+        }
+        m.totals = _t;
+      }
     }
     return out;
   };
@@ -4546,6 +4657,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const _swapNotes = applyRecipeCoreSwap(outMeals as any, targets as any, {
       weightKg: args.athleteWeightKg ?? 80,
       usedNames: usedNamesAcrossDays,
+      prevUsedNames: _prevUsedNames,
       reconverge: () => closeRecipeDayToCanon(_closeArgs[0] as any, _closeArgs[1] as any, _closeArgs[2] as any),
     });
     if (_swapNotes.length > 0) notes = [...notes, ..._swapNotes];
