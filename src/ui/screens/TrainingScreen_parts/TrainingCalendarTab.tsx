@@ -113,7 +113,7 @@ function summarizeTargetSets(exercises: unknown): { totalVolume: number; totalSe
   return { totalVolume, totalSets };
 }
 
-export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: number) {
+export function runtimeDaysToBridgeSessions(runtime: any) {
   if (!runtime || !Array.isArray(runtime.days) || runtime.days.length === 0) return null;
   const startWeek = Number(runtime.week) > 0 ? Number(runtime.week) : 1;
   // Якорь плана: N-й день — N-й тренировочный день от `startDate` по графику
@@ -293,7 +293,7 @@ export const TrainingCalendarTab: React.FC = () => {
       if (Array.isArray(runtime) && runtime.length > 0) {
         return buildPlannedMapFromBridgeSessions(plannedEntriesToBridgeSessions(runtime), startStr, endStr);
       }
-      const runtimeSessions = runtimeDaysToBridgeSessions(runtime, year, month);
+      const runtimeSessions = runtimeDaysToBridgeSessions(runtime);
       if (runtimeSessions?.length) {
         return buildPlannedMapFromBridgeSessions(runtimeSessions, startStr, endStr);
       }

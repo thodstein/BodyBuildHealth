@@ -1269,7 +1269,7 @@ export interface StrengthLogEntry {
   date: string;
   exerciseId: string;
   exerciseName: string;
-  sets: { weight: number; reps: number; rir: number; rpe?: number; techniqueScore?: number; plannedWeight?: number; plannedReps?: number; plannedRir?: number; plannedTempo?: string; actualTempo?: string; velocity?: number; /** Пауза на груди (жим) — IPF-стиль, без отбива. */ pause?: boolean }[];
+  sets: { weight: number; reps: number; rir: number; rpe?: number; techniqueScore?: number; plannedWeight?: number; plannedReps?: number; plannedRir?: number; plannedTempo?: string; actualTempo?: string; velocity?: number; /** Пауза на груди (жим) — IPF-стиль, без отбива. */ pause?: boolean; /** RIR не вводили: `rir: 0` — заполнитель, а не «до отказа». */ rirMissing?: boolean }[];
   totalVolume: number;
   estimated1RM: number;
   isCompound: boolean;

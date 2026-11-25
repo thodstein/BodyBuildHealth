@@ -94,7 +94,7 @@ describe('TrainingCalendarTab — RIR и якорь', () => {
       }),
     );
 
-    const sessions = runtimeDaysToBridgeSessions(JSON.parse(localStorage.getItem('he_pl_runtime')!), 2026, 2);
+    const sessions = runtimeDaysToBridgeSessions(JSON.parse(localStorage.getItem('he_pl_runtime')!));
     expect(sessions).not.toBeNull();
     const sets = sessions![0].exercises[0].sets;
     // Границы пары: RIR 15 → 10 и RPE 0, а не «RIR 15 / RPE 0».
@@ -115,7 +115,7 @@ describe('TrainingCalendarTab — RIR и якорь', () => {
       days: [planDayWith({ dayOfWeek: 5 }), planDayWith({ dayOfWeek: 5 })],
     };
 
-    const sessions = runtimeDaysToBridgeSessions(runtime, 2026, 2)!;
+    const sessions = runtimeDaysToBridgeSessions(runtime)!;
     // Индекс берётся от якоря по графику профиля, dayOfWeek не перебивает якорь.
     expect(sessions.map((s: any) => s.date)).toEqual(['2026-03-02', '2026-03-04']);
   });

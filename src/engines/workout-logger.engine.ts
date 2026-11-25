@@ -46,6 +46,12 @@ export interface WorkoutSet {
   pause?: boolean;
   /** Подход с собственным весом (подтягивания/отжимания): вес 0 допустим. */
   bodyweight?: boolean;
+  /**
+   * RIR на подходе не вводили: `rir: 0` здесь — заполнитель обязательного поля,
+   * а не «до отказа». Виджет и снапшот обязаны показывать «нет данных», иначе
+   * подход без оценки уезжает в нагрузку как максимальный (RPE 10).
+   */
+  rirMissing?: boolean;
 }
 
 /** Лимиты валидации подходов (guard от опечаток и повреждённых данных). */
@@ -351,7 +357,10 @@ export function logSet(
   const rpe = Math.max(0, Math.min(10, Number(set.rpe) || 0));
   // RIR — шкала 0…10 (RPE = 10 − RIR). 20 допускалось исторически и давало
   // «RIR 15 / RPE 0»: подход с несуществующей оценкой попадал в нагрузку.
-  const rir = Math.max(0, Math.min(10, Number(set.rir) || 0));
+  // `rirMissing` — «оценку не вводили»: ноль остаётся заполнителем обязательного
+  // поля, и читатели (снапшот виджета) обязаны показать «нет данных», а не «до отказа».
+  const rirMissing = set.rirMissing === true;
+  const rir = rirMissing ? 0 : Math.max(0, Math.min(10, Number(set.rir) || 0));
   // Скорость штанги (VBT): пишется только осмысленный диапазон (0..5 м/с —
   // выше — опечатка/не тот снаряд), иначе undefined.
   const rawVel = Number(set.velocityMs);
@@ -405,6 +414,7 @@ export function logSet(
       reps,
       rpe,
       rir,
+      rirMissing: rirMissing ? true : undefined,
       velocityMs,
       isPR,
       notes: set.notes || '',
@@ -455,6 +465,12 @@ export interface FinishSessionResult {
   session: WorkoutSession;
   /** Легла ли сессия в журнал. `false` — живая сессия осталась единственной копией. */
   saved: boolean;
+  /**
+   * Завершать было нечего: ни одного подхода. В журнал такая сессия не пишется
+   * (0 подходов — не тренировка), и `saved` тогда false по другой причине, чем отказ
+   * хранилища: вызывающий обязан очистить живую копию и не показывать «ошибку записи».
+   */
+  empty?: boolean;
 }
 
 /**
@@ -501,6 +517,10 @@ export function finishSessionWithSave(
   durationMin = Math.max(0, durationMin);
 
   const finished = { ...session, endTime, durationMin, notes };
+  // Ноль подходов — не тренировка: в журнал такую сессию не пишем (пустые записи
+  // засоряют дневник, историю и статистику). Отдаём `empty`, чтобы вызывающий
+  // снял живой ключ и не выдал это за отказ хранилища.
+  if (!isActiveSessionWorthSaving(finished)) return { session: finished, saved: false, empty: true };
   const sessions = loadSessions();
   // Идемпотентно: одну и ту же сессию могут завершить и виджет, и плеер. Повторная
   // запись того же sessionId не должна удваивать историю, объём, серии и PR-статистику.
@@ -559,17 +579,30 @@ export function isActiveSessionWorthSaving(session: WorkoutSession | null | unde
 }
 
 /** Живая сессия + служебные поля (когда сохранена, сколько сетов в плане дня). */
-export type ActiveSession = WorkoutSession & { savedAt?: number; plannedSetsTotal?: number };
+export type ActiveSession = WorkoutSession & {
+  savedAt?: number;
+  plannedSetsTotal?: number;
+  /**
+   * Сессию начали явно (тап «Начать тренировку», в т.ч. с виджета), но подходов
+   * ещё нет. Без этой метки `loadActiveSession` считает такую запись пустой и
+   * выбрасывает — «начатая» тренировка молча исчезала.
+   */
+  startedWithoutSets?: boolean;
+};
 
 /** Сохранить живую сессию (автосейв каждого подхода).
  *  plannedSets — плановое число подходов дня: без него прогресс живой сессии
- *  нечестен (2/2 = 100% при восьми запланированных). */
+ *  нечестен (2/2 = 100% при восьми запланированных).
+ *  `allowEmpty` — явный старт тренировки: подходов ещё нет, но сессия уже идёт и
+ *  должна пережить перезагрузку. Автосейв так не делает: пустой черновик не нужен. */
 export function saveActiveSession(
   session: WorkoutSession | null | undefined,
   plannedSets?: number,
-  opts?: { plannedTotalMax?: boolean },
+  opts?: { plannedTotalMax?: boolean; allowEmpty?: boolean },
 ): boolean {
-  if (!isActiveSessionWorthSaving(session) || !session) return false;
+  if (!session) return false;
+  const worth = isActiveSessionWorthSaving(session);
+  if (!worth && opts?.allowEmpty !== true) return false;
   try {
     let planned = Math.max(0, Math.round(Number(plannedSets) || 0));
     // План дня — знаменатель прогресса: путь из виджета не должен его уменьшать
@@ -586,6 +619,9 @@ export function saveActiveSession(
       /* предыдущая сессия недоступна — не блокируем запись */
     }
     const payload: ActiveSession = { ...session, savedAt: Date.now() };
+    // Метка живёт только пока подходов нет: с первым подходом это обычная сессия.
+    if (!worth) payload.startedWithoutSets = true;
+    else delete payload.startedWithoutSets;
     if (planned > 0) payload.plannedSetsTotal = planned;
     localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
     return true;
@@ -601,16 +637,34 @@ export function loadActiveSession(): ActiveSession | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.exercises)) return null;
-    if (!isActiveSessionWorthSaving(parsed)) return null;
+    // Явно начатая сессия без подходов — тоже живая: иначе тап «Начать» с виджета
+    // не переживал перезагрузку и виджет терял состояние «идёт тренировка».
+    if (!isActiveSessionWorthSaving(parsed) && parsed.startedWithoutSets !== true) return null;
     return parsed as ActiveSession;
   } catch {
     return null;
   }
 }
 
-/** Сбросить живую сессию (после сохранения или отказа). */
-export function clearActiveSession(): void {
+/**
+ * Сбросить живую сессию (после сохранения или отказа).
+ *
+ * `sessionId` — удалять только свою запись: между чтением и очисткой в ключ мог лечь
+ * черновик другой сессии (вторая вкладка, виджет), и `clearActiveSession()` без
+ * проверки стирал бы уже начатую тренировку.
+ */
+export function clearActiveSession(sessionId?: string): void {
   try {
+    if (sessionId) {
+      let stored: any = null;
+      try {
+        stored = JSON.parse(localStorage.getItem(ACTIVE_SESSION_KEY) || 'null');
+      } catch {
+        stored = null;
+      }
+      // Чужой валидный черновик не трогаем; битый JSON чистим как мусор.
+      if (stored && typeof stored === 'object' && stored.sessionId && stored.sessionId !== sessionId) return;
+    }
     localStorage.removeItem(ACTIVE_SESSION_KEY);
   } catch {
     /* ignore */
@@ -642,21 +696,25 @@ export function archiveActiveSession(note = ''): WorkoutSession | null {
   if (Number.isFinite(startMs) && savedMs > startMs) {
     durationMin = Math.min(MAX_SESSION_DURATION_MIN, Math.round((savedMs - startMs) / 60000));
   }
-  // Служебные поля живой сессии (когда автосейв, план дня) — не факты тренировки:
-  // в историю они не пишутся.
-  const { savedAt: _savedAt, plannedSetsTotal: _plannedTotal, ...cleanSession } = active;
+  // Служебные поля живой сессии (когда автосейв, план дня, метка явного старта) —
+  // не факты тренировки: в историю они не пишутся.
+  const {
+    savedAt: _savedAt,
+    plannedSetsTotal: _plannedTotal,
+    startedWithoutSets: _startedEmpty,
+    ...cleanSession
+  } = active;
   const { session: archived, saved } = finishSessionWithSave(
     cleanSession,
     note || `Незавершённая тренировка ${active.date}: сохранена при старте новой`,
     durationMin,
   );
   // Запись могла не лечь (квота/приватный режим): тогда живую сессию НЕ снимаем,
-  // иначе подходы исчезнут и из истории, и из автосейва.
+  // иначе подходы исчезнут и из истории, и из автосейва. Членство сессии в журнале
+  // `saved` уже гарантирует (второй шлюз там же) — повторный разбор журнала не нужен.
   if (!saved) return null;
-  // Второй шлюз: запись легла, но сессия могла не попасть в срез, если журнал полон
-  // более новыми датами (сбитые часы, импорт будущих дат).
-  if (!loadSessions().some((s) => s.sessionId === archived.sessionId)) return null;
-  clearActiveSession();
+  // Только свою запись: пока шла запись, в ключ мог лечь черновик другой сессии.
+  clearActiveSession(archived.sessionId);
   return archived;
 }
 
@@ -675,7 +733,11 @@ export function summarizeActiveSession(
   session: WorkoutSession | null | undefined,
   plannedSets?: number,
 ): ActiveSessionSummary | null {
-  if (!session || !isActiveSessionWorthSaving(session)) return null;
+  if (!session) return null;
+  // Явно начатая сессия без подходов — тоже «идёт», но только в свой день: иначе
+  // брошенный вчерашний старт держал бы «● Идёт» и «+ Сет» до следующей тренировки.
+  const startedEmpty = (session as ActiveSession).startedWithoutSets === true;
+  if (!isActiveSessionWorthSaving(session) && !(startedEmpty && session.date === localIsoDate())) return null;
   const setsDone = (session.exercises || []).reduce((s, e) => s + (e.sets || []).length, 0);
   const volumeKg = (session.exercises || []).reduce((s, e) => s + (e.totalVolume || 0), 0);
   const lastWithSets = [...(session.exercises || [])].reverse().find((e) => (e.sets || []).length > 0);
@@ -747,7 +809,10 @@ export function workoutLogToSession(log: WorkoutLog): WorkoutSession {
       weightKg: st.weight || 0,
       reps: st.reps || 0,
       rpe: st.rpe || 0,
-      rir: st.rir ?? 2,
+      // Прежний `?? 2` выдумывал измерение для записи без RIR: пишем 0 и метку
+      // «не вводили», как на пути logSet (0 без метки значит «до отказа»).
+      rir: st.rir ?? 0,
+      rirMissing: st.rirMissing === true ? true : undefined,
       velocityMs: undefined,
       isPR: false,
       notes: '',
@@ -1093,16 +1158,6 @@ export function importSessionsFromCSV(text: string): {
 export function getLastSession(): WorkoutSession | null {
   const sessions = loadSessions();
   return sessions.length > 0 ? sessions[0] : null;
-}
-
-/**
- * Сессии с заданным `weekNumber`.
- *
- * ВНИМАНИЕ: у сессий плеера/виджета это номер недели ПЛАНА (1..N), а не ISO-неделя
- * года; для «сколько тренировок на неделе» нужен `getSessionsInWeek(iso)`.
- */
-export function getSessionsByWeek(weekNumber: number): WorkoutSession[] {
-  return loadSessions().filter((s) => s.weekNumber === weekNumber);
 }
 
 /**

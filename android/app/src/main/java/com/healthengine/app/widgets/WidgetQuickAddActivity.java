@@ -868,11 +868,29 @@ public class WidgetQuickAddActivity extends Activity {
             return false;
         }
         String rirTxt = rirEt.getText() == null ? "" : rirEt.getText().toString().trim();
-        int rir = parseQty(rirEt, 20);
+        // Шкала RIR — 0…10 (RPE = 10 − RIR), как SET_LIMITS.maxRir в JS: 20 давало
+        // «RIR 15 / RPE 0», а движок молча клампил до 10.
+        int rir = parseQty(rirEt, 10);
         double rpeRaw = parseDecimal(rpeEt);
         // RIR из плана (подсказка) — не измерение: производный RPE считаем только из
         // явно введённого/исправленного RIR. Пустое поле раньше давало RPE 10.
         boolean rirEntered = rirTouched && !rirTxt.isEmpty();
+        // Не пустая, но нечитаемая запись («abc», 11, −1) раньше превращалась в честный
+        // ноль «до отказа». Отказываем явно, как для веса и повторов.
+        if (rirEntered) {
+            boolean rirValid;
+            try {
+                double v = Double.parseDouble(rirTxt.replace(',', '.'));
+                // Дробь раньше проходила валидацию, а parseQty молча округляла 1,5 → 2.
+                rirValid = !Double.isNaN(v) && v >= 0 && v <= 10 && v == Math.floor(v);
+            } catch (Exception e) {
+                rirValid = false;
+            }
+            if (!rirValid) {
+                showError("RIR — целое число от 0 до 10");
+                return false;
+            }
+        }
         double rpe = rpeRaw > 0
                 ? Math.min(10, rpeRaw)
                 : (rirEntered ? Math.max(0, 10 - rir) : 0);
@@ -884,6 +902,9 @@ public class WidgetQuickAddActivity extends Activity {
         item.put("reps", reps);
         item.put("rpe", rpe);
         item.put("rir", rirEntered ? rir : 0);
+        // Признак «RIR не вводили»: 0 — валидное «до отказа», поэтому одной величины
+        // мало. JS по нему пишет подход без RPE/RIR, а виджет не выдумывает 0.
+        item.put("rirMissing", !rirEntered);
         if (technique > 0) item.put("technique", technique);
         if (pause) item.put("pause", true);
         String note = setNoteEt.getText() == null ? "" : setNoteEt.getText().toString().trim();

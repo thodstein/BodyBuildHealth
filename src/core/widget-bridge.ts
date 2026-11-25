@@ -66,6 +66,11 @@ export interface QueuedItem {
   reps?: number;
   rpe?: number;
   rir?: number;
+  /**
+   * Для type='set_add': поле RIR не трогали (Android шлёт `rir: 0` как заполнитель).
+   * Без признака 0 неотличим от честного «до отказа».
+   */
+  rirMissing?: boolean;
   /** Оценка техники 3/4/5 (как в проведении тренировки). */
   technique?: number;
   /** Пауза на груди (жим, IPF-стиль). */

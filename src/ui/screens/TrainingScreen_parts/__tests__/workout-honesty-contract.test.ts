@@ -108,9 +108,12 @@ describe('workout-logger: отмена подхода и план', () => {
     );
   });
 
-  it('saveActiveSession понимает plannedTotalMax', () => {
-    expect(logger).toContain('opts?: { plannedTotalMax?: boolean }');
+  it('saveActiveSession понимает plannedTotalMax и allowEmpty', () => {
+    // `plannedTotalMax` — знаменатель прогресса не уменьшается виджетом;
+    // `allowEmpty` — явный старт (тап «Начать») переживает запись без подходов.
+    expect(logger).toMatch(/opts\?: \{ plannedTotalMax\?: boolean; allowEmpty\?: boolean \}/);
     expect(logger).toContain('if (opts?.plannedTotalMax) planned = Math.max(planned, prevPlanned);');
+    expect(logger).toContain('if (!worth && opts?.allowEmpty !== true) return false;');
   });
 
   it('PR по e1RM строго выше текущего максимума (повтор не рекорд)', () => {
@@ -120,6 +123,19 @@ describe('workout-logger: отмена подхода и план', () => {
   it('завершение переживает битую startTime, а не падает', () => {
     expect(logger).toContain("String(session.startTime || '')");
     expect(logger).toContain('const validStart =');
+  });
+
+  it('пустая тренировка не пишется в журнал, а вызывающий получает empty', () => {
+    // 0 подходов — не тренировка: раньше такая запись попадала в дневник и статистику.
+    expect(logger).toContain(
+      'if (!isActiveSessionWorthSaving(finished)) return { session: finished, saved: false, empty: true };',
+    );
+  });
+
+  it('clearActiveSession удаляет только свою запись', () => {
+    // Между чтением и очисткой в ключ мог лечь черновик другой сессии (вкладка/виджет).
+    expect(logger).toContain('export function clearActiveSession(sessionId?: string): void {');
+    expect(logger).toContain('stored.sessionId !== sessionId');
   });
 });
 

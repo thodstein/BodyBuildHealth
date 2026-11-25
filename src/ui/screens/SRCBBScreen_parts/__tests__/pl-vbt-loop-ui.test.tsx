@@ -5,19 +5,21 @@
  * нажал «Применить» → следующий подход получил новый вес (и это видно).
  * Плюс обещание «молча ничего не меняется»: без нажатия вес остаётся плановым.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { SessionPlayer, type PlayerDay } from '../SessionPlayer';
 
 const day = (weights: number[] = [100, 100, 100]): PlayerDay => ({
   label: 'День 1 · присед',
-  exercises: [{
-    name: 'Присед',
-    group: 'legs',
-    load: 'Тяжелая',
-    restSec: 180,
-    targetSets: weights.map(w => ({ weight: w, reps: 5, rir: 2 })),
-  } as never],
+  exercises: [
+    {
+      name: 'Присед',
+      group: 'legs',
+      load: 'Тяжелая',
+      restSec: 180,
+      targetSets: weights.map((w) => ({ weight: w, reps: 5, rir: 2 })),
+    } as never,
+  ],
 });
 
 const setVel = (idx: number, value: string) => {
@@ -32,6 +34,13 @@ const openMain = () => {
 };
 
 describe('SessionPlayer — VBT-замкнутый контур (п.7)', () => {
+  // Явный старт пишет живой черновик тренировки (иначе после убийства WebView
+  // «Продолжить» не появилось бы): без очистки следующий тест видел бы
+  // «Продолжить тренировку» вместо «Начать тренировку».
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('скорость упала на 24 % → рекомендация легче на 5 % и кнопка применения', () => {
     render(<SessionPlayer days={[day()]} weekNumber={1} focus="PL" />);
     openMain();

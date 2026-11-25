@@ -19,7 +19,7 @@ describe('training runtime bridge', () => {
           ],
         }],
       }],
-    }, 2026, 7);
+    });
 
     expect(sessions).toHaveLength(1);
     expect(sessions?.[0].source).toBe('BB');
@@ -43,7 +43,7 @@ describe('training runtime bridge', () => {
           targetSets: [{ weight: 60, reps: 6, rir: 2 }],
         }],
       }],
-    }, 2026, 9);
+    });
 
     expect(sessions?.[0].source).toBe('ARM');
     expect(sessions?.[0].duration).toBe(55);
@@ -52,8 +52,8 @@ describe('training runtime bridge', () => {
   });
 
   it('rejects malformed runtime payloads', () => {
-    expect(runtimeDaysToBridgeSessions(null, 2026, 7)).toBeNull();
-    expect(runtimeDaysToBridgeSessions({ days: [] }, 2026, 7)).toBeNull();
+    expect(runtimeDaysToBridgeSessions(null)).toBeNull();
+    expect(runtimeDaysToBridgeSessions({ days: [] })).toBeNull();
   });
 });
 
@@ -71,8 +71,6 @@ describe('даты и объёмы плана — без выдумок', () => 
           { label: 'Д2', dayOfWeek: 2, exercises },
         ],
       },
-      2026,
-      10,
     );
 
     expect(sessions?.map((s: any) => s.date)).toEqual(['2026-11-02', '2026-11-04']);
@@ -87,8 +85,6 @@ describe('даты и объёмы плана — без выдумок', () => 
         week: 1,
         days: [{ label: 'Без даты', exercises }],
       },
-      2026,
-      10,
     );
 
     expect(sessions).toEqual([]);
@@ -99,8 +95,6 @@ describe('даты и объёмы плана — без выдумок', () => 
       {
         days: [{ label: 'Д', date: '2026-11-15', exercises }],
       },
-      2026,
-      10,
     );
 
     expect(sessions?.[0].date).toBe('2026-11-15');

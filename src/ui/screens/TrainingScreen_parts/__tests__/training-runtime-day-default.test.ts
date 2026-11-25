@@ -23,26 +23,31 @@ import {
   RUNTIME_DAY_MIGRATED_KEY,
 } from '../runtime-day';
 
-const trainingScreen = readFileSync('src/ui/screens/TrainingScreen.tsx', 'utf8');
-const executionZone = readFileSync('src/ui/screens/TrainingScreen_parts/ExecutionZone.tsx', 'utf8');
-const runtimeDaySource = readFileSync('src/ui/screens/TrainingScreen_parts/runtime-day.ts', 'utf8');
+/** Источник с нормализованными пробелами: перенос строки/отступы не ломают замок. */
+const src = (rel: string) => readFileSync(rel, 'utf8').replace(/\s+/g, ' ');
+
+const trainingScreen = src('src/ui/screens/TrainingScreen.tsx');
+const executionZone = src('src/ui/screens/TrainingScreen_parts/ExecutionZone.tsx');
+const runtimeDaySource = src('src/ui/screens/TrainingScreen_parts/runtime-day.ts');
 
 describe('день проведения по умолчанию', () => {
   it('runtimeDay берётся из readRuntimeDay, а не из localStorage с дефолтом 1', () => {
-    const line = trainingScreen
-      .split(/\r?\n/)
-      .find((l) => l.includes('const [runtimeDay, setRuntimeDay]') && l.includes('useState'));
-    expect(line).toBeTruthy();
-    expect(line).toContain('readRuntimeDay()');
-    expect(line).not.toContain("|| '1'");
+    // Замок на само объявление: дефолт — вызов readRuntimeDay(), а не литерал '1'.
+    // Регулярка по нормализованному тексту переживает перенос строки и отступы.
+    expect(trainingScreen).toMatch(
+      /const \[runtimeDay, setRuntimeDay\] = useState<number>\(\s*\(\)\s*=>\s*readRuntimeDay\(\)\s*\)/,
+    );
+    // Литерал '1' как дефолт дня не должен вернуться рядом с объявлением, но
+    // глобальный запрет ловил бы посторонние `|| '1'` в других местах экрана.
+    expect(trainingScreen).not.toMatch(/runtimeDay[^;]*\|\|\s*'1'/);
     // Второй независимой записи ключа на экране быть не должно.
-    expect(trainingScreen).not.toContain("localStorage.setItem('he_runtime_day'");
+    expect(trainingScreen).not.toMatch(/localStorage\.setItem\(\s*'he_runtime_day'/);
   });
 
   it('SessionPlayer получает день из якоря плана, а не всегда первый', () => {
-    expect(executionZone).toContain('initialDayIndex={initialPlanDay}');
-    expect(executionZone).toContain('startDate: plRuntime.startDate');
-    expect(executionZone).toContain('pickPlanDayIndex(');
+    expect(executionZone).toMatch(/initialDayIndex=\{\s*initialPlanDay\s*\}/);
+    expect(executionZone).toMatch(/startDate:\s*plRuntime\.startDate/);
+    expect(executionZone).toMatch(/pickPlanDayIndex\(/);
   });
 });
 
@@ -141,12 +146,12 @@ describe('runtimeDay — индекс списка тренировочных д
   it('документация не выдаёт индекс за день недели', () => {
     // Прежний док-комментарий обещал «0 = Пн … 6 = Вс»: следующий читатель строил
     // на этом миграции и путался, почему «вторник» открывает второй день плана.
-    expect(runtimeDaySource).not.toContain('0 = Пн');
-    expect(runtimeDaySource).toContain('индекс в списке тренировочных дней');
+    expect(runtimeDaySource).not.toMatch(/0\s*=\s*Пн/);
+    expect(runtimeDaySource).toMatch(/индекс в списке тренировочных/);
   });
 
   it('ExecutionZone клампит день по длине отфильтрованного списка', () => {
-    expect(executionZone).toContain('resolveRuntimeDayIndex(runtimeDay, trainingDaysList.length)');
+    expect(executionZone).toMatch(/resolveRuntimeDayIndex\(\s*runtimeDay\s*,\s*trainingDaysList\.length\s*\)/);
   });
 
   it('индекс вне списка клампится последним днём, пустой список — 0', () => {

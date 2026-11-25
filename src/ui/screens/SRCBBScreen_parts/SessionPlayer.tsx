@@ -22,6 +22,7 @@ import {
   localIsoDate,
   saveActiveSession,
   loadActiveSession,
+  isActiveSessionWorthSaving,
   clearActiveSession,
   archiveActiveSession,
   summarizeActiveSession,
@@ -106,6 +107,13 @@ import { ruCount, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../../../engines/
 // Фаза 3: карточки/кнопки/поля — из единого кита training-ui.
 const CARD = TRAIN_CARD;
 const ACCENT = '#00e68a';
+
+/** Автосейв подхода не лёг: живая копия осталась в памяти, дневник её не получил. */
+const AUTOSAVE_FAIL_MESSAGE =
+  'Не удалось сохранить подходы: хранилище недоступно (квота или приватный режим). Живая копия в памяти — не закрывайте тренировку.';
+/** Архив незавершённой тренировки не лёг: карточку/панель не убираем, живая копия — единственная. */
+const ARCHIVE_FAIL_MESSAGE =
+  'Не удалось сохранить незавершённую тренировку в дневник: живая копия осталась в приложении — не закрывайте её. Попробуйте позже.';
 
 // CSS анимация для таймера
 const timerAnimationStyle = `
@@ -262,8 +270,33 @@ export interface PlayerDay {
 const planIsBodyweight = (ex: PlayerExercise, planWeight: number): boolean =>
   ex.isBodyweight === true || (Number(planWeight) <= 0 && isBodyweightExercise({ name: ex.name }));
 
-/** Значения подхода в редакторе плеера: вес/повторы/RPE/RIR/темп. */
-export type SessionSetValue = { weight: number; reps: number; rpe: number; rir?: number; tempo?: string };
+/**
+ * Черновик для кнопки «Продолжить»: пустой черновик прошлого дня не продолжаем —
+ * иначе сегодняшняя работа уйдёт в дневник вчерашней датой. Свой пустой вчерашний
+ * черновик снимаем по id, чтобы он не висел в ключе.
+ */
+const loadResumeDraft = (): ActiveSession | null => {
+  try {
+    const s = loadActiveSession();
+    if (!s) return null;
+    if (isActiveSessionWorthSaving(s) || s.date === localIsoDate()) return s;
+    clearActiveSession(s.sessionId);
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/** Значения подхода в редакторе плеера: вес/повторы/RPE/RIR/темп.
+ *  `rirMissing` — RIR не вводили (пришёл с виджета нулём): печатаем «RIR —», не «RIR 0». */
+export type SessionSetValue = {
+  weight: number;
+  reps: number;
+  rpe: number;
+  rir?: number;
+  tempo?: string;
+  rirMissing?: boolean;
+};
 
 /**
  * Убрать из сессии подход с указанным `setNumber` (перед повторной записью того же сета).
@@ -348,6 +381,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   // Провал записи в дневник (квота/приватный режим): без баннера плеер выглядел бы
   // сохранённым, хотя живая сессия — единственная копия тренировки.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Отказ автосейва подхода: отдельное сообщение, потому что saveError занят
+  // завершением/архивом, а теряющийся подход тоже нужно показать честно.
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+  const saveErrorRef = useRef<string | null>(null);
+  saveErrorRef.current = saveError;
   const [done, setDone] = useState<WorkoutSession | null>(null);
   // Фидбек кнопки «Копировать сводку» — на 1.8 с меняется на «✓ Скопировано».
   const [copyDone, setCopyDone] = useState(false);
@@ -372,13 +410,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     }
   }, [done]);
   // Незавершённая сессия из автосейва — живёт между закрытиями приложения.
-  const [resumeFrom, setResumeFrom] = useState<ActiveSession | null>(() => {
-    try {
-      return loadActiveSession();
-    } catch {
-      return null;
-    }
-  });
+  const [resumeFrom, setResumeFrom] = useState<ActiveSession | null>(() => loadResumeDraft());
   // Защита от двойного сохранения (finish вызывается из «Завершить» и из exitSession)
   const savedRef = useRef(false);
   // Хоткеи Space/Enter объявлены выше logOne и подписаны один раз: держим
@@ -1093,6 +1125,14 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     });
     setSession(s);
     setPhase('main');
+    // Явный старт — живая копия сразу: автосейв без allowEmpty пустой черновик не пишет,
+    // и после убийства WebView «Продолжить» не появилось бы (метки startedWithoutSets нет).
+    try {
+      const planned = day.exercises.reduce((n, ex) => n + (Array.isArray(ex.targetSets) ? ex.targetSets.length : 0), 0);
+      saveActiveSession(s, planned, { allowEmpty: true });
+    } catch {
+      /* хранилище недоступно — сессия остаётся в памяти */
+    }
     // авто-подтягивание весов из последней сессии (double progression)
     const hydratePrevious = async () => {
       let prevSession: WorkoutSession | null = null;
@@ -1177,7 +1217,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     // Пустую сессию в дневник не пишем: «Завершить» без единого подхода создавало
     // тренировку на 0 сетов и пустой «Итог» без объяснения.
     if (!sess.exercises.some((ex) => (ex.sets || []).length > 0)) {
-      clearActiveSession();
+      // Только свою запись: в ключ мог лечь черновик другой сессии (вкладка/виджет).
+      clearActiveSession(sess.sessionId);
       try {
         localStorage.removeItem('he_workout_rest_timer_v1');
       } catch {
@@ -1192,11 +1233,21 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     // Для сессии, начатой сегодня, «стенные» часы точны (и включают паузы). Если её начали
     // вчера и вернулись утром — доверяем таймеру плеера, иначе в историю уедет ~10 часов.
     const sameDayStart = sess.date === localIsoDate();
-    const { session: finished, saved } = finishSessionWithSave(
-      sess,
-      `${focus} — ${day?.label}`,
-      sameDayStart ? undefined : sessionDur,
-    );
+    const {
+      session: finished,
+      saved,
+      empty,
+    } = finishSessionWithSave(sess, `${focus} — ${day?.label}`, sameDayStart ? undefined : sessionDur);
+    if (empty) {
+      // Гонка: подходы исчезли между проверкой и записью. Завершать нечего —
+      // это не отказ хранилища: снимаем только свою живую копию, без «ошибки записи».
+      clearActiveSession(sess.sessionId);
+      setDone(null);
+      setDonePlan(null);
+      savedRef.current = false;
+      setPhase('done');
+      return false;
+    }
     if (!saved) {
       // Запись не легла (квота/приватный режим): живая сессия остаётся единственной
       // копией тренировки. Не выдаём «сохранено», не чистим автосейв и не уходим в
@@ -1206,6 +1257,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       return false;
     }
     setSaveError(null);
+    // Сессия в дневнике — предупреждение автосейва больше не актуально.
+    setAutosaveError(null);
     if (timerSoundSettings.vibrate) hapticNotify('success');
     savedRef.current = true;
     try {
@@ -1232,7 +1285,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     setCooldownBlocks(generateCooldown(cooldownInput));
     setPhase('cooldown');
     setCooldownDone({});
-    clearActiveSession();
+    // Свою живую копию: чужой черновик, легший в ключ за время записи, не трогаем.
+    clearActiveSession(sess.sessionId);
     try {
       localStorage.removeItem('he_workout_rest_timer_v1');
     } catch {
@@ -1344,7 +1398,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     // Диалог рисуем сами: window.confirm блокирует WebView и не попадает в тему.
     // «✓ Все подходы записаны» — явное намерение: подтверждения не требует, но
     // сохраняет подходы так же, как подтверждённый выход.
-    const hasLiveSets = !!session && session.exercises.some((e) => (e.sets || []).length > 0);
+    // Подход из виджета пишется в ref синхронно; state обновится ре-рендером. Тап
+    // «Завершить» между ними не должен принять живую копию за пустой черновик и стереть её.
+    const liveSess = liveSessionRef.current ?? session;
+    const hasLiveSets = !!liveSess && liveSess.exercises.some((e) => (e.sets || []).length > 0);
     if (hasLiveSets && !savedRef.current) {
       if (confirmFirst) setExitConfirm(true);
       else finish();
@@ -1370,6 +1427,17 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         /* дневник заминки недоступен — не блокируем выход */
       }
     }
+    // Явный старт без подходов пишет живой черновик: если уйти отсюда, не сняв его,
+    // виджет навсегда покажет «идёт тренировка», а `startTime` переедет в следующую
+    // сессию и превратит её длительность в кламп 360 минут.
+    if (liveSess && !hasLiveSets) {
+      clearActiveSession(liveSess.sessionId);
+      void import('../../native/widget-sync')
+        .then((m) => m.pushWorkoutWidget())
+        .catch(() => {
+          /* web/TG — виджетов нет */
+        });
+    }
     try {
       localStorage.removeItem('he_workout_rest_timer_v1');
     } catch {
@@ -1382,6 +1450,56 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   const confirmExitAndSave = () => {
     setExitConfirm(false);
     finish();
+  };
+
+  /**
+   * Убрать карточку «Незавершённая тренировка»: с подходами — в дневник, пустую — снять.
+   *
+   * Решение принимается по хранилищу, а не по снимку `resumeFrom`: виджет в фазе ready и
+   * вторая вкладка пишут подходы в тот же ключ уже после рендера карточки, и снимок
+   * «пусто» не должен стирать эти подходы. `false` — запись в дневник не легла.
+   */
+  /**
+   * Копия для отображения карточки: живая из хранилища, если это та же сессия.
+   *
+   * Виджет в фазе ready и вторая вкладка пишут подходы в ключ, не обновляя наш state:
+   * снимок показывал «0 подх.», хотя в дневник уйдёт больше.
+   */
+  const shownResume = (): ActiveSession | null => {
+    if (!resumeFrom) return null;
+    const stored = loadActiveSession();
+    return stored && stored.sessionId === resumeFrom.sessionId ? stored : resumeFrom;
+  };
+
+  const dropResumeDraft = (): boolean => {
+    const stored = loadActiveSession();
+    // В ключе уже другая сессия (старт из виджета/второй вкладки, пока карточка висела
+    // со снимком): архивировать её нельзя — это идущая тренировка, а не та, что на
+    // карточке. Показываем карточку по живой копии, ничего не закрывая.
+    if (resumeFrom && stored && stored.sessionId !== resumeFrom.sessionId) {
+      setResumeFrom(stored);
+      return true;
+    }
+    const hasSets = !!stored && stored.exercises.some((e) => (e.sets || []).length > 0);
+    if (!hasSets) {
+      // Пустой явный старт архивировать нечего (archiveActiveSession вернул бы null и
+      // карточка застряла бы с ложной ошибкой хранилища).
+      if (stored) clearActiveSession(stored.sessionId);
+      setResumeFrom(null);
+      return true;
+    }
+    // Заметка честная: этот путь не стартует новую тренировку (в отличие от автосейва).
+    const archived = archiveActiveSession('Незавершённая тренировка: перенесена в дневник');
+    if (archived) {
+      setResumeFrom(null);
+      return true;
+    }
+    // Пока шла запись, копию мог снять виджет/вторая вкладка: это не отказ хранилища.
+    if (!loadActiveSession()) {
+      setResumeFrom(null);
+      return true;
+    }
+    return false;
   };
 
   // горячие клавиши для быстрого логирования
@@ -1425,7 +1543,14 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       (s, ex) => s + (Array.isArray(ex.targetSets) ? ex.targetSets.length : 0),
       0,
     );
-    saveActiveSession(session, plannedSets, { plannedTotalMax: true });
+    // Пустой черновик автосейв не пишет (движок вернёт false) — это не отказ
+    // хранилища, поэтому баннер показываем только когда подходы уже есть.
+    const hasSets = session.exercises.some((ex) => (ex.sets || []).length > 0);
+    const saved = saveActiveSession(session, plannedSets, { plannedTotalMax: true });
+    if (hasSets) {
+      if (saved) setAutosaveError(null);
+      else if (!saveErrorRef.current) setAutosaveError(AUTOSAVE_FAIL_MESSAGE);
+    }
     // Виджеты/пульт в этом же экране перечитывают живое состояние.
     try {
       window.dispatchEvent(new Event('he-workout-live-update'));
@@ -1557,8 +1682,15 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     const enteredRaw = ov ? { rpe: ov.rpe ?? 0, rir: ov.rir } : actual[keyFor(ei, si)];
     const enteredRpe = Number(enteredRaw?.rpe) || 0;
     const enteredRir = typeof enteredRaw?.rir === 'number' ? enteredRaw.rir : undefined;
+    // 0 без метки значит «до отказа», поэтому «не вводили» — отдельный флаг; при
+    // введённом только RPE RIR выводится из него (10 − RPE), а не пишется нулём.
+    const enteredRirKnown =
+      enteredRir != null && enteredRir <= 10 && (enteredRaw as SessionSetValue | undefined)?.rirMissing !== true;
+    const measuredRir =
+      enteredRirKnown && enteredRir != null ? enteredRir : enteredRpe > 0 ? Math.max(0, 10 - enteredRpe) : 0;
+    const rirMissing = !enteredRirKnown && enteredRpe <= 0;
     const measuredRpe =
-      enteredRpe > 0 ? enteredRpe : enteredRir != null && enteredRir <= 10 ? Math.max(0, 10 - enteredRir) : 0;
+      enteredRpe > 0 ? enteredRpe : enteredRirKnown && enteredRir != null ? Math.max(0, 10 - enteredRir) : 0;
     // В `actual` не наследуем плановый/прошлый RIR: иначе повторное «✓» прочитало бы
     // прескрипцию как измерение и записало RPE, которого пользователь не вводил.
     const a = { weight: a0.weight, reps: a0.reps, rpe: measuredRpe, rir: enteredRir, tempo: a0.tempo };
@@ -1577,7 +1709,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         bodyweight: planIsBodyweight(ex, t.weight) && !(Number(a.weight) > 0),
         reps: a.reps,
         rpe: measuredRpe,
-        rir: enteredRir ?? 0,
+        rir: measuredRir,
+        rirMissing,
         // VBT-факт: скорость штанги этого подхода (м/с) — пишется в дневник,
         // чтобы отчёты «план vs факт» считали потерю скорости ПО ФАКТУ.
         velocityMs: vel[keyFor(ei, si)],
@@ -1625,8 +1758,22 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   logOneRef.current = logOne;
 
   /** Продолжить автосохранённую тренировку: восстанавливаем подходы и таймер. */
-  const resumeSavedSession = (saved: WorkoutSession) => {
+  const resumeSavedSession = (providedSaved: WorkoutSession) => {
     if (!day || !Array.isArray(day.exercises)) return;
+    // Реле he-workout-widget-set принимается только в phase === 'main': в фазе ready
+    // виджет пишет подход в localStorage сам. Снимок resumeFrom поэтому может быть
+    // старее живой копии — перечитываем ключ, иначе пересборка ниже затрёт подход.
+    let saved = providedSaved;
+    try {
+      const live = loadActiveSession();
+      if (live && live.sessionId === saved.sessionId) {
+        saved = live;
+        // Карточка «Продолжить» могла показывать старый счёт подходов.
+        setResumeFrom((prev) => (prev && prev.sessionId === live.sessionId ? live : prev));
+      }
+    } catch {
+      /* ключ недоступен — работаем с переданным снимком */
+    }
     // Подходы привязываем ПО ИМЕНИ упражнения, а не по индексу: автосейв мог быть сделан
     // в другой день или в другую версию плана, и тогда подход «приклеивался» к чужому
     // упражнению по совпадению номера.
@@ -1646,7 +1793,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         muscleGroup: ex.muscleGroup,
       });
     });
-    const rebuilt: Record<string, { weight: number; reps: number; rpe: number; rir?: number; tempo?: string }> = {};
+    const rebuilt: Record<string, SessionSetValue> = {};
     const progress: Record<string, { completed: number; total: number }> = {};
     /** Подход из автосейва → пересобранная сессия: `ei` — упражнение дня, номер сета — свой. */
     const applySavedSet = (ei: number, st: WorkoutSession['exercises'][number]['sets'][number], i: number) => {
@@ -1660,6 +1807,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         reps: st.reps,
         rpe: st.rpe,
         rir: st.rir,
+        rirMissing: st.rirMissing === true,
         notes: st.notes || '',
         techniqueScore: st.techniqueScore,
         plannedWeight: st.plannedWeight,
@@ -1679,6 +1827,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         rpe: st.rpe,
         rir: st.rir,
         tempo: st.actualTempo || st.plannedTempo,
+        rirMissing: st.rirMissing === true,
       };
     };
     day.exercises.forEach((dex, ei) => {
@@ -1835,7 +1984,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       setSessionTimerSec(0);
       savedRef.current = false;
       try {
-        setResumeFrom(loadActiveSession());
+        setResumeFrom(loadResumeDraft());
       } catch {
         setResumeFrom(null);
       }
@@ -1898,9 +2047,20 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       const weight = Math.max(0, Number(d.weight) || 0);
       const reps = Math.max(0, Math.round(Number(d.reps) || 0));
       const rirRaw = Number(d.rir);
-      const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(20, rirRaw) : 0;
       const rpeRaw = Number(d.rpe);
-      const rpe = Number.isFinite(rpeRaw) && rpeRaw > 0 ? Math.min(10, rpeRaw) : rir > 0 ? Math.max(0, 10 - rir) : 0;
+      // Виджет шлёт rir: 0 и когда оценку не вводили; метка rirMissing отличает это
+      // от «до отказа». Введённый RPE — тоже измерение: RIR выводим из него, метка
+      // не действует (Android присылает rpe, когда RIR-поле не трогали).
+      const rpeEntered = Number.isFinite(rpeRaw) && rpeRaw > 0;
+      const rirMissing = (d as { rirMissing?: boolean }).rirMissing === true && !rpeEntered;
+      const rir = rpeEntered
+        ? Math.max(0, 10 - Math.min(10, rpeRaw))
+        : rirMissing
+          ? 0
+          : Number.isFinite(rirRaw) && rirRaw > 0
+            ? Math.min(10, rirRaw)
+            : 0;
+      const rpe = rpeEntered ? Math.min(10, rpeRaw) : rirMissing ? 0 : Math.max(0, 10 - rir);
       const techRaw = Number(d.technique);
       const techniqueScore = Number.isFinite(techRaw) && techRaw >= 3 && techRaw <= 5 ? Math.round(techRaw) : undefined;
       const planWeight = planned && ex ? Number(ex.targetSets?.[0]?.weight) || 0 : 0;
@@ -1911,6 +2071,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         reps,
         rpe,
         rir,
+        rirMissing,
         notes: String(d.notes ?? '').slice(0, 200),
         techniqueScore,
         pause: d.pause === true,
@@ -1945,7 +2106,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         // плана дня полей редактора нет — ему нужен только сам подход.
         setActual((prev) => ({
           ...prev,
-          [keyFor(ei, nextNum - 1)]: { weight, reps, rpe, rir, tempo: undefined },
+          [keyFor(ei, nextNum - 1)]: { weight, reps, rpe, rir, tempo: undefined, rirMissing },
         }));
         setExerciseProgress((prev) => {
           const total = ex?.targetSets?.length || prevSets.length + 1;
@@ -2056,12 +2217,22 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
         if (loggedSet[k]) return;
         const plannedTempo = tempoText(t.tempo);
         const entered = actual[k];
+        // Пропуск упражнения RPE не измеряет: план (RIR) за факт не выдаём. Но и
+        // `rir: 0` без метки не пишем — иначе пропущенные подходы уезжают в дневник
+        // как «до отказа» и портят средний RIR и коррекцию мезоцикла.
+        const enteredRpe = Number(entered?.rpe) || 0;
+        const enteredRir = typeof entered?.rir === 'number' ? entered.rir : undefined;
+        const enteredRirKnown = enteredRir != null && enteredRir <= 10 && entered?.rirMissing !== true;
+        const measuredRir =
+          enteredRirKnown && enteredRir != null ? enteredRir : enteredRpe > 0 ? Math.max(0, 10 - enteredRpe) : 0;
+        const measuredRpe =
+          enteredRpe > 0 ? enteredRpe : enteredRirKnown && enteredRir != null ? Math.max(0, 10 - enteredRir) : 0;
         const a = {
           weight: entered?.weight ?? t.weight,
           reps: entered?.reps ?? t.reps,
-          // Пропуск упражнения RPE не измеряет: план (RIR) за факт не выдаём.
-          rpe: entered?.rpe || 0,
-          rir: entered?.rir,
+          rpe: measuredRpe,
+          rir: enteredRir,
+          rirMissing: !enteredRirKnown && enteredRpe <= 0,
           tempo: entered?.tempo ?? plannedTempo,
         };
         // Массовый пропуск тоже уважает валидацию движка: сет, который он отверг
@@ -2071,8 +2242,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           weightKg: a.weight,
           bodyweight: planIsBodyweight(ex, t.weight) && !(Number(a.weight) > 0),
           reps: a.reps,
-          rpe: entered?.rpe && entered.rpe > 0 ? entered.rpe : 0,
-          rir: entered?.rir ?? 0,
+          rpe: measuredRpe,
+          rir: measuredRir,
+          rirMissing: a.rirMissing,
           notes: '',
           plannedWeight: t.weight,
           plannedReps: t.reps,
@@ -2311,6 +2483,49 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
             onClick={() => setSaveError(null)}
             style={{
               flexShrink: 0,
+              minHeight: 44,
+              minWidth: 44,
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.25)',
+              background: 'transparent',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Понятно
+          </button>
+        </div>
+      )}
+      {/* Отказ автосейва подхода: та же правда, что у save-error, но отдельным событием. */}
+      {autosaveError && (
+        <div
+          data-session="autosave-error"
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 8,
+            padding: 8,
+            borderRadius: 10,
+            background: 'rgba(255,80,80,0.12)',
+            border: '1px solid rgba(255,80,80,0.45)',
+            color: '#fff',
+            fontSize: 11,
+          }}
+        >
+          <span style={{ flex: 1, lineHeight: 1.4 }}>{autosaveError}</span>
+          <button
+            type="button"
+            data-act="autosave-error-dismiss"
+            onClick={() => setAutosaveError(null)}
+            style={{
+              flexShrink: 0,
+              minHeight: 44,
+              minWidth: 44,
               padding: '6px 10px',
               borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.25)',
@@ -2639,7 +2854,11 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           <button
             onClick={() => {
               hapticImpact('medium');
-              if (resumeFrom) resumeSavedSession(resumeFrom);
+              // Виджет в фазе ready пишет подход сам (реле не принимается вне main):
+              // продолжаем живую копию, а не снимок, снятый при открытии плеера.
+              const live = resumeFrom ? loadActiveSession() : null;
+              const source = resumeFrom && live && live.sessionId === resumeFrom.sessionId ? live : resumeFrom;
+              if (source) resumeSavedSession(source);
               else begin();
             }}
             style={{
@@ -2678,9 +2897,12 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                 {resumeFrom ? 'Продолжить тренировку' : 'Начать тренировку'}
               </span>
               <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.75 }}>
-                {resumeFrom
-                  ? `${resumeFrom.focus || 'Тренировка'} · ${(resumeFrom.exercises || []).reduce((sum, e) => sum + (e.sets || []).length, 0)} подх. уже записано`
-                  : `${day.label} · нед ${weekNumber} · ${day.exercises?.length ?? 0} упр.`}
+                {(() => {
+                  const src = shownResume();
+                  return src
+                    ? `${src.focus || 'Тренировка'} · ${(src.exercises || []).reduce((sum, e) => sum + (e.sets || []).length, 0)} подх. уже записано`
+                    : `${day.label} · нед ${weekNumber} · ${day.exercises?.length ?? 0} упр.`;
+                })()}
               </span>
             </span>
             <span style={{ fontSize: 18, opacity: 0.7 }}>→</span>
@@ -2688,14 +2910,15 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           {/* ── Продолжение автосохранённой тренировки (после закрытия приложения) ── */}
           {resumeFrom &&
             (() => {
+              const src = shownResume() ?? resumeFrom;
               const sum = summarizeActiveSession(
-                resumeFrom,
+                src,
                 (day?.exercises ?? []).reduce((s, ex) => s + ex.targetSets.length, 0),
               );
               if (!sum) return null;
               const sameDay =
-                (resumeFrom.exercises || []).length === (day?.exercises ?? []).length &&
-                (resumeFrom.exercises || []).every((ex, i) => (day?.exercises?.[i]?.name || '') === ex.exerciseName);
+                (src.exercises || []).length === (day?.exercises ?? []).length &&
+                (src.exercises || []).every((ex, i) => (day?.exercises?.[i]?.name || '') === ex.exerciseName);
               return (
                 <div
                   data-session="resume"
@@ -2744,8 +2967,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                       onClick={() => {
                         // Не выбрасываем записанные подходы: переносим их в дневник.
                         // Если запись не легла (квота), карточку не убираем — иначе
-                        // создаётся впечатление, что подходы сохранены.
-                        if (archiveActiveSession()) setResumeFrom(null);
+                        // создаётся впечатление, что подходы сохранены, и объясняем отказ.
+                        if (!dropResumeDraft()) setSaveError(ARCHIVE_FAIL_MESSAGE);
                       }}
                       style={{ ...BTN_GHOST, flex: 1, minHeight: 48 }}
                     >
@@ -2756,7 +2979,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                     type="button"
                     data-act="resume-restart"
                     onClick={() => setRestartConfirm(true)}
-                    style={{ ...BTN_GHOST, width: '100%', marginTop: 6, minHeight: 40, fontSize: 10 }}
+                    style={{ ...BTN_GHOST, width: '100%', marginTop: 6, minHeight: 44, fontSize: 10 }}
                   >
                     🔄 Начать заново
                   </button>
@@ -2784,12 +3007,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                             hapticImpact('medium');
                             // Явный старт новой тренировки: незавершённую не выбрасываем, а
                             // сохраняем в дневник (прежний clearActiveSession молча терял подходы).
-                            if (!archiveActiveSession()) {
-                              setRestartConfirm(false);
+                            // Отказ архива панель не закрывает и новую не начинает: иначе
+                            // записанные подходы остались бы без единой копии.
+                            if (!dropResumeDraft()) {
+                              setSaveError(ARCHIVE_FAIL_MESSAGE);
                               return;
                             }
                             setRestartConfirm(false);
-                            setResumeFrom(null);
                             begin();
                           }}
                           style={{ ...BTN, flex: 1, minHeight: 44 }}
@@ -4664,6 +4888,8 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                 };
                 const plannedTempo = tempoText(t.tempo);
                 const logged = !!loggedSet[k];
+                // RIR, пришедший с виджета нулём без метки, — не «до отказа»: печатаем «нет данных».
+                const rirText = a.rirMissing === true ? ' · RIR —' : a.rir != null ? ` · RIR ${a.rir}` : '';
                 // Текущий подход — первый незаписанный (или раскрытый пользователем);
                 // остальные ждут строкой в очереди, а не полным редактором на весь экран.
                 const firstUnlogged = ex.targetSets.findIndex((_, si2) => !loggedSet[keyFor(ei, si2)]);
@@ -4691,7 +4917,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                       <span style={{ color: '#22c55e', fontSize: 11, fontWeight: 800, width: 52 }}>✓ {si + 1}</span>
                       <span style={{ color: '#fff', fontSize: 11, flex: 1, minWidth: 0 }}>
                         {a.weight} кг × {a.reps}
-                        {a.rir != null ? ` · RIR ${a.rir}` : ''}
+                        {rirText}
                         {a.rpe ? ` · RPE ${a.rpe}` : ''}
                       </span>
                       <button
@@ -5002,7 +5228,13 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                               const v = +e.target.value;
                               setActual((p) => ({
                                 ...p,
-                                [k]: { ...a, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 },
+                                [k]: {
+                                  ...a,
+                                  rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0,
+                                  // 0-RIR виджета — заполнитель: с введённым RPE он не факт.
+                                  rir: a.rirMissing ? undefined : a.rir,
+                                  rirMissing: false,
+                                },
                               }));
                             }}
                             aria-label="RPE"
@@ -5011,14 +5243,19 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                             style={{ ...IN, width: 48, textAlign: 'center', padding: '6px 2px', fontSize: 11 }}
                             type="number"
                             min={0}
-                            max={20}
+                            max={10}
                             placeholder="RIR"
                             value={a.rir ?? ''}
                             onChange={(e) => {
+                              // Ручной ввод — измерение: метка «с виджета без оценки» больше не действует.
                               const v = +e.target.value;
                               setActual((p) => ({
                                 ...p,
-                                [k]: { ...a, rir: Number.isFinite(v) ? Math.max(0, Math.min(20, v)) : undefined },
+                                [k]: {
+                                  ...a,
+                                  rir: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : undefined,
+                                  rirMissing: false,
+                                },
                               }));
                             }}
                             aria-label="RIR факт"
@@ -6449,7 +6686,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
               🏁
             </span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✅ Тренировка завершена</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>
+                {done ? '✅ Тренировка завершена' : 'Тренировка закрыта'}
+              </div>
+              {/* Пустое завершение (done === null) не печатает «undefined» в дате. */}
               <div
                 style={{
                   fontSize: 10,
@@ -6460,7 +6700,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {done?.date} · {done?.startTime}–{done?.endTime} · фокус: {done?.focus}
+                {done ? `${done.date} · ${done.startTime}–${done.endTime} · фокус: ${done.focus}` : null}
               </div>
             </div>
             {done && done.durationMin > 0 && (
@@ -7046,6 +7286,9 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           <button
             style={{ ...BTN_GHOST, width: '100%', marginTop: 8 }}
             onClick={() => {
+              // Только свою запись: иначе кнопка стирала бы уже начатую тренировку
+              // (вторая вкладка/виджет), легшую в ключ после завершения.
+              const finishedId = done?.sessionId;
               setDone(null);
               setDoneMoreOpen(false);
               setOpenSet({});
@@ -7054,7 +7297,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
               setCooldownBlocks([]);
               setSession(null);
               savedRef.current = false;
-              clearActiveSession();
+              if (finishedId) clearActiveSession(finishedId);
               setPhase('ready');
             }}
           >

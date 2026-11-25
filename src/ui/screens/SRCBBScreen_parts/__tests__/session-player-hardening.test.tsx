@@ -377,9 +377,11 @@ describe('SessionPlayer — продолжение автосохранённо�
     // Служебные поля живой сессии в историю не попадают.
     expect((sessions[0] as any).savedAt).toBeUndefined();
     expect((sessions[0] as any).plannedSetsTotal).toBeUndefined();
-    // Новая тренировка стартовала с чистого листа.
+    // Новая тренировка стартовала с чистого листа: живая копия есть, подходов в ней нет.
     expect(container.textContent).toContain('⏹ Завершить');
-    expect(loadActiveSession()).toBeNull();
+    const fresh = loadActiveSession();
+    expect(fresh?.startedWithoutSets).toBe(true);
+    expect((fresh?.exercises || []).some((e) => (e.sets || []).length > 0)).toBe(false);
     unmount();
   });
 
@@ -752,9 +754,11 @@ describe('SessionPlayer — честный отказ хранилища', () =>
     (localStorage as unknown as { setItem: (k: string, v: string) => void }).setItem = originalSetItem;
 
     // Виджету нельзя рапортовать успех: подход остался только в памяти,
-    // и при закрытии приложения он исчезнет без следа.
+    // и при закрытии приложения он исчезнет без следа. В ключе — лишь пустой
+    // черновик явного старта, без этого подхода.
     expect(detail.handled).toBe(false);
-    expect(loadActiveSession()).toBeNull();
+    const active = loadActiveSession();
+    expect((active?.exercises?.[0]?.sets || []).length).toBe(0);
     unmount();
   });
 });

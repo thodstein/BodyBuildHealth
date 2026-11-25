@@ -644,14 +644,20 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exBestReps = Math.max(exBestReps, reps);
         maxLoad = Math.max(maxLoad, weight);
         const rirRaw = (st as any)?.rir;
-        if (rirRaw != null && Number.isFinite(Number(rirRaw))) {
+        // `rirMissing` — «оценку не вводили»: ноль-заполнитель не средний RIR,
+        // не «около отказа» и не отказ.
+        const rirMissing = (st as any)?.rirMissing === true;
+        if (!rirMissing && rirRaw != null && Number.isFinite(Number(rirRaw))) {
           const rirVal = Number(rirRaw);
           exRirSum += rirVal; exRirN += 1;
           if (rirVal <= 2) nearFailSets += 1;
           if (rirVal <= 0) failSets += 1;
         }
+        // rpe 0 — «оценку не вводили» (как rirMissing): ноль не средний RPE и не повод
+        // для разгрузки (avgRPE ≥ 9 ниже).
         const rpeRaw = (st as any)?.rpe;
-        if (rpeRaw != null && Number.isFinite(Number(rpeRaw))) { exRpeSum += Number(rpeRaw); exRpeN += 1; }
+        const rpeVal = Number(rpeRaw);
+        if (rpeRaw != null && Number.isFinite(rpeVal) && rpeVal > 0) { exRpeSum += rpeVal; exRpeN += 1; }
         if (weight > 0 && reps > 0) {
           const e1 = epley1RM(weight, reps);
           if (e1 > exBestE1RM) {
@@ -998,6 +1004,8 @@ export function sessionToWorkoutLog(session: any): WorkoutLog {
       reps: num(st?.reps),
       rir: num(st?.rir),
       rpe: num(st?.rpe),
+      // Метка «RIR не вводили» иначе терялась в отчёте «Итог» и ноль считался отказом.
+      rirMissing: st?.rirMissing === true ? true : undefined,
     }));
     return {
       id: `${session?.sessionId || 'sess'}_${i}`,
@@ -1721,6 +1729,8 @@ export interface SetDetailRow {
   reps: number;
   rir: number | null;
   rpe: number | null;
+  /** RIR не вводили: `rir: 0` выше — заполнитель, а не «до отказа». */
+  rirMissing?: boolean;
   /** Вес подхода в % от лучшего e1RM этого упражнения в тренировке. */
   pct1RM: number | null;
 }
@@ -1771,6 +1781,7 @@ export function buildSetDetails(workouts: WorkoutLog[]): SetDetailSession[] {
           reps,
           rir: rirRaw != null && Number.isFinite(Number(rirRaw)) ? Number(rirRaw) : null,
           rpe: rpeRaw != null && Number.isFinite(Number(rpeRaw)) ? Number(rpeRaw) : null,
+          rirMissing: (st as any)?.rirMissing === true ? true : undefined,
           pct1RM: null,
         });
         tonnage += weight * reps;
@@ -2535,7 +2546,9 @@ export function buildWorkoutReportText(s: WorkoutSummary, opts: WorkoutReportTex
         session.exercises.forEach(ex => {
           const sets = ex.sets
             .map(st => {
-              const base = `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${st.rir != null ? `@${st.rir}` : st.rpe != null ? `@${st.rpe}RPE` : ''}`;
+              // `@—` вместо `@0`: ноль-заполнитель не должен читаться как «до отказа».
+              const rirText = st.rirMissing ? '@—' : st.rir != null ? `@${st.rir}` : st.rpe != null && st.rpe > 0 ? `@${st.rpe}RPE` : '';
+              const base = `${st.weight > 0 ? `${st.weight}×${st.reps}` : `×${st.reps}`}${rirText}`;
               return st.pct1RM != null ? `${base} (${st.pct1RM}%)` : base;
             })
             .join(', ');

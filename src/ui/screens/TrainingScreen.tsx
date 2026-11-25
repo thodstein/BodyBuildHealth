@@ -393,7 +393,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         for (const s of (e?.sets || [])) {
           const weight = Number(s?.weightKg ?? s?.weight ?? 0);
           const reps = Number(s?.reps ?? 0);
-          const rir = s?.rir != null ? Number(s.rir) : (s?.rpe ? 10 - Number(s.rpe) : null);
+          // `rirMissing` — «оценку не вводили»: там `rir: 0` лежит заполнителем, и ноль
+          // тянул среднюю к «до отказа». Считаем только измеренный RIR.
+          const rir =
+            s?.rirMissing === true ? null : s?.rir != null ? Number(s.rir) : (s?.rpe ? 10 - Number(s.rpe) : null);
           if (weight > 0 && reps > 0 && name) e1rmRows.push({ name, date, e1rm: Math.round(epley1RM(weight, reps) * 10) / 10 });
           if (date >= cutoff7) {
             dayKeys7.add(date || `w${sets7}`);

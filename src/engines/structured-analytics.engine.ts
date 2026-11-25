@@ -42,6 +42,8 @@ export interface PatternProgression {
   intensityTrend: number;
   estimated1RM: number;
   estimated1RMTrend: number;
+  /** Тренд 1RM считается: в обоих периодах есть данные одного метода оценки. */
+  rmComparable?: boolean;
 }
 
 export interface FatigueProfile {
@@ -74,7 +76,9 @@ export interface StructuredAnalyticsOutput {
 
 function calc1RM(w: number, r: number, rpe: number): number {
   if (r <= 0) return w;
-  if (rpe >= 10) return w * (1 + r / 30);
+  // RPE 0 — «оценку не вводили», а не «работал в запасе»: поправка на запас
+  // (10 − rpe)·3 % давала +30 % к Epley на каждом сете из виджета без RIR.
+  if (rpe <= 0 || rpe >= 10) return w * (1 + r / 30);
   return w * (1 + r / 30) * (1 + (10 - rpe) * 0.03);
 }
 
@@ -86,8 +90,11 @@ function calcVolume(exercises: SessionData['exercises']): number {
 
 function calcIntensity(exercises: SessionData['exercises']): number {
   const sets = exercises.flatMap(e => e.sets);
-  if (!sets.length) return 0;
-  return sets.reduce((s, set) => s + set.rpe, 0) / sets.length;
+  // Только измеренный RPE: ноль — «оценку не вводили», и деление на все сеты
+  // занижало интенсивность (analytics-engine те же сеты фильтрует по rpe > 0).
+  const measured = sets.filter(set => set.rpe > 0);
+  if (!measured.length) return 0;
+  return measured.reduce((s, set) => s + set.rpe, 0) / measured.length;
 }
 
 export function computeStructuredAnalytics(
@@ -132,14 +139,22 @@ export function computeStructuredAnalytics(
   });
 
   // ── Level 3: Intensity ──
-  const avgIntensity = sessions.reduce((s, sess) => s + calcIntensity(sess.exercises), 0) / sessions.length;
-  const prevIntensity = prevSessions.length > 0
-    ? prevSessions.reduce((s, sess) => s + calcIntensity(sess.exercises), 0) / prevSessions.length : avgIntensity;
+  // Сессии без измеренного RPE (все подходы `rpe: 0`) в среднее не входят: жёсткий
+  // ноль занижал интенсивность недели и переключал статус на «optimal».
+  const measuredIntensity = sessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
+  const prevMeasuredIntensity = prevSessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
+  const avgIntensity = measuredIntensity.length > 0
+    ? measuredIntensity.reduce((s, v) => s + v, 0) / measuredIntensity.length : 0;
+  const prevIntensity = prevMeasuredIntensity.length > 0
+    ? prevMeasuredIntensity.reduce((s, v) => s + v, 0) / prevMeasuredIntensity.length : avgIntensity;
   levels.push({
     level: 3, name: 'Интенсивность (RPE)',
     metrics: { avgRPE: Math.round(avgIntensity * 10) / 10, trend: Math.round((avgIntensity - prevIntensity) * 10) / 10 },
-    status: avgIntensity > 8.5 ? 'critical' : avgIntensity > 7.5 ? 'good' : 'optimal',
-    insight: avgIntensity > 8.5 ? 'Интенсивность >8.5 — ЦНС перегружена. Добавьте deload.' : 'Интенсивность в рабочем диапазоне',
+    // Ноль здесь — «RPE не вводили», а не «работал легко»: без измерений статус не
+    // должен читаться как «оптимально», иначе честные данные выглядят хорошим результатом.
+    status: measuredIntensity.length === 0 ? 'warning' : avgIntensity > 8.5 ? 'critical' : avgIntensity > 7.5 ? 'good' : 'optimal',
+    insight: measuredIntensity.length === 0 ? 'RPE не измерялся — интенсивность не оценивается' :
+      avgIntensity > 8.5 ? 'Интенсивность >8.5 — ЦНС перегружена. Добавьте deload.' : 'Интенсивность в рабочем диапазоне',
   });
 
   // ── Level 4: Density ──
@@ -152,8 +167,10 @@ export function computeStructuredAnalytics(
   levels.push({
     level: 4, name: 'Плотность тренировки',
     metrics: { kgPerMin: Math.round(density), avgDuration: Math.round(avgDuration) },
-    status: density > 400 ? 'warning' : density > 200 ? 'good' : 'optimal',
-    insight: density > 400 ? 'Очень высокая плотность — может страдать качество повторений' : 'Плотность оптимальна',
+    // Без записанной длительности плотность не считается: 0 кг/мин — не «оптимально».
+    status: timedSessions.length === 0 ? 'warning' : density > 400 ? 'warning' : density > 200 ? 'good' : 'optimal',
+    insight: timedSessions.length === 0 ? 'Длительность не записана — плотность не считается' :
+      density > 400 ? 'Очень высокая плотность — может страдать качество повторений' : 'Плотность оптимальна',
   });
 
   // ── Level 5: Set/rep distribution ──
@@ -173,7 +190,7 @@ export function computeStructuredAnalytics(
 
   // ── Level 6-8: Pattern progression (top 3 patterns) ──
   const patterns: PatternProgression[] = [];
-  const patternMap = new Map<string, { currentVol: number[]; currentInt: number[]; currentRM: number[]; prevVol: number[]; prevRM: number[] }>();
+  const patternMap = new Map<string, { currentVol: number[]; currentInt: number[]; currentRM: number[]; currentRmMeasured: boolean[]; prevVol: number[]; prevRM: number[]; prevRmMeasured: boolean[] }>();
 
   for (const sess of sessions) {
     for (const ex of sess.exercises) {
@@ -183,13 +200,22 @@ export function computeStructuredAnalytics(
         : ex.name.toLowerCase().includes('press') || ex.name.toLowerCase().includes('overhead') ? 'overhead'
         : ex.name.toLowerCase().includes('pull') || ex.name.toLowerCase().includes('row') ? 'pull'
         : 'other';
-      if (!patternMap.has(pattern)) patternMap.set(pattern, { currentVol: [], currentInt: [], currentRM: [], prevVol: [], prevRM: [] });
+      if (!patternMap.has(pattern)) patternMap.set(pattern, { currentVol: [], currentInt: [], currentRM: [], currentRmMeasured: [], prevVol: [], prevRM: [], prevRmMeasured: [] });
       const p = patternMap.get(pattern)!;
       const vol = ex.sets.reduce((s, st) => s + st.reps * st.weight, 0);
       p.currentVol.push(vol);
-      p.currentInt.push(ex.sets.reduce((s, st) => s + st.rpe, 0) / ex.sets.length);
-      const bestRM = Math.max(...ex.sets.map(st => calc1RM(st.weight, st.reps, st.rpe)));
+      // Ноль — «оценку не вводили»: такой подход не должен тянуть среднюю вниз.
+      const measuredSets = ex.sets.filter(st => st.rpe > 0);
+      if (measuredSets.length) {
+        p.currentInt.push(measuredSets.reduce((s, st) => s + st.rpe, 0) / measuredSets.length);
+      }
+      // Если RPE измерен хотя бы в одном подходе, лучший 1RM берём только из них:
+      // незаполненный rpe не делает подход «отказным», но и рекордом периода быть не должен.
+      const rmSets = measuredSets.length ? measuredSets : ex.sets;
+      const bestRM = Math.max(...rmSets.map(st => calc1RM(st.weight, st.reps, st.rpe)));
       p.currentRM.push(bestRM);
+      // Метод оценки: поправка на RPE применяется только там, где RPE измерен.
+      p.currentRmMeasured.push(measuredSets.length > 0);
     }
   }
 
@@ -201,10 +227,13 @@ export function computeStructuredAnalytics(
         : ex.name.toLowerCase().includes('press') || ex.name.toLowerCase().includes('overhead') ? 'overhead'
         : ex.name.toLowerCase().includes('pull') || ex.name.toLowerCase().includes('row') ? 'pull'
         : 'other';
-      if (!patternMap.has(pattern)) patternMap.set(pattern, { currentVol: [], currentInt: [], currentRM: [], prevVol: [], prevRM: [] });
+      if (!patternMap.has(pattern)) patternMap.set(pattern, { currentVol: [], currentInt: [], currentRM: [], currentRmMeasured: [], prevVol: [], prevRM: [], prevRmMeasured: [] });
       const p = patternMap.get(pattern)!;
       p.prevVol.push(ex.sets.reduce((s, st) => s + st.reps * st.weight, 0));
-      p.prevRM.push(Math.max(...ex.sets.map(st => calc1RM(st.weight, st.reps, st.rpe))));
+      const prevMeasured = ex.sets.filter(st => st.rpe > 0);
+      const prevRmSets = prevMeasured.length ? prevMeasured : ex.sets;
+      p.prevRM.push(Math.max(...prevRmSets.map(st => calc1RM(st.weight, st.reps, st.rpe))));
+      p.prevRmMeasured.push(prevMeasured.length > 0);
     }
   }
 
@@ -212,8 +241,23 @@ export function computeStructuredAnalytics(
     if (pattern === 'other') continue;
     const avgCV = data.currentVol.length > 0 ? data.currentVol.reduce((s, v) => s + v, 0) / data.currentVol.length : 0;
     const avgPV = data.prevVol.length > 0 ? data.prevVol.reduce((s, v) => s + v, 0) / data.prevVol.length : avgCV;
-    const maxRM = data.currentRM.length > 0 ? Math.max(...data.currentRM) : 0;
-    const prevMaxRM = data.prevRM.length > 0 ? Math.max(...data.prevRM) : maxRM;
+    // Если в периоде есть измеренные подходы, незаполненные в «лучший 1RM» не идут:
+    // иначе 20-повторный сет без RPE перебивал измеренный рекорд. Тренд сравниваем
+    // только внутри одного метода — иначе честный отказ от RPE читался как регресс.
+    const anyCurrentMeasured = data.currentRmMeasured.some(Boolean);
+    const anyPrevMeasured = data.prevRmMeasured.some(Boolean);
+    const currentRm = anyCurrentMeasured
+      ? data.currentRM.filter((_, i) => data.currentRmMeasured[i])
+      : data.currentRM;
+    const prevRm = anyPrevMeasured ? data.prevRM.filter((_, i) => data.prevRmMeasured[i]) : data.prevRM;
+    const maxRM = currentRm.length > 0 ? Math.max(...currentRm) : 0;
+    const prevMaxRM = prevRm.length > 0 ? Math.max(...prevRm) : maxRM;
+    // Сравнивать нечего, если один из периодов пуст: иначе «упражнение убрали из
+    // программы» читалось как регресс −100 % и прогноз 0 кг.
+    const rmComparable =
+      data.currentRM.length > 0 &&
+      data.prevRM.length > 0 &&
+      (data.prevRmMeasured.length === 0 || anyCurrentMeasured === anyPrevMeasured);
 
     patterns.push({
       pattern,
@@ -223,7 +267,10 @@ export function computeStructuredAnalytics(
       currentIntensity: data.currentInt.length > 0 ? Math.round(data.currentInt.reduce((s, v) => s + v, 0) / data.currentInt.length * 10) / 10 : 0,
       intensityTrend: 0,
       estimated1RM: Math.round(maxRM),
-      estimated1RMTrend: prevMaxRM > 0 ? Math.round(((maxRM - prevMaxRM) / prevMaxRM) * 100) : 0,
+      estimated1RMTrend: rmComparable && prevMaxRM > 0 ? Math.round(((maxRM - prevMaxRM) / prevMaxRM) * 100) : 0,
+      // Ноль тренда при несравнимых периодах — не «стабильно»: экран обязан отличать
+      // «нет сравнимых данных» от настоящего нуля.
+      rmComparable,
     });
   }
 
@@ -232,8 +279,9 @@ export function computeStructuredAnalytics(
     levels.push({
       level: lvl, name: `Прогрессия: ${p.pattern}`,
       metrics: { estimated1RM: p.estimated1RM, trend: p.estimated1RMTrend, volume: p.currentVolume },
-      status: p.estimated1RMTrend >= 0 ? 'optimal' : 'warning',
-      insight: p.estimated1RMTrend >= 5 ? `Рост ${p.pattern}: +${p.estimated1RMTrend}%` :
+      status: p.rmComparable === false ? 'warning' : p.estimated1RMTrend >= 0 ? 'optimal' : 'warning',
+      insight: p.rmComparable === false ? 'Нет сравнимых данных за период — тренд 1RM не считается' :
+        p.estimated1RMTrend >= 5 ? `Рост ${p.pattern}: +${p.estimated1RMTrend}%` :
         p.estimated1RMTrend <= -5 ? `Регресс ${p.pattern}: ${p.estimated1RMTrend}%. Проверьте программу.` : 'Стабильно',
     });
   });
@@ -323,8 +371,9 @@ export function computeStructuredAnalytics(
       avgMin: Math.round(avgDuration),
       maxMin: timedSessions.length > 0 ? Math.max(...timedSessions.map(s => Number(s.durationMin) || 0)) : 0,
     },
-    status: avgDuration > 120 ? 'warning' : avgDuration > 90 ? 'good' : 'optimal',
-    insight: avgDuration > 120 ? 'Средняя длительность >2ч — кортизол ↑, тестостерон ↓' : 'Длительность оптимальна',
+    status: timedSessions.length === 0 ? 'warning' : avgDuration > 120 ? 'warning' : avgDuration > 90 ? 'good' : 'optimal',
+    insight: timedSessions.length === 0 ? 'Длительность не записана — средняя не считается' :
+      avgDuration > 120 ? 'Средняя длительность >2ч — кортизол ↑, тестостерон ↓' : 'Длительность оптимальна',
   });
 
   // ── Level 19-20: Overtraining markers ──
@@ -340,8 +389,11 @@ export function computeStructuredAnalytics(
   const overtrainingRisk = Math.round(Math.min(1, overtrainingSignals / 4 + (acwr > 1.5 ? 0.3 : 0)) * 100);
   const plateauRisk = volTrend < -10 && avgIntensity > 8 ? 0.7 : volTrend > 40 ? 0.5 : 0.15;
 
+  // Прогноз строится только по измеренному 1RM: у паттерна без текущего периода
+  // `estimated1RM` — 0, и «squat: 0 кг» читалось бы как реальный прогноз.
   const predictions: Record<string, number> = {};
   for (const p of patterns) {
+    if (p.estimated1RM <= 0) continue;
     const growthRate = p.estimated1RMTrend / 100;
     predictions[p.pattern] = Math.round(p.estimated1RM * (1 + growthRate));
   }
@@ -349,8 +401,10 @@ export function computeStructuredAnalytics(
   levels.push({
     level: 21, name: 'Прогноз 1RM (след. неделя)',
     metrics: predictions,
-    status: 'optimal',
-    insight: Object.entries(predictions).map(([k, v]) => `${k}: ${v}кг`).join(', '),
+    status: Object.keys(predictions).length > 0 ? 'optimal' : 'warning',
+    insight: Object.keys(predictions).length > 0
+      ? Object.entries(predictions).map(([k, v]) => `${k}: ${v}кг`).join(', ')
+      : 'Нет данных для прогноза 1RM',
   });
 
   levels.push({

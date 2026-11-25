@@ -21,6 +21,8 @@ import {
   saveActiveSession,
   finishSessionWithSave,
   clearActiveSession,
+  archiveActiveSession,
+  isActiveSessionWorthSaving,
   type WorkoutSession,
 } from '../../engines/workout-logger.engine';
 import { isBodyweightExercise } from '../../engines/movement-pattern';
@@ -1081,7 +1083,11 @@ export const WORKOUT_WIDGET_ROWS = 5;
 export function collectWorkout(): WorkoutWidgetSnapshot {
   const today = todayLocalISO();
   const plan = safe(() => resolveWorkoutPlan(today), null);
-  const active = safe(() => loadActiveSession(), null);
+  const activeRaw = safe(() => loadActiveSession(), null);
+  // «Идёт» — ровно то, что видит домашняя карточка: брошенный вчерашний старт без
+  // подходов там не живой, и виджет не должен держать «● Идёт» и «+ Сет» сутки
+  // (снимался бы только новым стартом). Одна норма через summarizeActiveSession.
+  const active = activeRaw && safe(() => summarizeActiveSession(activeRaw), null) ? activeRaw : null;
   const exercises: WorkoutWidgetExercise[] = [];
   const seen = new Set<string>();
 
@@ -1094,9 +1100,11 @@ export function collectWorkout(): WorkoutWidgetSnapshot {
     const firstTarget = planEx?.sets[0] ?? null;
     // RIR — только назначенный (шкала 0…10, RPE = 10 − RIR): живой подход важнее
     // плана, а «нигде не назначали» — null, не выдуманный 0 (0 значит «до отказа»).
+    // У подхода без введённого RIR `rir` — 0-заполнитель и метка `rirMissing`.
     let snapshotRir: number | null;
-    if (last) snapshotRir = Math.max(0, Math.min(10, Math.round(Number(last.rir) || 0)));
-    else {
+    if (last) {
+      snapshotRir = last.rirMissing === true ? null : Math.max(0, Math.min(10, Math.round(Number(last.rir) || 0)));
+    } else {
       const planRir = firstTarget?.rir;
       snapshotRir =
         typeof planRir === 'number' && Number.isFinite(planRir) ? Math.max(0, Math.min(10, Math.round(planRir))) : null;
@@ -1427,17 +1435,33 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           // сами: иначе тап «Начать тренировку» молча теряется.
         }
         if (!current) {
-          if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets)) workoutsStarted += 1;
+          // Явный старт: подходов ещё нет, но сессия уже идёт — пишем её, иначе тап
+          // «Начать тренировку» с виджета немой (без подходов автосейв отказывает).
+          if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets, { allowEmpty: true })) workoutsStarted += 1;
           void pushWorkoutWidget();
         } else if (String(current.date || '') !== todayLocalISO()) {
           // Живая сессия другого дня (осталась с прошлой тренировки): дописывать в неё
           // план сегодняшнего нельзя — подходы двух дней слиплись бы в записи с датой
           // прошлого, а отдельной записи за сегодня не появилось бы. Плеер при открытии
           // сам предложит её продолжить или заархивировать; здесь только не портим копию.
+          // Пустой черновик (старт без единого подхода) — не тренировка: снимаем его
+          // и начинаем сегодняшнюю, иначе тап «Начать» теряется до конца дня.
+          if (!isActiveSessionWorthSaving(current)) {
+            clearActiveSession(current.sessionId);
+            if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets, { allowEmpty: true })) workoutsStarted += 1;
+            void pushWorkoutWidget();
+          } else {
+            // Живая сессия прошлого дня оставлена как есть: нативная сторона уже
+            // нарисовала оптимистичный «старт», поэтому снапшот возвращаем к факту,
+            // иначе пульт остался бы в фальшивом «идёт тренировка».
+            void pushWorkoutWidget();
+          }
         } else {
           // Сессия уже идёт: ничего не начинаем, только дополняем планом дня.
+          // `allowEmpty` — чтобы метка явного старта не слетала у черновика без подходов.
           saveActiveSession(ensurePlanExercises(current, plan), plan?.plannedSets, {
             plannedTotalMax: true,
+            allowEmpty: true,
           });
         }
       } else if (it.type === 'workout_finish') {
@@ -1457,13 +1481,27 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         }
         const active = loadActiveSession();
         if (active) {
-          const { saved } = finishSessionWithSave(active);
+          const { saved, empty } = finishSessionWithSave(active);
           // Запись в журнал не легла (квота/приватный режим): живая сессия — единственная
           // копия тренировки из-за переполненного хранилища. Тогда её не стираем, не считаем
           // тренировку завершённой и не перерисовываем виджет как «готово» — иначе подходы
           // пропадут молча, а следующий тап «Завершить» уже нечего будет завершать.
-          if (saved) {
-            clearActiveSession();
+          if (empty) {
+            // Ни одного подхода — завершать нечего: в журнал ничего не писали, но живой
+            // черновик (явный старт с виджета) надо снять, иначе виджет навсегда покажет
+            // «идёт тренировка». Это не «сохранено»: баннера о записи не показываем.
+            clearActiveSession(active.sessionId);
+            workoutsFinished += 1;
+            // Плеер мог держать пустой черновик в состоянии — просим его закрыться.
+            try {
+              window.dispatchEvent(new Event('he-workout-close'));
+            } catch {
+              /* noop */
+            }
+            void pushWorkoutWidget();
+          } else if (saved) {
+            // Только свою запись: пока шла запись, в ключ мог лечь черновик другой сессии.
+            clearActiveSession(active.sessionId);
             workoutsFinished += 1;
             // Плеер держит эту сессию в состоянии — сообщаем ему, чтобы он не завершил её повторно.
             try {
@@ -1477,10 +1515,80 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
-        const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
+        const today = todayLocalISO();
+        const plan = safe(() => resolveWorkoutPlan(today), null);
         const base = loadActiveSession();
-        let session = base ? ensurePlanExercises(base, plan) : sessionFromPlan(plan);
-        if (!base) {
+        // Измерения из очереди нормализуются один раз — для реле плееру и для записи:
+        // Java шлёт `rir: 0` и «RIR не трогали», но введённый RPE — тоже измерение,
+        // поэтому RIR выводим из него (10 − RPE), как делает плеер в logOne. Иначе один
+        // и тот же подход ложился в дневник с RPE 8 при закрытом плеере и с RPE 0 при
+        // открытом. Элементы очереди старой сборки APK поля rirMissing не несут — там
+        // 0 тоже был заполнителем, поэтому без метки отсутствием оценки считаем ноль.
+        const rpeRawQ = Number(it.rpe);
+        const rpeEntered = Number.isFinite(rpeRawQ) && rpeRawQ > 0;
+        const rpeQ = rpeEntered ? Math.max(0, Math.min(10, rpeRawQ)) : 0;
+        const flagMissing = typeof it.rirMissing === 'boolean' ? it.rirMissing === true : !(Number(it.rir) > 0);
+        const rirMissing = flagMissing && !rpeEntered;
+        const rirQ = rpeEntered
+          ? Math.max(0, 10 - rpeQ)
+          : rirMissing
+            ? 0
+            : Math.max(0, Math.min(10, Math.round(Number(it.rir) || 0)));
+        const rpeOut = rpeEntered ? rpeQ : rirMissing ? 0 : Math.max(0, 10 - rirQ);
+        // Плеер открыт — он единственный писатель. Спрашиваем его ДО архивации чужой
+        // сессии: тренировка, начатая вчера и продолженная ночью, живёт в его состоянии,
+        // и архив stored-копии вырвал бы её из-под идущей сессии.
+        if (playerActive()) {
+          const relay = {
+            exerciseName: name,
+            weight: Number(it.weight) || 0,
+            reps: Number(it.reps) || 0,
+            rir: rirQ,
+            rirMissing,
+            rpe: rpeOut,
+            technique: it.technique,
+            notes: it.notes,
+            pause: it.pause === true,
+            handled: false,
+          };
+          try {
+            window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: relay }));
+          } catch {
+            /* noop */
+          }
+          if (relay.handled) {
+            setsAdded += 1;
+            if (!base) workoutsStarted += 1;
+            continue;
+          }
+        }
+        // «Своя» живая сессия — та же дата ИЛИ запись обновлялась сегодня: тренировку,
+        // начатую вчера и продолженную ночью/утром, не рвём на две записи. Дата самой
+        // сессии — дата старта, подход её не сдвигает (контракт A1).
+        const lastSavedToday = !!base?.savedAt && isoFromTs(base.savedAt) === today;
+        const dayMatches = !base || base.date === today || lastSavedToday;
+        // Живую сессию чужого дня не дополняем: подход лёг бы в запись вчерашней
+        // даты (и план сегодняшнего дня — туда же), а за сегодня не появилось бы
+        // ничего. Незавершённую тренировку сначала архивируем в дневник, пустой
+        // черновик просто снимаем.
+        const reusable = dayMatches ? base : null;
+        if (base && !dayMatches) {
+          if (isActiveSessionWorthSaving(base)) {
+            const archived = archiveActiveSession();
+            if (!archived) {
+              // Запись не легла (квота/приватный режим): чужую сессию не трогаем
+              // и подход в неё не пишем — иначе вчерашний день получил бы подходы
+              // сегодняшней тренировки, а сегодняшний — ноль. Счётчики не растут.
+              void pushWorkoutWidget();
+              continue;
+            }
+            workoutsFinished += 1;
+          } else {
+            clearActiveSession(base.sessionId);
+          }
+        }
+        let session = reusable ? ensurePlanExercises(reusable, plan) : sessionFromPlan(plan);
+        if (!reusable) {
           // Подход с виджета несёт метку времени: сессия, созданная для первого
           // подхода, получает дату по ней — подход после полуночи не приземляется
           // в «вчера». Уже идущая сессия свою дату сохраняет.
@@ -1500,45 +1608,12 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           index = session.exercises.length - 1;
         }
         if (index >= 0) {
-          // Плеер открыт — он единственный писатель. Передаём подход ему, иначе его автосейв
-          // перезапишет активную сессию без только что добавленных виджетных подходов.
-          if (playerActive()) {
-            const relay = {
-              exerciseName: name,
-              weight: Number(it.weight) || 0,
-              reps: Number(it.reps) || 0,
-              rir: Number(it.rir),
-              rpe: Number(it.rpe),
-              technique: it.technique,
-              notes: it.notes,
-              pause: it.pause === true,
-              handled: false,
-            };
-            try {
-              window.dispatchEvent(new CustomEvent('he-workout-widget-set', { detail: relay }));
-            } catch {
-              /* noop */
-            }
-            if (relay.handled) {
-              setsAdded += 1;
-              if (!base) workoutsStarted += 1;
-              continue;
-            }
-          }
           const weight = Math.max(0, Math.min(500, Number(it.weight) || 0));
           const reps = Math.max(0, Math.min(100, Math.round(Number(it.reps) || 0)));
-          // RPE/RIR — только измеренное: отсутствующий RIR раньше превращался в 0, а из него
-          // синтезировался RPE 10, и подход без оценки уезжал в нагрузку как максимальный.
-          const rirRaw = Number(it.rir);
-          // RIR — шкала 0…10 (RPE = 10 − RIR): 20 «повторов в запасе» не бывает.
-          const rir = Number.isFinite(rirRaw) && rirRaw > 0 ? Math.min(10, Math.round(rirRaw)) : 0;
-          const rpeRaw = Number(it.rpe);
-          const rpe =
-            Number.isFinite(rpeRaw) && rpeRaw > 0
-              ? Math.max(0, Math.min(10, Math.round(rpeRaw * 10) / 10))
-              : rir > 0
-                ? Math.max(0, 10 - rir)
-                : 0;
+          // Значения уже нормализованы выше (одна правда для реле и для записи):
+          // RPE/RIR — только измеренное, пропуск «не вводили» не превращается в отказ.
+          const rir = rirQ;
+          const rpe = rpeOut;
           const techniqueRaw = Number(it.technique);
           const techniqueScore =
             Number.isFinite(techniqueRaw) && techniqueRaw >= 3 && techniqueRaw <= 5
@@ -1556,6 +1631,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             reps,
             rpe,
             rir,
+            rirMissing,
             notes: String(it.notes ?? '').slice(0, 200),
             techniqueScore,
             pause: it.pause === true,
@@ -1567,7 +1643,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           if (res.success && saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true })) {
             setsAdded += 1;
             // Первый подход с рабочего стола сам запускает сессию.
-            if (!base) workoutsStarted += 1;
+            if (!reusable) workoutsStarted += 1;
           }
         }
       }

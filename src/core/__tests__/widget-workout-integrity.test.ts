@@ -12,10 +12,12 @@ import {
   addDaysIso,
   applyWidgetQueue,
   collectCalendar,
+  collectWorkout,
   resolveWorkoutPlan,
   setWorkoutPlayerActive,
 } from '../../ui/native/widget-sync';
 import { localIsoDate } from '../../core/local-date';
+import type { QueuedItem } from '../widget-bridge';
 import {
   addExerciseToSession,
   finishSession,
@@ -24,7 +26,19 @@ import {
   logSet,
   saveActiveSession,
   startSession,
+  summarizeActiveSession,
 } from '../../engines/workout-logger.engine';
+
+/**
+ * Живая сессия, оставшаяся со вчера: `saveActiveSession` всегда ставит `savedAt: now`,
+ * а виджет отличает «продолжение» от «забытого черновика» именно по нему.
+ */
+const seedStaleActive = (session: Record<string, unknown>, dateIso: string) => {
+  localStorage.setItem(
+    'he_workout_active_v1',
+    JSON.stringify({ ...session, savedAt: Date.parse(`${dateIso}T20:00:00`) }),
+  );
+};
 
 const PLAN = {
   days: [
@@ -277,8 +291,67 @@ describe('виджет: подходы и завершение', () => {
     expect(active?.exercises.map((e) => e.exerciseName)).toEqual(['Тяга штанги']);
   });
 
+  it('подход с виджета не дописывается в сессию вчерашнего дня', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 75, reps: 10, rpe: 8, rir: 2 }).session;
+    seedStaleActive({ ...withSet, sessionId: 'sess_yesterday', date: yesterday }, yesterday);
+    // Плеер не смонтирован — так дренится очередь виджета на главном экране.
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+
+    // Вчерашняя тренировка ушла в дневник целиком и без сегодняшнего подхода.
+    const journal = loadSessions();
+    expect(journal).toHaveLength(1);
+    expect(journal[0].date).toBe(yesterday);
+    const saved = journal[0].exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets || [];
+    expect(saved).toHaveLength(1);
+    expect(saved[0].weightKg).toBe(75);
+
+    // Подход лёг в сегодняшнюю сессию.
+    const active = loadActiveSession();
+    expect(active?.date).toBe(localIsoDate());
+    expect(active?.sessionId).not.toBe('sess_yesterday');
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+    expect(res.setsAdded).toBe(1);
+    expect(res.workoutsFinished).toBe(1);
+  });
+
+  it('пустой вчерашний черновик заменяется сегодняшним подходом', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const draft = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    seedStaleActive({ ...draft, sessionId: 'sess_yesterday_draft', date: yesterday }, yesterday);
+
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+
+    // Черновик без подходов — не тренировка: в журнал ничего не пишем.
+    expect(res.workoutsFinished).toBe(0);
+    expect(loadSessions()).toHaveLength(0);
+    const active = loadActiveSession();
+    expect(active?.date).toBe(localIsoDate());
+    expect(active?.sessionId).not.toBe('sess_yesterday_draft');
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+    expect(res.setsAdded).toBe(1);
+  });
+
   it('подход без RPE и RIR не получает выдуманный RPE 10', () => {
-    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.now() }]);
+    // Java шлёт `rirMissing: true`, когда поле RIR не трогали (`rir: 0` — заполнитель).
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rirMissing: true, ts: Date.now() },
+    ]);
     const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
     expect(set?.rir).toBe(0);
     expect(set?.rpe).toBe(0);
@@ -290,6 +363,163 @@ describe('виджет: подходы и завершение', () => {
     const sets = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets || [];
     expect(sets[0]?.rpe).toBe(8);
     expect(sets[1]?.rpe).toBe(9.5);
+  });
+
+  it('тап старта без живой сессии создаёт сессию дня (подходов ещё нет)', () => {
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    expect(res.workoutsStarted).toBe(1);
+    const active = loadActiveSession();
+    expect(active).not.toBeNull();
+    expect(active?.date).toBe(localIsoDate());
+    // Сессия собрана из плана дня: упражнения на месте, подходов пока ноль.
+    expect(active?.exercises.map((e) => e.exerciseName)).toEqual(['Жим лёжа', 'Подтягивания']);
+    expect(active?.exercises.reduce((n, e) => n + e.sets.length, 0)).toBe(0);
+    // Домашняя карточка/виджет должны видеть явный старт как живую тренировку:
+    // иначе они продолжают предлагать «▶ Начать» при уже идущей сессии.
+    // Без plannedSets — как домашняя карточка: план дня уже лежит в plannedSetsTotal.
+    const live = summarizeActiveSession(active);
+    expect(live).not.toBeNull();
+    expect(live?.setsDone).toBe(0);
+    expect(live?.setsPlanned).toBeGreaterThan(0);
+  });
+
+  it('виджет не считает идущей брошенную вчерашнюю сессию без подходов', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const draft = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    expect(
+      saveActiveSession({ ...draft, sessionId: 'sess_yesterday_live', date: yesterday }, 6, { allowEmpty: true }),
+    ).toBe(true);
+
+    const snap = collectWorkout();
+    // Снапшот виджета и домашняя карточка живут по одному правилу: пустой явный
+    // старт идёт только в свой день, иначе «● Идёт · 0/6» висит до новой тренировки.
+    expect(snap.live).toBe(false);
+    expect(snap.startedAt).toBe('');
+    expect(snap.setsDone).toBe(0);
+    expect(summarizeActiveSession(loadActiveSession())).toBeNull();
+  });
+
+  it('пустой черновик прошлого дня заменяется сегодняшним стартом', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    // Вчерашний «старт» без единого подхода: такой черновик не тренировка.
+    const draft = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'row',
+      name: 'Тяга штанги',
+      pattern: 'horizontal_pull',
+      muscleGroup: 'back',
+    });
+    // sessionId явный: fake timers держат Date.now(), и startSession в том же «мгновении»
+    // выдал бы тот же id, что и сегодняшний старт.
+    expect(
+      saveActiveSession({ ...draft, sessionId: 'sess_yesterday_draft', date: yesterday }, 0, { allowEmpty: true }),
+    ).toBe(true);
+    const before = loadActiveSession();
+    expect(before?.date).toBe(yesterday);
+    // Брошенный вчерашний старт без подходов не «идёт» на домашней карточке.
+    expect(summarizeActiveSession(before)).toBeNull();
+
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    expect(res.workoutsStarted).toBe(1);
+    const active = loadActiveSession();
+    expect(active).not.toBeNull();
+    expect(active?.date).toBe(localIsoDate());
+    expect(active?.sessionId).not.toBe(before?.sessionId);
+    expect(active?.exercises.map((e) => e.exerciseName)).toEqual(['Жим лёжа', 'Подтягивания']);
+  });
+
+  it('подход без RIR не выдаёт RIR 0 в снапшоте', () => {
+    const items: QueuedItem[] = [
+      {
+        type: 'set_add',
+        exerciseName: 'Жим лёжа',
+        weight: 80,
+        reps: 8,
+        rpe: 0,
+        rir: 0,
+        rirMissing: true,
+        ts: Date.now(),
+      },
+    ];
+    applyWidgetQueue(items);
+
+    // В снапшоте «нет данных» (null), а не 0 («до отказа»).
+    expect(collectWorkout().exercises[0].rir).toBeNull();
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rir).toBe(0); // заполнитель обязательного поля
+    expect(set?.rirMissing).toBe(true);
+    expect(set?.rpe).toBe(0); // RPE из несуществующего RIR не синтезируется
+  });
+
+  it('явный RIR 0 остаётся 0 и не помечен как отсутствующий', () => {
+    const items: QueuedItem[] = [
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 0, rirMissing: false, ts: Date.now() },
+    ];
+    applyWidgetQueue(items);
+
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rir).toBe(0);
+    expect(set?.rirMissing).toBeUndefined();
+    // Явный 0 — «до отказа»: RPE выводится как 10 − RIR, и снапшот показывает 0, а не null.
+    expect(set?.rpe).toBe(10);
+    expect(collectWorkout().exercises[0].rir).toBe(0);
+  });
+
+  it('элемент очереди от старой APK: rir 0 без метки — «не вводили»', () => {
+    // Поле `rirMissing` появилось вместе с этой сборкой: у накопленных элементов его нет,
+    // а 0 там тоже был заполнителем. Иначе подход без оценки уехал бы в sRPE как «до отказа».
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 0, ts: Date.now() }]);
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rirMissing).toBe(true);
+    expect(set?.rpe).toBe(0);
+  });
+
+  it('реле подхода несёт rirMissing', () => {
+    setWorkoutPlayerActive(true);
+    const seen: Array<{ rirMissing?: boolean }> = [];
+    const onSet = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { rirMissing?: boolean; handled: boolean };
+      seen.push(detail);
+      detail.handled = true;
+    };
+    window.addEventListener('he-workout-widget-set', onSet);
+
+    const items: QueuedItem[] = [
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 0, rirMissing: true, ts: Date.now() },
+    ];
+    const res = applyWidgetQueue(items);
+
+    window.removeEventListener('he-workout-widget-set', onSet);
+    expect(res.setsAdded).toBe(1);
+    expect(seen).toHaveLength(1);
+    // Плеер — единственный писатель: без признака он запишет RIR 0 как «до отказа».
+    expect(seen[0].rirMissing).toBe(true);
+  });
+
+  it('завершение пустой начатой сессии не пишет запись в журнал и снимает живой ключ', () => {
+    const started = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+    expect(started.workoutsStarted).toBe(1);
+    expect(loadActiveSession()).not.toBeNull();
+
+    let closeEvents = 0;
+    const onClose = () => {
+      closeEvents += 1;
+    };
+    window.addEventListener('he-workout-close', onClose);
+    const res = applyWidgetQueue([{ type: 'workout_finish', ts: Date.now() }]);
+    window.removeEventListener('he-workout-close', onClose);
+
+    expect(res.workoutsFinished).toBe(1);
+    expect(loadSessions()).toHaveLength(0);
+    expect(loadActiveSession()).toBeNull();
+    // Плеер закрывается, как при успешном завершении, — но записи в журнал нет.
+    expect(closeEvents).toBe(1);
   });
 });
 
@@ -389,5 +619,94 @@ describe('виджет: день плана на дату по якорю startD
     expect(resolveWorkoutPlan('2026-01-05')).toMatchObject({ dayIndex: 0, planDays: 4, label: 'Д1 грудь' });
     expect(resolveWorkoutPlan('2026-01-07')).toMatchObject({ dayIndex: 1, label: 'Д2 отдых' });
     expect(resolveWorkoutPlan('2026-01-09')).toMatchObject({ dayIndex: 2, label: 'Д3 спина' });
+  });
+});
+
+describe('виджет: RPE без RIR и реле при открытом плеере', () => {
+  it('введённый RPE без RIR — измерение: RIR выводится из него, метка не пишется', () => {
+    // Так шлёт Android: поле RIR не трогали (rirMissing), но RPE ввели.
+    applyWidgetQueue([
+      {
+        type: 'set_add',
+        exerciseName: 'Жим лёжа',
+        weight: 80,
+        reps: 8,
+        rpe: 8,
+        rir: 0,
+        rirMissing: true,
+        ts: Date.now(),
+      },
+    ]);
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rpe).toBe(8);
+    expect(set?.rir).toBe(2);
+    expect(set?.rirMissing).toBeUndefined();
+  });
+
+  it('плеер открыт: подход уходит в живую сессию, вчерашняя копия не архивируется', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 75, reps: 10, rpe: 8, rir: 2 }).session;
+    seedStaleActive({ ...withSet, sessionId: 'sess_yesterday', date: yesterday }, yesterday);
+    setWorkoutPlayerActive(true);
+
+    const relayed: Array<{ handled: boolean; rir: number; rirMissing: boolean }> = [];
+    const onSet = (ev: Event) => {
+      const d = (ev as CustomEvent).detail;
+      relayed.push(d);
+      d.handled = true;
+    };
+    window.addEventListener('he-workout-widget-set', onSet);
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+    window.removeEventListener('he-workout-widget-set', onSet);
+
+    // Плеер — единственный писатель: подход отдан ему ДО архивации чужой сессии.
+    expect(relayed).toHaveLength(1);
+    expect(res.setsAdded).toBe(1);
+    expect(res.workoutsFinished).toBe(0);
+    expect(loadSessions()).toHaveLength(0);
+    expect(loadActiveSession()?.sessionId).toBe('sess_yesterday');
+  });
+
+  it('архив вчерашней сессии не лёг (квота): подход отброшен, журнал и черновик целы', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 75, reps: 10, rpe: 8, rir: 2 }).session;
+    seedStaleActive({ ...withSet, sessionId: 'sess_yesterday', date: yesterday }, yesterday);
+
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'he_workout_log_v2') {
+        const err: any = new Error('Quota exceeded');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      realSetItem(key, value);
+    });
+
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+
+    // Вчерашний день не получил сегодняшний подход, а подход не приземлился в никуда:
+    // счётчики молчат, журнал пуст, вчерашняя живая сессия не тронута.
+    expect(res.setsAdded).toBe(0);
+    expect(res.workoutsFinished).toBe(0);
+    expect(loadSessions()).toHaveLength(0);
+    const active = loadActiveSession();
+    expect(active?.sessionId).toBe('sess_yesterday');
+    expect(active?.exercises[0]?.sets).toHaveLength(1);
   });
 });

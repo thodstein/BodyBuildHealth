@@ -106,7 +106,11 @@ describe('SessionPlayer — дневник не врёт (P0-2)', () => {
     expect(container.querySelectorAll('[data-act="edit-set"]').length).toBe(0);
     expect(container.querySelector('[data-act="all-sets-done"]')).toBeNull();
     expect(container.textContent).toContain('0/3 подходов');
-    expect(loadActiveSession()).toBeNull();
+    // Явный старт сразу пишет живой черновик (иначе после убийства WebView «Продолжить»
+    // не появилось бы), но подходов в нём нет — старт не выдаётся за тренировку.
+    const started = loadActiveSession();
+    expect(started?.startedWithoutSets).toBe(true);
+    expect(started?.exercises?.[0]?.sets?.length ?? 0).toBe(0);
 
     // «OK» подтверждает подсказку — и только теперь подход попадает в дневник.
     fireEvent.click(btn(container, 'OK')!);
