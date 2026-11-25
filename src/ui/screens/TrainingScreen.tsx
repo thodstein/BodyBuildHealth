@@ -69,14 +69,14 @@ import { isNativeApp } from '../../core/app-platform';
 import {
   getWorkoutStats,
   getLastSession,
-  getSessionsByWeek,
-  getISOWeekNumber,
+  getSessionsInWeek,
 } from '../../engines/workout-logger.engine';
 import { InfoErrorBoundary } from '../components/InfoErrorBoundary';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
 import { shouldNavigateOnStorageEvent } from './TrainingScreen_parts/bb-auto-nav';
 import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
+import { readRuntimeDay, writeRuntimeDay } from './TrainingScreen_parts/runtime-day';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
 import { epley1RM } from '../../engines/e1rm';
@@ -93,7 +93,9 @@ const TrainingHeroStats: React.FC = () => {
   try {
     const d = new Date();
     const iso = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
-    week = getSessionsByWeek(getISOWeekNumber(iso)).length;
+    // По датам Пн-Вс, как в виджете: weekNumber у сессий плеера — номер недели
+    // ПЛАНА (1..N), и фильтр по ISO-номеру давал «0 за неделю».
+    week = getSessionsInWeek(iso).length;
     const stats = getWorkoutStats();
     streak = stats.streak || 0;
     total = stats.totalSessions || 0;
@@ -433,9 +435,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   }, [historyWorkouts, tprofile?.daysPerWeek]);
 
   // Runtime (live workout) state
-  // Индекс дня микроцикла 0-based (Пн = 0): дефолт 1 молча открывал второй день недели.
-  const [runtimeDay, setRuntimeDay] = useState<number>(() => { try { const v = JSON.parse(localStorage.getItem('he_runtime_day') || '0'); return typeof v === 'number' ? v : 0; } catch { return 0; } });
-  useEffect(() => { try { localStorage.setItem('he_runtime_day', JSON.stringify(runtimeDay)); } catch { /* ignore */ } }, [runtimeDay]);
+  // Индекс дня в списке ТРЕНИРОВОЧНЫХ дней микроцикла (не день недели): дефолт 1
+  // молча открывал второй тренировочный день, хотя первый тоже тренировочный.
+  // Унаследованный дефолт `he_runtime_day = 1` (прежняя версия писала 1 при
+  // первом рендере) снимается один раз в `readRuntimeDay`: иначе новый дефолт
+  // 0 не менял существующие установки и человек видел второй день плана.
+  const [runtimeDay, setRuntimeDay] = useState<number>(() => readRuntimeDay());
+  useEffect(() => { writeRuntimeDay(runtimeDay); }, [runtimeDay]);
   const [runtimeExIdx, setRuntimeExIdx] = useState(0);
   const [runtimeLogs, setRuntimeLogs] = useState<Record<string, { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean }>>({});
   const [runtimeStarted, setRuntimeStarted] = useState(false);

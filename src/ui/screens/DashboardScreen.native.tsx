@@ -16,7 +16,7 @@ import { getLocale } from '../../data/interactions-labels';
 import { NativeIcon } from '../native/NativeIcons';
 import { getSymptomDiaryStats } from '../../engines/symptom-diary.engine';
 import { getAdherenceStats } from '../../engines/symptom-adherence.engine';
-import { getISOWeekNumber, getSessionsByWeek } from '../../engines/workout-logger.engine';
+import { getSessionsInWeek } from '../../engines/workout-logger.engine';
 import { loadFoodLog } from '../../engines/nutrition-tracker.engine';
 
 export type DashboardNativeNavId =
@@ -59,7 +59,8 @@ export function readHomeToday(): HomeToday {
     const iso = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-${`${d.getDate()}`.padStart(2, '0')}`;
     let sessionsToday = 0;
     try {
-      sessionsToday = getSessionsByWeek(getISOWeekNumber(iso)).filter((s) => s.date === iso).length;
+      // Неделя по датам, а не по `weekNumber` (у сессий плеера это неделя ПЛАНА 1..N).
+      sessionsToday = getSessionsInWeek(iso).filter((s) => s.date === iso).length;
     } catch {
       sessionsToday = 0;
     }

@@ -16,6 +16,8 @@ import { localIsoDate } from './diary-shared';
 import { onPlRuntimeSaved } from '../../../core/pl-runtime-events';
 import { planDatesForIndexes } from '../../../engines/training-day.engine';
 import { getProfile } from '../../../core/profile-manager';
+import { onAnyProfileChangeCrossTab } from '../../../core/profile-events';
+import { saveCsvApk, saveTextFileApk } from '../../../core/apk-share';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -125,7 +127,11 @@ export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: n
   runtime.days.forEach((day: any, index: number) => {
     // День без выводимой даты пропускаем: показать план на выдуманном числе и
     // пометить его «пропущено» хуже, чем не показать день вовсе.
-    const date = resolvePlannedDate(day, runtime.startDate) ?? anchoredDates?.[index] ?? null;
+    // Явная дата дня → дата по якорю (`startDate` + график профиля) → и
+    // только потом `startDate + dayOfWeek`. Раньше `dayOfWeek` перебивал
+    // якорь: после смены графика план оставался на старых днях недели,
+    // хотя плеер и виджет уже считали даты от якоря.
+    const date = isoDateOrNull(day?.date) ?? anchoredDates?.[index] ?? resolvePlannedDate(day, runtime.startDate) ?? null;
     if (!date) return;
     const exercises = Array.isArray(day.exercises) ? day.exercises : [];
     const bridgeExercises = exercises.map((exercise: any, exerciseIndex: number) => {
@@ -135,17 +141,21 @@ export function runtimeDaysToBridgeSessions(runtime: any, year: number, month: n
         // раньше `Number(undefined) || 0` писал «до отказа» там, где плана не было.
         const rirNum = Number(set?.rir);
         const hasRir = set?.rir != null && set.rir !== '' && Number.isFinite(rirNum);
+        // RPE выводится как 10 − RIR, поэтому RIR живёт в тех же границах 0…10:
+        // раньше клэмпился только RPE и `rir: 15` давал пару `{ rir: 15, rpe: 0 }` —
+        // «до отказа» рядом с RIR 15 в одном подходе.
+        const rirClamped = hasRir ? Math.max(0, Math.min(10, Math.round(rirNum))) : null;
         return {
           setNumber: setIndex + 1,
           weightKg: Number(set.weight) || 0,
           reps: Number(set.reps) || 0,
-          rpe: hasRir ? Math.max(0, Math.min(10, 10 - rirNum)) : undefined,
-          rir: hasRir ? rirNum : undefined,
+          rpe: rirClamped == null ? undefined : Math.max(0, Math.min(10, 10 - rirClamped)),
+          rir: rirClamped ?? undefined,
           isPR: false,
           notes: '',
           plannedWeight: set.weight == null || !Number.isFinite(Number(set.weight)) ? undefined : Number(set.weight),
           plannedReps: set.reps == null || !Number.isFinite(Number(set.reps)) ? undefined : Number(set.reps),
-          plannedRir: hasRir ? rirNum : undefined,
+          plannedRir: rirClamped ?? undefined,
         };
       });
       return {
@@ -228,13 +238,13 @@ export const TrainingCalendarTab: React.FC = () => {
     }
   }, [toast]);
   const refreshWater = useCallback((amt: number) => { quickAddWater(amt); setWater(getWaterStats()); }, []);
-  const download = useCallback((filename: string, text: string, mime = 'text/plain') => {
-    try {
-      const blob = new Blob([text], { type: mime + ';charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) { /* ignore */ }
+  // Экспорт журнала: `<a download>` в Capacitor WebView файл никуда не
+  // сохраняет (см. core/apk-share.ts) — календарь оставался единственным
+  // экраном тренировок с «веб-скачиванием», на native файл терялся молча.
+  // Один путь на обе платформы: native — Documents + Share, web — скачивание.
+  const saveFile = useCallback(async (filename: string, text: string, mime = 'text/plain') => {
+    const res = mime.includes('csv') ? await saveCsvApk(filename, text) : await saveTextFileApk(filename, text, mime);
+    if (res === 'failed') setToast('Не удалось сохранить файл');
   }, []);
   const [flaggedDates, setFlaggedDates] = useState<Set<string>>(() => readManualFlags());
 
@@ -268,6 +278,12 @@ export const TrainingCalendarTab: React.FC = () => {
   const [runtimeVersion, setRuntimeVersion] = useState(0);
   useEffect(() => onPlRuntimeSaved(() => setRuntimeVersion(v => v + 1)), []);
 
+  // Даты плана считаются по графику профиля (`settings.training`), но сам
+  // `he_pl_runtime` при смене графика не перезаписывается: без подписки
+  // календарь держал плановый слой на старых днях недели до перезагрузки.
+  const [profileVersion, setProfileVersion] = useState(0);
+  useEffect(() => onAnyProfileChangeCrossTab(() => setProfileVersion(v => v + 1)), []);
+
   const plannedData = useMemo(() => {
     try {
       const runtime = JSON.parse(localStorage.getItem('he_pl_runtime') || 'null');
@@ -283,7 +299,7 @@ export const TrainingCalendarTab: React.FC = () => {
       }
     } catch { /* ignore */ }
     return null;
-  }, [monthKey, runtimeVersion]);
+  }, [monthKey, runtimeVersion, profileVersion]);
 
   const actualMap = useMemo(() => {
     const startStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
@@ -408,8 +424,8 @@ export const TrainingCalendarTab: React.FC = () => {
         <span style={{ fontSize: 13, fontWeight: 700, color: ACCENT }}>📤 Экспорт тренировок</span>
         <div style={{ fontSize: 10, color: DIM }}>Сохранить журнал тренировок (he_workout_log_v2) в CSV/JSON для анализа или передачи тренеру.</div>
         <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
-          <button onClick={() => download('workouts.csv', exportWorkoutsToCSV(), 'text/csv')} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт CSV</button>
-          <button onClick={() => { try { const raw = localStorage.getItem('he_workout_log_v2') || '[]'; const data = JSON.parse(raw); download('workouts.json', exportToJSON(data), 'application/json'); } catch { setToast('Ошибка чтения журнала тренировок'); } }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
+          <button data-act="export-csv" onClick={() => { void saveFile('workouts.csv', exportWorkoutsToCSV(), 'text/csv'); }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color: ACCENT, cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт CSV</button>
+          <button data-act="export-json" onClick={() => { try { const raw = localStorage.getItem('he_workout_log_v2') || '[]'; const data = JSON.parse(raw); void saveFile('workouts.json', exportToJSON(data), 'application/json'); } catch { setToast('Ошибка чтения журнала тренировок'); } }} style={{ padding:'10px 16px', borderRadius:8, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.05)', color: '#fff', cursor:'pointer', fontSize:12, fontWeight:700 }}>⬇ Экспорт JSON</button>
         </div>
       </div>
       {/* Header */}

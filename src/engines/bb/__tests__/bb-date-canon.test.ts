@@ -12,6 +12,8 @@ import { buildBBDiagnosticsHtml } from '../bb-diagnostics-export.engine';
 import { bbWeekDateRanges } from '../bb-visual.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 import { localIsoDate } from '../../../core/local-date';
+import { readFileSync } from 'node:fs';
+import { isoToday } from '../bb-contest-prep.engine';
 
 const report = () => ({
   weakCandidates: [],
@@ -58,5 +60,23 @@ describe('проход 200: даты движков ББ — календарь,
     const ranges = bbWeekDateRanges(plan, { startDate: '2026-09-19', referenceDate: '2026-09-21' });
     expect(ranges[0].isCurrent).toBe(true);
     expect(ranges[1].isCurrent).toBe(false);
+  });
+});
+describe('isoToday в BB-движке — делегат канона local-date', () => {
+  it('отдаёт местную календарную дату, а не UTC', () => {
+    // 01:40 по местному времени: в положительных поясах UTC-дата ещё вчерашняя.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 25, 1, 40, 0));
+    expect(isoToday()).toBe('2026-11-25');
+    expect(isoToday()).toBe(localIsoDate());
+    if (new Date().getTimezoneOffset() < 0) {
+      expect(isoToday()).not.toBe(new Date().toISOString().slice(0, 10));
+    }
+  });
+
+  it('второй независимой реализации форматтера в движке нет', () => {
+    const src = readFileSync('src/engines/bb/bb-contest-prep.engine.ts', 'utf8');
+    expect(src).toContain('export const isoToday: () => string = localIsoDate;');
+    expect(src).not.toContain('export function isoToday');
   });
 });

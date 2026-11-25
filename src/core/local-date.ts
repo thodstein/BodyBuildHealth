@@ -42,6 +42,24 @@ export function parseLocalIsoDate(iso: string): Date | null {
   return Number.isFinite(d.getTime()) ? d : null;
 }
 
+/**
+ * ISO-дата понедельника той локальной недели, в которую попадает `iso`.
+ *
+ * Недельные корзины нельзя считать через `Math.floor(ms / 7 суток)`: такая
+ * «неделя» начинается в произвольный день (для эпохи — в четверг), поэтому
+ * Пн–Вс одной календарной недели распадались на две корзины, а Вс+Пн попадали
+ * в одну. Здесь неделя — календарная, с понедельника по местному времени.
+ */
+export function mondayOfIso(iso: string): string | null {
+  // Сверка обратной записью: `2026-02-31` и `2026-13-99` разбор принимает (Date
+  // переносит месяц/день), и такая дата попала бы в НАСТОЯЩУЮ неделю.
+  if (!isIsoDate(iso)) return null;
+  const d = parseLocalIsoDate(iso)!;
+  const dow = (d.getDay() + 6) % 7; // 0 = Пн … 6 = Вс
+  d.setDate(d.getDate() - dow);
+  return localIsoDate(d);
+}
+
 /** Сдвиг ISO-даты на N дней (строковая арифметика календаря, без Date-объекта). */
 export function shiftIsoDate(iso: string, days: number): string {
   const d = parseLocalIsoDate(iso);

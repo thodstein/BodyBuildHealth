@@ -55,6 +55,37 @@ export function broadcastProfileChange(changedSections?: string[]): void {
   allListeners.forEach(h => { try { h(); } catch {} });
 }
 
+/** Ключ, под которым живёт профиль (`he_profile_v2` и его варианты). */
+const PROFILE_STORAGE_PREFIX = 'he_profile';
+
+/**
+ * Подписка на изменение профиля, включая ДРУГИЕ вкладки/окна.
+ *
+ * `broadcastProfileChange` живёт в памяти окна, поэтому вкладка, которая сама
+ * ничего не записывала, о правке профиля не узнает — а `storage` в окно-писатель
+ * не приходит. Нужны оба источника. Свой хендлер в каждом экране — то, из-за
+ * чего календарь держал даты по старому графику: делаем это здесь, один раз.
+ */
+export function onAnyProfileChangeCrossTab(handler: () => void): () => void {
+  const offBus = onAnyProfileChange(handler);
+  const onStorage = (e: StorageEvent) => {
+    if (!e.key || e.key.includes(PROFILE_STORAGE_PREFIX)) handler();
+  };
+  try {
+    window.addEventListener('storage', onStorage);
+  } catch {
+    /* не браузерное окружение — остаётся подписка на шину */
+  }
+  return () => {
+    offBus();
+    try {
+      window.removeEventListener('storage', onStorage);
+    } catch {
+      /* ignore */
+    }
+  };
+}
+
 /**
  * Получить количество активных подписчиков (для тестов и отладки).
  */

@@ -17,9 +17,12 @@
  * @module analytics-engine
  */
 
+// Календарная неделя (понедельник) — единый канон дат из core, не «7 суток от эпохи».
+import { mondayOfIso } from '../core/local-date';
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
-// ═════════════════════════════════════════════════@@@@═════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 
 export interface SetLogEntry {
   exerciseId: string;
@@ -126,9 +129,10 @@ export interface AnalyticsSnapshot {
 }
 
 export interface WeeklyBreakdown {
-  /** Бакет «7 дней от эпохи» (epoch/604800000), НЕ календарная ISO-неделя: границы —
-   *  произвольные сутки (эпоха началась в четверг), номер не является «неделей года».
-   *  Показывать это число как «нед. N» нельзя; для подписи нужно брать дату начала бакета. */
+  /** Начало календарной недели (понедельник) в ISO YYYY-MM-DD — по нему группируем и сортируем.
+   *  Неделя считается локально, с понедельника по воскресенье; это не «7 суток от эпохи». */
+  weekStart: string;
+  /** Компактный ключ недели YYYYMMDD из `weekStart` (сортируемо как число); это НЕ номер недели года. */
   week: number;
   sessions: number;
   totalSets: number;
@@ -647,19 +651,23 @@ export function computeVelocity(sessions: SessionLogEntry[]): VelocityMetrics {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function computeWeeklyBreakdown(sessions: SessionLogEntry[]): WeeklyBreakdown[] {
-  const weeks: Record<number, SessionLogEntry[]> = {};
+  const weeks = new Map<string, SessionLogEntry[]>();
 
   for (const sess of sessions) {
-    const date = new Date(sess.date);
-    // Approximate week number from epoch
-    const weekNum = Math.floor(date.getTime() / (7 * 24 * 3600 * 1000));
-    if (!weeks[weekNum]) weeks[weekNum] = [];
-    weeks[weekNum].push(sess);
+    // Корзина — календарная неделя с понедельника по МЕСТНОМУ времени, как в дневнике.
+    // Счёт `Math.floor(ms / 7 суток)` резал время на произвольные семидневки: Пн–Вс
+    // одной недели распадались на две, а Вс+Пн попадали в одну. Запись без валидной
+    // даты не угадываем — пропускаем (mondayOfIso вернёт null).
+    const weekStart = mondayOfIso(String(sess.date || '').slice(0, 10));
+    if (!weekStart) continue;
+    const bucket = weeks.get(weekStart);
+    if (bucket) bucket.push(sess);
+    else weeks.set(weekStart, [sess]);
   }
 
-  return Object.entries(weeks)
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([week, sessList]) => {
+  return [...weeks.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([weekStart, sessList]) => {
       let totalSets = 0,
         totalReps = 0,
         totalVol = 0,
@@ -677,7 +685,8 @@ export function computeWeeklyBreakdown(sessions: SessionLogEntry[]): WeeklyBreak
         }
       }
       return {
-        week: Number(week),
+        weekStart,
+        week: Number(weekStart.replace(/-/g, '')),
         sessions: sessList.length,
         totalSets,
         totalReps,

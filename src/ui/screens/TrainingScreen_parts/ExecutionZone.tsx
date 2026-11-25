@@ -27,6 +27,7 @@ import { NativeIcon } from '../../native/NativeIcons';
 import { useNativeWakeLock } from '../../native/useWakeLock';
 import type { TrainingTab } from './shared';
 import { todayTrainingDayIndex } from './diary-shared';
+import { resolveRuntimeDayIndex } from './runtime-day';
 import { pickPlanDayIndex } from '../../../engines/training-day.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { ruCount, RU_APPROACHES, RU_SESSIONS, RU_SETS, RU_TRAININGS } from '../../../engines/ru-plural';
@@ -184,7 +185,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
     }
   }, [currentMicrocycle]);
   const safeRuntimeDay = React.useMemo(
-    () => (trainingDaysList.length === 0 ? 0 : Math.min(runtimeDay, trainingDaysList.length - 1)),
+    () => resolveRuntimeDayIndex(runtimeDay, trainingDaysList.length),
     [trainingDaysList.length, runtimeDay],
   );
   // Мемоизация разминки — тяжёлый generateWarmup не гоняем на каждый ререндер таймера

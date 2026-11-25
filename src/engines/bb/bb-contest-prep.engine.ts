@@ -19,6 +19,7 @@
  */
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
+import { localIsoDate } from '../../core/local-date';
 import { ruCount, ruAdjCount, RU_DAYS, RU_WEEKS, RU_ADJ_COMPLETED } from '../ru-plural';
 import type { BBPlan } from './bb-builder.engine';
 import { reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
@@ -461,11 +462,14 @@ export function isLutealPhase(cycleDay?: number): boolean {
   return d >= 15 && d <= 28;
 }
 
-/** Локальное «сегодня» в ISO (без UTC-сдвигов). */
-export function isoToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+/**
+ * Локальное «сегодня» в ISO (без UTC-сдвигов).
+ *
+ * Реализация одна — `core/local-date.localIsoDate`. Второй независимый
+ * форматтер жил здесь и расходился с каноном при правках; экспорт оставлен
+ * ради существующих вызовов, новые места импортируют `localIsoDate`.
+ */
+export const isoToday: () => string = localIsoDate;
 
 function stablePlanHash(value: string): string {
   let hash = 2166136261;
