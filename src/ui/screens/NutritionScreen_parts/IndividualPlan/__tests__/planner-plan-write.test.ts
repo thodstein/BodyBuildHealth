@@ -73,7 +73,9 @@ describe('B3: перенос плана в дневник идемпотенте
   });
 
   it('сохраняет уже введённые вручную записи того же приёма', () => {
-    const diary: Record<string, any> = { '2026-10-29': { meals: { 'Завтрак': [{ name: 'Кофе', qty: '200 мл', kcal: 5 }] } } };
+    const diary: Record<string, any> = {
+      '2026-10-29': { meals: { Завтрак: [{ name: 'Кофе', qty: '200 мл', kcal: 5 }] } },
+    };
     mergePlanDayIntoDiary(diary, day([oats]), '2026-10-29');
     expect(diary['2026-10-29'].meals['Завтрак']).toHaveLength(2);
     expect(diary['2026-10-29'].meals['Завтрак'][0].name).toBe('Кофе');
@@ -129,7 +131,10 @@ describe('B8: правки адресуются конкретному дню п
   });
 
   it('sumPlanDaysTotals складывает итоги всех дней', () => {
-    const t = sumPlanDaysTotals([{ totals: { kcal: 100, p: 10, f: 5, c: 8 } }, { totals: { kcal: 200, p: 20, f: 7, c: 9 } }]);
+    const t = sumPlanDaysTotals([
+      { totals: { kcal: 100, p: 10, f: 5, c: 8 } },
+      { totals: { kcal: 200, p: 20, f: 7, c: 9 } },
+    ]);
     expect(t).toEqual({ kcal: 300, p: 30, f: 12, c: 17 });
   });
 
@@ -144,5 +149,37 @@ describe('B8: правки адресуются конкретному дню п
     expect(shouldMirrorToDayPlan('week', 4, 4, 2)).toBe(true);
     expect(shouldMirrorToDayPlan('week', 2, 4, 2)).toBe(false);
     expect(shouldMirrorToDayPlan('week', 4, null, 4)).toBe(false);
+  });
+});
+
+// §8.143 п. 10.6 (ревью): `writeMealsToPlanDay` пересобирал день и план локальными суммами
+// без натрия — правка времени приёма (🕐) и дубль приёма (📋) в 3/7-дневном плане гасили
+// `weekPlan.days[i].totals.na` и `weekPlan.totals.na`, хотя видимый день его сохранял.
+describe('§8.143 п. 10.6: запись в план не теряет натрий', () => {
+  const dayWithNa = (na?: number) => {
+    const t: any = { kcal: 300, p: 20, f: 10, c: 30, fiber: 4, leucine_mg: 1500 };
+    if (na != null) t.na = na;
+    return { meals: [{ label: 'Обед', items: [], totals: { ...t } }], totals: { ...t } };
+  };
+
+  it('writeMealsToPlanDay: день и план держат известный na', () => {
+    const src = { days: [dayWithNa(400), dayWithNa(650)], totals: { kcal: 0, p: 0, f: 0, c: 0 } };
+    const next = writeMealsToPlanDay(src, 0, (meals) => meals);
+    expect(next).not.toBeNull();
+    expect(next!.days[0].totals.na).toBe(400);
+    expect(next!.totals.na, 'план = сумма известных дней').toBe(400 + 650);
+  });
+
+  it('без известного na поля нет (не ложный ноль)', () => {
+    const src = { days: [dayWithNa(), dayWithNa()], totals: { kcal: 0, p: 0, f: 0, c: 0 } };
+    const next = writeMealsToPlanDay(src, 0, (meals) => meals);
+    expect(next).not.toBeNull();
+    expect('na' in next!.days[0].totals).toBe(false);
+    expect('na' in next!.totals).toBe(false);
+  });
+
+  it('sumPlanDaysTotals: натрий складывается по дням, ноль-дни не выдают поле', () => {
+    expect(sumPlanDaysTotals([{ totals: { kcal: 1, p: 1, f: 1, c: 1, na: 100 } }]).na).toBe(100);
+    expect('na' in sumPlanDaysTotals([{ totals: { kcal: 1, p: 1, f: 1, c: 1 } }])).toBe(false);
   });
 });

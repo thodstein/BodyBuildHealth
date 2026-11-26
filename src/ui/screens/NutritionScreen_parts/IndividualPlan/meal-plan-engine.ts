@@ -45,6 +45,7 @@ import {
 import { scoreDayQuality, describeQualityWeakness, MIN_MEANINGFUL_G, isRealVegItem } from './planner-quality-score';
 import { getMicroFromFood } from './planner-micro-reader';
 import { detectMealInteractions, cookMethodGuidance } from './planner-food-interactions';
+import { itemSodiumMg } from './planner-meal-sodium';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { LabCompositeResult } from '../../../../engines/lab-analysis.engine';
 // Эпик A/B (реализм тарелки): реестр доступности продуктов + дневные квоты.
@@ -670,7 +671,10 @@ function mealTotalsOf(items: any[]): EngineTotals {
       c: acc.c + it.c,
       fiber: acc.fiber + (it.fiber || 0),
       leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
-      na: (acc.na || 0) + (it.na || 0),
+      // §8.143 п.10: тотал приёма читает натрий тем же читателем, что UI
+      // (planner-meal-sodium.itemSodiumMg) — по ТЕКУЩЕМУ `amount`. Кэш `it.na` врёт
+      // после правок граммов (ставится один раз в `makeItem`), поэтому не суммируем его.
+      na: (acc.na || 0) + itemSodiumMg(it),
     }),
     { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0, na: 0 },
   );
@@ -28610,6 +28614,10 @@ function buildDayPlanCore(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    // §8.143 п.10: последняя точка правды по соли — ПОСЛЕ всех стадий, меняющих граммы
+    // (§8.68/§8.72, последняя миля, §8.134). До этого `refreshItemSodium` вызывался
+    // только в середине конвейера, и финальные порции оставляли `na` от прежних граммов.
+    refreshItemSodium(meals as any[], totals);
     // ─── Качество рациона одним числом (0–100) ───────────────────────────────
     // Сходимость ≤3% говорит, что граммы совпали; она молчит о том, съедобен ли план.
     // Здесь собираем «съедобность» из фактических тарелок: овощи, распределение жира,

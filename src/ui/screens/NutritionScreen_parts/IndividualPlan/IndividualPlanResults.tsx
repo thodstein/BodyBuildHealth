@@ -7,7 +7,8 @@ import { filterRecipesByHardRestrictions } from './recipe-engine';
 import { ALLERGEN_LIST, HEALTH_ISSUES } from './types';
 import { resolveAllergenFoodIds, resolveAllExcludedFoodIds, selectedAllergenTags } from './planner-restrictions';
 import { effectiveSpecialMealTarget } from './planner-special-meal-state';
-import { sumMealTotals, sumDayTotals } from './planner-recipe-mode';
+import { sumDayTotals, totalsAfterGramChange } from './planner-recipe-mode';
+import { itemSodiumMg, sumKnownNa } from './planner-meal-sodium';
 import { localIsoDate } from './planner-date-utils';
 import { buildTrainSchedule, isTrainingDayFor } from './planner-training-schedule';
 import { NutritionPeriodizationCard } from './NutritionPeriodizationCard';
@@ -146,7 +147,7 @@ export const _validateImportedPlan = (p: any): { ok: boolean; reason?: string; b
 export const _normalizeImportedPlan = (p: any) => {
   const meals = p.meals.map((m: any) => {
     const items = m.items.map((it: any) => ({ ...it, fiber: _finiteNonNeg(it.fiber) ? it.fiber : 0 }));
-    return { ...m, items, totals: sumMealTotals(items) };
+    return { ...m, items, totals: totalsAfterGramChange({ ...m, items }) };
   });
   return { ...p, meals, totals: sumDayTotals(meals) };
 };
@@ -8863,7 +8864,7 @@ export const IndividualPlanResults: React.FC = () => {
                                     //   • totals приёма/дня собирались без fiber/leucine;
                                     //   • итоги weekPlan/threeDayPlan вообще не обновлялись (оставались
                                     //     старые суммы недели, хотя дни изменились).
-                                    // Теперь всё считается едиными хелперами sumMealTotals/sumDayTotals.
+                                    // Теперь всё считается едиными хелперами totalsAfterGramChange/sumDayTotals.
                                     const dayIdx =
                                       planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
                                     const activePlan =
@@ -8873,7 +8874,8 @@ export const IndividualPlanResults: React.FC = () => {
                                           ? threeDayPlan?.days?.[selectedDayIndex]
                                           : weekPlan?.days?.[selectedDayIndex];
                                     if (!activePlan?.meals?.[meal.mealIdx]) return;
-                                    const mealItems = [...activePlan.meals[meal.mealIdx].items];
+                                    const srcMeal = activePlan.meals[meal.mealIdx];
+                                    const mealItems = [...srcMeal.items];
                                     const suggestions = issue.suggestion || [];
                                     let changed = false;
                                     const leucinePer100 = (f: any): number =>
@@ -8888,7 +8890,10 @@ export const IndividualPlanResults: React.FC = () => {
                                       );
                                       if (!targetFood) return;
                                       const ratio = (it.amount || 100) / 100;
-                                      mealItems[i] = {
+                                      // §8.143 п. 10: натрий — от НОВОГО продукта (из FOOD_DB), иначе
+                                      // после подмены `...it` оставлял соль прежнего продукта.
+                                      const _naNext = itemSodiumMg({ id: targetFood.id, amount: it.amount || 100 });
+                                      const _nextItem: any = {
                                         ...it,
                                         name: targetFood.name,
                                         id: targetFood.id,
@@ -8899,12 +8904,17 @@ export const IndividualPlanResults: React.FC = () => {
                                         c: Math.round((targetFood.carbs || 0) * ratio * 10) / 10,
                                         fiber: Math.round((targetFood.fiber || 0) * ratio * 10) / 10,
                                         leucine_mg: Math.round(leucinePer100(targetFood) * ratio),
+                                        ...(_naNext > 0 ? { na: _naNext } : {}),
                                       };
+                                      // §10.7: у продукта без известного натрия поля не пишем вовсе —
+                                      // «известный ноль» запрещал бы фолбэк на тотал приёма.
+                                      if (_naNext <= 0) delete _nextItem.na;
+                                      mealItems[i] = _nextItem;
                                       changed = true;
                                     });
                                     if (!changed) return; // нечего менять — не пишем «пустую» правку в undo
                                     saveUndo();
-                                    const totals = sumMealTotals(mealItems);
+                                    const totals = totalsAfterGramChange({ ...srcMeal, items: mealItems });
                                     const newMeals = activePlan.meals.map((m: any, mi2: number) =>
                                       mi2 === meal.mealIdx ? { ...m, items: mealItems, totals } : m,
                                     );
@@ -8914,8 +8924,10 @@ export const IndividualPlanResults: React.FC = () => {
                                       totals: sumDayTotals(newMeals),
                                     });
                                     // Итоги мульти-плана по всем дням (с клетчаткой и лейцином).
-                                    const multiTotals = (days: any[]) =>
-                                      days.reduce(
+                                    // §8.143 п. 10: и с натрием — иначе правка одного приёма гасила
+                                    // `na` всего мульти-плана.
+                                    const multiTotals = (days: any[]) => {
+                                      const t: any = days.reduce(
                                         (s: any, d: any) => ({
                                           kcal: s.kcal + (d?.totals?.kcal || 0),
                                           p: s.p + (d?.totals?.p || 0),
@@ -8926,6 +8938,10 @@ export const IndividualPlanResults: React.FC = () => {
                                         }),
                                         { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 },
                                       );
+                                      const naSum = sumKnownNa(days, (d: any) => d?.totals);
+                                      if (naSum > 0) t.na = naSum;
+                                      return t;
+                                    };
                                     if (dayIdx === 0) setDayPlan((prev: any) => apply(prev));
                                     else if (planDays === 3)
                                       setThreeDayPlan((prev: any) => {

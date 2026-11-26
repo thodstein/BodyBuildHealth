@@ -27,25 +27,48 @@ const HV_MEALS = () => [
 const HV_TARGETS = { kcal: 5100, p: 220, f: 110, c: 800 };
 
 const base = (over: any = {}): MealPlanInput => ({
-  weightKg: 110, lbmKg: 92, bodyFatPct: 16, sex: 'male' as const,
-  goalKcal: 5100, goalProteinG: 220, goalFatG: 110, goalCarbsG: 800,
-  mealsCount: 7, isTrainingDay: true, trainStartMin: 17 * 60, trainDurationMin: 90,
-  allowIntraWorkout: true, budget: 'max' as const, dayOffset: 0,
-  cyclePhase: 'course' as const, variety: 'max' as const, eveningLowCarb: false,
-  quality: 'full' as const, randomSalt: 3, carbCapGPerKg: 0,
-  wakeTime: '07:00', bedTime: '23:00', dinnerTime: '19:00',
+  weightKg: 110,
+  lbmKg: 92,
+  bodyFatPct: 16,
+  sex: 'male' as const,
+  goalKcal: 5100,
+  goalProteinG: 220,
+  goalFatG: 110,
+  goalCarbsG: 800,
+  mealsCount: 7,
+  isTrainingDay: true,
+  trainStartMin: 17 * 60,
+  trainDurationMin: 90,
+  allowIntraWorkout: true,
+  budget: 'max' as const,
+  dayOffset: 0,
+  cyclePhase: 'course' as const,
+  variety: 'max' as const,
+  eveningLowCarb: false,
+  quality: 'full' as const,
+  randomSalt: 3,
+  carbCapGPerKg: 0,
+  wakeTime: '07:00',
+  bedTime: '23:00',
+  dinnerTime: '19:00',
   ...over,
 });
 
 describe('R-HV: assembleRecipeDay на 800У (best-effort + честность)', () => {
   const res = assembleRecipeDay({
-    meals: HV_MEALS(), pool: RECIPE_DB as any, targets: HV_TARGETS,
-    excludedIds: new Set<string>(), trainDay: true, athleteWeightKg: 110, seed: 3, goal: 'mass',
+    meals: HV_MEALS(),
+    pool: RECIPE_DB as any,
+    targets: HV_TARGETS,
+    excludedIds: new Set<string>(),
+    trainDay: true,
+    athleteWeightKg: 110,
+    seed: 3,
+    goal: 'mass',
   });
 
   it('нет пустых основных приёмов', () => {
     for (const l of ['Завтрак', 'Обед', 'Ужин']) {
-      const m = res.meals.find(x => x.label === l)!;
+      const m = res.meals.find((x) => x.label === l)!;
       expect(m, l).toBeTruthy();
       expect((m.items || []).length, `${l} пуст`).toBeGreaterThan(0);
       expect(m.totals.kcal, `${l} 0 ккал`).toBeGreaterThan(0);
@@ -53,8 +76,8 @@ describe('R-HV: assembleRecipeDay на 800У (best-effort + честность)'
   });
 
   it('peri-капы: предтрен ≤63 / пост-трен ≤79', () => {
-    const pre = res.meals.find(m => m.label === 'Предтрен')!;
-    const post = res.meals.find(m => m.label === 'Пост-трен')!;
+    const pre = res.meals.find((m) => m.label === 'Предтрен')!;
+    const post = res.meals.find((m) => m.label === 'Пост-трен')!;
     // carb-гейт приёмки может оставить peri без рецепта — тогда проверяем целевой коридор
     if ((pre.items || []).length > 0) expect(pre.totals.c).toBeLessThanOrEqual(63);
     if ((post.items || []).length > 0) expect(post.totals.c).toBeLessThanOrEqual(79);
@@ -82,7 +105,13 @@ describe('R-HV: assembleRecipeDay на 800У (best-effort + честность)'
         expect(STEPS, `${m.label}: scale ${d.portionScale} вне ряда`).toContain(d.portionScale);
       }
       const ids: string[] = d.ingredientIds || [];
-      const hasPowder = ids.some(id => { try { return isProteinPowderId(id); } catch { return false; } });
+      const hasPowder = ids.some((id) => {
+        try {
+          return isProteinPowderId(id);
+        } catch {
+          return false;
+        }
+      });
       const t = String((m as any).type || m.label || '');
       if (hasPowder && t !== 'postworkout' && !/Пост-трен/i.test(m.label || '')) powderMeals++;
     }
@@ -91,14 +120,21 @@ describe('R-HV: assembleRecipeDay на 800У (best-effort + честность)'
 });
 
 describe('R-HV: products 1500У + инсулин', () => {
-  const plan = buildDayPlan(base({
-    weightKg: 120, lbmKg: 100, goalKcal: 8600, goalProteinG: 280, goalFatG: 120, goalCarbsG: 1500,
-    injections: [
-      { type: 'инсулин', name: 'А', time: '08:00', dose: 40, esterType: 'short' },
-      { type: 'инсулин', name: 'Б', time: '13:00', dose: 40, esterType: 'short' },
-      { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
-    ] as any,
-  }));
+  const plan = buildDayPlan(
+    base({
+      weightKg: 120,
+      lbmKg: 100,
+      goalKcal: 8600,
+      goalProteinG: 280,
+      goalFatG: 120,
+      goalCarbsG: 1500,
+      injections: [
+        { type: 'инсулин', name: 'А', time: '08:00', dose: 40, esterType: 'short' },
+        { type: 'инсулин', name: 'Б', time: '13:00', dose: 40, esterType: 'short' },
+        { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
+      ] as any,
+    }),
+  );
 
   it('угли сходятся ≤5%, окна на месте с маркером', () => {
     // Экстрим 1500У: после реализм-пулов (кап концентратов 50 г) день идёт 5.14% (было
@@ -106,7 +142,7 @@ describe('R-HV: products 1500У + инсулин', () => {
     expect(Math.abs(plan.totals.c - 1500) / 1500).toBeLessThanOrEqual(0.055);
     // §3C EXTREME-SCALE: 40-ЕД болюс ≈400 г быстрых У не влезает в одно окно ≤120 г —
     // цепочка до 3 под-кормлений на болюс (было: ровно 3 окна по 120, покрытие 30%).
-    const wins = plan.meals.filter(m => (m as any)._insulinWindow);
+    const wins = plan.meals.filter((m) => (m as any)._insulinWindow);
     expect(wins.length).toBeGreaterThanOrEqual(3);
     for (const w of wins) {
       expect(w.totals.c).toBeGreaterThanOrEqual(30);
@@ -114,30 +150,36 @@ describe('R-HV: products 1500У + инсулин', () => {
     }
     // Покрытие каждого болюса цепочкой ≥90% его потребности (3×40 ЕД = 1200 г → ≥1080 г).
     for (const name of ['А', 'Б', 'В']) {
-      const c = wins.filter(w => String((w as any).label || '').includes(`(${name})`))
+      const c = wins
+        .filter((w) => String((w as any).label || '').includes(`(${name})`))
         .reduce((s, w) => s + (w.totals?.c || 0), 0);
       expect(c, `болюс ${name}: ${Math.round(c)} г`).toBeGreaterThanOrEqual(350);
     }
   });
 
   it('peri-капы и преслип целы', () => {
-    const pre = plan.meals.find(m => m.type === 'preworkout');
-    const post = plan.meals.find(m => m.type === 'postworkout');
-    const intra = plan.meals.find(m => m.type === 'intra');
+    const pre = plan.meals.find((m) => m.type === 'preworkout');
+    const post = plan.meals.find((m) => m.type === 'postworkout');
+    const intra = plan.meals.find((m) => m.type === 'intra');
     if (pre) expect(pre.totals.c).toBeLessThanOrEqual(63);
     if (post) expect(post.totals.c).toBeLessThanOrEqual(79);
     if (intra) expect(intra.totals.c).toBeLessThanOrEqual(95);
-    const ps = plan.meals.find(m => m.type === 'presleep');
+    const ps = plan.meals.find((m) => m.type === 'presleep');
     if (ps) expect(ps.totals.c).toBeLessThanOrEqual(12);
   });
 
   it('съедобность: приём ≤900 г, иначе честная нота', () => {
     const notesJoined = (plan.notes || []).join('\n');
     for (const m of plan.meals) {
-      const solid = (m.items || []).filter((it: any) => it.role !== 'liquid').reduce((s: number, it: any) => s + (it.amount || 0), 0);
+      const solid = (m.items || [])
+        .filter((it: any) => it.role !== 'liquid')
+        .reduce((s: number, it: any) => s + (it.amount || 0), 0);
       expect(solid, `${m.label} ${solid} г`).toBeLessThanOrEqual(900);
       if (solid > 750) {
-        expect(notesJoined.includes('тяжёлым') || notesJoined.includes('Перегрузка'), `${m.label}: нет честной ноты`).toBe(true);
+        expect(
+          notesJoined.includes('тяжёлым') || notesJoined.includes('Перегрузка'),
+          `${m.label}: нет честной ноты`,
+        ).toBe(true);
       }
     }
   });
@@ -152,7 +194,7 @@ describe('R-HV: products 500Б — best-effort + бейдж', () => {
 
   it('белок дотянут (dev ≤25%) + бейдж выше потолка', () => {
     expect(Math.abs(plan.totals.p - 500) / 500).toBeLessThanOrEqual(0.25);
-    expect(plan.notes.some(n => (n || '').includes('выше потолка'))).toBe(true);
+    expect(plan.notes.some((n) => (n || '').includes('выше потолка'))).toBe(true);
   });
 
   it('§500Б-сглаживание: основные приёмы ≤ цель×1.35 (было 95 г при цели 68)', () => {
@@ -178,9 +220,15 @@ describe('R-HV: products 500Б — best-effort + бейдж', () => {
     }
     // Квота порошка: норма 2/день, ultraP-коктейли — до 4 (каждый ≤60 г + жидкий
     // белок; раньше был «изолят 186 г» в одном). Распределение лучше ведра.
-    const powderMeals = plan.meals.filter(m => (m.items || []).some((it: any) => {
-      try { return isProteinPowderId(it.id); } catch { return false; }
-    })).length;
+    const powderMeals = plan.meals.filter((m) =>
+      (m.items || []).some((it: any) => {
+        try {
+          return isProteinPowderId(it.id);
+        } catch {
+          return false;
+        }
+      }),
+    ).length;
     expect(powderMeals).toBeLessThanOrEqual(4);
   });
 
@@ -188,29 +236,36 @@ describe('R-HV: products 500Б — best-effort + бейдж', () => {
     for (const m of plan.meals) {
       for (const it of m.items || []) {
         let isPow = false;
-        try { isPow = isProteinPowderId(it.id); } catch { isPow = false; }
+        try {
+          isPow = isProteinPowderId(it.id);
+        } catch {
+          isPow = false;
+        }
         if (isPow) expect(it.amount || 0, `${m.label}/${it.id}: ведро вместо коктейля`).toBeLessThanOrEqual(60);
       }
-      const ids = (m.items || []).map(i => i.id);
+      const ids = (m.items || []).map((i) => i.id);
       expect(new Set(ids).size, `${m.label}: дубли ${ids.join(',')}`).toBe(ids.length);
     }
     // Расписание «что и когда выпить» — время отнесения коктейлей.
-    expect(plan.notes.some(n => (n || '').includes('Коктейл')), 'нет расписания коктейлей').toBe(true);
+    expect(
+      plan.notes.some((n) => (n || '').includes('Коктейл')),
+      'нет расписания коктейлей',
+    ).toBe(true);
   });
 });
 
 describe('R-HV: train/rest и snack carb-mode', () => {
   it('rest-day без intra; train-day с intra', () => {
     const rest = buildDayPlan(base({ isTrainingDay: false, allowIntraWorkout: false, trainStartMin: undefined }));
-    expect(rest.meals.some(m => m.type === 'intra')).toBe(false);
+    expect(rest.meals.some((m) => m.type === 'intra')).toBe(false);
     const train = buildDayPlan(base({}));
-    expect(train.meals.some(m => m.type === 'intra')).toBe(true);
+    expect(train.meals.some((m) => m.type === 'intra')).toBe(true);
   });
 
   it('перекусы несут угли на high-carb дне (не белковые заглушки)', () => {
     const plan = buildDayPlan(base({}));
     const snackCarbs = plan.meals
-      .filter(m => String(m.type || '').startsWith('snack'))
+      .filter((m) => String(m.type || '').startsWith('snack'))
       .reduce((s, m) => s + (m.totals?.c || 0), 0);
     expect(snackCarbs, `угли перекусов: ${snackCarbs}`).toBeGreaterThanOrEqual(50);
   });
@@ -222,21 +277,34 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
   // Структурный best-effort: 4 рецепта физически не закрывают 1500У в ±8%
   // (пул lunch топ 132У против цели 307У), поэтому пин — честный флаг + гарды,
   // как 800У (14.8%) и 500Б (−17%).
-  const plan1500 = buildDayPlan(base({
-    weightKg: 120, lbmKg: 100, goalKcal: 8600, goalProteinG: 280, goalFatG: 120, goalCarbsG: 1500,
-    injections: [
-      { type: 'инсулин', name: 'А', time: '08:00', dose: 40, esterType: 'short' },
-      { type: 'инсулин', name: 'Б', time: '13:00', dose: 40, esterType: 'short' },
-      { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
-    ] as any,
-  }));
+  const plan1500 = buildDayPlan(
+    base({
+      weightKg: 120,
+      lbmKg: 100,
+      goalKcal: 8600,
+      goalProteinG: 280,
+      goalFatG: 120,
+      goalCarbsG: 1500,
+      injections: [
+        { type: 'инсулин', name: 'А', time: '08:00', dose: 40, esterType: 'short' },
+        { type: 'инсулин', name: 'Б', time: '13:00', dose: 40, esterType: 'short' },
+        { type: 'инсулин', name: 'В', time: '19:30', dose: 40, esterType: 'short' },
+      ] as any,
+    }),
+  );
   const res1500 = assembleRecipeDay({
     meals: plan1500.meals.map((m: any) => ({
-      ...m, items: (m.items || []).map((i: any) => ({ ...i })),
+      ...m,
+      items: (m.items || []).map((i: any) => ({ ...i })),
       totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) },
     })) as any,
-    pool: RECIPE_DB as any, targets: { kcal: 8600, p: 280, f: 120, c: 1500 },
-    excludedIds: new Set<string>(), trainDay: true, athleteWeightKg: 120, seed: 3, goal: 'mass',
+    pool: RECIPE_DB as any,
+    targets: { kcal: 8600, p: 280, f: 120, c: 1500 },
+    excludedIds: new Set<string>(),
+    trainDay: true,
+    athleteWeightKg: 120,
+    seed: 3,
+    goal: 'mass',
   });
 
   it('best-effort dev ≤30% + честный флаг при >3%', () => {
@@ -246,15 +314,21 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
     // добивка — только углеводными топ-апами. Флаг честный, тарелки реальные.
     expect(res1500.deviationPct).toBeLessThanOrEqual(30);
     if (!res1500.withinTolerance) {
-      expect(res1500.notes.some(n => (n || '').includes('отклонение')), 'нет честного флага').toBe(true);
+      expect(
+        res1500.notes.some((n) => (n || '').includes('отклонение')),
+        'нет честного флага',
+      ).toBe(true);
     }
   });
 
   it('нет глупого добора: булгур 0 г, дублей id в приёме нет', () => {
-    const bulg = res1500.meals.flatMap(m => m.items || []).filter(i => i.id === 'bulgur').reduce((s, i) => s + (i.amount || 0), 0);
+    const bulg = res1500.meals
+      .flatMap((m) => m.items || [])
+      .filter((i) => i.id === 'bulgur')
+      .reduce((s, i) => s + (i.amount || 0), 0);
     expect(bulg, `булгур ${bulg} г`).toBe(0);
     for (const m of res1500.meals) {
-      const ids = (m.items || []).map(i => i.id);
+      const ids = (m.items || []).map((i) => i.id);
       expect(new Set(ids).size, `${m.label}: дубли ${ids.join(',')}`).toBe(ids.length);
     }
   });
@@ -278,18 +352,72 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
     }
   });
 
-  it('перекусы живы (не выедены резкой): каждый ≥100 ккал с белковым пунктом', () => {
-    const snacks = res1500.meals.filter(m => String((m as any).type || '').startsWith('snack') && !(m as any)._insulinWindow);
+  it('перекусы живы (не выедены резкой): каждый ≥100 ккал, белок — только пока день не перебирает', () => {
+    // §8.143: «перекус обязан нести белок» перестало быть безусловным инвариантом.
+    // Гард «день уже перебирает белок» (`_pOver`) был мёртв (`sumMealTotals` получал
+    // приёмы, `p` всегда 0) и белок лился в перекусы поверх цели. После починки на этом
+    // дне белок = 302.8 г при цели 280 (+8.1 %) и движок честно оставляет перекусы без
+    // белкового пункта, печатая ноту «день уже выше цели белка» — это §4.6
+    // («сходимость приоритетнее MPS-интервала»), а не регрессия. Замок требует:
+    // перекус ≥100 ккал всегда; белка нет ⇒ день реально выше цели И нота называет
+    // именно этот перекус. Мутация, которая обязана красить: оставить гард, но убрать
+    // ноту (или не перечислять в ней приём) → `toContain(label)`. Сама старая ветка
+    // (`sumMealTotals`) этот тест НЕ красит: она лила белок в перекус, «≥5 г есть»
+    // становилось истиной, и проверка пропускалась по `continue` — поэтому прямой замок
+    // на гард стоит отдельным тестом ниже («гард … сработал»), и мутация
+    // `sumDayTotals → sumMealTotals` краснит уже его.
+    const snacks = res1500.meals.filter(
+      (m) => String((m as any).type || '').startsWith('snack') && !(m as any)._insulinWindow,
+    );
+    const dayP = res1500.meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0);
+    const overProtein = dayP > 280 * 1.02;
+    const skipNote = res1500.notes.find((n) => /день уже выше цели белка/.test(String(n))) || '';
     expect(snacks.length).toBeGreaterThan(0);
     for (const s of snacks) {
       expect(s.totals.kcal, `${s.label} ${s.totals.kcal} ккал`).toBeGreaterThanOrEqual(100);
-      const hasProt = (s.items || []).some(i => (i.p || 0) >= 5);
-      expect(hasProt, `${s.label}: нет белка`).toBe(true);
+      const hasProt = (s.items || []).some((i) => (i.p || 0) >= 5);
+      if (hasProt) continue;
+      expect(overProtein, `${s.label}: нет белка, а день ${Math.round(dayP)} г при цели 280`).toBe(true);
+      expect(skipNote, `${s.label}: нет честной ноты «день уже выше цели белка»`).toContain(String(s.label));
+    }
+  });
+
+  // §8.143 (ревью, второй проход): прямой замок на гард `_pOver`. Соседний тест его покрасить не
+  // может по конструкции: при возврате старой ветки (`sumMealTotals` вместо `sumDayTotals`) белок
+  // льётся в перекус, «≥5 г есть» становится истиной и проверка пропускается по `continue`.
+  // Здесь ожидание не выводится из факта: нота обязана существовать, называть реальные приёмы,
+  // и ни один из названных не должен иметь ноту о доборе. Мутация `sumDayTotals(outMeals)` →
+  // `sumMealTotals(outMeals)` (или удаление пересчёта в `_pOverNow`) делает ноту пустой → красный.
+  it('§8.143: гард «день перебирает белок» сработал — названный перекус остался без белка', () => {
+    const dayP = res1500.meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0);
+    expect(dayP, `день ${Math.round(dayP)} г при цели 280 — гард обязан быть активен`).toBeGreaterThan(280 * 1.02);
+    const skipNote = String(res1500.notes.find((n) => /белок перекуса не добит/.test(String(n))) || '');
+    const cutAt = skipNote.indexOf(': белок перекуса не добит');
+    const labels =
+      cutAt > 0
+        ? skipNote
+            .slice(0, cutAt)
+            .replace(/^ℹ️\s*/, '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+    expect(labels, `нота о пропуске добра отсутствует или пуста: «${skipNote}»`).not.toHaveLength(0);
+    for (const label of labels) {
+      const snack = res1500.meals.find((x: any) => x.label === label);
+      expect(snack, `нота назвала несуществующий приём «${label}»`).toBeTruthy();
+      // Проверяем именно решение ЭТОЙ стадии: добора не было. Белок в перекусе может появиться
+      // позже от другой стадии (перенос тарелки: «Нут 0→44 г») — у неё своя честная нота,
+      // и требовать «в перекусе нет белка» значило бы запрещать перенос.
+      const restored = res1500.notes.filter(
+        (n) => String(n).includes('белковый пункт восстановлен') && String(n).includes(label),
+      );
+      expect(restored, `«${label}» пропущен по гарду, но есть нота о восстановлении белка`).toEqual([]);
     }
   });
 
   it('клетчатка не раздута добором: ≤150 г (продукты дают ~174 г)', () => {
-    const fib = res1500.meals.flatMap(m => m.items || []).reduce((s, i) => s + (i.fiber || 0), 0);
+    const fib = res1500.meals.flatMap((m) => m.items || []).reduce((s, i) => s + (i.fiber || 0), 0);
     expect(fib, `клетчатка ${fib} г`).toBeLessThanOrEqual(150);
   });
 
@@ -297,22 +425,19 @@ describe('R-1500: assembleRecipeDay на 1500У (реальный поток: pr
     // До фикса: рецептурный день финишировал на −24% по углям (1136/1500), потому что
     // перебор белка ядер запирал ккал-гейты всех промежуточных проходов. Финальный добор
     // (рис/картофель, Б ≤3/100 г) идёт ПОСЛЕ корректора и не даёт дню остаться «на −24%».
-    const c = res1500.meals.flatMap(m => m.items || []).reduce((s, i) => s + (i.c || 0), 0);
+    const c = res1500.meals.flatMap((m) => m.items || []).reduce((s, i) => s + (i.c || 0), 0);
     expect(c, `угли ${Math.round(c)} г`).toBeGreaterThanOrEqual(1500 * 0.85);
     // §3C EXTREME-SCALE: с цепочкой инсулин-окон (3×40 ЕД ≈ 1080 г быстрых У) день
     // сходится по углям БЕЗ экстрим-добора — проверяем сходимость, а не инструмент
     // (было: обязательна заметка «Экстрим-добор»).
-    const _topupRan = res1500.notes.some(n => (n || '').includes('Экстрим-добор'));
+    const _topupRan = res1500.notes.some((n) => (n || '').includes('Экстрим-добор'));
     expect(_topupRan || c >= 1500 * 0.9, `topup=${_topupRan}, carbs=${Math.round(c)}`).toBe(true);
     // §7.2-Р (p39): в экстрим-полосе карб-лоад блюдо реально выбирается — иначе день снова
     // перебирает белок ядер на +24…29%. §3C EXTREME-SCALE: с цепочкой инсулин-окон быстрые
     // У (≈1080 г) несут окна, мейнам карб-лоад-рецепт больше не обязателен — инвариант
     // ослаблен честно: либо карб-лоад-блюдо, либо день уже сошёлся по углям без него.
-    const applied = res1500.meals.map(m => (m as any).recipeApplied).filter(Boolean) as string[];
-    const _cFinal = res1500.meals.flatMap(m => m.items || []).reduce((s, i) => s + (i.c || 0), 0);
-    expect(
-      applied.some(n => n.startsWith('Загрузка:')) || _cFinal >= 1500 * 0.85,
-      applied.join(' | '),
-    ).toBe(true);
+    const applied = res1500.meals.map((m) => (m as any).recipeApplied).filter(Boolean) as string[];
+    const _cFinal = res1500.meals.flatMap((m) => m.items || []).reduce((s, i) => s + (i.c || 0), 0);
+    expect(applied.some((n) => n.startsWith('Загрузка:')) || _cFinal >= 1500 * 0.85, applied.join(' | ')).toBe(true);
   });
 });

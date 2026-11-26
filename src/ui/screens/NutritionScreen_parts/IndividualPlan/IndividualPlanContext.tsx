@@ -66,7 +66,7 @@ import {
   type PeriSyncState,
 } from './planner-peri-budget';
 import { readPlannedSession, planSignature, todayDowIndex, plannedDayCount } from './planner-planned-tonnage';
-import { naAfterResize } from './planner-meal-sodium';
+import { naAfterResize, itemSodiumMg, mealSodiumMg, sumKnownNa } from './planner-meal-sodium';
 import { localIsoDate } from './planner-date-utils';
 import { loadVarietyLedger, saveVarietyLedger, LEDGER_WEEK_FAMILIES_CAP } from './planner-variety-ledger';
 // P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
@@ -121,6 +121,7 @@ import {
   buildRecipeMealItems,
   sumMealTotals,
   sumDayTotals,
+  totalsAfterGramChange,
   pickRecipeOptions,
   rebalanceDayAfterRecipes,
   buildShoppingFromPlans,
@@ -803,26 +804,29 @@ export function freeSnackRoomForSecond(
       tp = 0,
       tf = 0,
       tc = 0,
-      tfi = 0;
+      tfi = 0,
+      tna = 0;
     for (const it of items) {
       tk += it.kcal || 0;
       tp += it.p || 0;
       tf += it.f || 0;
       tc += it.c || 0;
       tfi += it.fiber || 0;
+      tna += itemSodiumMg(it);
     }
-    return {
-      ...m,
-      items,
-      totals: {
-        ...(m.totals || {}),
-        kcal: Math.round(tk),
-        p: Math.round(tp * 10) / 10,
-        f: Math.round(tf * 10) / 10,
-        c: Math.round(tc * 10) / 10,
-        fiber: Math.round(tfi * 10) / 10,
-      },
+    // §8.143 п. 10: ужатый перекус — это НОВЫЕ граммы; устаревший `na` из `m.totals`
+    // нельзя переносить на них (раньше он молча ехал в спреде и врал после ужатия).
+    const nextTotals: any = {
+      ...(m.totals || {}),
+      kcal: Math.round(tk),
+      p: Math.round(tp * 10) / 10,
+      f: Math.round(tf * 10) / 10,
+      c: Math.round(tc * 10) / 10,
+      fiber: Math.round(tfi * 10) / 10,
     };
+    if (Math.round(tna) > 0) nextTotals.na = Math.round(tna);
+    else delete nextTotals.na;
+    return { ...m, items, totals: nextTotals };
   });
   return { meals, freedKcal: Math.max(0, Math.round(freed)) };
 }
@@ -3117,22 +3121,47 @@ export const IndividualPlanProvider: React.FC<{
     const { recipeApplied2: _recipeApplied2, recipeAppliedData2: _recipeAppliedData2, ...rest } = meal || {};
     return rest;
   };
-  const calcItemTotals = (items: any[]) => ({
-    kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0),
-    p: items.reduce((s: number, i: any) => s + (i.p || 0), 0),
-    f: items.reduce((s: number, i: any) => s + (i.f || 0), 0),
-    c: items.reduce((s: number, i: any) => s + (i.c || 0), 0),
-    fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0),
-    leucine_mg: items.reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0),
-  });
-  const calcMealTotals = (meals: any[]) => ({
-    kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0),
-    p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0),
-    f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0),
-    c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0),
-    fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0),
-    leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0),
-  });
+  // §8.143 п. 10: эти пересборки — самые частые UI-пути (правка граммов, drag&drop,
+  // «Автокоррекция», ужатие перекусов). Без натрия они стирали `totals.na` приёма/дня.
+  // Правило (§10.6): `na` пересчитывается из текущих позиций и пишется при сумме > 0,
+  // независимо от того, было ли поле раньше; «не знаем» — поля нет.
+  const calcItemTotals = (items: any[]) => {
+    const sums = {
+      kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0),
+      p: items.reduce((s: number, i: any) => s + (i.p || 0), 0),
+      f: items.reduce((s: number, i: any) => s + (i.f || 0), 0),
+      c: items.reduce((s: number, i: any) => s + (i.c || 0), 0),
+      fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0),
+      leucine_mg: items.reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0),
+    };
+    const naSum = Math.round(items.reduce((s: number, i: any) => s + itemSodiumMg(i), 0));
+    return naSum > 0 ? { ...sums, na: naSum } : sums;
+  };
+  const sumNaOf = (list: any[], pick: (x: any) => any) => sumKnownNa(list, pick);
+  const calcMealTotals = (meals: any[]) => {
+    const sums = {
+      kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0),
+      p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0),
+      f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0),
+      c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0),
+      fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0),
+      leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0),
+    };
+    const naSum = sumNaOf(meals, (m: any) => m?.totals);
+    return naSum > 0 ? { ...sums, na: naSum } : sums;
+  };
+  const calcDaysTotals = (days: any[]) => {
+    const sums = {
+      kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
+      p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
+      f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
+      c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
+      fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0),
+      leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0),
+    };
+    const naSum = sumNaOf(days, (d: any) => d?.totals);
+    return naSum > 0 ? { ...sums, na: naSum } : sums;
+  };
   const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
     if (!prev) return prev;
     const meals = [...prev.meals];
@@ -3164,14 +3193,7 @@ export const IndividualPlanProvider: React.FC<{
       };
     }
     days[dayIdx] = updated;
-    const allTotals = {
-      kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
-      p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
-      f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
-      c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
-      fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0),
-      leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0),
-    };
+    const allTotals = calcDaysTotals(days);
     // P1-fix: используем функциональные updaters вместо сравнения ссылок (===).
     // Раньше `plan === threeDayPlan` сравнивал closure-captured ссылку с текущим state,
     // что могло дать false и тихо потерять правки. Теперь определяем тип плана по
@@ -3203,26 +3225,9 @@ export const IndividualPlanProvider: React.FC<{
         if (!meals[toMealIdx]) return prev;
         meals[toMealIdx].items.push(item);
         meals.forEach((m: any, i: number) => {
-          meals[i] = {
-            ...m,
-            totals: {
-              kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0),
-              p: m.items.reduce((s: number, it: any) => s + it.p, 0),
-              f: m.items.reduce((s: number, it: any) => s + it.f, 0),
-              c: m.items.reduce((s: number, it: any) => s + it.c, 0),
-              fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0),
-              leucine_mg: m.items.reduce((s: number, it: any) => s + (it.leucine_mg || 0), 0),
-            },
-          };
+          meals[i] = { ...m, totals: calcItemTotals(m.items) };
         });
-        const totals = {
-          kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0),
-          p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0),
-          f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0),
-          c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0),
-          fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0),
-          leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0),
-        };
+        const totals = calcMealTotals(meals);
         return { ...prev, meals, totals };
       });
       if (weekEditDay !== null && weekPlan?.days?.[weekEditDay] && dayIdx === 0) {
@@ -3283,14 +3288,7 @@ export const IndividualPlanProvider: React.FC<{
         if (!prev?.days?.[resolved.day]) return prev;
         const days = [...prev.days];
         days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
-        const allTotals = {
-          kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
-          p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
-          f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
-          c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
-          fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0),
-          leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0),
-        };
+        const allTotals = calcDaysTotals(days);
         return { ...prev, days, totals: allTotals };
       });
     } else if (resolved.plan === 'week') {
@@ -3327,14 +3325,7 @@ export const IndividualPlanProvider: React.FC<{
         if (!prev?.days?.[resolved.day]) return prev;
         const days = [...prev.days];
         days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
-        const allTotals = {
-          kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
-          p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
-          f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
-          c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
-          fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0),
-          leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0),
-        };
+        const allTotals = calcDaysTotals(days);
         return { ...prev, days, totals: allTotals };
       });
     }
@@ -3712,6 +3703,13 @@ export const IndividualPlanProvider: React.FC<{
       fiber: Math.round((newFood.fiber || 0) * ratio * 10) / 10,
       leucine_mg: Math.round(leuPer100 * ratio),
     };
+    // §8.143 п. 10.7 (ревью-2): `...old` тащил кэш `na` ПРЕЖНЕГО продукта. У 950 из 1354
+    // продуктов плотности в `micros.Na` нет (§10.4), поэтому читатель (FOOD_DB → кэш) отдавал
+    // соль старой тарелки: замена 40 г сыра на 40 г риса показывала 200 мг Na. Кэш нового
+    // продукта считаем из его id и сохранённых граммов; данных нет — поля нет (не наследуем).
+    const _replNa = itemSodiumMg({ id: newFood.id, amount: grams, na: (newFood as any).na } as any);
+    if (_replNa > 0) (replacement as any).na = _replNa;
+    else delete (replacement as any).na;
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(
         mealIdx,
@@ -3868,7 +3866,13 @@ export const IndividualPlanProvider: React.FC<{
     const flatScaled: FlatRecipeOption = scaled ? { ...flat, appliedScale: scaled.scale } : flat;
     const next = mealsSrc.map((x: any, i: number) =>
       i === mealIdx
-        ? { ...x, items, totals: sumMealTotals(items), recipeApplied: flat.name, recipeAppliedData: flatScaled }
+        ? {
+            ...x,
+            items,
+            totals: totalsAfterGramChange({ ...x, items }),
+            recipeApplied: flat.name,
+            recipeAppliedData: flatScaled,
+          }
         : x,
     );
     const pre = sumDayTotals(next as any);
@@ -3881,12 +3885,20 @@ export const IndividualPlanProvider: React.FC<{
     return { ok: true, meals: rb.meals as any[], notes: rb.notes };
   };
 
-  const sumMultiTotals = (days: any[]) => ({
-    kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
-    p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
-    f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
-    c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
-  });
+  const sumMultiTotals = (days: any[]) => {
+    const t: any = {
+      kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0),
+      p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0),
+      f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0),
+      c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
+    };
+    // §8.143 п. 10.6 (ревью): без натрия дубль/удаление приёма, смена времени и смена
+    // варианта рецепта гасили `na` недели/трёхдневки, хотя видимый день его сохранял —
+    // один и тот же день жил в двух состояниях. Правило одно на проект — `sumKnownNa`.
+    const naSum = sumKnownNa(days, (d: any) => d?.totals);
+    if (naSum > 0) t.na = naSum;
+    return t;
+  };
 
   /** ♻️ Пропуск приёма: удаляем и пересобираем день — недобор закрывается топ-апами
    *  в гибкие слоты (ребаланс ±3%), рецепт-дни защищены. Работает во всех режимах. */
@@ -4918,7 +4930,7 @@ export const IndividualPlanProvider: React.FC<{
         ? {
             ...x,
             items: mergedItems,
-            totals: sumMealTotals(mergedItems),
+            totals: totalsAfterGramChange({ ...x, items: mergedItems }),
             recipeApplied2: recipe.name,
             recipeAppliedData2: flat2,
             rationale: _notes2.length > 0 ? [...(x.rationale || []), ..._notes2] : x.rationale,
@@ -5096,7 +5108,14 @@ export const IndividualPlanProvider: React.FC<{
     const mergedItems = [...baseItems, ...items2];
     const flat2 = { ...flat2orig, appliedScale: s, portionScale: s };
     const patched = resolved.meals.map((x: any, i: number) =>
-      i === mealIdx ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeAppliedData2: flat2 } : x,
+      i === mealIdx
+        ? {
+            ...x,
+            items: mergedItems,
+            totals: totalsAfterGramChange({ ...x, items: mergedItems }),
+            recipeAppliedData2: flat2,
+          }
+        : x,
     );
     const pre = sumDayTotals(patched as any);
     const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -5187,7 +5206,7 @@ export const IndividualPlanProvider: React.FC<{
     }
     const patched = resolved.meals.map((x: any, i: number) => {
       if (i !== mealIdx) return x;
-      const nx: any = { ...x, items: baseItems, totals: sumMealTotals(baseItems) };
+      const nx: any = { ...x, items: baseItems, totals: totalsAfterGramChange({ ...x, items: baseItems }) };
       delete nx.recipeApplied2;
       delete nx.recipeAppliedData2;
       return nx;
@@ -6607,7 +6626,9 @@ export const IndividualPlanProvider: React.FC<{
                 leucine_mg: it.leucine_mg,
                 // Натрий позиции (мг) — чтобы карточка соли в приёме не пересчитывала
                 // из FOOD_DB после ручных правок порций (fallback в UI остаётся).
-                na: (it as any).na,
+                // §8.143 п. 10: считаем из ТЕКУЩЕГО amount (FOOD_DB — плотность), кэш `na` — фолбэк
+                // для составных блюд. Раньше писался голый кэш и при отсутствии поля — ничего.
+                na: itemSodiumMg(it),
                 role: it.role,
                 ...((it as any)._cocktail ? { _cocktail: (it as any)._cocktail } : {}),
               })),
@@ -6617,7 +6638,9 @@ export const IndividualPlanProvider: React.FC<{
                 f: m?.totals?.f || 0,
                 c: m?.totals?.c || 0,
                 fiber: m?.totals?.fiber || 0,
-                na: m?.totals?.na || 0,
+                // §8.143 п. 10: снимок больше не пишет ноль молча — натрий приёма
+                // считается по позициям (mealSodiumMg), totals от движка — только фолбэк.
+                na: mealSodiumMg({ items: m?.items, totalsNa: m?.totals?.na }),
               },
               type: m?.type,
               conflictWarnings: undefined,
@@ -6849,6 +6872,11 @@ export const IndividualPlanProvider: React.FC<{
             } catch {}
             return {
               meals,
+              // §8.143 п. 10.7 (ревью-2): тоталы дня обязаны нести `na` — иначе у только что
+              // сгенерированного плана натрия нет ни на уровне дня, ни в 3/7-дневных агрегатах,
+              // хотя каждый приём его знает; после первой же правки дня (`writeMealsToPlanDay`)
+              // недельный итог становился «частичной суммой известных дней». Гейт тот же:
+              // поле есть, только если сумма известна (> 0).
               totals: _hasFinalTotals
                 ? {
                     kcal: _finalDayTotals.kcal,
@@ -6856,8 +6884,20 @@ export const IndividualPlanProvider: React.FC<{
                     f: _finalDayTotals.f,
                     c: _finalDayTotals.c,
                     fiber: _finalDayTotals.fiber || 0,
+                    ...(typeof _finalDayTotals.na === 'number' && _finalDayTotals.na > 0
+                      ? { na: _finalDayTotals.na }
+                      : {}),
                   }
-                : { kcal: v2.totals.kcal, p: v2.totals.p, f: v2.totals.f, c: v2.totals.c, fiber: v2.totals.fiber },
+                : {
+                    kcal: v2.totals.kcal,
+                    p: v2.totals.p,
+                    f: v2.totals.f,
+                    c: v2.totals.c,
+                    fiber: v2.totals.fiber,
+                    ...(typeof (v2.totals as any).na === 'number' && (v2.totals as any).na > 0
+                      ? { na: (v2.totals as any).na }
+                      : {}),
+                  },
               // Вердикт рецептурного контура — по его финальной тарелке (продуктовый удалён выше).
               ...(_asmVerdict
                 ? { deviationPct: _asmVerdict.deviationPct, withinTolerance: _asmVerdict.withinTolerance }
@@ -6952,13 +6992,19 @@ export const IndividualPlanProvider: React.FC<{
             d3 = buildOneDay(2);
             setThreeDayPlan({
               days: [d1, d2, d3],
-              totals: {
-                kcal: (d1?.totals?.kcal || 0) + (d2?.totals?.kcal || 0) + (d3?.totals?.kcal || 0),
-                p: (d1?.totals?.p || 0) + (d2?.totals?.p || 0) + (d3?.totals?.p || 0),
-                f: (d1?.totals?.f || 0) + (d2?.totals?.f || 0) + (d3?.totals?.f || 0),
-                c: (d1?.totals?.c || 0) + (d2?.totals?.c || 0) + (d3?.totals?.c || 0),
-                fiber: (d1?.totals?.fiber || 0) + (d2?.totals?.fiber || 0) + (d3?.totals?.fiber || 0),
-              },
+              totals: (() => {
+                const t: any = {
+                  kcal: (d1?.totals?.kcal || 0) + (d2?.totals?.kcal || 0) + (d3?.totals?.kcal || 0),
+                  p: (d1?.totals?.p || 0) + (d2?.totals?.p || 0) + (d3?.totals?.p || 0),
+                  f: (d1?.totals?.f || 0) + (d2?.totals?.f || 0) + (d3?.totals?.f || 0),
+                  c: (d1?.totals?.c || 0) + (d2?.totals?.c || 0) + (d3?.totals?.c || 0),
+                  fiber: (d1?.totals?.fiber || 0) + (d2?.totals?.fiber || 0) + (d3?.totals?.fiber || 0),
+                };
+                // §8.143 п. 10.7: тот же гейт, что у `sumDayTotals` — «не знаем» = поля нет.
+                const _na = sumNaOf([d1, d2, d3], (d: any) => d?.totals);
+                if (_na > 0) t.na = _na;
+                return t;
+              })(),
             });
           }
           if (days >= 7) {
@@ -6982,12 +7028,18 @@ export const IndividualPlanProvider: React.FC<{
             weekDays = _weekAcc;
             weekData = {
               days: weekDays,
-              totals: {
-                kcal: weekDays.reduce((s: any, d: any) => s + (d?.totals?.kcal || 0), 0),
-                p: weekDays.reduce((s: any, d: any) => s + (d?.totals?.p || 0), 0),
-                f: weekDays.reduce((s: any, d: any) => s + (d?.totals?.f || 0), 0),
-                c: weekDays.reduce((s: any, d: any) => s + (d?.totals?.c || 0), 0),
-              },
+              totals: (() => {
+                const t: any = {
+                  kcal: weekDays.reduce((s: any, d: any) => s + (d?.totals?.kcal || 0), 0),
+                  p: weekDays.reduce((s: any, d: any) => s + (d?.totals?.p || 0), 0),
+                  f: weekDays.reduce((s: any, d: any) => s + (d?.totals?.f || 0), 0),
+                  c: weekDays.reduce((s: any, d: any) => s + (d?.totals?.c || 0), 0),
+                };
+                // §8.143 п. 10.7: недельный итог держит натрий дней (гейт `> 0`).
+                const _na = sumNaOf(weekDays, (d: any) => d?.totals);
+                if (_na > 0) t.na = _na;
+                return t;
+              })(),
             };
             if (weekIndex !== undefined) {
               setMonthPlan((prev) => {
@@ -7250,17 +7302,24 @@ export const IndividualPlanProvider: React.FC<{
         excludedIds: new Set<string>([...(excludedFoods || [])]),
         allergenTags: selectedAllergenTags(allergens || [], dietPrefs || []),
       });
-      const meals = res.meals.map((m: any) => ({
-        ...m,
-        totals: {
-          kcal: m.totals?.kcal || 0,
-          p: m.totals?.p || 0,
-          f: m.totals?.f || 0,
-          c: m.totals?.c || 0,
-          fiber: m.totals?.fiber || 0,
-        },
-      }));
-      const totals = meals.reduce(
+      // §8.143 п. 10: корректор только что посчитал `na` приёмов (`recalcMealTotals`),
+      // а прежний `applyTo` собирал тоталы с нуля и выбрасывал поле — «Автокоррекция»
+      // гасила натрий сразу после того, как он был посчитан.
+      const meals = res.meals.map((m: any) => {
+        const next: any = {
+          ...m,
+          totals: {
+            kcal: m.totals?.kcal || 0,
+            p: m.totals?.p || 0,
+            f: m.totals?.f || 0,
+            c: m.totals?.c || 0,
+            fiber: m.totals?.fiber || 0,
+          },
+        };
+        if (typeof m.totals?.na === 'number') next.totals.na = m.totals.na;
+        return next;
+      });
+      const totals: any = meals.reduce(
         (acc: any, m: any) => ({
           kcal: acc.kcal + m.totals.kcal,
           p: acc.p + m.totals.p,
@@ -7270,6 +7329,8 @@ export const IndividualPlanProvider: React.FC<{
         }),
         { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 },
       );
+      const naSum = sumKnownNa(meals, (m: any) => m?.totals);
+      if (naSum > 0) totals.na = naSum;
       return { ...plan, meals, totals };
     };
     const correctedDay = applyTo(dayPlan);

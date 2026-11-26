@@ -4,6 +4,7 @@ import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
 import { recipeMacroDistance, filterRecipesByHardRestrictions } from "./recipe-engine";
 import { filterRecipePoolForBand } from "./planner-recipe-mode";
+import { sumPlanDaysTotals } from "./planner-plan-write";
 import { resolveAllExcludedFoodIds, selectedAllergenTags } from "./planner-restrictions";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
@@ -190,7 +191,10 @@ export const MealComposer: React.FC = () => {
     dayPlanKeyRef.current = key;
     const days = [...multiDay.days];
     days[selectedDayIndex] = JSON.parse(JSON.stringify(dayPlan));
-    const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+    // §8.143 п. 10.7 (ревью-2): сумма плана собиралась из четырёх макросов — натрий дней
+    // терялся, пока видимый день его сохранял (тот же класс, что `planner-plan-write`).
+    // Сумма плана теперь одна на весь проект — `sumPlanDaysTotals` (макросы + `na` под гейтом).
+    const allTotals = sumPlanDaysTotals(days);
     if (planDays === 3) setThreeDayPlan({ ...multiDay, days, totals: allTotals });
     else setWeekPlan({ ...multiDay, days, totals: allTotals });
   }, [dayPlan, planDays, selectedDayIndex]);

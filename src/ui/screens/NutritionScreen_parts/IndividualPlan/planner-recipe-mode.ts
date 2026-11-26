@@ -49,6 +49,7 @@ import {
   RICE_BUCKET_IDS,
 } from './meal-plan-engine';
 import { correctDayToTargets, PLANNER_CONVERGENCE_PCT } from './day-target-corrector';
+import { itemSodiumMg, naAfterResize } from './planner-meal-sodium';
 import { toRawPurchaseAmount } from './planner-weight-mode';
 import { getMicroFromFood } from './planner-micro-reader';
 import { RDA_BASE } from './planner-micro-coverage';
@@ -66,6 +67,8 @@ export interface PlanItemLike {
   c: number;
   fiber?: number;
   leucine_mg?: number;
+  /** §8.143 п. 10: кэш натрия (мг) — фолбэк читателя, когда плотности в FOOD_DB нет. */
+  na?: number;
   role?: string;
 }
 
@@ -76,6 +79,8 @@ export interface PlanTotalsLike {
   c: number;
   fiber?: number;
   leucine_mg?: number;
+  /** §8.143 п. 10: натрий приёма/дня (мг). Нет поля — «не знаем», а не ноль. */
+  na?: number;
 }
 
 export interface FlatRecipeOption {
@@ -375,8 +380,31 @@ export function sumMealTotals(items: PlanItemLike[]): PlanTotalsLike {
   };
 }
 
+/**
+ * §8.143 п. 8(3): тоталы приёма после изменения ГРАММ (трим квот, белковый добор в перекус).
+ * `sumMealTotals` не знает натрия, а приёмы движка ведут `totals.na` (`planner-meal-sodium.ts`).
+ * При слепом пересчёте поле исчезало и известный натрий терялся.
+ *
+ * Правило (§10.6 ревью): натрий ПЕРЕСЧИТЫВАЕТСЯ из текущих позиций и пишется, если сумма
+ * известна (> 0) — независимо от того, было ли поле в старых тоталах. Прежний гейт «поле было»
+ * терял соль навсегда у планов, импортированных без `totals.na` (старые экспорты): позиции
+ * знали натрий, но каждая пересборка отказывалась его записать. Старое число при этом НЕ
+ * переносится: сумма берётся из позиций, поэтому относиться к прежней тарелке не может.
+ * Неизвестная сумма — поля нет: честное «не знаем», а не ноль.
+ */
+export function totalsAfterGramChange(m: {
+  items?: PlanItemLike[];
+  totals?: PlanTotalsLike & { na?: number };
+}): PlanTotalsLike {
+  const items = ((m && m.items) || []) as PlanItemLike[];
+  const t = sumMealTotals(items as any);
+  const naSum = Math.round(items.reduce((s: number, it: any) => s + itemSodiumMg(it), 0));
+  if (naSum > 0) t.na = naSum;
+  return t;
+}
+
 export function sumDayTotals(meals: PlanMealLike[]): PlanTotalsLike {
-  return {
+  const t: PlanTotalsLike = {
     kcal: meals.reduce((s, m) => s + (m.totals?.kcal || 0), 0),
     p: Math.round(meals.reduce((s, m) => s + (m.totals?.p || 0), 0) * 10) / 10,
     f: Math.round(meals.reduce((s, m) => s + (m.totals?.f || 0), 0) * 10) / 10,
@@ -384,6 +412,12 @@ export function sumDayTotals(meals: PlanMealLike[]): PlanTotalsLike {
     fiber: Math.round(meals.reduce((s, m) => s + (m.totals?.fiber || 0), 0) * 10) / 10,
     leucine_mg: Math.round(meals.reduce((s, m) => s + (m.totals?.leucine_mg || 0), 0)),
   };
+  // §8.143 п. 10: день держит натрий по тому же правилу, что приём (`totalsAfterGramChange`):
+  // поле есть, только если оно известно хотя бы у одного приёма и сумма > 0; «не знаем» — нет
+  // поля, а не ноль. Иначе UI-пересборка дня (`sumDayTotals`) стирала соль приёмов.
+  const naSum = Math.round(meals.reduce((s, m) => s + (typeof m?.totals?.na === 'number' ? m.totals.na : 0), 0));
+  if (naSum > 0 && meals.some((m) => typeof m?.totals?.na === 'number')) t.na = naSum;
+  return t;
 }
 
 // ─── Ребаланс дня (недобор/перебор → ±3%) ──────────────────────────────
@@ -413,6 +447,10 @@ export function mergeSameIdItems(meals: PlanMealLike[]): void {
             ? Math.round((ex.leucine_mg || 0) + ((it as any).leucine_mg || 0))
             : undefined;
         ex.kcal = Math.round(4 * (ex.p || 0) + 9 * (ex.f || 0) + 4 * (ex.c || 0));
+        // §8.143 п. 10.7 (ревью-2): кэш `na` второго экземпляра терялся — у составных блюд
+        // (id вне FOOD_DB) сумма позиций после merge читала только первый кэш и недосчитывала.
+        // Зеркало движка (`meal-plan-engine.mergeDuplicateItems` уже суммирует `na`).
+        if (ex.na != null || it.na != null) ex.na = (ex.na || 0) + (it.na || 0);
       } else {
         seen.set(it.id, { ...it });
         order.push(it.id);
@@ -420,7 +458,7 @@ export function mergeSameIdItems(meals: PlanMealLike[]): void {
     }
     if (seen.size !== items.length) {
       m.items = order.map((id) => seen.get(id)!);
-      m.totals = sumMealTotals(m.items);
+      m.totals = totalsAfterGramChange(m);
     }
   }
 }
@@ -513,7 +551,7 @@ export function applyVegCarrierHygiene(
     it.c = Math.round((it.c || 0) * r * 10) / 10;
     it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
     if (it.fiber != null) it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
-    m.totals = sumMealTotals(m.items as any);
+    m.totals = totalsAfterGramChange(m);
   };
 
   for (const m of meals as any[]) {
@@ -620,7 +658,7 @@ export function applyVegCarrierHygiene(
         grams,
       ) as any;
       m.items = [...(m.items || []), host];
-      m.totals = sumMealTotals(m.items as any);
+      m.totals = totalsAfterGramChange(m);
     }
     // 3) Приёмка: день не стал хуже, канон цел, клетчатка дня ≥25 г.
     const t1 = sumDayTotals(meals as any);
@@ -699,7 +737,7 @@ export function applyPortionHygiene(meals: PlanMealLike[], opts?: { weightKg?: n
     // 30 г У у 100 кг cut/5/отд P1.8 и уводил день из канона 3.1% → 7.4% — овощи там
     // выступают носителем углеводов, а не «салатом». Правильное лечение — модель
     // «овощ-носитель vs овощ-гарнир», а не бланкетный срез (см. аудит §8.97b).
-    if (notes.length && items.length) m.totals = sumMealTotals(items);
+    if (notes.length && items.length) m.totals = totalsAfterGramChange(m);
   }
   return notes;
 }
@@ -824,7 +862,7 @@ export function closeRecipeDayToCanon(
     it.c = Math.round((it.c || 0) * r * 10) / 10;
     it.kcal = Math.round(4 * (it.p || 0) + 9 * (it.f || 0) + 4 * (it.c || 0));
     if (it.fiber != null) it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
-    m.totals = sumMealTotals(m.items as any);
+    m.totals = totalsAfterGramChange(m);
   };
   const addItem = (m: any, fd: any, grams: number, role: string): void => {
     m.items = [
@@ -844,7 +882,7 @@ export function closeRecipeDayToCanon(
         grams,
       ) as any,
     ];
-    m.totals = sumMealTotals(m.items as any);
+    m.totals = totalsAfterGramChange(m);
   };
   const avail = (id: string) => FOOD_DB.some((f: any) => f.id === id && !(excluded && excluded.has(id)));
 
@@ -1099,6 +1137,39 @@ export function closeRecipeDayToCanon(
   return notes;
 }
 
+/** Оси отклонения дня, по которым судится свап ядра (§8.102 / §8.143). */
+export type SwapAxes = { k: number; f: number; c: number; pUnder: number };
+
+/**
+ * §8.143 п. 8(1): свап ядра обязан уменьшать перебор дня, а не перекладывать его с оси на ось.
+ *
+ * Приёмка свапа судилась жёсткими 3 % (`brokeCanon`), а вход в стадию — каноном ПУТИ (`canonPct`:
+ * ручной день 2 %, авто 3 %). Из-за этого вариант мог поднять «здоровую» ось с 1.9 % до 2.9 %
+ * (в каноне 3 это норма, в ручном дне — уже выход из канона), а нота `🔄` называла только худшую
+ * ось: день переставал сходиться, и в ленте этого не было видно.
+ *
+ * Считаем СУММУ перебора сверх канона: сделка «жир 8.7 % → 3.5 % ценой ккал 1.6 % → 2.5 %»
+ * проходит (перебор падает), а «поделить перебор между двумя осями» (1.9 % → 2.9 % при каноне 2,
+ * перебор 0.95 → 1.8) — нет.
+ *
+ * Замеры на сетке 80 дней (§8.143 п. 8), чтобы правило не было выдумкой:
+ *  - «ни одна ось не растёт сверх max(было, канон)» — 63 отклонённых кандидата, средняя
+ *    2.04 → 3.33 % (канон 2) и 2.31 → 3.48 % (канон 3): запрещало честные сделки, ОТБРОШЕНО;
+ *  - «сумма всех осей не растёт» — 4 отклонённых кандидата, но дни seed 10 и 18 ухудшились
+ *    1.1/1.3 → 1.5 % даже внутри канона, где растекание безвредно; ОТБРОШЕНО;
+ *  - «сумма перебора сверх канона не растёт» (это правило) — на сетке числа идентичны
+ *    (вне канона 11/5, средняя 2.04/2.31 %, свапы 50/43): сетка в такое окно не попадает,
+ *    поэтому замок стоит прямой — `planner-recipe-core-swap-8102` («перебор поделен между осями»).
+ */
+export function swapExcessGrew(a0: SwapAxes, a1: SwapAxes, canonPct: number): boolean {
+  const excess = (a: SwapAxes) =>
+    Math.max(0, a.k - canonPct) +
+    Math.max(0, a.f - canonPct) +
+    Math.max(0, a.c - canonPct) +
+    Math.max(0, a.pUnder - canonPct);
+  return excess(a1) > excess(a0) + 1e-9;
+}
+
 /**
  * §8.102 (B15a): смена ядра рецепта в слоте.
  *
@@ -1119,7 +1190,8 @@ export function closeRecipeDayToCanon(
  * ЧЕСТНЫЙ масштаб, чтобы проверка «ядро = автор × масштаб» сходилась.
  *
  * Приёмка (жёстче, чем у закрывателя): худшая ось дня обязана упасть не меньше чем на 0.05 п.п.,
- * ни одна ось из канона не выходит, не появляется НИ ОДНОЙ вырожденной позиции в основных
+ * ни одна ось не выходит за жёсткие 3 % (`brokeCanon`), суммарный перебор сверх канона ПУТИ не
+ * растёт (`swapExcessGrew`, §8.143 п. 8), не появляется НИ ОДНОЙ вырожденной позиции в основных
  * приёмах (белок <40 г, гарнир <15 г), белок не «сваливается» сверх +5% цели (а на дне, который
  * уже перебирает белок, — не больше +8 г). Оценка — ТОЛЬКО по финальному исходу: пробный свап
  * прогоняется через закрыватель (`reconverge`) и сравнивается его итог, иначе жадная оценка
@@ -1140,9 +1212,13 @@ export function applyRecipeCoreSwap(
     usedNames?: Set<string>;
     /** Имена ПРОШЛЫХ дней — жёсткий запрет на повтор (§8.140). */
     prevUsedNames?: Set<string>;
+    /** §8.143: канон дня по пути (ручной 2 %, авто 3 %) — стадия не должна трогать день,
+     *  который уже в своём каноне. Раньше здесь стояло жёсткое `3`. */
+    canonPct?: number;
   },
 ): string[] {
   const notes: string[] = [];
+  const _canonPct = opts?.canonPct ?? PLANNER_CONVERGENCE_PCT;
   const mealAny = meals as any[];
   const maxSwaps = opts?.maxSwaps ?? 3;
   const axesOf = (t: any) => {
@@ -1204,7 +1280,7 @@ export function applyRecipeCoreSwap(
     });
 
   let a0 = axesOf(sumDayTotals(mealAny));
-  if (worstOf(a0) <= 3 + 1e-9) return notes; // день в каноне — не трогаем
+  if (worstOf(a0) <= _canonPct + 1e-9) return notes; // день в своём каноне — не трогаем
   let worstBefore = worstOf(a0);
   let swaps = 0;
 
@@ -1276,7 +1352,7 @@ export function applyRecipeCoreSwap(
         // белок, запрещаем только рост сверх +8 г.
         const pCap = dayPBefore > pTarget * 1.05 + 0.5 ? dayPBefore + 8 : pTarget * 1.05 + 0.5;
         m.items = merged;
-        m.totals = sumMealTotals(merged as any);
+        m.totals = totalsAfterGramChange({ items: merged as any, totals: m.totals });
         m.recipeApplied = o.name;
         m.recipeAppliedData = { ...(o as any), appliedScale: s } as any;
         // Приёмка ПО ФИНАЛЬНОМУ ИСХОДУ: пробуем довести день закрывателем и смотрим на его итог.
@@ -1289,7 +1365,9 @@ export function applyRecipeCoreSwap(
         const brokeCanon = (['k', 'f', 'c'] as const).some((ax) => a0[ax] <= 3 + 1e-9 && a1[ax] > 3 + 1e-9);
         const brokeDeg = degAll() > degBefore;
         const brokeProtein = (dayAfter.p || 0) > pCap;
-        if (!brokeCanon && !brokeDeg && !brokeProtein && worstOf(a1) <= worstBefore - 0.05) {
+        // §8.143 п. 8(1): запрет «поделить перебор между осями» — см. `swapExcessGrew`.
+        const _excessGrew = swapExcessGrew(a0, a1, _canonPct);
+        if (!brokeCanon && !brokeDeg && !brokeProtein && !_excessGrew && worstOf(a1) <= worstBefore - 0.05) {
           m.rationale = [
             ...((m as any).rationale || []),
             `🔄 «${String(m.label || m.type)}»: рецепт заменён на «${o.name}» ×${s} (сходимость дня)`,
@@ -1353,6 +1431,9 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
     c,
     fiber: it.fiber != null ? Math.round(it.fiber * r * 10) / 10 : undefined,
     leucine_mg: it.leucine_mg != null ? Math.round(it.leucine_mg * r) : undefined,
+    // §8.143 п. 10 (ревью): кэш натрия тоже едет за граммами — для составных блюд он
+    // единственный источник соли, и без этой строки соль оставалась от прежней порции.
+    ...(typeof it.na === 'number' ? { na: naAfterResize(it, newAmount) } : {}),
   };
 }
 
@@ -1832,7 +1913,11 @@ export function rebalanceDayAfterRecipes(
           },
           grams,
         );
-        work[fi] = { ...work[fi], items: [...work[fi].items, item], totals: sumMealTotals([...work[fi].items, item]) };
+        work[fi] = {
+          ...work[fi],
+          items: [...work[fi].items, item],
+          totals: totalsAfterGramChange({ items: [...work[fi].items, item], totals: work[fi].totals }),
+        };
         notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
         lastAddedMeal = fi;
         lastAddedId = chosen.id;
@@ -1898,7 +1983,11 @@ export function rebalanceDayAfterRecipes(
               c: totals.c - items[wi].c + ntTotals.c,
             };
             if (maxDeviationPct(ntDay as any, validTargets) < dev - 0.0005) {
-              work[fi] = { ...work[fi], items: nextItems, totals: ntTotals };
+              work[fi] = {
+                ...work[fi],
+                items: nextItems,
+                totals: totalsAfterGramChange({ items: nextItems, totals: work[fi].totals }),
+              };
               notes.push(`🔁 ${items[wi].name} → ${pf.name} ${g} г (белок вверх при переборе калорий)`);
               continue;
             }
@@ -1983,7 +2072,11 @@ export function rebalanceDayAfterRecipes(
                 };
                 // A2-гейт: замена обязана снижать max-dev дня (иначе жёём итерации во вред)
                 if (maxDeviationPct(ntDay as any, validTargets) < dev - 0.0005) {
-                  work[fi] = { ...work[fi], items: nextItems, totals: ntTotals };
+                  work[fi] = {
+                    ...work[fi],
+                    items: nextItems,
+                    totals: totalsAfterGramChange({ items: nextItems, totals: work[fi].totals }),
+                  };
                   notes.push(
                     `🔁 ${victim.name} → ${bestFood.name} ${g} г (${role === 'p' ? 'белок' : role === 'c' ? 'углеводы' : 'жиры'} вверх при переборе калорий)`,
                   );
@@ -2086,12 +2179,12 @@ export function rebalanceDayAfterRecipes(
       if (recentCuts.length > 40) recentCuts.shift();
       if (bc.newAmount < 20) {
         const items = work[bc.mi].items.filter((_, k) => k !== bc.ii);
-        work[bc.mi] = { ...work[bc.mi], items, totals: sumMealTotals(items) };
+        work[bc.mi] = { ...work[bc.mi], items, totals: totalsAfterGramChange({ items, totals: work[bc.mi].totals }) };
         notes.push(`➖ Убран ${it.name} из «${bc.label}» (перебор калорий)`);
       } else {
         const scaled = scaleItem(it, bc.newAmount);
         const items = work[bc.mi].items.map((x, k) => (k === bc.ii ? scaled : x));
-        work[bc.mi] = { ...work[bc.mi], items, totals: sumMealTotals(items) };
+        work[bc.mi] = { ...work[bc.mi], items, totals: totalsAfterGramChange({ items, totals: work[bc.mi].totals }) };
         notes.push(`➖ ${it.name}: ${it.amount} → ${bc.newAmount} г (перебор калорий)`);
       }
       continue;
@@ -2226,7 +2319,7 @@ export function rebalanceDayAfterRecipes(
         }
       }
       if (added.length > 0) {
-        m.totals = sumMealTotals(m.items || []);
+        m.totals = totalsAfterGramChange(m);
         notes.push(`🍽 Перекус «${l}» заполнен (был пуст после резки): ${added.join(' + ')}`);
       }
     }
@@ -2385,7 +2478,11 @@ export function rebalanceDayAfterRecipes(
           const scaledItems = (m.items || []).map((it: any, ii: number) =>
             inSet.has(ii) ? scaleItem(it, Math.max(5, Math.round((it.amount || 0) * best.s))) : it,
           );
-          work[mi] = { ...m, items: scaledItems, totals: sumMealTotals(scaledItems) };
+          work[mi] = {
+            ...m,
+            items: scaledItems,
+            totals: totalsAfterGramChange({ items: scaledItems, totals: m.totals }),
+          };
           cumScale.set(best.g.key, (cumScale.get(best.g.key) ?? 1) * best.s);
           notes.push(`⚖️ Порция «${best.g.name}» ×${Math.round(best.s * 100)}% для сходимости КБЖУ дня`);
           improved = true;
@@ -2575,7 +2672,7 @@ export function extremeCarbTopUp(
         const prevItems = m.items;
         const prevTotals = m.totals;
         m.items = [...(m.items || []), item];
-        m.totals = sumMealTotals(m.items || []);
+        m.totals = totalsAfterGramChange(m);
         const after = sumDayTotals(meals);
         if (maxDeviationPct(after, targets) > devCap + 1e-9) {
           m.items = prevItems;
@@ -2992,6 +3089,123 @@ export function carbRoomScore(
   return dBase * 0.65 + (1 - fill) * 0.25 + Math.min(1, pOver) * 0.3 + fOver * 0.35;
 }
 
+/**
+ * §8.140/§8.143: финальный грамм-трим квот (орехи/семена, масла, яйца) после корректора.
+ * Вынесен из `assembleRecipeDay` ради замка: нота — свидетельство факта, а не намерения,
+ * и это проверяется юнит-тестом на детерминированных квотах, а не только на сетке дней.
+ *
+ * Контракт:
+ *  - режет только то, что выше квоты, и только до пола (`minG`);
+ *  - печатает ноту ТОЛЬКО если граммы реально изменились;
+ *  - изменившиеся приёмы получают честные `totals` (натрий переносится, если был).
+ */
+export function trimQuotaOverflowForDay(
+  ms: PlanMealLike[],
+  opts?: { weightScale?: number; targetScale?: number; targets?: DayMacroTargets },
+): string[] {
+  const out: string[] = [];
+  const _sc = opts?.weightScale || 1;
+  // P1-фикс: экстрим-масштабирование квот и в рецептурном пути (было захардкожено 60/25/230
+  // ×weightScale, из-за чего экстрим-день рецептов не расширял орехи/масла/яйца).
+  const _ts = opts?.targetScale || 1;
+  const targets = opts?.targets;
+  const _ext = scaleQuotasForExtreme(targets?.kcal || 0, targets?.c || 0, targets?.p || 0, _ts);
+  const _gramScale = Math.min(2, _sc * _ts);
+  const trimByFam = (fams: string[], cap: number, minG: number, label: string) => {
+    let total = ms
+      .flatMap((m) => m.items)
+      .filter((it) => fams.includes(stapleFamilyOf(it.id) || ''))
+      .reduce((s, it) => s + (it.amount || 0), 0);
+    if (total <= cap) return;
+    const cutShare = Math.min(0.6, (total - cap) / total);
+    // §8.143: нота — свидетельство факта, а не намерения. Раньше она печаталась всегда,
+    // когда граммы семьи превышали квоту, даже если каждый пункт уже стоял на полу
+    // `minG` и ни один грамм не срезался (`ng >= amount` для всех) — «приведено к квоте»
+    // было ложью, а метрика «трим сработал» в замке §8.140 считалась по этой ноте.
+    let cut = 0;
+    for (const m of ms) {
+      for (let ii = 0; ii < (m.items || []).length; ii++) {
+        const it = m.items[ii];
+        if (!fams.includes(stapleFamilyOf(it.id) || '')) continue;
+        const ng = Math.max(minG, Math.floor((it.amount || 0) * (1 - cutShare)));
+        if (ng >= (it.amount || 0)) continue;
+        cut += (it.amount || 0) - ng;
+        // §8.143 (ревью): `scaleItem` переносит `na` СТАРОЙ порции — после среза соль пункта
+        // осталась бы от прежней тарелки (яйцо −30 г ≈ +42 мг). Пересчитываем тем же хелпером,
+        // что и ручная правка порции в UI.
+        const _scaled = scaleItem(it, ng) as any;
+        if (typeof (it as any)?.na === 'number') _scaled.na = naAfterResize(it, ng);
+        m.items[ii] = _scaled;
+      }
+    }
+    if (cut <= 0) return;
+    // P2-фикс: нота честная — если 60%-шага не хватило до квоты, сообщаем фактический объём.
+    const _after = ms
+      .flatMap((m) => m.items)
+      .filter((it) => fams.includes(stapleFamilyOf(it.id) || ''))
+      .reduce((s, it) => s + (it.amount || 0), 0);
+    out.push(
+      _after <= cap + 1
+        ? `⚖️ ${label}: приведено к квоте ${cap} г/день`
+        : `⚖️ ${label}: урезано до ${Math.round(_after)} г (квота ${cap} г за один шаг недостижима)`,
+    );
+  };
+  trimByFam(['nuts', 'seeds'], Math.round((_ext ? _ext.nuts : 60) * _gramScale), 8, 'Орехи/семена');
+  trimByFam(['oils'], Math.round((_ext ? _ext.oil : 25) * _gramScale), 5, 'Масла');
+  const eggs = ms
+    .flatMap((m) => m.items)
+    .filter((it) => it.id === 'egg_whole')
+    .reduce((s, it) => s + (it.amount || 0), 0);
+  const eggCap = Math.round((_ext ? _ext.egg : 230) * _gramScale);
+  if (eggs > eggCap) {
+    const cutShare = Math.min(0.5, (eggs - eggCap) / eggs);
+    // §8.143: та же честность, что и у семей — нота только при фактически срезанных граммах.
+    let cut = 0;
+    for (const m of ms) {
+      for (let ii = 0; ii < (m.items || []).length; ii++) {
+        const it = m.items[ii];
+        if (it.id !== 'egg_whole') continue;
+        const ng = Math.max(50, Math.floor((it.amount || 0) * (1 - cutShare)));
+        if (ng >= (it.amount || 0)) continue;
+        cut += (it.amount || 0) - ng;
+        const _scaled = scaleItem(it, ng) as any;
+        if (typeof (it as any)?.na === 'number') _scaled.na = naAfterResize(it, ng);
+        m.items[ii] = _scaled;
+      }
+    }
+    if (cut > 0) {
+      const _afterEggs = ms
+        .flatMap((m) => m.items)
+        .filter((it) => it.id === 'egg_whole')
+        .reduce((s, it) => s + (it.amount || 0), 0);
+      // §8.143 (ревью): та же честная формулировка, что у семей — пол 50 г на яйцо делает
+      // недостижение квоты обычным случаем (5 × 60 → 250 при квоте 230), и «приведено к квоте»
+      // было бы таким же свидетельством намерения, как и снятая нота семей.
+      out.push(
+        _afterEggs <= eggCap + 1
+          ? `⚖️ Яйца: приведено к квоте ${eggCap} г/день`
+          : `⚖️ Яйца: урезано до ${Math.round(_afterEggs)} г (квота ${eggCap} г за один шаг недостижима)`,
+      );
+    }
+  }
+  // P1-5 (§8.140): трим квот меняет ГРАММЫ, но тоталы приёма не обновлял — день продолжал
+  // показывать фантомные макросы. Дальше любая полная пересборка тоталов (перенос тарелки
+  // §8.98 зовёт `recalcMealTotals`) «теряла» 2–7 % дня: рецептурный замер — 9 дней из 50
+  // считались «в каноне 3 %» на фантоме, трейс «закрыватель 1.5 % → факт 7.1 %».
+  // Кто изменил граммы, тот и ставит честные тоталы — ровно как `trimPeriCarbs` (§8.97).
+  if (out.length > 0) {
+    for (const m of ms) {
+      if (!(m.items || []).length) continue;
+      const _t = totalsAfterGramChange(m);
+      // Ревью §8.143 (п. 10.6): `totalsAfterGramChange` пересчитывает `na` из ТЕКУЩИХ позиций
+      // (FOOD_DB × граммы, фолбэк — кэш) и пишет поле при сумме > 0, даже если его не было;
+      // «не знаем» — поля нет, чужое прежнее число не переносится.
+      m.totals = _t;
+    }
+  }
+  return out;
+}
+
 export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
   const { meals, pool: _poolRaw, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
   // §8.140: имена, занятые ПРОШЛЫМИ днями, — снимок ДО посадки сегодняшних. Свап ядра видит
@@ -3020,7 +3234,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const _stripped = m.items.filter((it: any) => !((it as any)._fixedGrams && it.role === 'veg'));
     if (_stripped.length !== m.items.length) {
       m.items = _stripped;
-      m.totals = sumMealTotals(m.items as any);
+      m.totals = totalsAfterGramChange(m);
     }
   }
   const _rankWeights = isExtremeCarbBand(targets?.c || 0, targets?.p || 0, args.athleteWeightKg ?? 80)
@@ -3055,84 +3269,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       } catch {}
     }
   });
-  // Финальный грамм-трим орехов/масел/яиц после корректора (он идёт мимо квот).
-  const trimQuotaOverflow = (ms: PlanMealLike[]): string[] => {
-    const out: string[] = [];
-    const _sc = quota.weightScale || 1;
-    // P1-фикс: экстрим-масштабирование квот и в рецептурном пути (было захардкожено 60/25/230
-    // ×weightScale, из-за чего экстрим-день рецептов не расширял орехи/масла/яйца).
-    const _ts = quota.targetScale || 1;
-    const _ext = scaleQuotasForExtreme(targets?.kcal || 0, targets?.c || 0, targets?.p || 0, _ts);
-    const _gramScale = Math.min(2, _sc * _ts);
-    const trimByFam = (fams: string[], cap: number, minG: number, label: string) => {
-      let total = ms
-        .flatMap((m) => m.items)
-        .filter((it) => fams.includes(stapleFamilyOf(it.id) || ''))
-        .reduce((s, it) => s + (it.amount || 0), 0);
-      if (total <= cap) return;
-      const cutShare = Math.min(0.6, (total - cap) / total);
-      for (const m of ms) {
-        for (let ii = 0; ii < (m.items || []).length; ii++) {
-          const it = m.items[ii];
-          if (!fams.includes(stapleFamilyOf(it.id) || '')) continue;
-          const ng = Math.max(minG, Math.floor((it.amount || 0) * (1 - cutShare)));
-          if (ng >= (it.amount || 0)) continue;
-          const r = ng / (it.amount || 1);
-          m.items[ii] = scaleItem(it, ng);
-          total -= (it.amount || 0) * (1 - r);
-        }
-      }
-      // P2-фикс: нота честная — если 60%-шага не хватило до квоты, сообщаем фактический объём.
-      const _after = ms
-        .flatMap((m) => m.items)
-        .filter((it) => fams.includes(stapleFamilyOf(it.id) || ''))
-        .reduce((s, it) => s + (it.amount || 0), 0);
-      out.push(
-        _after <= cap + 1
-          ? `⚖️ ${label}: приведено к квоте ${cap} г/день`
-          : `⚖️ ${label}: урезано до ${Math.round(_after)} г (квота ${cap} г за один шаг недостижима)`,
-      );
-    };
-    trimByFam(['nuts', 'seeds'], Math.round((_ext ? _ext.nuts : 60) * _gramScale), 8, 'Орехи/семена');
-    trimByFam(['oils'], Math.round((_ext ? _ext.oil : 25) * _gramScale), 5, 'Масла');
-    const eggs = ms
-      .flatMap((m) => m.items)
-      .filter((it) => it.id === 'egg_whole')
-      .reduce((s, it) => s + (it.amount || 0), 0);
-    const eggCap = Math.round((_ext ? _ext.egg : 230) * _gramScale);
-    if (eggs > eggCap) {
-      const cutShare = Math.min(0.5, (eggs - eggCap) / eggs);
-      for (const m of ms) {
-        for (let ii = 0; ii < (m.items || []).length; ii++) {
-          const it = m.items[ii];
-          if (it.id !== 'egg_whole') continue;
-          const ng = Math.max(50, Math.floor((it.amount || 0) * (1 - cutShare)));
-          if (ng >= (it.amount || 0)) continue;
-          m.items[ii] = scaleItem(it, ng);
-        }
-      }
-      out.push(`⚖️ Яйца: приведено к квоте ${eggCap} г/день`);
-    }
-    // P1-5 (§8.140): трим квот меняет ГРАММЫ, но тоталы приёма не обновлял — день продолжал
-    // показывать фантомные макросы. Дальше любая полная пересборка тоталов (перенос тарелки
-    // §8.98 зовёт `recalcMealTotals`) «теряла» 2–7 % дня: рецептурный замер — 9 дней из 50
-    // считались «в каноне 3 %» на фантоме, трейс «закрыватель 1.5 % → факт 7.1 %».
-    // Кто изменил граммы, тот и ставит честные тоталы — ровно как `trimPeriCarbs` (§8.97, ниже).
-    if (out.length > 0) {
-      for (const m of ms) {
-        if (!(m.items || []).length) continue;
-        const _t = sumMealTotals(m.items as any);
-        // Ревью 2026-11-25: `sumMealTotals` не знает натрия, а приёмы движка его ведут
-        // (`totals.na`, `planner-meal-sodium.ts`). Поле переносим только если оно было —
-        // форма тоталов у приёмов без натрия не меняется.
-        if (typeof (m.totals as any)?.na === 'number') {
-          (_t as any).na = Math.round((m.items as any[]).reduce((s, it) => s + (Number(it?.na) || 0), 0));
-        }
-        m.totals = _t;
-      }
-    }
-    return out;
-  };
+  // §8.143: сам трим вынесен в `trimQuotaOverflowForDay` (юнит-замок на ноте и граммах).
+  const trimQuotaOverflow = (ms: PlanMealLike[]): string[] =>
+    trimQuotaOverflowForDay(ms, {
+      weightScale: quota.weightScale,
+      targetScale: quota.targetScale,
+      targets,
+    });
   // Peri-стража рецептурного пути (физокна: предтрен ≤63 / пост-трен ≤79):
   // откуда бы ни приплыли угли (сайд tryBuild, топ-ап ребаланса, рост корректора) —
   // режем НЕ-белковые углеводные пункты (сайды первыми) до капа. Ядро рецепта
@@ -3184,7 +3327,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         over -= _cutG * _perG;
         out.push(`✂️ Peri-кап «${(m as any).label}»: ${it.name} −${_cutG} г (окно ${cap}У)`);
       }
-      (m as any).totals = sumMealTotals((m as any).items || []);
+      (m as any).totals = totalsAfterGramChange(m as any);
     }
     return out;
   };
@@ -3791,13 +3934,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           const ng = Math.max(10, Math.round((it.amount || 0) * k));
           return scaleItem(it, ng);
         });
-        use.totals = sumMealTotals(use.items);
+        use.totals = totalsAfterGramChange(use);
       }
     }
     const chosenFlat = use.flat;
     const finalItems = use.items;
     mealAny.items = finalItems;
-    mealAny.totals = use.totals;
+    // §8.143 п. 8(3): тоталы варианта собраны из позиций — известный натрий приёма переносим
+    // через общий помощник (иначе замена блюда стирала `totals.na`, как и добор/трим).
+    mealAny.totals = totalsAfterGramChange({ items: finalItems, totals: (mealAny as any).totals });
     mealAny.recipeApplied = chosenFlat.name;
     mealAny.recipeAppliedData = chosenFlat;
     const _ps = (chosenFlat as any).portionScale || 1;
@@ -3847,7 +3992,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           (_flat2 as any).portionScale = _core2.portions;
           _flat2.appliedScale = _core2.scale;
           mealAny.items = [...(mealAny.items || []), ...(_core2.items as any)];
-          mealAny.totals = sumMealTotals(mealAny.items as any);
+          mealAny.totals = totalsAfterGramChange(mealAny);
           (mealAny as any).recipeApplied2 = _flat2.name;
           (mealAny as any).recipeAppliedData2 = _flat2;
           mealAny.rationale = [
@@ -3966,7 +4111,14 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             }),
             {} as any,
           );
+          const _hadNa = (p.meal.totals as any)?.na;
           p.meal.totals = t;
+          if (typeof _hadNa === 'number') {
+            const _sumNa = Math.round(
+              ((p.meal.items || []) as any[]).reduce((s2: number, it2: any) => s2 + itemSodiumMg(it2), 0),
+            );
+            if (_sumNa > 0) (p.meal.totals as any).na = _sumNa;
+          }
           (p.meal.recipeAppliedData as any).portionScale = ns;
         });
       }
@@ -4052,7 +4204,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           _g,
         ),
       ];
-      _host.totals = sumMealTotals(_host.items as any);
+      _host.totals = totalsAfterGramChange(_host);
       const _d1 = _fatDev(sumDayTotals(rb.meals as any) as any);
       // §8.50/§8.94 (правка 2026-11-24): приёмка — только при ПАДЕНИИ худшей оси дня.
       // Прежнее условие `_d1 > _d0 + 0.0005` пропускало «равный» шаг, и день с худшей осью
@@ -4149,9 +4301,24 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // добор усиливал отклонение (замер: plain 2600 три изолята по 30 г при Б +4.1%).
   // Инвариант MPS тогда остаётся честным советом, а не молчаливой порчей сходимости.
   {
-    const _dayTotals0 = sumMealTotals(outMeals as any);
+    // §8.143: здесь стоял `sumMealTotals(outMeals)` — функция ждёт ПОЗИЦИИ, а получала приёмы,
+    // поэтому `p` был всегда 0 и гард «день уже перебирает белок» не срабатывал
+    // никогда (`skipped` = 0 на сетке 80 дней). Итог: белковый добор в перекус добавлялся даже
+    // на дне с перебором Б, усиливая отклонение (§4.6).
     const _goalP0 = targets?.p || 0;
-    const _pOver = _goalP0 > 0 && _dayTotals0.p > _goalP0 * 1.02;
+    // §8.143 (ревью, второй проход): порог считается ПЕРЕД КАЖДЫМ перекусом. Флаг, снятый один
+    // раз до цикла, устаревал после первого добора: день на +1.9 % получал ~5.5 г Б в первом
+    // перекусе и оставался «не перебирающим» для второго — второй добор уводил день за +5 %,
+    // ровно туда, куда политика §4.6 запрещает. Замер сетки 80 дней: числа ИДЕНТИЧНЫ до и после
+    // (доборов 8, пропусков 8 на 8 днях, сумма Б 14619 г, суммарный перебор 156.9 п.п.) — в окно
+    // (goal, goal*1.02] с двумя бедными перекусами сетка не попадает, потому что поздняя стадия
+    // «перекус заполнен» докидывает белок независимо от этого блока. То есть правка — про
+    // честность правила на будущих днях, а не про сдвиг текущих планов; замка нет и это
+    // осознанный долг (§8.143 п. 8).
+    const _pOverNow = (): boolean => {
+      if (!(_goalP0 > 0)) return false;
+      return sumDayTotals(outMeals as any).p > _goalP0 * 1.02;
+    };
     const _skippedSnacks: string[] = [];
     for (const m of outMeals as any[]) {
       const t = String((m as any).type || '');
@@ -4159,7 +4326,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const items = (m.items || []) as any[];
       if (items.length === 0 || (m.totals?.kcal || 0) < 100) continue;
       if (items.some((i: any) => (i.p || 0) >= 5)) continue;
-      if (_pOver) {
+      if (_pOverNow()) {
         _skippedSnacks.push(m.label);
         continue;
       }
@@ -4184,7 +4351,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           gP,
         ),
       ];
-      m.totals = sumMealTotals(m.items as any);
+      // §8.143 п. 8(3): добор меняет граммы — тоталы ставим через `totalsAfterGramChange`,
+      // иначе известный `totals.na` перекуса исчезал (та же болезнь, что лечил трим квот).
+      m.totals = totalsAfterGramChange(m);
       notes.push(`🍽 «${m.label}»: белковый пункт восстановлен (${prot.name} ${gP} г) — перекус оставался без белка`);
     }
     if (_skippedSnacks.length > 0) {
@@ -4263,7 +4432,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             _g,
           );
         }
-        m.totals = sumMealTotals(m.items as any);
+        m.totals = totalsAfterGramChange(m);
         const _t1 = sumDayTotals(outMeals as any);
         const _devAfter = maxDeviationPct(
           _t1 as any,
@@ -4273,7 +4442,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           // откат приёма — «не навреди»
           (m.items as any[]).length = 0;
           _snap.forEach((i: any) => (m.items as any[]).push(i));
-          m.totals = _mt0 || sumMealTotals(m.items as any);
+          m.totals = _mt0 || totalsAfterGramChange(m);
           continue;
         }
         notes.push(
@@ -4345,7 +4514,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         _prot.c = Math.round((_prot.c || 0) * _r * 10) / 10;
         _prot.kcal = Math.round(4 * _prot.p + 9 * _prot.f + 4 * _prot.c);
         _prot.fiber = Math.round((_prot.fiber || 0) * _r * 10) / 10;
-        m.totals = sumMealTotals(m.items as any);
+        m.totals = totalsAfterGramChange(m);
         const _t1p = sumDayTotals(outMeals as any);
         const _devAfterP = maxDeviationPct(
           _t1p as any,
@@ -4354,7 +4523,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         if (_devAfterP > _devBeforeP) {
           (m.items as any[]).length = 0;
           _snap.forEach((i: any) => (m.items as any[]).push(i));
-          m.totals = _mt0 || sumMealTotals(m.items as any);
+          m.totals = _mt0 || totalsAfterGramChange(m);
           continue;
         }
         notes.push(`⚖️ «${m.label}»: ${_prot.name} ужат на ${_cutG} г — день перебирал белок (ядра рецептов)`);
@@ -4416,7 +4585,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           it.c = Math.round((it.c || 0) * _r * 10) / 10;
           it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
           it.fiber = Math.round((it.fiber || 0) * _r * 10) / 10;
-          m.totals = sumMealTotals(m.items as any);
+          m.totals = totalsAfterGramChange(m);
           _fatNow = sumDayTotals(outMeals as any).f || 0;
         }
       }
@@ -4489,7 +4658,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         grams,
       );
       host.items = [...(host.items || []), item];
-      host.totals = sumMealTotals(host.items as any);
+      host.totals = totalsAfterGramChange(host);
       // §8.50 (правка 2026-11-24): приёмка строгая — шаг обязан СТРОГО снизить девиацию дня.
       // Прежнее `> d0 + 0.0005` пропускало «равный» шаг: нота «3.4 % → 3.4 %» была возможна,
       // хотя день не приближался к цели («докармливание» канонического дня).
@@ -4552,7 +4721,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
               _gF,
             ),
           ];
-          _hostF.totals = sumMealTotals(_hostF.items as any);
+          _hostF.totals = totalsAfterGramChange(_hostF);
           const _dvF = _mlDevFloor();
           if (_dvF < _bestDevF - 0.0005) {
             _bestDevF = _dvF;
@@ -4618,7 +4787,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
               g,
             );
             _hostBig.items = [...snap.items, item];
-            _hostBig.totals = sumMealTotals(_hostBig.items as any);
+            _hostBig.totals = totalsAfterGramChange(_hostBig);
             const dv = _mlDevFloor();
             if (dv < bestDev - 0.0005) {
               bestDev = dv;
@@ -4658,6 +4827,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       weightKg: args.athleteWeightKg ?? 80,
       usedNames: usedNamesAcrossDays,
       prevUsedNames: _prevUsedNames,
+      canonPct: _canonPct,
       reconverge: () => closeRecipeDayToCanon(_closeArgs[0] as any, _closeArgs[1] as any, _closeArgs[2] as any),
     });
     if (_swapNotes.length > 0) notes = [...notes, ..._swapNotes];
@@ -4773,8 +4943,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             if (idx < 0) continue;
             donor.items = (donor.items as any[]).filter((_x: any, k: number) => k !== idx);
             (hungry.items as any[]).push({ ...it });
-            donor.totals = sumMealTotals(donor.items as any);
-            hungry.totals = sumMealTotals(hungry.items as any);
+            donor.totals = totalsAfterGramChange(donor);
+            hungry.totals = totalsAfterGramChange(hungry);
             movedKcal += dKcal;
             moves.push(
               `${it.name} 0→${Math.round(dAmt)} г (перенос из «${String(donor.label || donor.type)}»: ${Math.round(dAmt)}→0 г)`,
@@ -4868,7 +5038,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           (next as any)._fixedGrams = next.amount;
           (next as any)._microProtectedG = next.amount;
           items[k] = next;
-          m.totals = sumMealTotals(items as any);
+          m.totals = totalsAfterGramChange(m);
           _vitE = vitEOf();
           notes = [
             ...notes,
@@ -4925,7 +5095,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           (next as any)._fixedGrams = next.amount;
           (next as any)._microProtectedG = next.amount;
           items[k] = next;
-          m.totals = sumMealTotals(items as any);
+          m.totals = totalsAfterGramChange(m);
           _vitA = vitAOf();
           notes = [
             ...notes,
@@ -4973,7 +5143,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
             it._fixedGrams = it.amount;
             it._microGap = true;
             host.m.items = [...(host.m.items || []), it];
-            host.m.totals = sumMealTotals(host.m.items as any);
+            host.m.totals = totalsAfterGramChange(host.m);
             _vitA = vitAOf();
             notes = [
               ...notes,
@@ -4997,6 +5167,13 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   };
   const _finDev = _floorDev(_finTot);
   const _finDevR = Math.round(_finDev * 10) / 10;
+  // §8.143 п. 8(2): вердикт судится НЕокруглённым отклонением. Раньше сравнивался `_finDevR`
+  // (`Math.round(dev*10)/10`), и день с фактом 2.022 % печатал «2 %» и проходил `<= 2`: флаг
+  // «в допуске» стоял на дне ЗА каноном (сетка 80 дней — ровно один такой день, seed 30 при
+  // каноне 2; отсюда 65 «в каноне» по флагу против 64 по факту). Для показа в этом единственном
+  // пограничном случае берём два знака — иначе нота «не сведён: 2 %» противоречила бы сама себе.
+  const _inCanon = _finDev <= _canonPct + 1e-9;
+  const _finDevShown = _inCanon ? _finDevR : _finDevR <= _canonPct ? Math.round(_finDev * 100) / 100 : _finDevR;
   // §8.103: единственная нота о сведении дня — по ФИНАЛЬНЫМ тоталам (после раскладки, переносов
   // тарелок и овощей). Ядро — авторский рецепт, поэтому когда база не сходится, ккал/Ж/У уже
   // «упёрлись»; честнее сказать «не сведён».
@@ -5004,17 +5181,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const _fmt = `${Math.round(_finTot.kcal)}/${Math.round(_finTot.p)}/${Math.round(_finTot.f)}/${Math.round(_finTot.c)}`;
     // §8.135: вердикт «сведён/не сведён» — по канону ПУТИ. Иначе ручной день на 2.3 % писал
     // «✓ День сведён к цели» рядом с «⚠ … 2.3% (>2%)» — два противоположных вердикта в одной ленте.
-    if (_finDevR <= _canonPct) {
-      notes = [...notes, `✓ День сведён к цели: ${_finDevR}% (${_fmt})`];
+    if (_inCanon) {
+      notes = [...notes, `✓ День сведён к цели: ${_finDevShown}% (${_fmt})`];
     } else if (_closeDev <= _canonPct) {
       // Закрыватель дошёл до канона, но следующий шаг (справедливость/перенос тарелки/овощи)
       // сдвинул день обратно за канон — это ДЕФЕКТ раскладки, и он обязан быть видимым.
       notes = [
         ...notes,
-        `⚠ День не сведён к цели: ${_finDevR}% (${_fmt}) — закрыватель дошёл до ${_closeDev}%, но последующая раскладка увела день обратно`,
+        `⚠ День не сведён к цели: ${_finDevShown}% (${_fmt}) — закрыватель дошёл до ${_closeDev}%, но последующая раскладка увела день обратно`,
       ];
     } else {
-      notes = [...notes, `⚠ День не сведён к цели: ${_finDevR}% (${_fmt}) — остаток сидит в ядрах рецептов`];
+      notes = [...notes, `⚠ День не сведён к цели: ${_finDevShown}% (${_fmt}) — остаток сидит в ядрах рецептов`];
     }
   }
   // §3E-честность (остаток E): ядра рецептов НЕ режутся (авторские пропорции), поэтому
@@ -5039,16 +5216,16 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // ребаланса — предупреждение обязательно (иначе property-тест «нет предупреждения» падает).
   // §8.135: порог — канон пути (`_canonPct`), иначе ручной день на 2.5 % получал красный
   // флаг БЕЗ объяснения в нотах.
-  if (_finDevR > _canonPct) {
+  if (!_inCanon) {
     notes = [
       ...notes,
-      `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevR}% (>${_canonPct}%) — попробуйте выбрать другие варианты рецептов.`,
+      `⚠ Режим «по рецептам»: дневное отклонение от целей ${_finDevShown}% (>${_canonPct}%) — попробуйте выбрать другие варианты рецептов.`,
     ];
   }
   return {
     meals: outMeals,
     notes,
-    withinTolerance: _finDevR <= _canonPct,
+    withinTolerance: _inCanon,
     deviationPct: _finDevR,
     appliedCount,
     ...(_effTargets ? { effectiveProteinTargetG: _effTargets.effP, deviationToEffectivePct: _effTargets.effDevR } : {}),

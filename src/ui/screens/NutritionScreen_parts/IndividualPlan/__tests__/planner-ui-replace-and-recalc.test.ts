@@ -63,8 +63,14 @@ describe('B9: «🔄 Все» пересчитывает клетчатку/ле
   });
 
   it('итоги приёма и дня считаются едиными хелперами (не вручную)', () => {
-    expect(src).toMatch(/const totals = sumMealTotals\(mealItems\)/);
+    // §8.143 п. 10: тоталы приёма после замены продукта — через `totalsAfterGramChange`
+    // (макросы из позиций + `na`), а не `sumMealTotals`, который натрий не знает.
+    expect(src).toMatch(/const totals = totalsAfterGramChange\(\{ \.\.\.srcMeal, items: mealItems \}\)/);
     expect(src).toMatch(/totals: sumDayTotals\(newMeals\)/);
+    // Замена продукта меняет и натрий позиции: кэш прежнего продукта не переносится, а
+    // «известный ноль» не пишется вовсе (§10.7) — иначе пропал бы фолбэк на тотал приёма.
+    expect(src).toMatch(/const _naNext = itemSodiumMg\(\{ id: targetFood\.id, amount: it\.amount \|\| 100 \}\)/);
+    expect(src).toMatch(/\.\.\.\(_naNext > 0 \? \{ na: _naNext \} : \{\}\)/);
   });
 
   it('пустая правка не пишется в undo', () => {
@@ -73,10 +79,11 @@ describe('B9: «🔄 Все» пересчитывает клетчатку/ле
 });
 
 describe('B6: анализ проблем не гейтится по plannerMode', () => {
-  const stripComments = (s: string) => s
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '')
-    .replace(/[ \t]\/\/[^\n]*/g, '');
+  const stripComments = (s: string) =>
+    s
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '')
+      .replace(/[ \t]\/\/[^\n]*/g, '');
 
   it('в analyzePlanIssues нет раннего выхода для не-pro режимов', () => {
     const s = stripComments(read('IndividualPlanResults.tsx'));
@@ -87,10 +94,11 @@ describe('B6: анализ проблем не гейтится по plannerMode
 });
 
 describe('B34: мёртвый CollapsibleSection удалён, ключ остался в очистке', () => {
-  const stripComments = (s: string) => s
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '')
-    .replace(/[ \t]\/\/[^\n]*/g, '');
+  const stripComments = (s: string) =>
+    s
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '')
+      .replace(/[ \t]\/\/[^\n]*/g, '');
 
   it('настроек больше не содержат собственного аккордеона', () => {
     const s = stripComments(read('IndividualPlanSettings.tsx'));
@@ -106,10 +114,11 @@ describe('B34: мёртвый CollapsibleSection удалён, ключ оста
 
 describe('B29/B30: мёртвое состояние удалено', () => {
   // Комментарии-«надгробия» намеренно упоминают удалённые имена — проверяем КОД.
-  const stripComments = (s: string) => s
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '')
-    .replace(/[ \t]\/\/[^\n]*/g, '');
+  const stripComments = (s: string) =>
+    s
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '')
+      .replace(/[ \t]\/\/[^\n]*/g, '');
   const ctx = () => stripComments(read('IndividualPlanContext.tsx'));
 
   it('peakWeekEnabled / peakWeekShowDay исчезли из контекста', () => {

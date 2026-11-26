@@ -32,13 +32,20 @@ export function shouldMirrorToDayPlan(
 }
 
 /** Сумма итогов по дням плана (неделя/3 дня) — как раньше в контексте, без округления. */
-export function sumPlanDaysTotals(days: any[]): { kcal: number; p: number; f: number; c: number } {
-  return {
+export function sumPlanDaysTotals(days: any[]): { kcal: number; p: number; f: number; c: number; na?: number } {
+  const t: { kcal: number; p: number; f: number; c: number; na?: number } = {
     kcal: days.reduce((s: number, d: any) => s + (d?.totals?.kcal || 0), 0),
     p: days.reduce((s: number, d: any) => s + (d?.totals?.p || 0), 0),
     f: days.reduce((s: number, d: any) => s + (d?.totals?.f || 0), 0),
     c: days.reduce((s: number, d: any) => s + (d?.totals?.c || 0), 0),
   };
+  // §8.143 п. 10.6 (ревью): план держит натрий по правилу `sumDayTotals` — поле есть,
+  // только если оно известно хотя бы у одного дня и сумма > 0; «не знаем» — поля нет.
+  // Без этого `writeMealsToPlanDay` (правка времени/дубль приёма) стирал `na` плана.
+  const known = days.filter((d: any) => typeof d?.totals?.na === 'number');
+  const naSum = Math.round(known.reduce((s: number, d: any) => s + d.totals.na, 0));
+  if (known.length > 0 && naSum > 0) t.na = naSum;
+  return t;
 }
 
 /**
@@ -66,18 +73,51 @@ export function writeMealsToPlanDay<P extends { days: any[]; totals?: any }>(
 }
 
 /** Итоги одного дня (внутренняя копия `sumDayTotals`, без внешних зависимостей). */
-export function sumMealsTotals(meals: any[]): { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number } {
-  const acc = (meals || []).reduce((s: any, m: any) => {
-    const t = m?.totals || {};
-    s.kcal += t.kcal || 0; s.p += t.p || 0; s.f += t.f || 0; s.c += t.c || 0;
-    s.fiber += t.fiber || 0; s.leucine_mg += t.leucine_mg || 0;
-    return s;
-  }, { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+export function sumMealsTotals(meals: any[]): {
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+  fiber: number;
+  leucine_mg: number;
+  na?: number;
+} {
+  const acc = (meals || []).reduce(
+    (s: any, m: any) => {
+      const t = m?.totals || {};
+      s.kcal += t.kcal || 0;
+      s.p += t.p || 0;
+      s.f += t.f || 0;
+      s.c += t.c || 0;
+      s.fiber += t.fiber || 0;
+      s.leucine_mg += t.leucine_mg || 0;
+      return s;
+    },
+    { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 },
+  );
   const r1 = (v: number) => Math.round(v * 10) / 10;
-  return {
-    kcal: acc.kcal, p: r1(acc.p), f: r1(acc.f), c: r1(acc.c),
-    fiber: r1(acc.fiber), leucine_mg: Math.round(acc.leucine_mg),
+  const out: {
+    kcal: number;
+    p: number;
+    f: number;
+    c: number;
+    fiber: number;
+    leucine_mg: number;
+    na?: number;
+  } = {
+    kcal: acc.kcal,
+    p: r1(acc.p),
+    f: r1(acc.f),
+    c: r1(acc.c),
+    fiber: r1(acc.fiber),
+    leucine_mg: Math.round(acc.leucine_mg),
   };
+  // §8.143 п. 10.6 (ревью): день держит натрий приёмов по правилу `sumDayTotals` — поле
+  // есть, только если оно известно хотя бы у одного приёма и сумма > 0.
+  const known = (meals || []).filter((m: any) => typeof m?.totals?.na === 'number');
+  const naSum = Math.round(known.reduce((s: number, m: any) => s + m.totals.na, 0));
+  if (known.length > 0 && naSum > 0) out.na = naSum;
+  return out;
 }
 
 /**
@@ -104,15 +144,24 @@ export function mergePlanDayIntoDiary(
     const label = m?.label || 'Приём пищи';
     if (!diary[dateStr].meals[label]) diary[dateStr].meals[label] = [];
     const bucket = diary[dateStr].meals[label] as any[];
-    for (const it of (Array.isArray(m?.items) ? m.items : [])) {
+    for (const it of Array.isArray(m?.items) ? m.items : []) {
       const grams = it.amount || 100;
       const foodKey = it.id || it.foodId || it.name;
       const planTag = `plan:${dateStr}:${label}:${foodKey}:${grams}`;
-      if (bucket.some((e: any) => e && e.planTag === planTag)) { skipped++; continue; }
+      if (bucket.some((e: any) => e && e.planTag === planTag)) {
+        skipped++;
+        continue;
+      }
       bucket.push({
-        name: it.name, qty: Number(grams) || 100, kcal: Math.round(it.kcal || 0),
-        p: Math.round((it.p || 0) * 10) / 10, f: Math.round((it.f || 0) * 10) / 10, c: Math.round((it.c || 0) * 10) / 10,
-        category: it.category, foodId: it.id || it.foodId, micros: it.micros,
+        name: it.name,
+        qty: Number(grams) || 100,
+        kcal: Math.round(it.kcal || 0),
+        p: Math.round((it.p || 0) * 10) / 10,
+        f: Math.round((it.f || 0) * 10) / 10,
+        c: Math.round((it.c || 0) * 10) / 10,
+        category: it.category,
+        foodId: it.id || it.foodId,
+        micros: it.micros,
         planTag,
       });
       added++;

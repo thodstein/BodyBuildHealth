@@ -44,6 +44,7 @@ import {
 } from './food-availability';
 import { afAllows } from './planner-meal-affinity';
 import { MPS_CEIL_LBM_G_PER_KG, FIBER_HARD_CAP_G, fiberHvStepCapG, isUltraPProtein } from './planner-day-limits';
+import { itemSodiumMg, naAfterResize } from './planner-meal-sodium';
 // Порошок — не больше скупа (60 г) в одном пункте, иначе «изолят 186 г в перекусе».
 // Универсально (не HV-гейт): таких порций не бывает и на обычных днях.
 const POWDER_PORTION_CAP_G = 60;
@@ -108,6 +109,8 @@ export interface CorrectorItem {
   c: number;
   fiber?: number;
   leucine_mg?: number;
+  /** Натрий позиции, мг (§8.143 п. 8(3): поле ведёт движок, корректор его не теряет). */
+  na?: number;
   role?: string;
   _fixedGrams?: number;
   _cocktail?: { kind: string; name: string; group: string };
@@ -117,7 +120,7 @@ export interface CorrectorMeal {
   type?: string;
   time?: string;
   items: CorrectorItem[];
-  totals?: { kcal: number; p: number; f: number; c: number; fiber?: number };
+  totals?: { kcal: number; p: number; f: number; c: number; fiber?: number; na?: number };
   recipeApplied?: string;
   recipeAppliedData?: { ingredientIds?: string[] };
   recipeApplied2?: string;
@@ -192,12 +195,19 @@ function recalcMealTotals(meals: CorrectorMeal[]): void {
       c += it.c || 0;
       fiber += it.fiber || 0;
     }
+    // §8.143 п. 8(3): `na` ведёт движок (`mealTotalsOf`), а этот пересчёт его стирал — и день,
+    // собранный рецептами, терял известный натрий приёмов (замер: перекус с `na` 5 мг выходил
+    // из `assembleRecipeDay` с тоталами без `na`). Правило то же, что в `totalsAfterGramChange`
+    // (§10.6): натрий пересчитывается из текущих позиций и пишется, если сумма известна (>
+    // 0) — независимо от того, было ли поле; «не знаем» — отсутствие поля, а не ноль.
+    const naSum = Math.round(m.items.reduce((s, it) => s + itemSodiumMg(it), 0));
     m.totals = {
       kcal: Math.round(kcal),
       p: Math.round(p * 10) / 10,
       f: Math.round(f * 10) / 10,
       c: Math.round(c * 10) / 10,
       fiber: Math.round(fiber * 10) / 10,
+      ...(naSum > 0 ? { na: naSum } : {}),
     };
   }
 }
@@ -205,6 +215,9 @@ function recalcMealTotals(meals: CorrectorMeal[]): void {
 function scaleItem(it: CorrectorItem, newAmount: number): void {
   if (it._fixedGrams) return;
   const r = newAmount / Math.max(1, it.amount);
+  // §8.143 п. 8(3): граммы изменились — натрий пересчитываем ДО правки `amount`: иначе
+  // `naAfterResize` не видит прежнюю порцию и оставляет натрий старой тарелки.
+  if (typeof it.na === 'number') it.na = naAfterResize(it, newAmount);
   it.amount = newAmount;
   it.p = Math.round((it.p || 0) * r * 10) / 10;
   it.f = Math.round((it.f || 0) * r * 10) / 10;

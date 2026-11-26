@@ -69,7 +69,7 @@ beforeEach(() => {
 });
 
 describe('planner-meal-sodium: соль/натрий по приёмам', () => {
-  it('Na из item.na важнее пересчёта; фолбэк — FOOD_DB', () => {
+  it('FOOD_DB по текущим граммам первым; кэш `na` — фолбэк без id в базе', () => {
     expect(itemSodiumMg({ na: 420 })).toBe(420);
     // Без na значение берётся из FOOD_DB (product exists → > 0) или 0, но не бросает.
     expect(itemSodiumMg({ id: 'does_not_exist', amount: 100 })).toBe(0);

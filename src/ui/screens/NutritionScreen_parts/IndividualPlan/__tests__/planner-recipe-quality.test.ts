@@ -11,19 +11,31 @@ import { scoreRecipeForMeal, type RecipeMatchOptions } from '../recipe-engine';
 import { assembleRecipeDay, type PlanMealLike } from '../planner-recipe-mode';
 import type { Recipe } from '../../../../../engines/nutrition-periodization.engine';
 
-const food = (id: string) => FOOD_DB.find(f => f.id === id)!;
+const food = (id: string) => FOOD_DB.find((f) => f.id === id)!;
 
 /** Рецепт-фикстура: kcal считается из FOOD_DB по формуле (как в p36-p38). */
 function mkRecipe(name: string, meal: Recipe['meal'], ing: [string, number][], over: Partial<Recipe> = {}): Recipe {
-  let kcal = 0, p = 0, f = 0, c = 0;
+  let kcal = 0,
+    p = 0,
+    f = 0,
+    c = 0;
   for (const [id, g] of ing) {
-    const fd = food(id); const k = g / 100;
-    kcal += (fd.kcal || 0) * k; p += (fd.protein || 0) * k; f += (fd.fat || 0) * k; c += (fd.carbs || 0) * k;
+    const fd = food(id);
+    const k = g / 100;
+    kcal += (fd.kcal || 0) * k;
+    p += (fd.protein || 0) * k;
+    f += (fd.fat || 0) * k;
+    c += (fd.carbs || 0) * k;
   }
-  kcal = Math.round(4 * p + 9 * f + 4 * c / 1) / 1;
+  kcal = Math.round(4 * p + 9 * f + (4 * c) / 1) / 1;
   return {
-    name, meal, prepTimeMin: 10,
-    kcal: Math.round(kcal), protein: Math.round(p * 10) / 10, fat: Math.round(f * 10) / 10, carbs: Math.round(c * 10) / 10,
+    name,
+    meal,
+    prepTimeMin: 10,
+    kcal: Math.round(kcal),
+    protein: Math.round(p * 10) / 10,
+    fat: Math.round(f * 10) / 10,
+    carbs: Math.round(c * 10) / 10,
     ingredientIds: ing.map(([id]) => id),
     portions: Object.fromEntries(ing.map(([id, g]) => [id, g])),
     ingredients: ing.map(([id, g]) => `${food(id).name} ${g} г`),
@@ -37,16 +49,30 @@ function mkRecipe(name: string, meal: Recipe['meal'], ing: [string, number][], o
 const BASE_TARGETS = { kcal: 2600, p: 170, f: 75, c: 300 };
 const EXCLUDED = new Set<string>();
 
-function meal(label: string, target?: { p: number; c: number; f: number }, items: PlanMealLike['items'] = []): PlanMealLike {
+function meal(
+  label: string,
+  target?: { p: number; c: number; f: number },
+  items: PlanMealLike['items'] = [],
+): PlanMealLike {
   const totals = { kcal: items.reduce((s, i) => s + (i.kcal || 0), 0), p: 0, f: 0, c: 0 };
   return { label, time: '12:00', items, totals, ...(target ? { target } : {}) };
 }
 
 describe('C2: peri-рецепты достижимы', () => {
   const pool = [
-    mkRecipe('PreW: рис-мёд-шейкер', 'preworkout', [['rice_white', 80], ['honey', 20], ['whey_isolate', 20]]),
-    mkRecipe('PostW: курица-рис анаболик', 'postworkout', [['chicken_breast', 150], ['rice_white', 120]]),
-    mkRecipe('PreSleep: творог-казеин ночь', 'presleep', [['cottage_cheese_0', 200], ['casein', 20]]),
+    mkRecipe('PreW: рис-мёд-шейкер', 'preworkout', [
+      ['rice_white', 80],
+      ['honey', 20],
+      ['whey_isolate', 20],
+    ]),
+    mkRecipe('PostW: курица-рис анаболик', 'postworkout', [
+      ['chicken_breast', 150],
+      ['rice_white', 120],
+    ]),
+    mkRecipe('PreSleep: творог-казеин ночь', 'presleep', [
+      ['cottage_cheese_0', 200],
+      ['casein', 20],
+    ]),
   ];
   const mkMeals = (): PlanMealLike[] => [
     meal('Завтрак', { p: 40, c: 60, f: 15 }),
@@ -60,35 +86,72 @@ describe('C2: peri-рецепты достижимы', () => {
 
   it('трен-день: предтрен/пост-трен/перед сном получают свои рецепты', () => {
     const meals = mkMeals();
-    const res = assembleRecipeDay({ meals, pool, targets: BASE_TARGETS, excludedIds: EXCLUDED, trainDay: true, athleteWeightKg: 85 });
-    const byLabel = (l: string) => res.meals.find(m => m.label === l);
+    const res = assembleRecipeDay({
+      meals,
+      pool,
+      targets: BASE_TARGETS,
+      excludedIds: EXCLUDED,
+      trainDay: true,
+      athleteWeightKg: 85,
+    });
+    const byLabel = (l: string) => res.meals.find((m) => m.label === l);
     const missing = ['Предтрен', 'Пост-трен', 'Перед сном']
-      .filter(l => { const ra = byLabel(l)?.recipeApplied; return !ra || !/PreW|PostW|PreSleep/.test(ra); })
-      .map(l => `${l} → ${String(byLabel(l)?.recipeApplied)} opts=${JSON.stringify(byLabel(l)?.recipeOptions?.map(o => o.name) || [])} notes=${JSON.stringify(res.notes)}`);
-    require('fs').writeFileSync('.tmp-c2dbg.txt', missing.join('\n') || 'ALL-OK', 'utf8');
+      .filter((l) => {
+        const ra = byLabel(l)?.recipeApplied;
+        return !ra || !/PreW|PostW|PreSleep/.test(ra);
+      })
+      .map(
+        (l) =>
+          `${l} → ${String(byLabel(l)?.recipeApplied)} opts=${JSON.stringify(byLabel(l)?.recipeOptions?.map((o) => o.name) || [])} notes=${JSON.stringify(res.notes)}`,
+      );
     expect(missing, missing.join(' | ')).toEqual([]);
   });
 
   it('день отдыха: предтрен/пост-трен остаются продуктовыми', () => {
     const meals = mkMeals();
-    const res = assembleRecipeDay({ meals, pool, targets: BASE_TARGETS, excludedIds: EXCLUDED, trainDay: false, athleteWeightKg: 85 });
-    expect(res.meals.find(m => m.label === 'Предтрен')?.recipeApplied).toBeUndefined();
-    expect(res.meals.find(m => m.label === 'Пост-трен')?.recipeApplied).toBeUndefined();
+    const res = assembleRecipeDay({
+      meals,
+      pool,
+      targets: BASE_TARGETS,
+      excludedIds: EXCLUDED,
+      trainDay: false,
+      athleteWeightKg: 85,
+    });
+    expect(res.meals.find((m) => m.label === 'Предтрен')?.recipeApplied).toBeUndefined();
+    expect(res.meals.find((m) => m.label === 'Пост-трен')?.recipeApplied).toBeUndefined();
   });
 });
 
 describe('C1: дневные квоты на рецептурном пути', () => {
   it('семейство гарнира (рис) не чаще 3 приёмов в дне, когда есть альтернатива', () => {
-    const riceRecipes = [1, 2, 3].map(n => mkRecipe(`Рис-боул №${n}`, 'lunch', [['rice_white', 150], ['chicken_breast', 150], ['broccoli', 80]]));
-    const altRecipe = mkRecipe('Гречка-боул с говядиной', 'dinner', [['buckwheat', 150], ['beef_lean', 150], ['tomato', 80]]);
+    const riceRecipes = [1, 2, 3].map((n) =>
+      mkRecipe(`Рис-боул №${n}`, 'lunch', [
+        ['rice_white', 150],
+        ['chicken_breast', 150],
+        ['broccoli', 80],
+      ]),
+    );
+    const altRecipe = mkRecipe('Гречка-боул с говядиной', 'dinner', [
+      ['buckwheat', 150],
+      ['beef_lean', 150],
+      ['tomato', 80],
+    ]);
     const meals: PlanMealLike[] = [
       meal('Завтрак', { p: 40, c: 60, f: 15 }),
       meal('Обед', { p: 45, c: 70, f: 18 }),
       meal('Ужин', { p: 40, c: 50, f: 16 }),
       meal('Перед сном', { p: 30, c: 20, f: 8 }),
     ];
-    const res = assembleRecipeDay({ meals, pool: [...riceRecipes, altRecipe], targets: BASE_TARGETS, excludedIds: EXCLUDED, athleteWeightKg: 85 });
-    const riceMeals = res.meals.filter(m => (m.items || []).some(it => it.id === 'rice_white' || it.id === 'rice_brown' || it.id === 'rice_basmati')).length;
+    const res = assembleRecipeDay({
+      meals,
+      pool: [...riceRecipes, altRecipe],
+      targets: BASE_TARGETS,
+      excludedIds: EXCLUDED,
+      athleteWeightKg: 85,
+    });
+    const riceMeals = res.meals.filter((m) =>
+      (m.items || []).some((it) => it.id === 'rice_white' || it.id === 'rice_brown' || it.id === 'rice_basmati'),
+    ).length;
     expect(riceMeals).toBeLessThanOrEqual(3);
   });
 
@@ -107,23 +170,41 @@ describe('C1: дневные квоты на рецептурном пути', (
       ]),
     ];
     const res = assembleRecipeDay({
-      meals: nutOver, pool: [], targets: BASE_TARGETS, excludedIds: EXCLUDED, athleteWeightKg: 80,
+      meals: nutOver,
+      pool: [],
+      targets: BASE_TARGETS,
+      excludedIds: EXCLUDED,
+      athleteWeightKg: 80,
     });
-    const nutG = res.meals.flatMap(m => m.items || []).filter(it => ['almonds', 'walnuts', 'cashew'].includes(it.id)).reduce((s, it) => s + (it.amount || 0), 0);
+    const nutG = res.meals
+      .flatMap((m) => m.items || [])
+      .filter((it) => ['almonds', 'walnuts', 'cashew'].includes(it.id))
+      .reduce((s, it) => s + (it.amount || 0), 0);
     expect(nutG).toBeLessThanOrEqual(60 + 10 + 5); // квота 60 + запас катчелла
   });
 });
 
 describe('C3: аллергены/вег для легаси (без ingredientIds)', () => {
   const opts = (over: Partial<RecipeMatchOptions>): RecipeMatchOptions => ({
-    mealType: 'lunch', targetKcal: 500, targetProteinG: 40, targetCarbsG: 50, targetFatG: 15,
-    excludedIds: new Set<string>(), ...over,
+    mealType: 'lunch',
+    targetKcal: 500,
+    targetProteinG: 40,
+    targetCarbsG: 50,
+    targetFatG: 15,
+    excludedIds: new Set<string>(),
+    ...over,
   });
   const legacyChicken: Recipe = {
-    name: 'Легаси куриный салат', meal: 'lunch', prepTimeMin: 10,
-    kcal: 480, protein: 42, fat: 12, carbs: 45,
+    name: 'Легаси куриный салат',
+    meal: 'lunch',
+    prepTimeMin: 10,
+    kcal: 480,
+    protein: 42,
+    fat: 12,
+    carbs: 45,
     ingredients: ['Куриная грудка 180 г', 'Рис белый 100 г', 'Оливковое масло 8 г'],
-    instructions: ['Смешать'], tags: ['обед'],
+    instructions: ['Смешать'],
+    tags: ['обед'],
   } as Recipe;
 
   it('исключённый продукт (из декомпозиции строк) — hardReject', () => {
@@ -145,11 +226,23 @@ describe('C3: аллергены/вег для легаси (без ingredientId
 describe('C5: ккал-гейт приёмки', () => {
   it('кандидат с дистанцией >±15% проигрывает точному при одинаковой базе', () => {
     // Цель приёма 500 ккал: near-рецепт ~500, far ~300 (девиация 40% — reject зона)
-    const near = mkRecipe('Точный обед 500', 'lunch', [['chicken_breast', 150], ['rice_white', 110], ['olive_oil', 10]]);
-    const far = mkRecipe('Лёгкий салат 250', 'lunch', [['cod', 150], ['cucumber', 100], ['lettuce_romaine', 50]]);
+    const near = mkRecipe('Точный обед 500', 'lunch', [
+      ['chicken_breast', 150],
+      ['rice_white', 110],
+      ['olive_oil', 10],
+    ]);
+    const far = mkRecipe('Лёгкий салат 250', 'lunch', [
+      ['cod', 150],
+      ['cucumber', 100],
+      ['lettuce_romaine', 50],
+    ]);
     const meals = [meal('Обед', { p: 40, c: 55, f: 14 })];
     const res = assembleRecipeDay({
-      meals, pool: [far, near], targets: BASE_TARGETS, excludedIds: EXCLUDED, athleteWeightKg: 85,
+      meals,
+      pool: [far, near],
+      targets: BASE_TARGETS,
+      excludedIds: EXCLUDED,
+      athleteWeightKg: 85,
     });
     expect(res.meals[0].recipeApplied).toBe(near.name);
     expect(res.appliedCount).toBe(1);
