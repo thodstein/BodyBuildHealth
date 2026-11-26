@@ -109,13 +109,28 @@ export function computeStructuredAnalytics(
     };
   }
 
-  const allSessions = [...prevSessions, ...sessions];
-  const recent = sessions.slice(-7);
+  // Карточка передаёт всю историю одним списком, поэтому `prevSessions` почти всегда
+  // пуст. Без второго периода тренд сравнивает период сам с собой, а прогноз 1RM
+  // показывает «рост +0 %» — фикция. Авто-сплит: сортируем историю по дате и делим
+  // пополам — первая половина прошлый период, вторая текущий. Явно переданный
+  // `prevSessions` сильнее авто-сплита; одна сессия остаётся текущим периодом
+  // без прошлого.
+  let currentSessions = sessions;
+  let previousSessions = prevSessions;
+  if (prevSessions.length === 0 && sessions.length >= 2) {
+    const sorted = [...sessions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const half = Math.floor(sorted.length / 2);
+    previousSessions = sorted.slice(0, half);
+    currentSessions = sorted.slice(half);
+  }
+
+  const allSessions = [...previousSessions, ...currentSessions];
+  const recent = currentSessions.slice(-7);
   const levels: AnalyticsLevel[] = [];
 
   // ── Level 1: Session count & consistency ──
-  const sessionCount = sessions.length;
-  const prevCount = prevSessions.length;
+  const sessionCount = currentSessions.length;
+  const prevCount = previousSessions.length;
   const consistency = prevCount > 0 ? Math.min(1, sessionCount / prevCount) : 0.8;
   levels.push({
     level: 1, name: 'Консистентность тренировок',
@@ -125,9 +140,9 @@ export function computeStructuredAnalytics(
   });
 
   // ── Level 2: Volume ──
-  const recentVolumes = sessions.map(s => calcVolume(s.exercises));
+  const recentVolumes = currentSessions.map(s => calcVolume(s.exercises));
   const avgVolume = recentVolumes.reduce((s, v) => s + v, 0) / recentVolumes.length;
-  const prevVolumes = prevSessions.map(s => calcVolume(s.exercises));
+  const prevVolumes = previousSessions.map(s => calcVolume(s.exercises));
   const prevAvgVol = prevVolumes.length > 0 ? prevVolumes.reduce((s, v) => s + v, 0) / prevVolumes.length : avgVolume;
   const volTrend = prevAvgVol > 0 ? ((avgVolume - prevAvgVol) / prevAvgVol) * 100 : 0;
   levels.push({
@@ -141,8 +156,8 @@ export function computeStructuredAnalytics(
   // ── Level 3: Intensity ──
   // Сессии без измеренного RPE (все подходы `rpe: 0`) в среднее не входят: жёсткий
   // ноль занижал интенсивность недели и переключал статус на «optimal».
-  const measuredIntensity = sessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
-  const prevMeasuredIntensity = prevSessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
+  const measuredIntensity = currentSessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
+  const prevMeasuredIntensity = previousSessions.map(sess => calcIntensity(sess.exercises)).filter(v => v > 0);
   const avgIntensity = measuredIntensity.length > 0
     ? measuredIntensity.reduce((s, v) => s + v, 0) / measuredIntensity.length : 0;
   const prevIntensity = prevMeasuredIntensity.length > 0
@@ -159,7 +174,7 @@ export function computeStructuredAnalytics(
 
   // ── Level 4: Density ──
   // Усредняем только сессии с измеренной длительностью: 0 — «неизвестно».
-  const timedSessions = sessions.filter(sess => (Number(sess.durationMin) || 0) > 0);
+  const timedSessions = currentSessions.filter(sess => (Number(sess.durationMin) || 0) > 0);
   const avgDuration = timedSessions.length > 0
     ? timedSessions.reduce((s, sess) => s + (Number(sess.durationMin) || 0), 0) / timedSessions.length
     : 0;
@@ -174,7 +189,7 @@ export function computeStructuredAnalytics(
   });
 
   // ── Level 5: Set/rep distribution ──
-  const allSets = sessions.flatMap(s => s.exercises.flatMap(e => e.sets));
+  const allSets = currentSessions.flatMap(s => s.exercises.flatMap(e => e.sets));
   const strengthSets = allSets.filter(s => s.reps <= 6);
   const hyperSets = allSets.filter(s => s.reps >= 7 && s.reps <= 15);
   const endurSets = allSets.filter(s => s.reps > 15);
@@ -184,15 +199,15 @@ export function computeStructuredAnalytics(
   levels.push({
     level: 5, name: 'Распределение повторений',
     metrics: { strength: strengthSets.length, hypertrophy: hyperSets.length, endurance: endurSets.length, ratio },
-    status: 'optimal',
-    insight: `S/H/E: ${ratio}%`,
+    status: allSets.length === 0 ? 'warning' : 'optimal',
+    insight: allSets.length === 0 ? 'Подходов нет — распределение повторений не оценивается' : `S/H/E: ${ratio}%`,
   });
 
   // ── Level 6-8: Pattern progression (top 3 patterns) ──
   const patterns: PatternProgression[] = [];
   const patternMap = new Map<string, { currentVol: number[]; currentInt: number[]; currentRM: number[]; currentRmMeasured: boolean[]; prevVol: number[]; prevRM: number[]; prevRmMeasured: boolean[] }>();
 
-  for (const sess of sessions) {
+  for (const sess of currentSessions) {
     for (const ex of sess.exercises) {
       const pattern = ex.name.toLowerCase().includes('squat') ? 'squat'
         : ex.name.toLowerCase().includes('bench') ? 'bench'
@@ -219,7 +234,7 @@ export function computeStructuredAnalytics(
     }
   }
 
-  for (const sess of prevSessions) {
+  for (const sess of previousSessions) {
     for (const ex of sess.exercises) {
       const pattern = ex.name.toLowerCase().includes('squat') ? 'squat'
         : ex.name.toLowerCase().includes('bench') ? 'bench'
@@ -288,7 +303,7 @@ export function computeStructuredAnalytics(
 
   // ── Level 12: Push/Pull ratio ──
   let pushVol = 0, pullVol = 0;
-  for (const sess of sessions) {
+  for (const sess of currentSessions) {
     for (const ex of sess.exercises) {
       const name = ex.name.toLowerCase();
       const vol = ex.sets.reduce((s, st) => s + st.reps * st.weight, 0);
@@ -308,7 +323,7 @@ export function computeStructuredAnalytics(
   // ── Level 13-15: Fatigue profile ──
   const chronicWeeks = Math.min(4, Math.floor(allSessions.length / 3));
   const chronicLoad = allSessions.slice(-chronicWeeks * 3).reduce((s, sess) => s + calcVolume(sess.exercises), 0) / chronicWeeks;
-  const acuteLoad = sessions.slice(-3).reduce((s, sess) => s + calcVolume(sess.exercises), 0);
+  const acuteLoad = currentSessions.slice(-3).reduce((s, sess) => s + calcVolume(sess.exercises), 0);
   const acwr = chronicLoad > 0 ? acuteLoad / chronicLoad : 1;
 
   const loadStdDev = Math.sqrt(recentVolumes.length > 1
@@ -316,9 +331,9 @@ export function computeStructuredAnalytics(
   const monotony = loadStdDev > 0 ? avgVolume / loadStdDev : 1;
   const strain = avgVolume * monotony * 0.01;
 
-  const cnsLoad = sessions.reduce((s, sess) =>
+  const cnsLoad = currentSessions.reduce((s, sess) =>
     s + sess.exercises.flatMap(e => e.sets).filter(st => st.rpe >= 8 && st.reps <= 5).length, 0);
-  const peripheralLoad = sessions.reduce((s, sess) =>
+  const peripheralLoad = currentSessions.reduce((s, sess) =>
     s + sess.exercises.flatMap(e => e.sets).filter(st => st.rpe <= 7 || st.reps >= 8).length, 0);
 
   const fatigue: FatigueProfile = {
@@ -358,11 +373,20 @@ export function computeStructuredAnalytics(
     insight: fatigue.recoveryDebt > 1000 ? 'Критический долг восстановления — deload обязателен' : 'Восстановление адекватно',
   });
 
+  // Частота — тренировок в неделю за длину окна периода, а не длина массива: после
+  // деления истории пополам 40 записей читались как «40 тренировок/нед».
+  const levelDates = currentSessions
+    .map((sess) => Date.parse(`${String(sess.date || '')}T00:00:00Z`))
+    .filter((t) => Number.isFinite(t));
+  const spanDays =
+    levelDates.length >= 2 ? Math.max(1, (Math.max(...levelDates) - Math.min(...levelDates)) / 86400000 + 1) : 0;
+  const sessionsPerWeek =
+    spanDays > 0 ? Math.round((currentSessions.length / (spanDays / 7)) * 10) / 10 : currentSessions.length;
   levels.push({
     level: 17, name: 'Тренировочная частота',
-    metrics: { sessionsPerWeek: sessions.length },
-    status: sessions.length >= 3 && sessions.length <= 6 ? 'optimal' : 'good',
-    insight: sessions.length < 2 ? 'Менее 2 тренировок/нед — недостаточно для прогресса' : 'Частота оптимальна',
+    metrics: { sessionsPerWeek },
+    status: sessionsPerWeek >= 3 && sessionsPerWeek <= 6 ? 'optimal' : 'good',
+    insight: sessionsPerWeek < 2 ? 'Менее 2 тренировок/нед — недостаточно для прогресса' : 'Частота оптимальна',
   });
 
   levels.push({
@@ -389,22 +413,27 @@ export function computeStructuredAnalytics(
   const overtrainingRisk = Math.round(Math.min(1, overtrainingSignals / 4 + (acwr > 1.5 ? 0.3 : 0)) * 100);
   const plateauRisk = volTrend < -10 && avgIntensity > 8 ? 0.7 : volTrend > 40 ? 0.5 : 0.15;
 
-  // Прогноз строится только по измеренному 1RM: у паттерна без текущего периода
-  // `estimated1RM` — 0, и «squat: 0 кг» читалось бы как реальный прогноз.
+  // Прогноз строится только по измеренному 1RM и только против сравнимого прошлого
+  // периода: у паттерна без текущего периода `estimated1RM` — 0 («squat: 0 кг»),
+  // а без прошлого рост считался от самого себя (+0 %) — это не прогноз, а эхо.
   const predictions: Record<string, number> = {};
+  const predictionParts: string[] = [];
   for (const p of patterns) {
-    if (p.estimated1RM <= 0) continue;
+    if (p.estimated1RM <= 0 || p.rmComparable !== true) continue;
     const growthRate = p.estimated1RMTrend / 100;
-    predictions[p.pattern] = Math.round(p.estimated1RM * (1 + growthRate));
+    const nextWeek = Math.round(p.estimated1RM * (1 + growthRate));
+    predictions[p.pattern] = nextWeek;
+    const sign = p.estimated1RMTrend > 0 ? '+' : '';
+    predictionParts.push(`${p.pattern}: ${nextWeek}кг (${sign}${p.estimated1RMTrend}%)`);
   }
 
   levels.push({
     level: 21, name: 'Прогноз 1RM (след. неделя)',
     metrics: predictions,
     status: Object.keys(predictions).length > 0 ? 'optimal' : 'warning',
-    insight: Object.keys(predictions).length > 0
-      ? Object.entries(predictions).map(([k, v]) => `${k}: ${v}кг`).join(', ')
-      : 'Нет данных для прогноза 1RM',
+    insight: predictionParts.length > 0
+      ? predictionParts.join(', ')
+      : 'Нет сравнимых периодов для прогноза 1RM',
   });
 
   levels.push({

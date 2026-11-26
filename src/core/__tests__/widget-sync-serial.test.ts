@@ -110,23 +110,43 @@ describe('A1 сериал синков: параллельный вызов не
 });
 
 describe('A1 дата сессии из метки очереди', () => {
-  it('новая сессия по set_add: дата из ts — подход после полуночи не приземляется в «вчера»', () => {
+  it('подход со старой меткой: запись в журнал своей датой, живой сессии не создаём', () => {
+    // Очередь пережила полночь (или сутки): подход принадлежит дню своей метки, а не дню
+    // дрена. Живую сессию за прошлый день не открываем — иначе утренний старт продолжил бы
+    // вчерашнюю тренировку и записал сегодняшнюю работу вчерашним числом.
     const target = addDaysIso(localIsoDate(), -1);
     const res = applyWidgetQueue([
       { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.parse(`${target}T08:15:00`) },
     ]);
     expect(res.setsAdded).toBe(1);
-    expect(loadActiveSession()?.date).toBe(target);
+    expect(res.workoutsStarted).toBe(0);
+    expect(loadActiveSession()).toBeNull();
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].date).toBe(target);
+    expect(saved[0].exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
   });
 
-  it('живая сессия: подход «сегодня» в ней не сдвигает дату', () => {
+  it('живая сессия: вчерашний подход её не сдвигает и не дополняет', () => {
+    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.now() }]);
+    const started = loadActiveSession();
+    expect(started?.date).toBe(localIsoDate());
+
     const target = addDaysIso(localIsoDate(), -1);
-    applyWidgetQueue([
-      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, ts: Date.parse(`${target}T07:00:00`) },
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 70, reps: 10, ts: Date.parse(`${target}T23:58:00`) },
     ]);
-    expect(loadActiveSession()?.date).toBe(target);
-    applyWidgetQueue([{ type: 'set_add', exerciseName: 'Жим лёжа', weight: 82.5, reps: 7, ts: Date.now() }]);
-    expect(loadActiveSession()?.date).toBe(target);
+    expect(res.setsAdded).toBe(1);
+
+    const active = loadActiveSession();
+    expect(active?.sessionId).toBe(started?.sessionId);
+    expect(active?.date).toBe(localIsoDate());
+    // Сегодняшний объём не раздут вчерашним подходом…
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+    // …он лёг отдельной записью своей даты.
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].date).toBe(target);
   });
 });
 

@@ -16,13 +16,18 @@ interface Props {
   missedSessions: number;
   exercises: Array<{ name: string; e1rmBefore: number; e1rmAfter: number }>;
   currentVolume: number;
-  currentRir: number;
+  /** Средний измеренный RIR; null/не передано — измерений RIR в истории нет. */
+  currentRir?: number | null;
 }
 
 const MesoCorrectionCard: React.FC<Props> = ({
   profile, acwr, monotony, avgReadiness, mesoWeeks, missedSessions,
   exercises, currentVolume, currentRir,
 }) => {
+  // `null` — измерений RIR нет: движку даём нейтральную базу, но сдвиг RIR и UI-текст
+  // не выдумываем, иначе карточка пишет «было 2» и предлагает изменение, которого нет.
+  const rirKnown = typeof currentRir === 'number' && Number.isFinite(currentRir);
+  const rirBase = rirKnown ? (currentRir as number) : null;
   const acwrInputMissing = !(typeof acwr === 'number' && Number.isFinite(acwr) && acwr > 0);
   const monotonyInputMissing = !(typeof monotony === 'number' && Number.isFinite(monotony) && monotony > 0);
   const acwrVal = acwrInputMissing ? 1 : (acwr as number);
@@ -40,9 +45,9 @@ const MesoCorrectionCard: React.FC<Props> = ({
       missedSessions,
       profile,
       currentVolume,
-      currentRir,
+      currentRir: rirBase,
     };
-  }, [exercises, mesoWeeks, acwrVal, monotonyVal, avgReadiness, missedSessions, profile, currentVolume, currentRir]);
+  }, [exercises, mesoWeeks, acwrVal, monotonyVal, avgReadiness, missedSessions, profile, currentVolume, rirBase]);
 
   const output = useMemo(() => analyzeMesoCycle(input), [input]);
 
@@ -54,14 +59,24 @@ const MesoCorrectionCard: React.FC<Props> = ({
 
   // Объём → множитель к текущим сетам, RIR → сдвиг. Делод-первым при критике объёма.
   const volumeKnown = currentVolume > 0;
-  const rawMult = volumeKnown ? output.recommendedVolume / currentVolume : 1;
+  // Движок не опускает объём ниже 6 сетов и не поднимает RIR выше 4. Сравниваем с базой
+  // после тех же зажимов: иначе пол 6 сам превращался в «рекомендацию ×1.5» и кнопка
+  // применяла к плану изменение, которого движок не предлагал.
+  const volumeBase = volumeKnown ? Math.max(6, currentVolume) : 0;
+  const rawMult = volumeBase > 0 ? output.recommendedVolume / volumeBase : 1;
   const mult = Math.min(1.5, Math.max(0.5, output.needsDeloadFirst ? Math.min(rawMult, 0.6) : rawMult));
-  const rirShift = output.recommendedRir - currentRir;
-  const meaningful = (volumeKnown && Math.abs(mult - 1) >= 0.01) || rirShift !== 0;
+  const rirCapBase = rirBase != null ? Math.min(4, Math.max(0, rirBase)) : null;
+  const rirShift = rirCapBase != null ? output.recommendedRir - rirCapBase : 0;
+  // Показываем рекомендацию только когда она отличается от базы: иначе потолок движка (4)
+  // читался бы как «рекомендуем 4» при измеренных 6, хотя менять нечего.
+  const rirShown = rirBase != null ? (rirShift !== 0 ? output.recommendedRir : rirBase) : null;
+  // Без измеренного RIR (и без реального сдвига после зажима) сдвиг не считается изменением.
+  const meaningful = (volumeKnown && Math.abs(mult - 1) >= 0.01) || (rirCapBase != null && rirShift !== 0);
   const dataNote = [
     acwrInputMissing ? 'ACWR: нет sRPE-логов (взят нейтральный 1.0)' : `ACWR ${acwrVal.toFixed(2)}`,
     monotonyInputMissing ? 'монотонность: нет данных' : `монотонность ${monotonyVal.toFixed(2)}`,
     `готовность ${Math.round(avgReadiness)}`,
+    rirBase == null ? 'RIR: нет измерений — сдвиг RIR не применяется' : null,
     missedSessions > 0 ? `пропусков ${missedSessions}` : null,
     exercises.length ? `упражнений в динамике ${exercises.length}` : 'динамики e1RM пока нет',
   ].filter(Boolean).join(' · ');
@@ -75,17 +90,19 @@ const MesoCorrectionCard: React.FC<Props> = ({
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Объём</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: volumeKnown && output.recommendedVolume > currentVolume ? ACCENT : volumeKnown ? '#ff4444' : '#fff' }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: volumeBase > 0 && output.recommendedVolume > volumeBase ? ACCENT : volumeKnown ? '#ff4444' : '#fff' }}>
             {volumeKnown ? output.recommendedVolume : '—'} <span style={{ fontSize: 10, color: '#fff' }}>сетов</span>
           </div>
           <div style={{ fontSize: 10, color: '#fff' }}>{volumeKnown ? `было ${currentVolume}` : 'нет данных'}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>RIR</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedRir !== currentRir ? '#ffaa00' : ACCENT }}>
-            {output.recommendedRir}
+          <div
+            style={{ fontSize: 16, fontWeight: 800, color: rirShift !== 0 ? '#ffaa00' : ACCENT }}
+          >
+            {rirShown != null ? rirShown : '—'}
           </div>
-          <div style={{ fontSize: 10, color: '#fff' }}>было {currentRir}</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>было {rirBase != null ? rirBase : 'нет измерений'}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Делоад</div>
@@ -111,7 +128,7 @@ const MesoCorrectionCard: React.FC<Props> = ({
         </div>
       ))}
 <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{output.recommendedRir}, делод каждые {output.recommendedDeloadFreq} нед.</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{rirShown != null ? rirShown : '—'}, делод каждые {output.recommendedDeloadFreq} нед.</div>
         {/* Мост: kind 'pri' (объём × множитель + сдвиг RIR) работает и для ББ, и для ПЛ.
             Раньше здесь был kind 'mrv' — чисто ББ-канал: в ПЛ-плане кнопка молча ничего не делала. */}
         <button

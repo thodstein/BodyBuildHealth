@@ -1233,6 +1233,74 @@ export function setWorkoutPlayerActive(active: boolean): void {
 }
 const playerActive = (): boolean => workoutPlayerActive && typeof window !== 'undefined';
 
+/**
+ * Отложенные подходы виджета. Очередь нативной стороны уже выдрана, когда
+ * `applyWidgetQueue` начинает разбор: если архив вчерашней сессии не лёг
+ * (квота/приватный режим), элемент некуда вернуть, и раньше подход исчезал
+ * молча. Держим его здесь и повторяем на следующем синке — дата чужого дня
+ * при этом не портится.
+ */
+const WIDGET_SET_RETRY_KEY = 'he_widget_set_retry_v1';
+
+/** Один подход: ключ повтора, чтобы два одинаковых дрена нет не задвоили запись. */
+function widgetSetSignature(it: QueuedItem): string {
+  return `${Number(it.ts) || 0}|${String(it.exerciseName || '')}|${Number(it.weight) || 0}|${Number(it.reps) || 0}`;
+}
+
+function readWidgetSetRetry(): QueuedItem[] {
+  const storage = localStorageRef();
+  if (!storage) return [];
+  try {
+    const parsed = JSON.parse(storage.getItem(WIDGET_SET_RETRY_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((it): it is QueuedItem => !!it && typeof it === 'object' && it.type === 'set_add');
+  } catch {
+    return [];
+  }
+}
+
+function writeWidgetSetRetry(items: QueuedItem[]): void {
+  const storage = localStorageRef();
+  if (!storage) return;
+  try {
+    if (items.length === 0) storage.removeItem(WIDGET_SET_RETRY_KEY);
+    // Держим свежие 50: при долгом отказе хранилища старые попытки уже неактуальны,
+    // а последние подходы — это текущая тренировка.
+    else storage.setItem(WIDGET_SET_RETRY_KEY, JSON.stringify(items.slice(-50)));
+  } catch {
+    /* хранилище недоступно — повторять некуда, элемент останется только в памяти этого прохода */
+  }
+}
+
+/**
+ * Уже записанные «прошлые» подходы — сигнатура `ts|упражнение|вес|повторы`.
+ * Запись прошлого дня одна на день (`sessionId = wset_<день>`), поэтому повторная
+ * доставка того же элемента (буфер повтора + нативная очередь) не должна ни задвоить
+ * подход внутри записи, ни соврать счётчиком «+1 подход».
+ */
+const WIDGET_RETRO_DONE_KEY = 'he_widget_retro_done_v1';
+
+function readWidgetRetroDone(): string[] {
+  const storage = localStorageRef();
+  if (!storage) return [];
+  try {
+    const parsed = JSON.parse(storage.getItem(WIDGET_RETRO_DONE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((v: unknown): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function appendWidgetRetroDone(signature: string): void {
+  const storage = localStorageRef();
+  if (!storage || !signature) return;
+  try {
+    storage.setItem(WIDGET_RETRO_DONE_KEY, JSON.stringify([...readWidgetRetroDone(), signature].slice(-200)));
+  } catch {
+    /* хранилище недоступно — идемпотентность держит стабильный sessionId дня */
+  }
+}
+
 export function applyWidgetQueue(items: QueuedItem[]): {
   waterMl: number;
   /** Снятая вода («−250» на виджете) — сколько реально убрали. */
@@ -1264,7 +1332,22 @@ export function applyWidgetQueue(items: QueuedItem[]): {
   // Сначала создаём быстрые задачи/заметки, потом применяем остальное:
   // иначе отметка «сделано» у только что добавленной с виджета задачи
   // пришла бы раньше создания и потерялась бы.
-  const ordered = [...items].sort((a, b) => addRank(a) - addRank(b));
+  // Отложенные подходы (провал архива на прошлом синке) идут в том же проходе:
+  // они уже выдран из нативной очереди, и без повтора подход исчез бы навсегда.
+  const retryPending = readWidgetSetRetry();
+  const merged: QueuedItem[] = [];
+  const seenSets = new Set<string>();
+  for (const it of [...retryPending, ...items]) {
+    if (it && it.type === 'set_add') {
+      const sig = widgetSetSignature(it);
+      if (seenSets.has(sig)) continue;
+      seenSets.add(sig);
+    }
+    merged.push(it);
+  }
+  const ordered = merged.sort((a, b) => addRank(a) - addRank(b));
+  /** Подходы, которые не удалось записать из-за хранилища: повтор на следующем синке. */
+  const keepRetry: QueuedItem[] = [];
   for (const it of ordered) {
     try {
       if (it.type === 'water') {
@@ -1416,8 +1499,16 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           notesAdded += 1;
         }
       } else if (it.type === 'workout_start') {
-        const plan = safe(() => resolveWorkoutPlan(todayLocalISO()), null);
+        const today = todayLocalISO();
+        const plan = safe(() => resolveWorkoutPlan(today), null);
         const current = loadActiveSession();
+        // «Своя» сессия — та же дата ИЛИ запись обновлялась сегодня: тренировку,
+        // начатую вчера и продолженную утром, не рвём на две записи (тот же контракт,
+        // что у set_add ниже). Без savedAt «Начать» считал такую сессию чужой.
+        // Пустой черновик (подходов нет) продолжаться не может: его дата сдвинулась бы
+        // на вчера и сегодняшняя работа ушла бы в прошлый день.
+        const lastSavedToday =
+          isActiveSessionWorthSaving(current) && !!current?.savedAt && isoFromTs(current.savedAt) === today;
         if (playerActive()) {
           // Player open: relay the start to the player instead of writing — the
           // player owns the true start time/duration/warmup while mounted.
@@ -1439,7 +1530,7 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           // «Начать тренировку» с виджета немой (без подходов автосейв отказывает).
           if (saveActiveSession(sessionFromPlan(plan), plan?.plannedSets, { allowEmpty: true })) workoutsStarted += 1;
           void pushWorkoutWidget();
-        } else if (String(current.date || '') !== todayLocalISO()) {
+        } else if (String(current.date || '') !== today && !lastSavedToday) {
           // Живая сессия другого дня (осталась с прошлой тренировки): дописывать в неё
           // план сегодняшнего нельзя — подходы двух дней слиплись бы в записи с датой
           // прошлого, а отдельной записи за сегодня не появилось бы. Плеер при открытии
@@ -1515,9 +1606,21 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         }
       } else if (it.type === 'set_add' && it.exerciseName) {
         const name = String(it.exerciseName).slice(0, 60);
-        const today = todayLocalISO();
-        const plan = safe(() => resolveWorkoutPlan(today), null);
+        // Дата подхода — по его собственной метке, а не «сегодня»: элемент очереди (и тем
+        // более буфера повтора) может пережить полночь, и подход 23:58 попал бы в объём
+        // сегодняшней тренировки. План резолвим тоже на дату подхода.
+        const itemDay = isoFromTs(it.ts || Date.now());
+        const plan = safe(() => resolveWorkoutPlan(itemDay), null);
         const base = loadActiveSession();
+        const today = todayLocalISO();
+        // Своя ли живая сессия этому подходу: та же дата ИЛИ запись обновлялась в день
+        // подхода (тренировка, начатая вчера и продолженная ночью, не рвётся на две).
+        const liveSavedDay = base?.savedAt ? isoFromTs(base.savedAt) : '';
+        const liveMatchesItem = !!base && (base.date === itemDay || liveSavedDay === itemDay);
+        // Подход прошлого дня, доехавший до синка сегодня (очередь пережила полночь или
+        // буфер повтора ждал хранилища): он не принадлежит сегодняшней тренировке и не
+        // должен подменять её живую копию. Пишется отдельной записью своей даты.
+        const retroItem = !liveMatchesItem && itemDay < today;
         // Измерения из очереди нормализуются один раз — для реле плееру и для записи:
         // Java шлёт `rir: 0` и «RIR не трогали», но введённый RPE — тоже измерение,
         // поэтому RIR выводим из него (10 − RPE), как делает плеер в logOne. Иначе один
@@ -1538,7 +1641,9 @@ export function applyWidgetQueue(items: QueuedItem[]): {
         // Плеер открыт — он единственный писатель. Спрашиваем его ДО архивации чужой
         // сессии: тренировка, начатая вчера и продолженная ночью, живёт в его состоянии,
         // и архив stored-копии вырвал бы её из-под идущей сессии.
-        if (playerActive()) {
+        // Прошлый подход плееру не релеим: у реле нет даты (payload её не несёт), и подход
+        // попал бы в открытую сегодняшнюю сессию. Он пишется в журнал своей датой ниже.
+        if (playerActive() && !retroItem) {
           const relay = {
             exerciseName: name,
             weight: Number(it.weight) || 0,
@@ -1562,23 +1667,29 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             continue;
           }
         }
-        // «Своя» живая сессия — та же дата ИЛИ запись обновлялась сегодня: тренировку,
-        // начатую вчера и продолженную ночью/утром, не рвём на две записи. Дата самой
-        // сессии — дата старта, подход её не сдвигает (контракт A1).
-        const lastSavedToday = !!base?.savedAt && isoFromTs(base.savedAt) === today;
-        const dayMatches = !base || base.date === today || lastSavedToday;
+        // Уже записанный прошлый подход (повторная доставка): в журнале он есть, второй
+        // раз не пишем и «+1 подход» не врём.
+        const retroSignature = retroItem ? widgetSetSignature(it) : '';
+        if (retroItem && readWidgetRetroDone().includes(retroSignature)) continue;
+        // «Своя» живая сессия — та же дата, что у подхода, ИЛИ запись обновлялась в этот
+        // день: тренировку, начатую вчера и продолженную ночью/утром, не рвём на две записи.
+        // Дата самой сессии — дата старта, подход её не сдвигает (контракт A1).
+        const dayMatches = !base || liveMatchesItem;
         // Живую сессию чужого дня не дополняем: подход лёг бы в запись вчерашней
         // даты (и план сегодняшнего дня — туда же), а за сегодня не появилось бы
         // ничего. Незавершённую тренировку сначала архивируем в дневник, пустой
         // черновик просто снимаем.
         const reusable = dayMatches ? base : null;
-        if (base && !dayMatches) {
+        if (base && !dayMatches && !retroItem) {
           if (isActiveSessionWorthSaving(base)) {
             const archived = archiveActiveSession();
             if (!archived) {
               // Запись не легла (квота/приватный режим): чужую сессию не трогаем
               // и подход в неё не пишем — иначе вчерашний день получил бы подходы
-              // сегодняшней тренировки, а сегодняшний — ноль. Счётчики не растут.
+              // сегодняшней тренировки, а сегодняшний — ноль. Но и выбрасывать
+              // элемент нельзя: очередь уже выдран, вернуть его некому. Кладём
+              // в отложенные — следующий синк повторит после успешного архива.
+              keepRetry.push(it);
               void pushWorkoutWidget();
               continue;
             }
@@ -1587,12 +1698,30 @@ export function applyWidgetQueue(items: QueuedItem[]): {
             clearActiveSession(base.sessionId);
           }
         }
-        let session = reusable ? ensurePlanExercises(reusable, plan) : sessionFromPlan(plan);
+        // Прошлый день собирается в ОДНУ запись: `sessionId = wset_<день>` стабилен, и второй
+        // подход того же дня дописывается в уже сохранённую запись, а не создаёт рядом ещё
+        // одну «тренировку» из одного подхода.
+        const retroSessionId = retroItem ? `wset_${itemDay}` : '';
+        const retroExisting = retroSessionId
+          ? loadSessions().find((saved) => saved.sessionId === retroSessionId) || null
+          : null;
+        let session = reusable
+          ? ensurePlanExercises(reusable, plan)
+          : retroExisting
+            ? {
+                ...retroExisting,
+                exercises: (retroExisting.exercises || []).map((ex) => ({
+                  ...ex,
+                  sets: (ex.sets || []).map((set) => ({ ...set })),
+                })),
+              }
+            : sessionFromPlan(plan);
         if (!reusable) {
           // Подход с виджета несёт метку времени: сессия, созданная для первого
           // подхода, получает дату по ней — подход после полуночи не приземляется
           // в «вчера». Уже идущая сессия свою дату сохраняет.
-          session = { ...session, date: isoFromTs(it.ts || Date.now()) };
+          session = { ...session, date: itemDay };
+          if (retroSessionId) session = { ...session, sessionId: retroSessionId };
         }
         let index = session.exercises.findIndex((e) => e.exerciseName === name);
         if (index < 0) {
@@ -1639,18 +1768,37 @@ export function applyWidgetQueue(items: QueuedItem[]): {
           });
           // Подход записан, только если живая сессия действительно легла в storage:
           // на квоте/в приватном режиме `saveActiveSession` вернёт false, и «+1 подход»
-          // был бы ложью (подхода нет ни в живой сессии, ни в журнале).
-          if (res.success && saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true })) {
+          // был бы ложью (подхода нет ни в живой сессии, ни в журнале). Такой элемент
+          // не выбрасываем — хранилище может освободиться к следующему синку.
+          // Запись прошлого дня уходит сразу в журнал (durationMinOverride 0 — длительность
+          // неизвестна); живой ключ при этом не трогается: finishSessionWithSave его не чистит.
+          const persisted = res.success
+            ? retroItem
+              ? finishSessionWithSave(res.session, '', 0).saved
+              : saveActiveSession(res.session, plan?.plannedSets, { plannedTotalMax: true })
+            : false;
+          if (persisted) {
             setsAdded += 1;
-            // Первый подход с рабочего стола сам запускает сессию.
-            if (!reusable) workoutsStarted += 1;
+            // Повторная доставка того же элемента больше подход не запишет.
+            if (retroItem) appendWidgetRetroDone(retroSignature);
+            // Первый подход с рабочего стола сам запускает сессию (кроме записи прошлого дня).
+            if (!reusable && !retroItem) workoutsStarted += 1;
+          } else if (res.success) {
+            keepRetry.push(it);
           }
+          // Отказ самого logSet (вес 0 у штанги, повторы вне границ) — не сбой хранилища,
+          // а неверные данные: повторять такой элемент бессмысленно, он не пройдёт никогда.
         }
       }
     } catch {
-      /* один битый элемент не роняет остальные */
+      // Один битый элемент не роняет остальные, но подход из очереди уже выдран из
+      // нативной стороны: без возврата в буфер он исчез бы молча. Повторим на следующем синке.
+      if (it && it.type === 'set_add' && it.exerciseName) keepRetry.push(it);
     }
   }
+  // Отложенные подходы переживают синк: успешные исчезают из списка, неудачные
+  // остаются до следующего прохода (архив/квота могли освободиться).
+  if (retryPending.length > 0 || keepRetry.length > 0) writeWidgetSetRetry(keepRetry);
   return {
     waterMl,
     waterRemovedMl,
@@ -1796,19 +1944,19 @@ async function doSyncAllWidgets(): Promise<WidgetSyncResult> {
   let workoutsFinished = 0;
   try {
     const items = await drainWidgetQueue();
-    if (items.length > 0) {
-      const applied = applyWidgetQueue(items);
-      drainedWaterMl = applied.waterMl;
-      drainedWaterRemovedMl = applied.waterRemovedMl;
-      drainedFoods = applied.foods;
-      drainedFoodsRemoved = applied.foodsRemoved;
-      tasksToggled = applied.tasks;
-      tasksAdded = applied.tasksAdded;
-      notesAdded = applied.notesAdded;
-      setsAdded = applied.setsAdded;
-      workoutsStarted = applied.workoutsStarted;
-      workoutsFinished = applied.workoutsFinished;
-    }
+    // Пустая нативная очередь не значит «нечего делать»: отложенный подход
+    // (провал архива на прошлом синке) ждёт в JS-списке и повторяется здесь.
+    const applied = applyWidgetQueue(items);
+    drainedWaterMl = applied.waterMl;
+    drainedWaterRemovedMl = applied.waterRemovedMl;
+    drainedFoods = applied.foods;
+    drainedFoodsRemoved = applied.foodsRemoved;
+    tasksToggled = applied.tasks;
+    tasksAdded = applied.tasksAdded;
+    notesAdded = applied.notesAdded;
+    setsAdded = applied.setsAdded;
+    workoutsStarted = applied.workoutsStarted;
+    workoutsFinished = applied.workoutsFinished;
   } catch {
     /* очередь недоступна */
   }

@@ -19,7 +19,8 @@ export interface DiagnosticsHubProps {
   mesoWeeks: number;
   missedSessions: number;
   currentVolume: number;
-  currentRir: number;
+  /** Средний измеренный RIR; null — измерений RIR в истории нет. */
+  currentRir: number | null;
   /** Реальный ACWR из SRPE-логов (раньше хаб получал только константу). */
   acwr?: number;
   /** Реальная монотонность недели (>2 — риск). */

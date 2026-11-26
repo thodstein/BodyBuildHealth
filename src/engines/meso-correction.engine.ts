@@ -31,8 +31,8 @@ export interface MesoCorrectionInput {
   profile: TrainingProfile;
   /** Текущий объём (сетов/нед) */
   currentVolume: number;
-  /** Текущий RIR */
-  currentRir: number;
+  /** Средний измеренный RIR; null — измерений нет (RIR-советы не выдаются) */
+  currentRir: number | null;
 }
 
 export interface MesoCorrectionOutput {
@@ -62,7 +62,10 @@ export interface MesoAdjustment {
 export function analyzeMesoCycle(input: MesoCorrectionInput): MesoCorrectionOutput {
   const adj: MesoAdjustment[] = [];
   let vol = input.currentVolume;
-  let rir = input.currentRir;
+  // Без измерений RIR нейтральная база нужна только для расчёта, но советы «RIR ±0.5»
+  // и строка «RIR N» в комментарии выдумывали бы оценку, которой не было.
+  const rirKnown = typeof input.currentRir === 'number' && Number.isFinite(input.currentRir);
+  let rir = rirKnown ? (input.currentRir as number) : 2;
   let deloadFreq = input.mesoWeeks;
   let progPct = 2.5;
   let changeSplit = false;
@@ -89,16 +92,16 @@ export function analyzeMesoCycle(input: MesoCorrectionInput): MesoCorrectionOutp
   } else if (progressedExercises > 0 && regressedExercises === 0) {
     // Хороший прогресс — можно увеличить объём или снизить RIR
     vol = Math.round(vol * 1.05);
-    rir = Math.max(0, rir - 0.5);
+    if (rirKnown) rir = Math.max(0, rir - 0.5);
     adj.push({
       type: 'volume_up',
-      reason: `Прогресс в ${progressedExercises} упражнениях → объём +5%, RIR −0.5`,
+      reason: `Прогресс в ${progressedExercises} упражнениях → объём +5%${rirKnown ? ', RIR −0.5' : ''}`,
       severity: 'info',
     });
   }
 
-  // 2. Анализ RIR-точности
-  if (input.rirBias > 1.0) {
+  // 2. Анализ RIR-точности (без измеренного RIR сравнивать не с чем)
+  if (rirKnown && input.rirBias > 1.0) {
     // Систематически легче плана — можно снизить RIR
     rir = Math.max(0, rir - 0.5);
     adj.push({
@@ -106,7 +109,7 @@ export function analyzeMesoCycle(input: MesoCorrectionInput): MesoCorrectionOutp
       reason: `RIR bias ${input.rirBias.toFixed(1)} (легче плана) → снижаем RIR на 0.5`,
       severity: 'info',
     });
-  } else if (input.rirBias < -1.0) {
+  } else if (rirKnown && input.rirBias < -1.0) {
     // Систематически тяжелее — нужно повысить RIR
     rir = rir + 0.5;
     adj.push({
@@ -184,7 +187,11 @@ export function analyzeMesoCycle(input: MesoCorrectionInput): MesoCorrectionOutp
   if (needsDeloadFirst) parts.push('🔴 Требуется делод перед следующим мезоциклом');
   if (changeSplit) parts.push('🔄 Рекомендована смена сплита');
   if (adj.length === 0) parts.push('✅ Мезоцикл прошёл успешно — параметры оптимальны');
-  parts.push(`📊 Рекомендации: объём ${vol} сетов/нед, RIR ${rir}, прогрессия ${progPct}%/нед`);
+  parts.push(
+    rirKnown
+      ? `📊 Рекомендации: объём ${vol} сетов/нед, RIR ${rir}, прогрессия ${progPct}%/нед`
+      : `📊 Рекомендации: объём ${vol} сетов/нед, прогрессия ${progPct}%/нед (RIR: нет измерений)`,
+  );
 
   return {
     adjustments: adj,

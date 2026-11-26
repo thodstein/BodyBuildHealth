@@ -91,6 +91,28 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     const durations = historyWorkouts.map((w) => Number(w.duration) || 0).filter((d) => d > 0);
     return durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : 0;
   })();
+  // Реальный измеренный RIR из истории: `rirMissing` — заглушка, RPE → RIR (10 − RPE).
+  // Нет значений → null, а не выдуманная «двойка»: иначе карточка коррекции пишет «было 2» без данных.
+  const measuredRir = React.useMemo(() => {
+    let sum = 0;
+    let n = 0;
+    for (const w of historyWorkouts as any[]) {
+      for (const e of w?.exercises || []) {
+        for (const s of e?.sets || []) {
+          const rpeRaw = typeof s?.rpe === 'number' ? s.rpe : 0;
+          const rirRaw =
+            s?.rirMissing === true || s?.rir == null || !Number.isFinite(Number(s.rir)) ? null : Number(s.rir);
+          // Ноль без метки и без введённого RPE — заполнитель старых сборок, а не «до отказа».
+          const rir = rirRaw != null && (rirRaw > 0 || rpeRaw > 0) ? rirRaw : rpeRaw > 0 ? 10 - rpeRaw : null;
+          if (rir != null && Number.isFinite(rir)) {
+            sum += rir;
+            n++;
+          }
+        }
+      }
+    }
+    return n > 0 ? Math.round((sum / n) * 10) / 10 : null;
+  }, [historyWorkouts]);
   if (!analytics) {
     return (
       <div className="train-diaryanalytics" style={style.card}>
@@ -2181,9 +2203,9 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   currentVolume={
                     expertRecentVol > 0
                       ? Math.round(expertRecentVol / Math.max(1, Math.floor(historyWorkouts.length / 14)))
-                      : 16
+                      : 0
                   }
-                  currentRir={expertRirStats.bias >= 0 ? 2 : 1}
+                  currentRir={measuredRir}
                 />
                 <MuscleProgressCard sessions={historyWorkouts} level={level} />
                 <VolumeTrendCard sessions={historyWorkouts} />

@@ -9,7 +9,7 @@ import { DiagnosticsHub } from './DiagnosticsHub';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingProfile } from './training-profile';
 
-export interface QualityJointHubProps { sessions: WorkoutLog[]; tprofile: TrainingProfile; readinessRecovery: number; readinessFatigue: number; mesoWeeks: number; missedSessions: number; currentVolume: number; currentRir: number; onBuildPlan: () => void; }
+export interface QualityJointHubProps { sessions: WorkoutLog[]; tprofile: TrainingProfile; readinessRecovery: number; readinessFatigue: number; mesoWeeks: number; missedSessions: number; currentVolume: number; currentRir: number | null; onBuildPlan: () => void; }
 
 export const QualityJointHub: React.FC<QualityJointHubProps> = (props) => {
   // По умолчанию показываем качество (диагностика — в своей вкладке)

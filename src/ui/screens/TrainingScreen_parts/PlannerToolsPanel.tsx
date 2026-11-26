@@ -42,7 +42,7 @@ const DiagnosticsWrap = () => (
     mesoWeeks={12}
     missedSessions={0}
     currentVolume={18}
-    currentRir={2}
+    currentRir={null}
   />
 );
 

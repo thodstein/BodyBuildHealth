@@ -573,6 +573,17 @@ export function deleteSession(sessionId: string): boolean {
 // Live (active) session — незавершённая тренировка
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** Сигнал «живая сессия изменилась»: карточка продолжения обновляется без перерисовки. */
+function notifyActiveSessionChanged(): void {
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('he-active-session-changed'));
+    }
+  } catch {
+    /* нет window/событий — тихо */
+  }
+}
+
 /** Стоит ли хранить сессию как «живую»: без подходов хранить нечего. */
 export function isActiveSessionWorthSaving(session: WorkoutSession | null | undefined): boolean {
   return !!session && (session.exercises || []).some((e) => (e.sets || []).length > 0);
@@ -624,6 +635,7 @@ export function saveActiveSession(
     else delete payload.startedWithoutSets;
     if (planned > 0) payload.plannedSetsTotal = planned;
     localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(payload));
+    notifyActiveSessionChanged();
     return true;
   } catch {
     return false;
@@ -666,6 +678,7 @@ export function clearActiveSession(sessionId?: string): void {
       if (stored && typeof stored === 'object' && stored.sessionId && stored.sessionId !== sessionId) return;
     }
     localStorage.removeItem(ACTIVE_SESSION_KEY);
+    notifyActiveSessionChanged();
   } catch {
     /* ignore */
   }

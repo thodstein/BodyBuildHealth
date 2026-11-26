@@ -20,6 +20,7 @@ import {
   saveActiveSession,
   startSession,
 } from '../../../../engines/workout-logger.engine';
+import { applyWidgetQueue, setWorkoutPlayerActive } from '../../../native/widget-sync';
 
 const btn = (root: ParentNode, text: string) =>
   Array.from(root.querySelectorAll('button')).find((b) => (b.textContent || '').includes(text)) as
@@ -98,6 +99,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  setWorkoutPlayerActive(false);
   localStorage.clear();
 });
 
@@ -147,6 +149,41 @@ describe('SessionPlayer — старт при провале архива про
     expect(active?.sessionId).toBe(stale.sessionId);
     expect(active?.exercises?.[0]?.sets?.length).toBe(1);
     expect(localStorage.getItem('he_workout_log_v2')).toBeNull();
+    unmount();
+  });
+});
+
+describe('SessionPlayer — сессия с упражнением вне плана дня', () => {
+  it('вход в основную часть продолжает её, а не рождает вторую запись за день', () => {
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    // Виджет записал подходы по плану дня и по упражнению, которого в плане уже нет
+    // (план пересобрался): раньше такие подходы уходили в отдельную запись, а плеер
+    // стартовал с нуля и показывал 0 подходов.
+    let live = startSession('День 1 · жим', 1);
+    live = addExerciseToSession(live, {
+      id: 'Жим штанги лёжа',
+      name: 'Жим штанги лёжа',
+      pattern: 'chest',
+      muscleGroup: 'chest',
+    });
+    live = addExerciseToSession(live, { id: 'Тяга блока', name: 'Тяга блока', pattern: 'back', muscleGroup: 'back' });
+    const bench = logSet(live, 0, { setNumber: 1, weightKg: 80, reps: 8, rpe: 8, rir: 2, notes: '' });
+    expect(bench.success).toBe(true);
+    const extra = logSet(bench.session, 1, { setNumber: 1, weightKg: 60, reps: 12, rpe: 8, rir: 2, notes: '' });
+    expect(extra.success).toBe(true);
+    live = extra.session;
+    expect(saveActiveSession(live, 3)).toBe(true);
+
+    startMain(container);
+
+    // Ни архива, ни второй записи: сессия та же, оба подхода в дневнике.
+    expect(container.querySelector('[data-session="save-error"]')).toBeNull();
+    expect(localStorage.getItem('he_workout_log_v2')).toBeNull();
+    expect(loadSessions()).toHaveLength(0);
+    const active = loadActiveSession();
+    expect(active?.sessionId).toBe(live.sessionId);
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим штанги лёжа')?.sets).toHaveLength(1);
+    expect(active?.exercises.find((e) => e.exerciseName === 'Тяга блока')?.sets).toHaveLength(1);
     unmount();
   });
 });
@@ -623,6 +660,134 @@ describe('SessionPlayer — RPE из виджета и пустой явный �
     const active = loadActiveSession();
     expect(active).not.toBeNull();
     expect(active?.sessionId).not.toBe('sess_today_empty2');
+    unmount();
+  });
+});
+
+describe('SessionPlayer — живая копия вне основной части', () => {
+  it('карточка «Незавершённая» обновляется сразу после записи живой копии', () => {
+    // Виджет в фазе ready пишет подход в ключ мимо state плеера. Карточка читала
+    // хранилище только на рендере: «0 подх. уже записано» висело до следующего тапа.
+    let draft = addExerciseToSession(startSession('День 1 · жим', 1), {
+      id: 'Жим штанги лёжа',
+      name: 'Жим штанги лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    draft = { ...draft, sessionId: 'sess_today_live_event' };
+    expect(saveActiveSession(draft, 6, { allowEmpty: true })).toBe(true);
+
+    const view = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    expect(view.container.textContent).toContain('0 подх. уже записано');
+
+    const stored = loadActiveSession()!;
+    const logged = logSet(stored, 0, { setNumber: 1, weightKg: 80, reps: 8, rpe: 8, rir: 2 });
+    expect(logged.success).toBe(true);
+    act(() => {
+      expect(saveActiveSession(logged.session, 6)).toBe(true);
+    });
+
+    // Без rerender: подписка на запись живой копии сама обновляет карточку.
+    expect(view.container.textContent).toContain('1 подх. уже записано');
+    view.unmount();
+  });
+
+  it('подход с виджета в разминке не теряется при входе в основную часть', () => {
+    // Порядок упражнений плеера отличается от порядка плана (виджет строит живую
+    // копию по плану). Сверка по индексу архивировала бы подход отдельной
+    // тренировкой, а основная часть стартовала бы с нуля.
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          {
+            label: 'День A',
+            exercises: [
+              {
+                name: 'Жим штанги лёжа',
+                muscleGroup: 'chest',
+                restSec: 120,
+                targetSets: [{ weight: 80, reps: 8, rir: 2 }],
+              },
+              {
+                name: 'Тяга штанги',
+                muscleGroup: 'back',
+                restSec: 90,
+                targetSets: [{ weight: 60, reps: 10, rir: 2 }],
+              },
+            ],
+          },
+        ],
+        focus: 'upper',
+        week: 1,
+        track: 'bb',
+      }),
+    );
+    const day: PlayerDay = {
+      label: 'День 1 · жим',
+      exercises: [
+        { name: 'Тяга штанги', muscleGroup: 'back', restSec: 90, targetSets: [{ weight: 60, reps: 10, rir: 2 }] },
+        { name: 'Жим штанги лёжа', muscleGroup: 'chest', restSec: 120, targetSets: [{ weight: 80, reps: 8, rir: 2 }] },
+      ],
+    };
+    const { container, unmount } = render(<SessionPlayer days={[day]} weekNumber={1} focus="PL" />);
+    fireEvent.click(btn(container, 'Начать тренировку')!);
+    expect(btn(container, 'К основной части')).toBeTruthy();
+
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим штанги лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+    fireEvent.click(btn(container, 'К основной части')!);
+
+    const active = loadActiveSession();
+    const ex = active?.exercises.find((e) => e.exerciseName === 'Жим штанги лёжа');
+    expect(ex?.sets).toHaveLength(1);
+    // Подход остался в живой сессии, а не превратился в отдельную запись дневника.
+    expect(loadSessions()).toHaveLength(0);
+    unmount();
+  });
+
+  it('подход с виджета в заминке остаётся живой копией, а не исчезает', () => {
+    // После завершения плеер снял свою живую копию; подход, записанный виджетом
+    // в заминке, — начало следующей работы и не должен пропасть при выходе.
+    localStorage.setItem(
+      'he_pl_runtime',
+      JSON.stringify({
+        days: [
+          {
+            label: 'День A',
+            exercises: [
+              {
+                name: 'Жим штанги лёжа',
+                muscleGroup: 'chest',
+                restSec: 120,
+                targetSets: [{ weight: 80, reps: 8, rir: 2 }],
+              },
+            ],
+          },
+        ],
+        focus: 'upper',
+        week: 1,
+        track: 'bb',
+      }),
+    );
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+    fireEvent.click(btn(container, 'OK')!);
+    fireEvent.click(container.querySelector('[data-act="finish-session"]') as HTMLElement);
+    fireEvent.click(container.querySelector('[data-act="exit-save"]') as HTMLElement);
+    expect(container.textContent).toContain('Заминка');
+    expect(loadActiveSession()).toBeNull();
+    expect(loadSessions()).toHaveLength(1);
+
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим штанги лёжа', weight: 85, reps: 5, rir: 1, ts: Date.now() },
+    ]);
+
+    const active = loadActiveSession();
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим штанги лёжа')?.sets).toHaveLength(1);
+    // Завершённая тренировка не переписана и не задвоена.
+    expect(loadSessions()).toHaveLength(1);
     unmount();
   });
 });

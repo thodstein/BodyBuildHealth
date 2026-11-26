@@ -753,9 +753,9 @@ export const LiftMasterCard: React.FC<{
   acwr?: number; monotony?: number;
   readinessRecovery?: number; readinessFatigue?: number;
   mesoWeeks?: number; missedSessions?: number;
-  currentVolume?: number; currentRir?: number;
+  currentVolume?: number; currentRir?: number | null;
   exercises?: Array<{ name: string; e1rmBefore: number; e1rmAfter: number }>;
-}> = ({ dayCount=7, template=null, sessions=[], profile, acwr, monotony, readinessRecovery=70, readinessFatigue=30, mesoWeeks=12, missedSessions=0, currentVolume=0, currentRir=2, exercises=[] }) => {
+}> = ({ dayCount=7, template=null, sessions=[], profile, acwr, monotony, readinessRecovery=70, readinessFatigue=30, mesoWeeks=12, missedSessions=0, currentVolume=0, currentRir=null, exercises=[] }) => {
   const initial = useMemo(loadMaster, []);
   const [lift, setLiftRaw] = useState<Lift>(initial.lift);
   const [phase, setPhase] = useState<WeakPoint|''>(initial.phase);

@@ -1085,11 +1085,21 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       // Только своя сессия: тот же день и тот же состав упражнений. Иначе подходы чужого дня
       // «приклеятся» к индексам текущей программы и попадут не в те упражнения.
       const sameDay = !!activeSession && activeSession.date === localIsoDate();
-      const samePlan =
-        sameDay &&
-        (activeSession!.exercises || []).every(
-          (ex, i) => !day.exercises[i] || ex.exerciseName === day.exercises[i].name,
-        );
+      // Сверяем по ИМЕНИ (нормализованному), а не по индексу: подход, дописанный виджетом
+      // в разминке, лежит в живой копии в порядке/подмножестве плана, и вход в основную часть
+      // не должен архивировать его отдельной тренировкой и стартовать с нуля. Регистр и
+      // лишние пробелы в имени не делают сессию чужой.
+      const dayNames = new Set(day.exercises.map((ex) => normalizeExerciseName(ex.name)).filter((n) => !!n));
+      const sessionNames = (activeSession!.exercises || [])
+        .map((ex) => normalizeExerciseName(ex.exerciseName))
+        .filter((n) => !!n);
+      const matched = sessionNames.filter((n) => dayNames.has(n)).length;
+      // Хоть одно общее упражнение — это та же тренировка дня: подход, дописанный виджетом
+      // по упражнению, которого в плане уже нет (план пересобрался), не должен превращать
+      // сессию в «чужую» и рождать вторую запись за день. Упражнения вне плана
+      // resumeSavedSession дописывает в конец. Ноль общих — другой день плана: его подходы
+      // «приклеились» бы к чужим упражнениям, такую сессию архивируем.
+      const samePlan = sameDay && matched > 0;
       if (samePlan && (activeSession!.exercises || []).some((ex) => (ex.sets || []).length > 0)) {
         resumeSavedSession(activeSession!);
         return true;
@@ -1992,6 +2002,25 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     window.addEventListener('he-workout-close', onClose);
     return () => window.removeEventListener('he-workout-close', onClose);
   }, []);
+
+  // Живая копия меняется мимо нашего state (виджет в фазе ready, вторая вкладка):
+  // карточка «Незавершённая» обновляется сразу, а не после следующего тапа.
+  React.useEffect(() => {
+    if (phase !== 'ready') return;
+    const sync = () => {
+      try {
+        setResumeFrom(loadResumeDraft());
+      } catch {
+        /* хранилище недоступно — оставляем снимок */
+      }
+    };
+    window.addEventListener('he-active-session-changed', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('he-active-session-changed', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, [phase]);
 
   // Отложенный «+ Сет» (пришёл до старта сессии): записываем первый
   // незаписанный подход, как только сессия реально появилась, и только тогда

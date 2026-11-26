@@ -78,6 +78,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   setWorkoutPlayerActive(false);
   localStorage.clear();
 });
@@ -275,7 +276,8 @@ describe('виджет: подходы и завершение', () => {
       muscleGroup: 'back',
     });
     const withSet = logSet(base, 0, { setNumber: 1, weightKg: 60, reps: 10, rpe: 8, rir: 2 }).session;
-    expect(saveActiveSession({ ...withSet, date: yesterday })).toBe(true);
+    // savedAt тоже вчера: сессию с тех пор не трогали, это брошенный черновик.
+    seedStaleActive({ ...withSet, date: yesterday }, yesterday);
     const before = loadActiveSession();
     expect(before?.date).toBe(yesterday);
 
@@ -434,6 +436,31 @@ describe('виджет: подходы и завершение', () => {
     expect(active?.exercises.map((e) => e.exerciseName)).toEqual(['Жим лёжа', 'Подтягивания']);
   });
 
+  it('сессию, начатую вчера и обновлённую сегодня, «Начать» не рвёт на две записи', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'row',
+      name: 'Тяга штанги',
+      pattern: 'horizontal_pull',
+      muscleGroup: 'back',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 60, reps: 10, rpe: 8, rir: 2 }).session;
+    // saveActiveSession ставит savedAt = сейчас: запись обновлялась сегодня, хотя
+    // дата старта — вчера. Это продолжение, а не брошенный черновик.
+    expect(saveActiveSession({ ...withSet, sessionId: 'sess_yesterday_cont', date: yesterday }, 0)).toBe(true);
+
+    const res = applyWidgetQueue([{ type: 'workout_start', ts: Date.now() }]);
+
+    // Новой тренировки не начато: план дня дописан в ту же запись.
+    expect(res.workoutsStarted).toBe(0);
+    const active = loadActiveSession();
+    expect(active?.sessionId).toBe('sess_yesterday_cont');
+    expect(active?.date).toBe(yesterday);
+    expect(active?.exercises.map((e) => e.exerciseName)).toEqual(
+      expect.arrayContaining(['Тяга штанги', 'Жим лёжа', 'Подтягивания']),
+    );
+  });
+
   it('подход без RIR не выдаёт RIR 0 в снапшоте', () => {
     const items: QueuedItem[] = [
       {
@@ -478,6 +505,18 @@ describe('виджет: подходы и завершение', () => {
     const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
     expect(set?.rirMissing).toBe(true);
     expect(set?.rpe).toBe(0);
+  });
+
+  it('элемент очереди от старой APK с явным нулём: rir 0 + rpe 10 — измерение, а не «не вводили»', () => {
+    // Метки `rirMissing` у старых сборок нет, но явный RIR 0 они отличали введённым
+    // RPE 10: это «до отказа», и подход не должен попасть в статистику как без оценки.
+    applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 0, rpe: 10, ts: Date.now() },
+    ]);
+    const set = loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets[0];
+    expect(set?.rir).toBe(0);
+    expect(set?.rpe).toBe(10);
+    expect(set?.rirMissing).toBeUndefined();
   });
 
   it('реле подхода несёт rirMissing', () => {
@@ -675,7 +714,7 @@ describe('виджет: RPE без RIR и реле при открытом пл�
     expect(loadActiveSession()?.sessionId).toBe('sess_yesterday');
   });
 
-  it('архив вчерашней сессии не лёг (квота): подход отброшен, журнал и черновик целы', () => {
+  it('архив вчерашней сессии не лёг (квота): подход уходит в буфер, журнал и черновик целы', () => {
     const yesterday = addDaysIso(localIsoDate(), -1);
     const base = addExerciseToSession(startSession('Вчерашняя', 1), {
       id: 'bench',
@@ -708,5 +747,225 @@ describe('виджет: RPE без RIR и реле при открытом пл�
     const active = loadActiveSession();
     expect(active?.sessionId).toBe('sess_yesterday');
     expect(active?.exercises[0]?.sets).toHaveLength(1);
+
+    // Ключевое: подход не выброшен. Нативная очередь уже выдрана, поэтому элемент
+    // лежит в JS-буфере и повторяется на следующем синке.
+    expect(JSON.parse(localStorage.getItem('he_widget_set_retry_v1') || '[]')).toHaveLength(1);
+  });
+
+  it('отложенный подход из буфера применяется, когда хранилище освободилось', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const base = addExerciseToSession(startSession('Вчерашняя', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    const withSet = logSet(base, 0, { setNumber: 1, weightKg: 75, reps: 10, rpe: 8, rir: 2 }).session;
+    seedStaleActive({ ...withSet, sessionId: 'sess_yesterday', date: yesterday }, yesterday);
+
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const quota = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'he_workout_log_v2') {
+        const err: any = new Error('Quota exceeded');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      realSetItem(key, value);
+    });
+    const item: QueuedItem = { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() };
+    expect(applyWidgetQueue([item]).setsAdded).toBe(0);
+
+    // Квота освободилась: пустая очередь тоже должна разобрать буфер повторных попыток.
+    quota.mockRestore();
+    const res = applyWidgetQueue([]);
+
+    expect(res.workoutsFinished).toBe(1);
+    expect(res.setsAdded).toBe(1);
+    expect(loadSessions()).toHaveLength(1);
+    const active = loadActiveSession();
+    expect(active?.date).toBe(localIsoDate());
+    expect(active?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+    // Буфер пуст — повтор не задваивает подход на каждом синке.
+    expect(localStorage.getItem('he_widget_set_retry_v1')).toBeNull();
+  });
+
+  it('провал записи живой сессии: подход ждёт в буфере, а не теряется', () => {
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const quota = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'he_workout_active_v1') {
+        const err: any = new Error('Quota exceeded');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      realSetItem(key, value);
+    });
+
+    const res = applyWidgetQueue([
+      { type: 'set_add', exerciseName: 'Жим лёжа', weight: 80, reps: 8, rir: 2, ts: Date.now() },
+    ]);
+
+    // Подход не записан — и «+1 подход» не врём; живой сессии нет.
+    expect(res.setsAdded).toBe(0);
+    expect(loadActiveSession()).toBeNull();
+    expect(JSON.parse(localStorage.getItem('he_widget_set_retry_v1') || '[]')).toHaveLength(1);
+
+    quota.mockRestore();
+    const retry = applyWidgetQueue([]);
+    expect(retry.setsAdded).toBe(1);
+    expect(loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+  });
+
+  it('повтор из буфера и тот же элемент в очереди не задваивают подход', () => {
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const quota = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'he_workout_active_v1') {
+        const err: any = new Error('Quota exceeded');
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      realSetItem(key, value);
+    });
+    const item: QueuedItem = {
+      type: 'set_add',
+      exerciseName: 'Жим лёжа',
+      weight: 80,
+      reps: 8,
+      rir: 2,
+      ts: Date.now(),
+    };
+    expect(applyWidgetQueue([item]).setsAdded).toBe(0);
+
+    // Тот же элемент пришёл повторно (нативная сторона не успела снять очередь) —
+    // сигнатура совпала, поэтому подход один.
+    quota.mockRestore();
+    const res = applyWidgetQueue([item]);
+    expect(res.setsAdded).toBe(1);
+    expect(loadActiveSession()?.exercises.find((e) => e.exerciseName === 'Жим лёжа')?.sets).toHaveLength(1);
+  });
+
+  it('подход прошлого дня не попадает в сегодняшнюю тренировку и не трогает её', () => {
+    const today = localIsoDate();
+    const yesterday = addDaysIso(today, -1);
+    let live = addExerciseToSession(startSession('День A', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    live = logSet(live, 0, { setNumber: 1, weightKg: 70, reps: 10, rpe: 8, rir: 2 }).session;
+    saveActiveSession({ ...live, sessionId: 'sess_today', date: today, startTime: '09:00' }, 2);
+
+    const res = applyWidgetQueue([
+      {
+        type: 'set_add',
+        exerciseName: 'Присед',
+        weight: 100,
+        reps: 5,
+        rpe: 8,
+        rir: 2,
+        ts: Date.parse(`${yesterday}T23:58:00`),
+      },
+    ]);
+
+    // Сегодняшняя живая тренировка на месте: ни архива, ни лишнего подхода.
+    const active = loadActiveSession();
+    expect(active?.sessionId).toBe('sess_today');
+    expect(active?.exercises.flatMap((e) => e.sets)).toHaveLength(1);
+    expect(res.workoutsFinished).toBe(0);
+    expect(res.workoutsStarted).toBe(0);
+    // Подход лёг в журнал своей датой — сегодняшний тоннаж и 7-дневный объём его не видят.
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].date).toBe(yesterday);
+    const withSets = saved[0].exercises.filter((e) => (e.sets || []).length > 0);
+    expect(withSets).toHaveLength(1);
+    expect(withSets[0].exerciseName).toBe('Присед');
+    expect(withSets[0].sets).toHaveLength(1);
+    expect(res.setsAdded).toBe(1);
+  });
+
+  it('повтор записи прошлого дня идемпотентен: одна запись и один подход, без «+1»', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const item: QueuedItem = {
+      type: 'set_add',
+      exerciseName: 'Присед',
+      weight: 100,
+      reps: 5,
+      rir: 2,
+      ts: Date.parse(`${yesterday}T23:58:00`),
+    };
+    expect(applyWidgetQueue([item]).setsAdded).toBe(1);
+    // Тот же элемент пришёл ещё раз (буфер повтора + очередь): подход уже в журнале,
+    // поэтому счётчик молчит — иначе виджет отчитался бы о втором подходе.
+    expect(applyWidgetQueue([item]).setsAdded).toBe(0);
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].exercises.flatMap((e) => e.sets)).toHaveLength(1);
+  });
+
+  it('два подхода одного прошлого дня ложатся в одну запись, а не в две', () => {
+    const yesterday = addDaysIso(localIsoDate(), -1);
+    const at = (hhmm: string): QueuedItem => ({
+      type: 'set_add',
+      exerciseName: 'Присед',
+      weight: 100,
+      reps: 5,
+      rir: 2,
+      ts: Date.parse(`${yesterday}T${hhmm}:00`),
+    });
+    expect(applyWidgetQueue([at('23:10')]).setsAdded).toBe(1);
+    expect(applyWidgetQueue([at('23:58')]).setsAdded).toBe(1);
+    const saved = loadSessions();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].date).toBe(yesterday);
+    expect(saved[0].exercises.find((e) => e.exerciseName === 'Присед')?.sets).toHaveLength(2);
+  });
+
+  it('плеер открыт: прошлый подход уходит в журнал, реле не трогает живую сессию', () => {
+    const today = localIsoDate();
+    const yesterday = addDaysIso(today, -1);
+    let live = addExerciseToSession(startSession('День A', 1), {
+      id: 'bench',
+      name: 'Жим лёжа',
+      pattern: 'horizontal_push',
+      muscleGroup: 'chest',
+    });
+    live = logSet(live, 0, { setNumber: 1, weightKg: 70, reps: 10, rpe: 8, rir: 2 }).session;
+    saveActiveSession({ ...live, sessionId: 'sess_today', date: today, startTime: '09:00' }, 2);
+
+    const relayed: Array<{ handled: boolean }> = [];
+    const listener = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { handled: boolean };
+      relayed.push(detail);
+      detail.handled = true;
+    };
+    window.addEventListener('he-workout-widget-set', listener);
+    setWorkoutPlayerActive(true);
+    try {
+      const res = applyWidgetQueue([
+        {
+          type: 'set_add',
+          exerciseName: 'Присед',
+          weight: 100,
+          reps: 5,
+          rpe: 8,
+          rir: 2,
+          ts: Date.parse(`${yesterday}T23:58:00`),
+        },
+      ]);
+      // Реле прошлый подход не получило — он не попал в сегодняшнюю сессию.
+      expect(relayed).toHaveLength(0);
+      expect(res.setsAdded).toBe(1);
+      const active = loadActiveSession();
+      expect(active?.sessionId).toBe('sess_today');
+      expect(active?.exercises.flatMap((e) => e.sets)).toHaveLength(1);
+      const saved = loadSessions();
+      expect(saved).toHaveLength(1);
+      expect(saved[0].date).toBe(yesterday);
+    } finally {
+      window.removeEventListener('he-workout-widget-set', listener);
+      setWorkoutPlayerActive(false);
+    }
   });
 });
