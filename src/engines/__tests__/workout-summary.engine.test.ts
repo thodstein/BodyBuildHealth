@@ -25,7 +25,7 @@ import type { WorkoutLog, StrengthLogEntry } from '../../core/types';
 
 function mkWorkout(
   date: string,
-  rows: Array<{ name: string; id?: string; weight: number; reps: number; sets?: number; rir?: number }>,
+  rows: Array<{ name: string; id?: string; weight: number; reps: number; sets?: number; rir?: number; rpe?: number }>,
   duration = 60,
 ): WorkoutLog {
   const exercises: StrengthLogEntry[] = rows.map((r, i) => ({
@@ -35,7 +35,12 @@ function mkWorkout(
     exerciseName: r.name,
     isCompound: true,
     weekNumber: 1,
-    sets: Array.from({ length: r.sets ?? 2 }, () => ({ weight: r.weight, reps: r.reps, rir: r.rir ?? 2, rpe: 7 })),
+    sets: Array.from({ length: r.sets ?? 2 }, () => ({
+      weight: r.weight,
+      reps: r.reps,
+      rir: r.rir ?? 2,
+      rpe: r.rpe ?? 7,
+    })),
     totalVolume: r.weight * r.reps * (r.sets ?? 2),
     estimated1RM: Math.round(r.weight * (1 + r.reps / 30)),
   }));
@@ -319,7 +324,7 @@ describe('workout-summary: выводы', () => {
 
   it('предупреждает о работе в отказ (RIR 0)', () => {
     const hard = mkWorkout('2026-11-10', [
-      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 0 },
+      { name: 'Жим штанги лёжа', id: 'bench_bar', weight: 80, reps: 8, sets: 3, rir: 0, rpe: 10 },
     ]);
     const summary = buildWorkoutSummary([hard]);
     expect(summary.totals.avgRIR).toBe(0);
@@ -395,7 +400,7 @@ describe('workout-summary: детализация подходов', () => {
 
   it('RIR 0 сохраняется как значение, а не как «нет данных»', () => {
     const w = mkWorkout('2026-11-10', [
-      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0 },
+      { name: 'Приседания со штангой', id: 'squat', weight: 100, reps: 5, sets: 1, rir: 0, rpe: 10 },
     ]);
     expect(buildSetDetails([w])[0].exercises[0].sets[0].rir).toBe(0);
   });
@@ -519,7 +524,7 @@ describe('workout-summary: недельная динамика и интенси
       { weight: 80, reps: 8, rir: 4, rpe: 6 },
       { weight: 80, reps: 8, rir: 3, rpe: 7 },
       { weight: 80, reps: 8, rir: 1, rpe: 8 },
-      { weight: 80, reps: 8, rir: 0, rpe: 9 },
+      { weight: 80, reps: 8, rir: 0, rpe: 10 },
     ];
     const s = buildWorkoutSummary([w]);
     expect(s.totals.rirLoggedSets).toBe(4);

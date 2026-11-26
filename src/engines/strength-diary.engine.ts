@@ -63,6 +63,9 @@ export function sessionToWorkoutLog(s: WorkoutSession): WorkoutLog {
         plannedTempo: st.plannedTempo,
         actualTempo: st.actualTempo,
         pause: st.pause === true ? true : undefined,
+        // «RIR не вводили» переживает границу сессии и журнала: иначе ноль-заполнитель
+        // читается средними как «до отказа».
+        rirMissing: st.rirMissing === true ? true : undefined,
       })),
       totalVolume: ex.totalVolume,
       estimated1RM: ex.best1RM,
@@ -347,6 +350,9 @@ export class StrengthDiary {
         plannedTempo: st.plannedTempo,
         actualTempo: st.actualTempo,
         pause: st.pause === true ? true : undefined,
+        // «RIR не вводили» переживает границу сессии и журнала: иначе ноль-заполнитель
+        // читается средними как «до отказа».
+        rirMissing: st.rirMissing === true ? true : undefined,
       })),
       totalVolume: ex.totalVolume,
       estimated1RM: ex.best1RM,

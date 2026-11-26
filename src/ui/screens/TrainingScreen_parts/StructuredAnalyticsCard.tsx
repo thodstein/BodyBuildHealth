@@ -60,14 +60,9 @@ export const StructuredAnalyticsCard: React.FC<{ sessions: StructuredAnalyticsSe
   const result = React.useMemo<StructuredAnalyticsOutput | null>(() => {
     if (sessions.length === 0) return null;
     try {
-      // Движок сравнивает отдельные текущий и прошлый периоды — делим историю
-      // по дате пополам, иначе тренд 1RM всегда «нет сравнимых данных».
-      const sorted = [...sessions].sort((a, b) => String(a.date).localeCompare(String(b.date)));
-      const half = Math.floor(sorted.length / 2);
-      const previous = sorted.slice(0, half).map(toSessionData);
-      const current = sorted.slice(half).map(toSessionData);
-      if (current.length === 0) return null;
-      return computeStructuredAnalytics(current, previous);
+      // Деление истории на прошлый и текущий период — в движке (одно правило для
+      // всех вызывающих): карточка отдаёт всю историю одним списком.
+      return computeStructuredAnalytics(sessions.map(toSessionData));
     } catch {
       return null;
     }
@@ -80,7 +75,10 @@ export const StructuredAnalyticsCard: React.FC<{ sessions: StructuredAnalyticsSe
   const prevCount = level1?.metrics.previous ?? '—';
   const avgVolume = level2?.metrics.avgVolume;
   const patterns = [...result.patterns].sort((a, b) => b.currentVolume - a.currentVolume).slice(0, 3);
-  const warnings = result.levels.filter((l) => l.status === 'warning' || l.status === 'critical').slice(0, 3);
+  // Уровни без данных — не проблемы: они не штрафуют оценку и не печатаются как ⚠.
+  const warnings = result.levels
+    .filter((l) => l.dataMissing !== true && (l.status === 'warning' || l.status === 'critical'))
+    .slice(0, 3);
 
   return (
     <div className="card train-structured" data-analytics="structured" style={{ marginTop: 8, padding: 10 }}>
@@ -89,6 +87,10 @@ export const StructuredAnalyticsCard: React.FC<{ sessions: StructuredAnalyticsSe
         Оценка:{' '}
         <b style={{ color: STATUS_COLOR[result.overallStatus.toLowerCase()] || '#fff' }}>{result.overallScore}/100</b> ·{' '}
         {result.overallStatus}
+        <span style={{ color: 'rgba(255,255,255,0.55)' }}>
+          {' '}
+          · оценено {result.evaluatedLevels} из {result.levels.length}
+        </span>
       </div>
       <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
         Объём: <b>{avgVolume != null ? `${avgVolume} кг` : '—'}</b> · Сессий: <b>{sessionCount}</b> / прошлых:{' '}
@@ -120,6 +122,11 @@ export const StructuredAnalyticsCard: React.FC<{ sessions: StructuredAnalyticsSe
           {l.status === 'critical' ? '⛔' : '⚠'} {l.insight}
         </div>
       ))}
+      {result.dataGapLevels > 0 && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
+          Нет данных для {result.dataGapLevels} из {result.levels.length} уровней — на оценку не влияют
+        </div>
+      )}
     </div>
   );
 };

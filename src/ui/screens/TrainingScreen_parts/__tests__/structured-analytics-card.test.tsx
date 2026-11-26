@@ -83,4 +83,25 @@ describe('StructuredAnalyticsCard — реальные поля движка', (
     expect(container.textContent).toBe('');
     expect(container.firstChild).toBeNull();
   });
+
+  it('печатает покрытие и не выдаёт «нет данных» за предупреждение', () => {
+    const { container } = render(<StructuredAnalyticsCard sessions={[mkSession('s1', '2026-11-10', 100)]} />);
+    const text = container.textContent || '';
+    expect(text).toMatch(/оценено \d+ из \d+/);
+    expect(text).toMatch(/Нет данных для \d+ из \d+ уровней/);
+    // Отсутствие длительности — пробел в данных, а не ⚠-предупреждение.
+    expect(text).not.toContain('Длительность не записана');
+  });
+
+  it('реальное предупреждение остаётся в карточке', () => {
+    // 100 → 160 кг между половинами истории: скачок объёма +60 %.
+    const jump: SessionData[] = [
+      mkSession('s1', '2026-11-10', 100),
+      mkSession('s2', '2026-11-12', 100),
+      mkSession('s3', '2026-11-17', 160),
+      mkSession('s4', '2026-11-19', 160),
+    ];
+    const { container } = render(<StructuredAnalyticsCard sessions={jump} />);
+    expect(container.textContent || '').toContain('Резкий рост объёма');
+  });
 });

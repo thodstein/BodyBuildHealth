@@ -40,10 +40,10 @@ export interface DiaryHubCtx {
   visMuscleVol: any[];
   visProg: any[];
   expertSrpe: any[];
-  expertAcwr: number;
-  expertMono: number;
+  /** undefined — нет базы sRPE (меньше трёх сессий): ACWR не считается. */
+  expertAcwr: number | undefined;
+  expertMono: number | undefined;
   expertExercises: any[];
-  expertRecentVol: number;
   expertRirStats: any;
 
   measurements: any[];

@@ -440,6 +440,23 @@ describe('SessionPlayer — ручной «OK» без RIR', () => {
     expect(set?.rirMissing).not.toBe(true);
     unmount();
   });
+  it('стёртый RIR не превращается в «до отказа» с RPE 10', () => {
+    // Прежний `+'' === 0` записывал очистку поля как измеренный отказ (rir 0, RPE 10):
+    // это поднимало failureSets и включало разгрузку там, где оценки просто нет.
+    const { container, unmount } = render(<SessionPlayer days={[plannedDay()]} weekNumber={1} focus="PL" />);
+    startMain(container);
+
+    const rir = container.querySelector('input[aria-label="RIR факт"]') as HTMLInputElement;
+    fireEvent.change(rir, { target: { value: '2' } });
+    fireEvent.change(rir, { target: { value: '' } });
+    fireEvent.click(btn(container, 'OK')!);
+
+    const set = loadActiveSession()?.exercises?.[0]?.sets?.[0];
+    expect(set?.rirMissing).toBe(true);
+    expect(set?.rpe).toBe(0);
+    expect(set?.rir).toBe(0);
+    unmount();
+  });
 });
 
 describe('SessionPlayer — RPE из виджета и пустой явный старт', () => {

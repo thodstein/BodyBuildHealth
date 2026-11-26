@@ -967,15 +967,26 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       return [];
     }
   }, []);
-  const expertAcwr = useMemo(
-    () => (expertSrpe.length >= 2 ? acuteChronicRatio(toDailyLoads(expertSrpe)).ratio : 1.0),
-    [expertSrpe],
-  );
-  const expertMono = useMemo(() => {
+  // Нет базы sRPE (меньше трёх сессий или вся нагрузка в острой неделе) — метрики НЕТ
+  // (undefined), а не «нейтральный 1.0»: карточка коррекции иначе печатает ACWR 1.00
+  // как измеренный.
+  const expertAcwr = useMemo(() => {
+    if (expertSrpe.length < 3) return undefined;
     try {
-      return expertSrpe.length >= 7 ? weeklyMonotony(toDailyLoads(expertSrpe)).monotony : 0;
+      const r = acuteChronicRatio(toDailyLoads(expertSrpe));
+      // Вся нагрузка внутри острой недели — базы нет, ratio 2.0 был бы артефактом.
+      return r.chronic > 0 && Number.isFinite(r.ratio) && r.ratio > 0 ? r.ratio : undefined;
     } catch {
-      return 0;
+      return undefined;
+    }
+  }, [expertSrpe]);
+  const expertMono = useMemo(() => {
+    if (expertSrpe.length < 7) return undefined;
+    try {
+      const m = weeklyMonotony(toDailyLoads(expertSrpe)).monotony;
+      return Number.isFinite(m) && m > 0 ? m : undefined;
+    } catch {
+      return undefined;
     }
   }, [expertSrpe]);
   const expertExercises = useMemo(() => {
@@ -1011,10 +1022,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       .slice(0, 10)
       .map(([name, v]) => ({ name, e1rmBefore: Math.round(v.first), e1rmAfter: Math.round(v.last) }));
   }, [deferredSafeHistory]);
-  const expertRecentVol = useMemo(
-    () => deferredSafeHistory.slice(-14).reduce((s: number, w: any) => s + (w.exercises || []).length, 0),
-    [deferredSafeHistory],
-  );
   const expertRirStats = useMemo(() => {
     try {
       return loadRirCalibrationStats();
@@ -1064,7 +1071,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     expertAcwr,
     expertMono,
     expertExercises,
-    expertRecentVol,
     expertRirStats,
     measurements,
     setMeasurements,

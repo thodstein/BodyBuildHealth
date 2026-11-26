@@ -2,6 +2,8 @@
 import React from 'react';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../../core/exercise-catalog';
 import { epley1RM } from '../../../engines/e1rm';
+import { measuredSetRir } from '../../../core/rir-honesty';
+import { computeHubDiagnostics } from './hub-diagnostics';
 import { LEVEL_VOLUMES } from '../../../engines/training.engine';
 import { loadReadinessHistory } from './readiness-history';
 import { Sparkline } from './Sparkline';
@@ -67,7 +69,6 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     expertAcwr,
     expertMono,
     expertExercises,
-    expertRecentVol,
     expertRirStats,
     tprofile,
     mesoLength,
@@ -91,20 +92,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     const durations = historyWorkouts.map((w) => Number(w.duration) || 0).filter((d) => d > 0);
     return durations.length > 0 ? Math.round(durations.reduce((s, d) => s + d, 0) / durations.length) : 0;
   })();
-  // Реальный измеренный RIR из истории: `rirMissing` — заглушка, RPE → RIR (10 − RPE).
-  // Нет значений → null, а не выдуманная «двойка»: иначе карточка коррекции пишет «было 2» без данных.
+  // Реальный измеренный RIR из истории — единое правило rir-honesty, без «двойки» без данных.
   const measuredRir = React.useMemo(() => {
     let sum = 0;
     let n = 0;
     for (const w of historyWorkouts as any[]) {
       for (const e of w?.exercises || []) {
         for (const s of e?.sets || []) {
-          const rpeRaw = typeof s?.rpe === 'number' ? s.rpe : 0;
-          const rirRaw =
-            s?.rirMissing === true || s?.rir == null || !Number.isFinite(Number(s.rir)) ? null : Number(s.rir);
-          // Ноль без метки и без введённого RPE — заполнитель старых сборок, а не «до отказа».
-          const rir = rirRaw != null && (rirRaw > 0 || rpeRaw > 0) ? rirRaw : rpeRaw > 0 ? 10 - rpeRaw : null;
-          if (rir != null && Number.isFinite(rir)) {
+          const rir = measuredSetRir(s);
+          if (rir != null) {
             sum += rir;
             n++;
           }
@@ -113,6 +109,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     }
     return n > 0 ? Math.round((sum / n) * 10) / 10 : null;
   }, [historyWorkouts]);
+  // Объём и пропуски для карточки коррекции — из того же расчёта, что в хабе
+  // диагностики (computeHubDiagnostics): одно 7-дневное окно, подходы, а не число
+  // упражнений за 14 тренировок.
+  const weekWindow = React.useMemo(() => {
+    const d = computeHubDiagnostics(historyWorkouts, Number(tprofile?.daysPerWeek ?? 0) || 0);
+    return { sets: d.currentVolume, missed: d.missedSessions };
+  }, [historyWorkouts, tprofile?.daysPerWeek]);
   if (!analytics) {
     return (
       <div className="train-diaryanalytics" style={style.card}>
@@ -2198,13 +2201,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     return r ? (r.recovery + (100 - r.fatigue)) / 2 : 70;
                   })()}
                   mesoWeeks={mesoLength}
-                  missedSessions={0}
+                  missedSessions={weekWindow.missed}
                   exercises={expertExercises}
-                  currentVolume={
-                    expertRecentVol > 0
-                      ? Math.round(expertRecentVol / Math.max(1, Math.floor(historyWorkouts.length / 14)))
-                      : 0
-                  }
+                  // Карточка подписывает объём как «сетов» — значит подходы за 7 дней,
+                  // а не число упражнений за 14 тренировок (это была другая единица).
+                  currentVolume={weekWindow.sets}
                   currentRir={measuredRir}
                 />
                 <MuscleProgressCard sessions={historyWorkouts} level={level} />

@@ -13,6 +13,7 @@
  * Чистые функции без React и localStorage — легко тестировать.
  */
 import { EXERCISE_CATALOG } from '../core/exercise-catalog';
+import { measuredSetRir } from '../core/rir-honesty';
 import { epley1RM } from './e1rm';
 import { getVolumeLandmarks, checkVolumeStatus, type VolumeStatus } from './volume-landmarks.engine';
 import { normalizeExerciseName } from './set-intensity.engine';
@@ -643,12 +644,10 @@ export function buildWorkoutSummary(workouts: WorkoutLog[], baselineWorkouts?: W
         exBestWeight = Math.max(exBestWeight, weight);
         exBestReps = Math.max(exBestReps, reps);
         maxLoad = Math.max(maxLoad, weight);
-        const rirRaw = (st as any)?.rir;
-        // `rirMissing` — «оценку не вводили»: ноль-заполнитель не средний RIR,
-        // не «около отказа» и не отказ.
-        const rirMissing = (st as any)?.rirMissing === true;
-        if (!rirMissing && rirRaw != null && Number.isFinite(Number(rirRaw))) {
-          const rirVal = Number(rirRaw);
+        // Честный RIR: `rirMissing`/пусто — «не вводили», ноль при введённом RPE<10 —
+        // заполнитель старой сборки (RIR 0 = RPE 10) → RIR из RPE, отказом не считается.
+        const rirVal = measuredSetRir(st as any);
+        if (rirVal != null) {
           exRirSum += rirVal; exRirN += 1;
           if (rirVal <= 2) nearFailSets += 1;
           if (rirVal <= 0) failSets += 1;
@@ -1774,12 +1773,11 @@ export function buildSetDetails(workouts: WorkoutLog[]): SetDetailSession[] {
         const weight = setWeight(st);
         const reps = setReps(st);
         if (weight <= 0 && reps <= 0) continue;
-        const rirRaw = (st as any)?.rir;
         const rpeRaw = (st as any)?.rpe;
         sets.push({
           weight,
           reps,
-          rir: rirRaw != null && Number.isFinite(Number(rirRaw)) ? Number(rirRaw) : null,
+          rir: measuredSetRir(st as any),
           rpe: rpeRaw != null && Number.isFinite(Number(rpeRaw)) ? Number(rpeRaw) : null,
           rirMissing: (st as any)?.rirMissing === true ? true : undefined,
           pct1RM: null,

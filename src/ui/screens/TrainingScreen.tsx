@@ -78,8 +78,8 @@ import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms
 import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
 import { readRuntimeDay, writeRuntimeDay } from './TrainingScreen_parts/runtime-day';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
-import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../engines/pro/training-load.engine';
-import { epley1RM } from '../../engines/e1rm';
+import { computeHubDiagnostics } from './TrainingScreen_parts/hub-diagnostics';
+import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 // BB-G-02/08: белый список целей deep-link'а из ББ-диагностики (один источник с движком советов).
 import { BB_DIAG_DEEP_LINKS } from '../../engines/bb/bb-diag-next-actions.engine';
 
@@ -361,83 +361,12 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
   /** Живые входы «Мастера движений» (вкладка Диагностика → коррекция мезоцикла).
    *  Раньше в хаб уходили константы (missedSessions=0, currentVolume=18, currentRir=2),
-   *  а ACWR/монотонность не передавались вовсе — коррекция считалась «из воздуха». */
-  const hubDiagnostics = useMemo(() => {
-    let acwr: number | undefined;
-    let monotony: number | undefined;
-    try {
-      const srpe = loadSRPESessions();
-      if (srpe.length >= 2) {
-        const daily = toDailyLoads(srpe);
-        const r = acuteChronicRatio(daily).ratio;
-        const m = weeklyMonotony(daily).monotony;
-        if (Number.isFinite(r) && r > 0) acwr = Math.round(r * 100) / 100;
-        if (Number.isFinite(m) && m > 0) monotony = Math.round(m * 100) / 100;
-      }
-    } catch { /* нет sRPE-логов — оставляем undefined, карточка честно скажет */ }
-
-    // Проход 173: окна «7/14 дней» — календарь пользователя, а не UTC-день.
-    const iso = (d: number) => localIsoDate(new Date(d));
-    const cutoff7 = iso(Date.now() - 7 * 86400000);
-    const cutoff14 = iso(Date.now() - 14 * 86400000);
-    let sets7 = 0;
-    let rirSum = 0;
-    let rirN = 0;
-    const dayKeys7 = new Set<string>();
-    const e1rmRows: Array<{ name: string; date: string; e1rm: number }> = [];
-
-    for (const w of (historyWorkouts as any[])) {
-      const date = String(w?.date || '');
-      for (const e of (w?.exercises || [])) {
-        const name = String(e?.exerciseName || e?.exerciseId || '');
-        for (const s of (e?.sets || [])) {
-          const weight = Number(s?.weightKg ?? s?.weight ?? 0);
-          const reps = Number(s?.reps ?? 0);
-          // `rirMissing` — «оценку не вводили»: там `rir: 0` лежит заполнителем, и ноль
-          // тянул среднюю к «до отказа». Старые сборки метки не писали, но явный «до отказа»
-          // отличали введённым RPE (10): ноль без RPE — тоже «не вводили».
-          const rpeRaw = Number(s?.rpe) || 0;
-          const rirRaw = s?.rirMissing === true || s?.rir == null || !Number.isFinite(Number(s.rir)) ? null : Number(s.rir);
-          const rir = rirRaw != null && (rirRaw > 0 || rpeRaw > 0) ? rirRaw : rpeRaw > 0 ? 10 - rpeRaw : null;
-          if (weight > 0 && reps > 0 && name) e1rmRows.push({ name, date, e1rm: Math.round(epley1RM(weight, reps) * 10) / 10 });
-          if (date >= cutoff7) {
-            dayKeys7.add(date || `w${sets7}`);
-            sets7++;
-            if (rir != null && Number.isFinite(rir)) { rirSum += rir; rirN++; }
-          } else if (date >= cutoff14 && rir != null && Number.isFinite(rir)) {
-            rirSum += rir; rirN++;
-          }
-        }
-      }
-    }
-
-    // Динамика e1RM по упражнениям: лучший сет до/после середины окна истории.
-    const dates = e1rmRows.map(r => r.date).filter(Boolean).sort();
-    const midDate = dates.length ? dates[Math.floor(dates.length / 2)] : '';
-    const acc = new Map<string, { before: number; after: number }>();
-    for (const r of e1rmRows) {
-      const cur = acc.get(r.name) ?? { before: 0, after: 0 };
-      if (midDate && r.date > midDate) cur.after = Math.max(cur.after, r.e1rm);
-      else cur.before = Math.max(cur.before, r.e1rm);
-      acc.set(r.name, cur);
-    }
-    const exercises = [...acc.entries()]
-      .filter(([, v]) => v.before > 0 && v.after > 0)
-      .map(([name, v]) => ({ name, e1rmBefore: v.before, e1rmAfter: v.after }))
-      .slice(0, 8);
-
-    const plannedWeekly = Number(tprofile?.daysPerWeek ?? 0) || 0;
-    const missedSessions = plannedWeekly > 0 ? Math.max(0, plannedWeekly - dayKeys7.size) : 0;
-
-    return {
-      acwr,
-      monotony,
-      exercises,
-      currentVolume: sets7,
-      currentRir: rirN > 0 ? Math.round((rirSum / rirN) * 10) / 10 : null,
-      missedSessions,
-    };
-  }, [historyWorkouts, tprofile?.daysPerWeek]);
+   *  а ACWR/монотонность не передавались вовсе — коррекция считалась «из воздуха».
+   *  Сам расчёт — computeHubDiagnostics (чистая функция, покрыта тестом). */
+  const hubDiagnostics = useMemo(
+    () => computeHubDiagnostics(historyWorkouts, Number(tprofile?.daysPerWeek ?? 0) || 0),
+    [historyWorkouts, tprofile?.daysPerWeek],
+  );
 
   // Runtime (live workout) state
   // Индекс дня в списке ТРЕНИРОВОЧНЫХ дней микроцикла (не день недели): дефолт 1

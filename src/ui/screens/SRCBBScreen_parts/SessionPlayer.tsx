@@ -1695,7 +1695,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     // 0 без метки значит «до отказа», поэтому «не вводили» — отдельный флаг; при
     // введённом только RPE RIR выводится из него (10 − RPE), а не пишется нулём.
     const enteredRirKnown =
-      enteredRir != null && enteredRir <= 10 && (enteredRaw as SessionSetValue | undefined)?.rirMissing !== true;
+      enteredRir != null &&
+      enteredRir >= 0 &&
+      enteredRir <= 10 &&
+      (enteredRaw as SessionSetValue | undefined)?.rirMissing !== true;
     const measuredRir =
       enteredRirKnown && enteredRir != null ? enteredRir : enteredRpe > 0 ? Math.max(0, 10 - enteredRpe) : 0;
     const rirMissing = !enteredRirKnown && enteredRpe <= 0;
@@ -5277,13 +5280,15 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                             value={a.rir ?? ''}
                             onChange={(e) => {
                               // Ручной ввод — измерение: метка «с виджета без оценки» больше не действует.
-                              const v = +e.target.value;
+                              // Стёртое поле — не ноль: `+'' === 0` превращал очистку в «до отказа» с RPE 10.
+                              const raw = e.target.value;
+                              const v = raw.trim() === '' ? NaN : Number(raw);
                               setActual((p) => ({
                                 ...p,
                                 [k]: {
                                   ...a,
                                   rir: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : undefined,
-                                  rirMissing: false,
+                                  rirMissing: !Number.isFinite(v),
                                 },
                               }));
                             }}
