@@ -850,17 +850,34 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
 }
 
 /**
+ * Нормализация одного значения микронутриента из дневника: строку с запятой
+ * («12,5») приводит к числу, отсутствующее/нечисловое — к `null`. Локальная
+ * копия логики `aggregateDiaryMicros` из UI-хранилища: движок не импортирует
+ * UI-модули (иначе тесты движка тянут React-экран дневника).
+ */
+function diaryMicroValue(raw: unknown): number | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const numeric = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+/** Микронутриенты дневника, которые считаем для покрытия рационом. */
+const DIET_COVERAGE_MICRO_KEYS = ['potassium_mg', 'magnesium_mg', 'calcium_mg', 'iron_mg', 'vitamin_d_mcg'] as const;
+
+/**
  * Агрегат питания из дневника за сегодня (`nutrition_diary_v2`) — единственный
  * существующий источник фактического рациона. Возвращает `undefined`, если
- * записей за сегодня нет. Дневник хранит только ккал/БЖУ/клетчатку/воду:
- * железо, кальций, D3, магний, калий и EPA+DHA в нём отсутствуют — вызывающий
- * код обязан оставить их `undefined`, а не заполнять нулями.
+ * записей за сегодня нет. Дневник гарантированно хранит ккал/БЖУ/клетчатку/воду;
+ * микронутриенты попадают в `micros` только если значение есть у КАЖДОЙ записи
+ * за сегодня (иначе ключа нет — вызывающий оставит `undefined`, а не ноль).
+ * EPA+DHA дневник не хранит вовсе.
  *
  * Используется и `hydrateState` (профиль), и фильтром «рацион покрывает
  * вещество» (опция `dietCoverage`), чтобы не заводить второй источник данных.
  */
 export function nutritionDiaryTotalsToday(): {
   calories: number; proteinG: number; fatG: number; carbsG: number; fiberG: number; waterL: number;
+  micros: Record<string, number>;
 } | undefined {
   try {
     const raw = localStorage.getItem('nutrition_diary_v2');
@@ -869,6 +886,20 @@ export function nutritionDiaryTotalsToday(): {
     const today = localIsoDate();
     const todayEntries = Object.values(diary?.[today]?.meals || {}).flatMap((items: any) => Array.isArray(items) ? items : []);
     if (todayEntries.length === 0) return undefined;
+    // «Всё или неизвестно»: ключ попадает в micros только если он есть у КАЖДОЙ
+    // записи за сегодня — иначе вызывающий получит undefined → `unknown`, а не
+    // ложный ноль. Округление до 1 знака.
+    const micros: Record<string, number> = {};
+    for (const key of DIET_COVERAGE_MICRO_KEYS) {
+      let sum = 0;
+      let complete = true;
+      for (const entry of todayEntries) {
+        const value = diaryMicroValue((entry as any)?.micros?.[key]);
+        if (value === null) { complete = false; break; }
+        sum += value;
+      }
+      if (complete) micros[key] = Math.round(sum * 10) / 10;
+    }
     const totals = todayEntries.reduce((acc: any, e: any) => ({
       calories: (acc.calories || 0) + (e.kcal || 0),
       proteinG: (acc.proteinG || 0) + (e.p || 0),
@@ -884,6 +915,7 @@ export function nutritionDiaryTotalsToday(): {
       carbsG: Math.round(totals.carbsG || 0),
       fiberG: Math.round(totals.fiberG || 0),
       waterL: Math.round((totals.waterL || 0) * 10) / 10,
+      micros,
     };
   } catch {
     return undefined;

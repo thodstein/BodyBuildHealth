@@ -22,6 +22,7 @@ import { DEFAULT_DOSAGES } from '../data/support-database';
 import { defaultDoseUnit } from '../data/dose-units';
 import { boundProvesSide, type LabBound } from '../core/lab-bound';
 import { supportNameRu } from '../data/support-names';
+import { POTASSIUM_ACTION } from '../data/potassium-action-thresholds';
 import type { BodyMeasurement } from './log-analytics-progression.engine';
 import type { BodyCompEntry } from './body-composition.engine';
 import type { UnifiedSettings } from '../core/types';
@@ -994,7 +995,7 @@ function generateRecommendations(sections: ReportSection[], pedRisk: RiskBridgeD
   else if (na != null && na < 136) recs.push({ section: 'Электролиты', priority: 'warning', text: `Натрий ${na} ммоль/л — гипонатриемия. Рассмотреть SAID (спиронолактон) при ААС.` });
 
   const k = numVal(findMetric('Калий'));
-  if (k != null && k > 5.5) recs.push({ section: 'Электролиты', priority: 'critical', text: `Калий ${k} ммоль/л — гиперкалиемия! Риск аритмии. Контроль ЭКГ, бикарбонат калия.` });
+  if (k != null && k > POTASSIUM_ACTION.reportFlagHigh) recs.push({ section: 'Электролиты', priority: 'critical', text: `Калий ${k} ммоль/л — гиперкалиемия! Риск аритмии. Контроль ЭКГ, бикарбонат калия.` });
   else if (k != null && k < 3.5) recs.push({ section: 'Электролиты', priority: 'warning', text: `Калий ${k} ммоль/л — гипокалиемия. Калийсберегающие диуретики при ААС, бананы, авокадо.` });
 
   const mg = numVal(findMetric('Магний'));

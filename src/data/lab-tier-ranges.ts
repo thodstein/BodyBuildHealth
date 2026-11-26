@@ -17,6 +17,7 @@ import {
   RETIC_BAND,
 } from '../engines/lab-norms.engine';
 import { ucumInfo } from '../core/constants';
+import { POTASSIUM_ACTION } from './potassium-action-thresholds';
 import { unitsIncommensurable } from '../core/labs-mapping';
 
 export type Tier = 0 | 1 | 2 | 3;
@@ -186,7 +187,7 @@ export const LAB_TIERS: Record<string, LabTierThreshold> = {
   // сознательно: источник называет тяжёлым «< 2.5», а приложение считает 2.5 экстренным —
   // округление бланка до десятых не повод откладывать помощь (осторожная сторона).
   // Поэтому ступень 3 здесь означает неотложную помощь, а не «наблюдение».
-  POTASSIUM:        { marker:'POTASSIUM', normal:[3.5,5.1], borderline:[3.0,3.5,5.1,5.5], treatment:[2.5,3,5.5,6.5], emergencyHigh:6.5, emergencyLow:2.5, direction:'both', unit:'mmol/L', label:'Калий' },
+  POTASSIUM:        { marker:'POTASSIUM', normal:[3.5,5.1], borderline:[3.0,3.5,5.1,5.5], treatment:[2.5,3,5.5,6.5], emergencyHigh:POTASSIUM_ACTION.emergencyHigh, emergencyLow:2.5, direction:'both', unit:'mmol/L', label:'Калий' },
   SODIUM:           { marker:'SODIUM', normal:[135,145], borderline:[130,135,145,150], treatment:[125,130,150,155], emergencyHigh:155, emergencyLow:125, direction:'both', unit:'mmol/L', label:'Натрий' },
   CALCIUM:          { marker:'CALCIUM', normal:[2.2,2.6], borderline:[2.0,2.2,2.6,2.8], treatment:[1.8,2.0,2.8,3.0], emergencyHigh:3.0, emergencyLow:1.8, direction:'both', unit:'mmol/L', label:'Кальций' },
   // Проход 209: норма 0.81–1.45 — Хеликс 06-046 (18+), те же числа, что в каталоге.

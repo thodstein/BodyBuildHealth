@@ -9,6 +9,7 @@ import {
 } from './lab-norms.engine';
 import { phaseHormoneBand, phaseUnionBand, type CycleState } from './female-cycle-phase.engine';
 import { labMechanismIndex } from './lab-index-model';
+import { POTASSIUM_ACTION } from '../data/potassium-action-thresholds';
 
 export interface LabInterpretation {
   code: string;
@@ -164,7 +165,7 @@ export const REFERENCE_RANGES: Record<string, { low: number; high: number; criti
   ERYTHROCYTES: { ...ucumRange('RBC'), low: 4.2, criticalHigh: 6.2, unit: '10^12/л' },
   LEUKOCYTES: { low: 4, high: 10, criticalHigh: 12, unit: '10^9/л' },
   THROMBOCYTES: { ...ucumRange('PLT'), criticalHigh: 500, unit: '10^9/л' },
-  POTASSIUM: { ...ucumRange('POTASSIUM'), criticalHigh: 6.0, unit: 'ммоль/л' },
+  POTASSIUM: { ...ucumRange('POTASSIUM'), criticalHigh: POTASSIUM_ACTION.criticalResultHigh, unit: 'ммоль/л' },
   SODIUM: { ...ucumRange('SODIUM'), criticalHigh: 155, unit: 'ммоль/л' },
 };
 

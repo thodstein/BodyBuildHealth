@@ -100,13 +100,23 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
 
   // ── 1b. Опция «🍽 рацион покрывает вещество» (opt-in): пометки, НЕ удаление ──
   // intake — только уже существующий агрегат дневника из engine.ts (сегодня).
-  // Железо/кальций/D3/магний/калий/EPA+DHA дневник не хранит → оставляем
-  // undefined, движок честно вернёт 'unknown', а не выдуманные нули.
+  // Микронутриенты приходят из totals.micros и только при полноте по всем
+  // записям дня; чего в дневнике нет (EPA+DHA) — остаётся undefined, и движок
+  // честно вернёт 'unknown', а не выдуманные нули.
   const dietCoverageNotes: string[] = [];
   let dietCoverageRows: NutrientCoverage[] = [];
   if (state.options?.dietCoverage) {
     const totals = nutritionDiaryTotalsToday();
-    const intake: DietIntake = { fiberG: totals?.fiberG };
+    const micros = totals?.micros || {};
+    const intake: DietIntake = {
+      fiberG: totals?.fiberG,
+      potassiumMg: micros.potassium_mg,
+      magnesiumMg: micros.magnesium_mg,
+      calciumMg: micros.calcium_mg,
+      ironMg: micros.iron_mg,
+      // 1 мкг витамина D = 40 МЕ (см. норму в support-diet-coverage.engine.ts).
+      vitaminDIu: typeof micros.vitamin_d_mcg === 'number' ? micros.vitamin_d_mcg * 40 : undefined,
+    };
     dietCoverageRows = dietCoverage(intake);
     const annotated = annotatePlanSubsByDiet(substances, dietCoverageRows);
     substances = annotated.subs;
