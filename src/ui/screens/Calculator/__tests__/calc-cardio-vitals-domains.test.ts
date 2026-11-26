@@ -25,8 +25,13 @@ import { DEFAULT_STATE } from '../Calc.types';
 import { SPECIALIZED_DOMAINS } from '../Calc.mapper';
 import type { CalculatorState } from '../../../../engines/support-plan/types';
 import { buildMapperCtx } from '../../../../engines/support-plan/mapper-ctx';
+import { LAB_TIERS } from '../../../../data/lab-tier-ranges';
 import {
-  bpStageCanon, bpStageIsHigh, bpSystolicOfStage, heartRateOf, BP_STAGE_LABEL,
+  bpStageCanon,
+  bpStageIsHigh,
+  bpSystolicOfStage,
+  heartRateOf,
+  BP_STAGE_LABEL,
 } from '../../../../engines/support-plan/cardio-vitals';
 
 const trigger = (
@@ -41,10 +46,11 @@ const trigger = (
   return d.trigger({ ...labs }, { profile: { sex }, cardio } as never);
 };
 
-const mapperState = (cardio: Record<string, unknown>) => ({
-  ...DEFAULT_STATE,
-  cardio: { ...DEFAULT_STATE.cardio, ...cardio },
-}) as CalculatorState;
+const mapperState = (cardio: Record<string, unknown>) =>
+  ({
+    ...DEFAULT_STATE,
+    cardio: { ...DEFAULT_STATE.cardio, ...cardio },
+  }) as CalculatorState;
 
 describe('проход 204: стадия АД → систола — одно правило', () => {
   it('канон стадии: старое `elevated` — это прегипертония, незнакомое — норма', () => {
@@ -137,11 +143,14 @@ describe('проход 204: пороги доменов — из лестниц�
     expect(trigger('metabolic', 'lipidmet', { HDL: 1.1 }, {}, 'male')).toBe(false);
   });
 
-  it('электролиты: калий 5.0 — верх нормы, 5.1 — домен', () => {
-    expect(trigger('renal', 'electrolytes', { K: 5.0 })).toBe(false);
-    expect(trigger('renal', 'electrolytes', { K: 5.1 })).toBe(true);
-    expect(trigger('renal', 'electrolytes', { K: 3.5 })).toBe(false);
-    expect(trigger('renal', 'electrolytes', { K: 3.4 })).toBe(true);
+  it('электролиты: граница ступени калия — норма, шаг за границей — домен', () => {
+    // Пороги домена читаются из LAB_TIERS.POTASSIUM.normal (проход 209: 3.5–5.1
+    // по референсу Хеликс 06-064, прежде 5.0), поэтому тест не хардкодит числа.
+    const [lo, hi] = LAB_TIERS.POTASSIUM.normal;
+    expect(trigger('renal', 'electrolytes', { K: hi })).toBe(false);
+    expect(trigger('renal', 'electrolytes', { K: Math.round((hi + 0.1) * 10) / 10 })).toBe(true);
+    expect(trigger('renal', 'electrolytes', { K: lo })).toBe(false);
+    expect(trigger('renal', 'electrolytes', { K: Math.round((lo - 0.1) * 10) / 10 })).toBe(true);
   });
 
   it('пролактин: совет включается на верхней границе «грани» (25)', () => {
