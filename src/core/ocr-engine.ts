@@ -1,4 +1,9 @@
-import { parseLabText as parseLabTextFromPdf, parseLabFile, ocrScannedPdf, type ParsedLabResult as PdfParsedLabResult } from '../engines/pdf-parser.engine';
+import {
+  parseLabText as parseLabTextFromPdf,
+  parseLabFile,
+  ocrScannedPdf,
+  type ParsedLabResult as PdfParsedLabResult,
+} from '../engines/pdf-parser.engine';
 import { parseNutritionText, type ParsedMeal } from '../engines/nutrition-ocr-parser';
 import { parseLabText as parseLabTextProviderAware, detectProvider } from './lab-auto-parser';
 import { boundProvesSide } from './lab-bound';
@@ -44,7 +49,11 @@ async function readFileAsText(file: File | Blob): Promise<string> {
 
 export async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
   if (typeof (file as any).arrayBuffer === 'function') {
-    try { return await (file as any).arrayBuffer(); } catch { /* use FileReader */ }
+    try {
+      return await (file as any).arrayBuffer();
+    } catch {
+      /* use FileReader */
+    }
   }
   return new Promise<ArrayBuffer>((resolve, reject) => {
     const reader = new FileReader();
@@ -57,7 +66,12 @@ export async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuf
   });
 }
 
-async function prepareImageForServer(
+/**
+ * Уменьшает кадр до лимитов и кодирует JPEG. Экспортируется для vision-слоя:
+ * AI-эндпоинту не нужен исходный 12-МП кадр, а повторять canvas-обвязку в
+ * двух местах — два разных поведения на одном и том же WebView.
+ */
+export async function prepareImageForServer(
   file: File,
   limits?: { maxSide?: number; maxPixels?: number },
 ): Promise<Blob> {
@@ -78,25 +92,21 @@ async function prepareImageForServer(
   // в WebView ещё удерживается.
   const maxSide = limits?.maxSide ?? 1280;
   const maxPixels = limits?.maxPixels ?? 1_600_000;
-  const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> => Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
-  ]);
+  const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
+    Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
 
-  const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> => withTimeout(
-    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.65)),
-    10_000,
-    'image encode timeout',
-  );
+  const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> =>
+    withTimeout(new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.65)), 10_000, 'image encode timeout');
 
   try {
     // Декодируем БЕЗ resize-хинтов: createImageBitmap с парой
     // resizeWidth+resizeHeight сплющивает высокий скриншот (1080×2400)
     // в квадрат 1280×1280 — текст сжимается по вертикали вдвое и OCR
     // не видит вообще ничего. Точный размер + canvas-кап ниже.
-    const bitmap = typeof createImageBitmap === 'function'
-      ? await withTimeout(createImageBitmap(file), 15_000, 'image decode timeout')
-      : null;
+    const bitmap =
+      typeof createImageBitmap === 'function'
+        ? await withTimeout(createImageBitmap(file), 15_000, 'image decode timeout')
+        : null;
     if (!bitmap) throw new Error('createImageBitmap unavailable');
     const scale = Math.min(
       1,
@@ -122,7 +132,8 @@ async function prepareImageForServer(
     // an HTMLImageElement instead of falling back to the full camera file.
     try {
       if (typeof Image === 'undefined' || typeof URL?.createObjectURL !== 'function') {
-        if (file.size > 5 * 1024 * 1024) throw new Error('Фото слишком большое и не удалось сжать. Сделайте скриншот экрана вместо фото камеры.');
+        if (file.size > 5 * 1024 * 1024)
+          throw new Error('Фото слишком большое и не удалось сжать. Сделайте скриншот экрана вместо фото камеры.');
         return file;
       }
       const url = URL.createObjectURL(file);
@@ -130,11 +141,21 @@ async function prepareImageForServer(
         const image = await new Promise<HTMLImageElement>((resolve, reject) => {
           const element = new Image();
           const timer = setTimeout(() => reject(new Error('image decode timeout')), 15_000);
-          element.onload = () => { clearTimeout(timer); resolve(element); };
-          element.onerror = () => { clearTimeout(timer); reject(new Error('image decode failed')); };
+          element.onload = () => {
+            clearTimeout(timer);
+            resolve(element);
+          };
+          element.onerror = () => {
+            clearTimeout(timer);
+            reject(new Error('image decode failed'));
+          };
           element.src = url;
         });
-        const scale = Math.min(1, maxSide / Math.max(image.width, image.height), Math.sqrt(maxPixels / Math.max(1, image.width * image.height)));
+        const scale = Math.min(
+          1,
+          maxSide / Math.max(image.width, image.height),
+          Math.sqrt(maxPixels / Math.max(1, image.width * image.height)),
+        );
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
@@ -146,7 +167,8 @@ async function prepareImageForServer(
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         const compressed = await encodeCanvas(canvas);
         if (compressed && compressed.size < file.size * 0.85 && file.size > 2 * 1024 * 1024) return compressed;
-        if (file.size > 5 * 1024 * 1024) throw new Error('Фото слишком большое даже после сжатия. Сделайте скриншот экрана.');
+        if (file.size > 5 * 1024 * 1024)
+          throw new Error('Фото слишком большое даже после сжатия. Сделайте скриншот экрана.');
         return file;
       } finally {
         URL.revokeObjectURL(url);
@@ -199,8 +221,16 @@ export interface ParsedLabValue {
  */
 function mergeParsedResults(
   pdfResults: ParsedLabValue[],
-  providerResults: { marker: string; value: number; unit: string; confidence: number; refLow?: number; refHigh?: number; bound?: '<' | '>' }[],
-  provider: string | undefined
+  providerResults: {
+    marker: string;
+    value: number;
+    unit: string;
+    confidence: number;
+    refLow?: number;
+    refHigh?: number;
+    bound?: '<' | '>';
+  }[],
+  provider: string | undefined,
 ): { labs: ParsedLabValue[]; warnings: string[] } {
   const warnings: string[] = [];
   const tableByCode = new Map<string, ParsedLabValue>();
@@ -215,14 +245,12 @@ function mergeParsedResults(
   }
 
   const codes = new Set([...tableByCode.keys(), ...providerByCode.keys()]);
-  const labs = [...codes].map(code => {
+  const labs = [...codes].map((code) => {
     const table = tableByCode.get(code);
     const providerValue = providerByCode.get(code);
     // Provider parser is useful for split OCR rows, while the table parser
     // carries the authoritative unit and reference range when available.
-    const source = table?.refLow !== undefined || table?.refHigh !== undefined
-      ? table
-      : providerValue || table!;
+    const source = table?.refLow !== undefined || table?.refHigh !== undefined ? table : providerValue || table!;
     // The unit must belong to the same candidate as the selected value. Using
     // a provider unit for a table value can silently apply the wrong factor.
     const sourceUnit = source.unit || '';
@@ -232,22 +260,25 @@ function mergeParsedResults(
       ? normalizeLabMeasurement(code, providerValue.value, providerValue.unit || sourceUnit).value
       : undefined;
     const refUnit = table?.unit || source.unit || '';
-    const refLow = table?.refLow !== undefined
-      ? normalizeLabMeasurement(code, table.refLow, refUnit).value
-      : providerValue?.refLow !== undefined
-      ? normalizeLabMeasurement(code, providerValue.refLow, providerValue.unit || refUnit).value
-      : undefined;
-    const refHigh = table?.refHigh !== undefined
-      ? normalizeLabMeasurement(code, table.refHigh, refUnit).value
-      : providerValue?.refHigh !== undefined
-      ? normalizeLabMeasurement(code, providerValue.refHigh, providerValue.unit || refUnit).value
-      : undefined;
+    const refLow =
+      table?.refLow !== undefined
+        ? normalizeLabMeasurement(code, table.refLow, refUnit).value
+        : providerValue?.refLow !== undefined
+          ? normalizeLabMeasurement(code, providerValue.refLow, providerValue.unit || refUnit).value
+          : undefined;
+    const refHigh =
+      table?.refHigh !== undefined
+        ? normalizeLabMeasurement(code, table.refHigh, refUnit).value
+        : providerValue?.refHigh !== undefined
+          ? normalizeLabMeasurement(code, providerValue.refHigh, providerValue.unit || refUnit).value
+          : undefined;
     // Проход 167: знак границы принадлежит тому значению, которое выбрано.
     // Табличный разбор бланка («Ферритин >1000 нг/мл 30-400») терял знак, и
     // число 1000 становилось точным измерением. Берём знак у провайдера, если
     // его число совпало с выбранным.
-    const bound = source.bound
-      ?? (providerNormalized !== undefined && Math.abs(providerNormalized - normalized.value) < 1e-9
+    const bound =
+      source.bound ??
+      (providerNormalized !== undefined && Math.abs(providerNormalized - normalized.value) < 1e-9
         ? providerValue?.bound
         : undefined);
     // Явный референс из бланка важнее среднепопуляционных границ UCUM_MAP.
@@ -264,8 +295,8 @@ function mergeParsedResults(
     if (bound) {
       abnormal = boundProvesSide(bound, normalized.value, low, high) ? true : undefined;
     } else if (refLow !== undefined || refHigh !== undefined) {
-      abnormal = (refHigh !== undefined && normalized.value > refHigh)
-        || (refLow !== undefined && normalized.value < refLow);
+      abnormal =
+        (refHigh !== undefined && normalized.value > refHigh) || (refLow !== undefined && normalized.value < refLow);
     } else if (info) {
       abnormal = normalized.value > info.uln || normalized.value < info.lln;
     } else {
@@ -298,17 +329,20 @@ function mergeParsedResults(
     // человек должен видеть, что это не измерение: иначе в истории оно выглядит
     // точным значением.
     warnings.push(
-      'Границы вместо чисел: '
-      + bounded.map((l) => `${l.name} ${l.bound}${l.value}`).join(', ')
-      + ' — сохранено по числу из бланка, знак границы показан рядом.',
+      'Границы вместо чисел: ' +
+        bounded.map((l) => `${l.name} ${l.bound}${l.value}`).join(', ') +
+        ' — сохранено по числу из бланка, знак границы показан рядом.',
     );
   }
   return { labs, warnings };
 }
 
-function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs: ParsedLabValue[]; provider: string; warnings: string[]; date?: string } {
+function parseLabTextAllWays(
+  rawText: string,
+  extractionMethod: string,
+): { labs: ParsedLabValue[]; provider: string; warnings: string[]; date?: string } {
   const parsed = parseLabTextFromPdf(rawText);
-  const pdfLabs = parsed.values.map(v => ({ ...v }));
+  const pdfLabs = parsed.values.map((v) => ({ ...v }));
   const providerResults = parseLabTextProviderAware(rawText);
   const provider = detectProvider(rawText);
   const merged = mergeParsedResults(pdfLabs, providerResults, provider);
@@ -329,9 +363,8 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
     // ec50 from biomarker-regex is a statistical bound, NOT a clinical reference.
     // Only use it as refHigh when the catalog provides no reference (rare markers).
     const info = ucumInfo(code);
-    const refHigh = (marker.ec50 > 0 && !info) 
-      ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value 
-      : undefined;
+    const refHigh =
+      marker.ec50 > 0 && !info ? normalizeLabMeasurement(code, marker.ec50, marker.unit).value : undefined;
     const newLab: ParsedLabValue = {
       code,
       name: marker.name,
@@ -340,7 +373,9 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
       refHigh,
       isAbnormal: info
         ? normalized.value > info.uln || normalized.value < info.lln
-        : refHigh !== undefined ? normalized.value > refHigh : undefined,
+        : refHigh !== undefined
+          ? normalized.value > refHigh
+          : undefined,
       raw: isUsefulRawLine(marker.sourceLine) ? marker.sourceLine : undefined,
     };
     const existing = labsByCode.get(code);
@@ -361,7 +396,12 @@ function parseLabTextAllWays(rawText: string, extractionMethod: string): { labs:
       labsByCode.set(code, newLab);
     }
   }
-  return { labs, provider: provider || 'unknown', warnings: [...merged.warnings, ...regexResults.warnings], date: formDate };
+  return {
+    labs,
+    provider: provider || 'unknown',
+    warnings: [...merged.warnings, ...regexResults.warnings],
+    date: formDate,
+  };
 }
 
 /**
@@ -374,8 +414,8 @@ function labOcrCandidateQuality(text: string): { score: number; labCount: number
   try {
     const parsed = parseLabTextAllWays(text, 'tesseract.js');
     const labs = finalizeLabCandidates(parsed.labs);
-    const withReference = labs.filter(lab => lab.refLow !== undefined || lab.refHigh !== undefined).length;
-    const withUnit = labs.filter(lab => Boolean(lab.unit)).length;
+    const withReference = labs.filter((lab) => lab.refLow !== undefined || lab.refHigh !== undefined).length;
+    const withUnit = labs.filter((lab) => Boolean(lab.unit)).length;
     // Recognized markers dominate; reference ranges and units break ties.
     return {
       score: labs.length * 100 + withReference * 15 + withUnit * 5,
@@ -404,7 +444,9 @@ function shouldRetryPdfWithOcr(text: string, labs: ParsedLabValue[]): boolean {
   const cleanText = text.replace(/\s+/g, ' ').trim();
   if (!cleanText || cleanText.length < 80 || /�|\uFFFD|invalid pdf|pdf parsing/i.test(cleanText)) return true;
   if (labs.length === 0) return true;
-  const headerHits = cleanText.match(/анализ|показател|результат|референ|единиц|наименование|лаборатор|гемотест|инвитро|хеликс|kdl/gi)?.length ?? 0;
+  const headerHits =
+    cleanText.match(/анализ|показател|результат|референ|единиц|наименование|лаборатор|гемотест|инвитро|хеликс|kdl/gi)
+      ?.length ?? 0;
   const numericTokens = cleanText.match(/\d+(?:[.,]\d+)?/g)?.length ?? 0;
   return labs.length < 2 && (headerHits === 0 || numericTokens < 2);
 }
@@ -421,10 +463,16 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
     // Zero is a valid result for urine microscopy and test-strip markers
     // (e.g. "лейкоциты: 0", "белок: отрицательно"). It used to be removed
     // here after the parsers had already recognized it.
-    const isUrineMarker = code.startsWith('URINE_') || code.startsWith('NECHIP_')
-      || code === 'UROBILINOGEN' || code === 'UROBILINOGEN_QR'
-      || code === 'PROTEIN_24H' || code === 'CREATININE_URINE';
-    const explicitZero = lab.value === 0 && /(?:^|\s)0(?:[.,]0*)?\s*[+*]*\s*(?:%|[а-яa-z]+\s*\/\s*[а-яa-z]+|[а-яa-z]+\s*[а-яa-z]+)/i.test(lab.raw || '');
+    const isUrineMarker =
+      code.startsWith('URINE_') ||
+      code.startsWith('NECHIP_') ||
+      code === 'UROBILINOGEN' ||
+      code === 'UROBILINOGEN_QR' ||
+      code === 'PROTEIN_24H' ||
+      code === 'CREATININE_URINE';
+    const explicitZero =
+      lab.value === 0 &&
+      /(?:^|\s)0(?:[.,]0*)?\s*[+*]*\s*(?:%|[а-яa-z]+\s*\/\s*[а-яa-z]+|[а-яa-z]+\s*[а-яa-z]+)/i.test(lab.raw || '');
     if (lab.value === 0 && !isUrineMarker && !explicitZero) continue;
     // Skip false-positive codes from combined-line parsing: section headers
     // concatenated with marker names (e.g. "ОБЩИЙ АНАЛИЗ КРОВИ ГЕМОГЛОБИН")
@@ -466,15 +514,41 @@ function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
 // Fallback unit lookup for codes that are in the biomarker dictionary but
 // not in UCUM_MAP. This keeps markers alive even when OCR loses the unit.
 const INFERRED_UNITS_BY_CODE: Record<string, string> = {
-  'TSH': 'mIU/L', 'E2': 'pmol/L', 'PRL': 'mIU/L', 'LH': 'IU/L', 'FSH': 'IU/L',
-  'IGF-1': 'ng/mL', 'PSA': 'ng/mL', 'HGB': 'g/L', 'HCT': '%', 'WBC': '10^9/L',
-  'RBC': '10^12/L', 'PLT': '10^9/L', 'FERRITIN': 'ng/mL', 'VITD': 'ng/mL',
-  'B12': 'pg/mL', 'FOL': 'ng/mL', 'INS': 'mIU/L', 'HbA1c': '%',
-  'D_DIMER': 'ng/mL', 'FIBRINOGEN': 'g/L', 'TROPONIN': 'ng/mL',
-  'HOMOCYSTEINE': 'mcmol/L', 'CORTISOL': 'nmol/L', 'AMYLASE': 'U/L',
-  'LIPASE': 'U/L', 'C_PEPTIDE': 'ng/mL', 'ACTH': 'pg/mL',
-  'ALDOSTERONE': 'pg/mL', 'PTH': 'pg/mL', 'MPV': 'fL',
-  'TPO_AB': 'IU/mL', 'TG_AB': 'IU/mL', 'APTT': 's', 'PT': 's', 'INR': '',
+  TSH: 'mIU/L',
+  E2: 'pmol/L',
+  PRL: 'mIU/L',
+  LH: 'IU/L',
+  FSH: 'IU/L',
+  'IGF-1': 'ng/mL',
+  PSA: 'ng/mL',
+  HGB: 'g/L',
+  HCT: '%',
+  WBC: '10^9/L',
+  RBC: '10^12/L',
+  PLT: '10^9/L',
+  FERRITIN: 'ng/mL',
+  VITD: 'ng/mL',
+  B12: 'pg/mL',
+  FOL: 'ng/mL',
+  INS: 'mIU/L',
+  HbA1c: '%',
+  D_DIMER: 'ng/mL',
+  FIBRINOGEN: 'g/L',
+  TROPONIN: 'ng/mL',
+  HOMOCYSTEINE: 'mcmol/L',
+  CORTISOL: 'nmol/L',
+  AMYLASE: 'U/L',
+  LIPASE: 'U/L',
+  C_PEPTIDE: 'ng/mL',
+  ACTH: 'pg/mL',
+  ALDOSTERONE: 'pg/mL',
+  PTH: 'pg/mL',
+  MPV: 'fL',
+  TPO_AB: 'IU/mL',
+  TG_AB: 'IU/mL',
+  APTT: 's',
+  PT: 's',
+  INR: '',
 };
 
 function isUsefulRawLine(raw: string | undefined): boolean {
@@ -485,8 +559,9 @@ function isUsefulRawLine(raw: string | undefined): boolean {
 
 function isMobileClient(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+  return (
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 900)
+  );
 }
 
 async function serverOcrScannedPdf(file: File): Promise<string> {
@@ -517,18 +592,17 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
-  const appBase = typeof document !== 'undefined' && document.baseURI
-    ? document.baseURI
-    : '';
+  const appBase = typeof document !== 'undefined' && document.baseURI ? document.baseURI : '';
   const resolveEndpoint = (path: string): string => {
     // In Telegram WebView window.location.origin can belong to Telegram,
     // while document.baseURI still points to the deployed Mini App.
-    try { return appBase ? new URL(path, appBase).toString() : path; } catch { return path; }
+    try {
+      return appBase ? new URL(path, appBase).toString() : path;
+    } catch {
+      return path;
+    }
   };
-  const endpoints = [
-    resolveEndpoint('./api/ocr-scanned-pdf'),
-    resolveEndpoint('./api/ocr-image'),
-  ];
+  const endpoints = [resolveEndpoint('./api/ocr-scanned-pdf'), resolveEndpoint('./api/ocr-image')];
   const errors: string[] = [];
 
   for (const endpoint of endpoints) {
@@ -553,7 +627,9 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
       }
       errors.push(`${endpoint}: ${payload.error || `HTTP ${response.status}`}`);
     } catch (error: any) {
-      errors.push(`${endpoint}: ${error?.name === 'AbortError' ? 'таймаут 35 секунд' : error?.message || String(error)}`);
+      errors.push(
+        `${endpoint}: ${error?.name === 'AbortError' ? 'таймаут 35 секунд' : error?.message || String(error)}`,
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -579,12 +655,22 @@ export async function describeOcrFailure(error?: unknown): Promise<string> {
   const lines: string[] = [];
   try {
     const { isNativeApp } = await import('./app-platform');
-    lines.push(`platform: ${isNativeApp() ? 'native' : 'web'} | online: ${typeof navigator === 'undefined' ? '?' : navigator.onLine ? 'yes' : 'no'}`);
-  } catch { /* ignore */ }
-  try { lines.push(`ua: ${typeof navigator !== 'undefined' ? navigator.userAgent : '?'}`); } catch { /* ignore */ }
+    lines.push(
+      `platform: ${isNativeApp() ? 'native' : 'web'} | online: ${typeof navigator === 'undefined' ? '?' : navigator.onLine ? 'yes' : 'no'}`,
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    lines.push(`ua: ${typeof navigator !== 'undefined' ? navigator.userAgent : '?'}`);
+  } catch {
+    /* ignore */
+  }
   try {
     lines.push(`location: ${typeof location !== 'undefined' ? location.href : '?'}`);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   try {
     const { probeOcrAssets } = await import('../engines/ocr-assets');
     const probes = await probeOcrAssets();
@@ -646,18 +732,20 @@ async function openOcrWorker(
     try {
       const status = m && typeof m.status === 'string' ? m.status : '';
       if (status) {
-        const pct = typeof m.progress === 'number' && Number.isFinite(m.progress)
-          ? ` ${Math.round(m.progress * 100)}%`
-          : '';
+        const pct =
+          typeof m.progress === 'number' && Number.isFinite(m.progress) ? ` ${Math.round(m.progress * 100)}%` : '';
         lastOcrBootStage = `${status}${pct}`;
       }
-    } catch { /* диагностика не должна ломать OCR */ }
+    } catch {
+      /* диагностика не должна ломать OCR */
+    }
     cfg.logger(m);
   };
-  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => Promise.race([
-    p,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`таймаут ${Math.round(ms / 1000)}с`)), ms)),
-  ]);
+  const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`таймаут ${Math.round(ms / 1000)}с`)), ms)),
+    ]);
   for (let i = 0; i < attempts.length; i++) {
     const a = attempts[i];
     let left = deadline - Date.now();
@@ -682,9 +770,8 @@ async function openOcrWorker(
     // Грузим только те модели, которые реально нашлись (если eng нет —
     // обходимся русской). Одиночный русский — быстрый повтор, если
     // двуязычная пачка упала до таймаута.
-    const langs = a.langs.length > 1
-      ? [a.langs.join('+'), a.langs[0]]
-      : a.langs.length === 1 ? [a.langs[0]] : ['rus+eng', 'rus'];
+    const langs =
+      a.langs.length > 1 ? [a.langs.join('+'), a.langs[0]] : a.langs.length === 1 ? [a.langs[0]] : ['rus+eng', 'rus'];
     let mechanismDead = false;
     for (let li = 0; li < langs.length; li++) {
       const leftForLang = deadline - Date.now();
@@ -723,7 +810,10 @@ async function openOcrWorker(
         // Долгий отказ ПОСЛЕ старта движка = медленное устройство/большая
         // модель. Менять механизм бессмысленно: следующая попытка снова
         // начнёт с нуля и снова не успеет.
-        if (took > 20_000 && stage) { mechanismDead = true; break; }
+        if (took > 20_000 && stage) {
+          mechanismDead = true;
+          break;
+        }
         // А если движок не отработал ни одной стадии, сломан именно механизм
         // создания воркера (например, WebView не поднял Blob-воркер) — тогда
         // следующий механизм получает отдельное окно (см. RESCUE_MS выше).
@@ -763,11 +853,13 @@ export async function recognizeImageTextOffline(
   const report = (fraction: number) => {
     try {
       onProgress?.(Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 0)));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   };
   let Tesseract: any;
   try {
-    Tesseract = await import('tesseract.js') as any;
+    Tesseract = (await import('tesseract.js')) as any;
   } catch {
     throw new Error('движок OCR не загрузился (tesseract.js). Пересоберите АПК: npm run build:native.');
   }
@@ -775,10 +867,13 @@ export async function recognizeImageTextOffline(
   // Разрешение — главный фактор точности OCR, а не экономии: для бланков
   // цифры мелкие (1800), для скриншотов еды текст 22-24px и тоже требует
   // нативного масштаба (2400 — типичный телефонный скрин 1080×2340).
-  const imageLimits = purpose === 'labs'
-    ? { maxSide: 1800, maxPixels: 2_600_000 }
-    : { maxSide: 2400, maxPixels: 4_000_000 };
-  try { upload = await prepareImageForServer(file, imageLimits); } catch { /* исходник как есть */ }
+  const imageLimits =
+    purpose === 'labs' ? { maxSide: 1800, maxPixels: 2_600_000 } : { maxSide: 2400, maxPixels: 4_000_000 };
+  try {
+    upload = await prepareImageForServer(file, imageLimits);
+  } catch {
+    /* исходник как есть */
+  }
   // Варианты кадра: предобработка (тёмная тема и т.д.) или сырой вход,
   // если canvas недоступен (jsdom/старый WebView).
   let inputs: Array<{ kind: string; blob: Blob }> = [{ kind: 'raw', blob: upload }];
@@ -786,7 +881,9 @@ export async function recognizeImageTextOffline(
     const { preprocessVariantsForOcr } = await import('../engines/ocr-preprocess');
     const variants = await preprocessVariantsForOcr(upload);
     if (variants.length > 0) inputs = variants.map((v) => ({ kind: v.kind, blob: v.blob }));
-  } catch { /* сырой вход */ }
+  } catch {
+    /* сырой вход */
+  }
   const progressWindow = { base: 0, span: 1 };
   let worker: any;
   try {
@@ -811,7 +908,15 @@ export async function recognizeImageTextOffline(
     throw new Error(`движок OCR не запустился (worker/core/lang): ${lastOcrBootError}`);
   }
   try {
-    const { scoreOcrText, isGoodOcrText, isCompleteOcrText, isNutritionDiaryOcrText, pickBestOcrText, hasMacroLabels, mergeNutritionOcrPasses } = await import('../engines/ocr-preprocess');
+    const {
+      scoreOcrText,
+      isGoodOcrText,
+      isCompleteOcrText,
+      isNutritionDiaryOcrText,
+      pickBestOcrText,
+      hasMacroLabels,
+      mergeNutritionOcrPasses,
+    } = await import('../engines/ocr-preprocess');
     const setPsm = async (mode: '6' | '11') => {
       if (typeof worker.setParameters === 'function') {
         await worker.setParameters({
@@ -881,10 +986,15 @@ export async function recognizeImageTextOffline(
           progressWindow.base = 0.82;
           progressWindow.span = 0.03;
           const psm4Text = String((await worker.recognize(passInputs[0].blob))?.data?.text || '');
-          if (psm4Text.trim() && labOcrCandidateQuality(`${best}\n${psm4Text}`).score > labOcrCandidateQuality(best).score) {
+          if (
+            psm4Text.trim() &&
+            labOcrCandidateQuality(`${best}\n${psm4Text}`).score > labOcrCandidateQuality(best).score
+          ) {
             best = `${best}\n${psm4Text}`;
           }
-        } catch { /* PSM-4 опционален */ }
+        } catch {
+          /* PSM-4 опционален */
+        }
       }
       // Латинские аббревиатуры (ALT, AST, HbA1c, TSH) двуязычная модель
       // `rus+eng` читает корректно — отдельный английский проход не нужен.
@@ -916,10 +1026,15 @@ export async function recognizeImageTextOffline(
     return await Promise.race([
       run,
       new Promise<string>((_, reject) =>
-        setTimeout(() => reject(new Error('превышено время оффлайн-распознавания')), timeoutMs)),
+        setTimeout(() => reject(new Error('превышено время оффлайн-распознавания')), timeoutMs),
+      ),
     ]);
   } finally {
-    try { await worker.terminate(); } catch { /* ignore */ }
+    try {
+      await worker.terminate();
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -951,10 +1066,20 @@ export async function processUploadedFile(
   const fileName = typeof file?.name === 'string' ? file.name : '';
   const isPDF = fileType === 'application/pdf' || /\.pdf$/i.test(fileName);
   const isText = fileType.includes('text') || /\.(txt|csv)$/i.test(fileName);
-  const isImage = fileType.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i.test(fileName) || (!isPDF && !isText && (file as any)?.size > 0);
+  const isImage =
+    fileType.startsWith('image/') ||
+    /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i.test(fileName) ||
+    (!isPDF && !isText && (file as any)?.size > 0);
 
   if (!file) {
-    return { text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл изображения не выбран или недоступен.'] };
+    return {
+      text: '',
+      labs: [],
+      meals: [],
+      source: 'text',
+      confidence: 0,
+      warnings: ['Файл изображения не выбран или недоступен.'],
+    };
   }
   if (/\.(heic|heif)$/i.test(fileName)) {
     warnings.push('Формат HEIC/HEIF может не распознаться на этом устройстве — лучше JPG/PNG или скриншот экрана.');
@@ -987,7 +1112,9 @@ export async function processUploadedFile(
         // parseLabFile can throw when pdfjs worker fails to load. Fall back to
         // direct OCR of the rendered pages so a broken PDF text-layer pipeline
         // does not turn a valid scanned PDF into "nothing recognized".
-        warnings.push(`PDF text-layer extraction failed: ${pdfParseError?.message || String(pdfParseError)}. Пробую OCR страниц.`);
+        warnings.push(
+          `PDF text-layer extraction failed: ${pdfParseError?.message || String(pdfParseError)}. Пробую OCR страниц.`,
+        );
         result = { values: [], rawText: '', source: 'pdf' as const, warnings: [] };
       }
       rawText = result.rawText;
@@ -1019,7 +1146,9 @@ export async function processUploadedFile(
             warnings.push('OCR PDF вернул пустой текст. Возможно, файл защищён или изображение неразборчиво.');
           }
         } catch (ocrError: any) {
-          warnings.push(`OCR PDF недоступен: ${ocrError?.message || 'неизвестная ошибка'}. Проверьте подключение к интернету или попробуйте скриншот.`);
+          warnings.push(
+            `OCR PDF недоступен: ${ocrError?.message || 'неизвестная ошибка'}. Проверьте подключение к интернету или попробуйте скриншот.`,
+          );
         }
       }
       labs = finalizeLabCandidates(parsedAll.labs);
@@ -1052,47 +1181,82 @@ export async function processUploadedFile(
           // модели; на повторных прогонах модели уже в кэше. Лабы гоняют
           // несколько проходов, поэтому им нужен запас больше.
           const offlineBudgetMs = opts?.purpose === 'labs' ? 150_000 : 120_000;
-          const offlineText = await recognizeImageTextOffline(file, offlineBudgetMs, opts?.onProgress, opts?.purpose ?? 'nutrition');
+          const offlineText = await recognizeImageTextOffline(
+            file,
+            offlineBudgetMs,
+            opts?.onProgress,
+            opts?.purpose ?? 'nutrition',
+          );
           if (offlineText.trim().length > 2) {
             warnings.push('Фото распознано оффлайн на устройстве (АПК-режим).');
             serverResult = { text: offlineText };
             rawText = offlineText;
           } else {
-            return { text: '', labs: [], meals: [], source, confidence: 0, warnings: [...warnings, 'Оффлайн-распознавание вернуло пустой текст. Попробуйте более чёткое фото при хорошем освещении или вставьте текст вручную.'] };
+            return {
+              text: '',
+              labs: [],
+              meals: [],
+              source,
+              confidence: 0,
+              warnings: [
+                ...warnings,
+                'Оффлайн-распознавание вернуло пустой текст. Попробуйте более чёткое фото при хорошем освещении или вставьте текст вручную.',
+              ],
+            };
           }
         } catch (offlineError: any) {
-          return { text: '', labs: [], meals: [], source, confidence: 0, warnings: [...warnings, `Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`] };
-        }
-      } else {
-      try {
-        serverResult = await serverOcrImage(file);
-        rawText = serverResult.text;
-        warnings.push('Фото обработано на сервере OCR.');
-      } catch (serverError: any) {
-        warnings.push(`Серверный OCR не завершился: ${serverError?.message || String(serverError)}`);
-        // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
-        // локальный tesseract, дальше общий парсинг rawText как обычно.
-        try {
-          // purpose: дефолт 'nutrition' — скриншоты приложений (FatSecret/
-          // MyFitnessPal). Лабы передают opts.purpose='labs': лабовые
-          // проходы (PSM-4, английский) идут только в этом режиме, а
-          // разреженный проход склеивается с блочным корректным переводом
-          // строки (раньше там был литеральный "\\n" — строки не разделялись
-          // и колонки терялись).
-          const offlineText = await recognizeImageTextOffline(file, 90_000, opts?.onProgress, opts?.purpose ?? 'nutrition');
-          if (offlineText.trim().length <= 2) {
-            return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
-          }
-          warnings.push('Сервер недоступен — фото распознано оффлайн на устройстве.');
-          serverResult = { text: offlineText };
-          rawText = offlineText;
-        } catch (offlineError: any) {
-          warnings.push(`Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`);
           return {
-            text: '', labs: [], meals: [], source, confidence: 0, warnings,
+            text: '',
+            labs: [],
+            meals: [],
+            source,
+            confidence: 0,
+            warnings: [
+              ...warnings,
+              `Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`,
+            ],
           };
         }
-      }
+      } else {
+        try {
+          serverResult = await serverOcrImage(file);
+          rawText = serverResult.text;
+          warnings.push('Фото обработано на сервере OCR.');
+        } catch (serverError: any) {
+          warnings.push(`Серверный OCR не завершился: ${serverError?.message || String(serverError)}`);
+          // АПК/оффлайн: серверные ./api/* в WebView недоступны — пробуем
+          // локальный tesseract, дальше общий парсинг rawText как обычно.
+          try {
+            // purpose: дефолт 'nutrition' — скриншоты приложений (FatSecret/
+            // MyFitnessPal). Лабы передают opts.purpose='labs': лабовые
+            // проходы (PSM-4, английский) идут только в этом режиме, а
+            // разреженный проход склеивается с блочным корректным переводом
+            // строки (раньше там был литеральный "\\n" — строки не разделялись
+            // и колонки терялись).
+            const offlineText = await recognizeImageTextOffline(
+              file,
+              90_000,
+              opts?.onProgress,
+              opts?.purpose ?? 'nutrition',
+            );
+            if (offlineText.trim().length <= 2) {
+              return { text: '', labs: [], meals: [], source, confidence: 0, warnings };
+            }
+            warnings.push('Сервер недоступен — фото распознано оффлайн на устройстве.');
+            serverResult = { text: offlineText };
+            rawText = offlineText;
+          } catch (offlineError: any) {
+            warnings.push(`Оффлайн-распознавание не удалось: ${offlineError?.message || String(offlineError)}`);
+            return {
+              text: '',
+              labs: [],
+              meals: [],
+              source,
+              confidence: 0,
+              warnings,
+            };
+          }
+        }
       }
 
       if (rawText.trim().length > 2) {
@@ -1121,16 +1285,20 @@ export async function processUploadedFile(
           meals = [];
         }
 
-        confidence = (labs.length > 0 || meals.length > 0) ? 0.75 : 0.3;
+        confidence = labs.length > 0 || meals.length > 0 ? 0.75 : 0.3;
         if (labs.length === 0 && meals.length === 0) {
           if (rawText.trim().length > 20) {
-            warnings.push(`Текст распознан (${rawText.trim().length} символов), но показатели не найдены. Возможно, это не бланк анализов.`);
+            warnings.push(
+              `Текст распознан (${rawText.trim().length} символов), но показатели не найдены. Возможно, это не бланк анализов.`,
+            );
           } else {
             warnings.push('Текст распознан, но данных недостаточно. Попробуйте более чёткое фото.');
           }
         }
       } else {
-        warnings.push('Не удалось распознать текст на изображении. Попробуйте более чёткое фото при хорошем освещении.');
+        warnings.push(
+          'Не удалось распознать текст на изображении. Попробуйте более чёткое фото при хорошем освещении.',
+        );
       }
     } catch (err: any) {
       const msg = err?.message || String(err);
@@ -1141,17 +1309,17 @@ export async function processUploadedFile(
     source = 'text';
     try {
       rawText = await readFileAsText(file);
-       const parsedAll = parseLabTextAllWays(rawText, 'text');
-       labs = finalizeLabCandidates(parsedAll.labs);
-       formDate = parsedAll.date;
-       const providerName = parsedAll.provider;
-       warnings.push(...parsedAll.warnings);
+      const parsedAll = parseLabTextAllWays(rawText, 'text');
+      labs = finalizeLabCandidates(parsedAll.labs);
+      formDate = parsedAll.date;
+      const providerName = parsedAll.provider;
+      warnings.push(...parsedAll.warnings);
 
       if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
       meals = parseNutritionText(rawText);
 
-      confidence = (labs.length > 0 || meals.length > 0) ? 0.9 : 0.3;
+      confidence = labs.length > 0 || meals.length > 0 ? 0.9 : 0.3;
     } catch (err: any) {
       warnings.push('Ошибка чтения текстового файла: ' + (err?.message || String(err)));
     }
@@ -1177,7 +1345,8 @@ export async function saveParsedLabs(
   let saved = 0;
   try {
     await db.init();
-    const validFormDate = typeof opts?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(opts.date) ? opts.date : undefined;
+    const validFormDate =
+      typeof opts?.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(opts.date) ? opts.date : undefined;
     const saveDate = validFormDate || formatDate(new Date());
     for (const lab of labs) {
       // Явный референс из бланка — авторитетнее половых норм приложения:
@@ -1200,18 +1369,20 @@ export async function saveParsedLabs(
             low = norm.lln;
             high = norm.uln;
           }
-        } catch { /* нет нормы для кода — оставляем как распознали */ }
+        } catch {
+          /* нет нормы для кода — оставляем как распознали */
+        }
       }
       if (lab.bound && (low !== undefined || high !== undefined)) {
         isAbnormal = boundProvesSide(lab.bound, lab.value, low, high) ? true : undefined;
       } else if (!hasReportReference && (low !== undefined || high !== undefined)) {
-        isAbnormal = (high !== undefined && lab.value > high)
-          || (low !== undefined && lab.value < low);
+        isAbnormal = (high !== undefined && lab.value > high) || (low !== undefined && lab.value < low);
       }
       const point: LabPoint = {
-        id: typeof globalThis.crypto?.randomUUID === 'function'
-          ? globalThis.crypto.randomUUID()
-          : `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id:
+          typeof globalThis.crypto?.randomUUID === 'function'
+            ? globalThis.crypto.randomUUID()
+            : `ocr-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         code: lab.code,
         name: lab.name,
         value: lab.value,
@@ -1241,14 +1412,14 @@ export function saveParsedMeals(meals: ParsedMeal[], onSaved?: () => void): numb
   try {
     const raw = localStorage.getItem('nutrition_diary_v2');
     const diary = raw ? JSON.parse(raw) : {};
-    
+
     for (const meal of meals) {
       const date = meal.date || formatDate(new Date());
       if (!diary[date]) diary[date] = { meals: {} };
-      
+
       const mealKey = meal.mealType || 'Приём пищи';
       if (!diary[date].meals[mealKey]) diary[date].meals[mealKey] = [];
-      
+
       for (const item of meal.items) {
         diary[date].meals[mealKey].push({
           name: item.name,
@@ -1264,7 +1435,7 @@ export function saveParsedMeals(meals: ParsedMeal[], onSaved?: () => void): numb
         saved++;
       }
     }
-    
+
     localStorage.setItem('nutrition_diary_v2', JSON.stringify({ ...diary, __version: 2 }));
     onSaved?.();
   } catch (e) {

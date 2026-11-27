@@ -28,6 +28,20 @@ vi.mock('../../../../../../core/native-bridge', () => ({
   pickPhoto: vi.fn(async () => ({ uri: 'data:image/jpeg;base64,BBBB', format: 'jpeg' })),
 }));
 
+const visionMock = vi.hoisted(() => ({
+  recognizeFoodPhoto: vi.fn(),
+  isFoodVisionAvailable: vi.fn(() => true),
+}));
+
+vi.mock('../../../../../../engines/food-vision.engine', async () => {
+  const actual = await vi.importActual<any>('../../../../../../engines/food-vision.engine');
+  return {
+    ...actual,
+    recognizeFoodPhoto: visionMock.recognizeFoodPhoto,
+    isFoodVisionAvailable: visionMock.isFoodVisionAvailable,
+  };
+});
+
 vi.mock('../../../../../../core/ocr-engine', () => ({
   processUploadedFile: vi.fn(async () => ({
     text: [
@@ -56,6 +70,15 @@ import { processUploadedFile } from '../../../../../../core/ocr-engine';
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
+  visionMock.recognizeFoodPhoto.mockReset();
+  visionMock.isFoodVisionAvailable.mockReturnValue(true);
+  // По умолчанию AI недоступен: тесты без явной настройки проверяют OCR-путь.
+  visionMock.recognizeFoodPhoto.mockResolvedValue({
+    ok: false,
+    meals: [],
+    warnings: [],
+    error: 'AI недоступен',
+  });
 });
 
 function setup() {
@@ -69,7 +92,9 @@ describe('useLabelScan: камера → OCR → своя база', () => {
   it('доводит снимок до распознавателя и сразу сохраняет продукт', async () => {
     const { result, toast, queued } = setup();
 
-    await act(async () => { result.current.handleLabelCamera(); });
+    await act(async () => {
+      result.current.handleLabelCamera();
+    });
 
     await waitFor(() => expect(result.current.labelDraft).not.toBeNull());
 
@@ -87,12 +112,26 @@ describe('useLabelScan: камера → OCR → своя база', () => {
     expect(result.current.labelProgress).toBe(0);
 
     // Значения попали в черновик как «на 100 г».
-    expect(result.current.labelDraft).toMatchObject({ name: 'Сыр Моцарелла', kcal: 280, p: 18, f: 24, c: 2, savedToBase: true });
+    expect(result.current.labelDraft).toMatchObject({
+      name: 'Сыр Моцарелла',
+      kcal: 280,
+      p: 18,
+      f: 24,
+      c: 2,
+      savedToBase: true,
+    });
 
     // И сразу в базу своих продуктов — без нажатия «сохранить».
     const saved = loadCustomFoods();
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ name: 'Сыр Моцарелла', kcal: 280, protein: 18, fat: 24, carbs: 2, source: 'label_photo' });
+    expect(saved[0]).toMatchObject({
+      name: 'Сыр Моцарелла',
+      kcal: 280,
+      protein: 18,
+      fat: 24,
+      carbs: 2,
+      source: 'label_photo',
+    });
     expect(saved[0].labelText).toContain('Белки, г');
     expect(toast).toHaveBeenCalledWith(expect.stringContaining('сохранён в базу'));
     expect(queued).toHaveLength(0);
@@ -100,7 +139,9 @@ describe('useLabelScan: камера → OCR → своя база', () => {
 
   it('в галерею идёт через pickPhoto, а не через камеру', async () => {
     const { result } = setup();
-    await act(async () => { result.current.handleLabelGallery(); });
+    await act(async () => {
+      result.current.handleLabelGallery();
+    });
     await waitFor(() => expect(result.current.labelDraft).not.toBeNull());
     expect(pickPhoto).toHaveBeenCalledTimes(1);
     expect(pickCameraPhoto).not.toHaveBeenCalled();
@@ -108,11 +149,16 @@ describe('useLabelScan: камера → OCR → своя база', () => {
 
   it('на фото без КБЖУ показывает ошибку и не зависает в загрузке', async () => {
     vi.mocked(processUploadedFile).mockResolvedValueOnce({
-      text: 'Состав: молоко, соль', labs: [], meals: [], warnings: ['КБЖУ не найдено'],
+      text: 'Состав: молоко, соль',
+      labs: [],
+      meals: [],
+      warnings: ['КБЖУ не найдено'],
     } as never);
     const { result } = setup();
 
-    await act(async () => { result.current.handleLabelCamera(); });
+    await act(async () => {
+      result.current.handleLabelCamera();
+    });
 
     await waitFor(() => expect(result.current.labelError).not.toBe(''));
     expect(result.current.labelLoading).toBe(false);
@@ -125,7 +171,9 @@ describe('useLabelScan: камера → OCR → своя база', () => {
     vi.mocked(processUploadedFile).mockRejectedValueOnce(new Error('tesseract не стартовал'));
     const { result } = setup();
 
-    await act(async () => { result.current.handleLabelCamera(); });
+    await act(async () => {
+      result.current.handleLabelCamera();
+    });
 
     await waitFor(() => expect(result.current.labelError).not.toBe(''));
     expect(result.current.labelLoading).toBe(false);
@@ -137,11 +185,54 @@ describe('useLabelScan: камера → OCR → своя база', () => {
     vi.mocked(pickCameraPhoto).mockResolvedValueOnce(null);
     const { result } = setup();
 
-    await act(async () => { result.current.handleLabelCamera(); });
+    await act(async () => {
+      result.current.handleLabelCamera();
+    });
 
     await waitFor(() => expect(result.current.labelError).toContain('Камера не открылась'));
     expect(result.current.labelLoading).toBe(false);
     expect(processUploadedFile).not.toHaveBeenCalled();
+  });
+
+  it('OCR не разобрал таблицу → КБЖУ читает AI с упаковки и сохраняет продукт', async () => {
+    vi.mocked(processUploadedFile).mockResolvedValueOnce({
+      text: 'Пищевая ценность на 100 г (блик, часть цифр не видна)',
+      labs: [],
+      meals: [],
+      warnings: ['КБЖУ не найдено'],
+    } as never);
+    visionMock.recognizeFoodPhoto.mockResolvedValueOnce({
+      ok: true,
+      meals: [],
+      warnings: ['КБЖУ прочитаны ИИ с фото упаковки — сверьте цифры с этикеткой перед сохранением.'],
+      label: {
+        productName: 'Творог 5%',
+        brand: 'Простоквашино',
+        per100g: { kcalPer100g: 121, proteinPer100g: 16, fatPer100g: 5, carbsPer100g: 3, fiber: 0, sodiumMg: 40 },
+        confidence: 0.82,
+      },
+    });
+
+    const { result } = setup();
+    await act(async () => {
+      result.current.handleLabelCamera();
+    });
+    await waitFor(() => expect(result.current.labelDraft).not.toBeNull());
+
+    expect(visionMock.recognizeFoodPhoto).toHaveBeenCalledTimes(1);
+    expect(visionMock.recognizeFoodPhoto.mock.calls[0][1]).toMatchObject({ purpose: 'label', highRes: true });
+    expect(result.current.labelDraft).toMatchObject({
+      name: 'Творог 5%',
+      kcal: 121,
+      p: 16,
+      f: 5,
+      c: 3,
+      basis: '100g',
+      savedToBase: true,
+    });
+    const saved = loadCustomFoods();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ name: 'Творог 5%', kcal: 121, protein: 16, source: 'label_photo' });
   });
 });
 

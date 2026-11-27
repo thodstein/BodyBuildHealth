@@ -13,7 +13,7 @@
     "cap:sync": "npx cap sync android",
     "cap:add-android": "npx cap add android",
     "cap:open": "npx cap open android",
-    "vercel-build": "npm run sync-ocr-assets && npm run sync-mediapipe-assets && node --max-old-space-size=8192 ./node_modules/vite/bin/vite.js build",
+    "vercel-build": "npm run sync-ocr-assets && npm run sync-mediapipe-assets && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
     "type-check": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",

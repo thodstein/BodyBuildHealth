@@ -2,6 +2,9 @@ node_modules
 dist
 .git
 .vercel
+# Android-проект (сотни МБ) Vercel для web-сборки не нужен, а CLI-загрузка
+# с ним обрывается.
+android
 *.log
 docs
 _tools
@@ -18,5 +21,6 @@ tmp_scripts
 test_dir
 scripts/*
 !scripts/sync-ocr-assets.mjs
+!scripts/sync-mediapipe-assets.mjs
 supabase
 *.md

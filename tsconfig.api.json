@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["api/food-vision.ts", "api/_vision-core.ts"],
+  "exclude": ["node_modules", "dist"]
+}

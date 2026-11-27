@@ -43,6 +43,9 @@ _*
 # ...но НЕ игнорировать __tests__/ директории с тестами
 !__tests__/
 !**/__tests__/
+# Общий модуль serverless-функции vision: Vercel не роутит api/_*, но правило
+# `_*` выше выкинуло бы его из коммита — файл обязан быть в git.
+!api/_vision-core.ts
 fix-*.cjs
 gen-*.cjs
 gen-*.mjs
@@ -106,3 +109,5 @@ android/app/*.jks
 dist-native/
 web-bundle*.zip
 android/assets/
+
+.vercel

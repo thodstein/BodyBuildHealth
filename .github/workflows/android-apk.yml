@@ -109,6 +109,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
+          # AI-распознавание еды/этикеток. В WebView относительный /api
+          # резолвится в https://localhost, поэтому нужен абсолютный URL.
+          # Секрет необязателен: без него берём продовый эндпоинт.
+          VITE_FOOD_VISION_URL: ${{ secrets.VITE_FOOD_VISION_URL || 'https://body-build-health.vercel.app/api/food-vision' }}
         run: npm run build:native
 
       # OTA-бандл: zip свежего dist/ (корень = index.html) для подтягивания
@@ -227,6 +231,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_CRYPTO_KEY: ${{ secrets.VITE_CRYPTO_KEY }}
+          # AI-распознавание еды/этикеток. В WebView относительный /api
+          # резолвится в https://localhost, поэтому нужен абсолютный URL.
+          # Секрет необязателен: без него берём продовый эндпоинт.
+          VITE_FOOD_VISION_URL: ${{ secrets.VITE_FOOD_VISION_URL || 'https://body-build-health.vercel.app/api/food-vision' }}
         run: npm run build:native
 
       - name: Setup JDK 21

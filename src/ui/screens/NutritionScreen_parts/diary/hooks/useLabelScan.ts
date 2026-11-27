@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { processUploadedFile } from '../../../../../core/ocr-engine';
 import { isCapacitorNative } from '../../../../../core/app-platform';
-import { parseNutritionLabel, labelToCustomFood, type ParsedNutritionLabel } from '../../../../../engines/nutrition-label-parser';
+import {
+  parseNutritionLabel,
+  labelToCustomFood,
+  type ParsedNutritionLabel,
+} from '../../../../../engines/nutrition-label-parser';
+import {
+  isFoodVisionAvailable,
+  mapLabelPayloadToNutritionLabel,
+  recognizeFoodPhoto,
+} from '../../../../../engines/food-vision.engine';
 import { saveOrUpdateCustomFood, type CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 import type { LabelDraftView } from '../LabelNutritionPanel';
 
@@ -21,7 +30,9 @@ function dataUrlToFile(uri: string, format: string): Promise<File> {
     try {
       const { dataUrlToBlob } = await import('../../../../../engines/ocr-preprocess');
       blob = dataUrlToBlob(uri);
-    } catch { /* fallback ниже */ }
+    } catch {
+      /* fallback ниже */
+    }
     if (!blob) blob = await (await fetch(uri)).blob();
     return new File([blob], `label.${format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
   })();
@@ -57,135 +68,183 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
   const [barcodeLoading, setBarcodeLoading] = useState(false);
   const requestRef = useRef(0);
 
-  const persist = useCallback((value: LabelDraftInternal, opts?: { silent?: boolean; keepId?: string | null; rawText?: string }): CustomFoodEntry => {
-    // Текст распознавания передаём явно: после setRawText() в том же тике
-    // state ещё старый, и в labelText попал бы предыдущий снимок.
-    const text = opts?.rawText ?? rawText;
-    const entry = labelToCustomFood({
-      name: value.name.trim() || 'Продукт с упаковки',
-      brand: value.brand,
-      kcal: value.kcal,
-      protein: value.p,
-      fat: value.f,
-      carbs: value.c,
-      fiber: value.fiber,
-      micros: value.micros,
-      servingSize: '100 г',
-      basis: value.basis,
-      confidence: value.confidence,
-      rawText: text,
-      warnings: value.warnings,
-    }, { id: opts?.keepId || undefined, barcode: value.barcode, brand: value.brand });
+  const persist = useCallback(
+    (
+      value: LabelDraftInternal,
+      opts?: { silent?: boolean; keepId?: string | null; rawText?: string },
+    ): CustomFoodEntry => {
+      // Текст распознавания передаём явно: после setRawText() в том же тике
+      // state ещё старый, и в labelText попал бы предыдущий снимок.
+      const text = opts?.rawText ?? rawText;
+      const entry = labelToCustomFood(
+        {
+          name: value.name.trim() || 'Продукт с упаковки',
+          brand: value.brand,
+          kcal: value.kcal,
+          protein: value.p,
+          fat: value.f,
+          carbs: value.c,
+          fiber: value.fiber,
+          micros: value.micros,
+          servingSize: '100 г',
+          basis: value.basis,
+          confidence: value.confidence,
+          rawText: text,
+          warnings: value.warnings,
+        },
+        { id: opts?.keepId || undefined, barcode: value.barcode, brand: value.brand },
+      );
 
-    const saved = saveOrUpdateCustomFood(entry);
-    setSavedId(saved.id);
-    setDraft(prev => prev ? { ...prev, savedToBase: true } : prev);
+      const saved = saveOrUpdateCustomFood(entry);
+      setSavedId(saved.id);
+      setDraft((prev) => (prev ? { ...prev, savedToBase: true } : prev));
 
-    const barcode = (value.barcode || '').replace(/\D/g, '');
-    if (barcode.length >= 8) {
-      // Кладём и в локальный кэш OFF, и в общую базу: сканер штрихкодов
-      // проверяет кэш первым и находит продукт без сети. Fire-and-forget —
-      // отсутствие Supabase/интернета не должно отменять локальное сохранение.
-      void (async () => {
-        try {
-          const off = await import('../../../../../engines/openfoodfacts.engine');
-          const product = {
-            id: barcode,
-            barcode,
-            name: saved.name,
-            brand: saved.brand,
-            category: saved.category,
-            kcal: saved.kcal,
-            protein: saved.protein,
-            fat: saved.fat,
-            carbs: saved.carbs,
-            fiber: saved.fiber,
-            servingSize: saved.servingSize,
-            cachedAt: Date.now(),
-          } as import('../../../../../engines/openfoodfacts.engine').OFFProduct;
-          await off.saveToCache(product);
-          const shared = await import('../../../../../engines/food-barcode-catalog.engine');
-          await shared.saveSharedBarcode(product);
-        } catch { /* оффлайн — локальная запись уже есть */ }
-      })();
-    }
+      const barcode = (value.barcode || '').replace(/\D/g, '');
+      if (barcode.length >= 8) {
+        // Кладём и в локальный кэш OFF, и в общую базу: сканер штрихкодов
+        // проверяет кэш первым и находит продукт без сети. Fire-and-forget —
+        // отсутствие Supabase/интернета не должно отменять локальное сохранение.
+        void (async () => {
+          try {
+            const off = await import('../../../../../engines/openfoodfacts.engine');
+            const product = {
+              id: barcode,
+              barcode,
+              name: saved.name,
+              brand: saved.brand,
+              category: saved.category,
+              kcal: saved.kcal,
+              protein: saved.protein,
+              fat: saved.fat,
+              carbs: saved.carbs,
+              fiber: saved.fiber,
+              servingSize: saved.servingSize,
+              cachedAt: Date.now(),
+            } as import('../../../../../engines/openfoodfacts.engine').OFFProduct;
+            await off.saveToCache(product);
+            const shared = await import('../../../../../engines/food-barcode-catalog.engine');
+            await shared.saveSharedBarcode(product);
+          } catch {
+            /* оффлайн — локальная запись уже есть */
+          }
+        })();
+      }
 
-    if (!opts?.silent) {
-      showToast(`🏷 «${saved.name}» сохранён в базу (на 100 г)`);
-    }
-    return saved;
-  }, [rawText, showToast]);
+      if (!opts?.silent) {
+        showToast(`🏷 «${saved.name}» сохранён в базу (на 100 г)`);
+      }
+      return saved;
+    },
+    [rawText, showToast],
+  );
 
-  const handlePick = useCallback(async (source: 'camera' | 'gallery') => {
-    if (loading) return;
-    const requestId = ++requestRef.current;
-    setLoading(true);
-    setError('');
-    setHint(source === 'camera' ? 'Открываем камеру…' : 'Открываем галерею…');
-    setProgress(0);
-    try {
-      const bridge = await import('../../../../../core/native-bridge');
-      const photo = source === 'camera' ? await bridge.pickCameraPhoto() : await bridge.pickPhoto();
-      if (!photo) {
-        if (requestId === requestRef.current) {
-          setError(source === 'camera'
-            ? 'Камера не открылась или снимок отменён. Разрешите камеру в настройках приложения и попробуйте снова.'
-            : 'Фото не выбрано. Попробуйте ещё раз.');
+  const handlePick = useCallback(
+    async (source: 'camera' | 'gallery') => {
+      if (loading) return;
+      const requestId = ++requestRef.current;
+      setLoading(true);
+      setError('');
+      setHint(source === 'camera' ? 'Открываем камеру…' : 'Открываем галерею…');
+      setProgress(0);
+      try {
+        const bridge = await import('../../../../../core/native-bridge');
+        const photo = source === 'camera' ? await bridge.pickCameraPhoto() : await bridge.pickPhoto();
+        if (!photo) {
+          if (requestId === requestRef.current) {
+            setError(
+              source === 'camera'
+                ? 'Камера не открылась или снимок отменён. Разрешите камеру в настройках приложения и попробуйте снова.'
+                : 'Фото не выбрано. Попробуйте ещё раз.',
+            );
+          }
+          return;
         }
-        return;
+        setHint('Распознаём этикетку…');
+        const file = await dataUrlToFile(photo.uri, photo.format);
+        const native = isCapacitorNative();
+        // Веб: серверный OCR (2 эндпоинта × 35 с) + офлайн-фолбэк (90 с) = до
+        // ~160 с. Прежние 55 с обрывали распознавание на живом сервере, и
+        // пользователь видел «таймаут» вместо готового результата.
+        const timeoutMs = native ? 140_000 : 170_000;
+        const result = await Promise.race([
+          processUploadedFile(file, {
+            purpose: 'nutrition',
+            onProgress: (fraction) => {
+              if (requestId !== requestRef.current) return;
+              setProgress(fraction);
+              const pct = Math.round(fraction * 100);
+              setHint(`Читаем КБЖУ… ${pct}%`);
+            },
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    native
+                      ? 'Распознавание не ответило за 140 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете.'
+                      : 'Распознавание не ответило за 170 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете или сделайте снимок меньшего размера.',
+                  ),
+                ),
+              timeoutMs,
+            ),
+          ),
+        ]);
+        if (requestId !== requestRef.current) return;
+        setRawText(result.text || '');
+        let parsed = parseNutritionLabel(result.text || '');
+        let visionError = '';
+        if (!parsed && isFoodVisionAvailable()) {
+          // OCR не тянет мелкую/бликующую таблицу — читаем тем же vision-слоем,
+          // что и тарелку (purpose='label'), а текст OCR передаём как подсказку.
+          setHint('🏷 OCR не разобрал таблицу — читаем упаковку нейросетью…');
+          const vision = await recognizeFoodPhoto(file, {
+            purpose: 'label',
+            hint: result.text || '',
+            highRes: true,
+          });
+          if (requestId !== requestRef.current) return;
+          if (vision.ok && vision.label) {
+            parsed = mapLabelPayloadToNutritionLabel(vision.label, result.text || '');
+            if (vision.warnings.length) parsed.warnings = [...parsed.warnings, ...vision.warnings];
+          } else {
+            visionError = vision.error || '';
+          }
+        }
+        if (!parsed) {
+          const baseError = result.warnings?.[0]
+            ? `Не удалось найти КБЖУ: ${result.warnings[0]}`
+            : 'На фото не найден блок «Пищевая ценность» с ккал/БЖУ. Сфотографируйте таблицу крупным планом.';
+          setError(visionError ? `${baseError} AI: ${visionError}` : baseError);
+          return;
+        }
+        const nextDraft = buildDraft(parsed);
+        setDraft(nextDraft);
+        setSavedId(null);
+        setHint('');
+        persist(nextDraft, { rawText: result.text || '' });
+      } catch (err) {
+        if (requestId === requestRef.current) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (requestId === requestRef.current) setLoading(false);
       }
-      setHint('Распознаём этикетку…');
-      const file = await dataUrlToFile(photo.uri, photo.format);
-      const native = isCapacitorNative();
-      // Веб: серверный OCR (2 эндпоинта × 35 с) + офлайн-фолбэк (90 с) = до
-      // ~160 с. Прежние 55 с обрывали распознавание на живом сервере, и
-      // пользователь видел «таймаут» вместо готового результата.
-      const timeoutMs = native ? 140_000 : 170_000;
-      const result = await Promise.race([
-        processUploadedFile(file, {
-          purpose: 'nutrition',
-          onProgress: (fraction) => {
-            if (requestId !== requestRef.current) return;
-            setProgress(fraction);
-            const pct = Math.round(fraction * 100);
-            setHint(`Читаем КБЖУ… ${pct}%`);
-          },
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(native
-          ? 'Распознавание не ответило за 140 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете.'
-          : 'Распознавание не ответило за 170 секунд. Сфотографируйте только блок «Пищевая ценность» при хорошем свете или сделайте снимок меньшего размера.')), timeoutMs)),
-      ]);
-      if (requestId !== requestRef.current) return;
-      setRawText(result.text || '');
-      const parsed = parseNutritionLabel(result.text || '');
-      if (!parsed) {
-        setError(result.warnings?.[0]
-          ? `Не удалось найти КБЖУ: ${result.warnings[0]}`
-          : 'На фото не найден блок «Пищевая ценность» с ккал/БЖУ. Сфотографируйте таблицу крупным планом.');
-        return;
-      }
-      const nextDraft = buildDraft(parsed);
-      setDraft(nextDraft);
-      setSavedId(null);
-      setHint('');
-      persist(nextDraft, { rawText: result.text || '' });
-    } catch (err) {
-      if (requestId === requestRef.current) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      if (requestId === requestRef.current) setLoading(false);
-    }
-  }, [loading, persist]);
+    },
+    [loading, persist],
+  );
 
-  const handleFieldChange = useCallback((field: 'name' | 'kcal' | 'p' | 'f' | 'c' | 'fiber' | 'barcode', value: string) => {
-    setDraft(prev => {
-      if (!prev) return prev;
-      if (field === 'name' || field === 'barcode') return { ...prev, [field]: value };
-      const numericValue = Number.parseFloat(value.replace(',', '.'));
-      return { ...prev, [field]: Number.isFinite(numericValue) ? numericValue : 0 };
-    });
-  }, []);
+  const handleFieldChange = useCallback(
+    (field: 'name' | 'kcal' | 'p' | 'f' | 'c' | 'fiber' | 'barcode', value: string) => {
+      setDraft((prev) => {
+        if (!prev) return prev;
+        if (field === 'name' || field === 'barcode') return { ...prev, [field]: value };
+        const numericValue = Number.parseFloat(value.replace(',', '.'));
+        return { ...prev, [field]: Number.isFinite(numericValue) ? numericValue : 0 };
+      });
+    },
+    [],
+  );
 
   const handleSaveToBase = useCallback(() => {
     if (!draft) return;
@@ -207,7 +266,7 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
       const { scanNativeBarcode } = await import('../../../../../core/native-bridge');
       const outcome = await scanNativeBarcode();
       if (outcome.status === 'scanned') {
-        setDraft(prev => prev ? { ...prev, barcode: outcome.code } : prev);
+        setDraft((prev) => (prev ? { ...prev, barcode: outcome.code } : prev));
         showToast('📷 Штрихкод считан — нажмите «Обновить в базе», чтобы привязать его');
       } else if (outcome.status === 'denied') {
         setError('Нет доступа к камере. Разрешите камеру или введите штрихкод цифрами вручную.');
@@ -260,13 +319,22 @@ export function useLabelScan({ showToast, onAddToQueue }: Options) {
     labelDraft: draft,
     labelRawText: rawText,
     labelBarcodeLoading: barcodeLoading,
-    openLabelScan: () => { setOpen(true); setError(''); },
+    openLabelScan: () => {
+      setOpen(true);
+      setError('');
+    },
     closeLabelScan: handleClose,
-    handleLabelCamera: () => { void handlePick('camera'); },
-    handleLabelGallery: () => { void handlePick('gallery'); },
+    handleLabelCamera: () => {
+      void handlePick('camera');
+    },
+    handleLabelGallery: () => {
+      void handlePick('gallery');
+    },
     handleLabelFieldChange: handleFieldChange,
     handleLabelSaveToBase: handleSaveToBase,
     handleLabelAddToDiary: handleAddToDiary,
-    handleLabelBarcodeScan: () => { void handleScanBarcode(); },
+    handleLabelBarcodeScan: () => {
+      void handleScanBarcode();
+    },
   };
 }

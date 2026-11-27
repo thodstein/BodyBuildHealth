@@ -13,6 +13,10 @@
       "maxDuration": 300,
       "memory": 2048,
       "includeFiles": "node_modules/{tesseract.js,tesseract.js-core,@tesseract.js-data,wasm-feature-detect,bmp-js,is-url,node-fetch,regenerator-runtime,zlibjs}/**"
+    },
+    "api/food-vision.ts": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "headers": [

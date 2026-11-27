@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { type OFFProduct, productToFoodItem } from '../../../../../engines/openfoodfacts.engine';
 import { fillMissingMicros, parseNutritionText, quantityToGrams, findFood } from '../../../../../engines/nutrition-ocr-parser';
 import { processUploadedFile } from '../../../../../core/ocr-engine';
+import { isFoodVisionAvailable, recognizeFoodOrLabel } from '../../../../../engines/food-vision.engine';
 import { isCapacitorNative } from '../../../../../core/app-platform';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { type DiaryItem, type FoodItemLike } from '../../types';
@@ -30,6 +31,9 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
   const [ocrFileLoading, setOcrFileLoading] = useState(false);
   /** 0..1 — прогресс распознавания скриншота (как у анализов), не «бегущий» текст. */
   const [ocrProgress, setOcrProgress] = useState(0);
+  // Счётчик запросов распознавания: пока пользователь грузит второе фото,
+  // ответ по первому не должен перетирать очередь (AI-путь идёт до 2 минут).
+  const ocrRequestRef = useRef(0);
   const [showCustomFood, setShowCustomFood] = useState(false);
   const [customFoodName, setCustomFoodName] = useState('');
   const [customFoodKcal, setCustomFoodKcal] = useState('100');
@@ -175,6 +179,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
 
   const handleOcrFileUpload = useCallback(async (file: File) => {
     if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); setOcrFileLoading(false); return; }
+    const requestId = ++ocrRequestRef.current;
     setOcrFileLoading(true); setOcrError(''); setOcrProgress(0); setOcrHint(`⏳ Файл выбран: ${((file as any)?.size ? ((file.size/1024/1024).toFixed(2)+' МБ') : '…')} — загружаем…`);
     if ((file as any)?.size > 15 * 1024 * 1024) {
       setOcrFileLoading(false);
@@ -193,6 +198,7 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
       backup = window.setTimeout(() => reject(new Error(nativeOcr ? 'Превышено время ожидания (120с). Попробуйте фото меньше/чётче.' : 'Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, backupMs);
     });
     hard = window.setTimeout(() => {
+      if (requestId !== ocrRequestRef.current) return;
       setOcrFileLoading(false);
       setOcrError(prev => (prev as any) || (nativeOcr ? 'Зависло на телефоне. Попробуйте фото при хорошем свете или вставьте текст вручную через «Текст».' : 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).'));
     }, hardMs) as any;
@@ -212,6 +218,13 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
     // занимает 10-30с ДО первого процента прогресса. Без этой подсказки
     // экран выглядит как «зависло на загрузке».
     let stageTimer: number | undefined;
+    // PDF/текст AI-зрение не касается: у них свой путь (лабы/парсер текста).
+    // Всё остальное processUploadedFile считает изображением — тем же правилом
+    // пользуемся здесь, чтобы fallback не срабатывал на .txt.
+    const fileNameLower = typeof (file as any)?.name === 'string' ? (file as any).name : '';
+    const isPdfLike = (file as any)?.type === 'application/pdf' || /\.pdf$/i.test(fileNameLower);
+    const isTextLike = String((file as any)?.type || '').includes('text') || /\.(txt|csv)$/i.test(fileNameLower);
+    const isImageFile = !isPdfLike && !isTextLike;
     try {
       stageTimer = window.setTimeout(() => {
         if (!sawProgress) setOcrHint('⏳ Готовим движок OCR (первый запуск дольше обычного)…');
@@ -221,6 +234,13 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error(nativeOcr ? 'Оффлайн-распознавание не ответило за 120 секунд.' : 'Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), raceMs)),
         backupPromise,
       ]);
+      // OCR уже ответил: гонки-таймеры сворачиваем здесь, а не в finally.
+      // Иначе `backupPromise` отклоняется уже после того, как Promise.race
+      // осел (необработанный rejection), а AI-fallback получает чужой бюджет.
+      if (stageTimer) { clearTimeout(stageTimer); stageTimer = undefined; }
+      if (backup) { clearTimeout(backup); backup = undefined; }
+      if (hard) { clearTimeout(hard); hard = undefined; }
+      if (requestId !== ocrRequestRef.current) return;
       setOcrText(result.text || '');
       setOcrProgress(1);
       if (result.meals.length > 0) {
@@ -232,11 +252,52 @@ export function useDiaryQueue({ diaryData, selectedDate, mealType, usdaFoods, sa
         } else {
           setOcrError('Строки распознаны, но пищевые позиции не найдены. Попробуйте более чёткий снимок экрана MyFitnessPal/FatSecret или вставьте текст через «Текст».');
         }
+      } else if (result.meals.length === 0 && result.labs.length === 0 && isImageFile && isFoodVisionAvailable()) {
+        // OCR не нашёл позиций. Два случая: фото тарелки (текста нет) и фото
+        // упаковки (текст есть, но таблица не разобрана). recognizeFoodOrLabel
+        // сам выбирает порядок режимов, а КБЖУ раскладывает по контракту очереди.
+        setOcrProgress(0);
+        setOcrHint(result.text?.trim()
+          ? '🏷 Текст есть, таблица не разобрана — AI читает упаковку…'
+          : '🍽 Текст на фото не найден — AI определяет блюдо и порции…');
+        const vision = await recognizeFoodOrLabel(file, { ocrText: result.text || '' });
+        if (requestId !== ocrRequestRef.current) return;
+        if (vision.ok && vision.meals.length > 0) {
+          const converted = convertOCRItems(vision.meals, usdaFoods);
+          if (converted.length > 0) {
+            setParsedItems(converted);
+            setOcrError('');
+            setOcrHint((vision.mode === 'label'
+              ? `🏷 AI прочитал упаковку: ${converted.length} поз. на 100 г — укажите съеденную граммовку.`
+              : `🍽 AI-распознавание: ${converted.length} поз. Проверьте очередь — вес и состав правятся тапом.`)
+              + (vision.warnings.length ? ` ${vision.warnings[0]}` : ''));
+            return;
+          }
+        }
+        // Причина отказа AI важнее общего warning от OCR: иначе «нет ключа»
+        // или «провайдер перегружен» выглядит как «ничего не нашли».
+        setOcrError(
+          vision.error ||
+            result.warnings?.[0] ||
+            'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.',
+        );
       } else if (result.meals.length === 0 && result.labs.length === 0) {
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
-    } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
-    finally { if (stageTimer) clearTimeout(stageTimer); if (backup) clearTimeout(backup); if (hard) clearTimeout(hard); setOcrFileLoading(false); }
+    } catch (e) {
+      // Ошибка устаревшего запроса не должна появляться поверх нового фото.
+      if (requestId === ocrRequestRef.current) {
+        setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e)));
+      }
+    }
+    finally {
+      if (stageTimer) clearTimeout(stageTimer);
+      if (backup) clearTimeout(backup);
+      if (hard) clearTimeout(hard);
+      // Спиннер гасит только актуальный запрос: устаревший не должен снять
+      // загрузку с нового фото.
+      if (requestId === ocrRequestRef.current) setOcrFileLoading(false);
+    }
    }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => {
